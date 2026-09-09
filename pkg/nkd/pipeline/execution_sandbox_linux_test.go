@@ -20,9 +20,18 @@ func TestExecutionSandboxEnforcesFilesystemAndNetworkPolicy(t *testing.T) {
 	}
 	allowed := t.TempDir()
 	outside := t.TempDir()
+	// Coverage is emitted after the probe returns, while Landlock is still active.
+	// Keep both the runtime output and testing's temporary output inside the same
+	// write root as the probe; do not grant the sandbox access to the build tree.
+	args := []string{"-test.run=^TestExecutionSandboxPayload$"}
+	if testing.CoverMode() != "" {
+		args = append(args, "-test.gocoverdir="+allowed)
+	}
 	for _, mode := range []string{"allowed-write", "outside-write", "network"} {
-		cmd := exec.Command(os.Args[0], "-test.run=^TestExecutionSandboxPayload$")
+		cmd := exec.Command(os.Args[0], args...)
 		cmd.Env = append(os.Environ(),
+			"GOCOVERDIR="+allowed,
+			"TMPDIR="+allowed,
 			"NKD_SANDBOX_STAGE=apply",
 			"NKD_SANDBOX_MODE="+mode,
 			"NKD_SANDBOX_ALLOWED="+allowed,
@@ -53,7 +62,7 @@ func TestExecutionSandboxPayload(t *testing.T) {
 		if err := os.Setenv("NKD_SANDBOX_STAGE", "probe"); err != nil {
 			t.Fatal(err)
 		}
-		if err := SandboxExec([]string{os.Getenv("NKD_SANDBOX_ALLOWED")}, []string{os.Args[0], "-test.run=^TestExecutionSandboxPayload$"}); err != nil {
+		if err := SandboxExec([]string{os.Getenv("NKD_SANDBOX_ALLOWED")}, os.Args); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(125)
 		}

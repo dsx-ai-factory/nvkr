@@ -21,7 +21,7 @@ implementation. Contract tests, recorded external runs, and organizational accep
 | 15 Air gap | Outside current scope; former package, CLI and tests removed | No mirror or zero-egress lifecycle implementation |
 | 16 Release gates | Exact policy, reproduced-member, evidence/waiver, compatibility, conformance, trusted status and clearance contracts | No qualified production publication round trip; variant fallback is removed; incremental reuse remains diagnostic. V1 M3 qualification/M4 manifests are unimplemented |
 | 17 Public lifecycle | Seven objects; compiler-owned output joins, immutable attempts, failed requirements retained; context-first SDK; descriptions cannot restore executable/verification authority | Superseded authoring and diagnostic APIs are removed; no backward-compatibility requirement or general resume protocol |
-| 18 CI/execution | Shared helper launch; hosted GitHub Run generation with static-only PR checks, default-branch manual execution, bounded timeouts and non-canceling concurrency; build-only GitLab Go adapter; separate qualified emitter remains fail-closed where adapters are incomplete. Finalization checks job/restore success, terminal/SBOM/payload closure and production predicate | Current workflows unexercised by a provider. Qualified source emission lacks runtime attestation; Tekton/Argo factory emission and non-GitHub signing fail before output. Provider outage can prevent any Run record |
+| 18 CI/execution | Shared helper launch; hosted GitHub Run generation with static-only PR checks, default-branch manual execution, bounded timeouts and non-canceling concurrency; build-only GitLab Go adapter; separate qualified emitter remains fail-closed where adapters are incomplete. Finalization checks job/restore success, terminal/SBOM/payload closure and production predicate | First GitHub dispatch passed bootstrap/regeneration and uploaded a failed Run; internal NKE source access blocked execution. Successful hosted build/publication remains unexercised. Qualified source emission lacks runtime attestation; Tekton/Argo factory emission and non-GitHub signing fail before output. Provider outage can prevent any Run record |
 | 19 Cluster views | One authored view, exact composition-to-content realization, reusable roles, GPU closure on amd64/arm64 with synthetic producers | No provisioning engine or external cluster-qualification protocol; legacy wire descriptions grant no authority |
 | 20 Publication | Environment-owned routes/tools; derived roots; exact recursive OCI push/pull; binary/APT/Helm consumer binding; unchanged payload identity from Run to Release | Local registry interoperability only. Direct package/object-store publishers and qualified commit adapters unavailable; segment registration is deferred |
 | 21 Generation | Exact Definition/Environment inputs recorded; deterministic manifest-last writes and byte-exact check rejecting unexpected generated files; SDK/CLI share generation owner; current lifecycle regeneration tests | Scheduled bump/release automation, supported-provider transactions and complete same-checkout crash matrix remain |
@@ -56,6 +56,7 @@ The current content/demo cleanup has its own checks recorded under repository va
 
 | Record | What actually ran | Limit |
 |---|---|---|
+| [First GitHub hosted Run, 2026-09-09](../evidence/2026-09-09-github-run.md) | Actual hosted bootstrap, regeneration, helper transport and failed Run finalization | Internal NKE source fetch failed without cross-repository authentication; no hosted build, publication or signing success |
 | [Maintained demo audit, 2026-09-09](../evidence/2026-09-09-demo-audit.md) | Fresh NKE build/publication/recovered CLI, focused CLI demos, provider generation; real AICR render, observation and Helm packaging; old worker-component attempts exposed stale demo scope | Local unqualified and generation evidence; the OS build owns embedded workers, its NKD wrapper is deferred, and positive signed consumption requires a publication that does not yet exist |
 | [Current local lifecycle, 2026-09-08](../evidence/2026-09-08-m1-public-lifecycle-local.md) | Current NKE Definition/Environment, immutable attempt, pinned source build, SBOM, OCI publication/pull-back and recovered CLI execution | LOCAL / UNQUALIFIED; dry-run signing; no authenticated Release consumer or hosted acceptance |
 | [M1 local mechanics, 2026-09-04](../evidence/2026-09-04-m1-local.md) | Pinned NKE CLI build, loopback OCI publication/pull-back, dry-run signing | LOCAL / UNQUALIFIED; `signatureVerified: false`; earlier input model |
@@ -102,10 +103,10 @@ seconds; its exact identities and dry-run limitations are recorded above. The 20
 journey and exercised real AICR rendering/Helm packaging. Attempts to run the old individual worker-component
 demo exposed stale scope: the NKE OS build owns the whole embedded worker payload under the existing milestone
 contract. Those component-build fixtures do not define the v1 delivery path. The NKD OS-image wrapper, current
-hosted workflow execution and live signed Release consumption remain unexercised. Generation checks and
+successful hosted build/publication and live signed Release consumption remain unexercised. Generation checks and
 controlled contract producers do not establish those operational results.
 
 The [GitHub configuration audit](../github-audit.md) replaces stale generated factory payloads with the current
 NKE Run bundle, rejects extra generated files, and limits execution to default-branch manual dispatch. Its
 local completion gate, uncached tests, Linux signing/pipeline/provenance race checks, workflow linters and
-NKE/AICR regeneration checks passed. This remains local validation; no hosted dispatch has run.
+NKE/AICR regeneration checks passed. The subsequent first hosted dispatch passed bootstrap/regeneration and recorded an honest failed Run after internal source access failed; see the dated evidence above.

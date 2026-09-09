@@ -26,8 +26,9 @@ they are not separate authored public objects. The public entry point and genera
 
 ## Operational boundary
 
-Local validation does not prove a hosted run. The current workflow has not exercised GitHub runner source
-access, GHCR publication or real OIDC signing. Protected-environment integration and automatic default-branch
+The [first hosted Run](evidence/2026-09-09-github-run.md) passed bootstrap and regeneration but failed
+fetching the internal NKE source without a cross-repository credential. It uploaded a failed Run record.
+Successful source acquisition, GHCR publication and real OIDC signing remain unexercised. Protected-environment integration and automatic default-branch
 publication remain deferred in ADR-18. No signed publication exists for positive Release-consumer acceptance.
 
 ## Validation
@@ -41,7 +42,5 @@ execution guards. Changed-document relative links and `git diff --check` pass.
 The current NKE plan digest is
 `sha256:04a2fd55836d9bef3d3b34b52d5df6b9fb65a8ff6a6a265089203cc8a500d504`.
 
-GitHub inspection confirmed Actions is enabled, but default branch `main` is still template commit
-`a2e9c71ca5556aa5958410134d5b0703d733b8bc` and GitHub reports no registered workflows. The implementation is on
-`github-baseline`; the latest cleanup is local. A hosted dispatch therefore needs the implementation and
-generated workflow promoted to the default branch first.
+GitHub Actions is enabled. Commit `3c55dcf` promoted the implementation and generated workflow to `main`;
+manual dispatch then exercised the hosted failure path described above.
