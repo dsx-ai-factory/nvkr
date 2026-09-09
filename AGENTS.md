@@ -46,8 +46,8 @@ paths; macOS builds and runs tests and diagnostics.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 
 `docs/sadd.md` explains architecture, `CONTEXT.md` defines vocabulary, and `docs/milestones.md` plus
-`docs/epics-v1-spec.md` govern product acceptance. `docs/README.md` maps active documentation. Historical
-material under `docs/archive/`, the SRD and dated evidence retain their original scope.
+`docs/epics-v1-spec.md` govern product acceptance. `docs/README.md` maps active documentation. Dated evidence
+retains its original scope; superseded requirements and plans are available only in Git history.
 
 ## Working contract
 
@@ -154,7 +154,7 @@ and excluded from logical Recipe identity; attempt metadata may affect its own R
 | Raw `sha256.Sum256` as a structured identity | Use the canonical codec and an existing typed digest family |
 | Log a warning and continue on a validation, pin, or signature problem | Return a coded error; fail closed |
 | Emit a self-hosted runner label or a `git tag` trigger in a generated workflow | Hosted runners only; sign on default-branch push or manual dispatch |
-| Hand-edit `.github/workflows/nkd-factory.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
+| Hand-edit `.github/workflows/nkd-run.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
 | Claim a feature works because a unit test with a fake passes | Record external evidence under `docs/evidence/` and keep the reconciliation row honest |
 | Write repo paths, commands, or code identifiers into a product spec or epic | Specs use product nouns only; implementation detail belongs in ADRs and code |
 | Append an amendment chain for an existing decision | Update its owning ADR section and reconciliation directly; label lane and deferred behavior |
@@ -187,7 +187,7 @@ and excluded from logical Recipe identity; attempt metadata may affect its own R
 ## Key files
 
 Use `docs/README.md` for the documentation map and `scripts/README.md` for runnable demos. `definitions/nke-v1/`
-contains current NKE product inputs. `.github/workflows/nkd-factory.yml` and `.github/nkd-factory/manifest.json`
+contains current NKE product inputs. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
 ## Completion gate

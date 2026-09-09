@@ -35,7 +35,7 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	if plan.DefinitionPath == "" || plan.DeliveryPath == "" {
+	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {
 		return nil, e.New(e.CodeEngineCapability, "GitLab generation requires repository-relative definition and delivery source paths")
 	}
 	if err := gitlabSigningUnsupported(plan); err != nil {
@@ -87,7 +87,7 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 		fmt.Fprintln(&body, "  stage: bootstrap")
 		// The from-source bootstrap needs the Go toolchain. GitLab has no setup-go action and a
 		// bare docker/dind runner has no Go, so run it on the operator's pinned builder image.
-		if img := strings.TrimSpace(plan.Delivery.Runtime.BuilderImage); img != "" {
+		if img := strings.TrimSpace(plan.ExecutionSettings.Runtime.BuilderImage); img != "" {
 			fmt.Fprintf(&body, "  image: %s\n", yamlSingle(img))
 		}
 		fmt.Fprintf(&body, "  tags: [%s]\n", yamlSingle(runner))
@@ -113,7 +113,7 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 		// Node jobs run the transported nkd-exec (a static binary) and orchestrate the pinned
 		// toolchain container via `docker run`, so they run on the operator's pinned runtime
 		// image (a docker-capable base). Empty leaves them on the runner's default image.
-		if img := strings.TrimSpace(plan.Delivery.Runtime.RuntimeImage); img != "" {
+		if img := strings.TrimSpace(plan.ExecutionSettings.Runtime.RuntimeImage); img != "" {
 			fmt.Fprintf(&body, "  image: %s\n", yamlSingle(img))
 		}
 		// ADR-18 §8: for an IR-projected node the helper self-orchestrates its pinned
@@ -131,11 +131,11 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 		// daemon) plus, for a publish node only, its credential reference — merged into ONE
 		// variables block. A build-only delivery has no publish node and no credential.
 		vars := map[string]string{}
-		for k, v := range plan.Delivery.Runtime.Variables {
+		for k, v := range plan.ExecutionSettings.Runtime.Variables {
 			vars[k] = v
 		}
 		if node.Kind == NodePublish {
-			target := plan.Delivery.Targets[node.Target]
+			target := plan.ExecutionSettings.Targets[node.Target]
 			if target.CredentialRef != "" {
 				secret, ok := strings.CutPrefix(target.CredentialRef, "gitlab:")
 				if !ok || !regexpSecret(secret) {
@@ -153,12 +153,12 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 			}
 		}
 		// The helper's `docker run` needs a daemon; attach the operator's pinned dind service(s).
-		if svcs := plan.Delivery.Runtime.Services; len(svcs) > 0 {
+		if svcs := plan.ExecutionSettings.Runtime.Services; len(svcs) > 0 {
 			fmt.Fprintf(&body, "  services: [%s]\n", yamlQuotedList(svcs))
 		}
 		// Operator setup before the helper runs (e.g. `docker login` so the dind daemon can pull
 		// a private, digest-pinned toolchain from the operator registry). Environment config.
-		if setup := plan.Delivery.Runtime.Setup; len(setup) > 0 {
+		if setup := plan.ExecutionSettings.Runtime.Setup; len(setup) > 0 {
 			fmt.Fprintln(&body, "  before_script:")
 			for _, line := range setup {
 				fmt.Fprintf(&body, "    - %s\n", yamlSingle(line))
@@ -217,7 +217,7 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 		runners := sortedKeys(bootstrapJobs)
 		fmt.Fprintln(&body, "nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "  stage: lifecycle")
-		if img := strings.TrimSpace(plan.Delivery.Runtime.BuilderImage); img != "" {
+		if img := strings.TrimSpace(plan.ExecutionSettings.Runtime.BuilderImage); img != "" {
 			fmt.Fprintf(&body, "  image: %s\n", yamlSingle(img))
 		}
 		fmt.Fprintf(&body, "  tags: [%s]\n", yamlSingle(runners[0]))
@@ -233,7 +233,7 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 				shellQuote(providerSuccess), shellQuote(status), shellQuote(carrierPath(artifact.ID)), shellQuote(status), shellQuote(carrierPath(artifact.ID)), shellQuote(artifact.Path), shellQuote(status), shellQuote(status))
 		}
 		fmt.Fprintf(&body, "    - ./nkd-exec run finalize --definition %s --environment %s --plan %s --attempt \"${CI_PIPELINE_ID}-${CI_JOB_ID}\" --workspace .nkd/factory --out .nkd/run.json\n",
-			shellQuote(plan.DefinitionPath), shellQuote(plan.DeliveryPath), shellQuote(GitLabPlanPath))
+			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(GitLabPlanPath))
 		fmt.Fprintln(&body, "  artifacts:")
 		fmt.Fprintln(&body, "    when: always")
 		fmt.Fprintln(&body, "    paths: [.nkd/run.json]")
@@ -254,12 +254,12 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 // unsigned artifacts while its plan claims signing was configured, so this fails
 // closed instead.
 func gitlabSigningUnsupported(plan *Plan) error {
-	if plan.Delivery.Signing == nil {
+	if plan.ExecutionSettings.Signing == nil {
 		return nil
 	}
 	return e.New(e.CodeEngineCapability,
 		"GitLab generation cannot enforce publication signing (delivery signing mode %q); "+
-			"no signing/verification adapter is implemented for this engine", plan.Delivery.Signing.Mode)
+			"no signing/verification adapter is implemented for this engine", plan.ExecutionSettings.Signing.Mode)
 }
 
 func factoryNodeDepths(graph ArtifactGraph) (map[string]int, int, error) {

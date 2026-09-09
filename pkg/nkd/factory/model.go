@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	CompileSpecAPIVersion       = "nkd.dev/factory/v1"
-	CompileSpecKind             = "FactoryDefinition"
-	ExecutionSettingsAPIVersion = "nkd.dev/delivery-profile/v1"
-	ExecutionSettingsKind       = "DeliveryProfile"
-	PlanSchemaVersion           = "nkd.dev/factory-plan/v1"
+	CompileSpecAPIVersion       = "nkd.dev/compile-spec/v1"
+	CompileSpecKind             = "CompileSpec"
+	ExecutionSettingsAPIVersion = "nkd.dev/execution-settings/v1"
+	ExecutionSettingsKind       = "ExecutionSettings"
+	PlanSchemaVersion           = "nkd.dev/run-plan/v1"
 	ArtifactGraphSchema         = "nkd.dev/artifact-graph/v1"
 	MaxDefinitionBytes          = int64(4 << 20)
 	// DefaultRunsOn is the runner an unset definition.runsOn falls back to. ADR-18 §8
@@ -342,15 +342,15 @@ type Plan struct {
 	Name                    string                   `json:"name"`
 	GeneratorVersion        string                   `json:"generatorVersion"`
 	DefinitionPath          string                   `json:"definitionPath,omitempty"`
-	FactoryDefinitionDigest string                   `json:"factoryDefinitionDigest,omitempty"`
+	CompileSpecDigest       string                   `json:"compileSpecDigest,omitempty"`
 	DefinitionDigest        string                   `json:"definitionDigest,omitempty"`
-	DeliveryPath            string                   `json:"deliveryPath,omitempty"`
+	EnvironmentPath         string                   `json:"environmentPath,omitempty"`
 	Qualification           EvidenceTier             `json:"qualification"`
 	CatalogDigest           string                   `json:"catalogDigest"`
 	AppliedOverlays         []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`
-	DeliveryProfileDigest   string                   `json:"deliveryProfileDigest"`
+	ExecutionSettingsDigest string                   `json:"executionSettingsDigest"`
 	EnvironmentDigest       string                   `json:"environmentDigest,omitempty"`
-	Delivery                ExecutionSettings        `json:"delivery"`
+	ExecutionSettings       ExecutionSettings        `json:"executionSettings"`
 	Recipes                 []RecipePlan             `json:"recipes"`
 	Compositions            []CompositionPlan        `json:"compositions,omitempty"`
 	LifecycleOutputs        []LifecycleOutputPlan    `json:"lifecycleOutputs,omitempty"`
@@ -638,16 +638,16 @@ func (profile ExecutionSettings) Digest() (string, error) {
 	if err := profile.Validate(); err != nil {
 		return "", err
 	}
-	return canonical.Digest(canonical.KindDeliveryProfile, profile)
+	return canonical.Digest(canonical.KindExecutionSettings, profile)
 }
 
-// Digest identifies the exact validated authored factory intent independently of
-// catalog location, delivery selection, generator version, or its resolved plan.
+// Digest identifies the exact validated compiler input independently of catalog
+// location, environment selection, generator version, or its resolved run plan.
 func (definition CompileSpec) Digest() (string, error) {
 	if err := definition.Validate(); err != nil {
 		return "", err
 	}
-	return canonical.Digest(canonical.KindFactoryDefinition, definition)
+	return canonical.Digest(canonical.KindCompileSpec, definition)
 }
 
 func (graph ArtifactGraph) Digest() (string, error) {
@@ -661,7 +661,7 @@ func (plan Plan) Digest() (string, error) {
 	if err := plan.Validate(); err != nil {
 		return "", err
 	}
-	return canonical.Digest(canonical.KindFactoryPlan, plan)
+	return canonical.Digest(canonical.KindRunPlan, plan)
 }
 
 // IdentityDigest returns the digest that names WHAT this plan builds, as opposed to the

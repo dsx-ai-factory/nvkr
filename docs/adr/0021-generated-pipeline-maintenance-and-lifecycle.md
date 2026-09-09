@@ -47,7 +47,9 @@ change. Generated files are not editable scaffolds.
 `run generate --check` re-emits in memory using the recorded Definition/Environment selection and compares
 against committed files. A mismatch fails closed with a distinct coded error (`pipeline-drift`, ADR-03) naming
 missing, extra or divergent owned files. Execution admission verifies the commit manifest before consuming its
-graph. The frozen qualified `bundle --check` adapter applies its own manifest and authority rules.
+graph. The dedicated generated Run directory must contain only expected payloads, its manifest and the
+persistent lock inode; unexpected files or directories and symlinks fail the check. Handwritten workflows
+outside that directory remain operator-owned. The frozen qualified `bundle --check` adapter applies its own manifest and authority rules.
 
 The deferred qualified `bundle --meta-lint` protocol emits a separate generated gate that checks the build
 bundle. Its checker stays outside the object it authenticates, avoiding recursive identity. This is distinct

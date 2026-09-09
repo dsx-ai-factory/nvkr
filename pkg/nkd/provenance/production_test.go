@@ -42,9 +42,9 @@ func testProductionInputs() ProductionInputs {
 	return ProductionInputs{
 		BuildType:               BuildTypeWrappedBuild,
 		PlanDigest:              testPlanDigest,
-		FactoryReference:        "nke-v1@0.1.0",
-		FactoryDefinitionDigest: testDefinitionDigest,
-		DeliveryProfileDigest:   testProfileDigest,
+		RunPlanReference:        "nke-v1@0.1.0",
+		CompileSpecDigest:       testDefinitionDigest,
+		ExecutionSettingsDigest: testProfileDigest,
 		CatalogDigest:           testCatalogDigest,
 		GeneratorVersion:        "nkdctl/0.1.0",
 		SigningMode:             SigningModeDryRun,
@@ -67,7 +67,7 @@ func testLocalRunContext(t *testing.T) RunContext {
 
 // The exact canonical predicate bytes are what a signer hashes and what cosign
 // attest consumes, so they are pinned here byte for byte.
-const goldenProductionPredicate = `{"buildDefinition":{"buildType":"https://nkd.dev/buildtypes/wrapped-build/v1","externalParameters":{"catalogDigest":"sha256:4444444444444444444444444444444444444444444444444444444444444444","deliveryProfileDigest":"sha256:3333333333333333333333333333333333333333333333333333333333333333","factoryDefinitionDigest":"sha256:2222222222222222222222222222222222222222222222222222222222222222","factoryReference":"nke-v1@0.1.0","planDigest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"},"internalParameters":{"generatorVersion":"nkdctl/0.1.0","signingMode":"dry-run"},"resolvedDependencies":[{"uri":"docker.io/library/golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6"},{"digest":{"gitCommit":"ed9fb09b04fd40bf331d25df2222206ffaca593e","gitTree":"309887e8cdb8ee24a39785b864390eda3afce5ec"},"uri":"https://github.com/NVIDIA/nke@ed9fb09b04fd40bf331d25df2222206ffaca593e"},{"digest":{"sha256":"1111111111111111111111111111111111111111111111111111111111111111"},"uri":"nkd:factory-plan"}]},"runDetails":{"builder":{"id":"https://nkd.dev/builders/local-factory-run/v1"},"metadata":{"finishedOn":"2026-09-04T17:06:35Z","invocationId":"sha256:1111111111111111111111111111111111111111111111111111111111111111/2026-09-04T17:05:03Z","startedOn":"2026-09-04T17:05:03Z"}}}`
+const goldenProductionPredicate = `{"buildDefinition":{"buildType":"https://nkd.dev/buildtypes/wrapped-build/v1","externalParameters":{"catalogDigest":"sha256:4444444444444444444444444444444444444444444444444444444444444444","compileSpecDigest":"sha256:2222222222222222222222222222222222222222222222222222222222222222","executionSettingsDigest":"sha256:3333333333333333333333333333333333333333333333333333333333333333","planDigest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","runPlanReference":"nke-v1@0.1.0"},"internalParameters":{"generatorVersion":"nkdctl/0.1.0","signingMode":"dry-run"},"resolvedDependencies":[{"uri":"docker.io/library/golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6"},{"digest":{"gitCommit":"ed9fb09b04fd40bf331d25df2222206ffaca593e","gitTree":"309887e8cdb8ee24a39785b864390eda3afce5ec"},"uri":"https://github.com/NVIDIA/nke@ed9fb09b04fd40bf331d25df2222206ffaca593e"},{"digest":{"sha256":"1111111111111111111111111111111111111111111111111111111111111111"},"uri":"nkd:run-plan"}]},"runDetails":{"builder":{"id":"https://nkd.dev/builders/local-factory-run/v1"},"metadata":{"finishedOn":"2026-09-04T17:06:35Z","invocationId":"sha256:1111111111111111111111111111111111111111111111111111111111111111/2026-09-04T17:05:03Z","startedOn":"2026-09-04T17:05:03Z"}}}`
 
 func TestProductionPredicateGolden(t *testing.T) {
 	predicate := ProductionPredicate(testLocalRunContext(t), testProductionInputs())
@@ -164,7 +164,7 @@ func TestProductionPredicateRejectsUnpinnedInputs(t *testing.T) {
 	requireCode(t, ValidateProduction(ProductionPredicate(testLocalRunContext(t), inputs)), nkderr.CodeUnverifiedRef)
 
 	inputs = testProductionInputs()
-	inputs.FactoryReference = ""
+	inputs.RunPlanReference = ""
 	requireCode(t, ValidateProduction(ProductionPredicate(testLocalRunContext(t), inputs)), nkderr.CodeProvenanceMissing)
 
 	inputs = testProductionInputs()

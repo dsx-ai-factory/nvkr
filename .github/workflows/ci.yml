@@ -1,8 +1,5 @@
-# Lightweight CI for the nkdctl POC: one job that runs the same `make` gate a
-# developer runs locally (fmt-check → vet → Go/shell lint → test → build). Kept small on
-# purpose (CLAUDE.md: no heavy CI gate). Source production needs a measured runtime
-# and is not claimed by this job. The stock verifier is measure-only; provider source
-# emission remains fail-closed until that provider supplies a stage-two attestation.
+# Repository checks: the same formatting, analysis, test and build gates used locally.
+# Product execution and publication belong to the generated Run workflow.
 name: ci
 
 on:

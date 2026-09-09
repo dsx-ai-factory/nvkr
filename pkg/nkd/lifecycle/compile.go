@@ -83,7 +83,7 @@ func Compile(ctx context.Context, definitionPath string, definition Definition,
 		plan.LifecycleClusters = append(plan.LifecycleClusters, bound)
 	}
 	plan.DefinitionPath = filepath.ToSlash(filepath.Clean(definitionPath))
-	plan.DeliveryPath = filepath.ToSlash(filepath.Clean(environmentPath))
+	plan.EnvironmentPath = filepath.ToSlash(filepath.Clean(environmentPath))
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}

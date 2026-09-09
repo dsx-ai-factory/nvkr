@@ -45,7 +45,7 @@ type signerFor func(ctx context.Context, plan *Plan, node Node, artifacts map[st
 // (the same convention executePublish uses), and handed to the adapter as data;
 // the adapter never reads the ambient environment for a secret.
 func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map[string]Artifact) (sign.OCISigner, error) {
-	signing := plan.Delivery.Signing
+	signing := plan.ExecutionSettings.Signing
 	if signing == nil {
 		return nil, e.New(e.CodeTrustPolicyMissing, "factory node %q has no delivery signing profile", node.ID)
 	}
@@ -78,7 +78,7 @@ func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map
 // process's environment. A target that declares a credentialRef and finds no
 // credential fails closed rather than silently attempting anonymous access.
 func registryCredential(plan *Plan, node Node) (sign.Credential, error) {
-	target := plan.Delivery.Targets[node.Target]
+	target := plan.ExecutionSettings.Targets[node.Target]
 	if target.CredentialRef == "" {
 		return sign.Credential{}, nil
 	}
@@ -113,7 +113,7 @@ func toolExecutableDigest(plan *Plan, name string) string {
 func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact,
 	newSigner signerFor, stdout io.Writer) error {
 	startedOn := time.Now().UTC()
-	signing := plan.Delivery.Signing
+	signing := plan.ExecutionSettings.Signing
 	if signing == nil {
 		return e.New(e.CodeTrustPolicyMissing, "factory sign node %q has no delivery signing profile", node.ID)
 	}
@@ -189,7 +189,7 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 
 func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact,
 	newSigner signerFor, stdout io.Writer) error {
-	signing := plan.Delivery.Signing
+	signing := plan.ExecutionSettings.Signing
 	if signing == nil {
 		return e.New(e.CodeTrustPolicyMissing, "factory verification node %q has no delivery signing profile", node.ID)
 	}
@@ -223,7 +223,7 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 			"factory verification node %q: signing record dryRun=%t contradicts delivery signing mode %q",
 			node.ID, signed.DryRun, signing.Mode)
 	}
-	target := plan.Delivery.Targets[node.Target]
+	target := plan.ExecutionSettings.Targets[node.Target]
 	served, err := delivery.ResolveDigest(ctx, subject.Ref, delivery.RegistryOptions{
 		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,
 		Username: registryUsername(target), Password: registryPassword(target),
@@ -305,10 +305,10 @@ func ProductionPredicate(plan *Plan, run provenance.RunContext) ([]byte, error) 
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	if plan.Delivery.Signing == nil {
+	if plan.ExecutionSettings.Signing == nil {
 		return nil, e.New(e.CodeTrustPolicyMissing, "production predicate requires an admitted signing profile")
 	}
-	return productionPredicateForRun(plan, plan.Delivery.Signing, run)
+	return productionPredicateForRun(plan, plan.ExecutionSettings.Signing, run)
 }
 
 // productionPredicateForRun renders the owning production predicate from one
@@ -320,16 +320,16 @@ func productionPredicateForRun(plan *Plan, signing *SigningProfile, run provenan
 	if err != nil {
 		return nil, err
 	}
-	if plan.FactoryDefinitionDigest == "" {
+	if plan.CompileSpecDigest == "" {
 		return nil, e.New(e.CodeProvenanceMissing,
-			"factory plan carries no definition digest to attest; recompile it with signing configured")
+			"run plan carries no compile-spec digest to attest; recompile it with signing configured")
 	}
 	return provenance.MarshalProduction(provenance.ProductionPredicate(run, provenance.ProductionInputs{
 		BuildType:               productionBuildType(plan),
 		PlanDigest:              planDigest,
-		FactoryReference:        plan.Name,
-		FactoryDefinitionDigest: plan.FactoryDefinitionDigest,
-		DeliveryProfileDigest:   plan.DeliveryProfileDigest,
+		RunPlanReference:        plan.Name,
+		CompileSpecDigest:       plan.CompileSpecDigest,
+		ExecutionSettingsDigest: plan.ExecutionSettingsDigest,
 		CatalogDigest:           plan.CatalogDigest,
 		GeneratorVersion:        plan.GeneratorVersion,
 		SigningMode:             signing.Mode,

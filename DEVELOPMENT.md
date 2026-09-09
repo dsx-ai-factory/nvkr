@@ -53,7 +53,7 @@ configuration belong to Environment. Legacy factory wire fixtures are test input
 - `definitions/`: maintained NKE CLI and AICR Definitions, Environments, and their catalogs.
 - `testdata/examples/`: multi-output, worker, cluster, and catalog contract fixtures.
 - `pkg/nkd/factory/`: internal compiler/executor shared by lifecycle adapters; current Runs are its callers.
-- `.github/nkd-factory/`: generated NKE bundle; regenerate from its Definition and Environment.
+- `.github/nkd-run/`: generated NKE bundle; regenerate from its Definition and Environment.
 - `toolchains/`: development adapter toolchains and helper pins; maintained demos use their declared utility image.
 
 The [cleanup record](docs/repository-cleanup.md) explains current package responsibilities and removed material.

@@ -14,7 +14,8 @@ workflows and their contracts are removed when they do not serve the current pro
 | Worker, multi-output, layered and operator examples | Moved to `testdata/examples/`; no longer advertised as product build instructions |
 | AICR dependency on the worker catalog | Removed; its catalog contains only the pinned AICR profile and an empty source lock |
 | Checked-in GitLab pipeline and bundle | Removed, including the root entrypoint, demo, and Environment files; Go adapter contracts retained |
-| Bootstrap instructions and HTML/DOCX requirement exports | Removed as superseded duplicates; historical Markdown and dated evidence retain traceability |
+| Bootstrap instructions and HTML/DOCX requirement exports | Removed as superseded duplicates; Git history and dated evidence retain traceability |
+| Historical plans, design drafts and SRD | Removed after review against current ADRs and milestone requirements; history retains the originals |
 | Unreferenced musl cross-build and QEMU smoke-test Dockerfiles | Removed; they belonged to the retired individual-worker/image demonstration |
 | Worker-specific Go/CGO/rootfs contexts and image lock | Removed together with the old toolchain builder and disabled image/package commands |
 | Unwired `pipeline/portable.go` prototype | Removed with its renderer-only test; the real helper-launch contract test is retained |

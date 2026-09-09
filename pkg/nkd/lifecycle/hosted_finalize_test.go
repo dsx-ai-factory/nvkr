@@ -310,7 +310,7 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 	if err := canonical.UnmarshalExact(bytes.TrimSuffix(predicate, []byte{'\n'}), &forged); err != nil {
 		t.Fatal(err)
 	}
-	forged.BuildDefinition.ExternalParameters["factoryReference"] = "unrelated-definition"
+	forged.BuildDefinition.ExternalParameters["runPlanReference"] = "unrelated-definition"
 	forgedRaw, err := provenance.MarshalProduction(forged)
 	if err != nil {
 		t.Fatal(err)

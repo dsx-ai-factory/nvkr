@@ -40,7 +40,7 @@ func LoadPlanContext(ctx context.Context, path string) (*Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "factory plan load requires a context")
 	}
-	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "factory-plan", MaxBytes: MaxDefinitionBytes})
+	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "run-plan", MaxBytes: MaxDefinitionBytes})
 	if err != nil {
 		return nil, classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "opening factory plan"))
 	}
@@ -565,7 +565,7 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	if len(node.Inputs) != 1 || len(node.Outputs) != 1 {
 		return e.New(e.CodePipelineDrift, "publish node %q is not unary", node.ID)
 	}
-	target := plan.Delivery.Targets[node.Target]
+	target := plan.ExecutionSettings.Targets[node.Target]
 	if target.Kind != TargetOCI {
 		return e.New(e.CodeEngineCapability, "factory publication target kind %q has no remote adapter", target.Kind)
 	}

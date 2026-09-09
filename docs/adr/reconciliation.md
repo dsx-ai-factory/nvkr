@@ -21,10 +21,10 @@ implementation. Contract tests, recorded external runs, and organizational accep
 | 15 Air gap | Outside current scope; former package, CLI and tests removed | No mirror or zero-egress lifecycle implementation |
 | 16 Release gates | Exact policy, reproduced-member, evidence/waiver, compatibility, conformance, trusted status and clearance contracts | No qualified production publication round trip; variant fallback is removed; incremental reuse remains diagnostic. V1 M3 qualification/M4 manifests are unimplemented |
 | 17 Public lifecycle | Seven objects; compiler-owned output joins, immutable attempts, failed requirements retained; context-first SDK; descriptions cannot restore executable/verification authority | Superseded authoring and diagnostic APIs are removed; no backward-compatibility requirement or general resume protocol |
-| 18 CI/execution | Shared helper launch; hosted GitHub and build-only GitLab factory generation; separate qualified emitter remains fail-closed where adapters are incomplete. Finalization checks job/restore success, terminal/SBOM/payload closure and production predicate | Current workflows unexercised by a provider. Qualified source emission lacks runtime attestation; Tekton/Argo factory emission and non-GitHub signing fail before output. Provider outage can prevent any Run record |
+| 18 CI/execution | Shared helper launch; hosted GitHub Run generation with static-only PR checks, default-branch manual execution, bounded timeouts and non-canceling concurrency; build-only GitLab Go adapter; separate qualified emitter remains fail-closed where adapters are incomplete. Finalization checks job/restore success, terminal/SBOM/payload closure and production predicate | Current workflows unexercised by a provider. Qualified source emission lacks runtime attestation; Tekton/Argo factory emission and non-GitHub signing fail before output. Provider outage can prevent any Run record |
 | 19 Cluster views | One authored view, exact composition-to-content realization, reusable roles, GPU closure on amd64/arm64 with synthetic producers | No provisioning engine or external cluster-qualification protocol; legacy wire descriptions grant no authority |
 | 20 Publication | Environment-owned routes/tools; derived roots; exact recursive OCI push/pull; binary/APT/Helm consumer binding; unchanged payload identity from Run to Release | Local registry interoperability only. Direct package/object-store publishers and qualified commit adapters unavailable; segment registration is deferred |
-| 21 Generation | Exact Definition/Environment inputs recorded; deterministic manifest-last writes and byte-exact check; SDK/CLI share generation owner; current lifecycle regeneration tests | Scheduled bump/release automation, supported-provider transactions and complete same-checkout crash matrix remain |
+| 21 Generation | Exact Definition/Environment inputs recorded; deterministic manifest-last writes and byte-exact check rejecting unexpected generated files; SDK/CLI share generation owner; current lifecycle regeneration tests | Scheduled bump/release automation, supported-provider transactions and complete same-checkout crash matrix remain |
 | 22 Catalog pins | Strict registry/lock, per-module `tagPrefix`, complete source/artifact keys, bounded no-follow reads, cancel/CAS-safe pin writes, chained whole-producer overlays | `pinSet`, `pinnedBy`, extractor/re-derivation, `derivedFrom` and `curatedBy` are unimplemented |
 
 The common positive consumer scope is `pipeline-attested` / `artifact-publication`. It establishes exact
@@ -59,7 +59,6 @@ The current content/demo cleanup has its own checks recorded under repository va
 | [Maintained demo audit, 2026-09-09](../evidence/2026-09-09-demo-audit.md) | Fresh NKE build/publication/recovered CLI, focused CLI demos, provider generation; real AICR render, observation and Helm packaging; old worker-component attempts exposed stale demo scope | Local unqualified and generation evidence; the OS build owns embedded workers, its NKD wrapper is deferred, and positive signed consumption requires a publication that does not yet exist |
 | [Current local lifecycle, 2026-09-08](../evidence/2026-09-08-m1-public-lifecycle-local.md) | Current NKE Definition/Environment, immutable attempt, pinned source build, SBOM, OCI publication/pull-back and recovered CLI execution | LOCAL / UNQUALIFIED; dry-run signing; no authenticated Release consumer or hosted acceptance |
 | [M1 local mechanics, 2026-09-04](../evidence/2026-09-04-m1-local.md) | Pinned NKE CLI build, loopback OCI publication/pull-back, dry-run signing | LOCAL / UNQUALIFIED; `signatureVerified: false`; earlier input model |
-| GitLab pipeline 64812267, commit `f0c6890`, 2026-08-26, recorded in [historical audit](../archive/milestone-audit-and-plan.md) | 23 green build/package jobs | Earlier build-only workflow; not the current generated bundle, GitHub or keyless signing |
 
 Dated evidence retains its original commands and identities. The current M1 demo has its own recorded run;
 historical success is never transferred by renaming inputs or inferred for other demos and providers.
@@ -84,7 +83,7 @@ ShellCheck and `git diff --check`. Linux/arm64 sign/pipeline race tests also pas
 init and network disabled. An initial restricted-sandbox `make check` could not bind three local test listeners.
 The final complete `make check` passed with listener access and the compatible linter (63.3% total coverage).
 
-The committed NKE lifecycle generation check passes with manifest identity
+The earlier NKE lifecycle generation check passed with manifest identity
 `sha256:1b999d9b9dfe2c7a2688c4a82aafe3b20267cb6f9d13d74a554d0c9fee5192e3`. Both GPU architectures and both hosted
 providers passed generation and byte-exact checks. NKE/GPU planning, the supported resolution matrix and its
 unsupported-architecture negative, isolated pin-change/drift/malformed-lock demonstrations, and six tamper cases
@@ -93,9 +92,8 @@ M1/consumer help and usage rejection also passed. Identity-rejection contracts r
 modules; the demo does not infer a specific rejection reason from cosign's generic subprocess-failure code.
 
 Documentation checks preserve all 29 SADD template anchors and six diagrams, resolve local links in active
-guides and archived Markdown, and leave 22 primary ADRs without retired amendment references in active content.
-Seventeen historical documents retain their original scope in the archive. Superseded migration fixtures are
-removed; maintained Definitions and retained demo journeys use current lifecycle or focused catalog/identity
+guides, and leave 22 primary ADRs without retired amendment references in active content.
+Superseded plans, requirement exports and migration fixtures are removed; maintained Definitions and retained demo journeys use current lifecycle or focused catalog/identity
 contracts. The [repository cleanup](../repository-cleanup.md) separates reference catalogs and test fixtures,
 removes checked-in GitLab CI material, and records every domain package’s disposition.
 
@@ -106,3 +104,8 @@ demo exposed stale scope: the NKE OS build owns the whole embedded worker payloa
 contract. Those component-build fixtures do not define the v1 delivery path. The NKD OS-image wrapper, current
 hosted workflow execution and live signed Release consumption remain unexercised. Generation checks and
 controlled contract producers do not establish those operational results.
+
+The [GitHub configuration audit](../github-audit.md) replaces stale generated factory payloads with the current
+NKE Run bundle, rejects extra generated files, and limits execution to default-branch manual dispatch. Its
+local completion gate, uncached tests, Linux signing/pipeline/provenance race checks, workflow linters and
+NKE/AICR regeneration checks passed. This remains local validation; no hosted dispatch has run.

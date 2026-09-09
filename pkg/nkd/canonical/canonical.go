@@ -79,9 +79,9 @@ const (
 	KindCatalogSnapshot         = "nkd.catalog-snapshot/v1"      // one fully resolved catalog state
 	KindCatalogOverlay          = "nkd.catalog-overlay/v1"       // one ordered component-level catalog overlay
 	KindArtifactGraph           = "nkd.artifact-graph/v1"        // typed build/package/delivery dataflow
-	KindDeliveryProfile         = "nkd.delivery-profile/v1"      // operator-owned publication routing
-	KindFactoryDefinition       = "nkd.factory-definition/v1"    // authored multi-recipe factory intent
-	KindFactoryPlan             = "nkd.factory-plan/v1"          // static AI-factory pipeline plan
+	KindExecutionSettings       = "nkd.execution-settings/v1"    // lowered environment execution and publication settings
+	KindCompileSpec             = "nkd.compile-spec/v1"          // compiler-owned handoff derived from Definition
+	KindRunPlan                 = "nkd.run-plan/v1"              // static lowered execution plan
 	KindFactoryObservation      = "nkd.factory-observation/v1"   // unqualified terminal byte observation
 	KindDefinition              = "nkd.definition"               // simplified authored product definition (ADR-17 §6)
 	KindEnvironment             = "nkd.environment"              // independently selected execution/delivery settings (ADR-20 §6)
@@ -112,7 +112,7 @@ var registeredKinds = [...]string{
 	KindReleaseSet, KindClearance, KindStatus, KindStatusCheckpoint, KindTrustedTime, KindPublication, KindPublicationManifest, KindPublicationRoot, KindBinaryBundle, KindAPTRepository, KindClusterDefinition, KindClusterComposition,
 	KindDiskManifest, KindStagingManifest,
 	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput, KindAICRBundle,
-	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindDeliveryProfile, KindFactoryDefinition, KindFactoryPlan, KindFactoryObservation,
+	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindExecutionSettings, KindCompileSpec, KindRunPlan, KindFactoryObservation,
 	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindClusterRealization, KindLifecycleBinding,
 	KindQualifiedReport, KindTerminalVerification, KindTerminalTree,
 	KindStatusCheckpointPolicy, KindQualifiedObservation, KindQualifiedPublication,

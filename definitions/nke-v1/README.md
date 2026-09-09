@@ -59,3 +59,9 @@ nkdctl run generate \
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
 The pinned NKE source remains `cli/v0.1.0-rc.2`, commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`, tree `309887e8cdb8ee24a39785b864390eda3afce5ec`. Repin only through `nkdctl catalog pin`; never hand-edit the lock.
+
+The committed generated workflow is `.github/workflows/nkd-run.yml`, with exact inputs under
+`.github/nkd-run/`. Pull requests check regeneration only. To execute, dispatch the workflow on the default
+branch. The GitHub Environment targets `ghcr.io/njhensley/nke-recipes/nkectl` and deliberately keeps signing
+in dry-run mode; registry access and NKE source access must be available to the hosted runner. This is not a
+production signing workflow until the deferred protected-environment and real-signing acceptance are complete.

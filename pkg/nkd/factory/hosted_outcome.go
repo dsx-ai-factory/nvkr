@@ -167,7 +167,7 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			return e.New(e.CodeProvenanceMissing, "hosted Run omits terminal observation for recipe %q", recipe.Name)
 		}
 	}
-	for _, route := range plan.Delivery.Routes {
+	for _, route := range plan.ExecutionSettings.Routes {
 		publicationPath, err := local(artifacts["publication/"+route.Name].Path)
 		if err != nil {
 			return err
@@ -176,7 +176,7 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 		if err != nil {
 			return e.Wrap(e.CodeProvenanceMissing, err, "reading hosted publication subject")
 		}
-		if plan.Delivery.Signing == nil {
+		if plan.ExecutionSettings.Signing == nil {
 			continue
 		}
 		signingPath, err := local(artifacts["signature/"+route.Name].Path)
@@ -196,10 +196,10 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			return e.Wrap(e.CodeProvenanceMissing, err, "reading hosted provenance predicate")
 		}
 		if record.Ref != publication.Ref || record.Digest != publication.Digest || record.PredicateSHA256 != pipeline.FileDigest(predicate) ||
-			record.Identity != plan.Delivery.Signing.Identity || record.Issuer != plan.Delivery.Signing.Issuer {
+			record.Identity != plan.ExecutionSettings.Signing.Identity || record.Issuer != plan.ExecutionSettings.Signing.Issuer {
 			return e.New(e.CodeVerifyFailed, "hosted signing record for %q differs from its publication, predicate, or policy", route.Name)
 		}
-		if err := validateHostedProductionPredicate(predicate, plan, plan.Delivery.Signing); err != nil {
+		if err := validateHostedProductionPredicate(predicate, plan, plan.ExecutionSettings.Signing); err != nil {
 			return err
 		}
 	}

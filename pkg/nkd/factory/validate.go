@@ -11,42 +11,42 @@ import (
 
 func (plan Plan) Validate() error {
 	if plan.SchemaVersion != PlanSchemaVersion || !canonicalName.MatchString(plan.Name) {
-		return e.New(e.CodeInvalidCatalog, "factory plan schema/name is invalid")
+		return e.New(e.CodeInvalidCatalog, "run plan schema/name is invalid")
 	}
 	if strings.TrimSpace(plan.GeneratorVersion) == "" {
-		return e.New(e.CodeInvalidCatalog, "factory plan has no generator version")
+		return e.New(e.CodeInvalidCatalog, "run plan has no generator version")
 	}
-	if (plan.DefinitionPath == "") != (plan.DeliveryPath == "") ||
-		(plan.DefinitionPath != "" && (!safeGeneratedPath(plan.DefinitionPath) || !safeGeneratedPath(plan.DeliveryPath))) {
-		return e.New(e.CodeInvalidCatalog, "factory plan definition/delivery source paths are incomplete or unsafe")
+	if (plan.DefinitionPath == "") != (plan.EnvironmentPath == "") ||
+		(plan.DefinitionPath != "" && (!safeGeneratedPath(plan.DefinitionPath) || !safeGeneratedPath(plan.EnvironmentPath))) {
+		return e.New(e.CodeInvalidCatalog, "run plan definition/environment source paths are incomplete or unsafe")
 	}
-	if plan.FactoryDefinitionDigest != "" && !canonical.IsDigest(plan.FactoryDefinitionDigest) {
-		return e.New(e.CodeUnpinnedSource, "factory plan definition identity is not digest-pinned")
+	if plan.CompileSpecDigest != "" && !canonical.IsDigest(plan.CompileSpecDigest) {
+		return e.New(e.CodeUnpinnedSource, "run plan compile-spec identity is not digest-pinned")
 	}
 	if plan.DefinitionDigest != "" && !canonical.IsDigest(plan.DefinitionDigest) {
-		return e.New(e.CodeUnverifiedRef, "factory plan has malformed definitionDigest %q", plan.DefinitionDigest)
+		return e.New(e.CodeUnverifiedRef, "run plan has malformed definitionDigest %q", plan.DefinitionDigest)
 	}
 	if plan.EnvironmentDigest != "" && !canonical.IsDigest(plan.EnvironmentDigest) {
-		return e.New(e.CodeUnverifiedRef, "factory plan has malformed environmentDigest %q", plan.EnvironmentDigest)
+		return e.New(e.CodeUnverifiedRef, "run plan has malformed environmentDigest %q", plan.EnvironmentDigest)
 	}
 	if (plan.DefinitionDigest == "") != (plan.EnvironmentDigest == "") {
-		return e.New(e.CodeUnverifiedRef, "factory plan must bind definitionDigest and environmentDigest together")
+		return e.New(e.CodeUnverifiedRef, "run plan must bind definitionDigest and environmentDigest together")
 	}
-	if err := plan.Qualification.ValidatePlanTier(plan.Delivery.Signing); err != nil {
+	if err := plan.Qualification.ValidatePlanTier(plan.ExecutionSettings.Signing); err != nil {
 		return err
 	}
-	if !canonical.IsDigest(plan.CatalogDigest) || !canonical.IsDigest(plan.DeliveryProfileDigest) {
-		return e.New(e.CodeUnpinnedSource, "factory plan catalog/delivery identity is not digest-pinned")
+	if !canonical.IsDigest(plan.CatalogDigest) || !canonical.IsDigest(plan.ExecutionSettingsDigest) {
+		return e.New(e.CodeUnpinnedSource, "run plan catalog/execution-settings identity is not digest-pinned")
 	}
-	if err := plan.Delivery.Validate(); err != nil {
+	if err := plan.ExecutionSettings.Validate(); err != nil {
 		return err
 	}
-	deliveryDigest, err := plan.Delivery.Digest()
+	executionSettingsDigest, err := plan.ExecutionSettings.Digest()
 	if err != nil {
 		return err
 	}
-	if deliveryDigest != plan.DeliveryProfileDigest {
-		return e.New(e.CodeUnverifiedRef, "factory plan delivery profile does not match deliveryProfileDigest")
+	if executionSettingsDigest != plan.ExecutionSettingsDigest {
+		return e.New(e.CodeUnverifiedRef, "run plan execution settings do not match executionSettingsDigest")
 	}
 	previous := ""
 	for _, applied := range plan.AppliedOverlays {
@@ -230,16 +230,16 @@ func (plan Plan) validateSigningGraph() error {
 		default:
 			continue
 		}
-		if plan.Delivery.Signing == nil {
+		if plan.ExecutionSettings.Signing == nil {
 			return e.New(e.CodeTrustPolicyMissing,
 				"factory plan node %q has no delivery signing profile authorizing it", node.ID)
 		}
-		if plan.Delivery.Targets[node.Target].Kind != TargetOCI {
+		if plan.ExecutionSettings.Targets[node.Target].Kind != TargetOCI {
 			return e.New(e.CodeEngineCapability,
 				"factory plan node %q signs target %q, which is not an OCI registry", node.ID, node.Target)
 		}
 	}
-	if plan.Delivery.Signing == nil {
+	if plan.ExecutionSettings.Signing == nil {
 		return nil
 	}
 	for target := range published {

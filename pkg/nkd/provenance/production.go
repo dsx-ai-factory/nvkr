@@ -45,7 +45,7 @@ const LocalBuilderID = "https://nkd.dev/builders/local-factory-run/v1"
 
 // PlanDependencyURI is the resolved-dependency URI under which the exact factory
 // plan identity is recorded.
-const PlanDependencyURI = "nkd:factory-plan"
+const PlanDependencyURI = "nkd:run-plan"
 
 // Signing modes recorded as an internal parameter. They mirror the delivery
 // profile's signing mode: only `cosign` can carry pipeline-attested authority.
@@ -177,9 +177,9 @@ func (l *LocalRunContext) InvocationID() string { return l.invocationID }
 type ProductionInputs struct {
 	BuildType               string
 	PlanDigest              string
-	FactoryReference        string
-	FactoryDefinitionDigest string
-	DeliveryProfileDigest   string
+	RunPlanReference        string
+	CompileSpecDigest       string
+	ExecutionSettingsDigest string
 	CatalogDigest           string
 	GeneratorVersion        string
 	SigningMode             string
@@ -240,9 +240,9 @@ func ProductionPredicate(run RunContext, in ProductionInputs) Predicate {
 			BuildType: in.BuildType,
 			ExternalParameters: map[string]string{
 				"planDigest":              in.PlanDigest,
-				"factoryReference":        in.FactoryReference,
-				"factoryDefinitionDigest": in.FactoryDefinitionDigest,
-				"deliveryProfileDigest":   in.DeliveryProfileDigest,
+				"runPlanReference":        in.RunPlanReference,
+				"compileSpecDigest":       in.CompileSpecDigest,
+				"executionSettingsDigest": in.ExecutionSettingsDigest,
 				"catalogDigest":           in.CatalogDigest,
 			},
 			InternalParameters: map[string]string{
@@ -275,19 +275,19 @@ var productionBuildTypes = map[string]bool{
 }
 
 var productionExternalParameters = []string{
-	"catalogDigest", "deliveryProfileDigest", "factoryDefinitionDigest",
-	"factoryReference", "planDigest",
+	"catalogDigest", "compileSpecDigest", "executionSettingsDigest",
+	"planDigest", "runPlanReference",
 }
 
 // productionExternalDigests are the external parameters that must be exact
-// content identities. factoryReference is a human/logical reference and is only
+// content identities. runPlanReference is a human/logical reference and is only
 // required to be non-empty and canonical whitespace.
 var productionExternalDigests = []string{
-	"catalogDigest", "deliveryProfileDigest", "factoryDefinitionDigest", "planDigest",
+	"catalogDigest", "compileSpecDigest", "executionSettingsDigest", "planDigest",
 }
 
 // ValidateProduction enforces the production predicate contract: a known build
-// type, exact plan/definition/profile/catalog identities, a declared generator
+// type, exact run-plan/compile-spec/execution-settings/catalog identities, a declared generator
 // and signing mode, canonically sorted and content-addressed dependencies
 // including the plan itself, a non-empty builder identity, and a complete,
 // ordered invocation/time triple. It is INDEPENDENT of Index.Validate, which

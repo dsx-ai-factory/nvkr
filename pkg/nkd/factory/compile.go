@@ -42,7 +42,7 @@ func CompileDocuments(ctx context.Context, definitionPath string, definition Com
 		return nil, err
 	}
 	plan.DefinitionPath = filepath.ToSlash(filepath.Clean(definitionPath))
-	plan.DeliveryPath = filepath.ToSlash(filepath.Clean(environmentPath))
+	plan.EnvironmentPath = filepath.ToSlash(filepath.Clean(environmentPath))
 	return plan, nil
 }
 
@@ -132,13 +132,13 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 	// is computed here (where the definition object exists) rather than rederived
 	// from a file the executing job may not even have. It is recorded only when the
 	// delivery signs: a plan that mints no attestation must keep its exact bytes.
-	authoredDefinitionDigest := ""
+	compileSpecDigest := ""
 	if delivery.Signing != nil {
 		digest, err := definition.Digest()
 		if err != nil {
 			return nil, err
 		}
-		authoredDefinitionDigest = digest
+		compileSpecDigest = digest
 	}
 	// ADR-18 §8: the runner is environment config. A delivery may override the definition's default
 	// runner for its environment (e.g. a GitLab tag); otherwise an unset runsOn falls back to the
@@ -157,7 +157,7 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 	if stack == nil || stack.Catalog == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "factory compilation requires a resolved catalog stack")
 	}
-	deliveryDigest, err := delivery.Digest()
+	executionSettingsDigest, err := delivery.Digest()
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +170,9 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 	}
 	plan := &Plan{SchemaVersion: PlanSchemaVersion, Name: definition.Metadata.Name,
 		GeneratorVersion: generatorVersion, Qualification: planTier(delivery.Signing),
-		FactoryDefinitionDigest: authoredDefinitionDigest,
-		CatalogDigest:           stack.Digest, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),
-		DeliveryProfileDigest: deliveryDigest, Delivery: delivery,
+		CompileSpecDigest: compileSpecDigest,
+		CatalogDigest:     stack.Digest, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),
+		ExecutionSettingsDigest: executionSettingsDigest, ExecutionSettings: delivery,
 		Graph: ArtifactGraph{SchemaVersion: ArtifactGraphSchema}}
 
 	targets := append([]RecipeTarget(nil), definition.Recipes...)

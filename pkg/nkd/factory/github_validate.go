@@ -17,18 +17,23 @@ type githubWorkflowDocument struct {
 	On          map[string]json.RawMessage `json:"on"`
 	Permissions map[string]string          `json:"permissions"`
 	Jobs        map[string]githubJob       `json:"jobs"`
+	Concurrency struct {
+		Group            string `json:"group"`
+		CancelInProgress bool   `json:"cancel-in-progress"`
+	} `json:"concurrency"`
 }
 
 type githubJob struct {
-	Name        string                     `json:"name"`
-	RunsOn      string                     `json:"runs-on"`
-	Container   json.RawMessage            `json:"container,omitempty"`
-	Services    map[string]json.RawMessage `json:"services,omitempty"`
-	Needs       []string                   `json:"needs,omitempty"`
-	If          string                     `json:"if,omitempty"`
-	Permissions map[string]string          `json:"permissions,omitempty"`
-	Env         map[string]string          `json:"env,omitempty"`
-	Steps       []githubStep               `json:"steps"`
+	TimeoutMinutes int                        `json:"timeout-minutes"`
+	Name           string                     `json:"name"`
+	RunsOn         string                     `json:"runs-on"`
+	Container      json.RawMessage            `json:"container,omitempty"`
+	Services       map[string]json.RawMessage `json:"services,omitempty"`
+	Needs          []string                   `json:"needs,omitempty"`
+	If             string                     `json:"if,omitempty"`
+	Permissions    map[string]string          `json:"permissions,omitempty"`
+	Env            map[string]string          `json:"env,omitempty"`
+	Steps          []githubStep               `json:"steps"`
 }
 
 type githubStep struct {
@@ -53,11 +58,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := yaml.UnmarshalStrict(workflow, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
 	}
-	if document.Name != "nkd-ai-factory-"+plan.Name || document.Permissions["contents"] != "read" {
+	if document.Name != "nkd-run-"+plan.Name || document.Permissions["contents"] != "read" {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow name/triggers/root permissions are incomplete")
 	}
 	if _, ok := document.On["workflow_dispatch"]; !ok {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits workflow_dispatch")
+	}
+	if len(document.On) != 2 || document.Concurrency.Group != "nkd-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress {
+		return e.New(e.CodeEngineCapability, "GitHub Run requires explicit dispatch/PR triggers and non-canceling workflow concurrency")
 	}
 	if pullRequest, ok := document.On["pull_request"]; !ok || strings.TrimSpace(string(pullRequest)) != "{}" {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow must statically check every pull request for generation drift")
@@ -91,6 +99,12 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 	}
 	for jobID, job := range document.Jobs {
+		if job.TimeoutMinutes <= 0 || job.TimeoutMinutes > 60 {
+			return e.New(e.CodeEngineCapability, "GitHub job %q requires a bounded timeout", jobID)
+		}
+		if jobID == "nkd-lifecycle-run" && job.If != "${{ always() && "+githubExecutionCondition+" }}" {
+			return e.New(e.CodeEngineCapability, "GitHub Run finalization must follow the admitted execution event even after failure")
+		}
 		// An OIDC identity token is the credential a keyless signature is minted from.
 		// Only the signing family may request one; anywhere else it is an ambient
 		// authority the pipeline never needs and must not be granted.
@@ -115,7 +129,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	for runner, jobID := range bootstrap {
 		job, ok := document.Jobs[jobID]
-		if !ok || job.RunsOn != runner || len(job.Steps) != 5 || job.Steps[0].Uses != githubCheckoutAction {
+		if !ok || job.RunsOn != runner || job.If != "" || len(job.Steps) != 5 || job.Steps[0].Uses != githubCheckoutAction {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
@@ -184,11 +198,15 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub container job %q does not bind its target platform", jobID)
 			}
 		}
-		if node.Kind == NodeVerify && job.If != "${{ always() }}" {
-			return e.New(e.CodeEngineCapability, "GitHub terminal observation job %q is not unconditional", jobID)
+		wantCondition := "${{ " + githubExecutionCondition + " }}"
+		if node.Kind == NodeVerify {
+			wantCondition = "${{ always() && " + githubExecutionCondition + " }}"
+		}
+		if job.If != wantCondition {
+			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on the default branch", jobID)
 		}
 		if node.Kind == NodePublish {
-			target := plan.Delivery.Targets[node.Target]
+			target := plan.ExecutionSettings.Targets[node.Target]
 			if strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
 				return e.New(e.CodeEngineCapability, "GitHub publish job %q lacks explicit packages:write", jobID)
 			}
@@ -200,15 +218,15 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			}
 		}
 		if signFamilyNode(node.Kind) {
-			if plan.Delivery.Signing == nil {
+			if plan.ExecutionSettings.Signing == nil {
 				return e.New(e.CodeTrustPolicyMissing,
 					"GitHub signing job %q has no delivery signing profile", jobID)
 			}
-			expected := githubSigningPermissions(node.Kind, plan.Delivery.Signing.Mode)
+			expected := githubSigningPermissions(node.Kind, plan.ExecutionSettings.Signing.Mode)
 			if len(job.Permissions) != len(expected) {
 				return e.New(e.CodeEngineCapability,
 					"GitHub signing job %q holds %d permissions; %s signing requires exactly %v",
-					jobID, len(job.Permissions), plan.Delivery.Signing.Mode, expected)
+					jobID, len(job.Permissions), plan.ExecutionSettings.Signing.Mode, expected)
 			}
 			for name, value := range expected {
 				if job.Permissions[name] != value {
@@ -216,7 +234,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 						"GitHub signing job %q has %s: %q, want %q", jobID, name, job.Permissions[name], value)
 				}
 			}
-			target := plan.Delivery.Targets[node.Target]
+			target := plan.ExecutionSettings.Targets[node.Target]
 			if target.CredentialRef != "" && job.Env["NKD_CREDENTIAL"] == "" {
 				return e.New(e.CodeEngineCapability, "GitHub signing job %q omits its credential reference", jobID)
 			}

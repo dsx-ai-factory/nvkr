@@ -77,9 +77,8 @@ requirement. Worker binaries belong to the NKE OS-image build; add product outpu
    contribute the change under Apache-2.0. Configure `git config user.name`/`user.email` first.
 4. **Update authority and docs** when behavior changes: update the owning primary ADR directly when its decision
    changes; add an ADR only for a distinct decision, and update `docs/adr/reconciliation.md` when implementation maturity, evidence, or a disabled path
-   changes. The SRD, checklist, POC narrative, and design plan are historical snapshots; preserve their
-   traceability without promoting them to current release authority. Don't hand-edit generated HTML or DOCX
-   exports; regenerate them from their source when an export is intentionally refreshed.
+   changes. Current product requirements belong in the milestone specification; engineering contracts belong
+   in the owning ADR. Superseded plans and requirement exports are available in Git history.
 5. Open the PR with a clear description of *what* and *why*; link any issue.
 
 ## Reporting bugs / proposing changes

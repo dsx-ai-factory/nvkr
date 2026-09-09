@@ -168,8 +168,8 @@ func TestExecuteSignBindsTheExactPublishedDigestAndWritesTheProductionPredicate(
 		t.Fatal(err)
 	}
 	if predicate.BuildDefinition.ExternalParameters["planDigest"] != planDigest ||
-		predicate.BuildDefinition.ExternalParameters["factoryDefinitionDigest"] != harness.plan.FactoryDefinitionDigest ||
-		predicate.BuildDefinition.ExternalParameters["deliveryProfileDigest"] != harness.plan.DeliveryProfileDigest ||
+		predicate.BuildDefinition.ExternalParameters["compileSpecDigest"] != harness.plan.CompileSpecDigest ||
+		predicate.BuildDefinition.ExternalParameters["executionSettingsDigest"] != harness.plan.ExecutionSettingsDigest ||
 		predicate.BuildDefinition.ExternalParameters["catalogDigest"] != harness.plan.CatalogDigest {
 		t.Fatalf("predicate external parameters do not bind the plan: %+v", predicate.BuildDefinition.ExternalParameters)
 	}

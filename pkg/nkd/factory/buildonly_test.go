@@ -72,7 +72,7 @@ func buildOnlyPlan(t *testing.T, deliveryRunsOn string) *Plan {
 		t.Fatalf("a build-only delivery (no routes) must compile: %v", err)
 	}
 	plan.DefinitionPath = "examples/factory.yaml"
-	plan.DeliveryPath = "examples/delivery.yaml"
+	plan.EnvironmentPath = "examples/environment.yaml"
 	return plan
 }
 
@@ -145,15 +145,15 @@ func TestToolAcquireNodeIsNotIRProjected(t *testing.T) {
 // in its own syntax. It must not be GitLab-only.
 func TestDeliveryRuntimeConfigRendersOnBothEngines(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
-	plan.Delivery.Runtime.RuntimeImage = "docker:27@sha256:" + strings.Repeat("a", 64)
-	plan.Delivery.Runtime.Services = []string{"docker:dind@sha256:" + strings.Repeat("b", 64)}
-	plan.Delivery.Runtime.Variables = map[string]string{"DOCKER_HOST": "tcp://docker:2375"}
-	plan.Delivery.Runtime.Setup = []string{"docker login -u user -p pass registry.example"}
-	digest, err := plan.Delivery.Digest()
+	plan.ExecutionSettings.Runtime.RuntimeImage = "docker:27@sha256:" + strings.Repeat("a", 64)
+	plan.ExecutionSettings.Runtime.Services = []string{"docker:dind@sha256:" + strings.Repeat("b", 64)}
+	plan.ExecutionSettings.Runtime.Variables = map[string]string{"DOCKER_HOST": "tcp://docker:2375"}
+	plan.ExecutionSettings.Runtime.Setup = []string{"docker login -u user -p pass registry.example"}
+	digest, err := plan.ExecutionSettings.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.DeliveryProfileDigest = digest
+	plan.ExecutionSettingsDigest = digest
 
 	gl, err := RenderGitLab(context.Background(), plan)
 	if err != nil {

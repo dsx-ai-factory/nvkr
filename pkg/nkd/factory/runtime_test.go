@@ -62,12 +62,12 @@ func TestDeliveryRuntimeSourcesGeneratedRuntime(t *testing.T) {
 	}
 
 	override := gitlabTestPlan(t)
-	override.Delivery.Runtime = RuntimeProfile{Runtime: "docker"}
-	digest, err := override.Delivery.Digest()
+	override.ExecutionSettings.Runtime = RuntimeProfile{Runtime: "docker"}
+	digest, err := override.ExecutionSettings.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	override.DeliveryProfileDigest = digest
+	override.ExecutionSettingsDigest = digest
 	bundle2, err := Render(context.Background(), override, EngineGitLab)
 	if err != nil {
 		t.Fatal(err)

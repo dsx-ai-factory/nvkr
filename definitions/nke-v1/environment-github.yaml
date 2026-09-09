@@ -8,11 +8,11 @@ utilityPlatform: linux/amd64
 destinations:
   ghcr:
     kind: oci
-    ref: ghcr.io/example-nke/nke/nkectl:v0.1.0-rc.2
+    ref: ghcr.io/njhensley/nke-recipes/nkectl:v0.1.0-rc.2
     credentialRef: github:GITHUB_TOKEN
 publish:
   nkectl: ghcr
 signing:
   mode: dry-run
-  identity: '^https://github\.com/example-nke/nke/\.github/workflows/nkd-factory\.yml@refs/heads/main$'
+  identity: '^https://github\.com/njhensley/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/main$'
   issuer: https://token.actions.githubusercontent.com

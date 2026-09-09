@@ -73,7 +73,7 @@ func signedTestPlan(t *testing.T, signing *SigningProfile, target Target) *Plan 
 		t.Fatalf("compiling signed plan: %v", err)
 	}
 	plan.DefinitionPath = "definitions/factory.yaml"
-	plan.DeliveryPath = "definitions/delivery.yaml"
+	plan.EnvironmentPath = "definitions/environment.yaml"
 	return plan
 }
 
@@ -94,7 +94,7 @@ func TestCompileEmitsSigningLaneOnlyWhenTheDeliveryConfiguresIt(t *testing.T) {
 			t.Fatalf("unsigned delivery emitted signing artifact %q", artifact.ID)
 		}
 	}
-	if unsigned.FactoryDefinitionDigest != "" {
+	if unsigned.CompileSpecDigest != "" {
 		t.Fatal("an unsigned plan must keep its exact legacy bytes, including no definition digest")
 	}
 
@@ -121,8 +121,8 @@ func TestCompileEmitsSigningLaneOnlyWhenTheDeliveryConfiguresIt(t *testing.T) {
 		!contains(verify.Outputs, "verification/publication") {
 		t.Fatalf("verify node dataflow is incomplete: %+v", verify)
 	}
-	if !canonical.IsDigest(signed.FactoryDefinitionDigest) {
-		t.Fatalf("a signing plan must bind the authored definition identity, got %q", signed.FactoryDefinitionDigest)
+	if !canonical.IsDigest(signed.CompileSpecDigest) {
+		t.Fatalf("a signing plan must bind the compile-spec identity, got %q", signed.CompileSpecDigest)
 	}
 	// Dataflow, not authored order, must place signing after publication.
 	order := map[string]int{}
@@ -143,14 +143,14 @@ func TestSignedPlanSurvivesTheCanonicalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if relocated.Delivery.Signing == nil {
+	if relocated.ExecutionSettings.Signing == nil {
 		t.Fatal("the signing profile was dropped by the canonical round trip")
 	}
-	if *relocated.Delivery.Signing != *plan.Delivery.Signing {
-		t.Fatalf("signing profile round-tripped as %+v, want %+v", *relocated.Delivery.Signing, *plan.Delivery.Signing)
+	if *relocated.ExecutionSettings.Signing != *plan.ExecutionSettings.Signing {
+		t.Fatalf("signing settings round-tripped as %+v, want %+v", *relocated.ExecutionSettings.Signing, *plan.ExecutionSettings.Signing)
 	}
-	if relocated.Qualification != plan.Qualification || relocated.FactoryDefinitionDigest != plan.FactoryDefinitionDigest {
-		t.Fatalf("plan identity fields did not round-trip: %q/%q", relocated.Qualification, relocated.FactoryDefinitionDigest)
+	if relocated.Qualification != plan.Qualification || relocated.CompileSpecDigest != plan.CompileSpecDigest {
+		t.Fatalf("plan identity fields did not round-trip: %q/%q", relocated.Qualification, relocated.CompileSpecDigest)
 	}
 	before, err := plan.Digest()
 	if err != nil {
@@ -213,7 +213,7 @@ func TestRelocationPreservesAttestedPlanIdentity(t *testing.T) {
 
 	// The predicate is the thing that actually escapes the run, so assert on it too.
 	started := time.Unix(1787066575, 0).UTC()
-	raw, err := productionPredicateFor(first, first.Delivery.Signing, started, started)
+	raw, err := productionPredicateFor(first, first.ExecutionSettings.Signing, started, started)
 	if err != nil {
 		t.Fatal(err)
 	}

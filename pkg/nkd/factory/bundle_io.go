@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	GeneratedManifestPath   = ".github/nkd-factory/manifest.json"
-	generatedManifestSchema = "nkd.dev/factory-bundle/v2"
+	GeneratedManifestPath   = ".github/nkd-run/manifest.json"
+	generatedManifestSchema = "nkd.dev/generated-run/v1"
 	maxGeneratedFileBytes   = int64(32 << 20)
+	maxGeneratedDirEntries  = 4096
 )
 
 type GeneratedManifest struct {
@@ -40,14 +41,14 @@ type GeneratedMember struct {
 
 func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	if bundle == nil {
-		return GeneratedManifest{}, nil, e.New(e.CodeUsage, "factory bundle manifest requires generated files")
+		return GeneratedManifest{}, nil, e.New(e.CodeUsage, "generated Run manifest requires generated files")
 	}
 	if err := ValidateGenerationEngine(bundle.Engine); err != nil {
 		return GeneratedManifest{}, nil, err
 	}
 	if !safeGeneratedPath(bundle.WorkflowPath) || !safeGeneratedPath(bundle.ManifestPath) ||
 		!safeGeneratedPath(bundle.PlanPath) {
-		return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated factory bundle paths are unsafe")
+		return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run paths are unsafe")
 	}
 	workflow, ok := bundle.Files[bundle.WorkflowPath]
 	if !ok || pipeline.FileDigest(workflow) != bundle.WorkflowDigest {
@@ -58,7 +59,7 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	members := make([]GeneratedMember, 0, len(names))
 	for _, name := range names {
 		if !safeGeneratedPath(name) || int64(len(bundle.Files[name])) > maxGeneratedFileBytes {
-			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated factory member %q is unsafe or oversized", name)
+			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run member %q is unsafe or oversized", name)
 		}
 		members = append(members, GeneratedMember{Path: name, SHA256: pipeline.FileDigest(bundle.Files[name]), Mode: 0o644})
 	}
@@ -76,10 +77,10 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 // manifest last. Re-running with identical input is idempotent.
 func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
 	if ctx == nil {
-		return e.New(e.CodeUsage, "factory bundle write requires a context")
+		return e.New(e.CodeUsage, "generated Run write requires a context")
 	}
 	if strings.TrimSpace(root) == "" {
-		return e.New(e.CodeUsage, "factory bundle write requires a repository root")
+		return e.New(e.CodeUsage, "generated Run write requires a repository root")
 	}
 	_, manifestBytes, err := ManifestFor(bundle)
 	if err != nil {
@@ -94,7 +95,7 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	}
 	defer release()
 	if err := ctx.Err(); err != nil {
-		return e.Wrap(e.CodeTimeout, err, "factory bundle write canceled")
+		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
 	}
 
 	type staged struct{ destination, temporary string }
@@ -110,7 +111,7 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	defer cleanup()
 	stage := func(relative string, raw []byte) error {
 		if err := ctx.Err(); err != nil {
-			return e.Wrap(e.CodeTimeout, err, "factory bundle write canceled")
+			return e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
 		}
 		destination, err := generatedDestination(root, relative)
 		if err != nil {
@@ -119,7 +120,7 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		if err := ensureGeneratedDirectory(root, filepath.Dir(relative)); err != nil {
 			return err
 		}
-		tmp, err := os.CreateTemp(filepath.Dir(destination), ".nkd-factory-stage-*")
+		tmp, err := os.CreateTemp(filepath.Dir(destination), ".nkd-run-stage-*")
 		if err != nil {
 			return e.Wrap(e.CodeInternal, err, "staging generated member %s", relative)
 		}
@@ -148,7 +149,7 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		return err
 	}
 	if err := ctx.Err(); err != nil {
-		return e.Wrap(e.CodeTimeout, err, "factory bundle write canceled before commit")
+		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled before commit")
 	}
 	// The manifest is staged last and committed last. Once payload publication starts,
 	// complete the small commit even if voluntary cancellation arrives.
@@ -180,10 +181,16 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 // repository. It is the regeneration/drift gate used by update automation.
 func CheckGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
 	if ctx == nil {
-		return e.New(e.CodeUsage, "factory bundle check requires a context")
+		return e.New(e.CodeUsage, "generated Run check requires a context")
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "generated Run check canceled")
 	}
 	manifest, manifestBytes, err := ManifestFor(bundle)
 	if err != nil {
+		return err
+	}
+	if err := checkGeneratedDirectoryContents(ctx, root, bundle); err != nil {
 		return err
 	}
 	for _, member := range manifest.Members {
@@ -193,10 +200,10 @@ func CheckGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		}
 		raw, err := readGeneratedContext(ctx, destination)
 		if err != nil {
-			return e.Wrap(e.CodePipelineDrift, err, "generated factory member %s is missing or unsafe", member.Path)
+			return e.Wrap(e.CodePipelineDrift, err, "generated Run member %s is missing or unsafe", member.Path)
 		}
 		if !bytes.Equal(raw, bundle.Files[member.Path]) {
-			return e.New(e.CodePipelineDrift, "generated factory member %s differs; regenerate it", member.Path)
+			return e.New(e.CodePipelineDrift, "generated Run member %s differs; regenerate it", member.Path)
 		}
 	}
 	manifestPath, err := generatedDestination(root, bundle.ManifestPath)
@@ -205,13 +212,147 @@ func CheckGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	}
 	committedManifest, err := readGeneratedContext(ctx, manifestPath)
 	if err != nil || !bytes.Equal(committedManifest, manifestBytes) {
-		return e.New(e.CodePipelineDrift, "generated factory root manifest differs; regenerate the bundle")
+		return e.New(e.CodePipelineDrift, "generated Run root manifest differs; regenerate the bundle")
+	}
+	return nil
+}
+
+func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *GeneratedBundle) error {
+	directoryRelative := filepath.ToSlash(filepath.Dir(bundle.ManifestPath))
+	directory, err := generatedDestination(root, directoryRelative)
+	if err != nil {
+		return err
+	}
+	if err := validateGeneratedDirectoryChain(root, directoryRelative); err != nil {
+		return e.Wrap(e.CodePipelineDrift, err, "generated Run directory is missing or unsafe")
+	}
+
+	allowedFiles := map[string]bool{}
+	allowedDirectories := map[string]bool{".": true}
+	allow := func(path string) error {
+		relative, err := filepath.Rel(directory, path)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return nil
+		}
+		relative = filepath.ToSlash(relative)
+		allowedFiles[relative] = true
+		for parent := filepath.ToSlash(filepath.Dir(relative)); parent != "."; parent = filepath.ToSlash(filepath.Dir(parent)) {
+			allowedDirectories[parent] = true
+		}
+		return nil
+	}
+	for member := range bundle.Files {
+		destination, err := generatedDestination(root, member)
+		if err != nil {
+			return err
+		}
+		if err := allow(destination); err != nil {
+			return err
+		}
+	}
+	manifestPath, err := generatedDestination(root, bundle.ManifestPath)
+	if err != nil {
+		return err
+	}
+	if err := allow(manifestPath); err != nil {
+		return err
+	}
+	leasePath, err := generatedDestination(root, bundle.ManifestPath+".lease")
+	if err != nil {
+		return err
+	}
+	if err := allow(leasePath); err != nil {
+		return err
+	}
+
+	seen := 0
+	var inspect func(string, string) error
+	inspect = func(path, relative string) error {
+		if err := ctx.Err(); err != nil {
+			return e.Wrap(e.CodeTimeout, err, "generated Run check canceled")
+		}
+		before, err := os.Lstat(path)
+		if err != nil || !before.IsDir() || before.Mode()&os.ModeSymlink != 0 {
+			return e.New(e.CodePipelineDrift, "generated Run directory %s is missing or unsafe", path)
+		}
+		opened, err := os.Open(path)
+		if err != nil {
+			return e.Wrap(e.CodePipelineDrift, err, "opening generated Run directory %s", path)
+		}
+		defer func() { _ = opened.Close() }()
+		openedInfo, err := opened.Stat()
+		if err != nil || !openedInfo.IsDir() || !os.SameFile(before, openedInfo) {
+			return e.New(e.CodePipelineDrift, "generated Run directory %s changed while opening", path)
+		}
+		for {
+			entries, readErr := opened.ReadDir(128)
+			for _, entry := range entries {
+				if err := ctx.Err(); err != nil {
+					return e.Wrap(e.CodeTimeout, err, "generated Run check canceled")
+				}
+				seen++
+				if seen > maxGeneratedDirEntries {
+					return e.New(e.CodePipelineDrift, "generated Run directory exceeds %d entries", maxGeneratedDirEntries)
+				}
+				childRelative := entry.Name()
+				if relative != "." {
+					childRelative = relative + "/" + entry.Name()
+				}
+				childPath := filepath.Join(path, entry.Name())
+				info, statErr := os.Lstat(childPath)
+				if statErr != nil || info.Mode()&os.ModeSymlink != 0 {
+					return e.New(e.CodePipelineDrift, "generated Run member %s is missing or unsafe", childRelative)
+				}
+				if info.IsDir() {
+					if !allowedDirectories[childRelative] {
+						return e.New(e.CodePipelineDrift, "unexpected generated Run directory %s", childRelative)
+					}
+					if err := inspect(childPath, childRelative); err != nil {
+						return err
+					}
+					continue
+				}
+				if !info.Mode().IsRegular() || !allowedFiles[childRelative] {
+					return e.New(e.CodePipelineDrift, "unexpected generated Run member %s", childRelative)
+				}
+			}
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			if readErr != nil {
+				return e.Wrap(e.CodePipelineDrift, readErr, "listing generated Run directory %s", path)
+			}
+		}
+		after, err := os.Lstat(path)
+		if err != nil || !after.IsDir() || after.Mode()&os.ModeSymlink != 0 || !os.SameFile(before, after) {
+			return e.New(e.CodePipelineDrift, "generated Run directory %s changed during inspection", path)
+		}
+		return nil
+	}
+	return inspect(directory, ".")
+}
+
+func validateGeneratedDirectoryChain(root, relative string) error {
+	current := filepath.Clean(root)
+	info, err := os.Lstat(current)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return e.New(e.CodeImmutableViolation, "generated Run root %s is not a real directory", current)
+	}
+	for _, component := range strings.Split(filepath.ToSlash(relative), "/") {
+		if component == "." || component == "" {
+			continue
+		}
+		current = filepath.Join(current, component)
+		info, err = os.Lstat(current)
+		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return e.New(e.CodeImmutableViolation, "generated Run directory %s is not a real directory", current)
+		}
 	}
 	return nil
 }
 
 func readGeneratedContext(ctx context.Context, path string) ([]byte, error) {
-	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "generated factory member", MaxBytes: maxGeneratedFileBytes})
+	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "generated Run member", MaxBytes: maxGeneratedFileBytes})
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +362,7 @@ func readGeneratedContext(ctx context.Context, path string) ([]byte, error) {
 
 func generatedDestination(root, relative string) (string, error) {
 	if !safeGeneratedPath(relative) {
-		return "", e.New(e.CodeInvalidCatalog, "unsafe generated factory path %q", relative)
+		return "", e.New(e.CodeInvalidCatalog, "unsafe generated Run path %q", relative)
 	}
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
@@ -230,7 +371,7 @@ func generatedDestination(root, relative string) (string, error) {
 	destination := filepath.Join(absRoot, filepath.FromSlash(relative))
 	rel, err := filepath.Rel(absRoot, destination)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", e.New(e.CodeInvalidCatalog, "generated factory path %q escapes root", relative)
+		return "", e.New(e.CodeInvalidCatalog, "generated Run path %q escapes root", relative)
 	}
 	return destination, nil
 }
@@ -249,7 +390,7 @@ func ensureGeneratedDirectory(root, relative string) error {
 	current := filepath.Clean(root)
 	rootInfo, err := os.Lstat(current)
 	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 {
-		return e.New(e.CodeImmutableViolation, "factory bundle root %s is not a real directory", current)
+		return e.New(e.CodeImmutableViolation, "generated Run root %s is not a real directory", current)
 	}
 	for _, component := range strings.Split(filepath.ToSlash(relative), "/") {
 		if component == "." || component == "" {
@@ -259,12 +400,12 @@ func ensureGeneratedDirectory(root, relative string) error {
 		info, err := os.Lstat(current)
 		if errors.Is(err, os.ErrNotExist) {
 			if err := os.Mkdir(current, 0o755); err != nil {
-				return e.Wrap(e.CodeImmutableViolation, err, "creating generated factory directory %s", current)
+				return e.Wrap(e.CodeImmutableViolation, err, "creating generated Run directory %s", current)
 			}
 			info, err = os.Lstat(current)
 		}
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return e.New(e.CodeImmutableViolation, "generated factory directory %s is not a real directory", current)
+			return e.New(e.CodeImmutableViolation, "generated Run directory %s is not a real directory", current)
 		}
 	}
 	return nil
@@ -287,7 +428,7 @@ func copyContext(ctx context.Context, destination io.Writer, source io.Reader) (
 	var total int64
 	for {
 		if err := ctx.Err(); err != nil {
-			return total, e.Wrap(e.CodeTimeout, err, "factory bundle write canceled")
+			return total, e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
 		}
 		n, readErr := source.Read(buffer)
 		if n > 0 {

@@ -155,7 +155,7 @@ func ValidateGitLabBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			return e.New(e.CodeEngineCapability, "GitLab terminal observation job %q is not unconditional", jobID)
 		}
 		if node.Kind == NodePublish {
-			target := plan.Delivery.Targets[node.Target]
+			target := plan.ExecutionSettings.Targets[node.Target]
 			if target.CredentialRef != "" {
 				secret, ok := strings.CutPrefix(target.CredentialRef, "gitlab:")
 				if !ok || job.Variables["NKD_CREDENTIAL"] != "$"+secret {

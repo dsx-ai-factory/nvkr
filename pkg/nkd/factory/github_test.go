@@ -3,11 +3,13 @@ package factory
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
 	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
+	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
 	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
 	"sigs.k8s.io/yaml"
 )
@@ -40,7 +42,7 @@ func githubTestPlan(t *testing.T) *Plan {
 		t.Fatal(err)
 	}
 	plan.DefinitionPath = "examples/factory.yaml"
-	plan.DeliveryPath = "examples/delivery.yaml"
+	plan.EnvironmentPath = "examples/environment.yaml"
 	return plan
 }
 
@@ -87,7 +89,11 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 		name string
 		old  []byte
 		new  []byte
+		code e.Code
 	}{
+		{name: "execution-event", code: e.CodeEngineCapability, old: []byte(githubExecutionCondition), new: []byte("true")},
+		{name: "job-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 15"), new: []byte("timeout-minutes: 0")},
+		{name: "cancel-running-publication", code: e.CodeEngineCapability, old: []byte("cancel-in-progress: false"), new: []byte("cancel-in-progress: true")},
 		{name: "network", old: []byte("--network none"), new: []byte("--network bridge")},
 		{name: "launch", old: []byte("exec-node --launch"), new: []byte("exec-node")},
 		{name: "setup-go-version", old: []byte("go-version-file: '.go-version'"), new: []byte("go-version-file: 'go.mod'")},
@@ -105,8 +111,15 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 			}
 			mutated.Files[GitHubWorkflowPath] = bytes.Replace(original, test.old, test.new, 1)
 			mutated.WorkflowDigest = pipeline.FileDigest(mutated.Files[GitHubWorkflowPath])
-			if err := ValidateGitHubBundle(context.Background(), plan, &mutated); err == nil {
+			err := ValidateGitHubBundle(context.Background(), plan, &mutated)
+			if err == nil {
 				t.Fatal("tampered workflow passed static validation")
+			}
+			if test.code != "" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != test.code {
+					t.Fatalf("want %s, got %v", test.code, err)
+				}
 			}
 		})
 	}

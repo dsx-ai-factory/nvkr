@@ -147,14 +147,14 @@ func recordHostedFailure(ctx context.Context, outputPath string, run *Run, cause
 }
 
 func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *factory.Plan, artifacts map[string]factory.Artifact, observed []Artifact) error {
-	if plan.Delivery.Signing == nil || len(plan.Delivery.Routes) == 0 {
+	if plan.ExecutionSettings.Signing == nil || len(plan.ExecutionSettings.Routes) == 0 {
 		return e.New(e.CodeProvenanceMissing, "pipeline-attested Run has no planned signing and verification closure")
 	}
 	outputs := map[string]Artifact{}
 	for _, artifact := range observed {
 		outputs[artifact.Name] = artifact
 	}
-	for _, route := range plan.Delivery.Routes {
+	for _, route := range plan.ExecutionSettings.Routes {
 		artifact, ok := artifacts["verification/"+route.Name]
 		if !ok {
 			return e.New(e.CodeReleaseIncomplete, "pipeline-attested Run omits verification result for %q", route.Name)
@@ -180,7 +180,7 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 			return err
 		}
 		_, found := outputs[route.Name]
-		target := plan.Delivery.Targets[route.Target]
+		target := plan.ExecutionSettings.Targets[route.Target]
 		routed, routedFound := artifacts[route.Input]
 		if !routedFound || routed.Kind != factory.PackageOCI {
 			return e.New(e.CodeReleaseIncomplete, "pipeline route %q has no exact publication envelope", route.Name)
@@ -196,12 +196,12 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 		if !found || record.Digest != envelope.RootDigest || record.Ref != targetRepository(target.Ref)+"@"+envelope.RootDigest {
 			return e.New(e.CodeVerifyFailed, "publication verification for %q does not bind the exact routed output", route.Name)
 		}
-		identity, regexErr := regexp.Compile(plan.Delivery.Signing.Identity)
+		identity, regexErr := regexp.Compile(plan.ExecutionSettings.Signing.Identity)
 		if regexErr != nil {
 			return e.Wrap(e.CodeTrustPolicyMissing, regexErr, "compiling planned signing identity")
 		}
-		if record.DryRun || !record.SignatureVerified || !record.AttestationVerified || record.Identity != plan.Delivery.Signing.Identity || record.Issuer != plan.Delivery.Signing.Issuer ||
-			!identity.MatchString(record.ObservedIdentity) || record.ObservedIssuer != plan.Delivery.Signing.Issuer {
+		if record.DryRun || !record.SignatureVerified || !record.AttestationVerified || record.Identity != plan.ExecutionSettings.Signing.Identity || record.Issuer != plan.ExecutionSettings.Signing.Issuer ||
+			!identity.MatchString(record.ObservedIdentity) || record.ObservedIssuer != plan.ExecutionSettings.Signing.Issuer {
 			return e.New(e.CodeSignatureInvalid, "publication verification for %q does not prove the planned signer and provenance", route.Name)
 		}
 	}

@@ -83,7 +83,7 @@ func ValidateGeneratedBundle(ctx context.Context, plan *Plan, bundle *GeneratedB
 func generationCommand(plan *Plan, engine string) string {
 	return "./nkd-exec run generate --engine " + engine +
 		" --definition " + shellQuote(plan.DefinitionPath) +
-		" --environment " + shellQuote(plan.DeliveryPath) + " --root . --check"
+		" --environment " + shellQuote(plan.EnvironmentPath) + " --root . --check"
 }
 
 type generationLayout struct {

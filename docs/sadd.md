@@ -53,8 +53,7 @@ proposed registration handoff describe the downstream boundary, not fleet operat
 
 ## Assumptions {#assumptions}
 
-These assumptions are subject to the ADRs. The historical SRD supplies requirements context, not a competing
-implementation baseline.
+These assumptions are subject to the current ADRs and milestone acceptance criteria.
 
 - Source owners provide retrievable pinned commits, trees, toolchains, and acquired artifact digests. A pin
   establishes an expected identity; the fetch boundary must still check the bytes (ADR-22).
@@ -134,8 +133,7 @@ describes the claim attached to those bytes. Neither is a synonym for a recipe c
 | [ADR set](adr/) and [reconciliation](adr/reconciliation.md) | Design decisions, maturity, evidence, and unresolved critiques |
 | [v1 milestones](milestones.md) and [epic specification](epics-v1-spec.md) | M1–M4 product acceptance |
 | [Domain vocabulary](../CONTEXT.md) and [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) | Public object meanings and lifecycle contracts |
-| [SRD](srd.md) and [SRD snapshot](archive/nkd-srd-doc.md) | Historical FR/SEC/UC identifiers and requirements context |
-| [Current local evidence](evidence/2026-09-08-m1-public-lifecycle-local.md) and [historical audit](archive/milestone-audit-and-plan.md) | Recorded execution, with the limits described under Current support boundary |
+| [Current local evidence](evidence/2026-09-08-m1-public-lifecycle-local.md) | Recorded execution, with the limits described under Current support boundary |
 | [Contribution guide](../CONTRIBUTING.md) and [development guide](../DEVELOPMENT.md) | Repository verification and engineering workflow |
 
 # Architectural Details {#architectural-details}
@@ -322,7 +320,7 @@ This index locates design responsibility. Per-ADR maturity and remaining accepta
 ### Architecture drivers and validation
 
 The table maps the main review concerns to mechanisms and acceptance activities. It is an architectural
-coverage map, not a claim that every historical SRD requirement is implemented. M1–M4 acceptance remains in the
+coverage map, not a claim that every architectural capability is implemented. M1–M4 acceptance remains in the
 milestone specification.
 
 | Driver | Mechanism and view | Validation needed |
@@ -351,9 +349,6 @@ example coverage does not expand the amd64 NKE v1 delivery milestone.
 
 The [2026-09-08 local record](evidence/2026-09-08-m1-public-lifecycle-local.md) exercises the current NKE Definition,
 immutable Run, SBOM, loopback publication/pull-back and recovered CLI execution with dry-run signing.
-The [historical audit, fact F6](archive/milestone-audit-and-plan.md) records an earlier
-GitLab build-only run: pipeline 64812267, commit `f0c6890`, 2026-08-26, 23 green jobs. That historical run does
-not validate the current regenerated bundle or GitHub/keyless acceptance. No current provider execution or live keyless acceptance is inferred from that historical run.
 
 # Design Details {#design-details}
 
@@ -761,7 +756,6 @@ reproduction of helper bytes.
 | Approvers | **[INPUT NEEDED]** (per stakeholders) |
 | Status | Draft |
 | Revision | 2026-09-08 |
-| Related SRD | NKD SRD (2026-08-19) — `docs/nkd-srd-doc.md`, `docs/srd.md` |
 | Related ADRs | ADR-01…ADR-22 (`docs/adr/`) |
 | Related planning documents | NKD v1 milestone plan — `docs/milestones.md`; NKD v1 milestone epics (specification) — `docs/epics-v1-spec.md` (product acceptance; ADRs own engineering contracts) |
 | Current support record | `docs/adr/reconciliation.md` |

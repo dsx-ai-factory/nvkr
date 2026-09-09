@@ -14,16 +14,16 @@ import (
 func gitlabTestPlan(t *testing.T) *Plan {
 	t.Helper()
 	plan := githubTestPlan(t)
-	target := plan.Delivery.Targets["registry"]
+	target := plan.ExecutionSettings.Targets["registry"]
 	target.Ref = "registry.gitlab.com/example/nkd-tools:latest"
 	target.CredentialRef = "gitlab:NKD_REGISTRY_AUTH"
-	plan.Delivery.Targets["registry"] = target
-	digest, err := plan.Delivery.Digest()
+	plan.ExecutionSettings.Targets["registry"] = target
+	digest, err := plan.ExecutionSettings.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.DeliveryProfileDigest = digest
-	plan.DeliveryPath = "examples/delivery-gitlab.yaml"
+	plan.ExecutionSettingsDigest = digest
+	plan.EnvironmentPath = "examples/environment-gitlab.yaml"
 	return plan
 }
 
