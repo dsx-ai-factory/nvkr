@@ -1,0 +1,19 @@
+apiVersion: nkd.dev/definition/v2
+kind: Definition
+metadata:
+  name: nke-v1
+  description: Build and publish the NKE command line client from pinned source.
+catalog:
+  base: ./catalog
+recipes:
+  - name: nke-cli
+    criteria:
+      category: operations
+      k8sVersion: 1.36.0
+      os: ubuntu
+      arch: amd64
+outputs:
+  - name: nkectl
+    recipe: nke-cli
+    components: [nkectl]
+    format: executable

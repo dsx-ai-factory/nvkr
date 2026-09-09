@@ -1,0 +1,19 @@
+kind: RecipeMetadata
+apiVersion: nkd.dev/recipe/v1alpha1
+metadata:
+  name: base
+spec:
+  # The shared node substrate every Kubernetes node (control-plane or worker) runs:
+  # kubelet + kube-proxy, the container runtime (containerd + runc), CNI, and the
+  # client/admin tools. Role overlays inherit this and add their role-specific set.
+  mixins:
+    - os-ubuntu
+  componentRefs:
+    - name: kubelet
+    - name: kube-proxy
+    - name: kubeadm
+    - name: kubectl
+    - name: runc
+    - name: containerd
+    - name: cni-plugins
+    - name: crictl

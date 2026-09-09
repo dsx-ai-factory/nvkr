@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+# CUJ (M1, LOCAL): execute the production nke-v1 Definition end to end on this
+# laptop — build nkectl from the pinned NKE tag inside a pinned golang container, package
+# it as an OCI binary bundle inside an OCI publication root, publish it to a loopback
+# registry, show the per-artifact CycloneDX SBOM the run billed, run the DRY-RUN signing
+# and verify-publication lanes, then pull the result back BY DIGEST and run the recovered
+# binary.
+#
+# What this script does NOT establish: nothing here is signed. The signing lane runs in
+# dry-run mode, which executes no cosign and contacts no transparency log; it records the
+# exact invocations a real signer would run. The output is UNQUALIFIED local execution
+# evidence and does not authorize a Release or deployment. Real cosign,
+# OIDC, and a provisioned repository are the separate GitHub exercise.
+
+set -euo pipefail
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd "$SCRIPT_DIR/.."
+# shellcheck source=scripts/_demo-common.sh
+source "$SCRIPT_DIR/_demo-common.sh"
+
+ATTEMPTS_ROOT=${ATTEMPTS_ROOT:-.nkd/m1-local}
+ATTEMPT=${ATTEMPT:-$(demo_default_attempt m1)}
+WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
+CONSUME=${CONSUME:-.nkd/m1-local-consume}
+DEFINITIONS=${DEFINITIONS:-definitions/nke-v1}
+ROUTE=${ROUTE:-nkectl}
+BUNDLE=${BUNDLE:-nkectl}
+RECIPE_TARGET=${RECIPE_TARGET:-nke-cli}
+JOBS=${JOBS:-1}
+REGISTRY_CONTAINER=${REGISTRY_CONTAINER:-nkd-m1-registry}
+REGISTRY_IMAGE=${REGISTRY_IMAGE:-registry:3}
+REGISTRY_HOSTPORT=${REGISTRY_HOSTPORT:-127.0.0.1:5000}
+RUNTIME=${RUNTIME:-docker}
+KEEP_REGISTRY=1
+
+# The same pinned toolchain image the catalog builds nkectl with, reused here as the
+# amd64 execution environment for the recovered binary. Reusing it keeps this script from
+# introducing a second, unpinned image into an otherwise fully pinned demo.
+RUN_IMAGE=golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+# The version string upstream's own cli/Makefile stamps for tag cli/v0.1.0-rc.2.
+EXPECT_VERSION=${EXPECT_VERSION:-v0.1.0-rc.2}
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/demo-m1-local.sh [options]
+
+Run the complete M1 local validation:
+  pinned NKE source -> hermetic container build -> OCI binary bundle
+    -> OCI publication root -> loopback registry -> per-artifact SBOM
+    -> dry-run sign -> verify-publication -> pull by digest -> run the recovered nkectl
+
+Options:
+  --attempts-root DIR
+                    root for immutable Run attempts (default: .nkd/m1-local)
+  --attempt NAME    new immutable attempt name (default: timestamp plus process ID)
+  --consume DIR     scratch directory for the pull/extract half of the demo
+                    (default: .nkd/m1-local-consume)
+  --stop-registry   remove the demo registry container when the run finishes
+  -h, --help        show this help
+
+Environment:
+  NKE_LOCAL_CLONE   path to a local github.com/NVIDIA/nke clone. When set, git is
+                    redirected to it for this process only, via GIT_CONFIG_COUNT.
+                    The catalog keeps its https://github.com/NVIDIA/nke identity and
+                    the user's own git configuration is never modified.
+
+Requires docker, git, curl, and a Go toolchain. Re-running is safe: the registry
+container is reused; every execution gets a new immutable attempt, and the consume directory is rebuilt.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --attempts-root) [ "$#" -ge 2 ] || demo_die "missing --attempts-root value"; ATTEMPTS_ROOT=$2; shift 2 ;;
+    --attempt) [ "$#" -ge 2 ] || demo_die "missing --attempt value"; ATTEMPT=$2; shift 2 ;;
+    --consume) [ "$#" -ge 2 ] || demo_die "missing --consume value"; CONSUME=$2; shift 2 ;;
+    --stop-registry) KEEP_REGISTRY=0; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) demo_die "unknown flag: $1 (run --help)" ;;
+  esac
+done
+
+case "$ATTEMPTS_ROOT" in .nkd/?*) ;; *) demo_die "--attempts-root must be a repository-relative child of .nkd" ;; esac
+case "$ATTEMPT" in ""|*/*|*..*) demo_die "--attempt must be one clean name" ;; esac
+WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
+case "$CONSUME" in .nkd/?*) ;; *) demo_die "--consume must be a repository-relative child of .nkd" ;; esac
+[ "$WORKSPACE" != "$CONSUME" ] || demo_die "the Run attempt and --consume must differ"
+
+demo_need_command docker
+demo_need_command git
+demo_need_command curl
+docker info >/dev/null 2>&1 || demo_die "Docker daemon is not reachable"
+
+# Pretty-print a small canonical JSON record. python3 is a convenience for reading, never
+# a correctness dependency: without it the raw canonical bytes are shown instead.
+demo_show_json() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -m json.tool "$1"
+  else
+    cat "$1"
+    printf '\n'
+  fi
+}
+
+demo_section "0/8  Build nkdctl from this checkout"
+demo_prepare_nkdctl
+printf 'nkdctl: %s\n' "$NKD"
+
+# The catalog names the real upstream repository, because that is the component's
+# identity. Redirecting the TRANSPORT for a local run is environment configuration, so it
+# is expressed as git configuration scoped to this process — not as a catalog edit and
+# not as a mutation of the user's ~/.gitconfig.
+if [ -n "${NKE_LOCAL_CLONE:-}" ]; then
+  [ -d "$NKE_LOCAL_CLONE" ] || demo_die "NKE_LOCAL_CLONE is not a directory: $NKE_LOCAL_CLONE"
+  NKE_LOCAL_CLONE=$(demo_absolute_path "$NKE_LOCAL_CLONE")
+  export GIT_CONFIG_COUNT=1
+  export GIT_CONFIG_KEY_0="url.${NKE_LOCAL_CLONE}.insteadOf"
+  export GIT_CONFIG_VALUE_0="https://github.com/NVIDIA/nke"
+  printf 'git transport redirected for this process only: %s -> %s\n' \
+    "https://github.com/NVIDIA/nke" "$NKE_LOCAL_CLONE"
+fi
+
+demo_section "1/8  Start or reuse the loopback OCI registry"
+registry_owner_label=dev.nkd.demo.owner
+registry_owner=m1-local
+if docker container inspect "$REGISTRY_CONTAINER" >/dev/null 2>&1; then
+  owner=$(docker container inspect --format "{{index .Config.Labels \"$registry_owner_label\"}}" "$REGISTRY_CONTAINER")
+  [ "$owner" = "$registry_owner" ] ||
+    demo_die "container $REGISTRY_CONTAINER exists but is not owned by this demo (owner=${owner:-none})"
+  if [ "$(docker container inspect --format '{{.State.Running}}' "$REGISTRY_CONTAINER")" = true ]; then
+    printf 'reusing running registry container %s on %s\n' "$REGISTRY_CONTAINER" "$REGISTRY_HOSTPORT"
+  else
+    printf 'restarting existing registry container %s\n' "$REGISTRY_CONTAINER"
+    docker start "$REGISTRY_CONTAINER" >/dev/null
+  fi
+else
+  printf 'creating registry container %s (%s) on %s\n' "$REGISTRY_CONTAINER" "$REGISTRY_IMAGE" "$REGISTRY_HOSTPORT"
+  docker run -d --name "$REGISTRY_CONTAINER" --label "$registry_owner_label=$registry_owner" \
+    -p "$REGISTRY_HOSTPORT:5000" "$REGISTRY_IMAGE" >/dev/null
+fi
+
+registry_ready=0
+for _ in $(seq 1 30); do
+  if curl --fail --silent --show-error "http://$REGISTRY_HOSTPORT/v2/" >/dev/null 2>&1; then
+    registry_ready=1
+    break
+  fi
+  sleep 1
+done
+[ "$registry_ready" -eq 1 ] || demo_die "registry $REGISTRY_HOSTPORT did not become ready"
+printf 'registry ready: http://%s/v2/\n' "$REGISTRY_HOSTPORT"
+
+demo_section "2/8  Validate the pinned component catalog"
+"$NKD" catalog validate --data "$DEFINITIONS/catalog"
+
+demo_section "3/8  Validate the Definition and current generated hosted Run"
+"$NKD" definition validate --definition "$DEFINITIONS/definition.yaml"
+"$NKD" run plan --definition "$DEFINITIONS/definition.yaml" \
+  --environment "$DEFINITIONS/environment-local.yaml"
+# The committed bundle is generated with `go run`, whose stable development stamp
+# is independent of the dirty working-tree suffix embedded by `make build`.
+go run ./cmd/nkdctl run generate --definition "$DEFINITIONS/definition.yaml" \
+  --environment "$DEFINITIONS/environment-github.yaml" --engine github --root . --check
+
+demo_section "4/8  Execute one immutable Run and publish its OCI envelope"
+run_started=$SECONDS
+"$NKD" run local --definition "$DEFINITIONS/definition.yaml" \
+  --environment "$DEFINITIONS/environment-local.yaml" --attempts-root "$ATTEMPTS_ROOT" --attempt "$ATTEMPT" \
+  --runtime "$RUNTIME" --jobs "$JOBS" --publish
+run_seconds=$((SECONDS - run_started))
+
+reference_file="$WORKSPACE/publications/$ROUTE.txt"
+[ -f "$reference_file" ] || demo_die "Run completed without a published reference: $reference_file"
+REFERENCE=$(tr -d '\n' < "$reference_file")
+case "$REFERENCE" in
+  *@sha256:*) ;;
+  *) demo_die "published reference is not digest-pinned: $REFERENCE" ;;
+esac
+DIGEST=${REFERENCE#*@}
+printf '\npublished reference: %s\n' "$REFERENCE"
+
+demo_section "5/8  Show the per-artifact SBOM the Run billed"
+# The Run's SBOM node ran during
+# step 4 and wrote a deterministic CycloneDX SBOM per built component plus an aggregate
+# index, each bound to the component's runner-observed artifact digest. This is
+# static-unqualified composition evidence — it asserts what went in, never a signature.
+sbom_dir="$WORKSPACE/$RECIPE_TARGET/sbom"
+sbom_index="$sbom_dir/index.json"
+[ -f "$sbom_index" ] || demo_die "Run did not emit an SBOM index: $sbom_index"
+# Fail closed rather than narrate: an index that binds no exact subject digest would make
+# the SBOM's central claim — "this bill of materials is for THAT artifact" — uncheckable.
+grep -q '"artifactSha256":"sha256:' "$sbom_index" || demo_die "SBOM index binds no exact artifact digest"
+printf 'SBOM index: %s\n' "$sbom_index"
+demo_show_json "$sbom_index"
+sbom_count=0
+for cdx in "$sbom_dir"/*.cdx.json; do
+  [ -f "$cdx" ] || continue
+  printf '\nper-artifact SBOM: %s\n' "$cdx"
+  demo_show_json "$cdx"
+  sbom_count=$((sbom_count + 1))
+done
+[ "$sbom_count" -ge 1 ] || demo_die "SBOM index exists but no per-artifact CycloneDX document was written"
+
+demo_section "6/8  Show the dry-run signing and verification records"
+signature_record="$WORKSPACE/signatures/$ROUTE.json"
+predicate_record="$WORKSPACE/predicates/$ROUTE.json"
+verification_record="$WORKSPACE/verifications/$ROUTE.json"
+for record in "$signature_record" "$predicate_record" "$verification_record"; do
+  [ -f "$record" ] || demo_die "signing lane did not produce $record"
+done
+
+# Fail closed rather than narrate: a record that does not name the digest that was
+# actually published would make every downstream claim meaningless.
+grep -q "$DIGEST" "$signature_record" || demo_die "signing record does not name the published digest"
+grep -q "$DIGEST" "$verification_record" || demo_die "verification record does not name the published digest"
+grep -q '"dryRun":true' "$signature_record" || demo_die "signing record is not marked dry-run"
+grep -q '"dryRun":true' "$verification_record" || demo_die "verification record is not marked dry-run"
+
+# The record's predicateSha256 must hash the predicate file EXACTLY as it sits on disk —
+# those are the bytes a real `cosign attest --predicate <file>` would attest. Checking it
+# here is the only thing that makes the record's claim about the predicate falsifiable.
+PREDICATE_SHA256="sha256:$(demo_sha256 "$predicate_record")"
+grep -q "\"predicateSha256\":\"$PREDICATE_SHA256\"" "$signature_record" ||
+  demo_die "signing record's predicateSha256 does not hash the predicate file on disk"
+
+printf 'signing record:      %s\n' "$signature_record"
+demo_show_json "$signature_record"
+printf '\nSLSA v1 predicate:   %s\n' "$predicate_record"
+demo_show_json "$predicate_record"
+printf '\nverification record: %s\n' "$verification_record"
+demo_show_json "$verification_record"
+
+demo_section "7/8  Pull the publication back BY DIGEST and extract the binary bundle"
+CONSUME_ABS=$(demo_absolute_path "$CONSUME")
+demo_prepare_work "$CONSUME_ABS" "m1-local-consume"
+pull_started=$SECONDS
+"$NKD" publish pull --ref "$REFERENCE" --out "$CONSUME_ABS/root" --plain-http --anonymous
+pull_seconds=$((SECONDS - pull_started))
+"$NKD" publish inspect --layout "$CONSUME_ABS/root"
+"$NKD" publish extract --layout "$CONSUME_ABS/root" --bundle "$BUNDLE" --out "$CONSUME_ABS/extract"
+
+NKECTL="$CONSUME_ABS/extract/nkectl"
+[ -f "$NKECTL" ] || demo_die "the extracted bundle does not contain nkectl: $NKECTL"
+NKECTL_SHA256=$(demo_sha256 "$NKECTL")
+
+# Close the loop on the SBOM from step 5: the digest it billed for the built binary must
+# equal the sha256 of the binary we just recovered by digest from the registry. If they
+# disagree, the SBOM describes something other than what shipped, so fail closed.
+grep -q "$NKECTL_SHA256" "$sbom_dir"/*.cdx.json ||
+  demo_die "no per-artifact SBOM bills the recovered binary digest sha256:$NKECTL_SHA256"
+
+demo_section "8/8  Run the recovered nkectl under the pinned amd64 image"
+# The definition targets linux/amd64; on an arm64 host this runs under emulation.
+VERSION_OUTPUT=$(docker run --rm --platform linux/amd64 -v "$CONSUME_ABS/extract:/w" \
+  "$RUN_IMAGE" /w/nkectl version 2>&1)
+printf '%s\n' "$VERSION_OUTPUT"
+case "$VERSION_OUTPUT" in
+  *"$EXPECT_VERSION"*) ;;
+  *) demo_die "recovered nkectl reported '$VERSION_OUTPUT', which does not contain $EXPECT_VERSION" ;;
+esac
+
+if [ "$KEEP_REGISTRY" -eq 0 ]; then
+  docker rm -f "$REGISTRY_CONTAINER" >/dev/null
+  printf 'removed registry container %s\n' "$REGISTRY_CONTAINER"
+fi
+
+cat <<EOF
+
+M1 LOCAL VALIDATION COMPLETE — LOCAL, UNQUALIFIED, DRY-RUN-SIGNED
+  definition:          $DEFINITIONS/definition.yaml
+  registry:            http://$REGISTRY_HOSTPORT/v2/ (container $REGISTRY_CONTAINER)
+  published reference: $REFERENCE
+  index digest:        $DIGEST
+  nkectl sha256:       $NKECTL_SHA256
+  nkectl version:      $VERSION_OUTPUT
+  run record:          $WORKSPACE/lifecycle.json
+  SBOM index:          $sbom_index ($sbom_count per-artifact CycloneDX doc(s), static-unqualified)
+  signing record:      $signature_record
+  SLSA v1 predicate:   $predicate_record
+  predicate sha256:    $PREDICATE_SHA256
+  verification record: $verification_record
+  extracted binary:    $NKECTL
+  timings:             Run ${run_seconds}s, pull ${pull_seconds}s
+
+NOTHING HERE WAS SIGNED. The signing lane ran in dry-run mode: no cosign was executed,
+no key or OIDC identity was used, and no transparency log was contacted. The records
+above state the invocations a real signer WOULD run. The plan therefore remains
+static-unqualified; only cosign mode can claim pipeline-attested. This is local
+execution evidence, not M1 completion, and not a release, clearance, or deployment
+authority — that requires the GitHub run with real cosign, OIDC, and a provisioned
+repository.
+EOF

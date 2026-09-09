@@ -1,0 +1,64 @@
+apiVersion: nkd.dev/definition/v2
+kind: Definition
+metadata:
+  name: nke-gpu-tenant-arm64
+  description: Native ARM64 GPU worker deliverables and their tenant cluster view.
+catalog:
+  base: ../../catalogs/kubernetes-layered
+  overlays: [supplier-kubectl.yaml]
+tools:
+  aicr-v0.18.0:
+    url: https://github.com/NVIDIA/aicr/releases/download/v0.18.0/aicr_0.18.0_linux_amd64.tar.gz
+    archiveDigest: sha256:6a498b8ce0dcb0e28095de35cdae583391ad567f3922aae6657c851cc76275ee
+    executablePath: aicr
+    executableDigest: sha256:50287efe53d4b0aeb5c36c7ef792b4039509ae8f0ff5078d48369c09305a676f
+recipes:
+  - name: gpu-node
+    criteria:
+      category: kubernetes
+      k8sVersion: 1.32.0
+      os: ubuntu
+      arch: arm64
+  - name: h100-runtime
+    catalog:
+      base: ../layered-catalog
+    criteria:
+      category: accelerated-runtime
+      k8sVersion: 1.32.0
+      os: ubuntu
+      arch: arm64
+    parameters:
+      accelerator: h100
+      intent: training
+      service: eks
+    aicrGenerator: aicr-v0.18.0
+outputs:
+  - name: gpu-runtime
+    recipe: h100-runtime
+    format: helm-oci
+  - name: worker-apt
+    recipe: gpu-node
+    components: [containerd, crictl, kubeadm, kubectl, kubelet, runc]
+    format: apt-repository
+    apt:
+      distribution: stable
+      component: main
+  - name: worker-binaries
+    recipe: gpu-node
+    components: [containerd, crictl, kubeadm, kubectl, kubelet, runc]
+    format: executable
+clusters:
+  - name: gpu-tenant
+    type: tenant
+    cni: cni-plugins
+    members:
+      - output: gpu-runtime
+      - output: worker-binaries
+        role: gpu-worker
+    aicrBundle:
+      deployer: helm
+      storageClass: gp3
+      acceleratedNodeSelectors: [nvidia.com/gpu.present=true]
+      acceleratedNodeTolerations: ['nvidia.com/gpu=present:NoSchedule']
+      workloadSelectors: [nkd.dev/tenant=gpu]
+    validationRequirements: [aicr-bundle-verified, kubernetes-node-smoke]

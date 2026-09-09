@@ -1,0 +1,94 @@
+apiVersion: nkd.dev/catalog/v1
+kind: SourceBuildRegistry
+metadata:
+  name: layered-demo
+  description: >-
+    Demonstrator of the AICR-style overlay/mixin composition ported into nkdctl. The
+    registry declares every component ONCE (as in AICR's ComponentRegistry); the recipe
+    is not written flat — it is COMPOSED from overlays/ (base ← node-common ←
+    kubernetes, category-keyed single-parent inheritance) + mixins/ (orthogonal OS
+    fragment). Role filters the resolved category members only. See `nkdctl recipe
+    --data examples/layered-catalog --category kubernetes --role control-plane --k8s 1.32.0`.
+sources:
+  k8s:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.32.x
+    toolchainImage: sha256:9e4d7fdad5d2b10609edfb3f0cadb7b4ca7bea6a9d2e42bca6b175de85c8d8d2
+
+# Components declared once; overlays reference them by name (add / disable / override).
+components:
+  kubectl:
+    fromSource: true
+    source: k8s
+    cgo: false
+    outputType: host-package
+    roles: [control-plane, worker, gpu-worker]
+    buildCommand: [make, WHAT=cmd/kubectl, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kubectl
+    writeDir: _output
+    versionStamp: &kstamp
+      KUBE_GIT_VERSION: "{{.Tag}}"
+      KUBE_GIT_COMMIT: "{{.Commit}}"
+      KUBE_GIT_TREE_STATE: clean
+      KUBE_GIT_MAJOR: "{{.Major}}"
+      KUBE_GIT_MINOR: "{{.Minor}}"
+  kube-apiserver:
+    fromSource: true
+    source: k8s
+    cgo: false
+    outputType: oci-image
+    roles: [control-plane]
+    buildCommand: [make, WHAT=cmd/kube-apiserver, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kube-apiserver
+    writeDir: _output
+    versionStamp: *kstamp
+  kube-controller-manager:
+    fromSource: true
+    source: k8s
+    cgo: false
+    outputType: oci-image
+    roles: [control-plane]
+    buildCommand: [make, WHAT=cmd/kube-controller-manager, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kube-controller-manager
+    writeDir: _output
+    versionStamp: *kstamp
+  kubelet:
+    fromSource: true
+    source: k8s
+    cgo: false
+    outputType: host-package
+    roles: [control-plane, worker, gpu-worker]
+    buildCommand: [make, WHAT=cmd/kubelet, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kubelet
+    writeDir: _output
+    versionStamp: *kstamp
+  kube-proxy:
+    fromSource: true
+    source: k8s
+    cgo: false
+    outputType: oci-image
+    roles: [control-plane, worker, gpu-worker]
+    buildCommand: [make, WHAT=cmd/kube-proxy, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kube-proxy
+    writeDir: _output
+    versionStamp: *kstamp
+  # A prebuilt (no-compile) sandbox image — the pause container, acquired by digest.
+  pause:
+    source: k8s
+    outputType: oci-image
+    roles: [control-plane, worker, gpu-worker]
+    prebuilt:
+      image: registry.k8s.io/pause:3.10
+      # ADR-13 §2: acquired evidence is never silently absent — upstream pause ships no
+      # external SBOM/provenance we pin, so this is declared explicitly.
+      evidence:
+        none: true
+  # A prebuilt Cluster API controller image — the operator/management cluster acquires it
+  # (no-compile lane) to provision tenant clusters via CAPI.
+  capi-core:
+    source: k8s
+    outputType: oci-image
+    prebuilt:
+      image: registry.k8s.io/cluster-api/cluster-api-controller:v1.9.5
+      evidence:
+        none: true

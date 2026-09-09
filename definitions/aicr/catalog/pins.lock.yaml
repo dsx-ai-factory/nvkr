@@ -1,0 +1,3 @@
+apiVersion: nkd.dev/lock/v1
+kind: PinLock
+pins: {}

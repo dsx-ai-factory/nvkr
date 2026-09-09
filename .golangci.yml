@@ -1,0 +1,55 @@
+# Deliberately LIGHT golangci-lint config for the nkdctl POC (golangci-lint v2).
+# Per CLAUDE.md we do NOT port AICR's heavy multi-linter gate — this is the
+# standard linter set (errcheck, govet, ineffassign, staticcheck, unused) plus a
+# few low-noise, high-value extras. `make lint` stays green on the tree; the
+# pedantic revive "exported must have a doc comment / don't stutter" rules are
+# intentionally NOT enabled for a prototype.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - misspell     # spelling in comments/strings
+    - unconvert    # unnecessary type conversions
+    - bodyclose    # HTTP/response bodies closed
+    - revive       # curated to correctness/style rules below (no exported-doc/stutter noise)
+  settings:
+    misspell:
+      locale: US
+    errcheck:
+      # Idiomatic deferred cleanup whose error is intentionally ignored.
+      exclude-functions:
+        - (*os.File).Close
+        - (io.ReadCloser).Close
+        - os.RemoveAll
+    revive:
+      rules:
+        - name: error-return
+        - name: error-naming
+        - name: context-as-argument
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: unreachable-code
+  exclusions:
+    generated: lax
+    rules:
+      # User-facing CLI/report writers and the bake-off env harness intentionally
+      # ignore the write/flush/setenv error — the process is exiting or the output
+      # is advisory.
+      - linters: [errcheck]
+        source: '(fmt\.Fprint|\.Write\(|\.Flush\(|os\.Setenv)'
+      # QF1001 (apply De Morgan's law) is a stylistic quickfix, not a correctness issue.
+      - linters: [staticcheck]
+        text: 'QF1001'
+      # Test files may take shortcuts.
+      - path: _test\.go
+        linters: [revive, errcheck]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

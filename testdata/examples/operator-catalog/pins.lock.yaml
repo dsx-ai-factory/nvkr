@@ -1,0 +1,20 @@
+# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
+apiVersion: nkd.dev/lock/v1
+artifacts:
+  acme-kubectl-bin:
+    digests:
+      amd64: sha256:646d58f6d98ee670a71d9cdffbf6625aeea2849d567f214bc43a35f8ccb7bf70
+      arm64: sha256:ba4004f98f3d3a7b7d2954ff0a424caa2c2b06b78c17b1dccf2acc76a311a896
+    tag: v1.32.0
+  acme-pause:
+    digests:
+      amd64: sha256:7c38f24774e3cbd906d2d33c38354ccf787635581c122965132c9bd309754d4a
+      arm64: sha256:e50b7059b633caf3c1449b8da680d11845cda4506b513ee7a2de00725f0a34a7
+    tag: v1.32.0
+kind: PinLock
+pins:
+  k8s:
+    commit: 70d3cc986aa8221cd1dfb1121852688902d3bf53
+    sourceDateEpoch: 1733939955
+    tag: v1.32.0
+    treeHash: 195abcc8a74b362b88fc76b0ee676a3354e4937e

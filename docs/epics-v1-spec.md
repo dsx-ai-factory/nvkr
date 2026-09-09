@@ -1,0 +1,360 @@
+# NKD v1 — Milestone epics (specification, Jira-ready)
+
+Revised 2026-09-08. Production acceptance for M1–M4, using the seven-object public model. This specifies
+required behavior; the implementation record separately identifies completed work and external evidence.
+T-shirt sizes describe relative effort, not delivery guarantees. Owners and dates remain planning inputs.
+
+**What NKD v1 is.** A generator and evidence layer. From a digest-pinned Definition of NKE artifacts and a
+separately selected Environment it emits committed GitHub Actions workflows that build or acquire each artifact, publish it to an OCI
+registry, sign it, attach production provenance, qualify it, and tag releases. NVIDIA runs the generated
+workflows; consumers verify the results with standard tooling and no NKD software.
+
+**Facts the specification rests on.**
+- The NKE OS image build bakes in Kubernetes (node side and control-plane images), CNI, and node-agent. NKD wraps
+  that build; it does not build, separately deliver, or inspect the contents of those components. Verification of
+  what is inside the OS image belongs to the NKE OS image build team.
+- v1 targets amd64 only. The selected GitHub-hosted runner must admit the OS build's virtualization and privilege requirements; arm64 is NKE's to add to its OS build later
+  and is out of scope here.
+- Every artifact is delivered in OCI, signed keyless with cosign from the workflow run that produced it, and
+  carries an SLSA v1 provenance attestation describing how the bytes were produced. No reproduction or
+  byte-identity claim is made anywhere in v1, and the earlier builder-profile preflight and bake-off requirements
+  are relaxed for these milestones: a wrapped build's declared network and privilege are recorded, not forbidden.
+- Verification by a consumer means `cosign verify` and `cosign verify-attestation` (provenance and, from M3,
+  qualification evidence) succeed on a machine with only cosign installed, using the published signer identities
+  and issuer.
+- Workflows run on GitHub-hosted runners only.
+- Evidence for every acceptance criterion is a workflow run URL plus, where a consumer can check the criterion, a
+  consumer-side verification transcript, and, for negative criteria, the run log showing the refusal and its error
+  code. All of it is recorded in the evidence log and referenced from the implementation record.
+
+**Public objects.**
+
+| Object | Responsibility |
+|---|---|
+| Definition | Authored named outputs, Recipe selections, packaging and optional cluster views |
+| Recipe | Reusable build or acquisition instructions with pinned inputs and output contracts |
+| Environment | Execution settings, destinations, credential references, signing policy and workflow tooling |
+| Run | One immutable attempt with frozen requirements, observed artifacts, evidence and failures |
+| Artifact | Immutable executable, image, chart or packaged bytes |
+| Release | Immutable selected artifacts and evidence addressed by one pinned reference |
+| Verification Policy | Consumer requirements for signer identities, evidence and lifecycle state |
+
+A cluster is a named view within a Definition, realized against exact Release contents. Bundle denotes an
+Artifact format. Lockfiles hold resolved pins; manifests and per-step observations are generated records.
+Environment changes do not change Recipe identity. Workflow generation binds the Definition, Environment and
+generator identities together, so execution configuration remains accountable without becoming product intent.
+
+*Source lane* records how bytes were obtained: hermetic build, wrapped external build, or digest-pinned
+acquisition. *Evidence tier* records the accepted claim: production output uses `pipeline-attested` and targets
+SLSA Build L2; a plan or dry run alone supplies no such evidence. Recipe/evidence qualification in M3 and the
+signed Release manifest in M4 strengthen v1 acceptance without claiming qualified reproduction.
+
+The *decision records* contain current engineering proposals pending named-decider approval. The
+*implementation record* tracks support, the *evidence log* records actual runs, and *consumer instructions*
+describe independent verification.
+
+---
+
+## Epic M1 — Vertical slice
+
+| Field | Value |
+|---|---|
+| **Issue type** | Epic |
+| **Epic name** | NKD M1 Vertical Slice |
+| **Summary** | One generated GitHub Actions run builds the NKE CLI from a pinned commit, keyless-signs it, attaches SLSA provenance, pushes to OCI; `cosign verify` passes from a clean machine |
+| **Priority / Rank** | Highest / 1 |
+| **T-shirt size** | **XS** — the build → OCI → publish → dry-run sign/verify path is proven locally (2026-09-04); current-model acceptance and real-service integration remain, alongside external provisioning |
+| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m1-vertical-slice` |
+| **Milestone label** | M1 — Vertical slice |
+| **Due date (best estimate)** | 2026-09-16 |
+| **Linear status** | BUILDING |
+| **Depends on** | — (external: GitHub org and registry namespace, OIDC identity, NKE source mirror, product-security approval of public Sigstore) |
+| **Blocks** | M2, M3, M4 |
+| **Related** | NKX-14794 (NKD Design & Contracts) |
+| **Eng PIC / Product PIC** | TBD / TBD |
+| **Status note** | Local end-to-end validation complete 2026-09-04: pinned NKE CLI built hermetically, published to a local registry, dry-run signed and verified, pulled back by digest and executed. That run used earlier inputs. Open: current-model hosted execution, real keyless signing, NKE source access, independent review and decision ratification. |
+
+**Goal.** One generated workflow builds the NKE CLI from a pinned NKE commit, signs it, attaches provenance,
+pushes everything to OCI, and verifies it. Acceptance requires every signing and publication mechanism to run against the real services. Later milestones add build types, the gate and release tagging.
+
+**Delivers**
+- **The generator.** Turns the Definition and Environment into committed workflows whose third-party actions
+  are pinned to commit SHAs. Regeneration with the same pinned inputs and generator must match byte for byte.
+- **The pipeline helper.** Each job downloads it, verifies its digest against the pinned value, and fails otherwise.
+- **The pinned source model.** A source is a repository, a commit, a tree hash, a toolchain image digest, and a
+  build command. Private NKE sources are reachable from hosted runners through a mirror with vendored inputs and a
+  read-only fetch credential that is present only on fetch steps.
+- **The hermetic build step.** Runs the pinned toolchain container with the network disabled, re-hashes the
+  produced bytes, and writes the run record before anything downstream may use them.
+- **Publication.** Pushes the artifact and records the digest-pinned reference.
+- **Signing and attestation.** A keyless cosign signature and an SLSA v1 provenance attestation whose builder
+  identity is the committed workflow (path and ref), whose invocation identifies the run, whose build type names
+  the source lane, and whose resolved dependencies name the source commit, tree hash, toolchain digests, and
+  definition digest. The signing step re-derives the digest from the bytes it holds and refuses to sign unless
+  it equals the run record's digest for that subject.
+- **Verification step.** `cosign verify` and `cosign verify-attestation` against the published reference with the
+  pinned identity and issuer; the workflow fails if either fails.
+- **Trigger and credential model.** Pull requests from branches in this repository build and package only; the
+  only credential they hold is the read-only mirror-fetch credential, present on fetch steps only; they request no
+  OIDC token and have no registry-push credential or environment access. Pull requests from forks run the
+  regeneration check and schema validation only and hold no credential. Pushes to the default branch and manual
+  dispatch publish, sign, attest, and verify using the workflow's own token and OIDC identity inside a protected
+  environment. All signing runs execute on the default-branch ref, so the keyless identity is one fixed workflow
+  path and ref. Branch protection and code ownership cover the workflows, the generator, the pipeline helper, and
+  the signing code.
+
+**Does not deliver.** Invocation of an external repository's reusable workflow: the milestone's "pinned wrapped
+NKE reusable build" is satisfied by the pinned source model and hermetic build step above, and the substitution
+is recorded in the decision record. Git-tag-triggered runs. Reproduction or byte-identity claims. CI engines
+other than GitHub Actions.
+
+**Acceptance criteria**
+1. A run of the generated workflow on a GitHub-hosted runner, triggered by a push to the default branch, is green end to end.
+2. The run's provenance names the NKE repository, commit, and tree hash, each equal to the value in the committed definition; the run log shows the tree-hash check passing before the build step; the built NKE CLI is the subject of the published reference.
+3. The published reference carries a keyless cosign signature and an SLSA v1 provenance attestation whose builder identity is the committed workflow path and ref, whose invocation identifies the run, whose build type is `hermetic-build`, whose resolved dependencies name the NKE commit, tree hash, toolchain image digest, and definition digest, and whose evidence tier is `pipeline-attested`.
+4. On a clean machine with only cosign, `cosign verify` and `cosign verify-attestation --type slsaprovenance1` succeed against the published digest with the published identity and issuer.
+5. The committed workflow is pinned: the regeneration check passes; every action reference is a full commit SHA; regenerating from the same Definition, Environment and generator version yields byte-identical workflows; and every job verifies the pipeline helper's digest before running it, shown once by a job that fails on a wrong digest.
+6. A pull request run (including one from a fork) completes with read-only token permissions, runs no publish, sign, attest, or verify step, requests no OIDC token, and the registry shows no new digests or tag changes afterwards; the mirror-fetch credential is absent from every build, package, and check step's environment.
+
+**Definition of done**
+- Continuous integration is green on Linux: the full automated test suite including concurrency-safety checks, static analysis, and the regeneration check. Tests cover the signing step refusing a digest that differs from the run record, the build step's re-hash rejecting altered bytes, and the fetch credential being absent from every build step.
+- An independent review of the trust-bearing code (pipeline helper, signing adapter, provenance predicate, signing and verification steps, trigger and credential model) is closed with no open critical findings.
+- A decision record, approved by named deciders, defines the `pipeline-attested` tier and the three source lanes, the production-provenance predicate, the keyless signing model and cosign version pin, the trigger, identity, and credential rules, the private-mirror arrangement, and the v1 relaxation of builder-profile and byte-identity requirements; contributor guidance points to it.
+- Repository settings are captured in the evidence log: branch protection requiring review on the default branch; code ownership over the workflows, generator, helper, and signing code; publish and sign jobs confined to a protected environment restricted to the default branch and manual dispatch.
+- Consumer instructions are published: the exact commands, the build-workflow identity, the issuer, and the registry access needed.
+- The evidence log records the run URL, commit, definition digest, published reference, cosign version and digest, the consumer transcript, and the transparency-log index.
+
+---
+
+## Epic M2 — Breadth
+
+| Field | Value |
+|---|---|
+| **Issue type** | Epic |
+| **Epic name** | NKD M2 Breadth |
+| **Summary** | The in-scope artifact set is delivered and signed in OCI with provenance, centred on the wrapped NKE OS image (amd64); tenant cluster, site-controller cluster, and AICR bundle each yield one signed OCI bundle |
+| **Priority / Rank** | High / 2 |
+| **T-shirt size** | **M** — the wrapped-build lane, image/blob publication, and the two cluster views are real scope; OS-build feasibility still requires an admitted hosted environment. Re-size if capability testing fails, arm64 is pulled forward or wrapped-build isolation must be stricter |
+| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m2-breadth` |
+| **Milestone label** | M2 — Breadth |
+| **Due date (best estimate)** | 2026-09-25 (signed OS image and the M2 core) |
+| **Linear status** | PRIORITIZED |
+| **Depends on** | M1; external: NKE OS build runnable from a single pinned entrypoint on a hosted amd64 runner, NKE image list and chart sources by 2026-09-12, spire-agent placement decision 2026-09-10 |
+| **Blocks** | M3 (artifacts to qualify), M4 (artifacts to tag) |
+| **Related** | NKX-14794 |
+| **Eng PIC / Product PIC** | TBD / TBD |
+| **Status note** | Not started. Shape is fixed at the 2026-09-10 checkpoint (wrapped OS build or QCOW2 mirror; built or mirrored NKE images; spire-agent placement; which NKE images sit outside the OS image). |
+
+**Goal.** The in-scope artifact set is delivered. The centre is the NKE OS image for amd64, built by wrapping the
+NKE node-images build at a pinned commit and published as one signed disk-image artifact; it already contains
+Kubernetes (node side and control-plane images), CNI, and node-agent. Around it: the CWE controller image and the
+NKE cluster images that are not baked into the OS image (enumerated by name in the definition as a Sep 10
+checkpoint output), the operator tooling bundle, the AICR bundle, chart bundles, and the tenant and
+site-controller cluster bundles.
+
+**Delivers**
+- **Wrapped external builds.** A source lane for pinned external builds: a declared entrypoint from a pinned
+  repository commit, run in a pinned container with declared privilege and network access, with build, re-hash,
+  run record, publish, sign, and verify fused into one job because the output is gigabytes. The provenance build
+  type is `wrapped-build` and records the declared network and privilege, so a consumer can see NKD makes no
+  hermeticity claim; no builder-profile preflight or byte-identity gate applies in v1. A wrapped build holds no
+  credential of any kind during its build phase, network or not: private inputs are fetched into the workspace by
+  a preceding fetch step that holds only the fetch credential, and registry and OIDC credentials are introduced
+  only after the build phase has exited and the run record is written.
+- **The OS image artifact.** One disk-image artifact per OS image recipe, amd64, with provenance naming the NKE
+  commit and tree hash. Pushed as a single-layer artifact if the registry's blob limit permits (verified at the
+  Sep 10 checkpoint), otherwise chunked, with the whole-image digest in the run record and provenance. What is
+  inside the image is NKE's to verify; NKD attests how the bytes were produced and by which pinned inputs.
+- **Image and blob publication.** Pushing container-image layouts by digest with the pinned digest preserved,
+  and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
+  digest and skips content that is already present, so re-runs are cheap and mirrors are idempotent.
+- **Acquisition.** Digest-pinned acquisition of kubectl, Helm, the AICR CLI, AICR chart tarballs, and the
+  third-party images referenced by the AICR and NKE charts that are not inside the OS image. Pins live in the
+  lockfile and are written by the pin-resolution command (resolve an upstream version to a digest and rewrite the
+  lockfile), which M4 schedules and extends. Each acquired artifact carries an `acquired` provenance attestation
+  recording the upstream reference, the lockfile pin, and the fetch time, and making no build claim.
+- **Spire-agent.** Placement is decided at the Sep 10 checkpoint and recorded in the definition: inside the OS
+  image (its matrix row then reads "inside the OS image") or acquired by digest and bound in both SKU
+  compositions. Until decided it is a dated deferral, not an omission.
+- **Bundles and cluster views.** An operator tooling bundle (kubectl, Helm, AICR CLI); an AICR bundle (the rendered AICR
+  deployment plus its chart tarballs); NKE chart bundles where sources are available; a tenant cluster bundle and a
+  site-controller cluster bundle, each carrying a composition that binds the OS image, the bundles, and the cluster
+  images for that cluster type by digest.
+
+**Does not deliver.** Separate delivery of anything the definition marks "inside the OS image" (node-agent,
+node-side Kubernetes, control-plane images, CNI); verification of the OS image's contents (NKE OS image build
+team); NKD-built Kubernetes; vulnerability scanning; verification of upstream signatures on acquired
+artifacts (acquisition is digest-pinned trust on first use); arm64 and any other architecture.
+
+**Pre-authorized fallbacks.** Mirror the prebuilt signed QCOW2 by digest (`acquired`) if the OS build cannot run
+on a hosted runner. Mirror NKE-published CWE and NKE images (`acquired`) instead of building them. Enclose chart
+tarballs in the signed bundle instead of publishing CNCF OCI charts. Deliver a composition-only site-controller
+cluster package if its component pins are late: the composition binds every resolved member by digest and lists each
+unresolved member by name with a deferred status and reason; the M3 gate records each deferred member as a waiver,
+never a pass; the M4 release manifest lists the bundle with its deferred members enumerated.
+
+**Acceptance criteria**
+1. The OS image is published as one signed, attested amd64 disk-image artifact built from the pinned NKE commit; its provenance names that commit and tree hash with build type `wrapped-build`; consumer verification succeeds. (Under the fallback: the prebuilt QCOW2 is mirrored by digest, signed, consumer-verified, its `acquired` provenance names the upstream reference and digest, and the row is recorded as `acquired`.)
+2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, AICR CLI, spire-agent if acquired, third-party images, AICR chart bundle, NKE chart bundles, operator tooling bundle) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest.
+3. CWE controller and NKE container images are either built (`wrapped-build`, provenance naming the NKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
+4. The tenant cluster bundle, the site-controller cluster bundle, and the AICR bundle are each published as one signed, attested OCI artifact and pass consumer verification; each cluster view binds the OS image, the bundles, and the cluster images for that type by digest; any deferred member is visible in the composition and appears as a waiver in the qualification evidence.
+5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
+
+**Definition of done**
+- Tests cover tag-move refusal for image, blob, and bundle pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege or network; and the credential-free build phase.
+- The evidence log has one row per artifact-matrix row: published reference and digest with its source lane, "inside the OS image" (node-agent, Kubernetes, CNI, and spire-agent if so decided), or the deferral reason and date; plus the single run URL from criterion 5 and the consumer transcripts from criteria 1-4.
+- Every fallback taken and every deferral is recorded in the decision record, the implementation record, and the milestone document's source-lane column.
+- An independent review of the publication code, the wrapped-build policy (where privilege and network are allowed, and that no credential is present), and the definition and lockfile changes is closed.
+- The OS-build feasibility result (entrypoint, container, privilege, network, disk, wall time, output size, registry blob limit) and the Sep 10 decisions (OS build path, NKE image path, spire-agent placement, NKE images outside the OS image) are recorded.
+
+---
+
+## Epic M3 — Qualification
+
+| Field | Value |
+|---|---|
+| **Issue type** | Epic |
+| **Epic name** | NKD M3 Qualification |
+| **Summary** | An automated, fail-closed recipe/evidence gate (schema, pin consistency, signature/provenance presence, tooling smoke) runs after signing on every artifact and emits signed qualification evidence under its own identity; tampering or missing provenance fails closed |
+| **Priority / Rank** | High / 3 |
+| **T-shirt size** | **S** — one gate module, a node kind, signed evidence, and tamper negatives; OS-image content verification is out of scope (NKE OS image build team) |
+| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m3-qualification` |
+| **Milestone label** | M3 — Qualification |
+| **Due date (best estimate)** | 2026-10-01 |
+| **Linear status** | PLANNING |
+| **Depends on** | M1 (signing and verification), M2 (artifacts to qualify) |
+| **Blocks** | M4 (release requires the gate) |
+| **Related** | NKX-14794 |
+| **Eng PIC / Product PIC** | TBD / TBD |
+| **Status note** | Not started. Gate module can be built in parallel with M2 once M1's signing adapter exists. |
+
+**Goal.** An automated, fail-closed gate runs on every delivered artifact after signing and emits signed
+qualification evidence under its own identity. This checks Recipe and build evidence. It does not establish cluster conformance or inspect of what is inside the OS image.
+
+**Delivers**
+- **The gate.** Four checks over every published artifact: *schema* (the Definition, Recipe selections, cluster views, pins and Environment decode exactly and validate);
+  *pin consistency* (every acquired artifact's published digest equals its lockfile pin; every built artifact's
+  published digest equals its run-record digest and its provenance names the pinned source commit and tree hash;
+  every composition member digest equals the published digest of that member); *presence* (a cosign signature and
+  a provenance attestation exist and verify for every artifact under the build identity; a missing attestation is
+  a distinct failure); *smoke* (operator tooling binaries and the NKE CLI run `version` inside a
+  network-disabled container).
+- **Signed evidence.** A versioned qualification-evidence document naming the definition digest, the run record,
+  each subject's published digest, every applicable check with its verdict, and any waivers (component, reason,
+  approver named in the decision record). It is attested to every subject by the qualification workflow: a
+  separate committed workflow with its own keyless identity that holds only the credential needed to attach
+  attestations. Build provenance verifies against the build identity; qualification evidence verifies against
+  the qualification identity; both are in the consumer instructions. A failing verdict is never attested.
+- **Placement.** On default-branch runs the qualification workflow runs after the build workflow's verification
+  step and is a must-pass condition for release (M4). On pull requests the gate runs inside the build workflow
+  against the packaged outputs on the runner without contacting the registry: schema, pin consistency (against
+  run-record digests), and smoke run; presence is recorded as not applicable because pull requests sign nothing;
+  nothing is attested.
+- **Verify-only dispatch.** A manual dispatch that runs verification and the gate against an already-published
+  manifest, building and publishing nothing. Used for red-run rehearsal here and by M4's manual release.
+- **Carry-over.** Any cluster package deferred from M2 is completed here under M2's criterion 4 and passes the gate.
+
+**Does not deliver.** Inspection or verification of OS image contents (owned by the NKE OS image build team);
+new SBOM-generation requirements beyond the existing per-built-artifact composition; vulnerability scanning; booting the image; cluster conformance; cluster-scoped qualification
+(post-v1).
+
+**Acceptance criteria**
+1. The gate is green on the default-branch run for every recipe and every published artifact.
+2. On a clean machine, `cosign verify-attestation` with the qualification-evidence predicate type and the published qualification identity and issuer (distinct from the build identity) succeeds for each artifact; the decoded evidence names the definition digest, the run record, the subject digest, every applicable check with its verdict, and any waivers.
+3. Negatives, each run against a scratch registry repository, each failing the run with an error code specific to the failed check and attaching no qualification attestation to the affected subject: a mutated blob; a deleted provenance attestation; a stripped signature; a lockfile pin edited to a wrong digest.
+4. Every subject appears in the evidence with exactly one verdict: pass, fail, or waived. A waived verdict names the component, the reason, and the approver. A run containing any fail verdict attests no evidence.
+5. A pull request run executes the gate against the packaged outputs: the gate job is present and green, the run log records no registry reads or writes, presence is recorded as not applicable, and no qualification attestation is pushed.
+6. A verify-only dispatch pointed at the tampered scratch repository from criterion 3 is red with the same check-specific error codes. (Pre-authorized to slip to Oct 2.)
+
+**Definition of done**
+- Tests cover a passing gate, each failure mode in criterion 3, the not-applicable presence result on pull requests, and the invariant that failing evidence is never attested.
+- An independent review of the gate, its placement, and the qualification workflow's credential scope is closed.
+- Consumer instructions are extended with the qualification-evidence predicate type, the qualification identity and issuer, the command that decodes the evidence document, and the rule that an artifact without qualification evidence is not released.
+- The evidence log records the run URL, per-artifact evidence references, the consumer transcript, and the log of the negative runs.
+- The decision record scopes this gate as recipe-level, defers cluster-scoped qualification, and records that OS image content verification is owned by the NKE OS image build team.
+
+---
+
+## Epic M4 — Automated releases
+
+| Field | Value |
+|---|---|
+| **Issue type** | Epic |
+| **Epic name** | NKD M4 Automated Releases |
+| **Summary** | A pin update flows unattended to a reviewable PR; merging produces a signed, immutably tagged release manifest; a manual dispatch re-issues a release under a chosen tag |
+| **Priority / Rank** | High / 4 |
+| **T-shirt size** | **S** — bump chain, release manifest, immutable tag, and dispatch are mostly definition; the GitHub App token and registry tag-immutability are configuration |
+| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m4-automated-releases` |
+| **Milestone label** | M4 — Automated releases |
+| **Due date (best estimate)** | 2026-10-01 |
+| **Linear status** | PLANNING |
+| **Depends on** | M1 (trigger model), M2 (publication), M3 (gate); external: a GitHub App for the pin bot, registry-side tag immutability or a namespace whose only push credential is the release workflow's |
+| **Blocks** | — |
+| **Related** | NKX-14794 |
+| **Eng PIC / Product PIC** | TBD / TBD |
+| **Status note** | Not started. Pin detection primitives exist (source and action pin refresh with a check mode); the scheduled workflow, release manifest, and tagging are new. |
+
+**Goal.** A pin update flows unattended from detection to a reviewable pull request; merging to the default
+branch produces a signed, immutably tagged release; a manual dispatch re-issues a release under a chosen tag.
+
+**Delivers**
+- **Pin detection and regeneration.** A scheduled workflow detects new upstream versions, refreshes source pins,
+  lockfile pins, and action pins in one pass, regenerates the workflows, and opens a pull request using a GitHub
+  App installation token (the workflow's own token does not trigger pull-request workflows; a personal token is
+  not used) scoped to contents and pull requests on this repository only. The App's private key is the only
+  long-lived secret the pin-update workflow holds and is absent from every other workflow. The App authors the PR,
+  cannot approve it, and a code-owner approval is required to merge. The PR body lists, for every changed pin,
+  the old and new tag, commit, tree hash, and digest. Merging to the default branch is the release decision for
+  v1; the pin-update PR is the one that changes which pins are released.
+- **The release manifest.** A versioned release-manifest document listing, for one default-branch run, every
+  artifact whose qualification verdict is pass: its source lane, digest, signature, provenance attestation, and
+  qualification-evidence attestation, with any deferred bundle members enumerated. An artifact with a fail
+  verdict makes the run red and no manifest is issued. The manifest is signed and attested by the qualification
+  workflow. It is explicitly distinct from any future reproduction-based release authorization.
+- **Tagging.** The manifest is published under an immutable tag derived from the definition digest and the
+  repository commit of the run, so every default-branch run has exactly one tag. A re-run of the same repository
+  commit finds its tag present, publishes no new manifest, and succeeds with the recorded outcome
+  "already released" and the existing manifest digest. One mutable channel tag tracks the most recent green
+  default-branch release; the release step refuses to move any other existing tag. Immutability is enforced by
+  the release step and, where the registry supports it, by registry-side tag immutability on the release
+  repository; otherwise the release workflow's credential is the only one that can push there. Consumers resolve
+  a tag once and pin the manifest by digest thereafter.
+- **Manual release.** A dispatch on the default branch takes a release-tag input and a source-manifest reference
+  (the digest of a manifest already published by a default-branch run). It rebuilds nothing: it re-verifies every
+  member of the source manifest, emits a new manifest with identical members under the requested tag, and signs
+  and attests it. A dispatch naming a manifest whose members fail verification, or a tag that already exists, is
+  refused with a distinct error code.
+
+**Does not deliver.** Unattended merge (a pre-authorized option requiring security approval); verification of
+upstream signatures in the pin loop; a scheduled release-audit job; reproduction-based release authorization;
+any release registry or lookup service beyond the OCI tag itself.
+
+**Acceptance criteria**
+1. A scheduled run of the pin-update workflow (schedule enabled in the committed workflow; a dispatch against an injected upstream change may be used to demonstrate it) opens a pull request whose body lists, for every changed source, lockfile, and action pin, the old and new tag, commit, tree hash, and digest; the pull request's own build-and-qualify run starts automatically and is green.
+2. Merging that pull request produces a signed, attested release manifest under the tag computed by the decision record's rule from the definition digest and repository commit; the manifest lists the source lane, digest, signature, provenance, and qualification evidence of every artifact published by that run; consumer verification of the manifest succeeds against the qualification identity; the channel tag resolves to the new manifest digest.
+3. A dispatch with a release-tag input equal to an existing tag is refused with the tag-immutability error code; afterwards the existing tag still resolves to its prior digest and the channel tag is unchanged.
+4. A dispatch with a new release-tag input and a source-manifest reference publishes a manifest under the requested tag whose member digests are identical to the source manifest's, without running any build or acquisition job; consumer verification of the new manifest succeeds. (Pre-authorized to slip to Oct 2.)
+
+**Definition of done**
+- Tests cover the pin refresh end to end on a fixture definition and lockfile, deterministic serialization of the release manifest, the "already released" no-op on a re-run, and tag immutability against a registry.
+- An independent review of the release step, the pin tooling, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required) is closed before the release run is declared evidence; the final decision-record text is reviewed.
+- The evidence log records the pull request URL, run URLs, manifest reference, consumer transcripts, and the tag-move refusal.
+- The decision record is final; the implementation record, contributor guidance (including the explicit list of capabilities excluded from v1), and the milestone document's source-lane column match what shipped.
+
+---
+
+## Cross-epic
+
+- **Sizes and order:** M1 XS → M2 M → M3 S → M4 S. M2 is the only epic whose size rests on assumptions (amd64
+  only; relaxed builder profile); if either tightens, it drifts toward L and should be re-sized before commitment.
+- **M2 core:** the OS image, the operator tooling bundle, the AICR bundle, and the tenant cluster bundle. Everything
+  else in M2 is covered by the pre-authorized fallbacks.
+- **Never cut:** the independent reviews and the decision-record and evidence-log work.
+- **Checkpoints:** Thu Sep 10 decides the M2 shape (wrapped OS build or QCOW2 mirror; built or mirrored NKE
+  images; spire-agent placement; which NKE images are outside the OS image). Tue Sep 16 is the M1 stop-loss; if
+  M1 is not green on GitHub, the M2 fallbacks are taken immediately.
+- **External dependencies that decide the outcome:** NKE source reachable from GitHub-hosted runners through
+  private mirrors with vendored inputs; the NKE OS build runnable on a hosted amd64 runner from a single pinned
+  entrypoint; a GitHub organization, registry namespace, OIDC identities, and a GitHub App for the pin bot;
+  registry-side tag immutability on the release repository or a namespace whose only push credential is the
+  release workflow's; product-security approval of public Sigstore before NKE bytes are signed.

@@ -1,0 +1,12 @@
+kind: RecipeMetadata
+apiVersion: nkd.dev/recipe/v1alpha1
+metadata:
+  name: platform-services
+spec:
+  # Cluster type is view metadata, not a recipe axis. An operator Definition cluster view
+  # includes this platform-services category; a tenant definition omits it.
+  criteria:
+    category: platform-services
+  componentRefs:
+    # The CAPI controller the management cluster runs to provision tenants (prebuilt).
+    - name: capi-core

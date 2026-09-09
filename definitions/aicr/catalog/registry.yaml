@@ -1,0 +1,7 @@
+apiVersion: nkd.dev/catalog/v1
+kind: SourceBuildRegistry
+metadata:
+  name: nke-aicr
+  description: Pinned AICR profile for the NKE accelerated runtime output.
+sources: {}
+components: {}

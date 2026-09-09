@@ -1,0 +1,784 @@
+# NKD (NVIDIA Kubernetes Definition) — Software Architecture & Design Document
+
+## PLC-L1: Basic PLC: Software Architecture and Design Document
+
+- **Revision:** 2026-09-08 — consolidated architecture and public lifecycle
+- **Status:** Draft; ADR-01 through ADR-22 pending named-decider ratification
+- **Review scope:** shared definition architecture, v1 artifact delivery, and the separate qualified release contract
+
+> [!NOTE]
+> This document explains the system and the reasons for its boundaries. The [ADRs](adr/) govern design;
+> [reconciliation](adr/reconciliation.md) records implementation and evidence. Proposed ADRs are the engineering
+> baseline pending ratification, not organizational approval.
+> Public lifecycle ownership is defined in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md).
+> The current ADRs state the qualified and pipeline-attested contracts directly; [milestones](milestones.md)
+> define v1 acceptance. Registration, cluster qualification, and full v1 release automation remain deferred.
+> **[INPUT NEEDED]** identifies an unresolved decision or an owner-supplied deployment parameter.
+
+# Introduction {#introduction}
+
+## Purpose and Scope {#purpose-and-scope}
+
+NKD turns a product Definition into a Run and a Release of immutable artifacts and evidence. Its Go CLI,
+`nkdctl`, resolves pinned inputs, generates the pipelines that produce artifacts, and connects their bytes to
+verifiable evidence. NKE is the v1 customer: NVIDIA runs the generated pipeline and delivers signed OCI artifacts
+that a consumer can verify independently.
+
+This SADD is for implementers, release engineers, and architecture/security reviewers. It explains which parts
+of NKD run where, the objects they exchange, the trust boundaries they enforce, and the behavior required when
+work fails. Shared structure comes first; the v1 and qualified contracts are then described separately.
+Implementation status is summarized once under Current support boundary.
+
+NKD supports two different evidence contracts. They share resolution and identity primitives, but require
+separate acceptance decisions:
+
+| Concern | v1 delivery — `pipeline-attested` | Qualified release — `qualified` |
+|---|---|---|
+| Producer and consumer | NVIDIA's hosted workflow produces artifacts; consumers verify the published digest | Publisher provides signed expected identities; an operator reproduces and verifies in its own environment |
+| Claim | Production by a named workflow with signed SLSA v1 production provenance; ADR-16 §5 targets SLSA Build L2 | Exact-byte reproduction within a signed builder profile, supported by authenticated execution observations |
+| Execution | GitHub-hosted amd64 runners; declared hermetic, wrapped, or acquired source lane | Profile-bounded execution with authenticated runtime and terminal receipts; unsupported providers fail closed |
+| Publication | Signed artifact bytes in OCI; planned recipe/evidence qualification and release manifest | Operator-owned publication of a complete cleared release through the Publication Root protocol |
+| Consumer policy | Keyless build identity and issuer; separate qualification identity for the planned M3 gate | Trusted roles, reproduction, compatibility, conformance, evidence, policy, and fresh status |
+| Outside the lane | Reproduction, clearance, air gap, cluster-scoped qualification, registration | No relaxation from a v1 signature or a v1 qualification verdict |
+
+A third tier, `static-unqualified`, describes plans and development runs without authenticated producer evidence.
+Dry-run signing stays in that tier. Selecting a signing mode or rendering a workflow does not itself prove that
+an artifact was signed. `pipeline-attested` never satisfies a gate requiring `qualified` evidence (ADR-16 §5).
+
+The tool and its catalogs are separate products: the tool owns resolution and verification rules; catalogs
+provide reusable recipes, component selections, and pins. Definitions declare named deliverable outputs once.
+NKD does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
+access, registry retention, runtime conformance, and deployment policy. Cluster-view projection and the
+proposed registration handoff describe the downstream boundary, not fleet operations (ADR-19/20).
+
+## Assumptions {#assumptions}
+
+These assumptions are subject to the ADRs. The historical SRD supplies requirements context, not a competing
+implementation baseline.
+
+- Source owners provide retrievable pinned commits, trees, toolchains, and acquired artifact digests. A pin
+  establishes an expected identity; the fetch boundary must still check the bytes (ADR-22).
+- v1 has a networked hosted runner, reachable OCI registry, source mirror, and identity/transparency services.
+  Private NKE inputs are materialized through a mirror with vendored dependencies (ADR-18 §8).
+- Workflow ownership, branch protection, and protected publication environments are security controls in v1.
+  The consumer trusts the named producer and qualification identities under an explicit issuer policy.
+- Qualified reproduction assumes inputs can be normalized and the execution environment admitted against a
+  signed profile. Operators provide the independent conformance evidence and trust policy (ADR-07/08/16).
+- Qualified offline operation requires the retained input/evidence closure and pinned trust material; it is a
+  separate deployment contract, not a property inherited by the networked v1 workflow (ADR-15).
+
+## Constraints {#constraints}
+
+The following invariants apply across the architecture unless the lane comparison explicitly narrows them.
+Detailed receipt protocols and schemas remain in their owning ADRs.
+
+| Invariant | Architectural consequence | Authority |
+|---|---|---|
+| Structured identity is canonical and typed | Use the canonical codec and frozen digest families. Recipe identity excludes transport, observation times, and host-specific values | ADR-01/02 |
+| Inputs and generated execution are immutable | Pin source and tool bytes; regenerate workflows from the same inputs and reject drift before execution | ADR-21/22 |
+| Descriptions are not authority | A parsed document, path, digest string, or boolean must be authenticated by the owning module before it can authorize work | ADR-05/16/17 |
+| Capabilities precede work | Unsupported platforms, engines, tools, and lanes return coded errors before the affected input/output work | ADR-03/17/18 |
+| Artifact graphs are closed | Every executable boundary validates declared inputs, outputs, and dependencies; downstream nodes consume the intended producer results | ADR-18/21 |
+| Observation and verification have distinct purposes | A run record describes produced bytes; verification authenticates the relevant subject and policy independently | ADR-04/07/09 |
+| Credentials are transport configuration | Secrets are referenced, never embedded in definitions or artifacts; build phases cannot inherit publication credentials | ADR-20/18 |
+| Evidence cannot be strengthened by relabeling | Source lane, evidence tier, and signer role retain their meanings at every consumer boundary | ADR-09/16 |
+| Blocking work has an owner | Context, bounded I/O, cancellation, and child-process stop/join belong to the invoking module | ADR-17 |
+
+Qualified-only constraints include signed builder-profile admission, exact-byte reproduction, independent release
+gates, authenticated status freshness, and durable authority commits. The qualified flow below describes where
+those obligations enter; a v1 run cannot satisfy them by sharing the same package implementation.
+
+## Dependencies {#dependencies}
+
+| Owner | Dependency supplied | Impact if absent |
+|---|---|---|
+| Source/build owner | Pinned buildable source, vendored inputs where required, toolchain and build entrypoint | The affected component cannot be produced |
+| CI/release engineering | Hosted runner configuration, workflow ownership, fetch access, protected environment | The intended production workflow cannot be admitted or accepted |
+| Registry owner | OCI storage, access policy, retention, immutable-tag enforcement for planned releases | Publication or subsequent verification cannot complete |
+| Identity services and product security | Keyless identity issuance, transparency service, disclosure approval | No live keyless acceptance; approval precedes the first signed run containing NKE bytes |
+| Consumer/operator | Trusted identities, issuer policy, retained references; qualified-lane policies and conformance | Evidence cannot be interpreted as authorization |
+| AICR/downstream teams | Pinned external CLI contract; provisioning projection and proposed qualification/registration handoffs | Those integrations remain capability-gated |
+
+Service owners and concrete limits are **[INPUT NEEDED]** where listed under Future Work. NKD consumes these
+services; their availability is not supplied by the CLI.
+
+## Definitions, Acronyms, Abbreviations {#definitions}
+
+The [domain vocabulary](../CONTEXT.md) defines seven high-level public objects:
+
+| Object | Meaning |
+|---|---|
+| Definition | Authored product intent: named outputs, recipe selections, packaging, and optional cluster views |
+| Recipe | Reusable build or acquisition instructions, pinned inputs, and required output contracts |
+| Environment | Separately selected execution, destinations, credential references, and signing settings |
+| Run | One attempt against frozen requirements, with progress, observed artifacts, evidence, and failures |
+| Artifact | Immutable executable, image, chart, or packaged bytes |
+| Release | Immutable selected artifacts and evidence accessible through one pinned reference |
+| Verification Policy | Consumer requirements for acceptable identities, evidence, and lifecycle state |
+
+A cluster is a named view within a Definition and its exact realization within a Release. A binary bundle is an
+Artifact format. Neither introduces another independently authored product object.
+
+The internal records appear where needed to explain trust: plans describe admitted execution; Inventory and
+ReleaseSet represent required and realized qualified membership; ValidationVectors carry signed reproduction
+expectations; clearance authorizes exact qualified contents; publication roots carry the transport closure.
+These remain typed and inspectable. Normal callers do not construct and connect them manually.
+
+Source lane describes how bytes were obtained: `hermetic-build`, `wrapped-build`, or `acquired`. Evidence tier
+describes the claim attached to those bytes. Neither is a synonym for a recipe category, node role, or release status.
+
+## References {#references}
+
+| Reference | Use |
+|---|---|
+| [ADR set](adr/) and [reconciliation](adr/reconciliation.md) | Design decisions, maturity, evidence, and unresolved critiques |
+| [v1 milestones](milestones.md) and [epic specification](epics-v1-spec.md) | M1–M4 product acceptance |
+| [Domain vocabulary](../CONTEXT.md) and [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) | Public object meanings and lifecycle contracts |
+| [SRD](srd.md) and [SRD snapshot](archive/nkd-srd-doc.md) | Historical FR/SEC/UC identifiers and requirements context |
+| [Current local evidence](evidence/2026-09-08-m1-public-lifecycle-local.md) and [historical audit](archive/milestone-audit-and-plan.md) | Recorded execution, with the limits described under Current support boundary |
+| [Contribution guide](../CONTRIBUTING.md) and [development guide](../DEVELOPMENT.md) | Repository verification and engineering workflow |
+
+# Architectural Details {#architectural-details}
+
+## High-level architecture
+
+NKD has a compilation phase and an execution phase. Compilation closes a product definition over exact recipe
+and tool inputs, constructs an artifact dependency graph, and renders it for an admitted execution environment.
+Execution materializes those inputs, produces packages and evidence, and publishes according to the selected
+lane. Verification connects an observed or retrieved subject to its expected identity and trust policy.
+
+### System context
+
+```mermaid
+flowchart LR
+  Author["Catalog and definition author"] -->|"reviewed definitions and pins"| NKD["NKD compiler and execution modules"]
+  Sources["Source and tool owners"] -->|"pinned inputs"| NKD
+  CI["Hosted CI platform"] -->|"job execution and workflow identity"| NKD
+  NKD -->|"artifacts and evidence"| Registry["Operator-owned OCI registry"]
+  Trust["Identity and transparency services"] -->|"keyless signing services"| NKD
+  Registry -->|"digest-addressed bytes and evidence"| Consumer["Independent consumer verifier"]
+  Policy["Consumer trust policy"] --> Consumer
+  Consumer -->|"accepted inputs"| Downstream["Downstream deployment system"]
+```
+
+This view shows v1 delivery. In the qualified lane, the publisher supplies signed expected identities and the
+operator independently reproduces before release authorization. In both cases the downstream deployment system
+owns provisioning and fleet behavior.
+
+### Execution and deployment
+
+```mermaid
+flowchart TB
+  subgraph Generation["Generation: developer workspace or regeneration job"]
+    Inputs["Definition, catalog pins, Environment"] --> Compiler["NKD compiler"]
+    Compiler --> Bundle["Plan, graph, generated workflow, manifest"]
+  end
+  Bundle --> Repository["Reviewed repository revision"]
+  Repository --> Gate["Regeneration and admission checks"]
+  subgraph Execution["Execution: hosted CI jobs"]
+    Gate --> Helper["Pinned helper in runner environment"]
+    Helper --> Runtime["Container runtime"]
+    Runtime --> Build["Pinned build container"]
+    Build --> Workspace["Produced bytes and run records"]
+    Workspace --> Transport["Declared inter-job artifact transport"]
+    Transport --> Package["Package and evidence jobs"]
+    Package --> Publish["Publication and signing jobs"]
+    PullBack["Pull-back verification job"]
+  end
+  Publish --> OCI["Persistent OCI registry"]
+  Identity["CI identity / Fulcio / Rekor"] --> Publish
+  OCI --> PullBack
+  OCI --> Consumer["Independent consumer verifier"]
+```
+
+The graph describes logical dependencies; it does not require one job per logical node in every lane. Ordinary
+factory nodes exchange declared artifacts through provider transport. The proposed wrapped-build job keeps its
+large output in one job through publication and verification, avoiding repeated inter-job transfer (ADR-10).
+
+| Boundary | Data and responsibility | Trust or persistence rule |
+|---|---|---|
+| Repository → compiler | Definition, catalog selection, pins, Environment | Validate the complete input model; secrets remain references |
+| Compiler → committed bundle | Canonical plan, graph, provider files and manifest | Same inputs regenerate the owned files exactly; an editable workflow is not the source of truth |
+| Runner helper → build container | Declared sources, pinned toolchain and allowed environment | Runtime performs isolation; build code receives only the capabilities permitted by its source lane |
+| Job → next job | Exact declared artifact edges and run records | Provider storage transports bytes; presence in storage is not verification |
+| Publisher → registry | OCI content followed by signatures and attestations | Remote writes can be visible before the whole run succeeds |
+| Registry → verifier | Digest-selected manifest and associated evidence | Recompute identity and enforce signer/issuer policy |
+
+Runner workspaces and provider job artifacts are execution storage, not the release authority. Retention of
+published bytes and evidence belongs to the registry owner. The local factory runner executes the same logical
+graph for development, with local workspaces and optional publication; it cannot establish hosted-workflow identity.
+
+### Object relationships and identity
+
+```mermaid
+flowchart TB
+  Recipe["Recipe: reusable build or acquisition instructions"] --> Definition["Definition: named outputs and optional cluster views"]
+  Definition --> Prepare["Resolve and freeze required outputs"]
+  Environment["Environment: execution and publication settings"] --> Prepare
+  Prepare --> Run["Run: one attempt, observations and evidence"]
+  Run --> Complete["Authenticate observations and check completeness"]
+  Complete --> Release["Release: immutable artifacts and evidence"]
+  Release --> Verify["Authenticate selected closure"]
+  Policy["Verification Policy"] --> Verify
+  Verify --> Consumer["Accepted artifacts and cluster views"]
+```
+
+The arrows are admission and verification boundaries. A failed or incomplete Run cannot create a usable Release.
+A signing dry-run creates no authenticated production claim. Release consumption requires an explicit policy;
+its pinned reference locates bytes and grants no authority by itself.
+
+Verification Policy also states the acceptance scope. Build-evidence verification authenticates the exact
+selected artifact publication, build identity, and production provenance. Full v1 release acceptance adds the
+separate qualification verdicts, identity, membership, and revocation requirements. Qualified acceptance retains
+its own authorization and lifecycle checks. An unavailable scope fails explicitly; it never falls back to
+build-evidence verification. The returned capability applies only to its exact reference and policy.
+
+Each named output supplies its selection and format once. The compiler derives standard package envelopes,
+publication routes, and required output slots, then joins independently observed bytes into those slots.
+Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
+Specialized byte-changing transformations remain explicit product intent.
+
+One authored cluster view resolves to an immutable composition, including exact recipes, roles, frame, and AICR
+inputs. Its generated release binding checks the exact selected members. This preserves the difference between
+intent and realization without requiring a second ClusterDefinition document or a caller-supplied ready flag.
+
+A named Artifact keeps its payload digest across Run and Release views. The enclosing publication root has a
+separate identity. Release content binds payload membership, cluster realization binds that content and the
+exact composition, and the outer publication carries them together. Using the outer root as one of its own
+content members would create a circular identity and is forbidden.
+
+| Identity or record | Owner and purpose | Boundary |
+|---|---|---|
+| Definition | Product author → lifecycle compiler | Named output intent; the single product-authoring input |
+| Resolved Recipe | Resolver → compiler/executor | Canonical logical graph and pins; excludes transport and runtime observations |
+| Environment | Environment owner → compiler/executor | Execution, transport, and signing settings; changes may alter prepared execution |
+| Execution plan and graph | Compiler → renderer/executor | Closed inputs, required outputs, dependencies, and generator identity |
+| Generated execution bundle | Renderer → CI | Exact executable files and commit manifest, distinct from recipe identity |
+| Run observations | Executor → completeness/evidence owners | Exact observed bytes and attempt state; serialized records remain descriptions |
+| Artifact | Producer/packager → consumer | Exact blob or OCI bytes, separate from logical Recipe identity |
+| Release content and evidence | Release/transport owners → verifier | Noncircular exact content subject and typed proof closure |
+| Authenticated receipts | Owning verifier → authorized operation | Bound to exact subjects, roles, and policy; cannot be recreated by parsing |
+
+All structured identities use ADR-01's canonical codec and named digest families. The codec uses its specified
+integer-only numeric profile; an arbitrary JSON serialization is not an identity implementation. Raw SHA-256
+remains appropriate for exact blob integrity. These distinctions explain why one recipe can produce different
+run evidence without becoming a different recipe.
+
+## Module topology
+
+The module boundary follows ownership of invariants. Commands present inputs and errors; the SDK delegates to
+the lifecycle owner and the same domain modules. Migrating existing command-layer orchestration is tracked
+in reconciliation; a facade alone does not discharge that debt.
+
+| Responsibility | Owning modules under `pkg/nkd` | Boundary |
+|---|---|---|
+| Canonical identity and resolution | `canonical`, `ir`, `criteria`, `catalog`, `compose`, `recipe` | Authenticate and normalize inputs into deterministic logical identities |
+| Public lifecycle | `lifecycle` | Own Definition/Environment preparation, required-output construction, Run and Release views; delegate authority |
+| Compilation and execution | `factory` | Join resolved recipes into an artifact graph; render and execute admitted nodes |
+| Qualified graph execution | `pipeline` | Graph admission, runtime observations, terminal receipts, and provider transport |
+| Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
+| Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
+| Packaging and transport | `assemble`, `delivery`, `transport` | Artifact representation, OCI layout/closure and target transport |
+| Release authority and durable status | `release`, `status` | Authorization, freshness, durable publication/activation contracts |
+| Consumer projections | `cluster`, `aicr` | Cluster projection and external AICR integration |
+| Public adaptation | `errors`; `client/v1` and `cmd/nkdctl` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
+
+The purity guard lives in `internal/architecture` as a repository test, not a domain module.
+
+The factory stack and the ADR-18 authoritative single-recipe emitter are separate adapters. ADR-18 permits the
+factory's v1 production claim without a qualified provider execution receipt (ADR-18 §8). It does not unfreeze the
+single-recipe emitter or grant that adapter authority by analogy.
+
+## ADR index & traceability
+
+This index locates design responsibility. Per-ADR maturity and remaining acceptance evidence live in
+[reconciliation](adr/reconciliation.md), avoiding a second detailed status ledger here.
+
+| ADR | Design responsibility | Main view in this SADD |
+|---|---|---|
+| 01 | Canonical serialization and typed identities | Object relationships and identity |
+| 02 | IR purity | Constraints; worked example |
+| 03 | Coded errors | Error Handling |
+| 04 | Signing and verification | Lane comparison; Security Design |
+| 05 | Authenticated trust objects | Qualified flow |
+| 06 | Immutable publication and fresh status | State Machine; recovery |
+| 07 | Reproduction identity and builder profile | Qualified flow |
+| 08 | Reproducibility and bake-off | Test Automation |
+| 09 | Reproduction and production provenance | Data Flow |
+| 10 | Builder types | Qualified flow |
+| 11 | Composition and resolution | Object relationships |
+| 12 | Criteria and AICR activation | Configuration Data |
+| 13 | Subject-bound supply-chain evidence | Data Flow; SBOM output |
+| 14 | Canonical disk and derived delivery | Qualified flow |
+| 15 | Air-gap closure and activation | Recovery; availability |
+| 16 | Release gates and digest-first selection | Qualified flow; State Machine |
+| 17 | Public lifecycle, module boundaries and bounded I/O | Module topology; quality scenarios |
+| 18 | Execution graph and CI adapters | Deployment; module topology |
+| 19 | Cluster view, realization and deferred qualification | Object relationships; qualified flow |
+| 20 | Environment, publication and deferred registration | Interfaces; recovery |
+| 21 | Definition selection and generated-bundle maintenance | Compilation and drift |
+| 22 | Pins, lock contract, proposed derived pin sets | Configuration Data; worked example |
+
+### Architecture drivers and validation
+
+The table maps the main review concerns to mechanisms and acceptance activities. It is an architectural
+coverage map, not a claim that every historical SRD requirement is implemented. M1–M4 acceptance remains in the
+milestone specification.
+
+| Driver | Mechanism and view | Validation needed |
+|---|---|---|
+| Stable, reviewable definitions | Canonical identities, locked inputs, generated bundle | Golden identities; differential pin/destination tests; byte-exact regeneration |
+| M1 source-built delivery | Build → package → publish → sign → verify | Hosted NKE CLI run and independent cosign verification |
+| M2 artifact breadth | Multiple recipe targets, acquired inputs, compositions, proposed wrapped job | Each scoped artifact/variant delivered; large-output execution exercise |
+| M3 recipe/evidence qualification | Separate signer and subject-bound verdicts | Positive gate plus tamper, missing evidence, and wrong-pin negatives |
+| M4 release cadence | Immutable manifest and channel discovery | Re-run, concurrent-run and interrupted-publication exercises |
+| Qualified reproduction and authorization | Profile, independent evidence, clearance, status | Two-environment reproduction; exact receipt and complete-release negatives |
+| Integrity under interruption | Owned I/O, explicit durable commit boundaries | Cancellation and recovery scenarios below |
+
+## Current support boundary
+
+This is a dated routing summary for 2026-09-08. It distinguishes useful implementation from complete external
+acceptance; detailed module contracts remain in reconciliation.
+
+The seven-object workflow, local immutable attempts, scoped Release consumer, and both hosted renderers are
+implemented and contract-tested, including executable/APT/Helm GPU closure on amd64 and arm64 with controlled
+producers. Current signing-service and provider acceptance remains unverified. Full v1 release qualification,
+wrapped execution, derived pin sets, registration and cluster qualification remain unimplemented. Qualified
+production flows remain capability-gated where authority adapters are absent. Air-gap execution is outside scope and its dormant implementation has been removed.
+
+[Reconciliation](adr/reconciliation.md) is the single detailed support and evidence matrix. Multi-architecture
+example coverage does not expand the amd64 NKE v1 delivery milestone.
+
+The [2026-09-08 local record](evidence/2026-09-08-m1-public-lifecycle-local.md) exercises the current NKE Definition,
+immutable Run, SBOM, loopback publication/pull-back and recovered CLI execution with dry-run signing.
+The [historical audit, fact F6](archive/milestone-audit-and-plan.md) records an earlier
+GitLab build-only run: pipeline 64812267, commit `f0c6890`, 2026-08-26, 23 green jobs. That historical run does
+not validate the current regenerated bundle or GitHub/keyless acceptance. No current provider execution or live keyless acceptance is inferred from that historical run.
+
+# Design Details {#design-details}
+
+## Design Alternatives {#design-alternatives}
+
+| Choice | Reason for selection | Cost or limit | ADR |
+|---|---|---|---|
+| Seven public objects with generated internal relationships | Removes repeated authoring and caller-built receipt graphs while retaining typed trust boundaries | Requires compiler/verifier ownership | 17 |
+| Compile definitions into a graph rather than maintain hand-written CI | One reviewed model controls dependency and transport validation; regeneration makes changes inspectable | Compiler and provider adapters become security-sensitive infrastructure | 18/21 |
+| Separate recipe identity from environment and publication | A destination change does not change what is being built | Plan, bundle, artifact and evidence identities must remain distinct | 01/02/20 |
+| Name the v1 evidence tier explicitly | Hosted production can ship without claiming reproduction | Trust shifts to workflow ownership and the hosted platform | 16 |
+| Run pinned source entrypoints for wrapped builds | Commit, tree and toolchain remain explicit inputs | External build behavior and declared privilege remain producer risks; fused execution needs its own implementation | 10 |
+| Keyless cosign for v1 | Consumer acceptance uses standard signature and attestation verification against a workflow identity | Online identity/transparency dependencies and permanent disclosure; no qualified clearance | 04 |
+| Independent qualified verification and gates | A build defect cannot supply all of its own release authorization | Separate roles, policies, evidence and operational services are required | 04/16 |
+| Content-addressed OCI publication | Consumers select immutable bytes through standard transport | Multi-object publication is not a single atomic remote transaction | 06/20 |
+| Per-component builder types and canonical RAW disks | Preserve a defined reproduction boundary across toolchains and delivery envelopes | Qualified Nix and several disk-production adapters remain unavailable | 10/14 |
+
+## Static Design {#static-design}
+
+### Configuration Data {#configuration-data}
+
+The component catalog separates authored source declarations from machine-resolved lock entries. A lock binds
+tag, commit, tree hash, source date epoch and acquired artifact pins; it feeds recipe identity. `tagPrefix`
+selects independently tagged modules in a monorepo. Criteria select recipes by category, Kubernetes version, OS
+and architecture; roles and cluster types compose delivery views (ADR-11/12/22).
+
+A Definition selects recipes and declares named outputs and optional cluster views. An Environment supplies
+runtime, destinations, credential references, and signing configuration/tools. The compiler derives routine
+packaging and routes. Regeneration records the exact Definition and Environment input paths.
+Changing an Environment can change prepared execution and generated bytes without changing a Resolved Recipe;
+output-affecting build inputs remain bound to the identity they affect (ADR-17 §1).
+
+The qualified lane additionally consumes signed builder profiles, immutable promotion and evidence policies,
+and an operator trust store. It generates the exact Inventory compatibility form only after authenticated
+binding of the requirements frozen before execution. Trust precedence is explicit: CLI policy overrides operator
+store, while catalog identities remain advisory. External utilities are subprocess capabilities rather than
+linked build engines; qualified tools require the corresponding pinned execution contract (ADR-04/05/07/17).
+
+Proposed configuration includes ADR-22 §7 derived pin sets and ADR-10's embedded-component declarations. Derived member pins must be
+re-derived from the pinned upstream tree at validation; an annotation alone cannot establish consistency.
+`embeds` describes components inside an external image and is checked against its pinned upstream manifest.
+It does not authorize NKD to inspect or certify image contents. Deferred registration/cluster qualification add separate post-v1 handoff inputs.
+
+### External Interface and Specification {#external-interface-and-specification}
+
+| Interface | Producer → consumer | Contract and failure boundary |
+|---|---|---|
+| Git/source transport | Upstream or mirror → fetch step | Retrieve pinned source and check commit/tree before build; credentials limited to fetching |
+| Container runtime | Helper → pinned toolchain container | Apply declared platform/network/privilege; qualified execution additionally requires runtime receipts |
+| CI artifact transport | Producer job → dependent job | Carry declared artifact edges; graph admission and identity checks remain NKD responsibilities |
+| OCI distribution | Packager/publisher ↔ registry | Content selected by digest; layout/manifest integrity checked; remote failure cannot imply successful publication |
+| Keyless signing | Signing module ↔ cosign/Fulcio/Rekor | Exact pinned executable and subject, explicit identity/issuer; registry credentials in private `DOCKER_CONFIG` |
+| Consumer verification | Registry → independent verifier | Signature and production attestation against the digest and published identity policy; planned qualification uses a distinct identity |
+| Qualified evidence/status | External evidence producers → authorization modules | Authenticate role, subject, policy, completeness and fresh status before clearance |
+| AICR, qemu, Nix | NKD adapter → external utility | Pinned subprocess interface; reject absent capabilities; qualified Nix remains disabled |
+| Provisioning/registration | Cluster projection → downstream owner | NKD produces definitions; external systems provision. Registration transport is proposed |
+
+Exact schema and lifecycle contracts belong in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) and the owning
+ADRs; [the lifecycle guide](lifecycle.md) documents current commands. This interface view identifies architectural responsibility; it does not claim every listed adapter is enabled.
+
+### Dependencies {#dependencies-1}
+
+The deployment owner must connect the interfaces above with explicit policies. In v1 this includes source mirror
+access, a fixed workflow identity, protected publishing, OCI retention, and identity-service availability. In the
+qualified lane it additionally includes independent evidence producers, status/time authorities, and offline trust
+material where applicable. These dependencies cannot be replaced by caller-supplied success flags.
+
+## Dynamic Design {#dynamic-design}
+
+### Functionality and Behavior {#functionality-and-behavior}
+
+Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
+complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
+the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+
+Execution consumes this closed plan. Component producers create bytes and run records; factory nodes add
+packaging, composition and evidence dependencies. Publication is followed by signature/attestation and pull-back
+verification in v1. The qualified path performs its independent gates before constructing a cleared publication.
+The following flows describe intended contracts; the support table identifies what has been implemented.
+
+### Control Flow {#control-flow}
+
+#### v1 artifact delivery
+
+```mermaid
+flowchart TB
+  Fetch["Fetch pinned inputs"] --> Produce["Build or acquire"]
+  Produce --> Observe["Re-hash and record"]
+  Observe --> SBOM["Per-artifact SBOM and index"]
+  Observe --> Package["Package or compose"]
+  Package --> Publish["Publish OCI bytes"]
+  Publish --> Sign["Sign and attest"]
+  Sign --> Verify["Pull back and verify"]
+  Verify -.-> Qualify["M3 qualification: proposed"]
+  Qualify -.-> Release["M4 release manifest: proposed"]
+```
+
+Each component declares one source lane. A hermetic build uses pinned source/toolchain inputs with build network
+disabled. Acquisition fetches pinned upstream bytes and makes no upstream build or signature-verification claim;
+its evidence is `none` unless an upstream evidence reference is declared. Wrapped execution records an external
+build's declared network and privilege (ADR-10).
+
+The proposed wrapped job fuses build, re-hash, run record, publish, sign and verify so a multi-gigabyte artifact
+need not traverse job storage repeatedly. Fetching precedes the build; publication/OIDC credentials enter only
+after the build exits and the run record is written. The mechanism enforcing this phase separation is part of
+wrapped-job acceptance, not implied by putting steps in sequence.
+
+M3 is a recipe/evidence gate covering schema, pins, evidence and a tooling smoke test. Its separate workflow
+signs qualification evidence; it does not supply runtime conformance or ADR-19 §4 cluster qualification. M4 lists
+artifacts with passing qualification in a canonical release manifest, under an immutable definition/commit tag
+and one mutable channel tag. A failing verdict prevents manifest issuance. These gates remain proposed.
+
+#### Qualified reproduction and release
+
+The publisher creates a signed ValidationVector of expected identities. The operator admits the signed builder
+profile, materializes exact inputs, executes through authenticated runtime boundaries, and independently compares
+outputs. Reproduction provenance is deterministic and remains separate from v1 production provenance.
+
+```mermaid
+flowchart TB
+  Profile["Admit profile and inputs"] --> Build["Execute and observe"]
+  Build --> Reproduce["Independent reproduction check"]
+  Vector["Signed expected identities"] --> Reproduce
+  Reproduce --> Gates["Release authorization"]
+  Evidence["Compatibility, conformance, evidence, policy, status"] --> Gates
+  Gates --> Clearance["Clearance and publication manifest"]
+  Clearance --> Root["Qualified Publication Root"]
+  Root --> Consumer["Authenticate complete closure"]
+```
+
+Release authorization covers a complete ReleaseSet against its Inventory. Independent reproduction,
+compatibility, conformance, evidence, policy and status requirements must all hold (ADR-16). The Publication Root
+binds the manifest, exact artifacts/evidence and clearance without circular signing; the consumer authenticates
+that closure before treating it as a cleared release (ADR-20).
+
+For disk artifacts, RAW logical bytes define canonical identity; qcow2 and other delivery envelopes are checked
+through their decoded representation. Encryption creates a distinct identity outside pre-encryption reproduction
+(ADR-14). Variance classification cannot currently authorize release. Nix is a selected qualified builder design,
+but its execution capability is unavailable.
+
+A generated cluster realization maps the exact composition to accepted Release members for a downstream
+provisioner. Qualified cluster publication records remain descriptions until authenticated. The proposed ADR-19 §4
+QualificationResult concerns the provisioned combination and is a passive independent handoff. ADR-20 §7's proposed
+ReleaseRegistration binds the relevant immutable references for an operator-owned discovery interface. Neither
+is part of the v1 manifest or a substitute for its recipe/evidence gate.
+
+### Data Flow {#data-flow}
+
+#### Worked example: a CLI and an acquired utility
+
+This is an illustrative plan, not a recorded release. A definition selects a recipe containing a source-built
+CLI and a digest-pinned acquired utility, then requests a binary bundle for one platform.
+
+1. Resolution closes the CLI's commit/tree/toolchain and the utility's blob pin into the recipe graph. The
+   resulting Recipe Digest says what was selected; it does not prove either producer ran.
+2. The lifecycle compiler freezes required output slots, then derives producer, observation, SBOM, packaging,
+   root, and routing nodes from the named output and Environment. The plan records the exact input selection.
+3. Execution checks the inputs, builds the CLI and acquires the utility. Each producer records the observed
+   component bytes. Terminal observation gates the per-recipe SBOM node, which binds per-artifact CycloneDX
+   documents to observed digests and emits an aggregate index (ADR-13 §6).
+4. Packaging binds file names, modes, sizes and hashes into a Binary Bundle config and deterministic layer.
+   The package's OCI identity is distinct from either component hash and from the Recipe Digest.
+5. Publication produces a digest reference. Signing re-derives the routed layout identity and requires it to
+   agree with the publication subject. The production predicate records plan and input identities; cosign binds
+   it to the published subject. Pull-back verification checks the served manifest identity and signing policy.
+6. An independent consumer verifies the published digest and evidence. Proposed M3/M4 processing adds a
+   qualification verdict and a release-manifest entry; neither is implied by the artifact already being in OCI.
+
+The acquired component retains its acquisition-only claim. SBOM generation asserts composition; it neither
+verifies upstream signatures nor upgrades evidence. The implemented SBOM node produces documents and an index;
+this diagram does not imply that every generated SBOM is independently signed or routed to the registry.
+
+| Change to the example | Identity effect |
+|---|---|
+| CLI source pin changes | Recipe and enclosing plan change; new execution is needed to learn output identities |
+| Only registry destination changes | Recipe identity is unchanged; Environment/plan/bundle can change; preserved package bytes retain their OCI digest |
+| Only signing policy changes | Recipe identity is unchanged; Environment and production evidence change |
+| Same inputs run again | Recipe identity stays fixed; production metadata can differ; v1 makes no reproduction guarantee |
+| SBOM structure becomes a new plan output | Plan bytes and identity change; existing attestations retain their original meaning |
+
+### Error Handling {#error-handling}
+
+User-visible failures carry stable codes through the CLI/SDK and CI boundaries (ADR-03). Invalid definitions,
+unsupported capabilities, drift and failed verification stop the affected operation. Transient failures can be
+classified as retryable, but retry classification is not a resume protocol and does not authorize reuse of an
+unchecked output. The owning modules preserve context cancellation and bounded child-process cleanup (ADR-17).
+
+#### v1 interruption and recovery boundaries
+
+Publication, signing and verification are separate effects. OCI bytes or even a signature may remain visible
+when a later operation fails. Absence of a successful run record does not prove that no remote write occurred.
+The following scenarios separate established refusal rules from recovery decisions still needed for M4.
+
+| Interruption or failure | Possible durable state | Required disposition and remaining decision |
+|---|---|---|
+| Definition or graph admission fails | Existing committed inputs; no newly admitted execution | Fail before output for the unsupported operation; correct inputs and regenerate |
+| Build or packaging fails | Partial workspace/job artifacts | No successful downstream result; cleanup follows owned execution. No general checkpoint/resume guarantee is claimed |
+| Hosted producer job or artifact restore fails | Some usable artifacts may remain | Finalization must reject completion even when selected payloads exist; job success and successful restore are separate from exact-byte validation |
+| Bootstrap or the finalizer cannot run | Provider job state may exist without a Run record | Consult provider state; absence of a Run record proves neither success nor absence of remote effects |
+| OCI push succeeds, signing fails | Artifact visible; signature or attestation may be absent or partial | Run fails; presence alone is insufficient for verification. Retry deduplication and retention of partial publications need a deployment protocol |
+| Signing succeeds, verification fails | Artifact and signed evidence may be visible | Fail the run; do not issue a successful verification result. Consumer verification remains independent |
+| Remote write succeeds but local record is interrupted | Remote state may be ahead of the run's local record | Re-observation is needed to resolve uncertainty; exact cross-run reconciliation/resume behavior is not yet specified |
+| Proposed qualification fails | Earlier artifacts/evidence can remain in OCI | ADR-16 §5 forbids issuing the release manifest for a failing verdict |
+| Proposed release tag already exists on re-run | Existing immutable manifest | ADR-06 §6 specifies success with “already released” and the existing digest; tag collision validation and interrupted-create handling need implementation |
+| Two release runs overlap | Competing attempts to create tags or advance a channel | Immutable tags must not move. Serialization/CAS and the channel winner rule are open decisions, not established by content addressing |
+
+v1 has no atomic multi-object commit spanning artifact upload, signatures and a release tag. Its proposed release
+manifest is the aggregate completion record; direct digest consumers still apply their own verification policy.
+Publication visibility, successful verification and release membership must therefore be represented separately.
+
+Qualified durability uses a different contract: authenticated capabilities, kernel-released locks, byte-CAS or
+no-replace commits, commit markers and directory fsync at specified boundaries. Mirror activation and publication
+closure recovery follow ADR-15/20 and the implementation record. Those mechanisms do not automatically confer
+transactional recovery on the v1 remote workflow.
+
+### Logging and Debugging {#logging-and-debugging}
+
+Diagnostics go to stderr; machine-readable results go to stdout or declared output files. Logs must not contain
+credentials or key material. A useful failure report names the operation/node, coded error, expected subject and
+observed identity when available. Production predicates and run records provide the run/plan context; the
+qualified EvidenceBundle is diagnostic and cannot stand in for an authenticated receipt (ADR-03/05/17).
+
+Operational retention must preserve enough run, plan and subject information to investigate a partial publication.
+The retention duration and responsible store are open deployment parameters; transient CI logs alone are not a
+release record.
+
+### State Machine {#state-machine}
+
+ADR-17's Run contract separates frozen preparation from a recorded execution attempt. Admission precedes
+reservation of attempt storage. Each execution uses a distinct attempt identifier; completed and failed
+observations remain attached to that attempt. A retry produces another attempt rather than replacing its
+predecessor. Failed execution retains its required outputs and coded failure, and cannot be interpreted as a
+complete Release. Reconciliation records the persistence and observation contract tests; no general resume protocol is inferred from a saved Run description.
+
+The v1 states below are logical conditions, not a claim that an implemented durable workflow engine persists
+these transitions. “Release recorded” requires the proposed M3/M4 path.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Planned
+  Planned --> Produced: inputs admitted and bytes observed
+  Planned --> Failed: admission fails
+  Produced --> Published: OCI push succeeds
+  Published --> Signed: signature and attestation created
+  Signed --> Verified: pull-back checks pass
+  Verified --> QualificationPassed: proposed M3 gate
+  QualificationPassed --> ReleaseRecorded: proposed M4 manifest
+  Produced --> Failed: packaging or publication fails
+  Published --> Failed: signing fails
+  Signed --> Failed: verification fails
+  Verified --> Failed: qualification fails
+  ReleaseRecorded --> Revoked: proposed signed revocation
+```
+
+Failed runs can leave remote artifacts. The state diagram does not imply rollback or permission to resume from
+an old workspace. Revocation is proposed: a signed marker from the qualification identity, removal of the mutable
+channel reference, and consumer rejection while immutable release evidence remains (ADR-06 §6). It has none of
+ADR-06's trusted-time or anti-rollback guarantees.
+
+The qualified lifecycle advances through reproduced, attested, authorized and published conditions. Later signed
+status declarations mark a publication superseded, deprecated or withdrawn without mutating its identity.
+Consumers authenticate checkpoint completeness, freshness and monotonicity; a valid old signature alone does not
+establish current release status (ADR-06/16).
+
+## Security Design {#security-design}
+
+The protected assets are pinned definitions, produced bytes, signing identities, subject-bound evidence and
+release authorization. The principal trust boundaries are the source fetch, runner/container, job transport,
+publication/signing, registry retrieval and external evidence handoff boundaries shown above.
+
+In v1 the producing workflow self-attests. Compromise of its protected ref or signing execution compromises that
+claim; branch protection and code ownership are part of the trust model. Qualified release adds independent
+reproduction and evidence authorities. Cryptographic validity in either lane does not eliminate compromise of an
+authorized producer or signer.
+
+| Threat | Control | Scope / residual risk |
+|---|---|---|
+| Catalog substitutes an input | Pin validation and post-composition checks | Both lanes; source review still matters |
+| Job transport or registry substitutes bytes | Re-derive exact subjects and verify immutable references | Both lanes; storage presence never authorizes use |
+| Build code receives a credential | Fetch-only read credential; publish/OIDC capability introduced after build | v1 contract; wrapped phase isolation requires acceptance testing |
+| Workflow identity is spoofed | Explicit identity/ref and issuer policy; reject PR identities for signing | v1; protects identity selection, not a compromised authorized workflow |
+| Default branch or helper is compromised | Protected branch/environment and code ownership over generator, helper and signing code | Accepted v1 residual risk; no reproduction claim |
+| Evidence is relabeled across lanes or roles | Typed tier and predicate validation; distinct build/qualification identities | v1 qualification remains proposed |
+| A build defect supplies its own release proof | Independent reproduction, conformance and other authenticated gates | Qualified lane |
+| Registry omits fresh withdrawal status | Authenticated checkpoints, trusted time and anti-rollback state | Qualified lane; v1 revocation does not provide freshness |
+| Offline trust root is substituted | Pinned trust snapshot and offline inclusion proof | Qualified air-gap contract |
+| Mutable tag selects different bytes | Digest-first consumption; proposed immutable release tags and restricted channel update | v1 tag concurrency/registry policy requires acceptance |
+| Secrets escape through tools or logs | Referenced credentials, private signer config and bounded process environment | Both lanes under their admitted adapters |
+
+ADR-18 §8's event policy is the admission contract for production rendering:
+
+| Event | Permitted work | Credentials |
+|---|---|---|
+| Fork pull request | Regeneration/schema checks | None |
+| In-repository pull request | Build and package | Read-only credential on fetch steps; no publish or OIDC access |
+| Default-branch push / manual dispatch on default ref | Publish, sign, attest and verify in a protected environment | Phase-scoped registry and OIDC access |
+| Git tag | No v1 signing trigger | No signing authorization from the tag |
+
+A renderer unable to express the required guards must reject the affected lane. This table states the contract;
+it is not proof that an unexercised workflow or the proposed fused job already enforces it in production.
+
+Public transparency logs permanently disclose organization, repository, workflow identity and artifact digests.
+Product-security sign-off is required before the first signed run containing NKE bytes. Qualification evidence
+uses a separate identity; consumers must enforce the appropriate role as well as cryptographic validity.
+
+## Test Automation {#test-automation}
+
+Validation is organized around architectural boundaries rather than package counts. Existing contract evidence is
+recorded in reconciliation; the table states the acceptance strategy, including uncompleted exercises.
+
+| Boundary | Contract checks | External acceptance |
+|---|---|---|
+| Definition → identity | Canonical corpus, criteria/composition negatives, differential identity tests | Independent-language canonical corpus |
+| Plan → generated execution | Graph validation, unsupported-lane errors, byte-exact drift checks | Exact committed bundle executed by the target provider |
+| Producer → artifact | Observed subject binding, substitution and malformed-record negatives | Pinned source build on the intended runtime |
+| Artifact → SBOM | Subject/index binding and deterministic documents | Inspect generated evidence for the scoped real artifacts |
+| Publication → verification | Subject mismatch, mode/policy mismatch, missing evidence | Live keyless round trip and independent cosign-only verification |
+| v1 qualification/release | Planned verdict, signer separation, immutable-tag and re-run tests | M3 negatives and M4 interrupted/concurrent-run exercises |
+| Qualified authority | Profile/receipt substitution, status rollback, incomplete closure | Two-machine reproduction, live/offline trust, registry and air-gap exercises |
+| Execution lifecycle | Context cancellation and resource-bound negatives | Stop/join and cleanup on real Linux runners |
+
+Repository changes use the proportionate completion gate and the full release-blocking checks before claiming
+repository-wide completion: format, unit and race tests, vet, lint, shellcheck and diff checks. Linux authority
+paths require Linux evidence. A green contract suite does not establish service interoperability or milestone
+acceptance; the dated execution records remain separate.
+
+## Other Design Considerations {#other-design-considerations}
+
+### Resource Limits {#resource-limits}
+
+Compilation is dominated by catalog size and graph cardinality. Execution is dominated by producer working sets,
+package construction and artifact transport. Reads and subprocesses must be bounded, but a bounded reader alone
+does not establish that a large-image workflow fits a hosted runner.
+
+For a wrapped job, capacity planning must include materialized sources, toolchains, build scratch, produced image,
+package representation and verification temporaries that coexist. Fusion removes repeated job transfer, not these
+storage requirements. No numeric capacity or duration target is invented here.
+
+### High Availability {#high-availability}
+
+NKD is a batch tool, so it does not need an always-running control plane. Successful production still depends on
+retrievable inputs, CI capacity, registry writes/reads and identity services. Already published artifacts depend
+on registry/evidence retention for later verification. An unavailable dependency causes a failed or bounded-out
+operation; it cannot turn verification into an optional step.
+
+Qualified offline verification substitutes a retained authenticated closure for online dependencies (ADR-15).
+The networked v1 lane has no such availability claim. Partial remote writes and recovery are covered above.
+
+### Scalability {#scalability}
+
+Graph dependencies expose independent work for scheduling, but realized parallelism depends on the executor and
+provider quotas. Job-per-component transport trades scheduling flexibility for storage and transfer cost. The
+proposed wrapped job makes the opposite tradeoff for large artifacts. A composed release references member
+identities rather than rebuilding those members merely to describe the composition.
+
+Incremental equality identifies candidates for reuse. Qualified reuse still requires prior authenticated evidence
+rebound to the current policy and member; the existing IncrementalPlan is diagnostic (ADR-16). v1 remains amd64-only;
+additional architectures require their own source and runner acceptance.
+
+### Quality-attribute scenarios
+
+These scenarios make the design evaluable. Acceptance methods and unresolved parameters below are review targets,
+not claims of measured service levels or newly approved requirements.
+
+| Scenario | Expected response / acceptance measure | Parameter or decision still needed |
+|---|---|---|
+| Regenerate an unchanged definition | Zero missing, extra or divergent owned files | None for the invariant; fixture coverage follows the selected engine |
+| Change only a registry destination | Same Recipe Digest; Environment and plan changes are explicit | Test the chosen Definition/Environment pair |
+| Substitute artifact bytes before signing | Coded refusal and no successful signing result for the substituted subject | Real workflow negative beyond injected adapters |
+| Cancel while external work blocks | Child/container work stops and is joined within the selected cleanup bound | Release engineering: deadline and Linux measurement |
+| Build/package the largest scoped OS image | Peak disk/memory and transfer volume remain within the admitted runner budget | NKE/build owner: representative size and scratch demand; CI owner: budget/headroom |
+| Registry or signing service is unavailable | Finite failure; no successful verification or release claim | Service owner: timeout, retry budget and recovery procedure |
+| Two runs attempt release publication | Immutable references remain stable; channel update has a defined winner | Release engineering: serialization/CAS, ordering and collision protocol |
+| Investigate a partial publication after CI expiry | Recover the relevant plan/run/subject and remote-state evidence | Registry/CI owners: retention period and durable record location |
+
+### Future Work {#future-work}
+
+Open decisions are grouped by what they block. Owners below identify responsibilities to assign, not approvals
+already obtained.
+
+| Decision or acceptance gap | Responsible role | Blocks |
+|---|---|---|
+| Named-decider ratification of the ADR set | Architecture owners — **[INPUT NEEDED]** | Organizational acceptance of the proposed engineering baseline |
+| Live GitHub execution, source mirror access and protected environment | CI/release engineering and NKE source owners | M1 external acceptance |
+| Transparency disclosure, Fulcio/Rekor operations and deletion protection | Product security and service owners | First signed NKE run and sustainable consumer verification |
+| Wrapped-job isolation and capacity envelope | NKE build owner and CI engineering | Large OS-image delivery in M2 |
+| Derived pin sets and `embeds` consistency | Catalog/build owners | Checked upstream composition binding |
+| M3 role policy and qualification implementation | Qualification owner | Recipe/evidence verdicts |
+| M4 concurrency, partial-write reconciliation, tag and retention protocol | Release engineering and registry owner | Reliable repeated and interrupted release publication |
+| Qualified provider observation, Nix, authority/discovery adapters and operational exercises | Qualified-lane module owners | Qualified production acceptance |
+| Qualified helper-image admission | Execution/trust owners | Exact executable/runtime receipt protocol; image pin alone is insufficient |
+| Deferred registration/cluster qualification producer and consumer contracts | Downstream qualification/registration owners | Post-v1 cluster qualification and release registration |
+
+Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
+Source bootstrap records only the identities that actually participated; delivery by image cannot imply
+reproduction of helper bytes.
+
+# Documentation Control {#documentation-control}
+
+| Item | Description |
+| :---- | :---- |
+| Title | NKD (NVIDIA Kubernetes Definition) — Software Architecture and Design Document (PLC-L1) |
+| Author(s) | **[INPUT NEEDED]** |
+| Reviewers | **[INPUT NEEDED]** |
+| Approvers | **[INPUT NEEDED]** (per stakeholders) |
+| Status | Draft |
+| Revision | 2026-09-08 |
+| Related SRD | NKD SRD (2026-08-19) — `docs/nkd-srd-doc.md`, `docs/srd.md` |
+| Related ADRs | ADR-01…ADR-22 (`docs/adr/`) |
+| Related planning documents | NKD v1 milestone plan — `docs/milestones.md`; NKD v1 milestone epics (specification) — `docs/epics-v1-spec.md` (product acceptance; ADRs own engineering contracts) |
+| Current support record | `docs/adr/reconciliation.md` |
+| Related surface | `docs/lifecycle.md` |
+
+## Approvers
+
+> **[INPUT NEEDED]** — modify according to stakeholders.
+
+| Name | Role | Approval |
+| :---- | :---- | :---- |
+|  |  |  |
+
+## Reviewers
+
+> **[INPUT NEEDED]**
+
+| Name | Role | Date |
+| :---- | :---- | :---- |
+|  |  |  |

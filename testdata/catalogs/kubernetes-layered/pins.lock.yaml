@@ -1,0 +1,49 @@
+# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
+apiVersion: nkd.dev/lock/v1
+kind: PinLock
+pins:
+  cni-plugins:
+    commit: a5d507e2b884d8bd6a001c9e5a9118113ffef444
+    sourceDateEpoch: 1745579928
+    tag: v1.7.1
+    treeHash: 1f5c1a357fcc2f38439bf2d82b4980b6080acdf7
+  containerd:
+    commit: fb9028b920d254bdb73fe998a2ef75a393c88686
+    sourceDateEpoch: 1783639692
+    tag: v1.7.34
+    treeHash: 2f9967ace220cde90e5ec8d0ab14088b65833e1b
+  coredns:
+    commit: f32329577fd5e3fe19908f8a9ba5c76aafb45bf6
+    goVersion: 1.25.0
+    sourceDateEpoch: 1757339261
+    tag: v1.12.4
+    toolchainImage: golang@sha256:5502b0e56fca23feba76dbc5387ba59c593c02ccc2f0f7355871ea9a0852cebe
+    treeHash: 0865058022c1fe56264b58ecfb19236768be1b77
+  crictl:
+    commit: ca0237b9fec5b675b0bb7bc96b7496e6d54f5ccb
+    sourceDateEpoch: 1755762067
+    tag: v1.34.0
+    treeHash: 5256875f0fb92225af917d88935ebf93e6293487
+  etcd:
+    commit: 9f4b125405c7fbd92e2c9cbb5235feffe1904a1d
+    goVersion: 1.25.12
+    sourceDateEpoch: 1784833530
+    tag: v3.5.33
+    toolchainImage: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
+    treeHash: 8810d072bc707e014cdecb2a3377740cc5e35542
+  helm:
+    commit: b2e4314fa0f229a1de7b4c981273f61d69ee5a59
+    sourceDateEpoch: 1768248930
+    tag: v3.20.0
+    treeHash: aae061d8a14313844e73a80b3781c4bf5b8741a0
+  kubernetes:
+    commit: 70d3cc986aa8221cd1dfb1121852688902d3bf53
+    goVersion: 1.23.3
+    sourceDateEpoch: 1733939955
+    tag: v1.32.0
+    treeHash: 195abcc8a74b362b88fc76b0ee676a3354e4937e
+  runc:
+    commit: 8f2685a471d3347a686ad3909783d8aafc6bb208
+    sourceDateEpoch: 1783988681
+    tag: v1.5.1
+    treeHash: 6c153ef9ab10896cd69c211fef36f66e1406e259

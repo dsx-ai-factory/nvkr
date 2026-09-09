@@ -1,0 +1,286 @@
+apiVersion: nkd.dev/catalog/v1
+kind: SourceBuildRegistry
+metadata:
+  name: nkd-default
+  description: >-
+    NVIDIA Kubernetes Definition — default LAYERED catalog (top-level recipes/, like
+    AICR). Sources + the full Tier-1 component set are declared here once; the recipe
+    for a query is COMPOSED from overlays/ (base + the kubernetes category overlay) + mixins/.
+    Resolved pins live in pins.lock.yaml (machine-managed by `nkdctl catalog
+    pin/bump`), so a version bump touches only the lock. See docs/versioning.md.
+
+# ── Sources ──────────────────────────────────────────────────────────────────
+# A source is a pinned upstream repo shared by its components. constraint bounds
+# what `nkdctl catalog bump` will pick; the toolchain image is digest-pinned and
+# shared by every component built from this source.
+sources:
+  kubernetes:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.32.x
+    # MULTI-ARCH (model B): local/nkd-toolchain-go (toolchains/go/Dockerfile) = go 1.23
+    # + rsync + NATIVE gcc, built once per target arch and pinned by local image id. The
+    # native gcc serves kubelet's CGO lane and pause's C without a cross prefix — the
+    # container runs on its own arch (native, or emulated on a foreign host). Rebuild:
+    #   docker build --platform linux/<arch> -t local/nkd-toolchain-go:<arch> toolchains/go
+    toolchainImagesByArch:
+      # Registry-AGNOSTIC: pinned by content (nkd-toolchain-go@sha256:…), NOT by any operator's
+      # registry. The operator materializes this toolchain (`nkdctl toolchain build --push`) and
+      # names WHERE via the delivery's runtime.toolchainRegistry; the factory prepends it at
+      # compile time, preserving the digest so recipeDigest is unchanged. (arm64 digest is the
+      # current build; re-bump per arch as the toolchain source changes.)
+      amd64: nkd-toolchain-go@sha256:2154cb16a59fee9fa8d53167de0899936ed09b3b1a816b465bcce363e485c0ee
+      arm64: nkd-toolchain-go@sha256:0604f5c92d7dc2358ba205fd5474428022bab1b77cfbe297b370f7f7461c1c5e
+  # A second, independent source proves the model generalizes. Its toolchain is
+  # resolved AUTOMATICALLY from etcd's .go-version at the pinned tag (Go 1.25 today):
+  # `catalog pin`/`bump` reads .go-version and pins golang:<version>'s digest into
+  # the lock, so a version/minor bump carries its Go-toolchain bump with it — no hand
+  # edit. (The kubernetes source keeps an explicit digest because it needs a derived
+  # image with rsync + cross-gcc.)
+  etcd:
+    repo: https://github.com/etcd-io/etcd
+    constraint: 3.5.x
+    toolchainBaseImage: golang
+    # etcd does not vendor and is multi-module; vendor the server module (with
+    # network) in the fetch step so the build stays --network=none.
+    vendorCommand: [sh, -c, "cd server && go mod vendor"]
+  # runc: the static-CGO + libseccomp lane (NKD-FR-BLD-025) — the SRD's hard
+  # reproducibility case (the one CGO member). MULTI-ARCH (model B): it builds
+  # statically against libseccomp using a NATIVE per-arch toolchain (toolchains/cgo:
+  # native gcc + libseccomp, CC=gcc in the image ENV), so the same recipe builds runc
+  # natively for amd64 or arm64 with no cross-compilation. (glibc-static; a true musl
+  # lane remains the deferred hardening.) runc vendors, so the build is --network=none.
+  runc:
+    repo: https://github.com/opencontainers/runc
+    constraint: 1.5.x
+    toolchainImagesByArch:
+      # Registry-agnostic content pin; the delivery's runtime.toolchainRegistry resolves it.
+      amd64: nkd-toolchain-cgo@sha256:d9ca6b8de5ae00fd2b25c2768652adb92e86c44db199c51520730cbc31f3f0ac
+      arm64: nkd-toolchain-cgo@sha256:e2d93f718fc21fa61f9157c54e03336daf7649b0f9a866667e35dec51fecc56a
+  # Remaining Tier-1 (SRD Appendix B). Toolchains: coredns resolves golang from its
+  # .go-version; the others pin the public golang digest matching their go.mod
+  # (containerd/crictl/helm → Go 1.25, cni-plugins → Go 1.23). coredns and helm are
+  # not vendored, so they vendor in the fetch step; the rest vendor upstream.
+  coredns:
+    repo: https://github.com/coredns/coredns
+    constraint: 1.12.x
+    toolchainBaseImage: golang
+    vendorCommand: [go, mod, vendor]
+  containerd:
+    repo: https://github.com/containerd/containerd
+    constraint: 1.7.x
+    toolchainImage: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
+  cni-plugins:
+    repo: https://github.com/containernetworking/plugins
+    constraint: 1.7.x
+    toolchainImage: golang@sha256:59b8183301af6dc358c9258d7b2ab0ee1a9363618552334fb3b160d454cbda72
+  crictl:
+    repo: https://github.com/kubernetes-sigs/cri-tools
+    constraint: 1.34.x
+    toolchainImage: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
+  helm:
+    repo: https://github.com/helm/helm
+    # pinned to the SRD's 3.20 line (Go 1.25); helm 3.21+ requires Go 1.26.
+    constraint: 3.20.x
+    toolchainImage: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
+    vendorCommand: [go, mod, vendor]
+
+# ── Recipes ──────────────────────────────────────────────────────────────────
+# The default is LAYERED (like AICR): the recipe for a query is COMPOSED from
+# overlays/ (base + a kubernetes category overlay; ADR-12: category is the recipe axis, role is a delivery SKU)
+# and mixins/, not written flat here. See overlays/base.yaml. Components are declared
+# once below and referenced by name from the overlays.
+
+# ── Components ───────────────────────────────────────────────────────────────
+# Each references a source and differs only in make target, output form, and CGO.
+# versionStamp values are Go text/templates rendered from the resolved pin, so this
+# file does not churn on a version bump.
+components:
+  # etcd: a second-repo component. Built from etcd's own build.sh in etcd's own Go
+  # 1.25 toolchain. etcd is not vendored and is multi-module, so a hermetic
+  # (--network=none) build needs a module-vendoring fetch step — that integration is
+  # the reproducibility-spike follow-on (docs/poc.md); the catalog/resolver/IR model
+  # generalizes to it today (two fetch nodes, one per source).
+  etcd:
+    roles: [control-plane]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: etcd
+    cgo: false
+    outputType: oci-image
+    # Build the server module directly (its canonical entrypoint) against the
+    # vendored deps; --network=none, reproducible flags from the engine env.
+    buildCommand: [sh, -c, "cd server && go build -mod=vendor -trimpath -ldflags=-buildid= -o /src/bin/etcd ."]
+    artifactPath: bin/etcd
+    writeDir: bin
+
+  runc:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: runc
+    cgo: true
+    outputType: host-package
+    # Static CGO build against amd64 libseccomp (mirrors runc's `make static`), out
+    # to the writable subdir so the RO source is untouched.
+    # CC (=gcc) comes from the toolchain image ENV and pkg-config finds the arch's
+    # libseccomp in its default multiarch path, so the command carries no arch-literals.
+    buildCommand: [sh, -c, "go build -trimpath -tags 'seccomp netgo osusergo static_build' -ldflags '-buildid= -extldflags -static' -o /src/out/runc ."]
+    artifactPath: out/runc
+    writeDir: out
+
+  kube-apiserver:
+    roles: [control-plane]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    cgo: false
+    outputType: oci-image
+    buildCommand: [make, WHAT=cmd/kube-apiserver, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kube-apiserver
+    writeDir: _output
+    versionStamp: &kstamp
+      KUBE_GIT_VERSION: "{{.Tag}}"
+      KUBE_GIT_COMMIT: "{{.Commit}}"
+      KUBE_GIT_TREE_STATE: clean
+      KUBE_GIT_MAJOR: "{{.Major}}"
+      KUBE_GIT_MINOR: "{{.Minor}}"
+
+  kube-controller-manager:
+    roles: [control-plane]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    cgo: false
+    outputType: oci-image
+    buildCommand: [make, WHAT=cmd/kube-controller-manager, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kube-controller-manager
+    writeDir: _output
+    versionStamp: *kstamp
+
+  kube-scheduler:
+    roles: [control-plane]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    cgo: false
+    outputType: oci-image
+    buildCommand: [make, WHAT=cmd/kube-scheduler, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kube-scheduler
+    writeDir: _output
+    versionStamp: *kstamp
+
+  kube-proxy:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    cgo: false
+    outputType: oci-image
+    buildCommand: [make, WHAT=cmd/kube-proxy, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kube-proxy
+    writeDir: _output
+    versionStamp: *kstamp
+
+  kubelet:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    # kubelet is the one CGO member of the k8s core (built non-static, like runc).
+    # Under model B the make target == the host platform (see --platform), so kube
+    # builds it NATIVELY and CC=gcc is the native compiler for the arch — no cross
+    # prefix, no arch literal (NKD-FR-BLD-025).
+    cgo: true
+    outputType: host-package
+    buildCommand: [make, WHAT=cmd/kubelet, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kubelet
+    writeDir: _output
+    versionStamp:
+      KUBE_GIT_VERSION: "{{.Tag}}"
+      KUBE_GIT_COMMIT: "{{.Commit}}"
+      KUBE_GIT_TREE_STATE: clean
+      KUBE_GIT_MAJOR: "{{.Major}}"
+      KUBE_GIT_MINOR: "{{.Minor}}"
+      CC: gcc
+
+  kubeadm:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    cgo: false
+    outputType: host-package
+    buildCommand: [make, WHAT=cmd/kubeadm, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kubeadm
+    writeDir: _output
+    versionStamp: *kstamp
+
+  kubectl:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    cgo: false
+    outputType: host-package
+    buildCommand: [make, WHAT=cmd/kubectl, "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"]
+    artifactPath: _output/local/bin/linux/{{.Arch}}/kubectl
+    writeDir: _output
+    versionStamp: *kstamp
+
+  # ── Remaining Tier-1 components ──
+  coredns:
+    roles: [control-plane]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: coredns
+    cgo: false
+    outputType: oci-image
+    buildCommand: [go, build, "-mod=vendor", "-trimpath", "-ldflags=-buildid= -s -w", -o, /src/bin/coredns, .]
+    artifactPath: bin/coredns
+    writeDir: bin
+  containerd:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: containerd
+    cgo: false
+    outputType: host-package
+    # NOTE: this CGO-off build has NO seccomp support, so it cannot run pods that
+    # request the default seccomp profile (kubeadm's control-plane static pods do) —
+    # it fails "seccomp is not supported" (see docs/poc.md multi-node cluster). To run
+    # a real cluster on from-source containerd, add `seccomp` to -tags + build CGO with
+    # libseccomp (the same lane runc already uses). Deferred.
+    buildCommand: [go, build, "-mod=vendor", "-trimpath", "-ldflags=-buildid=", -tags, urfave_cli_no_docs, -o, /src/bin/containerd, ./cmd/containerd]
+    artifactPath: bin/containerd
+    writeDir: bin
+  cni-plugins:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: cni-plugins
+    cgo: false
+    outputType: host-package
+    # Canonical multi-binary build (18 plugins into ./bin); artifact points at a
+    # representative plugin — the full set lands in the writable bin/.
+    buildCommand: [sh, ./build_linux.sh]
+    artifactPath: bin/bridge
+    writeDir: bin
+  crictl:
+    roles: [control-plane, worker, gpu-worker]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: crictl
+    cgo: false
+    outputType: host-package
+    buildCommand: [go, build, "-mod=vendor", "-trimpath", "-ldflags=-buildid=", -o, /src/bin/crictl, ./cmd/crictl]
+    artifactPath: bin/crictl
+    writeDir: bin
+  helm:
+    roles: [control-plane]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: helm
+    cgo: false
+    outputType: host-package
+    buildCommand: [go, build, "-mod=vendor", "-trimpath", "-ldflags=-buildid=", -o, /src/bin/helm, ./cmd/helm]
+    artifactPath: bin/helm
+    writeDir: bin
+
+  # pause: C source in the kubernetes build tree (NKD-FR-BLD-026), compiled static with
+  # the NATIVE C toolchain in the kubernetes toolchain image. Under model B the container
+  # runs on the target arch, so plain gcc/strip are the arch's own tools — no cross prefix.
+  pause:
+    roles: [control-plane]  # node-role affinity (ADR-12 §3): SKU delivery filter, not recipe identity
+    fromSource: true
+    source: kubernetes
+    cgo: false
+    outputType: oci-image
+    buildCommand: [sh, -c, "gcc -Os -Wall -Werror -static -o /src/out/pause build/pause/linux/pause.c && strip /src/out/pause"]
+    artifactPath: out/pause
+    writeDir: out

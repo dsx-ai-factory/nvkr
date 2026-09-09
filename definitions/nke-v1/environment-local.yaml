@@ -1,0 +1,19 @@
+apiVersion: nkd.dev/environment/v1
+kind: Environment
+metadata:
+  name: nke-local
+  description: Local development registry and dry-run signing policy.
+utilityContainer: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+utilityPlatform: linux/amd64
+destinations:
+  local-registry:
+    kind: oci
+    ref: 127.0.0.1:5000/nke/nkectl:v0.1.0-rc.2
+    anonymous: true
+    plainHTTP: true
+publish:
+  nkectl: local-registry
+signing:
+  mode: dry-run
+  identity: '^local$'
+  issuer: https://nkd.dev/local

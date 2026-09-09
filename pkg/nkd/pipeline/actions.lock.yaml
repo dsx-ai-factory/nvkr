@@ -1,0 +1,26 @@
+# Machine-managed by `nkdctl actions bump`. Do not hand-edit.
+# The pinned third-party GitHub Actions the CI emitters render into generated workflows.
+# Each is pinned to an immutable commit sha; `track` is the moving major tag bump follows.
+apiVersion: nkd.dev/lock/v1
+kind: ActionLock
+actions:
+  checkout:
+    repo: actions/checkout
+    track: v4
+    version: v4.4.0
+    sha: 11d5960a326750d5838078e36cf38b85af677262
+  download-artifact:
+    repo: actions/download-artifact
+    track: v4
+    version: v4.3.0
+    sha: d3f86a106a0bac45b974a628896c90dbdf5c8093
+  setup-go:
+    repo: actions/setup-go
+    track: v5
+    version: v5.6.0
+    sha: 40f1582b2485089dde7abd97c1529aa768e1baff
+  upload-artifact:
+    repo: actions/upload-artifact
+    track: v4
+    version: v4.6.2
+    sha: ea165f8d65b6e75b540449e92b4886f43607fa02

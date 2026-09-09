@@ -1,0 +1,18 @@
+apiVersion: nkd.dev/environment/v1
+kind: Environment
+metadata:
+  name: nke-github
+  description: GitHub hosted-runner publication settings with a pinned identity policy.
+utilityContainer: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+utilityPlatform: linux/amd64
+destinations:
+  ghcr:
+    kind: oci
+    ref: ghcr.io/example-nke/nke/nkectl:v0.1.0-rc.2
+    credentialRef: github:GITHUB_TOKEN
+publish:
+  nkectl: ghcr
+signing:
+  mode: dry-run
+  identity: '^https://github\.com/example-nke/nke/\.github/workflows/nkd-factory\.yml@refs/heads/main$'
+  issuer: https://token.actions.githubusercontent.com

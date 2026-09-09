@@ -1,0 +1,14 @@
+kind: RecipeMetadata
+apiVersion: nkd.dev/recipe/v1alpha1
+metadata:
+  name: kubernetes
+spec:
+  base: node-common
+  criteria:
+    category: kubernetes
+    os: ubuntu
+  # The category recipe contains the complete node substrate. Roles are component
+  # affinity metadata, so control-plane and worker SKUs filter this one identity.
+  componentRefs:
+    - name: kube-apiserver
+    - name: kube-controller-manager

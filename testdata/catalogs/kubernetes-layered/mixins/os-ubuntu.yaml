@@ -1,0 +1,12 @@
+kind: RecipeMixin
+apiVersion: nkd.dev/recipe/v1alpha1
+metadata:
+  name: os-ubuntu
+spec:
+  # An orthogonal, single-axis fragment (defined once, composable by any overlay),
+  # mirroring AICR's mixins/os-*.yaml. It carries an advisory OS precondition; the
+  # from-source Go binaries are OS-agnostic, so this is a preflight constraint, not a
+  # build input.
+  constraints:
+    - name: os.release
+      value: ubuntu

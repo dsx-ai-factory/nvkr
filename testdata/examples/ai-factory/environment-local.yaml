@@ -1,0 +1,14 @@
+apiVersion: nkd.dev/environment/v1
+kind: Environment
+metadata:
+  name: laptop-registry
+utilityContainer: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
+utilityPlatform: linux/amd64
+destinations:
+  tenant-registry:
+    kind: oci
+    ref: localhost:5000/nke/tenant:1.32.0-h100
+    anonymous: true
+    plainHTTP: true
+publish:
+  worker-binaries: tenant-registry

@@ -1,0 +1,17 @@
+apiVersion: nkd.dev/catalog-overlay/v1
+kind: CatalogOverlay
+name: trusted-kubernetes-supplier
+requiresCatalogDigest: sha256:5c7aa8e1710577aa16bdd16850868a0905af438eb1dc21150f5d2c3dc25a925b
+components:
+  kubectl:
+    version: v1.32.0
+    sourceDateEpoch: 1733939955
+    outputType: host-package
+    roles: [control-plane, worker, gpu-worker]
+    prebuilt:
+      url: https://dl.k8s.io/release/v1.32.0/bin/linux/{{.Arch}}/kubectl
+      digests:
+        amd64: sha256:646d58f6d98ee670a71d9cdffbf6625aeea2849d567f214bc43a35f8ccb7bf70
+        arm64: sha256:ba4004f98f3d3a7b7d2954ff0a424caa2c2b06b78c17b1dccf2acc76a311a896
+      evidence:
+        none: true

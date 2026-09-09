@@ -1,0 +1,20 @@
+apiVersion: nkd.dev/lock/v1
+kind: PinLock
+# Machine-managed. Source pin + prebuilt artifact digests (nkdctl catalog pin / pin-artifacts).
+pins:
+  k8s:
+    tag: v1.32.0
+    commit: 70d3cc986aa8221cd1dfb1121852688902d3bf53
+    treeHash: 195abcc8a74b362b88fc76b0ee676a3354e4937e
+    sourceDateEpoch: 1733939955
+artifacts:
+  pause:
+    tag: v1.32.0
+    digests:
+      amd64: sha256:7c38f24774e3cbd906d2d33c38354ccf787635581c122965132c9bd309754d4a
+      arm64: sha256:e50b7059b633caf3c1449b8da680d11845cda4506b513ee7a2de00725f0a34a7
+  capi-core:
+    tag: v1.9.5
+    digests:
+      amd64: sha256:546c6ec38d4481620f5dd8b8c3f927fed6c8b5e0482aca85e04e134e1d877ce9
+      arm64: sha256:cc75e100fb2ede67a10c3e47499330b8c34c9cd20275ab138af4be3cadb5c054

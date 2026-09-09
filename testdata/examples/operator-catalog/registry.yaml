@@ -1,0 +1,111 @@
+apiVersion: nkd.dev/catalog/v1
+kind: SourceBuildRegistry
+metadata:
+  name: acme-operator
+  description: >-
+    Example operator-authored catalog. Passed via `--data examples/operator-catalog`
+    it FULLY replaces the embedded NVIDIA default — none of its sources, recipes, or
+    components are shared with it. This is the release-train seam (docs/versioning.md):
+    an operator tracks their own catalog + lock without depending on nkdctl's default.
+sources:
+  k8s:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.32.x
+    toolchainImage: sha256:9e4d7fdad5d2b10609edfb3f0cadb7b4ca7bea6a9d2e42bca6b175de85c8d8d2
+recipes:
+  - id: acme-cli-bundle
+    versionFrom: k8s
+    criteria: {category: kubernetes, os: any, arch: amd64}
+    components: [acme-kubectl]
+  # Demonstrator PREBUILT recipe (NKD-FR-BLD-050) — the no-compile lane. Instead of
+  # building from source, its components are acquired: a pinned, content-addressed
+  # download (fail-closed on digest mismatch), no compilation. Its criteria pin all four
+  # active recipe axes, so its concrete OS wins cleanly over acme-cli-bundle's wildcard for:
+  #   nkdctl fetch  --data examples/operator-catalog --category kubernetes --role worker --k8s 1.32.0 --os ubuntu --arch amd64
+  #   nkdctl attest --data examples/operator-catalog --category kubernetes --role worker --k8s 1.32.0 --os ubuntu --arch amd64 -o ed.json
+  #   nkdctl verify --data examples/operator-catalog --category kubernetes --role worker --k8s 1.32.0 --os ubuntu --arch amd64 -e ed.json
+  # The trust model shifts from "the same source rebuilds the same bytes" to "exactly
+  # these pinned, content-addressed bytes" — same checksum discipline, no from-source
+  # guarantee. Digests are machine-managed in pins.lock.yaml (artifacts:) per arch
+  # (amd64+arm64 both pinned below); regenerate with:
+  #   nkdctl catalog pin-artifacts --all --dir examples/operator-catalog --arch amd64 --arch arm64
+  - id: acme-prebuilt-node
+    versionFrom: k8s
+    criteria: {category: kubernetes, os: ubuntu, arch: amd64}
+    components: [acme-kubectl-bin, acme-pause]
+  - id: acme-prebuilt-node-arm64
+    versionFrom: k8s
+    criteria: {category: kubernetes, os: ubuntu, arch: arm64}
+    components: [acme-kubectl-bin, acme-pause]
+  # Demonstrator AICR-enabled recipe (NKD-FR-RC-013a). Declaring a digest-pinned
+  # aicrProfile ACTIVATES the AICR-governed axes (accelerator/service/intent/platform)
+  # for THIS recipe — a query carrying `--accelerator h100` resolves here (against a
+  # recipe without an aicrProfile it still fails closed). nkdctl does NOT build the
+  # GPU/driver stack from source: AICR is the foundational declarative layer for it
+  # (nkd-v1 goal 10 / §8.1). The pinned criteria + digest reference a SPECIFIC AICR
+  # configuration; on supported Linux authority hosts, `nkdctl aicr bundle` runs
+  # `aicr recipe … → aicr evidence digest (verified against the pin) → aicr bundle`.
+  # The resulting external tree remains unqualified because the current publisher
+  # adapter cannot bind its opaque render receipt into a validation vector. The digest is
+  # AICR's canonical `aicr evidence digest`
+  # for this exact criteria (deterministic; regenerate with the commented command below).
+  #   aicr recipe --service eks --accelerator h100 --os ubuntu --intent training -o r.yaml
+  #   aicr evidence digest --recipe r.yaml
+  # The generatorDigest binds the exact AICR profile. A Definition that renders this
+  # Recipe must also pin its platform-specific AICR executable.
+  - id: acme-accel-node
+    versionFrom: k8s
+    criteria: {category: accelerated-runtime, os: any, arch: amd64}
+    aicrProfile:
+      identity: h100-eks-ubuntu-training
+      digest: sha256:f6fbb6626affcaab365ab2c8926d343b1c441af95bc4612f3ad7c695870b19e9
+      generatorDigest: sha256:3b011745112ecee0c216310c732cbe13f474a21a20da6bc09476a2ee8d840a2a
+      repo: https://github.com/NVIDIA/aicr
+      service: eks
+      accelerator: h100
+      os: ubuntu
+      intent: training
+    # The AICR activation is cluster-level recipe content and has no component producer.
+    components: []
+components:
+  acme-kubectl:
+    fromSource: true
+    source: k8s
+    cgo: false
+    outputType: host-package
+    buildCommand: [make, WHAT=cmd/kubectl, KUBE_BUILD_PLATFORMS=linux/amd64]
+    artifactPath: _output/local/bin/linux/amd64/kubectl
+    writeDir: _output
+    versionStamp:
+      KUBE_GIT_VERSION: "{{.Tag}}"
+      KUBE_GIT_COMMIT: "{{.Commit}}"
+      KUBE_GIT_TREE_STATE: clean
+      KUBE_GIT_MAJOR: "{{.Major}}"
+      KUBE_GIT_MINOR: "{{.Minor}}"
+
+  # ── Prebuilt (no-compile) components ──
+  # acme-kubectl-bin: the SAME kubectl as acme-kubectl, but acquired as an official
+  # release binary instead of built. `source: k8s` supplies the version pin (v1.32.0),
+  # so {{.Tag}} tracks the same bump; {{.Arch}} resolves per target arch. The delivery
+  # form is host-package, so `fetch --package` assembles the verified binary into a
+  # reproducible .deb. Per-arch digests are pinned in the lock (nkdctl catalog
+  # pin-artifacts), read from dl.k8s.io's published .sha256 sidecars.
+  acme-kubectl-bin:
+    source: k8s
+    outputType: host-package
+    prebuilt:
+      url: https://dl.k8s.io/release/{{.Tag}}/bin/linux/{{.Arch}}/kubectl
+      # ADR-13 §2: declare external evidence explicitly (none, honestly, for this binary).
+      evidence:
+        none: true
+  # acme-pause: the pause sandbox image, acquired by pulling its content-addressed
+  # per-arch manifest digest (the pull BY DIGEST is the fail-closed integrity check).
+  # The image ref is a fixed version (pause is versioned independently of k8s); `source:
+  # k8s` still supplies a pin so the component tracks the catalog's release train.
+  acme-pause:
+    source: k8s
+    outputType: oci-image
+    prebuilt:
+      image: registry.k8s.io/pause:3.10
+      evidence:
+        none: true
