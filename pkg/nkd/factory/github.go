@@ -200,7 +200,18 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
 		}
-		fmt.Fprintf(&body, "      - name: Execute %s\n        run: |\n", yamlSingle(node.ID))
+		fmt.Fprintf(&body, "      - name: %s\n", yamlSingle("Execute "+node.ID))
+		sourceEnv := githubSourceEnvironment(plan, node)
+		if len(sourceEnv) > 0 {
+			fmt.Fprintln(&body, "        env:")
+			for _, key := range sortedKeys(sourceEnv) {
+				fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(sourceEnv[key]))
+			}
+		}
+		fmt.Fprintln(&body, "        run: |")
+		if len(sourceEnv) > 0 {
+			fmt.Fprintf(&body, "          %s\n", requireSourceToken)
+		}
 		for _, line := range generatedNodeCommands(node, plan, graphDigest, FactoryPlanPath, FactoryGraphDir, "$GITHUB_WORKSPACE") {
 			fmt.Fprintf(&body, "          %s\n", line)
 		}

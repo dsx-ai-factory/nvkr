@@ -66,6 +66,7 @@ func (plan Plan) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "factory plan has no recipes")
 	}
 	seen := map[string]bool{}
+	resolvedSources := map[string]bool{}
 	for _, recipePlan := range plan.Recipes {
 		if !canonicalName.MatchString(recipePlan.Name) || seen[recipePlan.Name] || recipePlan.Graph == nil {
 			return e.New(e.CodeInvalidCatalog, "factory plan recipe target %q is invalid or repeated", recipePlan.Name)
@@ -101,6 +102,17 @@ func (plan Plan) Validate() error {
 		}
 		if !sort.StringsAreSorted(recipePlan.Components) || !sort.StringsAreSorted(recipePlan.AllComponents) {
 			return e.New(e.CodeInvalidCatalog, "factory recipe target %q components are not canonical", recipePlan.Name)
+		}
+		for _, node := range recipePlan.Graph.Nodes {
+			if node.Kind == ir.KindFetch && node.Repo != "" {
+				resolvedSources[node.Repo] = true
+			}
+		}
+	}
+	for source := range plan.ExecutionSettings.SourceAccess {
+		if !resolvedSources[source] {
+			return e.New(e.CodeInvalidCatalog,
+				"execution settings sourceAccess %q does not match a resolved fetch source", source)
 		}
 	}
 	previousComposition := ""

@@ -4,6 +4,7 @@
 package lifecycle
 
 import (
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -119,17 +120,26 @@ type ClusterMember struct {
 // Environment contains settings independently selected for one run. Publish
 // maps a Definition output name to a destination name; routine routes are derived.
 type Environment struct {
-	APIVersion       string                 `json:"apiVersion"`
-	Kind             string                 `json:"kind"`
-	Metadata         Metadata               `json:"metadata"`
-	RunsOn           string                 `json:"runsOn,omitempty"`
-	UtilityContainer string                 `json:"utilityContainer"`
-	UtilityPlatform  string                 `json:"utilityPlatform"`
-	Tools            map[string]Tool        `json:"tools,omitempty"`
-	Destinations     map[string]Destination `json:"destinations,omitempty"`
-	Publish          map[string]string      `json:"publish,omitempty"`
-	Runtime          Runtime                `json:"runtime,omitempty"`
-	Signing          *Signing               `json:"signing,omitempty"`
+	APIVersion       string                  `json:"apiVersion"`
+	Kind             string                  `json:"kind"`
+	Metadata         Metadata                `json:"metadata"`
+	RunsOn           string                  `json:"runsOn,omitempty"`
+	UtilityContainer string                  `json:"utilityContainer"`
+	UtilityPlatform  string                  `json:"utilityPlatform"`
+	Tools            map[string]Tool         `json:"tools,omitempty"`
+	SourceAccess     map[string]SourceAccess `json:"sourceAccess,omitempty"`
+	Destinations     map[string]Destination  `json:"destinations,omitempty"`
+	Publish          map[string]string       `json:"publish,omitempty"`
+	Runtime          Runtime                 `json:"runtime,omitempty"`
+	Signing          *Signing                `json:"signing,omitempty"`
+}
+
+// SourceAccess configures transport-only authentication and mirroring for one
+// canonical catalog source URL. It cannot alter source commits, tree hashes, or
+// Recipe identity.
+type SourceAccess struct {
+	Mirror        string `json:"mirror"`
+	CredentialRef string `json:"credentialRef"`
 }
 
 type Destination struct {
@@ -363,6 +373,18 @@ func (environment Environment) Validate() error {
 			return err
 		}
 	}
+	for source, access := range environment.SourceAccess {
+		if err := validateHTTPSURL("environment sourceAccess source", source); err != nil {
+			return err
+		}
+		if err := validateHTTPSURL("environment sourceAccess mirror", access.Mirror); err != nil {
+			return err
+		}
+		if !githubCredentialRefPattern.MatchString(access.CredentialRef) {
+			return e.New(e.CodeInvalidCatalog,
+				"environment sourceAccess %q credentialRef must be github:SECRET_NAME", source)
+		}
+	}
 	for name, destination := range environment.Destinations {
 		if !namePattern.MatchString(name) || strings.TrimSpace(destination.Ref) == "" || destination.Anonymous == (destination.CredentialRef != "") {
 			return e.New(e.CodeInvalidCatalog, "environment destination %q is invalid or has ambiguous credentials", name)
@@ -390,6 +412,18 @@ func (environment Environment) Validate() error {
 		if !namePattern.MatchString(output) || environment.Destinations[target].Ref == "" {
 			return e.New(e.CodeInvalidCatalog, "environment publication %q references unknown destination %q", output, target)
 		}
+	}
+	return nil
+}
+
+var githubCredentialRefPattern = regexp.MustCompile(`^github:[A-Za-z_][A-Za-z0-9_]*$`)
+
+func validateHTTPSURL(label, value string) error {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil ||
+		parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || strings.ContainsAny(value, "?#") ||
+		parsed.Opaque != "" || parsed.String() != value {
+		return e.New(e.CodeInvalidCatalog, "%s %q must be a canonical HTTPS URL without userinfo, query, or fragment", label, value)
 	}
 	return nil
 }

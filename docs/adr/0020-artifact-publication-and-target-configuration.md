@@ -39,6 +39,13 @@ routine envelopes and routes from each named output, rejecting ambiguous, missin
 Changing destination or signing tools can change Environment, prepared plan and evidence while preserving logical
 Recipe identity. Output-affecting tools remain bound to Recipe/composition identity.
 
+Environment may also map a canonical source URL to an HTTPS fetch mirror and a GitHub secret reference
+through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
+commit/tree, or Recipe identity. The current adapter binds the credential only to the matching GitHub fetch
+execution step using transient, repository-scoped Git configuration. Secret values never enter a remote URL,
+serialized plan or transported source tree. Local and GitLab execution reject this configuration until those
+adapters support equivalent credential isolation.
+
 OCI is the current v1 publication transport. Executable, APT-repository and Helm outputs can share a recursive
 OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Package repository and object
 store targets remain separately capability-gated adapters. Credential values never enter serialized inputs.

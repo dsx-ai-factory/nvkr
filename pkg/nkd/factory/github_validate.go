@@ -37,6 +37,7 @@ type githubJob struct {
 }
 
 type githubStep struct {
+	Env             map[string]string `json:"env,omitempty"`
 	Name            string            `json:"name,omitempty"`
 	Uses            string            `json:"uses,omitempty"`
 	Run             string            `json:"run,omitempty"`
@@ -92,6 +93,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if len(document.Jobs) != expectedJobCount {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow has %d jobs; artifact graph requires %d", len(document.Jobs), expectedJobCount)
 	}
+	sourceEnvironments := make(map[string]map[string]string)
+	for _, node := range plan.Graph.Nodes {
+		sourceEnvironments[nodeJobs[node.ID]] = githubSourceEnvironment(plan, node)
+	}
 	signFamily := make(map[string]bool, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
 		if signFamilyNode(node.Kind) {
@@ -99,6 +104,31 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 	}
 	for jobID, job := range document.Jobs {
+		if _, present := job.Env[sourceTokenEnv]; present {
+			return e.New(e.CodeEngineCapability, "GitHub source credential must be scoped to its fetch step")
+		}
+		wantSourceEnv := sourceEnvironments[jobID]
+		foundSource := false
+		for _, step := range job.Steps {
+			if len(step.Env) == 0 {
+				continue
+			}
+			if len(wantSourceEnv) == 0 || step.Name != "Execute "+job.Name || len(step.Env) != len(wantSourceEnv) {
+				return e.New(e.CodeEngineCapability, "GitHub job %q has unexpected step credentials or environment", jobID)
+			}
+			for key, value := range wantSourceEnv {
+				if got, exists := step.Env[key]; !exists || got != value {
+					return e.New(e.CodeEngineCapability, "GitHub job %q source environment differs at %s", jobID, key)
+				}
+			}
+			if !strings.HasPrefix(step.Run, requireSourceToken+"\n") {
+				return e.New(e.CodeEngineCapability, "GitHub job %q must refuse an empty source credential", jobID)
+			}
+			foundSource = true
+		}
+		if len(wantSourceEnv) > 0 && !foundSource {
+			return e.New(e.CodeEngineCapability, "GitHub job %q omits source authentication", jobID)
+		}
 		if job.TimeoutMinutes <= 0 || job.TimeoutMinutes > 60 {
 			return e.New(e.CodeEngineCapability, "GitHub job %q requires a bounded timeout", jobID)
 		}

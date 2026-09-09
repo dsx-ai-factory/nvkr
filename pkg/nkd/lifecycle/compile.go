@@ -172,10 +172,14 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		APIVersion: factory.ExecutionSettingsAPIVersion, Kind: factory.ExecutionSettingsKind,
 		Metadata: factory.Metadata{Name: environment.Metadata.Name, Description: environment.Metadata.Description},
 		RunsOn:   environment.RunsOn, Targets: make(map[string]factory.Target, len(environment.Destinations)),
+		SourceAccess: make(map[string]factory.SourceAccess, len(environment.SourceAccess)),
 		Runtime: factory.RuntimeProfile{Runtime: environment.Runtime.Runtime, RuntimeImage: environment.Runtime.RuntimeImage,
 			HelperImage: environment.Runtime.HelperImage, BuilderImage: environment.Runtime.BuilderImage,
 			Services: append([]string(nil), environment.Runtime.Services...), Variables: cloneMap(environment.Runtime.Variables),
 			Setup: append([]string(nil), environment.Runtime.Setup...), ToolchainRegistry: environment.Runtime.ToolchainRegistry},
+	}
+	for source, access := range environment.SourceAccess {
+		delivery.SourceAccess[source] = factory.SourceAccess{Mirror: access.Mirror, CredentialRef: access.CredentialRef}
 	}
 	for name, target := range environment.Destinations {
 		delivery.Targets[name] = factory.Target{Kind: target.Kind, Ref: target.Ref, CredentialRef: target.CredentialRef,

@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -166,6 +167,9 @@ type ExecutionSettings struct {
 	APIVersion string   `json:"apiVersion"`
 	Kind       string   `json:"kind"`
 	Metadata   Metadata `json:"metadata"`
+	// SourceAccess is transport-only source authentication and mirroring keyed by
+	// the canonical repository URL carried by fetch nodes.
+	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
 	// RunsOn optionally overrides the definition's default runner for THIS environment (e.g. a
 	// GitLab tag such as "generic"). The runner is environment config, not recipe identity, so
 	// it may be set per-delivery without duplicating the definition or perturbing recipeDigest.
@@ -181,6 +185,11 @@ type ExecutionSettings struct {
 	// so turning signing on cannot perturb recipeDigest. Absent (the zero value)
 	// means the plan emits no sign or verify-publication node at all.
 	Signing *SigningProfile `json:"signing,omitempty"`
+}
+
+type SourceAccess struct {
+	Mirror        string `json:"mirror"`
+	CredentialRef string `json:"credentialRef"`
 }
 
 // SigningProfile is the exact publication signing policy of one environment.
@@ -495,6 +504,7 @@ type Artifact struct {
 
 var canonicalName = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 var containerPin = regexp.MustCompile(`(?:@|^)sha256:[0-9a-f]{64}$`)
+var githubCredentialRef = regexp.MustCompile(`^github:[A-Za-z_][A-Za-z0-9_]*$`)
 
 func (definition CompileSpec) Validate() error {
 	if definition.APIVersion != CompileSpecAPIVersion || definition.Kind != CompileSpecKind {
@@ -597,6 +607,18 @@ func (profile ExecutionSettings) Validate() error {
 	if strings.ContainsAny(profile.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "execution settings runsOn label must not contain control characters")
 	}
+	for source, access := range profile.SourceAccess {
+		if err := validateSourceAccessURL("source", source); err != nil {
+			return err
+		}
+		if err := validateSourceAccessURL("mirror", access.Mirror); err != nil {
+			return err
+		}
+		if !githubCredentialRef.MatchString(access.CredentialRef) {
+			return e.New(e.CodeInvalidCatalog,
+				"execution settings sourceAccess %q credentialRef must be github:SECRET_NAME", source)
+		}
+	}
 	// Build-only is a valid mode: a profile with no routes publishes nothing. Routes still
 	// require targets to publish to (each route's target is verified below).
 	if len(profile.Routes) > 0 && len(profile.Targets) == 0 {
@@ -632,6 +654,17 @@ func (profile ExecutionSettings) Validate() error {
 		return err
 	}
 	return profile.Signing.Validate(profile.Targets, profile.Routes)
+}
+
+func validateSourceAccessURL(label, value string) error {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil ||
+		parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || strings.ContainsAny(value, "?#") ||
+		parsed.Opaque != "" || parsed.String() != value {
+		return e.New(e.CodeInvalidCatalog,
+			"execution settings sourceAccess %s %q must be a canonical HTTPS URL without userinfo, query, or fragment", label, value)
+	}
+	return nil
 }
 
 func (profile ExecutionSettings) Digest() (string, error) {

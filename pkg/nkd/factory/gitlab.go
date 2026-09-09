@@ -35,6 +35,10 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if len(plan.ExecutionSettings.SourceAccess) != 0 {
+		return nil, e.New(e.CodeEngineCapability,
+			"GitLab generation does not support Environment.sourceAccess authentication")
+	}
 	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {
 		return nil, e.New(e.CodeEngineCapability, "GitLab generation requires repository-relative definition and delivery source paths")
 	}

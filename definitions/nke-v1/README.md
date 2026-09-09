@@ -65,3 +65,9 @@ The committed generated workflow is `.github/workflows/nkd-run.yml`, with exact 
 branch. The GitHub Environment targets `ghcr.io/njhensley/nke-recipes/nkectl` and deliberately keeps signing
 in dry-run mode; registry access and NKE source access must be available to the hosted runner. This is not a
 production signing workflow until the deferred protected-environment and real-signing acceptance are complete.
+
+The GitHub Environment fetches the canonical `NVIDIA/nke` source through the private `njhensley/nke` fork.
+Its `sourceAccess` entry references the repository Actions secret `NKE_SOURCE_TOKEN`, which must grant
+read-only Contents access to that fork. Only the matching fetch step receives the token; Git configuration
+is process-local, and the pinned commit/tree checks remain mandatory. The local Environment continues to
+use the existing command-scoped mirror override described above.
