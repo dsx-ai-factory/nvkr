@@ -5,12 +5,16 @@ These milestones define production acceptance for the `pipeline-attested` lane. 
 [implementation record](adr/reconciliation.md) records progress and external evidence.
 A local dry run or a passing contract test does not complete a milestone.
 
+Personal-namespace hosted signing and independent consumption are [recorded](evidence/2026-09-10-combined-run.md).
+Current NVIDIA execution and the remaining M1 acceptance requirements are separate. The historical M1 local
+script now executes the combined CLI/image/Helm Definition; see the [walkthrough](demo-m1.md) for its exact scope.
+
 | Milestone | Outcome | Exit criterion |
 |---|---|---|
 | M1 — Vertical slice | One pinned NKE CLI build through a generated GitHub workflow | A green default-branch Run builds from the pinned source entrypoint, publishes to OCI, keyless-signs and attaches production provenance; independent cosign verification succeeds |
 | M2 — Breadth | The complete in-scope artifact set, including the NKE OS image and cluster views | One Run delivers the required artifacts and exact tenant/site-controller membership, with signatures, source-lane provenance and consumer verification; recorded fallbacks remain visible |
 | M3 — Qualification | Automated recipe and evidence checks under a separate qualification identity | Schema, pin consistency, signature/provenance and tooling smoke checks pass; signed evidence records verdicts and approved waivers; tampering or missing evidence fails closed |
-| M4 — Automated releases | Reviewed pin updates produce immutable, qualified v1 Release manifests | Scheduled detection opens a reviewable update; merging produces a signed manifest and immutable tag; manual dispatch re-verifies an existing manifest without rebuilding |
+| M4 — Automated releases | Reviewed pin updates produce immutable, qualified v1 Release manifests | Scheduled detection opens a reviewable update; merging produces a signed manifest and immutable tag; manual dispatch re-verifies an existing manifest without rebuilding; overlapping and interrupted release runs never move an immutable tag; a signed revocation withdraws a release from the channel |
 
 M3 qualification does not establish cluster conformance or byte-identical reproduction. M4's Release manifest
 belongs to the v1 evidence contract; it does not grant qualified-lane clearance. Current artifact-publication

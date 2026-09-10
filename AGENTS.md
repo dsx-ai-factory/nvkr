@@ -122,7 +122,7 @@ consumer carries a stable `pkg/nkd/errors` code (ADR-03). Internal helpers may u
 the error must be wrapped with a code before it crosses a package boundary that maps to an exit code.
 
 ```go
-import "github.com/nhensley/nkdctl/pkg/nkd/errors"
+import "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 
 return errors.New(errors.CodeInvalidCatalog, "recipe %q: criteria arch %q is not supported", name, arch)
 return errors.Wrap(errors.CodeFetchFailed, err, "checkout %s", pin.Commit)
@@ -163,6 +163,8 @@ and excluded from logical Recipe identity; attempt metadata may affect its own R
 ## Git Configuration
 
 - The default branch is `main`.
+- Before committing, follow the Conventional Commits rules in [CONTRIBUTING.md](CONTRIBUTING.md#commit-messages).
+  Apply the same format to PR titles used for squash merges.
 - Commit only when asked. Sign every commit with `-S` (`commit.gpgsign` is on) and `-s` (DCO sign-off, see
   `CONTRIBUTING.md`), authored as the human, not the agent.
 - Do not add `Co-Authored-By` lines or agent attribution in commits or PRs (organization policy, aligned with

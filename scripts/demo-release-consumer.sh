@@ -23,7 +23,8 @@ Verify one digest-pinned lifecycle publication under an explicit
 pipeline-attested/artifact-publication Verification Policy. The consumer checks
 the exact signature, provenance attestation subject, signer identity and issuer,
 publication closure, named Artifacts, and cluster views before returning a
-Release capability.
+Release capability scoped to artifact-publication. This does not establish
+qualification verdicts, a release manifest, revocation status, or deployment acceptance.
 
 Required:
   --reference REF        registry/repository@sha256:...
@@ -41,8 +42,7 @@ Options:
 This command contacts the configured registry and cosign verification services.
 Run it on Linux with a static Linux cosign executable; macOS cannot execute the
 held-descriptor verification capability. It needs a real signed publication
-produced by the supported GitHub lane; local
-dry-run output cannot mint a Release capability.
+produced by the supported GitHub lane; local dry-run output cannot pass this policy.
 EOF
 }
 
@@ -77,4 +77,4 @@ args=(release verify --reference "$REFERENCE" --lane pipeline-attested --scope a
 [ "$ANONYMOUS" -eq 0 ] || args+=(--anonymous)
 "$NKD" "${args[@]}"
 
-printf '\nRELEASE VERIFIED\n  reference: %s\n  policy: pipeline-attested/artifact-publication\n' "$REFERENCE"
+printf '\nARTIFACT PUBLICATION VERIFIED\n  reference: %s\n  policy: pipeline-attested/artifact-publication\n' "$REFERENCE"

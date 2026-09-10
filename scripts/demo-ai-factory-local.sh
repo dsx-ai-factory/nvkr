@@ -38,7 +38,8 @@ Options:
 
 The execution needs Docker and network access to acquire the exact pinned AICR
 archive. Rendering runs in the pinned Linux utility container with no network.
-A local Run is static-unqualified and cannot mint a verified Release capability.
+Planning is static-unqualified. Executed local Runs record unqualified-local-execution
+and cannot mint a verified Release capability.
 EOF_USAGE
 }
 
@@ -113,7 +114,7 @@ ROOT="$WORK/packages/gpu-runtime-release"
 
 demo_section "4/4  Show Run and output locations"
 cat <<EOF_RESULT
-LOCAL AICR RUN COMPLETE — STATIC-UNQUALIFIED
+LOCAL AICR RUN COMPLETE — UNQUALIFIED-LOCAL-EXECUTION
   Run record:           $WORK/lifecycle.json
   AICR render tree:     $WORK/h100-runtime/aicr-bundle
   Helm OCI payload:     $WORK/packages/gpu-runtime
@@ -126,5 +127,5 @@ fi
 cat <<'EOF_NOTE'
 
 This local Run records the exact AICR and Helm output observations. Its lane is
-static-unqualified; it does not authorize release consumption or deployment.
+unqualified-local-execution; it does not authorize release consumption or deployment.
 EOF_NOTE

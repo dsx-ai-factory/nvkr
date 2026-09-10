@@ -4,7 +4,9 @@ One maintained Definition builds the NKE CLI, complete upstream CWE runtime imag
 from NKE commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`. The generated workflow observes all three outputs,
 publishes them to GHCR, signs and verifies their publication envelopes, and finalizes a complete Run.
 The [successful hosted run and independent consumption](evidence/2026-09-10-combined-run.md) establish this
-combined path at the `pipeline-attested` / `artifact-publication` scope.
+combined path at the `pipeline-attested` / `artifact-publication` scope for those recorded personal-namespace
+inputs. It predates the current NVIDIA migration and catalog/tool/action changes; it is not evidence of a new
+hosted Run from the current checkout.
 
 ## Implementation
 

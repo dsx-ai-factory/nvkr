@@ -1,6 +1,6 @@
-# Contributing to nkdctl
+# Contributing to NKE Recipes
 
-Thanks for your interest. nkdctl is an Apache-2.0 implementation of a pinned, reproducible
+Thanks for your interest. NKE Recipes is an Apache-2.0 implementation of a pinned, reproducible
 Definition → Run → Release architecture. This guide covers the dev loop, the
 contribution mechanics, and the invariants a change must respect. See **[DEVELOPMENT.md](DEVELOPMENT.md)**
 for a deeper environment walkthrough and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)**. The
@@ -9,10 +9,10 @@ for a deeper environment walkthrough and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.
 ## Getting started
 
 ```sh
-git clone https://github.com/nhensley/nkdctl && cd nkdctl
+git clone https://github.com/NVIDIA/nke-recipes && cd nke-recipes
 make help          # list all targets
-make build         # compile bin/nkdctl (embeds the default catalog)
-make check         # the full local gate: fmt-check + vet + lint + test
+make build         # compile bin/nkdctl; catalogs are supplied explicitly
+make check         # the full local gate: fmt-check + vet + lint + shellcheck + test
 ```
 
 - [`.go-version`](.go-version) records the supported Go major/minor used by CI. `make` keeps
@@ -69,9 +69,9 @@ requirement. Worker binaries belong to the NKE OS-image build; add product outpu
 
 1. **Branch** off `main`; keep the change focused.
 2. **`make check` is green** and new behavior has a test (pure-logic where possible).
-3. **Sign off every commit** with the [Developer Certificate of Origin](https://developercertificate.org):
+3. **Use Conventional Commits** as described below, cryptographically sign every commit, and sign off with the [Developer Certificate of Origin](https://developercertificate.org):
    ```sh
-   git commit -S -s
+   git commit -S -s -m "fix(pipeline): resolve action pins from the catalog"
    ```
    The `-s` adds a `Signed-off-by: Your Name <you@example.com>` line certifying you have the right to
    contribute the change under Apache-2.0. Configure `git config user.name`/`user.email` first.
@@ -80,6 +80,30 @@ requirement. Worker binaries belong to the NKE OS-image build; add product outpu
    changes. Current product requirements belong in the milestone specification; engineering contracts belong
    in the owning ADR. Superseded plans and requirement exports are available in Git history.
 5. Open the PR with a clear description of *what* and *why*; link any issue.
+
+## Commit messages
+
+Use Conventional Commits for every new commit and for PR titles that become squash commit subjects:
+
+```text
+type(optional-scope): imperative description
+```
+
+Use `feat` for new behavior, `fix` for corrections, `refactor` for structural changes without a behavior
+change, `docs` for documentation, `test` for tests, `perf` for performance, `build` for build tooling or
+dependencies, `ci` for CI configuration, and `chore` for other maintenance. Choose a short scope when useful,
+such as `catalog`, `pipeline`, or `lifecycle`. Describe the resulting change; explain its reason in the body
+when the subject is insufficient.
+
+Mark breaking changes with `!` before the colon and describe the migration in a `BREAKING CHANGE:` footer.
+Keep the DCO `Signed-off-by:` trailer. Examples:
+
+```text
+feat(catalog): support pinned GitHub action dependencies
+fix(lifecycle): reject incomplete publication evidence
+docs(demos): clarify local execution and M1 acceptance
+refactor(environment)!: derive publication routes from one prefix
+```
 
 ## Reporting bugs / proposing changes
 

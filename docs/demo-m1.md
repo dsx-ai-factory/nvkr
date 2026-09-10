@@ -1,20 +1,30 @@
-# Local NKE demo
+# Local NKE walkthrough and M1 evidence
 
-Run the production NKE Definition through one local attempt: build the pinned NKE CLI, package and publish it
-to a loopback OCI registry, inspect its SBOM and dry-run signing records, then pull by digest and execute the
-recovered binary. The script uses the current Definition and Environment inputs and preserves each Run attempt.
+The script name is historical: `demo-m1-local.sh` now runs the combined NKE Definition, producing the NKE
+CLI, CWE runtime image, and quickstart Helm bundle. **M1 itself requires only the CLI vertical slice.** The
+script builds and publishes all three outputs, then inspects and consumes the CLI publication. It does not
+independently pull or smoke-test the CWE image or render the Helm charts.
 
-This is unqualified local execution. Dry-run signing executes no cosign and produces no authenticated signature
-or attestation. The [2026-09-08 evidence](evidence/2026-09-08-m1-public-lifecycle-local.md) records a passing
-current-model run. The separate [2026-09-04 evidence](evidence/2026-09-04-m1-local.md) preserves the earlier
-version. Current checks are listed in
-[reconciliation](adr/reconciliation.md#repository-validation).
+Plans are `static-unqualified`; executed local Run records use `unqualified-local-execution`. Dry-run signing executes no cosign and produces no authenticated
+signature or attestation. The CLI build is offline; the CWE wrapped build uses network access. Calling the
+whole journey hermetic, signed, or M1-complete would be incorrect.
+
+The [2026-09-08 local evidence](evidence/2026-09-08-m1-public-lifecycle-local.md) and
+[2026-09-09 audit](evidence/2026-09-09-demo-audit.md) record earlier CLI-only inputs. They do not prove this
+checkout's combined local journey. Real hosted signing and independent consumption were subsequently
+[recorded for the combined outputs](evidence/2026-09-10-combined-run.md) in the personal GitHub namespace.
+Those records precede the current NVIDIA migration and catalog/tool/action changes. The subsequent
+[demo audit](evidence/2026-09-10-demo-language-audit.md) records a passing combined local execution with the
+current inputs, including CLI pull-back and version checks.
 
 ## Prepare and run
 
-Requires the repository's Go toolchain, Docker, Git, curl, access to the pinned images, and an NKE clone
-containing the pinned source. Docker must support execution of linux/amd64 images; an arm64 laptop uses
-emulation. The default registry binds loopback port 5000.
+Requires the repository's Go toolchain, Docker, Git, curl, an NKE clone containing both pinned module commits,
+and network access for pinned tool downloads, container acquisition, and the CWE build's upstream dependencies.
+The Docker Linux VM must support rootless BuildKit with overlayfs; the CWE build needs substantially more
+disk, memory and time than the CLI alone. Docker must support execution of linux/amd64 images; an arm64 laptop uses
+emulation. The default registry binds loopback port 5000. Its `registry:3` service image is tag-selected demo
+infrastructure, not a digest-pinned build input.
 
 From the repository root:
 
@@ -42,8 +52,8 @@ cleanup command. See `--help` for the path options.
 |---|---|---|
 | Build and validate | Definition, catalog pins and local Environment | The current checkout accepts the intended pinned inputs |
 | Check hosted generation | Committed GitHub bundle drift check | Hosted workflow bytes match the current inputs; no provider job is run |
-| Execute | `lifecycle.json` in the new attempt | Frozen required outputs, one attempt's observations and any failures |
-| Inspect SBOM | Recipe `sbom/index.json` and component documents | The bill of materials names the observed binary digest |
+| Execute | `lifecycle.json` in the new attempt | All three required outputs must complete; observations and failures are recorded |
+| Inspect SBOM | CLI Recipe `sbom/index.json` and component documents | The CLI bill of materials names the observed binary digest and includes configured dependency inspection |
 | Inspect signing | `signatures/`, `predicates/`, `verifications/` | Dry-run records name the published digest and exact predicate bytes; signature verification remains false |
 | Pull by digest | Published reference and extracted `nkectl` | Registry bytes round-trip and the recovered binary digest matches the SBOM subject |
 | Execute recovered binary | Version output in the pinned amd64 container | The published package contains a runnable NKE CLI with the expected upstream version |
@@ -52,15 +62,22 @@ The script prints the actual reference, digests, paths and timings. Use those va
 historical node counts, workspace names and digests are not stable expectations for the current model.
 
 Inspect [the NKE inputs](../definitions/nke-v1/README.md) to show the authorship split: Definition owns the
-output selection and packaging; Environment owns execution, destination and signing settings. Compiler output
+output selection and packaging; Environment owns runtime, publication namespace, credentials and signing identity. The catalog owns source,
+tool and action pins; the Definition selects tools by purpose. Compiler output
 contains the package graph and publication envelope, so users do not wire those records manually.
 
 ## Production acceptance
 
-M1 still requires a green generated GitHub Run with real keyless signing, production attestation and independent
-cosign consumption. That exercise also establishes source access, hosted execution, registry interoperability,
-identity policy and protected-environment behavior. Contract tests and this local dry run do not establish those
-external integrations.
+M1 acceptance includes a green generated hosted Run, real keyless signing and production provenance,
+independent consumer verification, and the review/governance requirements in the
+[acceptance specification](epics-v1-spec.md#epic-m1--vertical-slice). Hosted signing and consumption have been
+recorded in the personal namespace; they are not still wholly unimplemented. A run under the current NVIDIA
+repository and identity is not yet recorded.
 
-For other journeys, use the [demo index](../scripts/README.md): GPU cluster planning, hosted generation,
-pin changes, tamper rejection and policy-scoped Release consumption each demonstrate a distinct behavior.
+The implementation admits default-branch manual dispatch and makes all pull requests generation-only.
+The acceptance specification still calls for a default-branch **push** run and same-repository pull-request
+builds. Its per-job helper digest negative demonstration is also not established by the recorded run.
+These remain acceptance gaps; this documentation audit does not relax them or declare M1 complete.
+
+For other journeys, use the [demo index](../scripts/README.md): AICR rendering and packaging, hosted generation,
+pin changes, tamper rejection and policy-scoped publication verification each demonstrate a distinct behavior.

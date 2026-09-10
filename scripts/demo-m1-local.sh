@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# CUJ (M1, LOCAL): execute the production nke-v1 Definition end to end on this
-# laptop — build nkectl from the pinned NKE tag inside a pinned golang container, package
-# it as an OCI binary bundle inside an OCI publication root, publish it to a loopback
-# registry, show the per-artifact CycloneDX SBOM the run billed, run the DRY-RUN signing
-# and verify-publication lanes, then pull the result back BY DIGEST and run the recovered
-# binary.
+# Local combined NKE walkthrough. The historical M1 name predates the addition
+# of CWE and Helm: the current Definition builds and publishes all three outputs.
+# The CLI build is offline; CWE wraps the upstream network-enabled Dockerfile.
+# This script inspects the CLI SBOM and dry-run signing records, pulls its
+# publication by digest, and runs the recovered binary. It does not independently
+# smoke-test the image or render the charts.
 #
-# What this script does NOT establish: nothing here is signed. The signing lane runs in
-# dry-run mode, which executes no cosign and contacts no transparency log; it records the
-# exact invocations a real signer would run. The output is UNQUALIFIED local execution
-# evidence and does not authorize a Release or deployment. Real cosign,
-# OIDC, and a provisioned repository are the separate GitHub exercise.
+# Plans are static-unqualified; executed Runs are unqualified-local-execution.
+# Dry-run signing executes no cosign and produces no authenticated signature.
+# M1 acceptance requires the separate hosted exercise and its review requirements.
 
 set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -35,7 +33,7 @@ KEEP_REGISTRY=1
 
 # The same pinned toolchain image the catalog builds nkectl with, reused here as the
 # amd64 execution environment for the recovered binary. Reusing it keeps this script from
-# introducing a second, unpinned image into an otherwise fully pinned demo.
+# introducing another execution image. The loopback registry service uses registry:3.
 RUN_IMAGE=golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
 # The version string upstream's own cli/Makefile stamps for tag cli/v0.1.0-rc.2.
 EXPECT_VERSION=${EXPECT_VERSION:-v0.1.0-rc.2}
@@ -44,10 +42,15 @@ usage() {
   cat <<'EOF'
 Usage: scripts/demo-m1-local.sh [options]
 
-Run the complete M1 local validation:
-  pinned NKE source -> hermetic container build -> OCI binary bundle
-    -> OCI publication root -> loopback registry -> per-artifact SBOM
-    -> dry-run sign -> verify-publication -> pull by digest -> run the recovered nkectl
+Run the combined NKE local walkthrough (M1 requires the CLI slice only):
+  pinned NKE sources -> CLI + CWE image + Helm bundle -> per-artifact SBOMs
+    -> OCI publication envelopes -> loopback registry -> dry-run signing records
+    -> pull the CLI publication by digest -> check SBOM digest -> run recovered nkectl
+
+The CLI build is offline; CWE uses network-enabled rootless BuildKit. All three
+outputs must complete, but pull-back and version checks cover the CLI only.
+Planning is static-unqualified; executed Runs use unqualified-local-execution.
+Nothing is signed, and this walkthrough does not complete M1 acceptance.
 
 Options:
   --attempts-root DIR
@@ -55,7 +58,7 @@ Options:
   --attempt NAME    new immutable attempt name (default: timestamp plus process ID)
   --consume DIR     scratch directory for the pull/extract half of the demo
                     (default: .nkd/m1-local-consume)
-  --stop-registry   remove the demo registry container when the run finishes
+  --stop-registry   remove the demo registry container after successful completion
   -h, --help        show this help
 
 Environment:
@@ -64,7 +67,8 @@ Environment:
                     The catalog keeps its https://github.com/NVIDIA/nke identity and
                     the user's own git configuration is never modified.
 
-Requires docker, git, curl, and a Go toolchain. Re-running is safe: the registry
+Requires docker with rootless BuildKit/overlayfs support, git, curl, a Go toolchain,
+and network access for tools, images and CWE build dependencies. Re-running is safe: the registry
 container is reused; every execution gets a new immutable attempt, and the consume directory is rebuilt.
 EOF
 }
@@ -162,7 +166,7 @@ demo_section "3/8  Validate the Definition and current generated hosted Run"
 go run ./cmd/nkdctl run generate --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-github.yaml" --engine github --root . --check
 
-demo_section "4/8  Execute one immutable Run and publish its OCI envelope"
+demo_section "4/8  Build and publish all three outputs in one immutable Run"
 run_started=$SECONDS
 "$NKD" run local --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-local.yaml" --attempts-root "$ATTEMPTS_ROOT" --attempt "$ATTEMPT" \
@@ -179,11 +183,11 @@ esac
 DIGEST=${REFERENCE#*@}
 printf '\npublished reference: %s\n' "$REFERENCE"
 
-demo_section "5/8  Show the per-artifact SBOM the Run billed"
+demo_section "5/8  Inspect the CLI SBOM and its observed subject"
 # The Run's SBOM node ran during
 # step 4 and wrote a deterministic CycloneDX SBOM per built component plus an aggregate
 # index, each bound to the component's runner-observed artifact digest. This is
-# static-unqualified composition evidence — it asserts what went in, never a signature.
+# unqualified composition evidence — it asserts what went in, never a signature.
 sbom_dir="$WORKSPACE/$RECIPE_TARGET/sbom"
 sbom_index="$sbom_dir/index.json"
 [ -f "$sbom_index" ] || demo_die "Run did not emit an SBOM index: $sbom_index"
@@ -266,15 +270,17 @@ fi
 
 cat <<EOF
 
-M1 LOCAL VALIDATION COMPLETE — LOCAL, UNQUALIFIED, DRY-RUN-SIGNED
+LOCAL NKE WALKTHROUGH COMPLETE — UNQUALIFIED-LOCAL-EXECUTION, NO SIGNATURES
   definition:          $DEFINITIONS/definition.yaml
+  produced outputs:    nkectl, cwe, nke-helm (default Definition)
+  pull-back check:     nkectl only
   registry:            http://$REGISTRY_HOSTPORT/v2/ (container $REGISTRY_CONTAINER)
   published reference: $REFERENCE
   index digest:        $DIGEST
   nkectl sha256:       $NKECTL_SHA256
   nkectl version:      $VERSION_OUTPUT
   run record:          $WORKSPACE/lifecycle.json
-  SBOM index:          $sbom_index ($sbom_count per-artifact CycloneDX doc(s), static-unqualified)
+  SBOM index:          $sbom_index ($sbom_count CLI CycloneDX doc(s), unqualified composition evidence)
   signing record:      $signature_record
   SLSA v1 predicate:   $predicate_record
   predicate sha256:    $PREDICATE_SHA256
@@ -282,11 +288,10 @@ M1 LOCAL VALIDATION COMPLETE — LOCAL, UNQUALIFIED, DRY-RUN-SIGNED
   extracted binary:    $NKECTL
   timings:             Run ${run_seconds}s, pull ${pull_seconds}s
 
-NOTHING HERE WAS SIGNED. The signing lane ran in dry-run mode: no cosign was executed,
-no key or OIDC identity was used, and no transparency log was contacted. The records
-above state the invocations a real signer WOULD run. The plan therefore remains
-static-unqualified; only cosign mode can claim pipeline-attested. This is local
-execution evidence, not M1 completion, and not a release, clearance, or deployment
-authority — that requires the GitHub run with real cosign, OIDC, and a provisioned
-repository.
+Nothing was signed: dry-run mode executed no cosign and used no signing identity.
+The local Run records observations and dry-run signing/predicate records, not
+signature authority. Selecting cosign mode alone would not prove hosted execution,
+verification, or milestone completion. M1 acceptance also requires the hosted and
+independent-consumer evidence plus the review and governance requirements in the
+acceptance specification. This local run does not establish them.
 EOF

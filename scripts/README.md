@@ -10,7 +10,8 @@ supporting contract. They never turn local diagnostics into release authority.
 nkdctl run plan --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-local.yaml
 scripts/demo-ai-factory-local.sh --plan
 
-# Full local journeys; Docker and Go are required.
+# Local execution; Docker, Go and acquisition/build network access are required.
+# Despite its historical name, the M1 script executes CLI + CWE + Helm.
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
 scripts/demo-ai-factory-local.sh
 scripts/demo-ai-factory-local.sh --publish
@@ -19,9 +20,13 @@ scripts/demo-ai-factory-local.sh --publish
 `demo-ai-factory-local.sh` runs the pinned AICR render, terminal observation,
 Helm OCI package, and lifecycle envelope. It does not build the worker payload;
 that belongs to the NKE OS-image build. Local attempts are immutable and
-`static-unqualified`.
+`unqualified-local-execution`; plans remain `static-unqualified`.
 
-M1 uses the loopback registry on port 5000; AICR publication uses port 5001.
+The NKE script publishes all three outputs and demonstrates pull-back/SBOM/version checks for the CLI only.
+M1 acceptance is the CLI vertical slice, not the complete breadth of this Definition. See the
+[M1 walkthrough and acceptance limits](../docs/demo-m1.md).
+
+The NKE demo uses the loopback registry on port 5000; AICR publication uses port 5001.
 Both scripts generate their own valid immutable attempt names. The OS-image
 wrapper remains unimplemented; the worker-package contract fixtures are not an
 OS-image demo.
@@ -44,7 +49,8 @@ scripts/demo-release-consumer.sh --help
 ```
 
 The consumer takes one digest-pinned reference and one explicit Verification
-Policy. Run it on Linux: it requires a real statically linked, digest-pinned Linux
+Policy with `artifact-publication` scope. This does not establish M3 qualification or M4 Release-manifest
+acceptance. Run it on Linux: it requires a real statically linked, digest-pinned Linux
 cosign executable and a signed GitHub publication; local dry-run output is
 deliberately insufficient.
 Signer-policy rejection is covered by the owning consumer contract tests.
