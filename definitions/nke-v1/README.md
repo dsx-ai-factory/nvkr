@@ -1,10 +1,11 @@
 # `definitions/nke-v1` — Combined NKE Definition
 
 This Definition builds `nkectl`, the complete upstream CWE runtime image, and the quickstart Helm bundle from
-one pinned NKE source. It observes all three named outputs and generates their OCI publication and signing
+independently pinned CLI and controller module tags in NKE. It observes all three named outputs and generates their OCI publication and signing
 jobs. Recipes remain catalog-owned. Runtime, destination, and signing choices live in independently selected
 Environments. The [combined hosted run and independent consumers](../../docs/evidence/2026-09-10-combined-run.md)
-passed for all three outputs, including real signing and complete Run finalization.
+passed for all three outputs, including real signing and complete Run finalization. That recorded run predates
+the controller tag/version correction described below; it does not validate a hosted run of these updated inputs.
 
 | File | Purpose |
 |---|---|
@@ -60,6 +61,10 @@ manifest digest produced by the same graph and refreshes `checksums.txt`. The ad
 plain rendered, single-container Deployment in `templates/controller.yaml`; ambiguous or already-templated
 input fails closed.
 
+The chart source is the committed generated quickstart snapshot at the controller pin, not a fresh AICR
+generation. Upstream chart `version` and `appVersion` metadata are preserved; they are not the CWE binary's
+release version. The source commit and the bound image digest identify this packaged snapshot.
+
 After verifying and extracting the Release, supply its CWE repository as `image.repository` in deployment
 values. For this GitHub Environment that repository is `ghcr.io/njhensley/nke-recipes/cwe`. For example, rendering
 the extracted controller chart uses:
@@ -91,7 +96,18 @@ nkdctl run generate \
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
-The pinned NKE source remains `cli/v0.1.0-rc.2`, commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`, tree `309887e8cdb8ee24a39785b864390eda3afce5ec`. Repin only through `nkdctl catalog pin`; never hand-edit the lock.
+The CLI source `nke` is pinned to `cli/v0.1.0-rc.2`. The CWE and Helm source `nke-controller` is pinned to
+`controller/v0.1.1-rc.1`. Both tags currently resolve to commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`,
+tree `309887e8cdb8ee24a39785b864390eda3afce5ec`; selecting the controller tag does not upgrade source bytes.
+CWE stamps `v0.1.1-rc.1` from that module tag, matching upstream's prefix stripping, instead of synthesizing
+a version from the commit. The sources can be repinned independently, while CWE and its chart snapshot move together:
+
+```sh
+nkdctl catalog pin --dir definitions/nke-v1/catalog --tag v0.1.0-rc.2 nke
+nkdctl catalog pin --dir definitions/nke-v1/catalog --tag v0.1.1-rc.1 nke-controller
+```
+
+Repin only through `nkdctl catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
 
 The committed generated workflow is `.github/workflows/nkd-run.yml`, with exact inputs under
 `.github/nkd-run/`. Pull requests check regeneration only. To execute, dispatch the workflow on the default

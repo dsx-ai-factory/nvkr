@@ -7,3 +7,8 @@ pins:
     sourceDateEpoch: 1787066575
     tag: cli/v0.1.0-rc.2
     treeHash: 309887e8cdb8ee24a39785b864390eda3afce5ec
+  nke-controller:
+    commit: ed9fb09b04fd40bf331d25df2222206ffaca593e
+    sourceDateEpoch: 1787066575
+    tag: controller/v0.1.1-rc.1
+    treeHash: 309887e8cdb8ee24a39785b864390eda3afce5ec

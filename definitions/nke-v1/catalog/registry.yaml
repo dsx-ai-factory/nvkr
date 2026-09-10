@@ -3,11 +3,11 @@ kind: SourceBuildRegistry
 metadata:
   name: nke-v1
   description: >-
-    NKE components from one pinned upstream monorepo. The CLI uses an offline Go build;
+    NKE components from independently pinned CLI and controller module tags. The CLI uses an offline Go build;
     CWE wraps the upstream Dockerfile in digest-pinned rootless BuildKit.
 sources:
   # NKE is a Go workspace MONOREPO that publishes per-module tags under a path prefix
-  # (cli/v0.1.0-rc.2). tagPrefix makes that explicit: `catalog pin nke --tag v0.1.0-rc.2`
+  # (cli/v0.1.0-rc.2). tagPrefix makes that explicit: `catalog pin --tag v0.1.0-rc.2 nke`
   # (or the full cli/v0.1.0-rc.2) resolves refs/tags/cli/…, `catalog bump` considers only
   # cli/-prefixed tags, the lock records the FULL tag git can resolve, and every rendered
   # version ({{.Version}}, {{.Major}}…) is prefix-free.
@@ -18,6 +18,12 @@ sources:
     # The repo has no .go-version, so the toolchain cannot be derived by
     # toolchainBaseImage; it is pinned explicitly. This is docker.io/library/golang:1.26.6
     # (the multi-arch index digest), which carries the Go 1.26.6 the workspace declares.
+    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+  # CWE and its committed quickstart charts move together on the controller train.
+  nke-controller:
+    repo: https://github.com/NVIDIA/nke
+    tagPrefix: controller/
+    constraint: 0.1.x
     toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
 recipes:
   # `operations` is the closest ADR-12 §2 cluster-level category for an operator CLI; see
@@ -34,7 +40,7 @@ recipes:
 components:
   cwe:
     fromSource: true
-    source: nke
+    source: nke-controller
     builderType: buildkit-rootless
     toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
     outputType: oci-image
@@ -52,11 +58,11 @@ components:
         --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
         --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
     versionStamp:
-      BUILD_VERSION: "0.0.0-g{{slice .Commit 0 12}}"
+      BUILD_VERSION: "{{.ModuleTag}}"
       GIT_VERSION: "{{.Commit}}"
   nke-helm:
     fromSource: true
-    source: nke
+    source: nke-controller
     outputType: tarball
     writeDir: bin
     artifactPath: bin/nke-helm.tar
