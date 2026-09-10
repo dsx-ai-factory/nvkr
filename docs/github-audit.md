@@ -17,7 +17,8 @@ the drift check compared expected members but ignored leftover graphs. Other han
 outside that directory's ownership.
 
 The GitHub Environment now names this repository's GHCR destination and workflow signer identity. Signing
-remains `dry-run` and the resulting evidence remains `static-unqualified`. All pull requests perform only
+is now configured for the exact pinned cosign executable and the `nkd-release` deployment environment.
+Real-service acceptance is tracked in the [signed Run evidence](evidence/2026-09-10-github-signed-run.md). All pull requests perform only
 bootstrap and regeneration checks. Execution requires manual dispatch on the default branch, with bounded
 job timeouts and concurrency that does not cancel an in-progress publication.
 
@@ -29,8 +30,8 @@ they are not separate authored public objects. The public entry point and genera
 The [first hosted Run](evidence/2026-09-09-github-run.md) passed bootstrap and regeneration but failed
 fetching the internal NKE source without a cross-repository credential. It uploaded a failed Run record.
 The subsequent [authenticated fork Run](evidence/2026-09-09-github-authenticated-run.md) passed every job,
-including the CLI build, GHCR publication and complete Run finalization. Real OIDC signing, protected-environment
-integration and automatic default-branch publication remain deferred or unexercised in ADR-18. No signed publication exists for positive Release-consumer acceptance.
+including the CLI build, GHCR publication and complete Run finalization. The deployment environment now restricts execution to `main`, and only the signing job receives OIDC minting
+permission. The first real signing exercise is pending; automatic default-branch publication remains deferred.
 
 ## Validation
 
@@ -41,7 +42,7 @@ allowed. NKE and AICR generation checks pass, including regression coverage for 
 execution guards. Changed-document relative links and `git diff --check` pass.
 
 The current NKE plan digest is
-`sha256:eb5425d44ec91650c3ddcce825f2274e567b6e64200b63ef22171bc59b018102`.
+`sha256:afbf72d8d16cb5c5e0a6346fa7d6638874e432b18dbc5535ff8cae25f889734a`.
 
 GitHub Actions is enabled. Commit `3c55dcf` promoted the implementation and generated workflow to `main`;
 manual dispatch then exercised the hosted failure path described above.

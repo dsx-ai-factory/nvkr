@@ -57,6 +57,7 @@ func signedTestPlan(t *testing.T, signing *SigningProfile, target Target) *Plan 
 	}
 	if signing != nil && signing.Mode == SigningModeCosign {
 		definition.Tools = map[string]Tool{signing.CosignTool: {
+			Format:           ToolFormatTarGzip,
 			URL:              "https://example.invalid/cosign.tar.gz",
 			ArchiveDigest:    testCosignArchiveDigest,
 			ExecutablePath:   "cosign",
@@ -327,7 +328,7 @@ func TestRenderGitHubSigningJobsCarryModeScopedPermissions(t *testing.T) {
 			verify: map[string]string{"contents": "read", "packages": "read"}},
 		{name: "cosign", signing: cosignSigningProfile(),
 			sign:   map[string]string{"contents": "read", "packages": "write", "id-token": "write"},
-			verify: map[string]string{"contents": "read", "packages": "read", "id-token": "write"}},
+			verify: map[string]string{"contents": "read", "packages": "read"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -386,12 +387,17 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 		{name: "publish-grabs-id-token",
 			old: []byte("    permissions:\n      contents: read\n      packages: write\n    env:\n      NKD_CREDENTIAL"),
 			new: []byte("    permissions:\n      contents: read\n      id-token: write\n      packages: write\n    env:\n      NKD_CREDENTIAL")},
+		{name: "deployment-environment-removed",
+			old: []byte("    environment: 'nkd-release'\n"), new: []byte("")},
+		{name: "verify-grabs-id-token",
+			old: []byte("      contents: read\n      packages: read\n"),
+			new: []byte("      contents: read\n      id-token: write\n      packages: read\n")},
 		{name: "sign-drops-id-token",
 			old: []byte("      contents: read\n      id-token: write\n      packages: write\n"),
 			new: []byte("      contents: read\n      packages: write\n")},
 		{name: "sign-downgrades-id-token",
-			old: []byte("      id-token: write\n      packages: read\n"),
-			new: []byte("      id-token: read\n      packages: read\n")},
+			old: []byte("      id-token: write\n      packages: write\n"),
+			new: []byte("      id-token: read\n      packages: write\n")},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -3,8 +3,15 @@ kind: Environment
 metadata:
   name: nke-github
   description: GitHub hosted-runner publication settings with a pinned identity policy.
-utilityContainer: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
 utilityPlatform: linux/amd64
+tools:
+  cosign:
+    format: raw
+    url: https://github.com/sigstore/cosign/releases/download/v2.6.3/cosign-linux-amd64
+    archiveDigest: sha256:7c78a7f2efc00088bd788a758db6e0928e79f3e0eb83eb5d3c499ed98da4c4f4
+    executablePath: cosign-linux-amd64
+    executableDigest: sha256:7c78a7f2efc00088bd788a758db6e0928e79f3e0eb83eb5d3c499ed98da4c4f4
 sourceAccess:
   https://github.com/NVIDIA/nke:
     mirror: https://github.com/njhensley/nke
@@ -17,6 +24,7 @@ destinations:
 publish:
   nkectl: ghcr
 signing:
-  mode: dry-run
+  mode: cosign
   identity: '^https://github\.com/njhensley/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/main$'
   issuer: https://token.actions.githubusercontent.com
+  cosignTool: cosign

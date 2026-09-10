@@ -62,9 +62,11 @@ The pinned NKE source remains `cli/v0.1.0-rc.2`, commit `ed9fb09b04fd40bf331d25d
 
 The committed generated workflow is `.github/workflows/nkd-run.yml`, with exact inputs under
 `.github/nkd-run/`. Pull requests check regeneration only. To execute, dispatch the workflow on the default
-branch. The GitHub Environment targets `ghcr.io/njhensley/nke-recipes/nkectl` and deliberately keeps signing
-in dry-run mode; registry access and NKE source access must be available to the hosted runner. This is not a
-production signing workflow until the deferred protected-environment and real-signing acceptance are complete.
+branch. The GitHub Environment targets `ghcr.io/njhensley/nke-recipes/nkectl` and uses the
+exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
+environment `nkd-release` with a deployment branch policy admitting only `main`. Registry access and NKE source
+access must be available to the hosted runner. Real operational acceptance is recorded separately in the
+[implementation/evidence record](../../docs/adr/reconciliation.md).
 
 The GitHub Environment fetches the canonical `NVIDIA/nke` source through the private `njhensley/nke` fork.
 Its `sourceAccess` entry references the repository Actions secret `NKE_SOURCE_TOKEN`, which must grant

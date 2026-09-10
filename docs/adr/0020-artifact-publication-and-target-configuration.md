@@ -39,6 +39,12 @@ routine envelopes and routes from each named output, rejecting ambiguous, missin
 Changing destination or signing tools can change Environment, prepared plan and evidence while preserving logical
 Recipe identity. Output-affecting tools remain bound to Recipe/composition identity.
 
+Each acquired tool declares `format: raw` or `format: tar-gzip`. Both bind exact transport and executable
+SHA-256 digests. Raw tools require those digests to be identical; archive tools select one safe executable
+member. Unknown formats fail before acquisition. This supports official static executable release assets
+without introducing a repackaging step or inferring transport format from filenames.
+
+
 Environment may also map a canonical source URL to an HTTPS fetch mirror and a GitHub secret reference
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
 commit/tree, or Recipe identity. The current adapter binds the credential only to the matching GitHub fetch

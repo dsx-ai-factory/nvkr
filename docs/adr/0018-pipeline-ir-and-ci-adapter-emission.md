@@ -173,7 +173,10 @@ output; omitting unsupported signing jobs silently is forbidden. Tekton/Argo fac
 
 The current generated Run workflow admits a narrower subset: all pull requests perform only bootstrap and
 regeneration checks, and execution requires manual dispatch on the default branch. Default-branch push
-publication, in-repository PR builds and protected-environment integration remain deferred. Job timeouts are
+publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
+`nkd-release` GitHub deployment environment; operators must configure its deployment policy to admit only
+the default branch. Only the signing job receives OIDC minting permission. The verifier needs registry read
+access and obtains no identity token. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
 finalization still run after failures within an admitted execution; they do not run for static-only PR checks.
 
@@ -182,6 +185,16 @@ generator, helper and signing code with branch protection and code ownership. Ho
 with vendored inputs. The renderer must reject guards it cannot express, including OIDC outside the signing job
 family or credentials in build phases. These are testable contracts; current rendering is not proof that a
 provider or protected environment has exercised them.
+
+The v1 scheduler may group consecutive offline observation, SBOM and packaging nodes with identical runner,
+container and platform into one bounded job. Every logical node retains its exact execution command and
+container isolation; fetch, build, publication and signing remain separate jobs. Internal dependencies use the
+same workspace bytes and consumer checks. Each logical output retains its carrier for finalization. A failed
+shared job makes its outputs unsuccessful for finalization, even if an earlier step uploaded a carrier.
+This provider scheduling choice does not change the logical graph or Recipe identity.
+
+The finalizer batches downloads with an exact set of planned carrier names. It still restores every carrier
+and records its producer and restore outcome; a successful batch download alone proves no completeness.
 
 Finalizers are scheduled unconditionally and fail on failed/missing producers, failed restore, omitted required
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent

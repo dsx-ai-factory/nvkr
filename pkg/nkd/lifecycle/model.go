@@ -78,6 +78,7 @@ type Catalog struct {
 }
 
 type Tool struct {
+	Format           string `json:"format"`
 	URL              string `json:"url"`
 	ArchiveDigest    string `json:"archiveDigest"`
 	ExecutablePath   string `json:"executablePath"`
@@ -429,9 +430,15 @@ func validateHTTPSURL(label, value string) error {
 }
 
 func validateTool(name string, tool Tool) error {
+	if tool.Format != factoryToolFormatRaw && tool.Format != factoryToolFormatTarGzip {
+		return e.New(e.CodeInvalidCatalog, "tool %q has unsupported format %q", name, tool.Format)
+	}
 	if !namePattern.MatchString(name) || !strings.HasPrefix(tool.URL, "https://") || !canonical.IsDigest(tool.ArchiveDigest) ||
 		!canonical.IsDigest(tool.ExecutableDigest) || tool.ExecutablePath == "" || strings.HasPrefix(tool.ExecutablePath, "/") || strings.ContainsAny(tool.ExecutablePath, "\\\x00\r\n") {
 		return e.New(e.CodeInvalidCatalog, "tool %q does not bind a safe HTTPS archive and exact executable", name)
+	}
+	if tool.Format == factoryToolFormatRaw && tool.ArchiveDigest != tool.ExecutableDigest {
+		return e.New(e.CodeInvalidCatalog, "raw tool %q must bind identical transport and executable digests", name)
 	}
 	for _, part := range strings.Split(tool.ExecutablePath, "/") {
 		if part == "" || part == "." || part == ".." {
@@ -440,6 +447,11 @@ func validateTool(name string, tool Tool) error {
 	}
 	return nil
 }
+
+const (
+	factoryToolFormatRaw     = "raw"
+	factoryToolFormatTarGzip = "tar-gzip"
+)
 
 func (environment Environment) Digest() (string, error) {
 	if err := environment.Validate(); err != nil {

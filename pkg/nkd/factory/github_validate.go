@@ -1,14 +1,17 @@
 package factory
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
 	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
 	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
 	"sigs.k8s.io/yaml"
 )
 
@@ -24,6 +27,7 @@ type githubWorkflowDocument struct {
 }
 
 type githubJob struct {
+	Environment    string                     `json:"environment,omitempty"`
 	TimeoutMinutes int                        `json:"timeout-minutes"`
 	Name           string                     `json:"name"`
 	RunsOn         string                     `json:"runs-on"`
@@ -59,7 +63,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := yaml.UnmarshalStrict(workflow, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
 	}
-	if document.Name != "nkd-run-"+plan.Name || document.Permissions["contents"] != "read" {
+	if document.Name != "nkd-run-"+plan.Name || document.Permissions["contents"] != "read" || len(document.Permissions) != 1 {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow name/triggers/root permissions are incomplete")
 	}
 	if _, ok := document.On["workflow_dispatch"]; !ok {
@@ -80,13 +84,26 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	nodeJobs := make(map[string]string, len(plan.Graph.Nodes))
+	graphDigests := make(map[string]string, len(plan.Recipes))
+	for _, recipe := range plan.Recipes {
+		raw, err := recipe.Graph.CanonicalJSON()
+		if err != nil {
+			return err
+		}
+		graphDigests[recipe.Name] = pipeline.FileDigest(raw)
+	}
+	stages, nodeJobs := githubStages(plan)
+	byNode := make(map[string]githubStage, len(plan.Graph.Nodes))
+	for _, stage := range stages {
+		for _, node := range stage.Nodes {
+			byNode[node.ID] = stage
+		}
+	}
 	bootstrap := map[string]string{}
 	for _, node := range plan.Graph.Nodes {
-		nodeJobs[node.ID] = githubJobID(node.ID)
 		bootstrap[node.RunsOn] = "build-runner-" + shortStableName(node.RunsOn)
 	}
-	expectedJobCount := len(plan.Graph.Nodes) + len(bootstrap)
+	expectedJobCount := len(stages) + len(bootstrap)
 	if len(plan.LifecycleOutputs) > 0 {
 		expectedJobCount++
 	}
@@ -97,10 +114,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	for _, node := range plan.Graph.Nodes {
 		sourceEnvironments[nodeJobs[node.ID]] = githubSourceEnvironment(plan, node)
 	}
-	signFamily := make(map[string]bool, len(plan.Graph.Nodes))
+	signJobs := make(map[string]bool, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
-		if signFamilyNode(node.Kind) {
-			signFamily[nodeJobs[node.ID]] = true
+		if node.Kind == NodeSign {
+			signJobs[nodeJobs[node.ID]] = true
 		}
 	}
 	for jobID, job := range document.Jobs {
@@ -136,10 +153,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			return e.New(e.CodeEngineCapability, "GitHub Run finalization must follow the admitted execution event even after failure")
 		}
 		// An OIDC identity token is the credential a keyless signature is minted from.
-		// Only the signing family may request one; anywhere else it is an ambient
+		// Only the signing job may request one; anywhere else it is an ambient
 		// authority the pipeline never needs and must not be granted.
 		if token, ok := job.Permissions["id-token"]; ok {
-			if !signFamily[jobID] {
+			if !signJobs[jobID] {
 				return e.New(e.CodeEngineCapability,
 					"GitHub job %q requests id-token %q but is not a signing job", jobID, token)
 			}
@@ -180,22 +197,26 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 	}
 	for _, node := range plan.Graph.Nodes {
-		jobID := nodeJobs[node.ID]
+		stage := byNode[node.ID]
+		jobID := stage.ID
 		job, ok := document.Jobs[jobID]
-		if !ok || job.Name != node.ID || job.RunsOn != node.RunsOn {
+		wantEnvironment := ""
+		if githubProtectedPublication(plan, node) {
+			wantEnvironment = githubReleaseEnvironment
+		}
+		if job.Environment != wantEnvironment {
+			return e.New(e.CodeEngineCapability, "GitHub job %q deployment environment must be %q", jobID, wantEnvironment)
+		}
+		if !ok || job.Name != stage.Name || job.RunsOn != node.RunsOn {
 			return e.New(e.CodeInvalidCatalog, "GitHub workflow job for artifact node %q is missing or misbound", node.ID)
 		}
-		expectedNeeds := []string{bootstrap[node.RunsOn]}
-		for _, input := range node.Inputs {
-			expectedNeeds = append(expectedNeeds, nodeJobs[artifacts[input].Producer])
-		}
-		expectedNeeds = uniqueSorted(expectedNeeds)
+		expectedNeeds := stage.needs(artifacts, nodeJobs, bootstrap[node.RunsOn])
 		actualNeeds := append([]string(nil), job.Needs...)
 		sort.Strings(actualNeeds)
 		if strings.Join(actualNeeds, "\x00") != strings.Join(expectedNeeds, "\x00") {
 			return e.New(e.CodeInvalidCatalog, "GitHub job %q needs %v; artifact dataflow requires %v", jobID, actualNeeds, expectedNeeds)
 		}
-		if job.Steps[0].Uses != githubCheckoutAction || !stepUses(job.Steps, githubDownloadAction) {
+		if len(job.Steps) == 0 || job.Steps[0].Uses != githubCheckoutAction || !stepUses(job.Steps, githubDownloadAction) {
 			return e.New(e.CodeInvalidCatalog, "GitHub job %q omits pinned checkout or input transport", jobID)
 		}
 		if err := validateHelperPreparedFirst(jobID, job.Steps); err != nil {
@@ -205,6 +226,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			if step.Uses != "" && step.Uses != githubCheckoutAction && step.Uses != githubUploadAction && step.Uses != githubDownloadAction {
 				return e.New(e.CodeInvalidCatalog, "GitHub job %q uses unapproved or unpinned action %q", jobID, step.Uses)
 			}
+		}
+		if err := validateGitHubStageExecution(plan, stage, job.Steps, graphDigests); err != nil {
+			return err
 		}
 		runs := joinRuns(job.Steps)
 		if !strings.Contains(runs, "factory execute-node") && !strings.Contains(runs, "exec-node") {
@@ -228,10 +252,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub container job %q does not bind its target platform", jobID)
 			}
 		}
-		wantCondition := "${{ " + githubExecutionCondition + " }}"
-		if node.Kind == NodeVerify {
-			wantCondition = "${{ always() && " + githubExecutionCondition + " }}"
-		}
+		wantCondition := stage.condition()
 		if job.If != wantCondition {
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on the default branch", jobID)
 		}
@@ -275,11 +296,50 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
 		}
-		for _, input := range node.Inputs {
+		for _, input := range stage.inputs(artifacts, nodeJobs) {
 			if !strings.Contains(runs, "transport-unpack --archive "+carrierPath(input)+" --root . --path "+artifacts[input].Path) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not restore exact input %q", jobID, input)
 			}
 		}
+	}
+	if len(plan.LifecycleOutputs) > 0 {
+		job := document.Jobs["nkd-lifecycle-run"]
+		var expected bytes.Buffer
+		if err := writeGitHubFinalizerRestoreSteps(&expected, plan, nodeJobs); err != nil {
+			return err
+		}
+		var restore struct {
+			Steps []githubStep `json:"steps"`
+		}
+		if err := yaml.UnmarshalStrict([]byte("steps:\n"+expected.String()), &restore); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "GitHub finalizer restore schema")
+		}
+		if len(job.Steps) != 3+len(restore.Steps)+2 || !reflect.DeepEqual(job.Steps[3:3+len(restore.Steps)], restore.Steps) {
+			return e.New(e.CodeEngineCapability, "GitHub finalizer must restore every exact planned carrier and record its producer outcome")
+		}
+		if err := validateHelperPreparedFirst("nkd-lifecycle-run", job.Steps); err != nil {
+			return err
+		}
+		var needs []string
+		for _, id := range nodeJobs {
+			needs = append(needs, id)
+		}
+		for _, id := range bootstrap {
+			needs = append(needs, id)
+		}
+		if !reflect.DeepEqual(uniqueSorted(job.Needs), uniqueSorted(needs)) {
+			return e.New(e.CodeEngineCapability, "GitHub finalizer must await every producer stage")
+		}
+	}
+	// Semantic checks above produce useful coded diagnostics. Exact regeneration
+	// additionally rejects unrecognized steps, appended shell commands and ambient
+	// authority on any job; substring checks alone cannot authorize an entire job.
+	expected, err := renderGitHub(ctx, plan, false)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(workflow, expected.Files[GitHubWorkflowPath]) {
+		return e.New(e.CodeEngineCapability, "GitHub workflow differs from its exact admitted rendering")
 	}
 	return nil
 }
@@ -347,4 +407,33 @@ func stepUploads(steps []githubStep, name, path string) bool {
 
 func (document githubWorkflowDocument) String() string {
 	return fmt.Sprintf("%s (%d jobs)", document.Name, len(document.Jobs))
+}
+
+// Every logical node retains one exact, unconditional execution step in graph
+// order even when scheduling shares a runner. Another node's command cannot
+// satisfy this node's isolation or identity checks.
+func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubStep, graphDigests map[string]string) error {
+	next := 0
+	for _, step := range steps {
+		if !strings.HasPrefix(step.Name, "Execute ") {
+			continue
+		}
+		if next >= len(stage.Nodes) {
+			return e.New(e.CodeEngineCapability, "GitHub stage %q has an unexpected execution step", stage.ID)
+		}
+		node := stage.Nodes[next]
+		commands := generatedNodeCommands(node, plan, graphDigests, FactoryPlanPath, FactoryGraphDir, "$GITHUB_WORKSPACE")
+		if len(githubSourceEnvironment(plan, node)) > 0 {
+			commands = append([]string{requireSourceToken}, commands...)
+		}
+		if step.Name != "Execute "+node.ID || step.ContinueOnError || step.If != "" || step.Uses != "" ||
+			strings.TrimSpace(step.Run) != strings.Join(commands, "\n") {
+			return e.New(e.CodeEngineCapability, "GitHub stage %q must execute exact node %q in graph order without skipping failures", stage.ID, node.ID)
+		}
+		next++
+	}
+	if next != len(stage.Nodes) {
+		return e.New(e.CodeEngineCapability, "GitHub stage %q omits a logical node execution", stage.ID)
+	}
+	return nil
 }

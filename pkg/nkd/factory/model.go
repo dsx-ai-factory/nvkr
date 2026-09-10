@@ -79,6 +79,11 @@ const (
 	TargetObject = "object"
 )
 
+const (
+	ToolFormatRaw     = "raw"
+	ToolFormatTarGzip = "tar-gzip"
+)
+
 type Metadata struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
@@ -107,6 +112,7 @@ type CompileSpec struct {
 // Keeping tools outside the catalog prevents the factory implementation itself from
 // becoming an accidental member of an NKE ReleaseSet.
 type Tool struct {
+	Format           string `json:"format"`
 	URL              string `json:"url"`
 	ArchiveDigest    string `json:"archiveDigest"`
 	ExecutablePath   string `json:"executablePath"`
@@ -486,6 +492,7 @@ type Node struct {
 	Digest           string   `json:"digest,omitempty"`
 	Executable       string   `json:"executable,omitempty"`
 	ExecutableDigest string   `json:"executableDigest,omitempty"`
+	ToolFormat       string   `json:"toolFormat,omitempty"`
 	Inputs           []string `json:"inputs,omitempty"`
 	Outputs          []string `json:"outputs,omitempty"`
 }
@@ -530,11 +537,17 @@ func (definition CompileSpec) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "compile spec requires at least one recipe target")
 	}
 	for name, tool := range definition.Tools {
+		if tool.Format != ToolFormatRaw && tool.Format != ToolFormatTarGzip {
+			return e.New(e.CodeInvalidCatalog, "factory tool %q has unsupported format %q", name, tool.Format)
+		}
 		if !canonicalName.MatchString(name) || !strings.HasPrefix(tool.URL, "https://") ||
 			!canonical.IsDigest(tool.ArchiveDigest) || !canonical.IsDigest(tool.ExecutableDigest) ||
 			tool.ExecutablePath == "" || strings.HasPrefix(tool.ExecutablePath, "/") ||
 			strings.Contains(tool.ExecutablePath, "\\") || strings.ContainsAny(tool.ExecutablePath, "\x00\r\n") {
 			return e.New(e.CodeInvalidCatalog, "factory tool %q must bind an https archive, exact archive/executable digests, and a safe member path", name)
+		}
+		if tool.Format == ToolFormatRaw && tool.ArchiveDigest != tool.ExecutableDigest {
+			return e.New(e.CodeInvalidCatalog, "factory raw tool %q must bind identical transport and executable digests", name)
 		}
 		for _, part := range strings.Split(tool.ExecutablePath, "/") {
 			if part == "" || part == "." || part == ".." {

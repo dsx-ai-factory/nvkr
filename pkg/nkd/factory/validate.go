@@ -311,8 +311,12 @@ func (graph ArtifactGraph) Validate() error {
 		}
 		if node.Kind == NodeAcquire && node.IRNode == "" {
 			if !strings.HasPrefix(node.URL, "https://") || !canonical.IsDigest(node.Digest) ||
-				node.Executable == "" || !canonical.IsDigest(node.ExecutableDigest) {
+				node.Executable == "" || !canonical.IsDigest(node.ExecutableDigest) ||
+				(node.ToolFormat != ToolFormatRaw && node.ToolFormat != ToolFormatTarGzip) {
 				return e.New(e.CodeUnpinnedSource, "artifact graph tool acquisition %q is not transport- and executable-pinned", node.ID)
+			}
+			if node.ToolFormat == ToolFormatRaw && node.Digest != node.ExecutableDigest {
+				return e.New(e.CodeUnverifiedRef, "artifact graph raw tool acquisition %q has distinct transport and executable digests", node.ID)
 			}
 		}
 		if len(node.Outputs) == 0 {

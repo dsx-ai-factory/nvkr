@@ -46,7 +46,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	}
 	pin := "sha256:" + strings.Repeat("1", 64)
 	environment.Signing.Mode, environment.Signing.CosignTool = factory.SigningModeCosign, "cosign"
-	environment.Tools = map[string]Tool{"cosign": {URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
+	environment.Tools = map[string]Tool{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
 		ExecutablePath: "cosign", ExecutableDigest: pin}}
 	environmentPath := filepath.ToSlash(filepath.Join(caseRoot, "environment.json"))
 	writeCanonicalTestFile(t, environmentPath, environment)
@@ -220,7 +220,7 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 	definition.Clusters = nil
 	pin := "sha256:" + strings.Repeat("1", 64)
 	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^builder$", Issuer: "issuer", CosignTool: "cosign"}
-	environment.Tools = map[string]Tool{"cosign": {URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
+	environment.Tools = map[string]Tool{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
 		ExecutablePath: "cosign", ExecutableDigest: pin}}
 	writeCanonicalTestFile(t, "definition.json", definition)
 	writeCanonicalTestFile(t, "environment.json", environment)

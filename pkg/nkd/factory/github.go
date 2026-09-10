@@ -20,6 +20,7 @@ const (
 	FactoryPlanPath          = ".github/nkd-run/plan.json"
 	FactoryGraphDir          = ".github/nkd-run/graphs"
 	FactoryCompositionDir    = ".github/nkd-run/compositions"
+	githubReleaseEnvironment = "nkd-release"
 	githubExecutionCondition = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
 )
 
@@ -41,6 +42,11 @@ var githubLayout = generationLayout{workflowPath: GitHubWorkflowPath,
 // RenderGitHub emits a locally inspectable workflow and its exact plan/IR inputs,
 // then runs the semantic static validator before returning any bytes.
 func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
+	return renderGitHub(ctx, plan, true)
+}
+
+// validate=false is private to the validator's exact regeneration comparison.
+func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBundle, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "GitHub factory rendering requires a context")
 	}
@@ -66,10 +72,7 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	nodeJobs := make(map[string]string, len(plan.Graph.Nodes))
-	for _, node := range plan.Graph.Nodes {
-		nodeJobs[node.ID] = githubJobID(node.ID)
-	}
+	stages, nodeJobs := githubStages(plan)
 	bootstrapJobs := map[string]string{}
 	for _, node := range plan.Graph.Nodes {
 		bootstrapJobs[node.RunsOn] = "build-runner-" + shortStableName(node.RunsOn)
@@ -98,18 +101,15 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 			generationCommand(plan, EngineGitHub))
 		writeUploadStep(&body, "nkd-exec-"+shortStableName(runner), "nkd-exec")
 	}
-	for _, node := range plan.Graph.Nodes {
+	for _, stage := range stages {
+		node := stage.Nodes[0]
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "GitHub factory rendering canceled")
 		}
-		jobID := nodeJobs[node.ID]
-		needs := []string{bootstrapJobs[node.RunsOn]}
-		for _, input := range node.Inputs {
-			needs = append(needs, nodeJobs[artifacts[input].Producer])
-		}
-		needs = uniqueSorted(needs)
+		jobID := stage.ID
+		needs := stage.needs(artifacts, nodeJobs, bootstrapJobs[node.RunsOn])
 		fmt.Fprintf(&body, "  %s:\n", jobID)
-		fmt.Fprintf(&body, "    name: %s\n", yamlSingle(node.ID))
+		fmt.Fprintf(&body, "    name: %s\n", yamlSingle(stage.Name))
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(node.RunsOn))
 		fmt.Fprintln(&body, "    timeout-minutes: 60")
 		// Engine-agnostic environment config (ADR-18 §8), rendered in GitHub syntax: a docker-capable
@@ -125,10 +125,9 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 			}
 		}
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(needs, ", "))
-		if node.Kind == NodeVerify {
-			fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubExecutionCondition)
-		} else {
-			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubExecutionCondition)
+		fmt.Fprintf(&body, "    if: %s\n", stage.condition())
+		if githubProtectedPublication(plan, node) {
+			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
 		}
 		env := map[string]string{}
 		for k, v := range plan.ExecutionSettings.Runtime.Variables {
@@ -156,7 +155,7 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 					"GitHub node %q signs without a delivery signing profile", node.ID)
 			}
 			// Signing scopes are per-mode and per-kind, and `id-token: write` (the OIDC
-			// token keyless cosign exchanges for a certificate) is emitted ONLY here.
+			// token keyless cosign exchanges for a certificate) is emitted only for NodeSign.
 			permissions := githubSigningPermissions(node.Kind, signing.Mode)
 			fmt.Fprintf(&body, "    permissions:\n")
 			for _, name := range sortedKeys(permissions) {
@@ -187,7 +186,7 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 		// themselves helper invocations, so a chmod folded into the later Execute step leaves
 		// every input-bearing job failing at its first Restore.
 		writePrepareHelperStep(&body)
-		for _, input := range node.Inputs {
+		for _, input := range stage.inputs(artifacts, nodeJobs) {
 			writeDownloadStep(&body, githubArtifactName(input), ".nkd/carriers")
 			fmt.Fprintf(&body, "      - name: Restore %s\n        run: ./nkd-exec transport-unpack --archive %s --root . --path %s\n",
 				yamlSingle(input), shellQuote(carrierPath(input)), shellQuote(artifacts[input].Path))
@@ -200,25 +199,27 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
 		}
-		fmt.Fprintf(&body, "      - name: %s\n", yamlSingle("Execute "+node.ID))
-		sourceEnv := githubSourceEnvironment(plan, node)
-		if len(sourceEnv) > 0 {
-			fmt.Fprintln(&body, "        env:")
-			for _, key := range sortedKeys(sourceEnv) {
-				fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(sourceEnv[key]))
+		for _, node := range stage.Nodes {
+			fmt.Fprintf(&body, "      - name: %s\n", yamlSingle("Execute "+node.ID))
+			sourceEnv := githubSourceEnvironment(plan, node)
+			if len(sourceEnv) > 0 {
+				fmt.Fprintln(&body, "        env:")
+				for _, key := range sortedKeys(sourceEnv) {
+					fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(sourceEnv[key]))
+				}
 			}
-		}
-		fmt.Fprintln(&body, "        run: |")
-		if len(sourceEnv) > 0 {
-			fmt.Fprintf(&body, "          %s\n", requireSourceToken)
-		}
-		for _, line := range generatedNodeCommands(node, plan, graphDigest, FactoryPlanPath, FactoryGraphDir, "$GITHUB_WORKSPACE") {
-			fmt.Fprintf(&body, "          %s\n", line)
-		}
-		for _, output := range node.Outputs {
-			fmt.Fprintf(&body, "      - name: Pack %s\n        run: ./nkd-exec transport-pack --archive %s --root . --path %s\n",
-				yamlSingle(output), shellQuote(carrierPath(output)), shellQuote(artifacts[output].Path))
-			writeUploadStep(&body, githubArtifactName(output), carrierPath(output))
+			fmt.Fprintln(&body, "        run: |")
+			if len(sourceEnv) > 0 {
+				fmt.Fprintf(&body, "          %s\n", requireSourceToken)
+			}
+			for _, line := range generatedNodeCommands(node, plan, graphDigest, FactoryPlanPath, FactoryGraphDir, "$GITHUB_WORKSPACE") {
+				fmt.Fprintf(&body, "          %s\n", line)
+			}
+			for _, output := range node.Outputs {
+				fmt.Fprintf(&body, "      - name: Pack %s\n        run: ./nkd-exec transport-pack --archive %s --root . --path %s\n",
+					yamlSingle(output), shellQuote(carrierPath(output)), shellQuote(artifacts[output].Path))
+				writeUploadStep(&body, githubArtifactName(output), carrierPath(output))
+			}
 		}
 	}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {
@@ -241,13 +242,8 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 		writeCheckoutStep(&body)
 		writeDownloadStep(&body, "nkd-exec-"+shortStableName(runners[0]), ".")
 		writePrepareHelperStep(&body)
-		fmt.Fprintln(&body, "      - name: Prepare restore outcomes\n        run: mkdir -p .nkd/restore-outcomes")
-		for _, artifact := range plan.Graph.Artifacts {
-			fmt.Fprintf(&body, "      - uses: %s\n        continue-on-error: true\n        with:\n          name: %s\n          path: .nkd/carriers\n", githubDownloadAction, yamlSingle(githubArtifactName(artifact.ID)))
-			status := filepath.ToSlash(HostedRestoreOutcomePath(".nkd/factory", artifact.ID))
-			producerJob := nodeJobs[artifact.Producer]
-			fmt.Fprintf(&body, "      - name: Restore %s when produced\n        run: if [ '${{ needs.%s.result }}' != 'success' ]; then printf 'job-failed\\n' > %s; elif [ ! -f %s ]; then printf 'missing\\n' > %s; elif ./nkd-exec transport-unpack --archive %s --root . --path %s; then printf 'restored:success\\n' > %s; else printf 'restore-failed\\n' > %s; fi\n",
-				yamlSingle(artifact.ID), producerJob, shellQuote(status), shellQuote(carrierPath(artifact.ID)), shellQuote(status), shellQuote(carrierPath(artifact.ID)), shellQuote(artifact.Path), shellQuote(status), shellQuote(status))
+		if err := writeGitHubFinalizerRestoreSteps(&body, plan, nodeJobs); err != nil {
+			return nil, err
 		}
 		fmt.Fprintf(&body, "      - name: Finalize lifecycle Run\n        run: ./nkd-exec run finalize --definition %s --environment %s --plan %s --attempt \"${{ github.run_id }}-${{ github.run_attempt }}\" --workspace .nkd/factory --out .nkd/run.json\n",
 			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(FactoryPlanPath))
@@ -256,16 +252,17 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	workflow := body.Bytes()
 	files[GitHubWorkflowPath] = append([]byte(nil), workflow...)
 	bundle := newGeneratedBundle(EngineGitHub, githubLayout, files, planDigest)
-	if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
-		return nil, err
+	if validate {
+		if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
+			return nil, err
+		}
 	}
 	return bundle, nil
 }
 
 // signFamilyNode reports whether a node kind belongs to the signing family: the
-// only jobs permitted to request an OIDC identity token. It is the ONE definition
-// the emitter and the validator share, so a job that may hold `id-token: write`
-// and a job that does hold it can never diverge.
+// jobs that use a signing profile. Only NodeSign requests an OIDC identity token;
+// publication verification uses registry read access without minting credentials.
 func signFamilyNode(kind string) bool {
 	return kind == NodeSign || kind == NodeVerifyPublication
 }
@@ -283,8 +280,8 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 	if mode != SigningModeCosign {
 		return permissions
 	}
-	permissions["id-token"] = "write"
 	if kind == NodeSign {
+		permissions["id-token"] = "write"
 		permissions["packages"] = "write"
 	}
 	return permissions
@@ -475,4 +472,9 @@ func sortedFileNames(files map[string][]byte) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+func githubProtectedPublication(plan *Plan, node Node) bool {
+	return plan.ExecutionSettings.Signing != nil && plan.ExecutionSettings.Signing.Mode == SigningModeCosign &&
+		(node.Kind == NodePublish || signFamilyNode(node.Kind))
 }

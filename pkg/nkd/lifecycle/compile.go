@@ -99,7 +99,7 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		Tools:   make(map[string]factory.Tool, len(definition.Tools)+len(environment.Tools)),
 	}
 	for name, tool := range definition.Tools {
-		compileSpec.Tools[name] = factory.Tool{URL: tool.URL, ArchiveDigest: tool.ArchiveDigest,
+		compileSpec.Tools[name] = factory.Tool{Format: tool.Format, URL: tool.URL, ArchiveDigest: tool.ArchiveDigest,
 			ExecutablePath: tool.ExecutablePath, ExecutableDigest: tool.ExecutableDigest}
 	}
 	for name, tool := range environment.Tools {
@@ -107,7 +107,7 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 			return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeInvalidCatalog,
 				"tool %q is declared by both Definition and Environment", name)
 		}
-		compileSpec.Tools[name] = factory.Tool{URL: tool.URL, ArchiveDigest: tool.ArchiveDigest,
+		compileSpec.Tools[name] = factory.Tool{Format: tool.Format, URL: tool.URL, ArchiveDigest: tool.ArchiveDigest,
 			ExecutablePath: tool.ExecutablePath, ExecutableDigest: tool.ExecutableDigest}
 	}
 	outputComponents := make(map[string][]string, len(definition.Recipes))

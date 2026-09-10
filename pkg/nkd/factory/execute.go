@@ -161,6 +161,29 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 	if got != node.Digest {
 		return e.New(e.CodeVerifyFailed, "tool %s archive digest %s does not match %s", node.ID, got, node.Digest)
 	}
+	// Official tools may publish one directly executable static binary instead of
+	// wrapping it in an archive. The explicit raw format selects that shape; the
+	// model validator separately requires equal transport and executable digests.
+	if node.ToolFormat == ToolFormatRaw {
+		if _, err := archive.Seek(0, io.SeekStart); err != nil {
+			return e.Wrap(e.CodeInternal, err, "rewinding raw tool")
+		}
+		member, err := io.ReadAll(io.LimitReader(archive, maxFactoryToolBytes+1))
+		if err != nil {
+			return classifyContext(ctx, e.Wrap(e.CodeInternal, err, "reading raw tool"))
+		}
+		if int64(len(member)) > maxFactoryToolBytes {
+			return e.New(e.CodeVerifyFailed, "tool %s exceeds %d bytes", node.ID, maxFactoryToolBytes)
+		}
+		if err := writeFactoryFile(ctx, output.Path, member, 0o555); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "acquired %s: raw executable %s\n", node.ID, node.ExecutableDigest)
+		return nil
+	}
+	if node.ToolFormat != ToolFormatTarGzip {
+		return e.New(e.CodeInvalidCatalog, "tool %s has unsupported format %q", node.ID, node.ToolFormat)
+	}
 	if _, err := archive.Seek(0, io.SeekStart); err != nil {
 		return e.Wrap(e.CodeInternal, err, "rewinding tool archive")
 	}

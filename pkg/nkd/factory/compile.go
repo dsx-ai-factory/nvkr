@@ -185,7 +185,7 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 		artifactID := "tool/" + name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodeAcquire, RunsOn: definition.RunsOn,
 			Network: ir.NetworkDefault, URL: tool.URL, Digest: tool.ArchiveDigest,
-			Executable: tool.ExecutablePath, ExecutableDigest: tool.ExecutableDigest,
+			Executable: tool.ExecutablePath, ExecutableDigest: tool.ExecutableDigest, ToolFormat: tool.Format,
 			Outputs: []string{artifactID}}
 		artifacts[artifactID] = Artifact{ID: artifactID, Name: name, Kind: "pipeline-tool",
 			MediaType: "application/vnd.nkd.pipeline-tool.v1", Producer: nodeID,
