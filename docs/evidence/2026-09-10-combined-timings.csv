@@ -1,0 +1,21 @@
+job,started_at,completed_at,duration_seconds,conclusion
+Build static NKD runner ('ubuntu-latest'),2026-09-10T03:48:55Z,2026-09-10T03:49:28Z,33,success
+nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,2026-09-10T03:49:32Z,2026-09-10T03:49:52Z,20,success
+tool/cosign,2026-09-10T03:49:31Z,2026-09-10T03:49:50Z,19,success
+nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,2026-09-10T03:49:32Z,2026-09-10T03:49:54Z,22,success
+nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be,2026-09-10T03:49:32Z,2026-09-10T03:49:52Z,20,success
+nke-control-plane/build-cwe,2026-09-10T03:49:59Z,2026-09-10T03:54:39Z,280,success
+nke-control-plane/build-nke-helm,2026-09-10T03:49:55Z,2026-09-10T03:51:46Z,111,success
+nke-cli/build-nkectl,2026-09-10T03:49:57Z,2026-09-10T03:51:45Z,108,success
+Process artifacts: nke-cli/terminal-observe,2026-09-10T03:51:48Z,2026-09-10T03:51:57Z,9,success
+Process artifacts: nke-control-plane/terminal-observe,2026-09-10T03:54:42Z,2026-09-10T03:55:42Z,60,success
+publish/cwe,2026-09-10T03:55:47Z,2026-09-10T03:56:13Z,26,success
+publish/nkectl,2026-09-10T03:55:46Z,2026-09-10T03:56:05Z,19,success
+publish/nke-helm,2026-09-10T03:55:46Z,2026-09-10T03:56:05Z,19,success
+sign/nkectl,2026-09-10T03:56:09Z,2026-09-10T03:56:35Z,26,success
+sign/nke-helm,2026-09-10T03:56:09Z,2026-09-10T03:56:43Z,34,success
+sign/cwe,2026-09-10T03:56:17Z,2026-09-10T03:56:49Z,32,success
+verify-publication/nkectl,2026-09-10T03:56:39Z,2026-09-10T03:57:00Z,21,success
+verify-publication/nke-helm,2026-09-10T03:56:48Z,2026-09-10T03:57:06Z,18,success
+verify-publication/cwe,2026-09-10T03:56:57Z,2026-09-10T03:57:18Z,21,success
+Finalize lifecycle Run,2026-09-10T03:57:21Z,2026-09-10T03:58:15Z,54,success

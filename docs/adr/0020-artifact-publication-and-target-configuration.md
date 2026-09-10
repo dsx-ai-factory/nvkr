@@ -210,10 +210,12 @@ The container-image delivery adapter has contract tests for exact OCI-export arc
 manifest/config/layer closure, decompressed layer identities, platform selection, safe archive members and
 unchanged image identities inside a publication root. Public OCI outputs lower to one built OCI-export
 component, checked against its producer bytes before publication; consumer projection checks the native image
-and its platform. The CWE producer is generated and its upstream Dockerfile was exercised locally; acquired-image
-layout conversion remains unavailable, and no combined image/chart hosted Run is yet recorded. Source Helm
-archive selection and exact producer observation have focused contract tests. This adapter does not mint qualified execution or
-release authority.
+and its platform. The [combined hosted Run](../evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
+source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
+finalization. Independent consumers authenticate all three exact publications; downloaded payload checks
+exercise the native image, recovered CLI and rendered chart binding. Acquired-image layout conversion remains
+unavailable. Source Helm archive selection and exact producer observation also have focused contract tests.
+This adapter does not mint qualified execution or release authority.
 
 Current contract evidence in `pkg/nkd/transport/*_test.go`, `pkg/nkd/release/*_test.go`, and
 `pkg/nkd/delivery/*_test.go` covers target exclusion from recipe identity, authorization-bound subjects,
@@ -222,7 +224,7 @@ APT layouts, recursive OCI closure verification, extraction, and rejection of mi
 bytes. The dated local NKE record in reconciliation establishes development registry interoperability for
 earlier inputs, not authenticated release publication or production-registry acceptance.
 
-End-to-end acceptance requires publishing one cleared mixed-artifact ReleaseSet to operator-selected targets,
+Qualified end-to-end acceptance requires publishing one cleared mixed-artifact ReleaseSet to operator-selected targets,
 discovering every referrer by immutable digest, authenticating the downstream clearance, and proving that
 different destinations preserve every semantic and blob identity while omitted credentials never enter logs or
 payload bytes.

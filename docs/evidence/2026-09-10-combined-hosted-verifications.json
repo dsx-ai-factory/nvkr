@@ -1,0 +1,122 @@
+{
+  "cwe": {
+    "attestationVerified": true,
+    "cosignVersion": "v2.6.3",
+    "digest": "sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345",
+    "dryRun": false,
+    "identity": "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "observedIdentity": "https://github.com/njhensley/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main",
+    "observedIssuer": "https://token.actions.githubusercontent.com",
+    "predicateType": "https://slsa.dev/provenance/v1",
+    "ran": [
+      [
+        ".nkd/factory/tools/cosign/cosign-linux-amd64",
+        "verify",
+        "--certificate-identity-regexp",
+        "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+        "--certificate-oidc-issuer",
+        "https://token.actions.githubusercontent.com",
+        "--output",
+        "json",
+        "ghcr.io/njhensley/nke-recipes/cwe@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345"
+      ],
+      [
+        ".nkd/factory/tools/cosign/cosign-linux-amd64",
+        "verify-attestation",
+        "--type",
+        "slsaprovenance1",
+        "--certificate-identity-regexp",
+        "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+        "--certificate-oidc-issuer",
+        "https://token.actions.githubusercontent.com",
+        "--output",
+        "json",
+        "ghcr.io/njhensley/nke-recipes/cwe@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345"
+      ]
+    ],
+    "ref": "ghcr.io/njhensley/nke-recipes/cwe@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345",
+    "schemaVersion": "nkd.dev/oci-verification-record/v1",
+    "signatureVerified": true
+  },
+  "nke-helm": {
+    "attestationVerified": true,
+    "cosignVersion": "v2.6.3",
+    "digest": "sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345",
+    "dryRun": false,
+    "identity": "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "observedIdentity": "https://github.com/njhensley/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main",
+    "observedIssuer": "https://token.actions.githubusercontent.com",
+    "predicateType": "https://slsa.dev/provenance/v1",
+    "ran": [
+      [
+        ".nkd/factory/tools/cosign/cosign-linux-amd64",
+        "verify",
+        "--certificate-identity-regexp",
+        "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+        "--certificate-oidc-issuer",
+        "https://token.actions.githubusercontent.com",
+        "--output",
+        "json",
+        "ghcr.io/njhensley/nke-recipes/helm@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345"
+      ],
+      [
+        ".nkd/factory/tools/cosign/cosign-linux-amd64",
+        "verify-attestation",
+        "--type",
+        "slsaprovenance1",
+        "--certificate-identity-regexp",
+        "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+        "--certificate-oidc-issuer",
+        "https://token.actions.githubusercontent.com",
+        "--output",
+        "json",
+        "ghcr.io/njhensley/nke-recipes/helm@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345"
+      ]
+    ],
+    "ref": "ghcr.io/njhensley/nke-recipes/helm@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345",
+    "schemaVersion": "nkd.dev/oci-verification-record/v1",
+    "signatureVerified": true
+  },
+  "nkectl": {
+    "attestationVerified": true,
+    "cosignVersion": "v2.6.3",
+    "digest": "sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345",
+    "dryRun": false,
+    "identity": "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "observedIdentity": "https://github.com/njhensley/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main",
+    "observedIssuer": "https://token.actions.githubusercontent.com",
+    "predicateType": "https://slsa.dev/provenance/v1",
+    "ran": [
+      [
+        ".nkd/factory/tools/cosign/cosign-linux-amd64",
+        "verify",
+        "--certificate-identity-regexp",
+        "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+        "--certificate-oidc-issuer",
+        "https://token.actions.githubusercontent.com",
+        "--output",
+        "json",
+        "ghcr.io/njhensley/nke-recipes/nkectl@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345"
+      ],
+      [
+        ".nkd/factory/tools/cosign/cosign-linux-amd64",
+        "verify-attestation",
+        "--type",
+        "slsaprovenance1",
+        "--certificate-identity-regexp",
+        "^https://github\\.com/njhensley/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/main$",
+        "--certificate-oidc-issuer",
+        "https://token.actions.githubusercontent.com",
+        "--output",
+        "json",
+        "ghcr.io/njhensley/nke-recipes/nkectl@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345"
+      ]
+    ],
+    "ref": "ghcr.io/njhensley/nke-recipes/nkectl@sha256:b8c4ddf4679ed7346a25c790da618c64b95f3cb5ee303d944faa919447a16345",
+    "schemaVersion": "nkd.dev/oci-verification-record/v1",
+    "signatureVerified": true
+  }
+}

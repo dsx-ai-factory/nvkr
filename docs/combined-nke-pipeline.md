@@ -2,7 +2,9 @@
 
 One maintained Definition builds the NKE CLI, complete upstream CWE runtime image and quickstart Helm bundle
 from NKE commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`. The generated workflow observes all three outputs,
-publishes them to GHCR, signs and verifies their publication envelopes, and must finalize a complete Run.
+publishes them to GHCR, signs and verifies their publication envelopes, and finalizes a complete Run.
+The [successful hosted run and independent consumption](evidence/2026-09-10-combined-run.md) establish this
+combined path at the `pipeline-attested` / `artifact-publication` scope.
 
 ## Implementation
 
@@ -60,6 +62,7 @@ values digest override cannot replace the image binding. `TestPinnedNKEHelmBindi
 | [34430831748](https://github.com/njhensley/nke-recipes/actions/runs/34430831748), `16bbddb` | All three builds passed; CWE took 8m19s. Root-owned private image directories blocked host archive handoff. Generated Docker utilities now use runner ownership. A real Linux-volume experiment reproduced the failure and verified the correction. |
 | [34431910080](https://github.com/njhensley/nke-recipes/actions/runs/34431910080), `00656b2` | All builds, six package jobs, publication, signing and hosted verification passed. Independent consumers passed for all three repositories. Finalization failed because two source fetches restored the same receipt directory. Exact receipt-file carriers correct that collision. |
 | [34433727700](https://github.com/njhensley/nke-recipes/actions/runs/34433727700), `3c2afb2` | CWE exhausted runner disk space at the Go linker under the forced native snapshotter. The launcher now requires overlayfs; the receipt fix remains in place. No publication succeeded in this attempt. |
+| [34434756868](https://github.com/njhensley/nke-recipes/actions/runs/34434756868), `4557f64` | All 20 jobs passed, including all three builds, publication, real signing, verification and complete Run finalization. Independent cosign/NKD consumers and downloaded CLI/image/Helm checks passed. |
 
 An offline replay of the second attempt's successful producer carriers also passed all six package/archive
 handoffs. It verifies the packaging path, not new hosted execution or signatures.
@@ -90,13 +93,13 @@ NKD_BUILDKIT_TEST_IMAGE=moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7c
 The [pinned BuildKit rootless documentation](https://github.com/moby/buildkit/blob/v0.33.0/docs/rootless.md)
 requires Linux 5.11+ or an Ubuntu kernel for unprivileged overlayfs. The launcher does not add privileged mode,
 a host socket, credentials or a FUSE device. Unsupported hosts fail instead of silently using native storage.
-The miniature storage test does not prove that the complete upstream CWE build fits a hosted runner; the next
-full hosted attempt must establish that separately.
+The miniature storage test isolates the storage regression. The subsequent full hosted attempt separately
+passed the complete CWE build in 4m40s and finalized the combined Run.
 
 ## Acceptance boundary
 
-Completion requires a successful combined hosted Run and independent consumption of that attempt's three
-published outputs. Earlier CLI-only runs and successful partial attempts are insufficient. No Kubernetes
+The completed combined Run and all three independent consumers are recorded in the
+[acceptance evidence](evidence/2026-09-10-combined-run.md), with exact Run and Release descriptions. No Kubernetes
 deployment, database-backed CWE service startup, external chart availability or qualified reproduction is
 claimed. The OS-image build continues to own the complete worker payload; individual worker packages are
 outside this pipeline change.

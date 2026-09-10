@@ -9,6 +9,7 @@
 | Change an engineering contract | Current [ADRs](adr/); public lifecycle in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) |
 | Determine what works and what is deferred | [Implementation/evidence record](adr/reconciliation.md) |
 | Plan v1 delivery | [Milestones](milestones.md), [acceptance specification](epics-v1-spec.md) |
+| Build and verify the combined CLI, CWE image and Helm outputs | [Combined pipeline](combined-nke-pipeline.md), [hosted acceptance](evidence/2026-09-10-combined-run.md) |
 | Reproduce the local NKE demonstration | [NKE demo](demo-m1.md) |
 | Inspect actual past execution | Dated [evidence](evidence/) |
 | Understand retained modules and cleanup decisions | [Repository cleanup](repository-cleanup.md) |

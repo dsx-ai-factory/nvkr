@@ -3,7 +3,8 @@
 This Definition builds `nkectl`, the complete upstream CWE runtime image, and the quickstart Helm bundle from
 one pinned NKE source. It observes all three named outputs and generates their OCI publication and signing
 jobs. Recipes remain catalog-owned. Runtime, destination, and signing choices live in independently selected
-Environments. Combined hosted acceptance remains pending; earlier signed CLI runs do not prove this graph.
+Environments. The [combined hosted run and independent consumers](../../docs/evidence/2026-09-10-combined-run.md)
+passed for all three outputs, including real signing and complete Run finalization.
 
 | File | Purpose |
 |---|---|
@@ -47,7 +48,9 @@ The attempt record is `.nkd/runs/<attempt>/lifecycle.json`. It records all three
 their independently reopened payload observations. A dry-run signing Environment remains `static-unqualified`;
 it does not create a verified Release capability. The CLI and source-chart archive builds are offline. CWE
 uses the pinned rootless BuildKit image with network access for the upstream Dockerfile's base images and
-Alpine packages; this wrapped build does not claim hermeticity or exact image reproduction.
+Alpine packages; this wrapped build does not claim hermeticity or exact image reproduction. The Docker host
+must support unprivileged overlayfs (Linux 5.11+ or an Ubuntu kernel); native snapshot fallback is disabled
+because full-tree copies can exhaust hosted-runner disk space.
 
 ## Helm image binding
 
