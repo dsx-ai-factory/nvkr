@@ -43,5 +43,65 @@ Tool acquisition took 14s alongside source/build preparation.
 
 An independent Linux cosign-only consumer attempted the exact digest using the existing local GHCR login.
 GHCR denied private-package access before signature retrieval. The temporary credential copy was removed;
-this check remains pending usable registry read access. No signature or policy failure is inferred from an
+that initial check stopped pending usable registry read access. No signature or policy failure is inferred from an
 access denial. See the [performance baseline](../github-run-performance.md).
+
+
+## Successful corrected Run
+
+[Run 34422660746](https://github.com/njhensley/nke-recipes/actions/runs/34422660746), commit
+`6954dfcd58631e254d7794c2b34e96f615a854cf`, passed every generated job after the producer stopped appending
+newlines to canonical signing/verification records. The reader remains strict. Its
+[repository CI](https://github.com/njhensley/nke-recipes/actions/runs/34422638531) also passed.
+
+The downloaded Run record contains:
+
+- Attempt: `34422660746-1`; status: `complete`; lane: `pipeline-attested`.
+- Plan: `sha256:afbf72d8d16cb5c5e0a6346fa7d6638874e432b18dbc5535ff8cae25f889734a`.
+- Definition: `sha256:e17bdea9d8953bffe64da71a90ebc94f1628f512bc012eee6280eaac62bc2d8b`.
+- Environment: `sha256:e7b0f7e11c4db4fc4e78f41169180c4145a48051e1bd36572ee29566aefe235d`.
+- Recipe: `sha256:439746ba5095230598792c43bcc7523946a1d2e31e4cf3c72525f72bd10a8861`.
+- Observed executable output: `sha256:99cfd9c354a2c8719053dd1b69ce9917ed4b05d21fbe0478122d2b05d94ee969`.
+- Content subject: `sha256:3f820f8adb8104f32906fe64af6aa645cecfa13c5ce904b462fca6ffad355d42`.
+
+The verified published digest is the same `0c3d9a1e…03241` reference recorded above. The verification record
+has `dryRun: false`, `signatureVerified: true`, `attestationVerified: true`, and cosign version `v2.6.3`.
+Observed identity is `https://github.com/njhensley/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main`;
+observed issuer is `https://token.actions.githubusercontent.com`. Its bytes have no trailing newline and the
+strict lifecycle reader accepted them.
+
+Elapsed time was 4m12s versus the 5m17s dry-run baseline: 65s / 20.5% faster while adding real signing.
+The [complete timing table](2026-09-10-github-signed-run-timings.csv) and
+[comparison](../github-run-performance.md#implemented-comparison) retain the measurement details and limits.
+This proves hosted pipeline-attested publication, not qualified reproduction, runtime conformance, full Release
+scope, or organizational ratification.
+
+
+## Independent consumer acceptance
+
+After the owner updated the local GHCR login with private-package read access, a separate Linux/amd64
+container verified the exact published digest using the pinned official cosign v2.6.3 binary. These direct
+cosign commands ran outside the generated workflow and independently of NKD's signing adapter:
+
+```sh
+cosign verify --certificate-identity-regexp "$IDENTITY" \
+  --certificate-oidc-issuer "$ISSUER" --output json "$REFERENCE"
+cosign verify-attestation --type slsaprovenance1 \
+  --certificate-identity-regexp "$IDENTITY" \
+  --certificate-oidc-issuer "$ISSUER" --output json "$REFERENCE"
+```
+
+The reference and exact identity/issuer policy are recorded above. Both commands exited zero. Cosign accepted
+two signatures and two SLSA v1 attestations on the same digest, from the initial and corrected hosted attempts.
+The initial attempt's valid signature is not evidence that its Run finalized successfully.
+
+The same isolated consumer then invoked `nkdctl release verify` with explicit `pipeline-attested` lane,
+`artifact-publication` scope, exact cosign executable digest, reference and identity/issuer policy. It exited
+zero and returned a verified Release description with the expected `nkectl` artifact and content subject:
+[consumer result](2026-09-10-github-consumer-release.json). Its policy digest is
+`sha256:286c957506b24db6da0ed7da70971e33f546c8c5fbbf87f6373e4162fab130c6`.
+
+The consumer image was the digest-pinned Go image already used by the Recipe. Only the GHCR credential entry
+was copied into its private temporary Docker configuration, mounted read-only, and removed after completion.
+No credential value entered this evidence or the repository. This establishes positive public consumer
+acceptance for the stated scope; stronger unavailable scopes remain disabled.

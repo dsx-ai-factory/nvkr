@@ -31,7 +31,9 @@ The [first hosted Run](evidence/2026-09-09-github-run.md) passed bootstrap and r
 fetching the internal NKE source without a cross-repository credential. It uploaded a failed Run record.
 The subsequent [authenticated fork Run](evidence/2026-09-09-github-authenticated-run.md) passed every job,
 including the CLI build, GHCR publication and complete Run finalization. The deployment environment now restricts execution to `main`, and only the signing job receives OIDC minting
-permission. The first real signing exercise is pending; automatic default-branch publication remains deferred.
+permission. The corrected [signed Run](evidence/2026-09-10-github-signed-run.md) passed every job and completed a
+`pipeline-attested` Run. Independent local cosign and public Release consumption also passed; automatic
+default-branch publication remains deferred.
 
 ## Validation
 

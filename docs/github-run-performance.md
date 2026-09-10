@@ -109,3 +109,34 @@ by stage grouping and transfer batching measured independently.
 Prebuilding the helper is a low priority for this run: its compilation took only 3s thanks to an existing
 approximately 128 MiB Go cache. Its 16s setup step included downloading Go 1.27.1 and restoring that cache.
 Similarly, private-source authentication/fetch (4s) and actual GHCR publication (5s) were not bottlenecks.
+
+
+## Implemented comparison
+
+[Run 34422660746](https://github.com/njhensley/nke-recipes/actions/runs/34422660746) passed all nine jobs
+on commit `6954dfc`, including real signature/provenance verification and complete pipeline-attested Run
+finalization. The [step timings](evidence/2026-09-10-github-signed-run-timings.csv) use the same timestamp
+method as the baseline.
+
+| Measurement | Baseline dry-run signing | Improved real signing |
+|---|---:|---:|
+| Dispatch through final metadata update | 5m17s | 4m12s |
+| Hosted jobs | 11 | 9 |
+| Download-action invocations | 38 | 20 |
+| Checkout invocations | 11 | 9 |
+| Utility work along the critical chain | 90s across three jobs | 26s in one job, also including SBOM |
+| Finalization job | 34s | 22s |
+| Signing job | 9s, simulated | 19s, real |
+| Verification job | 14s, simulated signature checks | 13s, real |
+| CLI build job | 65s | 72s |
+
+The successful run is **65s faster (20.5%)**, despite acquiring and executing real cosign. The new 14s
+cosign-acquisition job overlaps source/build preparation. The complete finalizer carrier batch took 4s;
+source extraction still took 7s, and remains required by the current completeness contract. The first utility
+execution took 5s; the remaining three executions completed in about 2s combined at step timestamp resolution.
+
+This combines the minimal image, job grouping and batched downloads in one experiment, so their individual
+savings cannot be isolated or added. Runner/registry variation also matters: the immediately preceding
+attempt's utility job took 18s and signing took 30s, but that attempt failed canonical-record finalization and
+is not the successful comparison. The current bottleneck is now the 72s CLI build job, followed by scheduling,
+transport and real signing. Further changes should be measured against this signed baseline.

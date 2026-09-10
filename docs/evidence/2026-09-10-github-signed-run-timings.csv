@@ -1,0 +1,142 @@
+job_id,job,step,started_at,completed_at,duration_seconds,offset_seconds
+102701244655,Build static NKD runner ('ubuntu-latest'),ALL,2026-09-10T00:45:50Z,2026-09-10T00:46:12Z,22.0,4.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Set up job,2026-09-10T00:45:51Z,2026-09-10T00:45:52Z,1.0,5.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:45:52Z,2026-09-10T00:45:53Z,1.0,6.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Run actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff,2026-09-10T00:45:53Z,2026-09-10T00:46:04Z,11.0,7.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Build runner from this checkout,2026-09-10T00:46:04Z,2026-09-10T00:46:07Z,3.0,18.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Verify committed Run generation is current,2026-09-10T00:46:07Z,2026-09-10T00:46:07Z,0.0,21.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:46:07Z,2026-09-10T00:46:09Z,2.0,21.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Post Run actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff,2026-09-10T00:46:09Z,2026-09-10T00:46:09Z,0.0,23.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:46:09Z,2026-09-10T00:46:09Z,0.0,23.0
+102701244655,Build static NKD runner ('ubuntu-latest'),Complete job,2026-09-10T00:46:09Z,2026-09-10T00:46:09Z,0.0,23.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,ALL,2026-09-10T00:46:14Z,2026-09-10T00:46:29Z,15.0,28.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Set up job,2026-09-10T00:46:15Z,2026-09-10T00:46:16Z,1.0,29.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:46:16Z,2026-09-10T00:46:17Z,1.0,30.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:46:17Z,2026-09-10T00:46:18Z,1.0,31.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Prepare helper,2026-09-10T00:46:18Z,2026-09-10T00:46:18Z,0.0,32.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Execute nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,2026-09-10T00:46:18Z,2026-09-10T00:46:21Z,3.0,32.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Pack 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063',2026-09-10T00:46:21Z,2026-09-10T00:46:21Z,0.0,35.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:46:21Z,2026-09-10T00:46:22Z,1.0,35.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Pack 'source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063',2026-09-10T00:46:22Z,2026-09-10T00:46:24Z,2.0,36.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:46:24Z,2026-09-10T00:46:28Z,4.0,38.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:46:28Z,2026-09-10T00:46:28Z,0.0,42.0
+102701329925,nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063,Complete job,2026-09-10T00:46:28Z,2026-09-10T00:46:28Z,0.0,42.0
+102701329927,tool/cosign,ALL,2026-09-10T00:46:14Z,2026-09-10T00:46:28Z,14.0,28.0
+102701329927,tool/cosign,Set up job,2026-09-10T00:46:15Z,2026-09-10T00:46:16Z,1.0,29.0
+102701329927,tool/cosign,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:46:16Z,2026-09-10T00:46:17Z,1.0,30.0
+102701329927,tool/cosign,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:46:17Z,2026-09-10T00:46:18Z,1.0,31.0
+102701329927,tool/cosign,Prepare helper,2026-09-10T00:46:18Z,2026-09-10T00:46:18Z,0.0,32.0
+102701329927,tool/cosign,Execute tool/cosign,2026-09-10T00:46:18Z,2026-09-10T00:46:20Z,2.0,32.0
+102701329927,tool/cosign,Pack 'tool/cosign',2026-09-10T00:46:20Z,2026-09-10T00:46:21Z,1.0,34.0
+102701329927,tool/cosign,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:46:21Z,2026-09-10T00:46:26Z,5.0,35.0
+102701329927,tool/cosign,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:46:26Z,2026-09-10T00:46:27Z,1.0,40.0
+102701329927,tool/cosign,Complete job,2026-09-10T00:46:27Z,2026-09-10T00:46:27Z,0.0,41.0
+102701392395,nke-cli/build-nkectl,ALL,2026-09-10T00:46:33Z,2026-09-10T00:47:45Z,72.0,47.0
+102701392395,nke-cli/build-nkectl,Set up job,2026-09-10T00:46:34Z,2026-09-10T00:46:35Z,1.0,48.0
+102701392395,nke-cli/build-nkectl,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:46:35Z,2026-09-10T00:46:37Z,2.0,49.0
+102701392395,nke-cli/build-nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:46:37Z,2026-09-10T00:46:39Z,2.0,51.0
+102701392395,nke-cli/build-nkectl,Prepare helper,2026-09-10T00:46:39Z,2026-09-10T00:46:39Z,0.0,53.0
+102701392395,nke-cli/build-nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:46:39Z,2026-09-10T00:46:40Z,1.0,53.0
+102701392395,nke-cli/build-nkectl,Restore 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063',2026-09-10T00:46:40Z,2026-09-10T00:46:40Z,0.0,54.0
+102701392395,nke-cli/build-nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:46:40Z,2026-09-10T00:46:42Z,2.0,54.0
+102701392395,nke-cli/build-nkectl,Restore 'source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063',2026-09-10T00:46:42Z,2026-09-10T00:46:51Z,9.0,56.0
+102701392395,nke-cli/build-nkectl,Execute nke-cli/build-nkectl,2026-09-10T00:46:51Z,2026-09-10T00:47:39Z,48.0,65.0
+102701392395,nke-cli/build-nkectl,Pack 'artifact/nke-cli/nkectl',2026-09-10T00:47:39Z,2026-09-10T00:47:39Z,0.0,113.0
+102701392395,nke-cli/build-nkectl,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:47:39Z,2026-09-10T00:47:41Z,2.0,113.0
+102701392395,nke-cli/build-nkectl,Pack 'result/nke-cli/nkectl',2026-09-10T00:47:41Z,2026-09-10T00:47:41Z,0.0,115.0
+102701392395,nke-cli/build-nkectl,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:47:41Z,2026-09-10T00:47:42Z,1.0,115.0
+102701392395,nke-cli/build-nkectl,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:47:42Z,2026-09-10T00:47:42Z,0.0,116.0
+102701392395,nke-cli/build-nkectl,Complete job,2026-09-10T00:47:42Z,2026-09-10T00:47:42Z,0.0,116.0
+102701655988,Process artifacts: nke-cli/terminal-observe,ALL,2026-09-10T00:47:48Z,2026-09-10T00:48:14Z,26.0,122.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Set up job,2026-09-10T00:47:49Z,2026-09-10T00:47:50Z,1.0,123.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:47:50Z,2026-09-10T00:47:51Z,1.0,124.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:47:51Z,2026-09-10T00:47:53Z,2.0,125.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Prepare helper,2026-09-10T00:47:53Z,2026-09-10T00:47:54Z,1.0,127.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:47:54Z,2026-09-10T00:47:56Z,2.0,128.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Restore 'artifact/nke-cli/nkectl',2026-09-10T00:47:56Z,2026-09-10T00:47:56Z,0.0,130.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:47:56Z,2026-09-10T00:47:57Z,1.0,130.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Restore 'result/nke-cli/nkectl',2026-09-10T00:47:57Z,2026-09-10T00:47:57Z,0.0,131.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Execute nke-cli/terminal-observe,2026-09-10T00:47:57Z,2026-09-10T00:48:02Z,5.0,131.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Pack 'observation/nke-cli',2026-09-10T00:48:02Z,2026-09-10T00:48:02Z,0.0,136.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:48:02Z,2026-09-10T00:48:04Z,2.0,136.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Execute nke-cli/sbom,2026-09-10T00:48:04Z,2026-09-10T00:48:04Z,0.0,138.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Pack 'sbom/nke-cli',2026-09-10T00:48:04Z,2026-09-10T00:48:04Z,0.0,138.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:48:04Z,2026-09-10T00:48:06Z,2.0,138.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Execute package/nkectl,2026-09-10T00:48:06Z,2026-09-10T00:48:07Z,1.0,140.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Pack 'package/nkectl',2026-09-10T00:48:07Z,2026-09-10T00:48:07Z,0.0,141.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:48:07Z,2026-09-10T00:48:09Z,2.0,141.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Execute package/nkectl-release,2026-09-10T00:48:09Z,2026-09-10T00:48:10Z,1.0,143.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Pack 'package/nkectl-release',2026-09-10T00:48:10Z,2026-09-10T00:48:10Z,0.0,144.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:48:10Z,2026-09-10T00:48:12Z,2.0,144.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:48:12Z,2026-09-10T00:48:12Z,0.0,146.0
+102701655988,Process artifacts: nke-cli/terminal-observe,Complete job,2026-09-10T00:48:12Z,2026-09-10T00:48:12Z,0.0,146.0
+102701761092,publish/nkectl,ALL,2026-09-10T00:48:20Z,2026-09-10T00:48:32Z,12.0,154.0
+102701761092,publish/nkectl,Set up job,2026-09-10T00:48:20Z,2026-09-10T00:48:22Z,2.0,154.0
+102701761092,publish/nkectl,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:48:22Z,2026-09-10T00:48:24Z,2.0,156.0
+102701761092,publish/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:48:24Z,2026-09-10T00:48:26Z,2.0,158.0
+102701761092,publish/nkectl,Prepare helper,2026-09-10T00:48:26Z,2026-09-10T00:48:26Z,0.0,160.0
+102701761092,publish/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:48:26Z,2026-09-10T00:48:27Z,1.0,160.0
+102701761092,publish/nkectl,Restore 'package/nkectl-release',2026-09-10T00:48:27Z,2026-09-10T00:48:28Z,1.0,161.0
+102701761092,publish/nkectl,Execute publish/nkectl,2026-09-10T00:48:28Z,2026-09-10T00:48:28Z,0.0,162.0
+102701761092,publish/nkectl,Pack 'publication/nkectl',2026-09-10T00:48:28Z,2026-09-10T00:48:29Z,1.0,162.0
+102701761092,publish/nkectl,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:48:29Z,2026-09-10T00:48:30Z,1.0,163.0
+102701761092,publish/nkectl,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:48:30Z,2026-09-10T00:48:30Z,0.0,164.0
+102701761092,publish/nkectl,Complete job,2026-09-10T00:48:30Z,2026-09-10T00:48:30Z,0.0,164.0
+102701822959,sign/nkectl,ALL,2026-09-10T00:48:36Z,2026-09-10T00:48:55Z,19.0,170.0
+102701822959,sign/nkectl,Set up job,2026-09-10T00:48:37Z,2026-09-10T00:48:38Z,1.0,171.0
+102701822959,sign/nkectl,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:48:38Z,2026-09-10T00:48:39Z,1.0,172.0
+102701822959,sign/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:48:39Z,2026-09-10T00:48:40Z,1.0,173.0
+102701822959,sign/nkectl,Prepare helper,2026-09-10T00:48:40Z,2026-09-10T00:48:40Z,0.0,174.0
+102701822959,sign/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:48:40Z,2026-09-10T00:48:40Z,0.0,174.0
+102701822959,sign/nkectl,Restore 'package/nkectl-release',2026-09-10T00:48:40Z,2026-09-10T00:48:40Z,0.0,174.0
+102701822959,sign/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:48:40Z,2026-09-10T00:48:41Z,1.0,174.0
+102701822959,sign/nkectl,Restore 'publication/nkectl',2026-09-10T00:48:41Z,2026-09-10T00:48:41Z,0.0,175.0
+102701822959,sign/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:48:41Z,2026-09-10T00:48:43Z,2.0,175.0
+102701822959,sign/nkectl,Restore 'tool/cosign',2026-09-10T00:48:43Z,2026-09-10T00:48:44Z,1.0,177.0
+102701822959,sign/nkectl,Execute sign/nkectl,2026-09-10T00:48:44Z,2026-09-10T00:48:52Z,8.0,178.0
+102701822959,sign/nkectl,Pack 'predicate/nkectl',2026-09-10T00:48:52Z,2026-09-10T00:48:52Z,0.0,186.0
+102701822959,sign/nkectl,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:48:52Z,2026-09-10T00:48:52Z,0.0,186.0
+102701822959,sign/nkectl,Pack 'signature/nkectl',2026-09-10T00:48:52Z,2026-09-10T00:48:52Z,0.0,186.0
+102701822959,sign/nkectl,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:48:52Z,2026-09-10T00:48:53Z,1.0,186.0
+102701822959,sign/nkectl,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:48:53Z,2026-09-10T00:48:54Z,1.0,187.0
+102701822959,sign/nkectl,Complete job,2026-09-10T00:48:54Z,2026-09-10T00:48:54Z,0.0,188.0
+102701900690,verify-publication/nkectl,ALL,2026-09-10T00:49:18Z,2026-09-10T00:49:31Z,13.0,212.0
+102701900690,verify-publication/nkectl,Set up job,2026-09-10T00:49:19Z,2026-09-10T00:49:20Z,1.0,213.0
+102701900690,verify-publication/nkectl,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:49:20Z,2026-09-10T00:49:21Z,1.0,214.0
+102701900690,verify-publication/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:49:21Z,2026-09-10T00:49:23Z,2.0,215.0
+102701900690,verify-publication/nkectl,Prepare helper,2026-09-10T00:49:23Z,2026-09-10T00:49:23Z,0.0,217.0
+102701900690,verify-publication/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:49:23Z,2026-09-10T00:49:23Z,0.0,217.0
+102701900690,verify-publication/nkectl,Restore 'publication/nkectl',2026-09-10T00:49:23Z,2026-09-10T00:49:23Z,0.0,217.0
+102701900690,verify-publication/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:49:23Z,2026-09-10T00:49:24Z,1.0,217.0
+102701900690,verify-publication/nkectl,Restore 'signature/nkectl',2026-09-10T00:49:24Z,2026-09-10T00:49:24Z,0.0,218.0
+102701900690,verify-publication/nkectl,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:49:24Z,2026-09-10T00:49:26Z,2.0,218.0
+102701900690,verify-publication/nkectl,Restore 'tool/cosign',2026-09-10T00:49:26Z,2026-09-10T00:49:27Z,1.0,220.0
+102701900690,verify-publication/nkectl,Execute verify-publication/nkectl,2026-09-10T00:49:27Z,2026-09-10T00:49:29Z,2.0,221.0
+102701900690,verify-publication/nkectl,Pack 'verification/nkectl',2026-09-10T00:49:29Z,2026-09-10T00:49:29Z,0.0,223.0
+102701900690,verify-publication/nkectl,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:49:29Z,2026-09-10T00:49:30Z,1.0,223.0
+102701900690,verify-publication/nkectl,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:49:30Z,2026-09-10T00:49:30Z,0.0,224.0
+102701900690,verify-publication/nkectl,Complete job,2026-09-10T00:49:30Z,2026-09-10T00:49:30Z,0.0,224.0
+102702024704,Finalize lifecycle Run,ALL,2026-09-10T00:49:35Z,2026-09-10T00:49:57Z,22.0,229.0
+102702024704,Finalize lifecycle Run,Set up job,2026-09-10T00:49:36Z,2026-09-10T00:49:37Z,1.0,230.0
+102702024704,Finalize lifecycle Run,Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:49:37Z,2026-09-10T00:49:39Z,2.0,231.0
+102702024704,Finalize lifecycle Run,Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093,2026-09-10T00:49:39Z,2026-09-10T00:49:41Z,2.0,233.0
+102702024704,Finalize lifecycle Run,Prepare helper,2026-09-10T00:49:41Z,2026-09-10T00:49:41Z,0.0,235.0
+102702024704,Finalize lifecycle Run,Prepare restore outcomes,2026-09-10T00:49:41Z,2026-09-10T00:49:41Z,0.0,235.0
+102702024704,Finalize lifecycle Run,Download Run carriers,2026-09-10T00:49:41Z,2026-09-10T00:49:45Z,4.0,235.0
+102702024704,Finalize lifecycle Run,Restore 'artifact/nke-cli/nkectl' when produced,2026-09-10T00:49:45Z,2026-09-10T00:49:45Z,0.0,239.0
+102702024704,Finalize lifecycle Run,Restore 'observation/nke-cli' when produced,2026-09-10T00:49:45Z,2026-09-10T00:49:45Z,0.0,239.0
+102702024704,Finalize lifecycle Run,Restore 'package/nkectl' when produced,2026-09-10T00:49:45Z,2026-09-10T00:49:45Z,0.0,239.0
+102702024704,Finalize lifecycle Run,Restore 'package/nkectl-release' when produced,2026-09-10T00:49:45Z,2026-09-10T00:49:45Z,0.0,239.0
+102702024704,Finalize lifecycle Run,Restore 'predicate/nkectl' when produced,2026-09-10T00:49:45Z,2026-09-10T00:49:45Z,0.0,239.0
+102702024704,Finalize lifecycle Run,Restore 'publication/nkectl' when produced,2026-09-10T00:49:45Z,2026-09-10T00:49:46Z,1.0,239.0
+102702024704,Finalize lifecycle Run,Restore 'result/nke-cli/nkectl' when produced,2026-09-10T00:49:46Z,2026-09-10T00:49:46Z,0.0,240.0
+102702024704,Finalize lifecycle Run,Restore 'sbom/nke-cli' when produced,2026-09-10T00:49:46Z,2026-09-10T00:49:46Z,0.0,240.0
+102702024704,Finalize lifecycle Run,Restore 'signature/nkectl' when produced,2026-09-10T00:49:46Z,2026-09-10T00:49:46Z,0.0,240.0
+102702024704,Finalize lifecycle Run,Restore 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063' when produced,2026-09-10T00:49:46Z,2026-09-10T00:49:46Z,0.0,240.0
+102702024704,Finalize lifecycle Run,Restore 'source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063' when produced,2026-09-10T00:49:46Z,2026-09-10T00:49:53Z,7.0,240.0
+102702024704,Finalize lifecycle Run,Restore 'tool/cosign' when produced,2026-09-10T00:49:53Z,2026-09-10T00:49:53Z,0.0,247.0
+102702024704,Finalize lifecycle Run,Restore 'verification/nkectl' when produced,2026-09-10T00:49:53Z,2026-09-10T00:49:53Z,0.0,247.0
+102702024704,Finalize lifecycle Run,Finalize lifecycle Run,2026-09-10T00:49:53Z,2026-09-10T00:49:53Z,0.0,247.0
+102702024704,Finalize lifecycle Run,Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02,2026-09-10T00:49:53Z,2026-09-10T00:49:55Z,2.0,247.0
+102702024704,Finalize lifecycle Run,Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262,2026-09-10T00:49:55Z,2026-09-10T00:49:55Z,0.0,249.0
+102702024704,Finalize lifecycle Run,Complete job,2026-09-10T00:49:55Z,2026-09-10T00:49:55Z,0.0,249.0
