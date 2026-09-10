@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nhensley/nkdctl/pkg/nkd/assemble"
@@ -12,6 +13,43 @@ import (
 	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
 	"github.com/nhensley/nkdctl/pkg/nkd/factory"
 )
+
+func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
+	ctx := context.Background()
+	t.Chdir(filepath.Join("..", "..", ".."))
+	root := filepath.Join("definitions", "nke-v1")
+	definitionPath := filepath.Join(root, "definition.yaml")
+	definition, err := LoadDefinition(ctx, definitionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentPath := filepath.Join(root, "environment-github.yaml")
+	environment, err := LoadEnvironment(ctx, environmentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, runtime := range []string{"docker", "podman", ""} {
+		t.Run("runtime="+runtime, func(t *testing.T) {
+			environment.Runtime.Runtime = runtime
+			plan, err := Compile(ctx, definitionPath, definition, environmentPath, environment, "v0.0.0 (test)")
+			if runtime != "docker" {
+				assertCode(t, err, e.CodeEngineCapability)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := factory.Render(ctx, plan, factory.EngineGitHub)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workflow := string(bundle.Files[factory.GitHubWorkflowPath])
+			if !strings.Contains(workflow, "exec-node --launch --runtime docker --node build-cwe") {
+				t.Fatal("CWE launch does not select admitted Docker runtime")
+			}
+		})
+	}
+}
 
 func TestLowerDerivesImageEnvelope(t *testing.T) {
 	definition := testDefinition(t)

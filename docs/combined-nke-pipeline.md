@@ -159,3 +159,12 @@ actionlint and yamllint passed. A subsequent strict multi-document parsing test 
 separators; the refreshed full gate and real-input Helm test also passed before commit. Local rendering used
 Helm `v4.2.3+g43e8b7f`. Hosted execution, publication, signing and independent consumption of the combined
 outputs remain outstanding.
+
+The first combined hosted run, [34430414883](https://github.com/njhensley/nke-recipes/actions/runs/34430414883),
+ran commit `d61ce88`. CLI and source Helm builds passed, but CWE failed before build execution because the
+Environment default selected Podman while rootless BuildKit requires Docker. Dependent publication/signing
+jobs were skipped; the workflow failed and retained a lifecycle artifact. Both maintained Environments now
+select Docker explicitly. Plan validation rejects incompatible BuildKit runtime settings before generation;
+the regression test checks Docker emission and rejection of Podman/default settings. The refreshed full gate
+passed (64.2% coverage), with actionlint and yamllint. The corrected plan digest is
+`sha256:6a99ce1837a0b3d059993478c56b2285ec20bb47b74cf1df4bd9f96f1592427a`.

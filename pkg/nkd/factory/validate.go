@@ -170,6 +170,9 @@ func (plan Plan) Validate() error {
 		if !ok || node.Network != build.Network || node.Container != build.Toolchain || node.Platform != build.Platform {
 			return e.New(e.CodePipelineDrift, "build node %q changes its exact recipe execution settings", node.ID)
 		}
+		if build.BuilderType == ir.BuilderBuildKit && plan.ExecutionSettings.RuntimeBinary() != "docker" {
+			return e.New(e.CodeEngineCapability, "rootless BuildKit node %q requires the Docker runtime in its Environment", node.ID)
+		}
 	}
 	return plan.validateLifecyclePlans()
 }
