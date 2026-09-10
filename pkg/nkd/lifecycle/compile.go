@@ -96,20 +96,23 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		Metadata:         factory.Metadata{Name: definition.Metadata.Name, Description: definition.Metadata.Description},
 		UtilityContainer: environment.UtilityContainer, UtilityPlatform: environment.UtilityPlatform,
 		Catalog: factory.CatalogStack{Base: definition.Catalog.Base, Overlays: append([]string(nil), definition.Catalog.Overlays...)},
-		Tools:   make(map[string]factory.Tool, len(definition.Tools)+len(environment.Tools)),
 	}
-	for name, tool := range definition.Tools {
-		compileSpec.Tools[name] = factory.Tool{Format: tool.Format, URL: tool.URL, ArchiveDigest: tool.ArchiveDigest,
-			ExecutablePath: tool.ExecutablePath, ExecutableDigest: tool.ExecutableDigest}
+	if environment.Signing != nil && environment.Signing.Mode == "cosign" && definition.CosignTool == "" {
+		return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeTrustPolicyMissing, "cosign signing requires Definition.cosignTool")
 	}
-	for name, tool := range environment.Tools {
-		if _, exists := compileSpec.Tools[name]; exists {
-			return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeInvalidCatalog,
-				"tool %q is declared by both Definition and Environment", name)
+	tools := []string{}
+	if definition.SBOMTool != "" {
+		tools = append(tools, definition.SBOMTool)
+	}
+	if environment.Signing != nil && environment.Signing.Mode == "cosign" {
+		tools = append(tools, definition.CosignTool)
+	}
+	for _, selection := range definition.Recipes {
+		if selection.AICRGenerator != "" {
+			tools = append(tools, selection.AICRGenerator)
 		}
-		compileSpec.Tools[name] = factory.Tool{Format: tool.Format, URL: tool.URL, ArchiveDigest: tool.ArchiveDigest,
-			ExecutablePath: tool.ExecutablePath, ExecutableDigest: tool.ExecutableDigest}
 	}
+	compileSpec.SelectedTools = uniqueSorted(tools)
 	outputComponents := make(map[string][]string, len(definition.Recipes))
 	for _, output := range definition.Outputs {
 		outputComponents[output.Recipe] = append(outputComponents[output.Recipe], output.Components...)
@@ -169,10 +172,10 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 	}
 
 	delivery := factory.ExecutionSettings{
-		SBOMTool:   environment.SBOMTool,
+		SBOMTool:   definition.SBOMTool,
 		APIVersion: factory.ExecutionSettingsAPIVersion, Kind: factory.ExecutionSettingsKind,
 		Metadata: factory.Metadata{Name: environment.Metadata.Name, Description: environment.Metadata.Description},
-		RunsOn:   environment.RunsOn, Targets: make(map[string]factory.Target, len(environment.Destinations)),
+		RunsOn:   environment.RunsOn, Targets: make(map[string]factory.Target, len(definition.Outputs)),
 		SourceAccess: make(map[string]factory.SourceAccess, len(environment.SourceAccess)),
 		Runtime: factory.RuntimeProfile{Runtime: environment.Runtime.Runtime, RuntimeImage: environment.Runtime.RuntimeImage,
 			HelperImage: environment.Runtime.HelperImage, BuilderImage: environment.Runtime.BuilderImage,
@@ -182,13 +185,9 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 	for source, access := range environment.SourceAccess {
 		delivery.SourceAccess[source] = factory.SourceAccess{Mirror: access.Mirror, CredentialRef: access.CredentialRef}
 	}
-	for name, target := range environment.Destinations {
-		delivery.Targets[name] = factory.Target{Kind: target.Kind, Ref: target.Ref, CredentialRef: target.CredentialRef,
-			Anonymous: target.Anonymous, PlainHTTP: target.PlainHTTP}
-	}
 	if environment.Signing != nil {
 		delivery.Signing = &factory.SigningProfile{Mode: environment.Signing.Mode, Identity: environment.Signing.Identity,
-			Issuer: environment.Signing.Issuer, CosignTool: environment.Signing.CosignTool}
+			Issuer: environment.Signing.Issuer, CosignTool: definition.CosignTool}
 	}
 
 	outputs := append([]DefinitionOutput(nil), definition.Outputs...)
@@ -238,38 +237,21 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 			packageSpec.Distribution, packageSpec.Component = output.APT.Distribution, output.APT.Component
 		}
 		compileSpec.Packages = append(compileSpec.Packages, packageSpec)
-		publishTarget, publish := environment.Publish[output.Name]
-		if !publish {
+		if environment.Publication == nil {
 			continue
 		}
-		if _, ok := environment.Destinations[publishTarget]; !ok {
+		publishTarget := output.Name
+		publication := environment.Publication
+		delivery.Targets[publishTarget] = factory.Target{Kind: factory.TargetOCI, Ref: publication.RepositoryPrefix + "/" + output.Name, CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}
+		packageName := releasePackageName(output.Name)
+		if authoredNames[packageName] || packageNames[packageName] {
 			return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeInvalidCatalog,
-				"environment publishes output %q to unknown destination %q", output.Name, publishTarget)
+				"definition output %q derives release package name %q that collides with another output", output.Name, packageName)
 		}
-		packageName := bundleName
-		if environment.Destinations[publishTarget].Kind == factory.TargetOCI {
-			packageName = releasePackageName(output.Name)
-			if authoredNames[packageName] || packageNames[packageName] {
-				return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeInvalidCatalog,
-					"definition output %q derives release package name %q that collides with another output", output.Name, packageName)
-			}
-			packageNames[packageName] = true
-			compileSpec.Packages = append(compileSpec.Packages, factory.PackageSpec{Name: packageName, Kind: factory.PackageOCI,
-				Inputs: append([]string(nil), closureInputs...)})
-		}
+		packageNames[packageName] = true
+		compileSpec.Packages = append(compileSpec.Packages, factory.PackageSpec{Name: packageName, Kind: factory.PackageOCI,
+			Inputs: append([]string(nil), closureInputs...)})
 		delivery.Routes = append(delivery.Routes, factory.Route{Name: output.Name, Input: "package/" + packageName, Target: publishTarget})
-	}
-	for output := range environment.Publish {
-		found := false
-		for _, candidate := range definition.Outputs {
-			if candidate.Name == output {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeInvalidCatalog, "environment publishes unknown definition output %q", output)
-		}
 	}
 	return compileSpec, delivery, nil
 }

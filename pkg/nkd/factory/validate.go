@@ -10,6 +10,11 @@ import (
 )
 
 func (plan Plan) Validate() error {
+	for _, pin := range plan.Actions {
+		if err := pin.Validate(); err != nil {
+			return err
+		}
+	}
 	if plan.SchemaVersion != PlanSchemaVersion || !canonicalName.MatchString(plan.Name) {
 		return e.New(e.CodeInvalidCatalog, "run plan schema/name is invalid")
 	}

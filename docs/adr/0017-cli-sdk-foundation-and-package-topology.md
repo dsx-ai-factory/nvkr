@@ -32,7 +32,7 @@ remain explicit. Ambiguous/duplicate selections, missing components, conflicting
 fail with coded errors. Existing catalog criteria remain explicit; recipe reuse does not require general product
 imports. Definitions are selected directly by file.
 
-Environment separately supplies runtime, runner, destinations, credential references and signing utility pins
+Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools such as the AICR generator stay in the Recipe/composition identity they affect.
 Changing transport or signing configuration cannot silently change logical Recipe identity.
 

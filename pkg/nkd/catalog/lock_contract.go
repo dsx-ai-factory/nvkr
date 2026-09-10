@@ -66,6 +66,11 @@ func validatePinLockShape(lock *PinLock) error {
 
 	for _, name := range sortedPinNames(lock.Pins) {
 		pin := lock.Pins[name]
+		if pin.Tool != nil {
+			if err := validateToolPin(*pin.Tool); err != nil {
+				return err
+			}
+		}
 		if strings.TrimSpace(name) == "" {
 			return e.New(e.CodeInvalidCatalog, "lock has an empty source pin name")
 		}
@@ -133,6 +138,14 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 			return e.New(e.CodeUnpinnedSource, "lock is incomplete: declared source %q has no pin", name)
 		}
 		src := reg.Sources[name]
+		if src.Kind == SourceGitHubAction {
+			if err := (ActionPin{Repo: strings.TrimPrefix(src.Repo, "https://github.com/"), Version: pin.Tag, SHA: pin.Commit}).Validate(); err != nil {
+				return err
+			}
+		}
+		if err := checkToolPin(src.Tool, pin); err != nil {
+			return err
+		}
 		if src.ToolchainBaseImage != "" {
 			if strings.TrimSpace(pin.GoVersion) == "" || pin.ToolchainImage == "" {
 				return e.New(e.CodeUnpinnedSource,
@@ -281,6 +294,10 @@ func sortedPinNames(m map[string]Pin) []string {
 func clonePinLock(lock *PinLock) *PinLock {
 	out := &PinLock{APIVersion: lockAPIVersion, Kind: lockKind, Pins: make(map[string]Pin, len(lock.Pins))}
 	for name, pin := range lock.Pins {
+		if pin.Tool != nil {
+			copy := *pin.Tool
+			pin.Tool = &copy
+		}
 		out.Pins[name] = pin
 	}
 	if len(lock.Artifacts) > 0 {

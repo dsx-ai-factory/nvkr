@@ -22,7 +22,7 @@ func TestEnvironmentSourceAccessValidationAndLowering(t *testing.T) {
 	environment := testEnvironment()
 	source := "https://github.com/NVIDIA/nke"
 	environment.SourceAccess = map[string]SourceAccess{source: {
-		Mirror: "https://github.com/njhensley/nke", CredentialRef: "github:NKE_SOURCE_TOKEN",
+		Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
 	}}
 	if err := environment.Validate(); err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestEnvironmentSourceAccessValidationAndLowering(t *testing.T) {
 	if !reflect.DeepEqual(compileSpec, baseCompileSpec) {
 		t.Fatal("source access changed the Recipe-affecting compile spec")
 	}
-	if got := settings.SourceAccess[source]; got.Mirror != "https://github.com/njhensley/nke" || got.CredentialRef != "github:NKE_SOURCE_TOKEN" {
+	if got := settings.SourceAccess[source]; got.Mirror != "https://github.com/example/nke-mirror" || got.CredentialRef != "github:NKE_SOURCE_TOKEN" {
 		t.Fatalf("lowered source access = %+v", got)
 	}
 	if digest, err := definition.Digest(); err != nil || digest != baseRecipeDigest {
@@ -48,11 +48,11 @@ func TestEnvironmentRejectsInvalidSourceAccess(t *testing.T) {
 		source string
 		access SourceAccess
 	}{
-		{name: "source scheme", source: "http://github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/njhensley/nke", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
-		{name: "source userinfo", source: "https://token@github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/njhensley/nke", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
-		{name: "source empty query", source: "https://github.com/NVIDIA/nke?", access: SourceAccess{Mirror: "https://github.com/njhensley/nke", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
-		{name: "mirror fragment", source: "https://github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/njhensley/nke#main", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
-		{name: "credential", source: "https://github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/njhensley/nke", CredentialRef: "github:NKE-SOURCE-TOKEN"}},
+		{name: "source scheme", source: "http://github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
+		{name: "source userinfo", source: "https://token@github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
+		{name: "source empty query", source: "https://github.com/NVIDIA/nke?", access: SourceAccess{Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
+		{name: "mirror fragment", source: "https://github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/example/nke-mirror#main", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
+		{name: "credential", source: "https://github.com/NVIDIA/nke", access: SourceAccess{Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE-SOURCE-TOKEN"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

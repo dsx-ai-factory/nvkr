@@ -1,6 +1,6 @@
 # Artifact dependency SBOMs
 
-Both maintained NKE Environments select a digest-pinned Syft executable using `sbomTool: syft`. The scanner
+The NKE Definition selects a catalog-pinned Syft executable using `sbomTool: syft`. The scanner
 is acquired as a normal pipeline tool. SBOM jobs run offline after artifact observation and consume the exact
 payloads plus their producer records. The implementation is selected by artifact format, not component name.
 
@@ -20,7 +20,7 @@ Helm dependency inspection reads standard `Chart.yaml`/`Chart.lock` files and He
 are references, not vendored packages; their transitive dependencies are not claimed. The Helm subject is the
 built source archive, preceding the separate image-binding and packaging operation.
 
-An Environment without `sbomTool` still emits declaration-only source metadata and does not claim dependency
+A Definition without `sbomTool` still emits declaration-only source metadata and does not claim dependency
 inspection. This does not enable vulnerability scanning or qualified reproduction. The existing SBOM outputs
 remain Run evidence; this change does not introduce separate SBOM signatures or OCI referrer publication.
 

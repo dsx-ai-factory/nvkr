@@ -24,17 +24,6 @@ const (
 	githubExecutionCondition = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
 )
 
-// The pinned GitHub Action references are aliased from the authoritative pipeline adapter so
-// both GitHub emitters share ONE definition (the embedded actions.lock.yaml) and a security
-// bump — `nkdctl actions bump` — is made in exactly one place. They are vars, not consts,
-// because they are sourced from that lockfile at load time rather than baked in as literals.
-var (
-	githubCheckoutAction = pipeline.GitHubCheckoutAction
-	githubUploadAction   = pipeline.GitHubUploadAction
-	githubDownloadAction = pipeline.GitHubDownloadAction
-	githubSetupGoAction  = pipeline.GitHubSetupGoAction
-)
-
 var githubLayout = generationLayout{workflowPath: GitHubWorkflowPath,
 	manifestPath: GeneratedManifestPath, planPath: FactoryPlanPath,
 	graphDir: FactoryGraphDir, compositionDir: FactoryCompositionDir}
@@ -58,6 +47,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	}
 	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {
 		return nil, e.New(e.CodeEngineCapability, "GitHub generation requires repository-relative definition and delivery source paths")
+	}
+	actions, err := resolveGitHubActions(plan.Actions)
+	if err != nil {
+		return nil, err
 	}
 	linkerFlags, err := generatorLinkerFlags(plan.GeneratorVersion)
 	if err != nil {
@@ -94,12 +87,12 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runner))
 		fmt.Fprintln(&body, "    timeout-minutes: 15")
 		fmt.Fprintf(&body, "    steps:\n")
-		writeCheckoutStep(&body)
-		writeSetupGoStep(&body)
+		actions.writeCheckoutStep(&body)
+		actions.writeSetupGoStep(&body)
 		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: CGO_ENABLED=0 go build -trimpath -ldflags %s -o nkd-exec ./cmd/nkdctl\n", shellQuote(linkerFlags))
 		fmt.Fprintf(&body, "      - name: Verify committed Run generation is current\n        run: %s\n",
 			generationCommand(plan, EngineGitHub))
-		writeUploadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runner), "nkd-exec")
+		actions.writeUploadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runner), "nkd-exec")
 	}
 	for _, stage := range stages {
 		node := stage.Nodes[0]
@@ -178,8 +171,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			}
 		}
 		fmt.Fprintf(&body, "    steps:\n")
-		writeCheckoutStep(&body)
-		writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(node.RunsOn), ".")
+		actions.writeCheckoutStep(&body)
+		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(node.RunsOn), ".")
 		// upload-artifact/download-artifact do not preserve the execute bit, so the helper
 		// arrives non-executable. Restore it in a dedicated step IMMEDIATELY after the helper
 		// download, before ANY ./nkd-exec invocation: the input Restore steps below are
@@ -187,7 +180,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		// every input-bearing job failing at its first Restore.
 		writePrepareHelperStep(&body)
 		for _, input := range stage.inputs(artifacts, nodeJobs) {
-			writeDownloadStep(&body, githubArtifactLabel(plan, artifacts[input]), githubArtifactName(input), ".nkd/carriers")
+			actions.writeDownloadStep(&body, githubArtifactLabel(plan, artifacts[input]), githubArtifactName(input), ".nkd/carriers")
 			fmt.Fprintf(&body, "      - name: %s\n        run: ./nkd-exec transport-unpack --archive %s --root . --path %s\n",
 				yamlSingle("Restore "+githubArtifactLabel(plan, artifacts[input])), shellQuote(carrierPath(input)), shellQuote(artifacts[input].Path))
 		}
@@ -216,7 +209,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for _, output := range node.Outputs {
 				fmt.Fprintf(&body, "      - name: %s\n        run: ./nkd-exec transport-pack --archive %s --root . --path %s\n",
 					yamlSingle("Archive "+githubArtifactLabel(plan, artifacts[output])), shellQuote(carrierPath(output)), shellQuote(artifacts[output].Path))
-				writeUploadStep(&body, githubArtifactLabel(plan, artifacts[output]), githubArtifactName(output), carrierPath(output))
+				actions.writeUploadStep(&body, githubArtifactLabel(plan, artifacts[output]), githubArtifactName(output), carrierPath(output))
 			}
 		}
 	}
@@ -237,15 +230,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubExecutionCondition)
 		fmt.Fprintln(&body, "    steps:")
-		writeCheckoutStep(&body)
-		writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runners[0]), ".")
+		actions.writeCheckoutStep(&body)
+		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runners[0]), ".")
 		writePrepareHelperStep(&body)
 		if err := writeGitHubFinalizerRestoreSteps(&body, plan, nodeJobs); err != nil {
 			return nil, err
 		}
 		fmt.Fprintf(&body, "      - name: Finalize Run and check completeness\n        run: ./nkd-exec run finalize --definition %s --environment %s --plan %s --attempt \"${{ github.run_id }}-${{ github.run_attempt }}\" --workspace .nkd/factory --out .nkd/run.json\n",
 			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(FactoryPlanPath))
-		fmt.Fprintf(&body, "      - name: Upload final Run record\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nkd-lifecycle-run\n          path: .nkd/run.json\n          if-no-files-found: error\n", githubUploadAction)
+		fmt.Fprintf(&body, "      - name: Upload final Run record\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nkd-lifecycle-run\n          path: .nkd/run.json\n          if-no-files-found: error\n", actions.Upload)
 	}
 	workflow := body.Bytes()
 	files[GitHubWorkflowPath] = append([]byte(nil), workflow...)
@@ -361,20 +354,20 @@ func generatedNodeCommands(node Node, plan *Plan, graphDigests map[string]string
 		runtime, network, platform, owner, workspaceVariable, shellQuote(node.Container), "/workspace/"+strings.TrimPrefix(command, "./"))}
 }
 
-func writeUploadStep(out *bytes.Buffer, label, name, path string) {
-	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n", yamlSingle("Upload "+label), githubUploadAction, yamlSingle(name), yamlSingle(path))
+func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, label, name, path string) {
+	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name), yamlSingle(path))
 }
 
-func writeCheckoutStep(out *bytes.Buffer) {
-	fmt.Fprintf(out, "      - name: Check out workflow source\n        uses: %s\n        with:\n          persist-credentials: 'false'\n", githubCheckoutAction)
+func (actions githubActionRefs) writeCheckoutStep(out *bytes.Buffer) {
+	fmt.Fprintf(out, "      - name: Check out workflow source\n        uses: %s\n        with:\n          persist-credentials: 'false'\n", actions.Checkout)
 }
 
 // writeSetupGoStep provisions the Go toolchain on the runner before the bootstrap `go build`,
 // so the workflow does not silently depend on a preinstalled Go (true on GitHub-hosted
 // ubuntu-latest, but not on a minimal or self-hosted runner). The version is read from the
 // checked-out repo's .go-version, so setup-go and the actual build toolchain cannot drift.
-func writeSetupGoStep(out *bytes.Buffer) {
-	fmt.Fprintf(out, "      - name: Set up Go\n        uses: %s\n        with:\n          go-version-file: '.go-version'\n", githubSetupGoAction)
+func (actions githubActionRefs) writeSetupGoStep(out *bytes.Buffer) {
+	fmt.Fprintf(out, "      - name: Set up Go\n        uses: %s\n        with:\n          go-version-file: '.go-version'\n", actions.SetupGo)
 }
 
 // prepareHelperStepName and prepareHelperRun are the ONE definition of the helper
@@ -389,8 +382,8 @@ func writePrepareHelperStep(out *bytes.Buffer) {
 	fmt.Fprintf(out, "      - name: %s\n        run: %s\n", prepareHelperStepName, prepareHelperRun)
 }
 
-func writeDownloadStep(out *bytes.Buffer, label, name, path string) {
-	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n", yamlSingle("Download "+label), githubDownloadAction, yamlSingle(name), yamlSingle(path))
+func (actions githubActionRefs) writeDownloadStep(out *bytes.Buffer, label, name, path string) {
+	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n", yamlSingle("Download "+label), actions.Download, yamlSingle(name), yamlSingle(path))
 }
 
 func githubJobID(id string) string { return generatedJobID(id) }

@@ -80,7 +80,7 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 	for _, node := range stage.Nodes {
 		wantExecuted = append(wantExecuted, githubJobID(node.ID))
 		for _, output := range node.Outputs {
-			if !stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
+			if !testActionRefs(t, plan).stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				t.Errorf("logical output %q is not uploaded from grouped stage %q", output, stage.ID)
 			}
 		}
@@ -95,7 +95,7 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 	for _, node := range stage.Nodes {
 		for _, input := range node.Inputs {
 			internal := nodeJobs[artifacts[input].Producer] == stage.ID
-			downloaded := stepDownloadsArtifact(job.Steps, githubArtifactName(input))
+			downloaded := stepDownloadsArtifact(plan, job.Steps, githubArtifactName(input))
 			if internal && downloaded {
 				t.Errorf("internal input %q was redundantly downloaded", input)
 			}
@@ -265,9 +265,9 @@ func requireGroupedGitHubStage(t *testing.T, stages []githubStage) githubStage {
 	return githubStage{}
 }
 
-func stepDownloadsArtifact(steps []githubStep, name string) bool {
+func stepDownloadsArtifact(plan *Plan, steps []githubStep, name string) bool {
 	for _, step := range steps {
-		if step.Uses == githubDownloadAction && step.With["name"] == name {
+		if step.Uses == plan.Actions["download-artifact"].Uses() && step.With["name"] == name {
 			return true
 		}
 	}

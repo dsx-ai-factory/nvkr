@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/google/go-containerregistry/pkg/registry"
 )
 
 func TestPublicationExecutorPersistsExactRegistryIdentity(t *testing.T) {

@@ -33,16 +33,24 @@ cross-environment byte-identity.
 
 ### 2. Target configuration surface
 
-Environment (`nkd.dev/environment/v1`) owns runtime settings, destinations, credential references and signing
-utility pins. Definition owns selected components and byte-changing packaging intent. The compiler derives
-routine envelopes and routes from each named output, rejecting ambiguous, missing or unsupported routing.
-Changing destination or signing tools can change Environment, prepared plan and evidence while preserving logical
-Recipe identity. Output-affecting tools remain bound to Recipe/composition identity.
+Environment (`nkd.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
+credential references and signing identity/issuer policy. `publication.repositoryPrefix` is an explicitly
+qualified, untagged repository prefix; credentials, anonymous access and plain HTTP are transport settings.
+When publication is configured, every named Definition output publishes under `<repositoryPrefix>/<output>`.
+Omitting publication produces a build-only Run. Destinations and a separate output-to-destination map are
+not authored. The generated internal routes still bind exact package inputs and targets.
 
-Each acquired tool declares `format: raw` or `format: tar-gzip`. Both bind exact transport and executable
-SHA-256 digests. Raw tools require those digests to be identical; archive tools select one safe executable
-member. Unknown formats fail before acquisition. This supports official static executable release assets
-without introducing a repackaging step or inferring transport format from filenames.
+The publisher uploads each publication root by its content digest, without creating or advancing `latest`,
+a fixed version tag, or a development tag. It returns the digest-pinned reference recorded in the Run.
+Explicit low-level tagged publication remains a discovery operation; automatic version/channel aliases and
+promotion policy are not implemented by this lifecycle configuration.
+
+Definition owns selected components, byte-changing packaging intent, and catalog tool selectors (`sbomTool`,
+`cosignTool`, and recipe `aicrGenerator`). Catalog source declarations own release URL templates, executable
+members, formats, platform and version constraints. The generated source lock owns the resolved tool URL,
+archive digest and executable digest (ADR-22). Environment contains no executable pins. A dry-run signing
+Environment does not acquire the selected cosign executable. Output-affecting tools remain bound to Recipe
+identity; evidence tools affect catalog/plan/evidence identity without changing source-build Recipe identity.
 
 
 Environment may also map a canonical source URL to an HTTPS fetch mirror and a GitHub secret reference

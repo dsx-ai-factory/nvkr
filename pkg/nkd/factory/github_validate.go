@@ -60,6 +60,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		return err
 	}
 
+	actions, err := resolveGitHubActions(plan.Actions)
+	if err != nil {
+		return err
+	}
 	var document githubWorkflowDocument
 	if err := yaml.UnmarshalStrict(workflow, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
@@ -167,23 +171,23 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			}
 		}
 		for _, step := range job.Steps {
-			if step.Uses == githubCheckoutAction && step.With["persist-credentials"] != "false" {
+			if step.Uses == actions.Checkout && step.With["persist-credentials"] != "false" {
 				return e.New(e.CodeEngineCapability, "GitHub job %q permits checkout to persist ambient credentials", jobID)
 			}
-			if step.Uses == githubUploadAction && step.With["if-no-files-found"] != "error" {
+			if step.Uses == actions.Upload && step.With["if-no-files-found"] != "error" {
 				return e.New(e.CodeEngineCapability, "GitHub job %q permits a missing declared output", jobID)
 			}
 		}
 	}
 	for runner, jobID := range bootstrap {
 		job, ok := document.Jobs[jobID]
-		if !ok || job.RunsOn != runner || job.If != "" || len(job.Steps) != 5 || job.Steps[0].Uses != githubCheckoutAction {
+		if !ok || job.RunsOn != runner || job.If != "" || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
 		// than assume a preinstalled Go, and pin the version to the repo's .go-version so the
 		// toolchain and setup-go cannot drift.
-		if job.Steps[1].Uses != githubSetupGoAction || job.Steps[1].With["go-version-file"] != ".go-version" {
+		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != ".go-version" {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain from .go-version", jobID)
 		}
 		bootstrapRuns := joinRuns(job.Steps)
@@ -191,7 +195,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if err != nil {
 			return err
 		}
-		if !stepUses(job.Steps, githubUploadAction) || !strings.Contains(bootstrapRuns, "go build -trimpath") ||
+		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go build -trimpath") ||
 			!strings.Contains(bootstrapRuns, "-ldflags "+shellQuote(linkerFlags)) ||
 			!strings.Contains(bootstrapRuns, generationCommand(plan, EngineGitHub)) {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not build and transport the runner", jobID)
@@ -217,14 +221,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if strings.Join(actualNeeds, "\x00") != strings.Join(expectedNeeds, "\x00") {
 			return e.New(e.CodeInvalidCatalog, "GitHub job %q needs %v; artifact dataflow requires %v", jobID, actualNeeds, expectedNeeds)
 		}
-		if len(job.Steps) == 0 || job.Steps[0].Uses != githubCheckoutAction || !stepUses(job.Steps, githubDownloadAction) {
+		if len(job.Steps) == 0 || job.Steps[0].Uses != actions.Checkout || !stepUses(job.Steps, actions.Download) {
 			return e.New(e.CodeInvalidCatalog, "GitHub job %q omits pinned checkout or input transport", jobID)
 		}
-		if err := validateHelperPreparedFirst(jobID, job.Steps); err != nil {
+		if err := actions.validateHelperPreparedFirst(jobID, job.Steps); err != nil {
 			return err
 		}
 		for _, step := range job.Steps {
-			if step.Uses != "" && step.Uses != githubCheckoutAction && step.Uses != githubUploadAction && step.Uses != githubDownloadAction {
+			if step.Uses != "" && step.Uses != actions.Checkout && step.Uses != actions.Upload && step.Uses != actions.Download {
 				return e.New(e.CodeInvalidCatalog, "GitHub job %q uses unapproved or unpinned action %q", jobID, step.Uses)
 			}
 		}
@@ -293,7 +297,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		for _, output := range node.Outputs {
 			if !strings.Contains(runs, "transport-pack --archive "+carrierPath(output)+" --root . --path "+artifacts[output].Path) ||
-				!stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
+				!actions.stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
 		}
@@ -318,7 +322,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if len(job.Steps) != 3+len(restore.Steps)+2 || !reflect.DeepEqual(job.Steps[3:3+len(restore.Steps)], restore.Steps) {
 			return e.New(e.CodeEngineCapability, "GitHub finalizer must restore every exact planned carrier and record its producer outcome")
 		}
-		if err := validateHelperPreparedFirst("nkd-lifecycle-run", job.Steps); err != nil {
+		if err := actions.validateHelperPreparedFirst("nkd-lifecycle-run", job.Steps); err != nil {
 			return err
 		}
 		var needs []string
@@ -350,7 +354,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 // not runnable until the dedicated preparation step runs; because the input Restore steps
 // are themselves helper invocations, the preparation must come immediately after the
 // helper download and strictly before the FIRST ./nkd-exec in the job.
-func validateHelperPreparedFirst(jobID string, steps []githubStep) error {
+func (actions githubActionRefs) validateHelperPreparedFirst(jobID string, steps []githubStep) error {
 	prepared := -1
 	for index, step := range steps {
 		if step.Name == prepareHelperStepName && strings.TrimSpace(step.Run) == prepareHelperRun {
@@ -362,7 +366,7 @@ func validateHelperPreparedFirst(jobID string, steps []githubStep) error {
 		return e.New(e.CodeEngineCapability,
 			"GitHub job %q has no %q step; the transported helper arrives without its execute bit", jobID, prepareHelperStepName)
 	}
-	if prepared == 0 || steps[prepared-1].Uses != githubDownloadAction {
+	if prepared == 0 || steps[prepared-1].Uses != actions.Download {
 		return e.New(e.CodeEngineCapability,
 			"GitHub job %q does not prepare the helper immediately after downloading it", jobID)
 	}
@@ -397,9 +401,9 @@ func joinRuns(steps []githubStep) string {
 	return strings.Join(runs, "\n")
 }
 
-func stepUploads(steps []githubStep, name, path string) bool {
+func (actions githubActionRefs) stepUploads(steps []githubStep, name, path string) bool {
 	for _, step := range steps {
-		if step.Uses == githubUploadAction && step.With["name"] == name && step.With["path"] == path && step.With["if-no-files-found"] == "error" {
+		if step.Uses == actions.Upload && step.With["name"] == name && step.With["path"] == path && step.With["if-no-files-found"] == "error" {
 			return true
 		}
 	}

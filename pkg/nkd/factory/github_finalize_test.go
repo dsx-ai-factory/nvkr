@@ -33,7 +33,7 @@ func TestGitHubFinalizerBatchesExactCarriersAndPreservesFailureAccounting(t *tes
 			len(document.Steps), len(plan.Graph.Artifacts))
 	}
 	download := document.Steps[1]
-	if download.Uses != githubDownloadAction || !download.ContinueOnError ||
+	if download.Uses != plan.Actions["download-artifact"].Uses() || !download.ContinueOnError ||
 		download.With["path"] != ".nkd/carriers" || download.With["merge-multiple"] != "true" {
 		t.Fatalf("batch download is incomplete: %+v", download)
 	}
@@ -59,7 +59,7 @@ func TestGitHubFinalizerBatchesExactCarriersAndPreservesFailureAccounting(t *tes
 }
 
 func TestGitHubFinalizerRejectsMergedCarrierNameCollisionsBeforeOutput(t *testing.T) {
-	plan := &Plan{Graph: ArtifactGraph{Artifacts: []Artifact{
+	plan := &Plan{Actions: githubTestPlan(t).Actions, Graph: ArtifactGraph{Artifacts: []Artifact{
 		{ID: "result/a-b", Producer: "producer-a", Path: ".nkd/factory/a"},
 		{ID: "result/a/b", Producer: "producer-b", Path: ".nkd/factory/b"},
 	}}}

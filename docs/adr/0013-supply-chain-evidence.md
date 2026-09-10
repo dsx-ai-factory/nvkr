@@ -111,7 +111,7 @@ per-recipe SBOM node after terminal observation. Each subject is the runner-obse
 also binds Recipe Digest. Resolved component declarations are frozen in the plan so the node needs no live
 catalog. Adding those declarations or outputs changes canonical plan identity and requires regeneration.
 
-An Environment may select a pinned Syft executable through `sbomTool` and `tools`. Both maintained NKE
+A Definition may select a catalog-pinned Syft executable through `sbomTool`. Both maintained NKE
 Environments require it. The graph then requires each observed payload and the acquired scanner as explicit
 SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismatched bytes, scanner errors and
 empty inventories fail closed. Without `sbomTool`, the existing declaration-only documents provide source

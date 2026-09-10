@@ -14,11 +14,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	ociname "github.com/google/go-containerregistry/pkg/name"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	ociname "github.com/google/go-containerregistry/pkg/name"
 	"sigs.k8s.io/yaml"
 )
 
@@ -120,6 +120,21 @@ func load(p DataProvider) (*Catalog, error) {
 		Metadata:   reg.Metadata,
 		Sources:    reg.Sources,
 		Components: map[string]Component{},
+		Tools:      map[string]ToolPin{},
+		Actions:    map[string]ActionPin{},
+	}
+
+	for name, pin := range lock.Pins {
+		if source := reg.Sources[name]; source.Kind == SourceGitHubAction {
+			action := ActionPin{Repo: strings.TrimPrefix(source.Repo, "https://github.com/"), Version: pin.Tag, SHA: pin.Commit}
+			if err := action.Validate(); err != nil {
+				return nil, err
+			}
+			cat.Actions[name] = action
+		}
+		if pin.Tool != nil {
+			cat.Tools[name] = *pin.Tool
+		}
 	}
 
 	// Recipes: fill the k8sVersion axis from a source pin when versionFrom is set,
@@ -322,6 +337,14 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 			return e.New(e.CodeInvalidCatalog, "catalog source name %q is empty or has surrounding whitespace", sourceName)
 		}
 		src := reg.Sources[sourceName]
+		if err := validateSourceKind(src); err != nil {
+			return err
+		}
+		if src.Tool != nil {
+			if err := validateToolSource(*src.Tool); err != nil {
+				return err
+			}
+		}
 		if strings.TrimSpace(src.Repo) == "" {
 			return e.New(e.CodeInvalidCatalog, "catalog source %q has no repository", sourceName)
 		}
@@ -652,6 +675,11 @@ func splitVersion(tag string) (maj, min, pat string) {
 func (cat *Catalog) Validate() error {
 	if cat == nil {
 		return e.New(e.CodeInvalidCatalog, "catalog is nil")
+	}
+	for _, pin := range cat.Actions {
+		if err := pin.Validate(); err != nil {
+			return err
+		}
 	}
 	// A catalog needs at least one way to resolve: flat recipes OR composition layers.
 	if len(cat.Recipes) == 0 && cat.Layers == nil {

@@ -1,7 +1,7 @@
 apiVersion: nkd.dev/catalog-overlay/v1
 kind: CatalogOverlay
 name: trusted-kubernetes-supplier
-requiresCatalogDigest: sha256:5c7aa8e1710577aa16bdd16850868a0905af438eb1dc21150f5d2c3dc25a925b
+requiresCatalogDigest: sha256:c00c9c624249be5453bceaf58ff2b26856c1c7f0cc1db04c857a0593fbe2bc59
 components:
   kubectl:
     version: v1.32.0

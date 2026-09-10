@@ -128,6 +128,27 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "factory compilation canceled")
 	}
+	if stack == nil || stack.Catalog == nil {
+		return nil, e.New(e.CodeInvalidCatalog, "factory compilation requires a resolved catalog stack")
+	}
+	if len(definition.SelectedTools) > 0 {
+		if definition.Tools == nil {
+			definition.Tools = map[string]Tool{}
+		}
+		for _, name := range definition.SelectedTools {
+			pin, ok := stack.Catalog.Tools[name]
+			if !ok {
+				return nil, e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
+			}
+			if _, duplicate := definition.Tools[name]; duplicate {
+				return nil, e.New(e.CodeInvalidCatalog, "duplicate tool %q", name)
+			}
+			if pin.Platform != definition.UtilityPlatform {
+				return nil, e.New(e.CodeEngineCapability, "tool %q platform %s does not match utility platform %s", name, pin.Platform, definition.UtilityPlatform)
+			}
+			definition.Tools[name] = Tool{Format: pin.Format, URL: pin.URL, ArchiveDigest: pin.ArchiveDigest, ExecutablePath: pin.ExecutablePath, ExecutableDigest: pin.ExecutableDigest}
+		}
+	}
 	// The AUTHORED definition's identity, taken before the runner defaulting below
 	// mutates the document. Production signing binds it into the attestation, so it
 	// is computed here (where the definition object exists) rather than rederived
@@ -169,7 +190,7 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 				delivery.Signing.CosignTool, definition.Metadata.Name)
 		}
 	}
-	plan := &Plan{SchemaVersion: PlanSchemaVersion, Name: definition.Metadata.Name,
+	plan := &Plan{Actions: cloneActionPins(stack.Catalog.Actions), SchemaVersion: PlanSchemaVersion, Name: definition.Metadata.Name,
 		GeneratorVersion: generatorVersion, Qualification: planTier(delivery.Signing),
 		CompileSpecDigest: compileSpecDigest,
 		CatalogDigest:     stack.Digest, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),

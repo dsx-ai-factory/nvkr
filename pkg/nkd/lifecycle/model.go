@@ -14,6 +14,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/google/go-containerregistry/pkg/name"
 )
 
 const (
@@ -52,7 +53,8 @@ type Definition struct {
 	Kind       string              `json:"kind"`
 	Metadata   Metadata            `json:"metadata"`
 	Catalog    Catalog             `json:"catalog"`
-	Tools      map[string]Tool     `json:"tools,omitempty"`
+	SBOMTool   string              `json:"sbomTool,omitempty"`
+	CosignTool string              `json:"cosignTool,omitempty"`
 	Recipes    []RecipeSelection   `json:"recipes"`
 	Outputs    []DefinitionOutput  `json:"outputs"`
 	Clusters   []DefinitionCluster `json:"clusters,omitempty"`
@@ -75,14 +77,6 @@ type RecipeSelection struct {
 type Catalog struct {
 	Base     string   `json:"base"`
 	Overlays []string `json:"overlays,omitempty"`
-}
-
-type Tool struct {
-	Format           string `json:"format"`
-	URL              string `json:"url"`
-	ArchiveDigest    string `json:"archiveDigest"`
-	ExecutablePath   string `json:"executablePath"`
-	ExecutableDigest string `json:"executableDigest"`
 }
 
 // DefinitionOutput is a named artifact slot frozen before a run. Components
@@ -127,21 +121,19 @@ type ClusterMember struct {
 }
 
 // Environment contains settings independently selected for one run. Publish
-// maps a Definition output name to a destination name; routine routes are derived.
+// uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
-	SBOMTool         string                  `json:"sbomTool,omitempty"`
-	APIVersion       string                  `json:"apiVersion"`
-	Kind             string                  `json:"kind"`
-	Metadata         Metadata                `json:"metadata"`
-	RunsOn           string                  `json:"runsOn,omitempty"`
-	UtilityContainer string                  `json:"utilityContainer"`
-	UtilityPlatform  string                  `json:"utilityPlatform"`
-	Tools            map[string]Tool         `json:"tools,omitempty"`
-	SourceAccess     map[string]SourceAccess `json:"sourceAccess,omitempty"`
-	Destinations     map[string]Destination  `json:"destinations,omitempty"`
-	Publish          map[string]string       `json:"publish,omitempty"`
-	Runtime          Runtime                 `json:"runtime,omitempty"`
-	Signing          *Signing                `json:"signing,omitempty"`
+	APIVersion       string   `json:"apiVersion"`
+	Kind             string   `json:"kind"`
+	Metadata         Metadata `json:"metadata"`
+	RunsOn           string   `json:"runsOn,omitempty"`
+	UtilityContainer string   `json:"utilityContainer"`
+	UtilityPlatform  string   `json:"utilityPlatform"`
+
+	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
+	Publication  *Publication            `json:"publication,omitempty"`
+	Runtime      Runtime                 `json:"runtime,omitempty"`
+	Signing      *Signing                `json:"signing,omitempty"`
 }
 
 // SourceAccess configures transport-only authentication and mirroring for one
@@ -152,12 +144,12 @@ type SourceAccess struct {
 	CredentialRef string `json:"credentialRef"`
 }
 
-type Destination struct {
-	Kind          string `json:"kind"`
-	Ref           string `json:"ref"`
-	CredentialRef string `json:"credentialRef,omitempty"`
-	Anonymous     bool   `json:"anonymous,omitempty"`
-	PlainHTTP     bool   `json:"plainHTTP,omitempty"`
+// Publication selects one OCI namespace. Repositories derive from output names.
+type Publication struct {
+	RepositoryPrefix string `json:"repositoryPrefix"`
+	CredentialRef    string `json:"credentialRef,omitempty"`
+	Anonymous        bool   `json:"anonymous,omitempty"`
+	PlainHTTP        bool   `json:"plainHTTP,omitempty"`
 }
 
 type Runtime struct {
@@ -172,10 +164,9 @@ type Runtime struct {
 }
 
 type Signing struct {
-	Mode       string `json:"mode"`
-	Identity   string `json:"identity"`
-	Issuer     string `json:"issuer"`
-	CosignTool string `json:"cosignTool,omitempty"`
+	Mode     string `json:"mode"`
+	Identity string `json:"identity"`
+	Issuer   string `json:"issuer"`
 }
 
 // Artifact is an immutable public output or evidence reference. It always names
@@ -253,9 +244,9 @@ func (definition Definition) Validate() error {
 	if !namePattern.MatchString(definition.Metadata.Name) || definition.Catalog.Base == "" || len(definition.Recipes) == 0 || len(definition.Outputs) == 0 {
 		return e.New(e.CodeInvalidCatalog, "definition requires a canonical name, catalog, recipes, and outputs")
 	}
-	for name, tool := range definition.Tools {
-		if err := validateTool(name, tool); err != nil {
-			return err
+	for _, tool := range []string{definition.SBOMTool, definition.CosignTool} {
+		if tool != "" && !namePattern.MatchString(tool) {
+			return e.New(e.CodeInvalidCatalog, "invalid catalog tool selector %q", tool)
 		}
 	}
 	recipes := make(map[string]bool, len(definition.Recipes))
@@ -278,7 +269,7 @@ func (definition Definition) Validate() error {
 		selections[recipe.Name] = recipe
 		previous = recipe.Name
 		if recipe.AICRGenerator != "" {
-			if _, ok := definition.Tools[recipe.AICRGenerator]; !ok {
+			if !namePattern.MatchString(recipe.AICRGenerator) {
 				return e.New(e.CodeInvalidCatalog, "recipe selection %q references unknown output tool %q", recipe.Name, recipe.AICRGenerator)
 			}
 		}
@@ -396,11 +387,6 @@ func (environment Environment) Validate() error {
 	if strings.ContainsAny(environment.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "environment runner contains control characters")
 	}
-	for name, tool := range environment.Tools {
-		if err := validateTool(name, tool); err != nil {
-			return err
-		}
-	}
 	for source, access := range environment.SourceAccess {
 		if err := validateHTTPSURL("environment sourceAccess source", source); err != nil {
 			return err
@@ -413,19 +399,11 @@ func (environment Environment) Validate() error {
 				"environment sourceAccess %q credentialRef must be github:SECRET_NAME", source)
 		}
 	}
-	for name, destination := range environment.Destinations {
-		if !namePattern.MatchString(name) || strings.TrimSpace(destination.Ref) == "" || destination.Anonymous == (destination.CredentialRef != "") {
-			return e.New(e.CodeInvalidCatalog, "environment destination %q is invalid or has ambiguous credentials", name)
-		}
-		switch destination.Kind {
-		case "oci", "apt", "object":
-		default:
-			return e.New(e.CodeUnsupported, "environment destination %q has unsupported kind %q", name, destination.Kind)
-		}
-	}
-	if environment.SBOMTool != "" {
-		if _, ok := environment.Tools[environment.SBOMTool]; !ok || !namePattern.MatchString(environment.SBOMTool) {
-			return e.New(e.CodeInvalidCatalog, "environment sbomTool must name a pinned tool")
+	if publication := environment.Publication; publication != nil {
+		prefix := publication.RepositoryPrefix
+		repository, err := name.NewRepository(prefix, name.StrictValidation)
+		if err != nil || repository.Name() != prefix || strings.ContainsAny(prefix[strings.LastIndex(prefix, "/")+1:], ":@") || strings.Contains(prefix, "@") || publication.Anonymous == (publication.CredentialRef != "") {
+			return e.New(e.CodeInvalidCatalog, "publication requires a canonical untagged repositoryPrefix and exactly one credential mode")
 		}
 	}
 	if environment.Signing != nil {
@@ -435,17 +413,8 @@ func (environment Environment) Validate() error {
 		if strings.TrimSpace(environment.Signing.Identity) == "" || strings.TrimSpace(environment.Signing.Issuer) == "" {
 			return e.New(e.CodeTrustPolicyMissing, "environment signing requires identity and issuer")
 		}
-		if environment.Signing.Mode == "cosign" {
-			if _, ok := environment.Tools[environment.Signing.CosignTool]; !ok {
-				return e.New(e.CodeTrustPolicyMissing, "environment signing tool %q is not pinned in Environment.tools", environment.Signing.CosignTool)
-			}
-		}
 	}
-	for output, target := range environment.Publish {
-		if !namePattern.MatchString(output) || environment.Destinations[target].Ref == "" {
-			return e.New(e.CodeInvalidCatalog, "environment publication %q references unknown destination %q", output, target)
-		}
-	}
+
 	return nil
 }
 
@@ -460,30 +429,6 @@ func validateHTTPSURL(label, value string) error {
 	}
 	return nil
 }
-
-func validateTool(name string, tool Tool) error {
-	if tool.Format != factoryToolFormatRaw && tool.Format != factoryToolFormatTarGzip {
-		return e.New(e.CodeInvalidCatalog, "tool %q has unsupported format %q", name, tool.Format)
-	}
-	if !namePattern.MatchString(name) || !strings.HasPrefix(tool.URL, "https://") || !canonical.IsDigest(tool.ArchiveDigest) ||
-		!canonical.IsDigest(tool.ExecutableDigest) || tool.ExecutablePath == "" || strings.HasPrefix(tool.ExecutablePath, "/") || strings.ContainsAny(tool.ExecutablePath, "\\\x00\r\n") {
-		return e.New(e.CodeInvalidCatalog, "tool %q does not bind a safe HTTPS archive and exact executable", name)
-	}
-	if tool.Format == factoryToolFormatRaw && tool.ArchiveDigest != tool.ExecutableDigest {
-		return e.New(e.CodeInvalidCatalog, "raw tool %q must bind identical transport and executable digests", name)
-	}
-	for _, part := range strings.Split(tool.ExecutablePath, "/") {
-		if part == "" || part == "." || part == ".." {
-			return e.New(e.CodeInvalidCatalog, "tool %q has unsafe executablePath", name)
-		}
-	}
-	return nil
-}
-
-const (
-	factoryToolFormatRaw     = "raw"
-	factoryToolFormatTarGzip = "tar-gzip"
-)
 
 func (environment Environment) Digest() (string, error) {
 	if err := environment.Validate(); err != nil {

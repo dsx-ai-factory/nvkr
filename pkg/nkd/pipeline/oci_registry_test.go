@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestOCITransportAcquiresAndReusesExactRegistryClosure(t *testing.T) {

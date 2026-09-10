@@ -1,6 +1,6 @@
-# nkdctl
+# NKE Recipes
 
-`nkdctl` turns a product **Definition** into a **Run** and an immutable **Release** of artifacts and evidence.
+NKE Recipes uses `nkdctl` to turn a product **Definition** into a **Run** and an immutable **Release** of artifacts and evidence.
 Recipes supply reusable build instructions; an Environment supplies execution/publication settings; consumers
 apply a Verification Policy. A cluster is an optional named view in the Definition and its exact realization
 in the Release. Authors declare outputs once; NKD derives packages, routes and internal evidence relationships.
@@ -16,7 +16,7 @@ bin/nkdctl run plan --definition definitions/nke-v1/definition.yaml \
 
 Planning reads inputs without building or publishing. Follow the [lifecycle guide](docs/lifecycle.md) for local
 attempts, hosted generation and policy-scoped Release verification, or choose a [runnable demo](scripts/README.md).
-The [NKE inputs](definitions/nke-v1/README.md) show one executable; the
+The [NKE inputs](definitions/nke-v1/README.md) build the CLI, CWE image, and Helm bundle; the
 [AICR inputs](definitions/aicr/README.md) produce a pinned Helm OCI output. The NKE OS-image build owns
 the entire worker payload; its NKD integration remains deferred.
 
@@ -26,8 +26,9 @@ Definition/Environment compilation, immutable local attempts, GitHub generation,
 binary/APT/Helm Release-consumer contracts are implemented. Linux verification requires pinned tools and explicit
 identity/issuer policy. The supported consumer scope authenticates artifact publication and build evidence.
 
-The project is not a production-complete release system. Current hosted workflows and live keyless signing have
-not passed operational acceptance. Full v1 release qualification/automation, wrapped OS builds and several
+The project is not a production-complete release system. Earlier personal-namespace hosted runs demonstrated
+real keyless signing and independent consumption; the current NVIDIA inputs have not yet been exercised
+in a hosted Run, and organizational acceptance remains open. Full v1 release qualification/automation, wrapped OS builds and several
 qualified authority adapters remain unavailable. Dry-run/local output is unqualified; a production signature
 does not prove exact-byte reproduction. See the [implementation and evidence record](docs/adr/reconciliation.md).
 

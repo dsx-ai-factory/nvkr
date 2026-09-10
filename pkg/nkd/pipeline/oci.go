@@ -13,13 +13,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/types"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 const (

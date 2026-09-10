@@ -46,18 +46,13 @@ func TestEnvironmentRejectsInvalidExecutionAndPublicationInputs(t *testing.T) {
 		{"platform", func(v *Environment) { v.UtilityPlatform = "windows/amd64" }, e.CodeUnpinnedSource},
 		{"mutable utility", func(v *Environment) { v.UtilityContainer = "golang:latest" }, e.CodeUnpinnedSource},
 		{"runner newline", func(v *Environment) { v.RunsOn = "ubuntu\nother" }, e.CodeInvalidCatalog},
-		{"unknown destination kind", func(v *Environment) {
-			v.Destinations["registry"] = Destination{Kind: "unknown", Ref: "target", Anonymous: true}
-		}, e.CodeUnsupported},
-		{"ambiguous credentials", func(v *Environment) {
-			v.Destinations["registry"] = Destination{Kind: "oci", Ref: "target", Anonymous: true, CredentialRef: "github:TOKEN"}
+		{"tagged prefix", func(v *Environment) { v.Publication.RepositoryPrefix = "registry.example.test/product:latest" }, e.CodeInvalidCatalog},
+		{"ambiguous credentials", func(v *Environment) { v.Publication.CredentialRef = "github:TOKEN" }, e.CodeInvalidCatalog},
+		{"digest prefix", func(v *Environment) {
+			v.Publication.RepositoryPrefix = "registry.example.test/product@sha256:" + repeat("a", 64)
 		}, e.CodeInvalidCatalog},
-		{"missing destination", func(v *Environment) { v.Publish["cli"] = "missing" }, e.CodeInvalidCatalog},
 		{"unknown signing", func(v *Environment) { v.Signing = &Signing{Mode: "unknown"} }, e.CodeUnsupported},
 		{"missing signer identity", func(v *Environment) { v.Signing = &Signing{Mode: "cosign"} }, e.CodeTrustPolicyMissing},
-		{"missing signer tool", func(v *Environment) {
-			v.Signing = &Signing{Mode: "cosign", Identity: "builder", Issuer: "issuer", CosignTool: "missing"}
-		}, e.CodeTrustPolicyMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := testEnvironment()
@@ -67,40 +62,6 @@ func TestEnvironmentRejectsInvalidExecutionAndPublicationInputs(t *testing.T) {
 			assertCode(t, err, tc.want)
 			if digest != "" {
 				t.Fatal("invalid environment received identity")
-			}
-		})
-	}
-}
-
-func TestEnvironmentToolPinsAndPaths(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		change func(*Tool)
-	}{
-		{name: "valid archive"},
-		{name: "valid raw", change: func(v *Tool) { v.Format = "raw" }},
-		{name: "unknown format", change: func(v *Tool) { v.Format = "zip" }},
-		{name: "HTTP", change: func(v *Tool) { v.URL = "http://example.test/tool" }},
-		{name: "raw mismatch", change: func(v *Tool) { v.Format = "raw"; v.ExecutableDigest = "sha256:" + repeat("b", 64) }},
-		{name: "absolute", change: func(v *Tool) { v.ExecutablePath = "/tool" }},
-		{name: "parent", change: func(v *Tool) { v.ExecutablePath = "bin/../tool" }},
-		{name: "empty segment", change: func(v *Tool) { v.ExecutablePath = "bin//tool" }},
-		{name: "dot segment", change: func(v *Tool) { v.ExecutablePath = "./tool" }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			tool := Tool{Format: "tar-gzip", URL: "https://example.test/tool", ArchiveDigest: "sha256:" + repeat("a", 64), ExecutableDigest: "sha256:" + repeat("a", 64), ExecutablePath: "bin/tool"}
-			if tc.change != nil {
-				tc.change(&tool)
-			}
-			env := testEnvironment()
-			env.Tools = map[string]Tool{"tool": tool}
-			err := env.Validate()
-			if tc.name == "valid archive" || tc.name == "valid raw" {
-				if err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				assertCode(t, err, e.CodeInvalidCatalog)
 			}
 		})
 	}

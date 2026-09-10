@@ -102,6 +102,7 @@ type CompileSpec struct {
 	UtilityPlatform  string          `json:"utilityPlatform"`  // linux/amd64 or linux/arm64
 	Catalog          CatalogStack    `json:"catalog"`
 	Tools            map[string]Tool `json:"tools,omitempty"`
+	SelectedTools    []string        `json:"selectedTools,omitempty"`
 	Recipes          []RecipeTarget  `json:"recipes"`
 	Clusters         []ClusterSpec   `json:"clusters,omitempty"`
 	Packages         []PackageSpec   `json:"packages,omitempty"`
@@ -362,24 +363,25 @@ type Route struct {
 }
 
 type Plan struct {
-	SchemaVersion           string                   `json:"schemaVersion"`
-	Name                    string                   `json:"name"`
-	GeneratorVersion        string                   `json:"generatorVersion"`
-	DefinitionPath          string                   `json:"definitionPath,omitempty"`
-	CompileSpecDigest       string                   `json:"compileSpecDigest,omitempty"`
-	DefinitionDigest        string                   `json:"definitionDigest,omitempty"`
-	EnvironmentPath         string                   `json:"environmentPath,omitempty"`
-	Qualification           EvidenceTier             `json:"qualification"`
-	CatalogDigest           string                   `json:"catalogDigest"`
-	AppliedOverlays         []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`
-	ExecutionSettingsDigest string                   `json:"executionSettingsDigest"`
-	EnvironmentDigest       string                   `json:"environmentDigest,omitempty"`
-	ExecutionSettings       ExecutionSettings        `json:"executionSettings"`
-	Recipes                 []RecipePlan             `json:"recipes"`
-	Compositions            []CompositionPlan        `json:"compositions,omitempty"`
-	LifecycleOutputs        []LifecycleOutputPlan    `json:"lifecycleOutputs,omitempty"`
-	LifecycleClusters       []LifecycleClusterPlan   `json:"lifecycleClusters,omitempty"`
-	Graph                   ArtifactGraph            `json:"graph"`
+	Actions                 map[string]catalog.ActionPin `json:"actions,omitempty"`
+	SchemaVersion           string                       `json:"schemaVersion"`
+	Name                    string                       `json:"name"`
+	GeneratorVersion        string                       `json:"generatorVersion"`
+	DefinitionPath          string                       `json:"definitionPath,omitempty"`
+	CompileSpecDigest       string                       `json:"compileSpecDigest,omitempty"`
+	DefinitionDigest        string                       `json:"definitionDigest,omitempty"`
+	EnvironmentPath         string                       `json:"environmentPath,omitempty"`
+	Qualification           EvidenceTier                 `json:"qualification"`
+	CatalogDigest           string                       `json:"catalogDigest"`
+	AppliedOverlays         []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
+	ExecutionSettingsDigest string                       `json:"executionSettingsDigest"`
+	EnvironmentDigest       string                       `json:"environmentDigest,omitempty"`
+	ExecutionSettings       ExecutionSettings            `json:"executionSettings"`
+	Recipes                 []RecipePlan                 `json:"recipes"`
+	Compositions            []CompositionPlan            `json:"compositions,omitempty"`
+	LifecycleOutputs        []LifecycleOutputPlan        `json:"lifecycleOutputs,omitempty"`
+	LifecycleClusters       []LifecycleClusterPlan       `json:"lifecycleClusters,omitempty"`
+	Graph                   ArtifactGraph                `json:"graph"`
 
 	// identityDigest is the digest of this plan AS COMPILED, carried across the local
 	// runner's workspace relocation. It is deliberately unexported: it never reaches the

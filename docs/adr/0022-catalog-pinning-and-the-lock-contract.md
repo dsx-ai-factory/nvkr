@@ -283,3 +283,34 @@ canonical bytes, registry+lock snapshot CAS, one-winner concurrent writes, atomi
 of the prior lock on conflict. Operational acceptance still
 requires every documented bump mode against real upstreams, dry-run/write byte equality, process kill points on
 supported filesystems, and publication of a separately versioned catalog-data release.
+
+## Tool release assets
+
+A source may declare `tool` with `format` (`raw` or `tar-gzip`), a version-rendered HTTPS `url`,
+`platform` (`linux/amd64` or `linux/arm64`), and `executablePath`. Tool names are source names; they do not
+include release versions. The same source constraint and tag-prefix selection used by other sources governs
+`catalog pin` and `catalog bump`. Each declared tool currently selects one platform; multiple platforms use
+distinct source names. No platform fallback is inferred.
+
+Pinning resolves the upstream tag to commit/tree/epoch, downloads the release asset with bounded I/O, checks
+archive structure and computes both archive and selected-executable SHA-256 digests without running the tool.
+The source lock's nested `tool` record stores the exact URL, format, member, platform and digests. A changed
+version or acquisition declaration with an old tool pin fails catalog loading. Tool updates use the existing
+lock snapshot/CAS writer, including `--check` no-write behavior; a failed download produces no lock update.
+These hashes pin acquired bytes; they do not establish an upstream signature or reproducible build.
+
+The resolved catalog snapshot includes tool pins. Definition selects tools by purpose, and compilation
+requires each selected catalog tool to match the utility execution platform. Missing pins, invalid formats
+or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
+
+## GitHub action dependencies
+
+A source with `kind: github-action` declares a canonical `https://github.com/owner/repository` URL and a
+semver constraint. It has no tool download, build toolchain, vendor command, or tag prefix. Pinning requires
+an exact stable release tag and resolves its commit/tree/epoch through the existing source resolver and
+CAS lock writer. Moving major tags are not release pins. Unknown source kinds fail closed.
+
+Resolved action references are included in the catalog snapshot and Run plan. The GitHub adapters own
+supported repository/major-version contracts; they contain no release commit constants or embedded locks.
+A compatible patch/minor bump is a catalog lock change followed by regeneration. A new major requires an
+adapter compatibility change and validation. Local generation does not require GitHub actions.

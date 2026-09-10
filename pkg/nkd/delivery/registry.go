@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // RegistryOptions selects transport only. PlainHTTP is deliberately explicit and
@@ -24,7 +24,7 @@ type RegistryOptions struct {
 
 // Push publishes a complete verified OCI layout to a Distribution-compatible
 // repository and returns the digest-pinned bootstrap reference. reference must be
-// a tag: tags are discovery handles, while the returned digest is the operator input.
+// an untagged repository for digest-only publication, or an explicit discovery tag.
 func Push(ctx context.Context, layoutPath, reference string, options RegistryOptions) (string, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
@@ -39,7 +39,19 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 	if options.PlainHTTP {
 		parseOptions = append(parseOptions, name.Insecure)
 	}
-	ref, err := name.NewTag(reference, parseOptions...)
+	var ref name.Reference
+	var err error
+	digestOnly := !strings.ContainsAny(reference[strings.LastIndex(reference, "/")+1:], ":@")
+	if digestOnly {
+		var repo name.Repository
+		repo, err = name.NewRepository(reference, parseOptions...)
+		if err == nil && repo.Name() != reference {
+			return "", e.New(e.CodeUsage, "publication repository must be canonical")
+		}
+		ref = repo.Tag("unused")
+	} else {
+		ref, err = name.NewTag(reference, parseOptions...)
+	}
 	if err != nil {
 		return "", e.Wrap(e.CodeUsage, err, "parsing OCI publication tag %q", reference)
 	}
@@ -54,6 +66,9 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 	digest, err := index.Digest()
 	if err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "digesting OCI publication index")
+	}
+	if digestOnly {
+		ref = ref.Context().Digest(digest.String())
 	}
 	remoteOptions := registryOptions(ctx, options)
 	if err := remote.WriteIndex(ref, index, remoteOptions...); err != nil {

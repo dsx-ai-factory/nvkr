@@ -1,114 +1,117 @@
 apiVersion: nkd.dev/catalog/v1
-kind: SourceBuildRegistry
-metadata:
-  name: nke-v1
-  description: >-
-    NKE components from independently pinned CLI and controller module tags. The CLI uses an offline Go build;
-    CWE wraps the upstream Dockerfile in digest-pinned rootless BuildKit.
-sources:
-  # NKE is a Go workspace MONOREPO that publishes per-module tags under a path prefix
-  # (cli/v0.1.0-rc.2). tagPrefix makes that explicit: `catalog pin --tag v0.1.0-rc.2 nke`
-  # (or the full cli/v0.1.0-rc.2) resolves refs/tags/cli/…, `catalog bump` considers only
-  # cli/-prefixed tags, the lock records the FULL tag git can resolve, and every rendered
-  # version ({{.Version}}, {{.Major}}…) is prefix-free.
-  nke:
-    repo: https://github.com/NVIDIA/nke
-    tagPrefix: cli/
-    constraint: 0.1.x
-    # The repo has no .go-version, so the toolchain cannot be derived by
-    # toolchainBaseImage; it is pinned explicitly. This is docker.io/library/golang:1.26.6
-    # (the multi-arch index digest), which carries the Go 1.26.6 the workspace declares.
-    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
-  # CWE and its committed quickstart charts move together on the controller train.
-  nke-controller:
-    repo: https://github.com/NVIDIA/nke
-    tagPrefix: controller/
-    constraint: 0.1.x
-    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
-recipes:
-  # `operations` is the closest ADR-12 §2 cluster-level category for an operator CLI; see
-  # README.md ("Vocabulary notes") for why this is a deliberate stretch of the taxonomy.
-  # The recipe wildcards os and k8sVersion: nkectl is a static, OS-independent Go binary
-  # and its version train is its own, not Kubernetes'. The Definition supplies a
-  # concrete frame for both axes.
-  - id: nke-cli
-    criteria: {category: operations, os: any, arch: amd64, k8sVersion: any}
-    components: [nkectl]
-  - id: nke-control-plane
-    criteria: {category: platform-services, os: any, arch: amd64, k8sVersion: any}
-    components: [cwe, nke-helm]
 components:
   cwe:
-    fromSource: true
-    source: nke-controller
-    builderType: buildkit-rootless
-    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
-    outputType: oci-image
-    writeDir: bin
     artifactPath: bin/cwe.oci.tar
     buildCommand:
-      - sh
-      - -ec
-      - >-
-        buildctl-daemonless.sh build --frontend dockerfile.v0
-        --local context=/src --local dockerfile=/src/controller
-        --opt platform=linux/amd64
-        --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
-        --opt "build-arg:GIT_VERSION=$GIT_VERSION"
-        --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
-        --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
-    versionStamp:
-      BUILD_VERSION: "{{.ModuleTag}}"
-      GIT_VERSION: "{{.Commit}}"
-  nke-helm:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local
+      dockerfile=/src/controller --opt platform=linux/amd64 --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
+      --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+      --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
     fromSource: true
+    outputType: oci-image
     source: nke-controller
-    outputType: tarball
-    writeDir: bin
-    artifactPath: bin/nke-helm.tar
-    # Preserve the complete pinned quickstart tree, including dependency chart
-    # references and deployment scripts. This step needs no network.
-    buildCommand:
-      - sh
-      - -ec
-      - >-
-        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH"
-        --owner=0 --group=0 --numeric-owner
-        -C /src/generated/aicr/quickstart
-        -cf /src/bin/nke-helm.tar helm
-  nkectl:
-    fromSource: true
-    source: nke
-    cgo: false
-    # host-package is the delivery form of a single host binary. It does NOT make the
-    # local factory runner assemble a .deb: Debian assembly happens only for an
-    # apt-repository package (or `nkdctl fetch --package`). The binary-bundle package
-    # consumes the built binary directly.
-    outputType: host-package
-    # The build container mounts the authenticated source read-only at /src and mounts
-    # the writable output at /src/bin (writeDir), so the compiler writes there and the
-    # runner collects bin/nkectl. The build runs from the repo ROOT (the go.work
-    # workspace) with -mod=vendor against NKE's committed workspace vendor tree, so it
-    # needs no network and no credentials under --network=none.
-    # versionStamp values reach the container as pinned environment variables (one -e per
-    # stamp), so the command references them as $NKECTL_* rather than templating them into
-    # the argv — which keeps the argv identical across bumps.
-    buildCommand:
-      - sh
-      - -c
-      - 'go build -mod=vendor -trimpath -ldflags "-s -w -buildid= -X main.version=$NKECTL_VERSION -X main.gitCommit=$NKECTL_COMMIT -X main.gitTreeState=clean -X main.buildDate=$NKECTL_DATE -X github.com/NVIDIA/nke/cli/internal/cwedeploy.capiVersion=$NKECTL_CAPI_VERSION" -o /src/bin/nkectl ./cli/cmd/nkectl'
-    artifactPath: bin/nkectl
-    writeDir: bin
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
     versionStamp:
-      # Mirrors cli/Makefile's ldflags. Every value is derived from the LOCK, never from
-      # wall-clock time or the local git checkout: {{.Date}} is the pinned committer
-      # epoch in RFC 3339 UTC.
-      # {{.ModuleTag}}, not {{.Version}}: cli/Makefile strips only the `cli/` module
-      # prefix and stamps the rest verbatim, so upstream's own binary reports
-      # `v0.1.0-rc.2`. {{.Version}} would also strip the leading v and make our build
-      # report `0.1.0-rc.2` — a different version string than the release it claims to be.
-      NKECTL_VERSION: "{{.ModuleTag}}"
-      NKECTL_COMMIT: "{{slice .Commit 0 8}}"
-      NKECTL_DATE: "{{.Date}}"
-      # Static upstream value from NKE's make/tool-versions.mk (CAPI_VERSION).
+      BUILD_VERSION: '{{.ModuleTag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: bin
+  nke-helm:
+    artifactPath: bin/nke-helm.tar
+    buildCommand:
+    - sh
+    - -ec
+    - tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner
+      -C /src/generated/aicr/quickstart -cf /src/bin/nke-helm.tar helm
+    fromSource: true
+    outputType: tarball
+    source: nke-controller
+    writeDir: bin
+  nkectl:
+    artifactPath: bin/nkectl
+    buildCommand:
+    - sh
+    - -c
+    - go build -mod=vendor -trimpath -ldflags "-s -w -buildid= -X main.version=$NKECTL_VERSION
+      -X main.gitCommit=$NKECTL_COMMIT -X main.gitTreeState=clean -X main.buildDate=$NKECTL_DATE
+      -X github.com/NVIDIA/nke/cli/internal/cwedeploy.capiVersion=$NKECTL_CAPI_VERSION"
+      -o /src/bin/nkectl ./cli/cmd/nkectl
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    source: nke
+    versionStamp:
       NKECTL_CAPI_VERSION: v1.12.3
+      NKECTL_COMMIT: '{{slice .Commit 0 8}}'
+      NKECTL_DATE: '{{.Date}}'
+      NKECTL_VERSION: '{{.ModuleTag}}'
+    writeDir: bin
+kind: SourceBuildRegistry
+metadata:
+  description: NKE components from independently pinned CLI and controller module
+    tags. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+    rootless BuildKit.
+  name: nke-v1
+recipes:
+- components:
+  - nkectl
+  criteria:
+    arch: amd64
+    category: operations
+    k8sVersion: any
+    os: any
+  id: nke-cli
+- components:
+  - cwe
+  - nke-helm
+  criteria:
+    arch: amd64
+    category: platform-services
+    k8sVersion: any
+    os: any
+  id: nke-control-plane
+sources:
+  checkout:
+    kind: github-action
+    repo: https://github.com/actions/checkout
+    constraint: 7.x
+  download-artifact:
+    kind: github-action
+    repo: https://github.com/actions/download-artifact
+    constraint: 8.x
+  setup-go:
+    kind: github-action
+    repo: https://github.com/actions/setup-go
+    constraint: 7.x
+  upload-artifact:
+    kind: github-action
+    repo: https://github.com/actions/upload-artifact
+    constraint: 7.x
+  cosign:
+    constraint: 2.6.x
+    repo: https://github.com/sigstore/cosign
+    tool:
+      executablePath: cosign-linux-amd64
+      format: raw
+      platform: linux/amd64
+      url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
+  nke:
+    constraint: 0.1.x
+    repo: https://github.com/NVIDIA/nke
+    tagPrefix: cli/
+    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+  nke-controller:
+    constraint: 0.1.x
+    repo: https://github.com/NVIDIA/nke
+    tagPrefix: controller/
+    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+  syft:
+    constraint: 1.51.x
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz

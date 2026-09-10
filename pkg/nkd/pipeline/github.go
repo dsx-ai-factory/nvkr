@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -17,6 +18,7 @@ import (
 // container block is used. The prebuilt lane is admitted; from-source graphs still fail
 // closed in validateEmitterContract until provider runtime attestation exists (ADR-18 §8).
 type GitHub struct {
+	Actions      map[string]catalog.ActionPin
 	Data         string      // the operator's --data catalog path, threaded onto verify
 	Ext          *Extensions // operator hook points injected at pre-build / post-verify (ADR-21 §4)
 	RunnerDigest string      // builder-profile pinned helper digest (ADR-07/18 §4)
@@ -55,13 +57,6 @@ func withoutBootstrapWhen(needs []string, active bool) []string {
 	return withoutBootstrap(needs)
 }
 
-// The digest-pinned GitHub Action references (GitHubCheckoutAction, GitHubUploadAction,
-// GitHubDownloadAction, GitHubSetupGoAction) are the single source of truth for both GitHub
-// emitters — this authoritative pipeline adapter and the factory review-topology generator
-// (which aliases them). They are sourced from the embedded actions.lock.yaml (see
-// actionlock.go), so a security bump is a lockfile change via `nkdctl actions bump`, made in
-// exactly one place, not a scattered set of code constants that can silently drift.
-
 func (GitHub) Name() string { return "github-actions" }
 
 func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([]byte, error) {
@@ -75,6 +70,10 @@ func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 		return nil, err
 	}
 	if err := requireEmitterContext(ctx); err != nil {
+		return nil, err
+	}
+	actions, err := ResolveGitHubActions(e.Actions)
+	if err != nil {
 		return nil, err
 	}
 	helper := e.helper()
@@ -120,20 +119,20 @@ func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 			fmt.Fprintf(bw, "    if: ${{ always() }}\n") // unconditional terminal verify (ADR-18 §7)
 		}
 		fmt.Fprintf(bw, "    steps:\n")
-		fmt.Fprintf(bw, "      - uses: %s\n", GitHubCheckoutAction)
+		fmt.Fprintf(bw, "      - uses: %s\n", actions.Checkout)
 		switch j.Kind {
 		case "bootstrap":
 			fmt.Fprintf(bw, "      - run: |\n")
 			for _, l := range BootstrapScript(e.RunnerDigest) {
 				fmt.Fprintf(bw, "          %s\n", l)
 			}
-			emitGitHubUpload(bw, *j.Produces)
+			actions.emitGitHubUpload(bw, *j.Produces)
 		case "verify":
 			for _, name := range j.Consumes {
 				if e.HelperImage != "" && name == RunnerBinary {
 					continue // the helper is in the image, not a transported artifact
 				}
-				emitGitHubDownload(bw, name)
+				actions.emitGitHubDownload(bw, name)
 			}
 			fmt.Fprintf(bw, "      - run: |\n")
 			for _, l := range append(PrepareTransportScriptWith(j, e.RunnerDigest, helper), verifyCmd) {
@@ -150,7 +149,7 @@ func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 				if e.HelperImage != "" && name == RunnerBinary {
 					continue // the helper is in the image, not a transported artifact
 				}
-				emitGitHubDownload(bw, name)
+				actions.emitGitHubDownload(bw, name)
 			}
 			if e.Ext != nil && len(e.Ext.PreBuild) > 0 {
 				fmt.Fprintf(bw, "      - name: pre-build (operator extension)\n        run: |\n")
@@ -163,25 +162,25 @@ func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 				fmt.Fprintf(bw, "          %s\n", l)
 			}
 			if j.Produces != nil {
-				emitGitHubUpload(bw, *j.Produces)
+				actions.emitGitHubUpload(bw, *j.Produces)
 			}
 		}
 	}
 	return GeneratedPipelineBytes(ctx, e.Name(), recipeDigest, g.RecipeID, g, body.Bytes())
 }
 
-func emitGitHubDownload(w io.Writer, name string) {
+func (actions GitHubActionRefs) emitGitHubDownload(w io.Writer, name string) {
 	destination := "."
 	if name != RunnerBinary {
 		destination = filepath.ToSlash(filepath.Dir(TransportArchivePath(name)))
 	}
-	fmt.Fprintf(w, "      - uses: %s\n        with:\n          name: %s\n          path: %s\n", GitHubDownloadAction, name, destination)
+	fmt.Fprintf(w, "      - uses: %s\n        with:\n          name: %s\n          path: %s\n", actions.Download, name, destination)
 }
 
-func emitGitHubUpload(w io.Writer, artifact JobArtifact) {
+func (actions GitHubActionRefs) emitGitHubUpload(w io.Writer, artifact JobArtifact) {
 	path := artifact.Paths[0]
 	if artifact.Name != RunnerBinary {
 		path = TransportArchivePath(artifact.Name)
 	}
-	fmt.Fprintf(w, "      - uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n", GitHubUploadAction, artifact.Name, path)
+	fmt.Fprintf(w, "      - uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n", actions.Upload, artifact.Name, path)
 }

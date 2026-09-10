@@ -50,7 +50,6 @@ func newApp() *cli.App {
 			hideCommand(cmdVerify()),
 			hideCommand(cmdPublish()),
 			cmdCatalog(),
-			hideCommand(cmdActions()),
 			cmdRelease(),
 			hideCommand(cmdProfile()),
 			hideCommand(cmdFactory()),

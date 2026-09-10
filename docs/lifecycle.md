@@ -24,8 +24,9 @@ artifacts before it is usable by a downstream system. NKD does not provision or 
 
 The [local Environment](../definitions/nke-v1/environment-local.yaml) supplies execution settings and a local
 registry destination. The [GitHub Environment](../definitions/nke-v1/environment-github.yaml) supplies the
-corresponding hosted-run settings. Environments own signing tools and credential references; output-affecting
-recipe tools remain part of build identity.
+corresponding hosted-run settings. Environments own the publication namespace, credentials and signing identity policy. Catalog sources and
+locks own tool versions and byte pins; Definition selects the scanner, signer and generators by name.
+Output-affecting recipe tools remain part of build identity.
 
 A destination or signing-setting change can change the prepared execution and generated workflow while
 preserving Recipe identity. A dry-run signing mode records intended operations and never supplies a signature.
@@ -129,7 +130,7 @@ package consumer
 import (
 	"context"
 
-	client "github.com/nhensley/nkdctl/client/v1"
+	client "github.com/NVIDIA/nke-recipes/client/v1"
 )
 
 func configuredClient(cosignPath, cosignDigest string) *client.Client {

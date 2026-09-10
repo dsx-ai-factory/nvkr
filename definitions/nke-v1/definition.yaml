@@ -1,36 +1,42 @@
 apiVersion: nkd.dev/definition/v2
-kind: Definition
-metadata:
-  name: nke-v1
-  description: Build the NKE CLI, CWE runtime image and quickstart Helm bundle from pinned source.
 catalog:
   base: ./catalog
-recipes:
-  - name: nke-cli
-    criteria:
-      category: operations
-      k8sVersion: 1.36.0
-      os: ubuntu
-      arch: amd64
-  - name: nke-control-plane
-    criteria:
-      category: platform-services
-      k8sVersion: 1.36.0
-      os: ubuntu
-      arch: amd64
+cosignTool: cosign
+kind: Definition
+metadata:
+  description: Build the NKE CLI, CWE runtime image and quickstart Helm bundle from
+    pinned source.
+  name: nke-v1
 outputs:
-  - name: cwe
-    recipe: nke-control-plane
-    components: [cwe]
-    format: oci
-  - name: nke-helm
-    recipe: nke-control-plane
-    components: [nke-helm]
-    format: helm-oci
-    helm:
-      imageOutput: cwe
-      chart: 007-controller
-  - name: nkectl
-    recipe: nke-cli
-    components: [nkectl]
-    format: executable
+- components:
+  - cwe
+  format: oci
+  name: cwe
+  recipe: nke-control-plane
+- components:
+  - nke-helm
+  format: helm-oci
+  helm:
+    chart: 007-controller
+    imageOutput: cwe
+  name: nke-helm
+  recipe: nke-control-plane
+- components:
+  - nkectl
+  format: executable
+  name: nkectl
+  recipe: nke-cli
+recipes:
+- criteria:
+    arch: amd64
+    category: operations
+    k8sVersion: 1.36.0
+    os: ubuntu
+  name: nke-cli
+- criteria:
+    arch: amd64
+    category: platform-services
+    k8sVersion: 1.36.0
+    os: ubuntu
+  name: nke-control-plane
+sbomTool: syft

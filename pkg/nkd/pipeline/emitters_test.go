@@ -418,7 +418,7 @@ func TestPinnedHelperImageSkipsBootstrap(t *testing.T) {
 			return GitLab{RunnerDigest: runner, Verify: verify, HelperImage: img}.Render(context.Background(), g, digest)
 		}},
 		{"github", func() ([]byte, error) {
-			return GitHub{RunnerDigest: runner, Verify: verify, HelperImage: img}.Render(context.Background(), g, digest)
+			return GitHub{Actions: testActionPins(), RunnerDigest: runner, Verify: verify, HelperImage: img}.Render(context.Background(), g, digest)
 		}},
 	} {
 		b, err := tc.render()
@@ -460,7 +460,7 @@ func TestGitHubRendersExtensionOverlayHooks(t *testing.T) {
 	g := prebuiltEmitterGraph()
 	digest := graphDigest(t, g)
 	ext := &Extensions{PreBuild: []string{"echo pre"}, PostVerify: []string{"echo post"}}
-	b, err := (GitHub{Ext: ext, RunnerDigest: "sha256:" + strings.Repeat("a", 64), Verify: testVerificationConfig()}).Render(context.Background(), g, digest)
+	b, err := (GitHub{Actions: testActionPins(), Ext: ext, RunnerDigest: "sha256:" + strings.Repeat("a", 64), Verify: testVerificationConfig()}).Render(context.Background(), g, digest)
 	if err != nil {
 		t.Fatalf("Model-B GitHub prebuilt render failed: %v", err)
 	}

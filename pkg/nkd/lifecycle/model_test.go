@@ -104,11 +104,7 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	changed := environment
-	changed.Destinations = make(map[string]Destination, len(environment.Destinations))
-	for name, destination := range environment.Destinations {
-		changed.Destinations[name] = destination
-	}
-	changed.Destinations["local-registry"] = Destination{Kind: factory.TargetOCI, Ref: "registry.example.test/other:v1", Anonymous: true}
+	changed.Publication = &Publication{RepositoryPrefix: "registry.example.test/other", Anonymous: true}
 	changedDigest, err := changed.Digest()
 	if err != nil {
 		t.Fatal(err)
@@ -117,51 +113,24 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 		t.Fatal("definition and environment identities were not independently domain-separated")
 	}
 	signingEnvironment := environment
-	signingEnvironment.Tools = make(map[string]Tool, len(environment.Tools)+1)
-	for name, tool := range environment.Tools {
-		signingEnvironment.Tools[name] = tool
-	}
-	signingEnvironment.Tools["cosign"] = Tool{Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz",
-		ArchiveDigest: "sha256:" + repeat("3", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + repeat("4", 64)}
-	signingEnvironment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^builder$", Issuer: "issuer", CosignTool: "cosign"}
+	signingEnvironment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^builder$", Issuer: "issuer"}
 	signingDigest, err := signingEnvironment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	signingEnvironment.Tools["cosign"] = Tool{Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz",
-		ArchiveDigest: "sha256:" + repeat("3", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + repeat("5", 64)}
+	changedSigner := *signingEnvironment.Signing
+	changedSigner.Identity = "^another-builder$"
+	signingEnvironment.Signing = &changedSigner
 	changedSigningDigest, err := signingEnvironment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if signingDigest == changedSigningDigest {
-		t.Fatal("changing an Environment-owned signing executable did not change Environment identity")
+		t.Fatal("signer policy did not change Environment identity")
 	}
 	definitionDigestAgain, err := definition.Digest()
 	if err != nil || definitionDigestAgain != definitionDigest {
 		t.Fatal("changing an environment perturbed definition identity")
-	}
-	aiDefinitionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "testdata", "examples", "ai-factory", "definition.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	aiDefinition, err := LoadDefinition(context.Background(), aiDefinitionPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	aiDigest, err := aiDefinition.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	tool := aiDefinition.Tools["aicr-v0.18.0"]
-	tool.ExecutableDigest = "sha256:" + repeat("6", 64)
-	aiDefinition.Tools["aicr-v0.18.0"] = tool
-	changedAICRDigest, err := aiDefinition.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if aiDigest == changedAICRDigest {
-		t.Fatal("changing a Definition-owned output tool did not change Definition identity")
 	}
 	base, err := catalog.LoadContext(context.Background(), catalog.Dir(filepath.Join(filepath.Dir(definitionPath), "catalog")))
 	if err != nil {
@@ -212,41 +181,7 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 	if firstPlanDigest == secondPlanDigest {
 		t.Fatal("environment destination did not change prepared plan identity")
 	}
-	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(definitionPath)))
-	aiEnvironmentPath := filepath.Join(repoRoot, "testdata", "examples", "ai-factory", "environment-local.yaml")
-	aiEnvironment, err := LoadEnvironment(context.Background(), aiEnvironmentPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(repoRoot)
-	baseAIDefinition, err := LoadDefinition(context.Background(), "testdata/examples/ai-factory/definition.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	baseAIPlan, err := Compile(context.Background(), "testdata/examples/ai-factory/definition.yaml", baseAIDefinition,
-		"testdata/examples/ai-factory/environment-local.yaml", aiEnvironment, "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	changedAIPlan, err := Compile(context.Background(), "testdata/examples/ai-factory/definition.yaml", aiDefinition,
-		"testdata/examples/ai-factory/environment-local.yaml", aiEnvironment, "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	baseRecipe, changedRecipe := "", ""
-	for _, recipePlan := range baseAIPlan.Recipes {
-		if recipePlan.Name == "h100-runtime" {
-			baseRecipe = recipePlan.RecipeDigest
-		}
-	}
-	for _, recipePlan := range changedAIPlan.Recipes {
-		if recipePlan.Name == "h100-runtime" {
-			changedRecipe = recipePlan.RecipeDigest
-		}
-	}
-	if baseRecipe == "" || changedRecipe == "" || baseRecipe == changedRecipe {
-		t.Fatal("changing a Definition-owned AICR tool did not change the resolved Recipe identity")
-	}
+
 }
 
 func TestLifecyclePlanRejectsPartialPublicIdentityPair(t *testing.T) {
@@ -286,7 +221,7 @@ func TestLowerDerivesExecutableEnvelopeAndRoute(t *testing.T) {
 		definition.Packages[1].Kind != factory.PackageOCI {
 		t.Fatalf("derived packages = %#v", definition.Packages)
 	}
-	if len(delivery.Routes) != 1 || delivery.Routes[0] != (factory.Route{Name: "cli", Input: "package/cli-release", Target: "registry"}) {
+	if len(delivery.Routes) != 1 || delivery.Routes[0] != (factory.Route{Name: "cli", Input: "package/cli-release", Target: "cli"}) {
 		t.Fatalf("derived routes = %#v", delivery.Routes)
 	}
 }
@@ -359,8 +294,7 @@ func testDefinition(t *testing.T) Definition {
 func testEnvironment() Environment {
 	return Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "test"},
 		UtilityContainer: "golang@sha256:" + repeat("1", 64), UtilityPlatform: "linux/amd64",
-		Destinations: map[string]Destination{"registry": {Kind: factory.TargetOCI, Ref: "registry.example.test/product:v1", Anonymous: true}},
-		Publish:      map[string]string{"cli": "registry"}}
+		Publication: &Publication{RepositoryPrefix: "registry.example.test/product", Anonymous: true}}
 }
 
 func repeat(value string, count int) string {

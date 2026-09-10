@@ -92,7 +92,7 @@ func TestObserveAPTRejectsSubstitutedProducerBytes(t *testing.T) {
 	definition.Clusters = nil
 	definition.Outputs[0].Format = OutputAPT
 	definition.Outputs[0].APT = &APTOutput{Distribution: "stable", Component: "main"}
-	environment.Publish, environment.Destinations = nil, nil
+	environment.Publication = nil
 	plan, err := Compile(ctx, "definition.yaml", definition, "environment.yaml", environment, "test")
 	if err != nil {
 		t.Fatal(err)

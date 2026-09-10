@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -315,8 +316,16 @@ func cmdBundleWithProfileVerifier(profileVerifier trust.DocumentVerifier) *cli.C
 			data := c.String("data")
 			// Inject only the runner digest derived from the authenticated profile
 			// receipt above. The graph's prebuilt artifact identity remains profile-free.
+			var actions map[string]catalog.ActionPin
+			if eng == "github" {
+				cat, err := catalog.LoadContext(c.Context, providerFor(c))
+				if err != nil {
+					return err
+				}
+				actions = cat.Actions
+			}
 			emitters := map[string]pipeline.Emitter{
-				"github": pipeline.GitHub{Data: data, RunnerDigest: runnerDigest, Verify: verify},
+				"github": pipeline.GitHub{Actions: actions, Data: data, RunnerDigest: runnerDigest, Verify: verify},
 				"gitlab": pipeline.GitLab{Data: data, RunnerDigest: runnerDigest, Verify: verify},
 				"tekton": pipeline.Tekton{Data: data, RunnerDigest: runnerDigest, Verify: verify},
 				"argo":   pipeline.Argo{Data: data, RunnerDigest: runnerDigest, Verify: verify},
@@ -2315,7 +2324,7 @@ func cmdCatalog() *cli.Command {
 			},
 			{
 				Name:      "pin",
-				Usage:     "resolve a source's tag to a full pin (commit/tree/epoch) and write the lock",
+				Usage:     "resolve a source tag and any declared tool asset to exact pins, then write the lock",
 				ArgsUsage: "<source>",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "tag", Usage: "tag to pin (default: newest matching the source constraint)"},
@@ -2326,7 +2335,7 @@ func cmdCatalog() *cli.Command {
 			},
 			{
 				Name:      "bump",
-				Usage:     "pin the newest tag matching each source's constraint (for scheduled CI)",
+				Usage:     "pin the newest constraint-matching source releases, including declared tool assets",
 				ArgsUsage: "[source...]",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{Name: "all", Usage: "bump every source"},
@@ -2416,7 +2425,7 @@ func pinSources(c *cli.Context, bump bool) error {
 		if err != nil {
 			return err
 		}
-		if prev == pin {
+		if reflect.DeepEqual(prev, pin) {
 			fmt.Printf("  %s: already at %s (%s)\n", name, pin.Tag, pin.Commit[:12])
 			continue
 		}

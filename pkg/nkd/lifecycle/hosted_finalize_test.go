@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
+	"sigs.k8s.io/yaml"
 )
 
 func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *testing.T) {
@@ -62,11 +64,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	definition.Catalog.Base = filepath.Join(repo, "definitions", "nke-v1", "catalog")
 	definitionPath = filepath.ToSlash(filepath.Join(caseRoot, "definition.json"))
 	writeCanonicalTestFile(t, definitionPath, definition)
-	environment.Publish = map[string]string{"nkectl": environment.Publish["nkectl"]}
-	pin := "sha256:" + strings.Repeat("1", 64)
-	environment.Signing.Mode, environment.Signing.CosignTool = factory.SigningModeCosign, "cosign"
-	environment.Tools["cosign"] = Tool{Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
-		ExecutablePath: "cosign", ExecutableDigest: pin}
+	environment.Signing.Mode = factory.SigningModeCosign
 	environmentPath := filepath.ToSlash(filepath.Join(caseRoot, "environment.json"))
 	writeCanonicalTestFile(t, environmentPath, environment)
 	plan, err := Compile(ctx, definitionPath, definition, environmentPath, environment, "test")
@@ -127,7 +125,7 @@ func TestFinalizeGeneratedRequiresExactStaticHostedEvidenceClosure(t *testing.T)
 			t.Chdir(t.TempDir())
 			definition, environment := testDefinition(t), testEnvironment()
 			definition.Clusters = nil
-			environment.Publish, environment.Destinations, environment.Signing = nil, nil, nil
+			environment.Publication, environment.Signing = nil, nil
 			writeCanonicalTestFile(t, "definition.json", definition)
 			writeCanonicalTestFile(t, "environment.json", environment)
 			plan, err := CompileFiles(ctx, "definition.json", "environment.json", "test")
@@ -237,10 +235,8 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 	t.Chdir(t.TempDir())
 	definition, environment := testDefinition(t), testEnvironment()
 	definition.Clusters = nil
-	pin := "sha256:" + strings.Repeat("1", 64)
-	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^builder$", Issuer: "issuer", CosignTool: "cosign"}
-	environment.Tools = map[string]Tool{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
-		ExecutablePath: "cosign", ExecutableDigest: pin}}
+	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^builder$", Issuer: "issuer"}
+	addTestSigningTool(t, &definition)
 	writeCanonicalTestFile(t, "definition.json", definition)
 	writeCanonicalTestFile(t, "environment.json", environment)
 	plan, err := CompileFiles(ctx, "definition.json", "environment.json", "test")
@@ -291,7 +287,7 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	reference := "registry.example.test/product@" + envelope.RootDigest
+	reference := "registry.example.test/product/cli@" + envelope.RootDigest
 	if err := os.MkdirAll(filepath.Dir(artifacts["publication/cli"].Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -382,4 +378,41 @@ func writeCanonicalTestFile(t *testing.T, path string, value any) {
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func addTestSigningTool(t *testing.T, definition *Definition) {
+	t.Helper()
+	// Use a private fixture catalog; no source tree or real lock is changed.
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS(definition.Catalog.Base)); err != nil {
+		t.Fatal(err)
+	}
+	definition.Catalog.Base = dir
+	registryPath := filepath.Join(dir, "registry.yaml")
+	raw, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registry map[string]any
+	if err := yaml.UnmarshalStrict(raw, &registry); err != nil {
+		t.Fatal(err)
+	}
+	registry["sources"].(map[string]any)["cosign"] = map[string]any{"repo": "https://example.test/cosign", "tool": map[string]any{"format": "raw", "url": "https://example.test/{{.Tag}}/cosign", "platform": "linux/amd64", "executablePath": "cosign"}}
+	encoded, err := yaml.Marshal(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(registryPath, encoded, 0600); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := catalog.LoadLockContext(t.Context(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := "sha256:" + strings.Repeat("1", 64)
+	lock.Pins["cosign"] = catalog.Pin{Tag: "v1.0.0", Commit: strings.Repeat("1", 40), TreeHash: strings.Repeat("2", 40), SourceDateEpoch: 1, Tool: &catalog.ToolPin{Format: "raw", URL: "https://example.test/v1.0.0/cosign", Platform: "linux/amd64", ExecutablePath: "cosign", ArchiveDigest: pin, ExecutableDigest: pin}}
+	if err := catalog.WriteLockContext(t.Context(), dir, lock); err != nil {
+		t.Fatal(err)
+	}
+	definition.CosignTool = "cosign"
 }

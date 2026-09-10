@@ -24,6 +24,10 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 		return e.New(e.CodeInvalidCatalog, "GitHub lifecycle finalizer requires at least one carrier")
 	}
 
+	actions, err := resolveGitHubActions(plan.Actions)
+	if err != nil {
+		return err
+	}
 	type carrier struct {
 		artifact Artifact
 		name     string
@@ -66,7 +70,7 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 	var rendered bytes.Buffer
 	fmt.Fprintln(&rendered, "      - name: Prepare artifact recovery\n        run: mkdir -p .nkd/restore-outcomes")
 	fmt.Fprintf(&rendered, "      - name: Download artifacts and evidence\n        uses: %s\n        continue-on-error: true\n        with:\n          pattern: %s\n          path: .nkd/carriers\n          merge-multiple: 'true'\n",
-		githubDownloadAction, yamlSingle(pattern))
+		actions.Download, yamlSingle(pattern))
 	for _, carrier := range carriers {
 		status := filepath.ToSlash(HostedRestoreOutcomePath(".nkd/factory", carrier.artifact.ID))
 		fmt.Fprintf(&rendered, "      - name: %s\n        run: |\n          if [ '${{ needs.%s.result }}' != 'success' ]; then printf 'job-failed\\n' > %s; elif [ ! -f %s ]; then printf 'missing\\n' > %s; elif ./nkd-exec transport-unpack --archive %s --root . --path %s; then printf 'restored:success\\n' > %s; else printf 'restore-failed\\n' > %s; fi\n",

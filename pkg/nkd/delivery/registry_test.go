@@ -10,10 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
-	"github.com/google/go-containerregistry/pkg/registry"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/google/go-containerregistry/pkg/registry"
 )
 
 func registryPublicationFixture(t *testing.T) (string, Result) {
@@ -149,5 +150,35 @@ func assertRegistryCode(t *testing.T, err error, want e.Code) {
 	var coded *e.Error
 	if !errors.As(err, &coded) || coded.Code != want {
 		t.Fatalf("error=%v, want %s", err, want)
+	}
+}
+
+func TestDigestOnlyPublicationNeverWritesATag(t *testing.T) {
+	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+	var mu sync.Mutex
+	var tagWrites []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/manifests/") && !strings.Contains(r.URL.Path, "/manifests/sha256:") {
+			mu.Lock()
+			tagWrites = append(tagWrites, r.URL.Path)
+			mu.Unlock()
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+	layout, result := registryPublicationFixture(t)
+	repository := strings.TrimPrefix(server.URL, "http://") + "/product/tool"
+	ref, err := Push(t.Context(), layout, repository, RegistryOptions{PlainHTTP: true, Anonymous: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if ref != repository+"@"+result.RootDigest || len(tagWrites) != 0 {
+		t.Fatalf("ref=%s tag writes=%v", ref, tagWrites)
+	}
+	inspection, err := Pull(t.Context(), ref, filepath.Join(t.TempDir(), "pulled"), RegistryOptions{PlainHTTP: true, Anonymous: true})
+	if err != nil || inspection.RootDigest != result.RootDigest {
+		t.Fatalf("digest-only round trip: %v", err)
 	}
 }

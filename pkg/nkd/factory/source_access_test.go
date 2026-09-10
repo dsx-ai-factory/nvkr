@@ -21,7 +21,7 @@ func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 		t.Fatal("test plan has no fetch source")
 	}
 	plan.ExecutionSettings.SourceAccess = map[string]SourceAccess{source: {
-		Mirror: "https://github.com/njhensley/nke", CredentialRef: "github:NKE_SOURCE_TOKEN",
+		Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
 	}}
 	digest, err := plan.ExecutionSettings.Digest()
 	if err != nil {
@@ -44,7 +44,7 @@ func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 	}
 
 	plan.ExecutionSettings.SourceAccess = map[string]SourceAccess{"https://github.com/unknown/source": {
-		Mirror: "https://github.com/njhensley/nke", CredentialRef: "github:NKE_SOURCE_TOKEN",
+		Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
 	}}
 	digest, err = plan.ExecutionSettings.Digest()
 	if err != nil {

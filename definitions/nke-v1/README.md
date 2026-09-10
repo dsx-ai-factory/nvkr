@@ -46,8 +46,8 @@ export GIT_CONFIG_VALUE_0="https://github.com/NVIDIA/nke"
 ```
 
 The attempt record is `.nkd/runs/<attempt>/lifecycle.json`. It records all three frozen expected outputs and
-their independently reopened payload observations. A dry-run signing Environment remains `static-unqualified`;
-it does not create a verified Release capability. The CLI and source-chart archive builds are offline. CWE
+their independently reopened payload observations. Planning with dry-run signing is `static-unqualified`; executed local Run records use
+`unqualified-local-execution`. Neither creates a verified Release capability. The CLI and source-chart archive builds are offline. CWE
 uses the pinned rootless BuildKit image with network access for the upstream Dockerfile's base images and
 Alpine packages; this wrapped build does not claim hermeticity or exact image reproduction. The Docker host
 must support unprivileged overlayfs (Linux 5.11+ or an Ubuntu kernel); native snapshot fallback is disabled
@@ -55,8 +55,8 @@ because full-tree copies can exhaust hosted-runner disk space.
 
 ## Dependency SBOMs
 
-Both Environments enable dependency inspection with `sbomTool: syft`, acquired using exact archive and executable
-digests. The CLI and image SBOMs inventory packages discovered in their produced bytes. The Helm SBOM inventories
+The Definition enables dependency inspection with `sbomTool: syft`; the catalog lock supplies exact archive
+and executable digests shared by both Environments. The CLI and image SBOMs inventory packages discovered in their produced bytes. The Helm SBOM inventories
 bundled chart metadata and external chart references. See [dependency SBOMs](../../docs/dependency-sboms.md) for
 scope, limits and offline checks on actual artifacts. These populated documents supersede the source-metadata-only
 SBOMs emitted by earlier runs; existing signed publications are not modified.
@@ -74,12 +74,12 @@ generation. Upstream chart `version` and `appVersion` metadata are preserved; th
 release version. The source commit and the bound image digest identify this packaged snapshot.
 
 After verifying and extracting the Release, supply its CWE repository as `image.repository` in deployment
-values. For this GitHub Environment that repository is `ghcr.io/njhensley/nke-recipes/cwe`. For example, rendering
+values. For this GitHub Environment that repository is `ghcr.io/nvidia/nke-recipes/cwe`. For example, rendering
 the extracted controller chart uses:
 
 ```sh
 helm template controller ./helm/007-controller \
-  --set-string image.repository=ghcr.io/njhensley/nke-recipes/cwe
+  --set-string image.repository=ghcr.io/nvidia/nke-recipes/cwe
 ```
 
 The immutable digest is embedded in the template; overriding `image.digest` cannot change it. The default
@@ -119,15 +119,42 @@ Repin only through `nkdctl catalog pin`; never hand-edit the lock. Regenerate CI
 
 The committed generated workflow is `.github/workflows/nkd-run.yml`, with exact inputs under
 `.github/nkd-run/`. Pull requests check regeneration only. To execute, dispatch the workflow on the default
-branch. The GitHub Environment targets the `nkectl`, `cwe` and `helm` repositories under
-`ghcr.io/njhensley/nke-recipes` and uses the
+branch. The GitHub Environment targets the `nkectl`, `cwe` and `nke-helm` repositories under
+`ghcr.io/nvidia/nke-recipes` and uses the
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
 environment `nkd-release` with a deployment branch policy admitting only `main`. Registry access and NKE source
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
 [implementation/evidence record](../../docs/adr/reconciliation.md).
 
-The GitHub Environment fetches the canonical `NVIDIA/nke` source through the private `njhensley/nke` fork.
+The GitHub Environment fetches pinned source directly from the internal `NVIDIA/nke` repository.
 Its `sourceAccess` entry references the repository Actions secret `NKE_SOURCE_TOKEN`, which must grant
-read-only Contents access to that fork. Only the matching fetch step receives the token; Git configuration
+read-only Contents access to `NVIDIA/nke`. Only the matching fetch step receives the token; Git configuration
 is process-local, and the pinned commit/tree checks remain mandatory. The local Environment continues to
 use the existing command-scoped mirror override described above.
+
+## Catalog tools and publication
+
+`sbomTool: syft` and `cosignTool: cosign` select catalog sources. Their release declarations live in
+`catalog/registry.yaml`; `catalog/pins.lock.yaml` binds source and executable bytes. Update through:
+
+```sh
+nkdctl catalog pin --dir definitions/nke-v1/catalog --tag v1.51.1 syft
+nkdctl catalog bump --dir definitions/nke-v1/catalog syft cosign
+```
+
+Regenerate the workflow after changing the lock. Each Environment configures one
+`publication.repositoryPrefix`; repositories derive from Definition output names. Publication writes the
+root by digest and records `<prefix>/<output>@sha256:…`. No mutable tag is updated automatically.
+
+## GitHub action pins
+
+Workflow dependencies are catalog sources with `kind: github-action`. Their constraints select supported
+release lines; their exact commits are in the same lock as NKE and tool pins.
+
+```sh
+nkdctl catalog bump --dir definitions/nke-v1/catalog --check checkout download-artifact setup-go upload-artifact
+nkdctl catalog bump --dir definitions/nke-v1/catalog checkout download-artifact setup-go upload-artifact
+```
+
+Regenerate the Run workflow after applying an update. No generator rebuild is needed. The adapter rejects
+missing pins, unexpected action repositories and unsupported major versions before producing a workflow.

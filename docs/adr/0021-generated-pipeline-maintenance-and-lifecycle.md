@@ -81,13 +81,14 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
 - A scheduled job runs bump → regeneration → build → verification → PR. Qualified changes require reproduction; v1 production uses its explicit evidence contract. Merge to the default branch is the v1 release decision (ADR-16), without a reproduction claim. Scheduled automation and release-manifest issuance remain deferred. Regeneration is a reviewable diff.
 
 
-GitHub action pins are maintained by `nkdctl actions bump`. An explicit `--track NAME=vN` selects a new
-major release line; ordinary bumps stay on each recorded line. Unknown actions, malformed or duplicate
-overrides, and overrides excluded by `--only` fail before resolution. Track-only changes still update the
-machine-managed lock even when the resolved commit is unchanged. After a bump, rebuild the generator and
-regenerate the committed Run workflow in the same change. Handwritten repository CI pins are reviewed
-alongside the shared lock. Native action runtime declarations and transport behavior require external checks;
-a commit pin alone does not establish compatibility.
+GitHub actions are catalog sources with `kind: github-action`. The registry owns the GitHub repository
+and semver constraint; `catalog pin` and `catalog bump` write exact release commits into the source lock.
+The resolved catalog snapshot and generated Run bind those pins. Regenerate after bumping; the generator
+binary does not need rebuilding. Both GitHub adapters require their supported repositories and major versions
+before emitting bytes. Missing pins, mutable refs, and unsupported interfaces fail closed. Handwritten
+repository CI has its own reviewed action pins; it is not part of the generated product Run.
+Native action runtime declarations and transport behavior require external checks; a commit pin alone does
+not establish compatibility.
 
 ### 4. Deferred customization: extension overlay and callable form
 

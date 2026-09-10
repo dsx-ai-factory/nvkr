@@ -2,6 +2,24 @@
 apiVersion: nkd.dev/lock/v1
 kind: PinLock
 pins:
+  aicr:
+    commit: 1439f2fc5db27e6bb9ef3d73e8f8afca45a32126
+    goVersion: 1.26.5
+    sourceDateEpoch: 1784827036
+    tag: v0.18.0
+    tool:
+      archiveDigest: sha256:6a498b8ce0dcb0e28095de35cdae583391ad567f3922aae6657c851cc76275ee
+      executableDigest: sha256:50287efe53d4b0aeb5c36c7ef792b4039509ae8f0ff5078d48369c09305a676f
+      executablePath: aicr
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/NVIDIA/aicr/releases/download/v0.18.0/aicr_0.18.0_linux_amd64.tar.gz
+    treeHash: 834b35d0485dfacc918c4ec9887ef327badde52e
+  checkout:
+    commit: 3d3c42e5aac5ba805825da76410c181273ba90b1
+    sourceDateEpoch: 1784313911
+    tag: v7.0.1
+    treeHash: 150e70ecad5ebf06a559a01ea3a56d9a3236d2b1
   cni-plugins:
     commit: a5d507e2b884d8bd6a001c9e5a9118113ffef444
     sourceDateEpoch: 1745579928
@@ -24,6 +42,11 @@ pins:
     sourceDateEpoch: 1755762067
     tag: v1.34.0
     treeHash: 5256875f0fb92225af917d88935ebf93e6293487
+  download-artifact:
+    commit: 3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+    sourceDateEpoch: 1773243354
+    tag: v8.0.1
+    treeHash: f008da01d74dc8156ff9b1d22b2bccec8ff2ee72
   etcd:
     commit: 9f4b125405c7fbd92e2c9cbb5235feffe1904a1d
     goVersion: 1.25.12
@@ -47,3 +70,13 @@ pins:
     sourceDateEpoch: 1783988681
     tag: v1.5.1
     treeHash: 6c153ef9ab10896cd69c211fef36f66e1406e259
+  setup-go:
+    commit: b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+    sourceDateEpoch: 1784170069
+    tag: v7.0.0
+    treeHash: c5a9f59184ebebf27a466db31500c90156089f62
+  upload-artifact:
+    commit: 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+    sourceDateEpoch: 1775837312
+    tag: v7.0.1
+    treeHash: 9eac56dcf4bfeeb308ee3d0d7d49913c3d65b676

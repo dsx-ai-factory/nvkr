@@ -13,13 +13,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
+	"github.com/google/go-containerregistry/pkg/registry"
 )
 
 // fakeOCISigner records what it was asked to bind and returns exactly what the

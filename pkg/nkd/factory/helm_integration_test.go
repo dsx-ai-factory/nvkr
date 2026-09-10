@@ -64,7 +64,7 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	if raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart).CombinedOutput(); err == nil || !strings.Contains(string(raw), "set image.repository") {
 		t.Fatalf("missing repository must fail: %v\n%s", err, raw)
 	}
-	for _, repository := range []string{"ghcr.io/njhensley/nke-recipes/cwe", "mirror.example.test/cwe"} {
+	for _, repository := range []string{"ghcr.io/nvidia/nke-recipes/cwe", "mirror.example.test/cwe"} {
 		raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart, "--set-string", "image.repository="+repository,
 			"--set-string", "image.digest=sha256:"+strings.Repeat("f", 64)).CombinedOutput()
 		if err != nil {

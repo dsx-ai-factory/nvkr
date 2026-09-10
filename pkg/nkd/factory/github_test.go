@@ -57,7 +57,7 @@ func TestRenderGitHubProducesStaticallyValidCompleteBundle(t *testing.T) {
 		[]byte("qualification: " + TierStaticUnqualified.String()),
 		// The bootstrap provisions Go via the pinned setup-go action (from .go-version) rather
 		// than assuming a preinstalled toolchain.
-		[]byte("uses: " + githubSetupGoAction),
+		[]byte("uses: " + plan.Actions["setup-go"].Uses()),
 		[]byte("go-version-file: '.go-version'"),
 		// IR build/fetch nodes are isolated by the helper orchestrating their pinned
 		// container itself (ADR-18 §8), sharing the pipeline emitter's per-node primitive.
@@ -143,7 +143,7 @@ func TestRenderGitHubPreparesHelperBeforeFirstUse(t *testing.T) {
 		if strings.HasPrefix(jobID, "build-runner-") {
 			continue
 		}
-		if job.Steps[1].Uses != githubDownloadAction || job.Steps[1].With["name"] == "" {
+		if job.Steps[1].Uses != plan.Actions["download-artifact"].Uses() || job.Steps[1].With["name"] == "" {
 			t.Fatalf("job %q does not download the helper as its second step", jobID)
 		}
 		if job.Steps[2].Name != prepareHelperStepName || strings.TrimSpace(job.Steps[2].Run) != prepareHelperRun {
@@ -198,4 +198,13 @@ func TestValidateGitHubBundleRejectsLateHelperPreparation(t *testing.T) {
 	if !strings.Contains(err.Error(), prepareHelperStepName) {
 		t.Fatalf("rejection does not name the missing preparation step: %v", err)
 	}
+}
+
+func testActionRefs(t *testing.T, plan *Plan) githubActionRefs {
+	t.Helper()
+	refs, err := resolveGitHubActions(plan.Actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return refs
 }

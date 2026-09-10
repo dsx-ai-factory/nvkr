@@ -17,7 +17,9 @@ Its declared builder mode distinguishes offline compilation from wrapped upstrea
 _Avoid_: Product definition, run, release
 
 **Environment**:
-Separately selected execution, publication, credential-reference, and signing settings for producing a Definition's outputs.
+Separately selected execution settings, publication namespace, credential references, and signing identity policy.
+Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
+are also catalog dependencies; the workflow adapter consumes their locked commits.
 _Avoid_: Delivery profile, recipe, build identity
 
 **Run**:

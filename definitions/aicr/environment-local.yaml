@@ -2,13 +2,9 @@ apiVersion: nkd.dev/environment/v1
 kind: Environment
 metadata:
   name: laptop-aicr
+publication:
+  anonymous: true
+  plainHTTP: true
+  repositoryPrefix: 127.0.0.1:5001/nke
 utilityContainer: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
 utilityPlatform: linux/amd64
-destinations:
-  aicr-registry:
-    kind: oci
-    ref: 127.0.0.1:5001/nke/aicr:h100
-    anonymous: true
-    plainHTTP: true
-publish:
-  gpu-runtime: aicr-registry

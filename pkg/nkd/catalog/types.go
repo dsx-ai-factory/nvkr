@@ -36,8 +36,10 @@ type Metadata struct {
 // source's .go-version at the pinned tag, so the toolchain tracks the Go version a
 // bump requires without a hand edit (ADR-22 §2).
 type Source struct {
-	Repo       string `json:"repo"`
-	Constraint string `json:"constraint,omitempty"` // semver range for `bump`, e.g. 1.32.x
+	Kind       string      `json:"kind,omitempty"` // github-action for hosted workflow dependencies; empty for build sources
+	Tool       *ToolSource `json:"tool,omitempty"`
+	Repo       string      `json:"repo"`
+	Constraint string      `json:"constraint,omitempty"` // semver range for `bump`, e.g. 1.32.x
 	// TagPrefix is the module-scoped tag prefix a monorepo publishes its releases under
 	// (e.g. "cli/" for github.com/NVIDIA/nke's cli/v0.1.0-rc.2). When set, `catalog pin`
 	// resolves refs/tags/<prefix><tag>, `catalog bump` considers ONLY tags carrying the
@@ -60,12 +62,13 @@ type Source struct {
 // GoVersion and ToolchainImage are populated when the source resolves its toolchain
 // from .go-version.
 type Pin struct {
-	Tag             string `json:"tag"`
-	Commit          string `json:"commit"`
-	TreeHash        string `json:"treeHash"`
-	SourceDateEpoch int64  `json:"sourceDateEpoch"`
-	GoVersion       string `json:"goVersion,omitempty"`
-	ToolchainImage  string `json:"toolchainImage,omitempty"`
+	Tool            *ToolPin `json:"tool,omitempty"`
+	Tag             string   `json:"tag"`
+	Commit          string   `json:"commit"`
+	TreeHash        string   `json:"treeHash"`
+	SourceDateEpoch int64    `json:"sourceDateEpoch"`
+	GoVersion       string   `json:"goVersion,omitempty"`
+	ToolchainImage  string   `json:"toolchainImage,omitempty"`
 }
 
 // ArtifactPin is the machine-managed digest pin for a prebuilt component in the
@@ -246,6 +249,8 @@ func (r Recipe) compositionFields() []string {
 // optional composition store (base/overlays/mixins, AICR-style): when present the
 // catalog resolves recipes by composing layers instead of matching a flat recipe.
 type Catalog struct {
+	Actions    map[string]ActionPin
+	Tools      map[string]ToolPin
 	APIVersion string
 	Kind       string
 	Metadata   Metadata

@@ -360,6 +360,17 @@ func ResolvePin(ctx context.Context, src Source, tag string) (Pin, error) {
 	if err := pinContextError(ctx); err != nil {
 		return Pin{}, err
 	}
+	if src.Tool != nil {
+		if err := validateToolSource(*src.Tool); err != nil {
+			return Pin{}, err
+		}
+	}
+	if err := validateSourceKind(src); err != nil {
+		return Pin{}, err
+	}
+	if src.Kind == SourceGitHubAction && !actionVersion.MatchString(tag) {
+		return Pin{}, e.New(e.CodeInvalidCatalog, "GitHub actions require an exact release tag, got %q", tag)
+	}
 	tag = src.QualifiedTag(tag)
 	commit, err := resolveTagCommit(ctx, src.Repo, tag)
 	if err != nil {
@@ -416,6 +427,13 @@ func ResolvePin(ctx context.Context, src Source, tag string) (Pin, error) {
 			return Pin{}, err
 		}
 		pin.ToolchainImage = dig
+	}
+	if src.Tool != nil {
+		tool, err := resolveToolPin(ctx, *src.Tool, pin)
+		if err != nil {
+			return Pin{}, err
+		}
+		pin.Tool = &tool
 	}
 	return pin, nil
 }

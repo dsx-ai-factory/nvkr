@@ -1,7 +1,31 @@
 apiVersion: nkd.dev/catalog/v1
+components: {}
 kind: SourceBuildRegistry
 metadata:
-  name: nke-aicr
   description: Pinned AICR profile for the NKE accelerated runtime output.
-sources: {}
-components: {}
+  name: nke-aicr
+sources:
+  checkout:
+    kind: github-action
+    repo: https://github.com/actions/checkout
+    constraint: 7.x
+  download-artifact:
+    kind: github-action
+    repo: https://github.com/actions/download-artifact
+    constraint: 8.x
+  setup-go:
+    kind: github-action
+    repo: https://github.com/actions/setup-go
+    constraint: 7.x
+  upload-artifact:
+    kind: github-action
+    repo: https://github.com/actions/upload-artifact
+    constraint: 7.x
+  aicr:
+    constraint: 0.18.x
+    repo: https://github.com/NVIDIA/aicr
+    tool:
+      executablePath: aicr
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_amd64.tar.gz

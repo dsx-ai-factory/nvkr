@@ -26,7 +26,7 @@ nkdctl run generate \
   --engine github --root .nkd/ai-factory-github
 ```
 
-The adjacent `catalog/` contains only the pinned AICR profile. Multi-output worker and cluster compiler fixtures live under `testdata/examples/`; the NKE OS-image build owns the worker payload.
+The adjacent `catalog/` contains the AICR profile and the generator source/lock pin. Multi-output worker and cluster compiler fixtures live under `testdata/examples/`; the NKE OS-image build owns the worker payload.
 
 Local admission without output is also available:
 
@@ -37,4 +37,9 @@ nkdctl run local \
   --attempt aicr-check --dry-run
 ```
 
-Local results are `static-unqualified`; verified Release consumption requires a digest-pinned reference, an explicit pipeline artifact-publication Verification Policy, and real signature plus provenance verification.
+Plans are `static-unqualified`; executed local Run records use `unqualified-local-execution`. Verified Release consumption requires a digest-pinned reference, an explicit pipeline artifact-publication Verification Policy, and real signature plus provenance verification.
+
+The Definition selects `aicrGenerator: aicr`. Update its release through
+`nkdctl catalog bump --dir definitions/aicr/catalog aicr`, then regenerate. Each Environment supplies one
+publication prefix; the generated repository is `<prefix>/gpu-runtime`, published by digest without an
+automatic version or channel tag.
