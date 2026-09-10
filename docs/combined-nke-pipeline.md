@@ -168,3 +168,19 @@ select Docker explicitly. Plan validation rejects incompatible BuildKit runtime 
 the regression test checks Docker emission and rejection of Podman/default settings. The refreshed full gate
 passed (64.2% coverage), with actionlint and yamllint. The corrected plan digest is
 `sha256:6a99ce1837a0b3d059993478c56b2285ec20bb47b74cf1df4bd9f96f1592427a`.
+
+The first run's downloaded [failure record](evidence/2026-09-10-combined-first-failed-run.json) preserves all
+three required outputs, reports `status: failed` and `lane: static-unqualified`, and identifies the missing
+successful CWE carrier. It does not shrink the required output set to the successful CLI/Helm source builds.
+The corrected [run 34430831748](https://github.com/njhensley/nke-recipes/actions/runs/34430831748) executes
+commit `16bbddbaa5d08e4ca56a15ec8faabf7fbf491062`. All three builds passed; CWE took 8m19s and produced native
+manifest `sha256:43331f47936aab50e9566ca4b78c29c2920ce02b98f9359c57217f5354bab277`. The producer's OCI archive
+is 72,946,176 bytes with SHA-256 `6b271f2f4a01d3e8c953ae0e40578e1755d013bfab74192be539bc08e6873de1`.
+
+Control-plane terminal observation, SBOM generation and image import succeeded, but the host transport step
+could not reopen the imported layout: the Docker utility container had created its private directory as root.
+Generated Docker utility commands now select the host runner's UID/GID and `HOME=/tmp`, matching local
+execution. A real Docker Linux-volume experiment reproduced the root-owned failure and verified successful
+private-directory read/archive handoff between successive runner-owned processes. Generator tests, the full
+`make check` gate (64.2% coverage), exact generation checking, actionlint and yamllint passed before commit.
+The next hosted attempt remains pending. No publication/signing success is claimed for this run.

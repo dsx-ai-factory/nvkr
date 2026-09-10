@@ -77,3 +77,26 @@ func TestDeliveryRuntimeSourcesGeneratedRuntime(t *testing.T) {
 		t.Fatalf("ExecutionSettings runtime override to docker was not honored:\n%s", wf2)
 	}
 }
+
+func TestGitHubDockerUtilityPreservesRunnerOwnership(t *testing.T) {
+	for _, runtime := range []string{"docker", "podman"} {
+		t.Run(runtime, func(t *testing.T) {
+			plan := githubTestPlan(t)
+			plan.ExecutionSettings.Runtime.Runtime = runtime
+			digest, err := plan.ExecutionSettings.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.ExecutionSettingsDigest = digest
+			bundle, err := RenderGitHub(context.Background(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workflow := string(bundle.Files[GitHubWorkflowPath])
+			owner := `--user "$(id -u):$(id -g)" -e HOME=/tmp`
+			if strings.Contains(workflow, owner) != (runtime == "docker") {
+				t.Fatalf("utility ownership missing or applied to the wrong runtime: %s", runtime)
+			}
+		})
+	}
+}

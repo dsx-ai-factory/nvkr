@@ -353,8 +353,14 @@ func generatedNodeCommands(node Node, plan *Plan, graphDigests map[string]string
 	if node.Platform != "" {
 		platform = " --platform " + shellQuote(node.Platform)
 	}
-	return []string{fmt.Sprintf("%s run --rm --network %s%s -v \"%s:/workspace\" -w /workspace %s %s",
-		runtime, network, platform, workspaceVariable, shellQuote(node.Container), "/workspace/"+strings.TrimPrefix(command, "./"))}
+	owner := ""
+	if runtime == "docker" {
+		// Docker's container root is host root. Keep private staged layouts owned
+		// by the runner so subsequent host transport steps can reopen them.
+		owner = ` --user "$(id -u):$(id -g)" -e HOME=/tmp`
+	}
+	return []string{fmt.Sprintf("%s run --rm --network %s%s%s -v \"%s:/workspace\" -w /workspace %s %s",
+		runtime, network, platform, owner, workspaceVariable, shellQuote(node.Container), "/workspace/"+strings.TrimPrefix(command, "./"))}
 }
 
 func writeUploadStep(out *bytes.Buffer, name, path string) {

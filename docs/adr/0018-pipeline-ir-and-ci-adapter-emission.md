@@ -138,6 +138,11 @@ Isolation and the fixed environment/mount contract are identical across all engi
 - `prebuilt` nodes lower to acquire-and-digest-verify.
 - `exclusion` emits no node.
 
+Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the
+local runner's ownership contract. Private package layouts must remain reopenable by later host transport
+steps. Rootless Podman's existing user mapping is retained; the rootless BuildKit build container keeps its
+separate fixed UID and private output-promotion contract.
+
 ### 7. Terminal verify + granularity
 
 Every emitted pipeline is **job-per-component** and ends in an **unconditional terminal verify** (GitHub

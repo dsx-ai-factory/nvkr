@@ -155,7 +155,7 @@ jobs:
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/results/build-nkectl.json
       - name: 'Execute nke-cli/terminal-observe'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/terminal-observe --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/terminal-observe --workspace .nkd/factory
       - name: Pack 'observation/nke-cli'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-nke-cli.tar --root . --path .nkd/factory/nke-cli/terminal-observation.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -165,7 +165,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute nke-cli/sbom'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/sbom --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/sbom --workspace .nkd/factory
       - name: Pack 'sbom/nke-cli'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-nke-cli.tar --root . --path .nkd/factory/nke-cli/sbom
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -419,7 +419,7 @@ jobs:
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/results/build-nke-helm.json
       - name: 'Execute nke-control-plane/terminal-observe'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-control-plane/terminal-observe --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-control-plane/terminal-observe --workspace .nkd/factory
       - name: Pack 'observation/nke-control-plane'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/terminal-observation.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -429,7 +429,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute nke-control-plane/sbom'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-control-plane/sbom --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-control-plane/sbom --workspace .nkd/factory
       - name: Pack 'sbom/nke-control-plane'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/sbom
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -439,7 +439,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute package/cwe'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/cwe --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/cwe --workspace .nkd/factory
       - name: Pack 'package/cwe'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-cwe.tar --root . --path .nkd/factory/packages/cwe
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -449,7 +449,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute package/nke-helm'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nke-helm --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nke-helm --workspace .nkd/factory
       - name: Pack 'package/nke-helm'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nke-helm.tar --root . --path .nkd/factory/packages/nke-helm
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -459,7 +459,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute package/nkectl'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl --workspace .nkd/factory
       - name: Pack 'package/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nkectl.tar --root . --path .nkd/factory/packages/nkectl
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -469,7 +469,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute package/cwe-release'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/cwe-release --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/cwe-release --workspace .nkd/factory
       - name: Pack 'package/cwe-release'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-cwe-release.tar --root . --path .nkd/factory/packages/cwe-release
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -479,7 +479,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute package/nke-helm-release'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nke-helm-release --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nke-helm-release --workspace .nkd/factory
       - name: Pack 'package/nke-helm-release'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nke-helm-release.tar --root . --path .nkd/factory/packages/nke-helm-release
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -489,7 +489,7 @@ jobs:
           if-no-files-found: error
       - name: 'Execute package/nkectl-release'
         run: |
-          docker run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl-release --workspace .nkd/factory
+          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl-release --workspace .nkd/factory
       - name: Pack 'package/nkectl-release'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
