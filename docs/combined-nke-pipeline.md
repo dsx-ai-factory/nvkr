@@ -184,3 +184,28 @@ execution. A real Docker Linux-volume experiment reproduced the root-owned failu
 private-directory read/archive handoff between successive runner-owned processes. Generator tests, the full
 `make check` gate (64.2% coverage), exact generation checking, actionlint and yamllint passed before commit.
 The next hosted attempt remains pending. No publication/signing success is claimed for this run.
+
+Run [34431910080](https://github.com/njhensley/nke-recipes/actions/runs/34431910080) tests ownership-fix commit
+`00656b24e00e1bc0b2ac73b8fa5785b8fe594f06`. While it builds, an offline replay used the previous hosted run's
+successful artifact/result/observation/SBOM carriers with the current plan and helper. All six package/archive
+handoffs passed: CLI, native image, image-bound Helm, and the three derived publication envelopes. This replay
+does not authenticate a new hosted Run or publish/sign anything.
+
+The previous hosted CWE image also passed offline executable/helper/UI/license/CA checks and reported
+`cloud-workflow-engine 0.0.0-ged9fb09b04fd`. Extraction from the replayed publication payload preserved the
+image-bound Helm tree: all three local charts rendered, the controller referenced manifest `43331f47936aab50e9566ca4b78c29c2920ce02b98f9359c57217f5354bab277`,
+and all 47 checksums matched. Final acceptance still requires the live run's published subjects, signatures,
+complete Run record and independent consumption.
+
+Run `34431910080` completed all three builds, six package jobs and all publication, signing and verification
+jobs. Independent cosign signature/attestation checks and public NKD consumption passed for all three
+publication references. Finalization failed because two fetch jobs transported the same source-receipts
+directory. The compiler now selects each exact receipt file through the pipeline module's existing mapping;
+immutable restoration and authentication are unchanged. A regression test restores both independent receipts
+into one workspace. The corrected graph's 35 carrier paths have no exact or ancestor collisions.
+
+The published CWE manifest `sha256:38b30b65d4e8c333d9823f3376f9d623846c0474837e62182d973e4c8b7adecf`
+passed offline executable/helper/UI/license/CA checks. The downloaded Helm bundle passed all 47 checksums
+and rendered all three local charts, with the controller bound to that manifest. These publication checks do
+not turn the failed Run into a completed Run. The receipt correction passed the full local gate (64.2%
+coverage) and Linux pipeline/sign race checks; a new hosted attempt is required for final acceptance.

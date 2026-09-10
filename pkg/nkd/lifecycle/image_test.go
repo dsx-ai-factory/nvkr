@@ -39,6 +39,19 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			seenReceipts := map[string]bool{}
+			for _, artifact := range plan.Graph.Artifacts {
+				if artifact.Kind != "source-receipt" {
+					continue
+				}
+				if seenReceipts[artifact.Path] || !strings.HasSuffix(artifact.Path, ".json") {
+					t.Fatalf("source receipt carrier overlaps another fetch: %s", artifact.Path)
+				}
+				seenReceipts[artifact.Path] = true
+			}
+			if len(seenReceipts) < 3 {
+				t.Fatal("combined fixture must exercise independent fetches within one recipe")
+			}
 			bundle, err := factory.Render(ctx, plan, factory.EngineGitHub)
 			if err != nil {
 				t.Fatal(err)

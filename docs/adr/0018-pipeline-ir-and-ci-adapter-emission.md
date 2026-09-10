@@ -143,6 +143,11 @@ local runner's ownership contract. Private package layouts must remain reopenabl
 steps. Rootless Podman's existing user mapping is retained; the rootless BuildKit build container keeps its
 separate fixed UID and private output-promotion contract.
 
+Each fetched source transports its exact receipt file, using the pipeline module's destination-to-receipt
+path mapping. A receipt carrier must not include the shared receipt directory: independent fetch jobs can
+otherwise claim the same immutable destination during finalization. The path is a transport description;
+receipt authentication and no-replace restoration remain mandatory.
+
 ### 7. Terminal verify + granularity
 
 Every emitted pipeline is **job-per-component** and ends in an **unconditional terminal verify** (GitHub

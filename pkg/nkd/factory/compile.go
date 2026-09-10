@@ -11,6 +11,7 @@ import (
 	"github.com/nhensley/nkdctl/pkg/nkd/cluster"
 	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
 	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
 	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
 )
 
@@ -628,6 +629,10 @@ func addRecipeDataflow(targetSpec RecipeTarget, graph *ir.Graph, selected map[st
 			}
 			output := "source/" + target + "/" + irNode.ID
 			receipt := "source-receipt/" + target + "/" + irNode.ID
+			receiptPath, err := pipeline.SourceReceiptPath(filepath.Join(".nkd", "factory", target, "src"), irNode.Dest)
+			if err != nil {
+				return err
+			}
 			nodes[nodeID] = Node{ID: nodeID, Kind: NodeFetch, RecipeTarget: target, IRNode: irNode.ID,
 				Network: ir.NetworkDefault, Container: irNode.VendorImage, Platform: "linux/" + targetSpec.Criteria.Arch,
 				RunsOn: targetSpec.RunsOn, Outputs: []string{output, receipt}}
@@ -636,7 +641,7 @@ func addRecipeDataflow(targetSpec RecipeTarget, graph *ir.Graph, selected map[st
 				Path: filepath.ToSlash(filepath.Join(".nkd", "factory", target, "src", irNode.Dest))}
 			artifacts[receipt] = Artifact{ID: receipt, Name: irNode.ID + "-receipt", Kind: "source-receipt",
 				Producer: nodeID, RecipeTarget: target,
-				Path: filepath.ToSlash(filepath.Join(".nkd", "factory", target, "source-receipts"))}
+				Path: filepath.ToSlash(receiptPath)}
 		case ir.KindBuild:
 			if !selected[irNode.Component] {
 				continue

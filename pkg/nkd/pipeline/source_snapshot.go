@@ -795,6 +795,17 @@ func fetchVendorSpecDigest(n ir.Node) (string, error) {
 	return digest, nil
 }
 
+// SourceReceiptPath describes the exact receipt file for a source destination.
+// Generators use it to transport one fetch result without capturing sibling receipts.
+// The returned path grants no authority; execution still authenticates its bytes.
+func SourceReceiptPath(sourceRoot, dest string) (string, error) {
+	path, err := sourceReceiptPath(sourceRoot, dest)
+	if err != nil {
+		return "", e.Wrap(e.CodeInvalidCatalog, err, "locating source receipt")
+	}
+	return path, nil
+}
+
 func sourceReceiptPath(sourceRoot, dest string) (string, error) {
 	if _, err := pathWithin(sourceRoot, dest); err != nil {
 		return "", err
