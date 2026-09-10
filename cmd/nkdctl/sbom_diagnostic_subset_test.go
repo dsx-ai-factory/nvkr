@@ -99,4 +99,52 @@ func TestDiagnosticSBOMConsumesSelectedBakeOffRecordOnlyWithExplicitFlag(t *test
 	if len(bom.Components) != 1 || bom.Components[0].Name != "crictl" {
 		t.Fatalf("diagnostic SBOM did not retain the exact selected scope: %+v", bom.Components)
 	}
+
+	perArtifactDir := filepath.Join(t.TempDir(), "sboms")
+	perArtifactArgs := append([]string(nil), strictArgs...)
+	perArtifactArgs[len(perArtifactArgs)-1] = perArtifactDir
+	perArtifactArgs = append(perArtifactArgs, "--diagnostic", "--per-artifact")
+	output, err := runCLIWithCapturedStdout(t, newApp(), perArtifactArgs...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(output), "UNQUALIFIED DIAGNOSTIC") {
+		t.Fatalf("missing diagnostic label: %s", output)
+	}
+	entries, err := os.ReadDir(perArtifactDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].Name() != "crictl.cdx.json" || entries[1].Name() != "index.json" {
+		t.Fatalf("unexpected per-artifact scope: %v", entries)
+	}
+	artifactBytes, err := os.ReadFile(filepath.Join(perArtifactDir, "crictl.cdx.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var artifactBOM sbom.BOM
+	if err := json.Unmarshal(artifactBytes, &artifactBOM); err != nil {
+		t.Fatal(err)
+	}
+	if len(artifactBOM.Components) != 0 || artifactBOM.Metadata.Component.Name != "crictl" {
+		t.Fatalf("per-artifact BOM changed scope: %+v", artifactBOM)
+	}
+	indexBytes, err := os.ReadFile(filepath.Join(perArtifactDir, "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index sbom.Index
+	if err := json.Unmarshal(indexBytes, &index); err != nil {
+		t.Fatal(err)
+	}
+	if index.RecipeDigest != recipeDigest || len(index.Entries) != 1 {
+		t.Fatalf("index lost recipe/scope: %+v", index)
+	}
+	artifactDigest, err := artifactBOM.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry := index.Entries[0]; entry.Artifact != "crictl" || entry.SBOMDigest != artifactDigest || entry.ArtifactSHA != manifest.Components[0].SHA256 {
+		t.Fatalf("index does not bind emitted SBOM and artifact: %+v", entry)
+	}
 }

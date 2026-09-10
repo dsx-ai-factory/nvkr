@@ -348,20 +348,26 @@ func factoryRunContext(planDigest string, startedOn, finishedOn time.Time) (prov
 	return provenance.NewGitHubRunContext(provenance.OSEnvLookup, startedOn, finishedOn)
 }
 
-// productionBuildType classifies what this plan actually did. Any from-source
-// build node makes the publication a hermetic build (NKD builds from pinned
-// sources inside a pinned toolchain with no unpinned network input); a plan whose
-// components are all pinned prebuilt acquisitions only verified identities.
+// productionBuildType classifies the whole plan. A wrapped/networked build
+// prevents a hermetic claim even when another recipe builds offline. A plan
+// without build nodes only acquired existing artifacts.
 func productionBuildType(plan *Plan) string {
+	hasBuild := false
 	for _, recipePlan := range plan.Recipes {
 		if recipePlan.Graph == nil {
 			continue
 		}
 		for _, node := range recipePlan.Graph.Nodes {
 			if node.Kind == ir.KindBuild {
-				return provenance.BuildTypeHermeticBuild
+				if node.BuilderType == ir.BuilderBuildKit || node.Network != ir.NetworkNone {
+					return provenance.BuildTypeWrappedBuild
+				}
+				hasBuild = true
 			}
 		}
+	}
+	if hasBuild {
+		return provenance.BuildTypeHermeticBuild
 	}
 	return provenance.BuildTypeAcquired
 }

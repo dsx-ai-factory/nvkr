@@ -22,7 +22,16 @@ var (
 )
 
 func main() {
-	app := &cli.App{
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := newApp().RunContext(ctx, os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, "nkdctl: "+err.Error())
+		os.Exit(nkderr.ExitCode(err))
+	}
+}
+
+func newApp() *cli.App {
+	return &cli.App{
 		Name:                 "nkdctl",
 		Usage:                "define, run, and verify immutable release workflows",
 		Version:              version + " (" + commit + ")",
@@ -56,12 +65,6 @@ func main() {
 			cmdTransportUnpack(),
 			cmdSandboxExec(),
 		},
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	if err := app.RunContext(ctx, os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, "nkdctl: "+err.Error())
-		os.Exit(nkderr.ExitCode(err))
 	}
 }
 

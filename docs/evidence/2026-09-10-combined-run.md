@@ -88,5 +88,9 @@ spanned 9m25s from creation to completion, including scheduling. Earlier native-
 The [implementation record](../combined-nke-pipeline.md) retains the failed attempts and their corrections.
 
 This proves combined hosted `pipeline-attested` artifact publication and independent consumer acceptance.
+Subsequent coverage tests found that this run's production classifier incorrectly labeled the mixed,
+network-enabled build as `hermetic-build`. The published bytes and recorded signature checks remain real,
+but that build-type claim is too strong. The classifier now selects `wrapped-build` when any recipe uses a
+wrapped/network-enabled build; this code correction does not retroactively change the recorded attestation.
 It does not establish qualified reproduction, full Release-scope acceptance, Kubernetes deployment,
 database-backed CWE startup or availability of the versioned external charts referenced by the quickstart.

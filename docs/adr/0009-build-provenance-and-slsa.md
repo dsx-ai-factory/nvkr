@@ -74,7 +74,7 @@ reproducible identity and cannot replace §1's reproduction predicate.
 
 | Field | Production contract |
 |---|---|
-| `buildType` | Versioned NKD URI identifying `hermetic-build`, `wrapped-build`, or `acquired` |
+| `buildType` | Versioned NKD URI identifying `hermetic-build`, `wrapped-build`, or `acquired`; any wrapped/network-enabled build makes the complete plan `wrapped-build`, regardless of recipe order |
 | `builder.id` | Committed workflow path and ref; a local Run uses a distinct local builder URI |
 | Invocation metadata | Exact Run identity with start and finish times |
 | `externalParameters` | Definition, Environment, catalog/selection and prepared plan identities |
