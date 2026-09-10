@@ -35,5 +35,17 @@ downloads, preserving the carrier contract.
 
 ## Hosted validation
 
-Pending dispatch after the complete local gate, workflow linting, exact regeneration and Linux pipeline/signing
-race checks. Static validation alone does not prove the upgraded provider actions work or clear annotations.
+The [generated Run `34423934362`](https://github.com/njhensley/nke-recipes/actions/runs/34423934362)
+passed all nine jobs at commit `31fe79c008cbcd7fb213a92be3bfbe39735c0a02`, including private source fetch,
+artifact transport, publication, real keyless signing, publication verification and lifecycle finalization.
+Its downloaded Run record reports attempt `34423934362-1`, status `complete` and lane `pipeline-attested`.
+The content subject remains `sha256:3f820f8adb8104f32906fe64af6aa645cecfa13c5ce904b462fca6ffad355d42`.
+
+The [repository CI Run `34423919628`](https://github.com/njhensley/nke-recipes/actions/runs/34423919628)
+also passed. Inspection of the GitHub check-run annotations returned zero annotations for each of the nine
+generated jobs and the repository CI job: no Node.js 20 warnings remain in these completed runs.
+
+Before pushing, `make check`, workflow actionlint/yamllint, byte-exact generated-bundle checking and Linux
+pipeline/signing race checks passed. The hosted run separately proves the upgraded action versions work
+with the existing carrier transport and signing path. This evidence does not establish the stronger
+`qualified` lane.
