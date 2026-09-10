@@ -22,6 +22,10 @@ Real-service acceptance is tracked in the [signed Run evidence](evidence/2026-09
 bootstrap and regeneration checks. Execution requires manual dispatch on the default branch, with bounded
 job timeouts and concurrency that does not cancel an in-progress publication.
 
+The shared action lock and handwritten CI now select native Node.js 24 releases, with immutable commit pins.
+The [runtime-upgrade evidence](evidence/2026-09-10-github-node24-actions.md) records exact versions, transport
+compatibility and hosted annotation checks.
+
 The internal `factory execute-node` helper and `.nkd/factory` scratch paths remain compiler/executor mechanics;
 they are not separate authored public objects. The public entry point and generated files use Run terminology.
 

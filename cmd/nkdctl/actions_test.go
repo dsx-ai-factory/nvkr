@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
 )
 
 // TestGitHubRefResolverAgainstFakeAPI exercises the real resolver end-to-end against a stand-in
@@ -47,5 +51,36 @@ func TestGitHubRefResolverSurfacesAPIErrors(t *testing.T) {
 	r.baseURL = srv.URL
 	if _, _, err := r.Resolve(context.Background(), "actions/nope", "v1"); err == nil {
 		t.Fatal("a 404 from the API must surface as an error, not a silent empty pin")
+	}
+}
+
+func TestParseActionTracksRejectsAmbiguousOverrides(t *testing.T) {
+	lock := pipeline.EmbeddedActionLock()
+	tests := []struct {
+		name   string
+		values []string
+		only   []string
+	}{
+		{name: "malformed", values: []string{"checkout"}},
+		{name: "unknown", values: []string{"missing=v7"}},
+		{name: "duplicate", values: []string{"checkout=v6", "checkout=v7"}},
+		{name: "excluded", values: []string{"checkout=v7"}, only: []string{"setup-go"}},
+		{name: "mutable ref", values: []string{"checkout=main"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := parseActionTracks(lock, test.values, test.only)
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeUsage {
+				t.Fatalf("invalid action track override = %v, want %s", err, e.CodeUsage)
+			}
+		})
+	}
+	got, err := parseActionTracks(lock, []string{"checkout=v7", "setup-go=v7"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["checkout"] != "v7" || got["setup-go"] != "v7" || len(got) != 2 {
+		t.Fatalf("parsed overrides = %v", got)
 	}
 }

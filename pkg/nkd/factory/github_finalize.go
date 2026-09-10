@@ -11,7 +11,7 @@ import (
 )
 
 // writeGitHubFinalizerRestoreSteps emits the complete carrier download and restore
-// sequence for the lifecycle finalizer. actions/download-artifact v4.3.0 expands
+// sequence for the lifecycle finalizer. actions/download-artifact v8.0.1 expands
 // the exact minimatch brace set, downloads up to five artifacts concurrently, and
 // merges their uniquely named carrier files into one directory. The action succeeds
 // when the pattern matches no artifacts, so every expected artifact still reaches

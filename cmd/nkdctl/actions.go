@@ -35,6 +35,7 @@ func cmdActions() *cli.Command {
 						Usage: "path to the embedded action lockfile source"},
 					&cli.BoolFlag{Name: "check", Usage: "resolve and report but write nothing; exit non-zero if any pin is stale"},
 					&cli.StringSliceFlag{Name: "only", Usage: "bump only these action names (repeatable)"},
+					&cli.StringSliceFlag{Name: "track", Usage: "move an action to a major track as name=vN (repeatable)"},
 					&cli.StringFlag{Name: "token", EnvVars: []string{"GITHUB_TOKEN"},
 						Usage: "GitHub token for the API (raises rate limits; optional for public actions)"},
 				},
@@ -54,21 +55,32 @@ func runActionsBump(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	tracks, err := parseActionTracks(lock, c.StringSlice("track"), c.StringSlice("only"))
+	if err != nil {
+		return err
+	}
+	lock, trackChanges, err := lock.Retarget(tracks)
+	if err != nil {
+		return err
+	}
 	resolver := newGitHubRefResolver(c.String("token"))
 	bumped, changes, err := lock.Bump(c.Context, resolver, c.StringSlice("only"))
 	if err != nil {
 		return err
 	}
-	if len(changes) == 0 {
+	if len(changes) == 0 && len(trackChanges) == 0 {
 		fmt.Println("action pins are current")
 		return nil
+	}
+	for _, ch := range trackChanges {
+		fmt.Printf("  %-18s track %s -> %s\n", ch.Name, ch.OldTrack, ch.NewTrack)
 	}
 	for _, ch := range changes {
 		fmt.Printf("  %-18s %s (%s) -> %s (%s)\n", ch.Name,
 			shortSHA(ch.OldSHA), ch.OldVersion, shortSHA(ch.NewSHA), ch.NewVersion)
 	}
 	if c.Bool("check") {
-		return e.New(e.CodePipelineDrift, "%d action pin(s) are stale; run `nkdctl actions bump`, then rebuild nkdctl and regenerate workflows", len(changes))
+		return e.New(e.CodePipelineDrift, "%d action pin or track change(s) are pending; run `nkdctl actions bump`, then rebuild nkdctl and regenerate workflows", len(changes)+len(trackChanges))
 	}
 	out, err := bumped.Marshal()
 	if err != nil {
@@ -77,8 +89,33 @@ func runActionsBump(c *cli.Context) error {
 	if err := writeAtomic(c.Context, path, out, 0o644); err != nil {
 		return e.Wrap(e.CodeInternal, err, "writing %s", path)
 	}
-	fmt.Printf("updated %s (%d change(s)); rebuild nkdctl and regenerate workflows (nkdctl run generate / nkdctl bundle)\n", path, len(changes))
+	fmt.Printf("updated %s (%d change(s)); rebuild nkdctl and regenerate workflows (nkdctl run generate)\n", path, len(changes)+len(trackChanges))
 	return nil
+}
+
+func parseActionTracks(lock pipeline.ActionLock, values, only []string) (map[string]string, error) {
+	selected := make(map[string]bool, len(only))
+	for _, name := range only {
+		selected[name] = true
+	}
+	overrides := make(map[string]string, len(values))
+	for _, value := range values {
+		name, track, ok := strings.Cut(value, "=")
+		if !ok || name == "" || track == "" {
+			return nil, e.New(e.CodeUsage, "action track override %q must be name=vN", value)
+		}
+		if _, duplicate := overrides[name]; duplicate {
+			return nil, e.New(e.CodeUsage, "action track override %q is repeated", name)
+		}
+		if len(selected) > 0 && !selected[name] {
+			return nil, e.New(e.CodeUsage, "action track override %q is excluded by --only", name)
+		}
+		overrides[name] = track
+	}
+	if _, _, err := lock.Retarget(overrides); err != nil {
+		return nil, err
+	}
+	return overrides, nil
 }
 
 func shortSHA(sha string) string {

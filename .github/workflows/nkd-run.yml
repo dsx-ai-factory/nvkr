@@ -17,17 +17,17 @@ jobs:
     runs-on: 'ubuntu-latest'
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: '.go-version'
       - name: Build runner from this checkout
         run: CGO_ENABLED=0 go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o nkd-exec ./cmd/nkdctl
       - name: Verify committed Run generation is current
         run: ./nkd-exec run generate --engine github --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-github.yaml --root . --check
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: 'nkd-exec'
@@ -39,10 +39,10 @@ jobs:
     needs: [build-runner-ubuntu-latest]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
@@ -68,14 +68,14 @@ jobs:
           ./nkd-exec exec-node --launch --runtime podman --node fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063 --nodes-digest sha256:8ad6aebaed9bc25f5dd751407d273f743e56b0cf4da6a0a9c320bcb325892d7c --source-root .nkd/factory/nke-cli/src .github/nkd-run/graphs/nke-cli.json
       - name: Pack 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar --root . --path .nkd/factory/nke-cli/source-receipts
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-receipt-nke-cli-fetch-source-a97eec4285f7'
           path: '.nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar'
           if-no-files-found: error
       - name: Pack 'source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar --root . --path .nkd/factory/nke-cli/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c'
           path: '.nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar'
@@ -87,22 +87,22 @@ jobs:
     needs: [build-runner-ubuntu-latest, nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-receipt-nke-cli-fetch-source-a97eec4285f7'
           path: '.nkd/carriers'
       - name: Restore 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar --root . --path .nkd/factory/nke-cli/source-receipts
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c'
           path: '.nkd/carriers'
@@ -113,14 +113,14 @@ jobs:
           ./nkd-exec exec-node --launch --runtime podman --node build-nkectl --nodes-digest sha256:8ad6aebaed9bc25f5dd751407d273f743e56b0cf4da6a0a9c320bcb325892d7c --source-root .nkd/factory/nke-cli/src --result .nkd/factory/nke-cli/results/build-nkectl.json .github/nkd-run/graphs/nke-cli.json
       - name: Pack 'artifact/nke-cli/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/out/nkectl/nkectl
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-nke-cli-nkectl'
           path: '.nkd/carriers/artifact-nke-cli-nkectl.tar'
           if-no-files-found: error
       - name: Pack 'result/nke-cli/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/result-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/results/build-nkectl.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-result-nke-cli-nkectl'
           path: '.nkd/carriers/result-nke-cli-nkectl.tar'
@@ -132,22 +132,22 @@ jobs:
     needs: [build-runner-ubuntu-latest, nkd-nke-cli-build-nkectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-artifact-nke-cli-nkectl'
           path: '.nkd/carriers'
       - name: Restore 'artifact/nke-cli/nkectl'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/out/nkectl/nkectl
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-result-nke-cli-nkectl'
           path: '.nkd/carriers'
@@ -158,7 +158,7 @@ jobs:
           podman run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/terminal-observe --workspace .nkd/factory
       - name: Pack 'observation/nke-cli'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-nke-cli.tar --root . --path .nkd/factory/nke-cli/terminal-observation.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-observation-nke-cli'
           path: '.nkd/carriers/observation-nke-cli.tar'
@@ -168,7 +168,7 @@ jobs:
           podman run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/sbom --workspace .nkd/factory
       - name: Pack 'sbom/nke-cli'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-nke-cli.tar --root . --path .nkd/factory/nke-cli/sbom
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-sbom-nke-cli'
           path: '.nkd/carriers/sbom-nke-cli.tar'
@@ -178,7 +178,7 @@ jobs:
           podman run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl --workspace .nkd/factory
       - name: Pack 'package/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nkectl.tar --root . --path .nkd/factory/packages/nkectl
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-nkectl'
           path: '.nkd/carriers/package-nkectl.tar'
@@ -188,7 +188,7 @@ jobs:
           podman run --rm --network none --platform linux/amd64 -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl-release --workspace .nkd/factory
       - name: Pack 'package/nkectl-release'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-nkectl-release'
           path: '.nkd/carriers/package-nkectl-release.tar'
@@ -207,16 +207,16 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-nkectl-release'
           path: '.nkd/carriers'
@@ -227,7 +227,7 @@ jobs:
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node publish/nkectl --workspace .nkd/factory
       - name: Pack 'publication/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-publication-nkectl'
           path: '.nkd/carriers/publication-nkectl.tar'
@@ -239,10 +239,10 @@ jobs:
     needs: [build-runner-ubuntu-latest]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
@@ -253,7 +253,7 @@ jobs:
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node tool/cosign --workspace .nkd/factory
       - name: Pack 'tool/cosign'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers/tool-cosign.tar'
@@ -273,28 +273,28 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-nkectl-release'
           path: '.nkd/carriers'
       - name: Restore 'package/nkectl-release'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-nkectl'
           path: '.nkd/carriers'
       - name: Restore 'publication/nkectl'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
@@ -305,14 +305,14 @@ jobs:
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node sign/nkectl --workspace .nkd/factory
       - name: Pack 'predicate/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/predicate-nkectl.tar --root . --path .nkd/factory/predicates/nkectl.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-predicate-nkectl'
           path: '.nkd/carriers/predicate-nkectl.tar'
           if-no-files-found: error
       - name: Pack 'signature/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/signature-nkectl.tar --root . --path .nkd/factory/signatures/nkectl.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-signature-nkectl'
           path: '.nkd/carriers/signature-nkectl.tar'
@@ -331,28 +331,28 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-nkectl'
           path: '.nkd/carriers'
       - name: Restore 'publication/nkectl'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-signature-nkectl'
           path: '.nkd/carriers'
       - name: Restore 'signature/nkectl'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/signature-nkectl.tar --root . --path .nkd/factory/signatures/nkectl.json
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
@@ -363,7 +363,7 @@ jobs:
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node verify-publication/nkectl --workspace .nkd/factory
       - name: Pack 'verification/nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/verification-nkectl.tar --root . --path .nkd/factory/verifications/nkectl.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-verification-nkectl'
           path: '.nkd/carriers/verification-nkectl.tar'
@@ -375,10 +375,10 @@ jobs:
     needs: [build-runner-ubuntu-latest, nkd-nke-cli-build-nkectl, nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6, nkd-process-nke-cli-terminal-observe-nke-3837591e25e5, nkd-publish-nkectl, nkd-sign-nkectl, nkd-tool-cosign, nkd-verify-publication-nkectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
@@ -387,7 +387,7 @@ jobs:
       - name: Prepare restore outcomes
         run: mkdir -p .nkd/restore-outcomes
       - name: Download Run carriers
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         continue-on-error: true
         with:
           pattern: '{nkd-artifact-nke-cli-nkectl,nkd-observation-nke-cli,nkd-package-nkectl,nkd-package-nkectl-release,nkd-predicate-nkectl,nkd-publication-nkectl,nkd-result-nke-cli-nkectl,nkd-sbom-nke-cli,nkd-signature-nkectl,nkd-source-receipt-nke-cli-fetch-source-a97eec4285f7,nkd-source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c,nkd-tool-cosign,nkd-verification-nkectl}'
@@ -421,7 +421,7 @@ jobs:
         run: if [ '${{ needs.nkd-verify-publication-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-nkectl.status; elif [ ! -f .nkd/carriers/verification-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-nkectl.tar --root . --path .nkd/factory/verifications/nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-nkectl.status; fi
       - name: Finalize lifecycle Run
         run: ./nkd-exec run finalize --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-github.yaml --plan .github/nkd-run/plan.json --attempt "${{ github.run_id }}-${{ github.run_attempt }}" --workspace .nkd/factory --out .nkd/run.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: ${{ always() }}
         with:
           name: nkd-lifecycle-run

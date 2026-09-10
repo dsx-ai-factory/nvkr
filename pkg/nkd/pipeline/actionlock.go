@@ -48,8 +48,9 @@ type ActionLock struct {
 }
 
 var (
-	actionSHA  = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	actionRepo = regexp.MustCompile(`^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$`)
+	actionSHA   = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	actionRepo  = regexp.MustCompile(`^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$`)
+	actionTrack = regexp.MustCompile(`^v[1-9][0-9]*$`)
 )
 
 // Validate fails closed on an unpinned or malformed lock: an action that is not pinned to an
@@ -71,8 +72,8 @@ func (l ActionLock) Validate() error {
 		if !actionSHA.MatchString(pin.SHA) {
 			return e.New(e.CodeUnpinnedSource, "action %q must pin an exact 40-hex commit sha, got %q", name, pin.SHA)
 		}
-		if strings.TrimSpace(pin.Track) == "" {
-			return e.New(e.CodeInvalidCatalog, "action %q has no track for bumping", name)
+		if !actionTrack.MatchString(pin.Track) {
+			return e.New(e.CodeInvalidCatalog, "action %q track %q must be a major tag such as v6", name, pin.Track)
 		}
 	}
 	return nil
@@ -145,6 +146,49 @@ type ActionChange struct {
 	NewSHA     string
 	OldVersion string
 	NewVersion string
+}
+
+// ActionTrackChange records an intentional major-track transition separately from the
+// resolved commit change. A track-only transition must still rewrite the machine lock.
+type ActionTrackChange struct {
+	Name     string
+	OldTrack string
+	NewTrack string
+}
+
+// Retarget returns a copy with explicit major-track overrides applied. Unknown actions and
+// malformed tracks fail before any resolver I/O in the caller.
+func (l ActionLock) Retarget(overrides map[string]string) (ActionLock, []ActionTrackChange, error) {
+	if err := l.Validate(); err != nil {
+		return ActionLock{}, nil, err
+	}
+	out := ActionLock{APIVersion: l.APIVersion, Kind: l.Kind, Actions: make(map[string]ActionPin, len(l.Actions))}
+	for name, pin := range l.Actions {
+		out.Actions[name] = pin
+	}
+	names := make([]string, 0, len(overrides))
+	for name := range overrides {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var changes []ActionTrackChange
+	for _, name := range names {
+		pin, ok := out.Actions[name]
+		if !ok {
+			return ActionLock{}, nil, e.New(e.CodeUsage, "action lock has no action %q to retarget", name)
+		}
+		track := overrides[name]
+		if !actionTrack.MatchString(track) {
+			return ActionLock{}, nil, e.New(e.CodeUsage, "action %q track %q must be a major tag such as v6", name, track)
+		}
+		if pin.Track == track {
+			continue
+		}
+		changes = append(changes, ActionTrackChange{Name: name, OldTrack: pin.Track, NewTrack: track})
+		pin.Track = track
+		out.Actions[name] = pin
+	}
+	return out, changes, nil
 }
 
 // Bump resolves each selected action's track to the current sha/version and returns the updated

@@ -104,7 +104,8 @@ The M1 publication is
 `127.0.0.1:5000/nke/nkectl@sha256:c115be7e4be62aa43e43fee38917586c19e7a524711e4d6902d1f7eb6fe63562`.
 The AICR publication is
 `127.0.0.1:5001/nke/aicr@sha256:80d95992f5377ab7c61da8011c123ab8136261f1bc698fdedee00b05934780c4`.
-Both remain `static-unqualified`; M1 signing was dry-run. No real signed publication is available for the
-Release-consumer demo, whose admission and refusal behavior is covered separately.
+Both remain `static-unqualified`; M1 signing was dry-run. At this cleanup audit, no real signed publication was available
+for the Release-consumer demo. The later [signed hosted Run and independent consumption](evidence/2026-09-10-github-signed-run.md)
+now provide that positive evidence.
 
 These checks do not establish hosted CI, live signing, OS-image integration, or qualified production acceptance.
