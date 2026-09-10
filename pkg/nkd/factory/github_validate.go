@@ -41,6 +41,7 @@ type githubJob struct {
 }
 
 type githubStep struct {
+	ID              string            `json:"id,omitempty"`
 	Env             map[string]string `json:"env,omitempty"`
 	Name            string            `json:"name,omitempty"`
 	Uses            string            `json:"uses,omitempty"`
@@ -130,7 +131,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			if len(step.Env) == 0 {
 				continue
 			}
-			if len(wantSourceEnv) == 0 || step.Name != "Execute "+job.Name || len(step.Env) != len(wantSourceEnv) {
+			if len(wantSourceEnv) == 0 || step.ID != jobID || len(step.Env) != len(wantSourceEnv) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q has unexpected step credentials or environment", jobID)
 			}
 			for key, value := range wantSourceEnv {
@@ -138,7 +139,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 					return e.New(e.CodeEngineCapability, "GitHub job %q source environment differs at %s", jobID, key)
 				}
 			}
-			if !strings.HasPrefix(step.Run, requireSourceToken+"\n") {
+			if !strings.Contains(step.Run, "\n"+requireSourceToken+"\n") {
 				return e.New(e.CodeEngineCapability, "GitHub job %q must refuse an empty source credential", jobID)
 			}
 			foundSource = true
@@ -415,18 +416,15 @@ func (document githubWorkflowDocument) String() string {
 func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubStep, graphDigests map[string]string) error {
 	next := 0
 	for _, step := range steps {
-		if !strings.HasPrefix(step.Name, "Execute ") {
+		if step.ID == "" {
 			continue
 		}
 		if next >= len(stage.Nodes) {
 			return e.New(e.CodeEngineCapability, "GitHub stage %q has an unexpected execution step", stage.ID)
 		}
 		node := stage.Nodes[next]
-		commands := generatedNodeCommands(node, plan, graphDigests, FactoryPlanPath, FactoryGraphDir, "$GITHUB_WORKSPACE")
-		if len(githubSourceEnvironment(plan, node)) > 0 {
-			commands = append([]string{requireSourceToken}, commands...)
-		}
-		if step.Name != "Execute "+node.ID || step.ContinueOnError || step.If != "" || step.Uses != "" ||
+		commands := githubNodeCommands(node, plan, graphDigests)
+		if step.ID != githubJobID(node.ID) || step.Name != githubNodeLabel(plan, node) || step.ContinueOnError || step.If != "" || step.Uses != "" ||
 			strings.TrimSpace(step.Run) != strings.Join(commands, "\n") {
 			return e.New(e.CodeEngineCapability, "GitHub stage %q must execute exact node %q in graph order without skipping failures", stage.ID, node.ID)
 		}

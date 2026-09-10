@@ -2,6 +2,7 @@ package factory
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -157,8 +158,20 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	for _, artifact := range artifacts {
 		plan.Graph.Artifacts = append(plan.Graph.Artifacts, artifact)
 	}
-	if err := executePackage(ctx, plan, node, artifacts); err != nil {
+	var log bytes.Buffer
+	if err := executePackage(ctx, plan, node, artifacts, &log); err != nil {
 		t.Fatal(err)
+	}
+	if binding {
+		image, err := inspectFactoryImage(ctx, plan, artifacts["package/image"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(log.String(), image.ManifestDigest) || !strings.Contains(log.String(), "checksums refreshed") {
+			t.Fatalf("missing exact binding log: %s", &log)
+		}
+	} else if strings.Contains(log.String(), "Bound Helm") {
+		t.Fatalf("claimed an image binding without an image: %s", &log)
 	}
 	expected := LifecycleOutputPlan{Name: "charts", Kind: "helm-oci", ArtifactID: "package/charts", RecipeDigest: recipeDigest, Components: []string{"charts"}}
 	observed, err := ObserveLifecyclePayload(ctx, plan, expected, artifacts)

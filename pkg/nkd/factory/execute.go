@@ -99,9 +99,9 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 	case NodeSBOM:
 		return executeSBOM(ctx, plan, node, artifacts, stdout)
 	case NodePackage:
-		return executePackage(ctx, plan, node, artifacts)
+		return executePackage(ctx, plan, node, artifacts, stdout)
 	case NodePublish:
-		return executePublish(ctx, plan, node, artifacts)
+		return executePublish(ctx, plan, node, artifacts, stdout)
 	case NodeComposition:
 		return executeComposition(ctx, plan, node, artifacts)
 	case NodeSign:
@@ -343,7 +343,7 @@ func executeObservation(ctx context.Context, plan *Plan, node Node, artifacts ma
 	return writeFactoryFile(ctx, artifacts[node.Outputs[0]].Path, append(raw, '\n'), 0o644)
 }
 
-func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) error {
+func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
 	output := artifacts[node.Outputs[0]]
 	var inputs []Artifact
 	for _, id := range node.Inputs {
@@ -376,7 +376,10 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		if err != nil {
 			return err
 		}
-		_, err = delivery.ImportContainerImage(ctx, inputs[0].Path, digest, "linux/"+packageArch(plan, inputs), output.Path)
+		image, err := delivery.ImportContainerImage(ctx, inputs[0].Path, digest, "linux/"+packageArch(plan, inputs), output.Path)
+		if err == nil {
+			fmt.Fprintf(stdout, "Packaged container image %q: manifest %s\n", output.Name, image.ManifestDigest)
+		}
 		return err
 	case PackageBinaryBundle:
 		files := make([]delivery.BinaryFileInput, 0, len(inputs))
@@ -460,6 +463,7 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			if err := bindHelmImage(ctx, filepath.Join(root, relative), node.HelmImage.Chart, imageDigest); err != nil {
 				return err
 			}
+			fmt.Fprintf(stdout, "Bound Helm chart %q to image %q at %s; checksums refreshed\n", node.HelmImage.Chart, artifacts[node.HelmImage.Image].Name, imageDigest)
 		}
 		if inputs[0].Kind == "tarball" {
 			archive = filepath.Join(root, "bundle.tar")
@@ -631,7 +635,7 @@ func packageInputMetadata(plan *Plan, artifact Artifact) (string, int64, string,
 	return "", 0, "", e.New(e.CodePipelineDrift, "artifact %s has no producing recipe node", artifact.ID)
 }
 
-func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) error {
+func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
 	if len(node.Inputs) != 1 || len(node.Outputs) != 1 {
 		return e.New(e.CodePipelineDrift, "publish node %q is not unary", node.ID)
 	}
@@ -651,7 +655,11 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	if err != nil {
 		return err
 	}
-	return writeFactoryFile(ctx, artifacts[node.Outputs[0]].Path, []byte(ref+"\n"), 0o644)
+	if err := writeFactoryFile(ctx, artifacts[node.Outputs[0]].Path, []byte(ref+"\n"), 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "Published immutable reference: %s\n", ref)
+	return nil
 }
 
 func packageArch(plan *Plan, inputs []Artifact) string {

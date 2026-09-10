@@ -172,7 +172,7 @@ func TestDeliveryRuntimeConfigRendersOnBothEngines(t *testing.T) {
 	}
 	ghwf := string(gh.Files[GitHubWorkflowPath])
 	for _, want := range []string{"container: 'docker:27@sha256:", "image: 'docker:dind@sha256:",
-		"DOCKER_HOST: 'tcp://docker:2375'", "- name: Setup", "docker login -u user -p pass registry.example"} {
+		"DOCKER_HOST: 'tcp://docker:2375'", "- name: Configure build environment", "docker login -u user -p pass registry.example"} {
 		if !strings.Contains(ghwf, want) {
 			t.Fatalf("github runtime config missing %q", want)
 		}

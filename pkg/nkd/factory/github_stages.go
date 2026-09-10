@@ -33,14 +33,13 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string) {
 	for i := range stages {
 		stage := &stages[i]
 		stage.ID = githubJobID(stage.Nodes[0].ID)
-		stage.Name = stage.Nodes[0].ID
+		stage.Name = githubStageLabel(plan, stage.Nodes)
 		if len(stage.Nodes) > 1 {
 			var ids []string
 			for _, node := range stage.Nodes {
 				ids = append(ids, node.ID)
 			}
 			stage.ID = githubJobID("process/" + strings.Join(ids, "+"))
-			stage.Name = "Process artifacts: " + stage.Nodes[0].ID
 		}
 		for _, node := range stage.Nodes {
 			jobs[node.ID] = stage.ID

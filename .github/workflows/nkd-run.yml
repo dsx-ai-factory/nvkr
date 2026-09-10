@@ -13,42 +13,48 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build-runner-ubuntu-latest:
-    name: Build static NKD runner ('ubuntu-latest')
+    name: 'Prepare NKD runner (ubuntu-latest)'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: '.go-version'
       - name: Build runner from this checkout
         run: CGO_ENABLED=0 go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o nkd-exec ./cmd/nkdctl
       - name: Verify committed Run generation is current
         run: ./nkd-exec run generate --engine github --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-github.yaml --root . --check
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload NKD runner'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: 'nkd-exec'
           if-no-files-found: error
   nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6:
-    name: 'nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+    name: 'Fetch pinned source for nkectl (nke-cli)'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Execute nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Fetch pinned source for nkectl (nke-cli)'
+        id: nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6
         env:
           GIT_CONFIG_COUNT: '4'
           GIT_CONFIG_GLOBAL: '/dev/null'
@@ -64,132 +70,186 @@ jobs:
           GIT_TERMINAL_PROMPT: '0'
           NKD_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Fetch pinned source for nkectl (nke-cli)'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
           [ -n "${NKD_SOURCE_TOKEN:-}" ] || { printf '%s\n' 'nkdctl: [NKD-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
           ./nkd-exec exec-node --launch --runtime docker --node fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063 --nodes-digest sha256:8ad6aebaed9bc25f5dd751407d273f743e56b0cf4da6a0a9c320bcb325892d7c --source-root .nkd/factory/nke-cli/src .github/nkd-run/graphs/nke-cli.json
-      - name: Pack 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+          printf '%s\n' 'Produced: source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+          printf '%s\n' 'Produced: source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Archive source verification for nkectl (nke-cli)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar --root . --path .nkd/factory/nke-cli/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload source verification for nkectl (nke-cli)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-receipt-nke-cli-fetch-source-a97eec4285f7'
           path: '.nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar'
           if-no-files-found: error
-      - name: Pack 'source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Archive source for nkectl (nke-cli)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar --root . --path .nkd/factory/nke-cli/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload source for nkectl (nke-cli)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c'
           path: '.nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar'
           if-no-files-found: error
   nkd-nke-cli-build-nkectl:
-    name: 'nke-cli/build-nkectl'
+    name: 'Build nkectl (nke-cli)'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download source verification for nkectl (nke-cli)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-receipt-nke-cli-fetch-source-a97eec4285f7'
           path: '.nkd/carriers'
-      - name: Restore 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Restore source verification for nkectl (nke-cli)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar --root . --path .nkd/factory/nke-cli/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download source for nkectl (nke-cli)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c'
           path: '.nkd/carriers'
-      - name: Restore 'source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Restore source for nkectl (nke-cli)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar --root . --path .nkd/factory/nke-cli/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063
-      - name: 'Execute nke-cli/build-nkectl'
+      - name: 'Build nkectl (nke-cli)'
+        id: nkd-nke-cli-build-nkectl
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Build nkectl (nke-cli)'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-cli/build-nkectl'
           ./nkd-exec exec-node --launch --runtime docker --node build-nkectl --nodes-digest sha256:8ad6aebaed9bc25f5dd751407d273f743e56b0cf4da6a0a9c320bcb325892d7c --source-root .nkd/factory/nke-cli/src --result .nkd/factory/nke-cli/results/build-nkectl.json .github/nkd-run/graphs/nke-cli.json
-      - name: Pack 'artifact/nke-cli/nkectl'
+          printf '%s\n' 'Produced: artifact/nke-cli/nkectl'
+          printf '%s\n' 'Produced: result/nke-cli/nkectl'
+      - name: 'Archive nkectl (binary)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/out/nkectl/nkectl
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nkectl (binary)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-nke-cli-nkectl'
           path: '.nkd/carriers/artifact-nke-cli-nkectl.tar'
           if-no-files-found: error
-      - name: Pack 'result/nke-cli/nkectl'
+      - name: 'Archive build result for nkectl'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/result-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/results/build-nkectl.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload build result for nkectl'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-result-nke-cli-nkectl'
           path: '.nkd/carriers/result-nke-cli-nkectl.tar'
           if-no-files-found: error
   nkd-process-nke-cli-terminal-observe-nke-cli-sbom:
-    name: 'Process artifacts: nke-cli/terminal-observe'
+    name: 'Verify artifacts and generate SBOMs: nke-cli'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-nke-cli-build-nkectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nkectl (binary)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-artifact-nke-cli-nkectl'
           path: '.nkd/carriers'
-      - name: Restore 'artifact/nke-cli/nkectl'
+      - name: 'Restore nkectl (binary)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/out/nkectl/nkectl
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download build result for nkectl'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-result-nke-cli-nkectl'
           path: '.nkd/carriers'
-      - name: Restore 'result/nke-cli/nkectl'
+      - name: 'Restore build result for nkectl'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/results/build-nkectl.json
-      - name: 'Execute nke-cli/terminal-observe'
+      - name: 'Verify built artifacts: nke-cli'
+        id: nkd-nke-cli-terminal-observe
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Verify built artifacts: nke-cli'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-cli/terminal-observe'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/terminal-observe --workspace .nkd/factory
-      - name: Pack 'observation/nke-cli'
+          printf '%s\n' 'Produced: observation/nke-cli'
+      - name: 'Archive artifact checks for nke-cli'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-nke-cli.tar --root . --path .nkd/factory/nke-cli/terminal-observation.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload artifact checks for nke-cli'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-observation-nke-cli'
           path: '.nkd/carriers/observation-nke-cli.tar'
           if-no-files-found: error
-      - name: 'Execute nke-cli/sbom'
+      - name: 'Generate SBOMs: nke-cli'
+        id: nkd-nke-cli-sbom
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Generate SBOMs: nke-cli'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-cli/sbom'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-cli/sbom --workspace .nkd/factory
-      - name: Pack 'sbom/nke-cli'
+          printf '%s\n' 'Produced: sbom/nke-cli'
+      - name: 'Archive SBOMs for nke-cli'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-nke-cli.tar --root . --path .nkd/factory/nke-cli/sbom
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload SBOMs for nke-cli'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-sbom-nke-cli'
           path: '.nkd/carriers/sbom-nke-cli.tar'
           if-no-files-found: error
   nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6:
-    name: 'nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+    name: 'Fetch pinned source for nke-helm (nke-control-plane)'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Execute nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Fetch pinned source for nke-helm (nke-control-plane)'
+        id: nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6
         env:
           GIT_CONFIG_COUNT: '4'
           GIT_CONFIG_GLOBAL: '/dev/null'
@@ -205,84 +265,114 @@ jobs:
           GIT_TERMINAL_PROMPT: '0'
           NKD_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Fetch pinned source for nke-helm (nke-control-plane)'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
           [ -n "${NKD_SOURCE_TOKEN:-}" ] || { printf '%s\n' 'nkdctl: [NKD-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
           ./nkd-exec exec-node --launch --runtime docker --node fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063 --nodes-digest sha256:7b5df70ea7d0d428c15cb40d3eecbecb98d0cea6b6efb01c6e17200721ecbc2d --source-root .nkd/factory/nke-control-plane/src .github/nkd-run/graphs/nke-control-plane.json
-      - name: Pack 'source-receipt/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+          printf '%s\n' 'Produced: source-receipt/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+          printf '%s\n' 'Produced: source/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Archive source verification for nke-helm (nke-control-plane)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-d1142b4e0bbb.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload source verification for nke-helm (nke-control-plane)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-receipt-nke-control-plane-fet-d1142b4e0bbb'
           path: '.nkd/carriers/source-receipt-nke-control-plane-fet-d1142b4e0bbb.tar'
           if-no-files-found: error
-      - name: Pack 'source/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Archive source for nke-helm (nke-control-plane)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-d5a8439ec93e.tar --root . --path .nkd/factory/nke-control-plane/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload source for nke-helm (nke-control-plane)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-nke-control-plane-fetch-sourc-d5a8439ec93e'
           path: '.nkd/carriers/source-nke-control-plane-fetch-sourc-d5a8439ec93e.tar'
           if-no-files-found: error
   nkd-nke-control-plane-build-nke-helm:
-    name: 'nke-control-plane/build-nke-helm'
+    name: 'Build nke-helm (nke-control-plane)'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download source verification for nke-helm (nke-control-plane)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-receipt-nke-control-plane-fet-d1142b4e0bbb'
           path: '.nkd/carriers'
-      - name: Restore 'source-receipt/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Restore source verification for nke-helm (nke-control-plane)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-d1142b4e0bbb.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download source for nke-helm (nke-control-plane)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-nke-control-plane-fetch-sourc-d5a8439ec93e'
           path: '.nkd/carriers'
-      - name: Restore 'source/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063'
+      - name: 'Restore source for nke-helm (nke-control-plane)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-d5a8439ec93e.tar --root . --path .nkd/factory/nke-control-plane/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063
-      - name: 'Execute nke-control-plane/build-nke-helm'
+      - name: 'Build nke-helm (nke-control-plane)'
+        id: nkd-nke-control-plane-build-nke-helm
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Build nke-helm (nke-control-plane)'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-control-plane/build-nke-helm'
           ./nkd-exec exec-node --launch --runtime docker --node build-nke-helm --nodes-digest sha256:7b5df70ea7d0d428c15cb40d3eecbecb98d0cea6b6efb01c6e17200721ecbc2d --source-root .nkd/factory/nke-control-plane/src --result .nkd/factory/nke-control-plane/results/build-nke-helm.json .github/nkd-run/graphs/nke-control-plane.json
-      - name: Pack 'artifact/nke-control-plane/nke-helm'
+          printf '%s\n' 'Produced: artifact/nke-control-plane/nke-helm'
+          printf '%s\n' 'Produced: result/nke-control-plane/nke-helm'
+      - name: 'Archive nke-helm (source archive)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/out/nke-helm/nke-helm.tar
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nke-helm (source archive)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-nke-control-plane-nke-helm'
           path: '.nkd/carriers/artifact-nke-control-plane-nke-helm.tar'
           if-no-files-found: error
-      - name: Pack 'result/nke-control-plane/nke-helm'
+      - name: 'Archive build result for nke-helm'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/result-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/results/build-nke-helm.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload build result for nke-helm'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-result-nke-control-plane-nke-helm'
           path: '.nkd/carriers/result-nke-control-plane-nke-helm.tar'
           if-no-files-found: error
   nkd-nke-control-plane-fetch-source-54834-4fa958e0512c:
-    name: 'nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+    name: 'Fetch pinned source for cwe (nke-control-plane)'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Execute nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+      - name: 'Fetch pinned source for cwe (nke-control-plane)'
+        id: nkd-nke-control-plane-fetch-source-54834-4fa958e0512c
         env:
           GIT_CONFIG_COUNT: '4'
           GIT_CONFIG_GLOBAL: '/dev/null'
@@ -298,207 +388,323 @@ jobs:
           GIT_TERMINAL_PROMPT: '0'
           NKD_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Fetch pinned source for cwe (nke-control-plane)'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
           [ -n "${NKD_SOURCE_TOKEN:-}" ] || { printf '%s\n' 'nkdctl: [NKD-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
           ./nkd-exec exec-node --launch --runtime docker --node fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be --nodes-digest sha256:7b5df70ea7d0d428c15cb40d3eecbecb98d0cea6b6efb01c6e17200721ecbc2d --source-root .nkd/factory/nke-control-plane/src .github/nkd-run/graphs/nke-control-plane.json
-      - name: Pack 'source-receipt/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+          printf '%s\n' 'Produced: source-receipt/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+          printf '%s\n' 'Produced: source/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+      - name: 'Archive source verification for cwe (nke-control-plane)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-2ebbea6b9857.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be-03b299ee6a33.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload source verification for cwe (nke-control-plane)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-receipt-nke-control-plane-fet-2ebbea6b9857'
           path: '.nkd/carriers/source-receipt-nke-control-plane-fet-2ebbea6b9857.tar'
           if-no-files-found: error
-      - name: Pack 'source/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+      - name: 'Archive source for cwe (nke-control-plane)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-318ab8d49282.tar --root . --path .nkd/factory/nke-control-plane/src/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload source for cwe (nke-control-plane)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-nke-control-plane-fetch-sourc-318ab8d49282'
           path: '.nkd/carriers/source-nke-control-plane-fetch-sourc-318ab8d49282.tar'
           if-no-files-found: error
   nkd-nke-control-plane-build-cwe:
-    name: 'nke-control-plane/build-cwe'
+    name: 'Build cwe (nke-control-plane)'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-nke-control-plane-fetch-source-54834-4fa958e0512c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download source verification for cwe (nke-control-plane)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-receipt-nke-control-plane-fet-2ebbea6b9857'
           path: '.nkd/carriers'
-      - name: Restore 'source-receipt/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+      - name: 'Restore source verification for cwe (nke-control-plane)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-2ebbea6b9857.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be-03b299ee6a33.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download source for cwe (nke-control-plane)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-source-nke-control-plane-fetch-sourc-318ab8d49282'
           path: '.nkd/carriers'
-      - name: Restore 'source/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be'
+      - name: 'Restore source for cwe (nke-control-plane)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-318ab8d49282.tar --root . --path .nkd/factory/nke-control-plane/src/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be
-      - name: 'Execute nke-control-plane/build-cwe'
+      - name: 'Build cwe (nke-control-plane)'
+        id: nkd-nke-control-plane-build-cwe
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Build cwe (nke-control-plane)'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-control-plane/build-cwe'
           ./nkd-exec exec-node --launch --runtime docker --node build-cwe --nodes-digest sha256:7b5df70ea7d0d428c15cb40d3eecbecb98d0cea6b6efb01c6e17200721ecbc2d --source-root .nkd/factory/nke-control-plane/src --result .nkd/factory/nke-control-plane/results/build-cwe.json .github/nkd-run/graphs/nke-control-plane.json
-      - name: Pack 'artifact/nke-control-plane/cwe'
+          printf '%s\n' 'Produced: artifact/nke-control-plane/cwe'
+          printf '%s\n' 'Produced: result/nke-control-plane/cwe'
+      - name: 'Archive cwe (image export)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/out/cwe/cwe.oci.tar
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cwe (image export)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-nke-control-plane-cwe'
           path: '.nkd/carriers/artifact-nke-control-plane-cwe.tar'
           if-no-files-found: error
-      - name: Pack 'result/nke-control-plane/cwe'
+      - name: 'Archive build result for cwe'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/result-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/results/build-cwe.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload build result for cwe'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-result-nke-control-plane-cwe'
           path: '.nkd/carriers/result-nke-control-plane-cwe.tar'
           if-no-files-found: error
   nkd-process-nke-control-plane-terminal-o-fc162219bb4f:
-    name: 'Process artifacts: nke-control-plane/terminal-observe'
+    name: 'Verify and package outputs with Helm image binding'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-nke-cli-build-nkectl, nkd-nke-control-plane-build-cwe, nkd-nke-control-plane-build-nke-helm, nkd-process-nke-cli-terminal-observe-nke-cli-sbom]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nkectl (binary)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-artifact-nke-cli-nkectl'
           path: '.nkd/carriers'
-      - name: Restore 'artifact/nke-cli/nkectl'
+      - name: 'Restore nkectl (binary)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/out/nkectl/nkectl
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cwe (image export)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-artifact-nke-control-plane-cwe'
           path: '.nkd/carriers'
-      - name: Restore 'artifact/nke-control-plane/cwe'
+      - name: 'Restore cwe (image export)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/out/cwe/cwe.oci.tar
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nke-helm (source archive)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-artifact-nke-control-plane-nke-helm'
           path: '.nkd/carriers'
-      - name: Restore 'artifact/nke-control-plane/nke-helm'
+      - name: 'Restore nke-helm (source archive)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/out/nke-helm/nke-helm.tar
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download artifact checks for nke-cli'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-observation-nke-cli'
           path: '.nkd/carriers'
-      - name: Restore 'observation/nke-cli'
+      - name: 'Restore artifact checks for nke-cli'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-nke-cli.tar --root . --path .nkd/factory/nke-cli/terminal-observation.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download build result for nkectl'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-result-nke-cli-nkectl'
           path: '.nkd/carriers'
-      - name: Restore 'result/nke-cli/nkectl'
+      - name: 'Restore build result for nkectl'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/results/build-nkectl.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download build result for cwe'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-result-nke-control-plane-cwe'
           path: '.nkd/carriers'
-      - name: Restore 'result/nke-control-plane/cwe'
+      - name: 'Restore build result for cwe'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/results/build-cwe.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download build result for nke-helm'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-result-nke-control-plane-nke-helm'
           path: '.nkd/carriers'
-      - name: Restore 'result/nke-control-plane/nke-helm'
+      - name: 'Restore build result for nke-helm'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/results/build-nke-helm.json
-      - name: 'Execute nke-control-plane/terminal-observe'
+      - name: 'Verify built artifacts: nke-control-plane'
+        id: nkd-nke-control-plane-terminal-observe
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Verify built artifacts: nke-control-plane'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-control-plane/terminal-observe'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-control-plane/terminal-observe --workspace .nkd/factory
-      - name: Pack 'observation/nke-control-plane'
+          printf '%s\n' 'Produced: observation/nke-control-plane'
+      - name: 'Archive artifact checks for nke-control-plane'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/terminal-observation.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload artifact checks for nke-control-plane'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-observation-nke-control-plane'
           path: '.nkd/carriers/observation-nke-control-plane.tar'
           if-no-files-found: error
-      - name: 'Execute nke-control-plane/sbom'
+      - name: 'Generate SBOMs: nke-control-plane'
+        id: nkd-nke-control-plane-sbom
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Generate SBOMs: nke-control-plane'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: nke-control-plane/sbom'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node nke-control-plane/sbom --workspace .nkd/factory
-      - name: Pack 'sbom/nke-control-plane'
+          printf '%s\n' 'Produced: sbom/nke-control-plane'
+      - name: 'Archive SBOMs for nke-control-plane'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/sbom
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload SBOMs for nke-control-plane'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-sbom-nke-control-plane'
           path: '.nkd/carriers/sbom-nke-control-plane.tar'
           if-no-files-found: error
-      - name: 'Execute package/cwe'
+      - name: 'Package container image: cwe'
+        id: nkd-package-cwe
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Package container image: cwe'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: package/cwe'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/cwe --workspace .nkd/factory
-      - name: Pack 'package/cwe'
+          printf '%s\n' 'Produced: package/cwe'
+      - name: 'Archive cwe (container image)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-cwe.tar --root . --path .nkd/factory/packages/cwe
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cwe (container image)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-cwe'
           path: '.nkd/carriers/package-cwe.tar'
           if-no-files-found: error
-      - name: 'Execute package/nke-helm'
+      - name: 'Bind image digest and package Helm: nke-helm'
+        id: nkd-package-nke-helm
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Bind image digest and package Helm: nke-helm'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: package/nke-helm'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nke-helm --workspace .nkd/factory
-      - name: Pack 'package/nke-helm'
+          printf '%s\n' 'Produced: package/nke-helm'
+      - name: 'Archive nke-helm (Helm bundle)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nke-helm.tar --root . --path .nkd/factory/packages/nke-helm
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nke-helm (Helm bundle)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-nke-helm'
           path: '.nkd/carriers/package-nke-helm.tar'
           if-no-files-found: error
-      - name: 'Execute package/nkectl'
+      - name: 'Package binaries: nkectl'
+        id: nkd-package-nkectl
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Package binaries: nkectl'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: package/nkectl'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl --workspace .nkd/factory
-      - name: Pack 'package/nkectl'
+          printf '%s\n' 'Produced: package/nkectl'
+      - name: 'Archive nkectl (binary bundle)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nkectl.tar --root . --path .nkd/factory/packages/nkectl
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nkectl (binary bundle)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-nkectl'
           path: '.nkd/carriers/package-nkectl.tar'
           if-no-files-found: error
-      - name: 'Execute package/cwe-release'
+      - name: 'Package publication bundle: cwe-release'
+        id: nkd-package-cwe-release
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Package publication bundle: cwe-release'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: package/cwe-release'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/cwe-release --workspace .nkd/factory
-      - name: Pack 'package/cwe-release'
+          printf '%s\n' 'Produced: package/cwe-release'
+      - name: 'Archive cwe-release (publication bundle)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-cwe-release.tar --root . --path .nkd/factory/packages/cwe-release
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cwe-release (publication bundle)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-cwe-release'
           path: '.nkd/carriers/package-cwe-release.tar'
           if-no-files-found: error
-      - name: 'Execute package/nke-helm-release'
+      - name: 'Package publication bundle: nke-helm-release'
+        id: nkd-package-nke-helm-release
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Package publication bundle: nke-helm-release'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: package/nke-helm-release'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nke-helm-release --workspace .nkd/factory
-      - name: Pack 'package/nke-helm-release'
+          printf '%s\n' 'Produced: package/nke-helm-release'
+      - name: 'Archive nke-helm-release (publication bundle)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nke-helm-release.tar --root . --path .nkd/factory/packages/nke-helm-release
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nke-helm-release (publication bundle)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-nke-helm-release'
           path: '.nkd/carriers/package-nke-helm-release.tar'
           if-no-files-found: error
-      - name: 'Execute package/nkectl-release'
+      - name: 'Package publication bundle: nkectl-release'
+        id: nkd-package-nkectl-release
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Package publication bundle: nkectl-release'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: package/nkectl-release'
           docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/nkectl-release --workspace .nkd/factory
-      - name: Pack 'package/nkectl-release'
+          printf '%s\n' 'Produced: package/nkectl-release'
+      - name: 'Archive nkectl-release (publication bundle)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nkectl-release (publication bundle)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-package-nkectl-release'
           path: '.nkd/carriers/package-nkectl-release.tar'
           if-no-files-found: error
   nkd-publish-cwe:
-    name: 'publish/cwe'
+    name: 'Publish cwe'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-process-nke-control-plane-terminal-o-fc162219bb4f]
@@ -511,33 +717,46 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cwe-release (publication bundle)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-cwe-release'
           path: '.nkd/carriers'
-      - name: Restore 'package/cwe-release'
+      - name: 'Restore cwe-release (publication bundle)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe-release.tar --root . --path .nkd/factory/packages/cwe-release
-      - name: 'Execute publish/cwe'
+      - name: 'Publish cwe'
+        id: nkd-publish-cwe
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Publish cwe'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: publish/cwe'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node publish/cwe --workspace .nkd/factory
-      - name: Pack 'publication/cwe'
+          printf '%s\n' 'Produced: publication/cwe'
+      - name: 'Archive cwe (published reference)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/publication-cwe.tar --root . --path .nkd/factory/publications/cwe.txt
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cwe (published reference)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-publication-cwe'
           path: '.nkd/carriers/publication-cwe.tar'
           if-no-files-found: error
   nkd-publish-nke-helm:
-    name: 'publish/nke-helm'
+    name: 'Publish nke-helm'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-process-nke-control-plane-terminal-o-fc162219bb4f]
@@ -550,33 +769,46 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nke-helm-release (publication bundle)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-nke-helm-release'
           path: '.nkd/carriers'
-      - name: Restore 'package/nke-helm-release'
+      - name: 'Restore nke-helm-release (publication bundle)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-nke-helm-release.tar --root . --path .nkd/factory/packages/nke-helm-release
-      - name: 'Execute publish/nke-helm'
+      - name: 'Publish nke-helm'
+        id: nkd-publish-nke-helm
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Publish nke-helm'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: publish/nke-helm'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node publish/nke-helm --workspace .nkd/factory
-      - name: Pack 'publication/nke-helm'
+          printf '%s\n' 'Produced: publication/nke-helm'
+      - name: 'Archive nke-helm (published reference)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/publication-nke-helm.tar --root . --path .nkd/factory/publications/nke-helm.txt
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nke-helm (published reference)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-publication-nke-helm'
           path: '.nkd/carriers/publication-nke-helm.tar'
           if-no-files-found: error
   nkd-publish-nkectl:
-    name: 'publish/nkectl'
+    name: 'Publish nkectl'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-process-nke-control-plane-terminal-o-fc162219bb4f]
@@ -589,59 +821,84 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nkectl-release (publication bundle)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-nkectl-release'
           path: '.nkd/carriers'
-      - name: Restore 'package/nkectl-release'
+      - name: 'Restore nkectl-release (publication bundle)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release
-      - name: 'Execute publish/nkectl'
+      - name: 'Publish nkectl'
+        id: nkd-publish-nkectl
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Publish nkectl'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: publish/nkectl'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node publish/nkectl --workspace .nkd/factory
-      - name: Pack 'publication/nkectl'
+          printf '%s\n' 'Produced: publication/nkectl'
+      - name: 'Archive nkectl (published reference)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nkectl (published reference)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-publication-nkectl'
           path: '.nkd/carriers/publication-nkectl.tar'
           if-no-files-found: error
   nkd-tool-cosign:
-    name: 'tool/cosign'
+    name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Execute tool/cosign'
+      - name: 'Acquire pinned cosign'
+        id: nkd-tool-cosign
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Acquire pinned cosign'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: tool/cosign'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node tool/cosign --workspace .nkd/factory
-      - name: Pack 'tool/cosign'
+          printf '%s\n' 'Produced: tool/cosign'
+      - name: 'Archive cosign (tool)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cosign (tool)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers/tool-cosign.tar'
           if-no-files-found: error
   nkd-sign-cwe:
-    name: 'sign/cwe'
+    name: 'Sign and attest cwe'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-process-nke-control-plane-terminal-o-fc162219bb4f, nkd-publish-cwe, nkd-tool-cosign]
@@ -655,52 +912,69 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cwe-release (publication bundle)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-cwe-release'
           path: '.nkd/carriers'
-      - name: Restore 'package/cwe-release'
+      - name: 'Restore cwe-release (publication bundle)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe-release.tar --root . --path .nkd/factory/packages/cwe-release
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cwe (published reference)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-cwe'
           path: '.nkd/carriers'
-      - name: Restore 'publication/cwe'
+      - name: 'Restore cwe (published reference)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-cwe.tar --root . --path .nkd/factory/publications/cwe.txt
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cosign (tool)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
-      - name: Restore 'tool/cosign'
+      - name: 'Restore cosign (tool)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - name: 'Execute sign/cwe'
+      - name: 'Sign and attest cwe'
+        id: nkd-sign-cwe
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Sign and attest cwe'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: sign/cwe'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node sign/cwe --workspace .nkd/factory
-      - name: Pack 'predicate/cwe'
+          printf '%s\n' 'Produced: predicate/cwe'
+          printf '%s\n' 'Produced: signature/cwe'
+      - name: 'Archive cwe (provenance)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/predicate-cwe.tar --root . --path .nkd/factory/predicates/cwe.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cwe (provenance)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-predicate-cwe'
           path: '.nkd/carriers/predicate-cwe.tar'
           if-no-files-found: error
-      - name: Pack 'signature/cwe'
+      - name: 'Archive cwe (signature record)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/signature-cwe.tar --root . --path .nkd/factory/signatures/cwe.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cwe (signature record)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-signature-cwe'
           path: '.nkd/carriers/signature-cwe.tar'
           if-no-files-found: error
   nkd-sign-nke-helm:
-    name: 'sign/nke-helm'
+    name: 'Sign and attest nke-helm'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-process-nke-control-plane-terminal-o-fc162219bb4f, nkd-publish-nke-helm, nkd-tool-cosign]
@@ -714,52 +988,69 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nke-helm-release (publication bundle)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-nke-helm-release'
           path: '.nkd/carriers'
-      - name: Restore 'package/nke-helm-release'
+      - name: 'Restore nke-helm-release (publication bundle)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-nke-helm-release.tar --root . --path .nkd/factory/packages/nke-helm-release
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nke-helm (published reference)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-nke-helm'
           path: '.nkd/carriers'
-      - name: Restore 'publication/nke-helm'
+      - name: 'Restore nke-helm (published reference)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nke-helm.tar --root . --path .nkd/factory/publications/nke-helm.txt
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cosign (tool)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
-      - name: Restore 'tool/cosign'
+      - name: 'Restore cosign (tool)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - name: 'Execute sign/nke-helm'
+      - name: 'Sign and attest nke-helm'
+        id: nkd-sign-nke-helm
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Sign and attest nke-helm'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: sign/nke-helm'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node sign/nke-helm --workspace .nkd/factory
-      - name: Pack 'predicate/nke-helm'
+          printf '%s\n' 'Produced: predicate/nke-helm'
+          printf '%s\n' 'Produced: signature/nke-helm'
+      - name: 'Archive nke-helm (provenance)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/predicate-nke-helm.tar --root . --path .nkd/factory/predicates/nke-helm.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nke-helm (provenance)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-predicate-nke-helm'
           path: '.nkd/carriers/predicate-nke-helm.tar'
           if-no-files-found: error
-      - name: Pack 'signature/nke-helm'
+      - name: 'Archive nke-helm (signature record)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/signature-nke-helm.tar --root . --path .nkd/factory/signatures/nke-helm.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nke-helm (signature record)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-signature-nke-helm'
           path: '.nkd/carriers/signature-nke-helm.tar'
           if-no-files-found: error
   nkd-sign-nkectl:
-    name: 'sign/nkectl'
+    name: 'Sign and attest nkectl'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-process-nke-control-plane-terminal-o-fc162219bb4f, nkd-publish-nkectl, nkd-tool-cosign]
@@ -773,52 +1064,69 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nkectl-release (publication bundle)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-package-nkectl-release'
           path: '.nkd/carriers'
-      - name: Restore 'package/nkectl-release'
+      - name: 'Restore nkectl-release (publication bundle)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nkectl (published reference)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-nkectl'
           path: '.nkd/carriers'
-      - name: Restore 'publication/nkectl'
+      - name: 'Restore nkectl (published reference)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cosign (tool)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
-      - name: Restore 'tool/cosign'
+      - name: 'Restore cosign (tool)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - name: 'Execute sign/nkectl'
+      - name: 'Sign and attest nkectl'
+        id: nkd-sign-nkectl
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Sign and attest nkectl'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: sign/nkectl'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node sign/nkectl --workspace .nkd/factory
-      - name: Pack 'predicate/nkectl'
+          printf '%s\n' 'Produced: predicate/nkectl'
+          printf '%s\n' 'Produced: signature/nkectl'
+      - name: 'Archive nkectl (provenance)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/predicate-nkectl.tar --root . --path .nkd/factory/predicates/nkectl.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nkectl (provenance)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-predicate-nkectl'
           path: '.nkd/carriers/predicate-nkectl.tar'
           if-no-files-found: error
-      - name: Pack 'signature/nkectl'
+      - name: 'Archive nkectl (signature record)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/signature-nkectl.tar --root . --path .nkd/factory/signatures/nkectl.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nkectl (signature record)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-signature-nkectl'
           path: '.nkd/carriers/signature-nkectl.tar'
           if-no-files-found: error
   nkd-verify-publication-cwe:
-    name: 'verify-publication/cwe'
+    name: 'Verify published signatures: cwe'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-publish-cwe, nkd-sign-cwe, nkd-tool-cosign]
@@ -831,45 +1139,60 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cwe (published reference)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-cwe'
           path: '.nkd/carriers'
-      - name: Restore 'publication/cwe'
+      - name: 'Restore cwe (published reference)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-cwe.tar --root . --path .nkd/factory/publications/cwe.txt
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cwe (signature record)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-signature-cwe'
           path: '.nkd/carriers'
-      - name: Restore 'signature/cwe'
+      - name: 'Restore cwe (signature record)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/signature-cwe.tar --root . --path .nkd/factory/signatures/cwe.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cosign (tool)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
-      - name: Restore 'tool/cosign'
+      - name: 'Restore cosign (tool)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - name: 'Execute verify-publication/cwe'
+      - name: 'Verify published signatures: cwe'
+        id: nkd-verify-publication-cwe
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Verify published signatures: cwe'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: verify-publication/cwe'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node verify-publication/cwe --workspace .nkd/factory
-      - name: Pack 'verification/cwe'
+          printf '%s\n' 'Produced: verification/cwe'
+      - name: 'Archive cwe (signature checks)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/verification-cwe.tar --root . --path .nkd/factory/verifications/cwe.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload cwe (signature checks)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-verification-cwe'
           path: '.nkd/carriers/verification-cwe.tar'
           if-no-files-found: error
   nkd-verify-publication-nke-helm:
-    name: 'verify-publication/nke-helm'
+    name: 'Verify published signatures: nke-helm'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-publish-nke-helm, nkd-sign-nke-helm, nkd-tool-cosign]
@@ -882,45 +1205,60 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nke-helm (published reference)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-nke-helm'
           path: '.nkd/carriers'
-      - name: Restore 'publication/nke-helm'
+      - name: 'Restore nke-helm (published reference)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nke-helm.tar --root . --path .nkd/factory/publications/nke-helm.txt
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nke-helm (signature record)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-signature-nke-helm'
           path: '.nkd/carriers'
-      - name: Restore 'signature/nke-helm'
+      - name: 'Restore nke-helm (signature record)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/signature-nke-helm.tar --root . --path .nkd/factory/signatures/nke-helm.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cosign (tool)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
-      - name: Restore 'tool/cosign'
+      - name: 'Restore cosign (tool)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - name: 'Execute verify-publication/nke-helm'
+      - name: 'Verify published signatures: nke-helm'
+        id: nkd-verify-publication-nke-helm
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Verify published signatures: nke-helm'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: verify-publication/nke-helm'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node verify-publication/nke-helm --workspace .nkd/factory
-      - name: Pack 'verification/nke-helm'
+          printf '%s\n' 'Produced: verification/nke-helm'
+      - name: 'Archive nke-helm (signature checks)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/verification-nke-helm.tar --root . --path .nkd/factory/verifications/nke-helm.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nke-helm (signature checks)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-verification-nke-helm'
           path: '.nkd/carriers/verification-nke-helm.tar'
           if-no-files-found: error
   nkd-verify-publication-nkectl:
-    name: 'verify-publication/nkectl'
+    name: 'Verify published signatures: nkectl'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-publish-nkectl, nkd-sign-nkectl, nkd-tool-cosign]
@@ -933,141 +1271,264 @@ jobs:
       NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NKD_REGISTRY_USER: '${{ github.actor }}'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nkectl (published reference)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-publication-nkectl'
           path: '.nkd/carriers'
-      - name: Restore 'publication/nkectl'
+      - name: 'Restore nkectl (published reference)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download nkectl (signature record)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-signature-nkectl'
           path: '.nkd/carriers'
-      - name: Restore 'signature/nkectl'
+      - name: 'Restore nkectl (signature record)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/signature-nkectl.tar --root . --path .nkd/factory/signatures/nkectl.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download cosign (tool)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-tool-cosign'
           path: '.nkd/carriers'
-      - name: Restore 'tool/cosign'
+      - name: 'Restore cosign (tool)'
         run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
-      - name: 'Execute verify-publication/nkectl'
+      - name: 'Verify published signatures: nkectl'
+        id: nkd-verify-publication-nkectl
         run: |
+          set -euo pipefail
+          nkd_started=$SECONDS
+          nkd_step='Verify published signatures: nkectl'
+          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
+          trap nkd_finish EXIT
+          printf 'Starting: %s\n' "$nkd_step"
+          printf '%s\n' 'Node: verify-publication/nkectl'
           ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node verify-publication/nkectl --workspace .nkd/factory
-      - name: Pack 'verification/nkectl'
+          printf '%s\n' 'Produced: verification/nkectl'
+      - name: 'Archive nkectl (signature checks)'
         run: ./nkd-exec transport-pack --archive .nkd/carriers/verification-nkectl.tar --root . --path .nkd/factory/verifications/nkectl.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: 'Upload nkectl (signature checks)'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-verification-nkectl'
           path: '.nkd/carriers/verification-nkectl.tar'
           if-no-files-found: error
   nkd-lifecycle-run:
-    name: Finalize lifecycle Run
+    name: Finalize Run and check completeness
     runs-on: 'ubuntu-latest'
     timeout-minutes: 15
     needs: [build-runner-ubuntu-latest, nkd-nke-cli-build-nkectl, nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6, nkd-nke-control-plane-build-cwe, nkd-nke-control-plane-build-nke-helm, nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6, nkd-nke-control-plane-fetch-source-54834-4fa958e0512c, nkd-process-nke-cli-terminal-observe-nke-cli-sbom, nkd-process-nke-control-plane-terminal-o-fc162219bb4f, nkd-publish-cwe, nkd-publish-nke-helm, nkd-publish-nkectl, nkd-sign-cwe, nkd-sign-nke-helm, nkd-sign-nkectl, nkd-tool-cosign, nkd-verify-publication-cwe, nkd-verify-publication-nke-helm, nkd-verify-publication-nkectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: 'Download NKD runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: 'nkd-exec-ubuntu-latest'
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: Prepare restore outcomes
+      - name: Prepare artifact recovery
         run: mkdir -p .nkd/restore-outcomes
-      - name: Download Run carriers
+      - name: Download artifacts and evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         continue-on-error: true
         with:
           pattern: '{nkd-artifact-nke-cli-nkectl,nkd-artifact-nke-control-plane-cwe,nkd-artifact-nke-control-plane-nke-helm,nkd-observation-nke-cli,nkd-observation-nke-control-plane,nkd-package-cwe,nkd-package-cwe-release,nkd-package-nke-helm,nkd-package-nke-helm-release,nkd-package-nkectl,nkd-package-nkectl-release,nkd-predicate-cwe,nkd-predicate-nke-helm,nkd-predicate-nkectl,nkd-publication-cwe,nkd-publication-nke-helm,nkd-publication-nkectl,nkd-result-nke-cli-nkectl,nkd-result-nke-control-plane-cwe,nkd-result-nke-control-plane-nke-helm,nkd-sbom-nke-cli,nkd-sbom-nke-control-plane,nkd-signature-cwe,nkd-signature-nke-helm,nkd-signature-nkectl,nkd-source-receipt-nke-cli-fetch-source-a97eec4285f7,nkd-source-receipt-nke-control-plane-fet-d1142b4e0bbb,nkd-source-receipt-nke-control-plane-fet-2ebbea6b9857,nkd-source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c,nkd-source-nke-control-plane-fetch-sourc-d5a8439ec93e,nkd-source-nke-control-plane-fetch-sourc-318ab8d49282,nkd-tool-cosign,nkd-verification-cwe,nkd-verification-nke-helm,nkd-verification-nkectl}'
           path: .nkd/carriers
           merge-multiple: 'true'
-      - name: Restore 'artifact/nke-cli/nkectl' when produced
-        run: if [ '${{ needs.nkd-nke-cli-build-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; elif [ ! -f .nkd/carriers/artifact-nke-cli-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/out/nkectl/nkectl; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; fi
-      - name: Restore 'artifact/nke-control-plane/cwe' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-build-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; elif [ ! -f .nkd/carriers/artifact-nke-control-plane-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/out/cwe/cwe.oci.tar; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; fi
-      - name: Restore 'artifact/nke-control-plane/nke-helm' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-build-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; elif [ ! -f .nkd/carriers/artifact-nke-control-plane-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/out/nke-helm/nke-helm.tar; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; fi
-      - name: Restore 'observation/nke-cli' when produced
-        run: if [ '${{ needs.nkd-process-nke-cli-terminal-observe-nke-cli-sbom.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-nke-cli.status; elif [ ! -f .nkd/carriers/observation-nke-cli.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-nke-cli.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-nke-cli.tar --root . --path .nkd/factory/nke-cli/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-nke-cli.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-nke-cli.status; fi
-      - name: Restore 'observation/nke-control-plane' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; elif [ ! -f .nkd/carriers/observation-nke-control-plane.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; fi
-      - name: Restore 'package/cwe' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-cwe.status; elif [ ! -f .nkd/carriers/package-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe.tar --root . --path .nkd/factory/packages/cwe; then printf 'restored:success\n' > .nkd/restore-outcomes/package-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-cwe.status; fi
-      - name: Restore 'package/cwe-release' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-cwe-release.status; elif [ ! -f .nkd/carriers/package-cwe-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-cwe-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe-release.tar --root . --path .nkd/factory/packages/cwe-release; then printf 'restored:success\n' > .nkd/restore-outcomes/package-cwe-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-cwe-release.status; fi
-      - name: Restore 'package/nke-helm' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nke-helm.status; elif [ ! -f .nkd/carriers/package-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nke-helm.tar --root . --path .nkd/factory/packages/nke-helm; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nke-helm.status; fi
-      - name: Restore 'package/nke-helm-release' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nke-helm-release.status; elif [ ! -f .nkd/carriers/package-nke-helm-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nke-helm-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nke-helm-release.tar --root . --path .nkd/factory/packages/nke-helm-release; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nke-helm-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nke-helm-release.status; fi
-      - name: Restore 'package/nkectl' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nkectl.status; elif [ ! -f .nkd/carriers/package-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nkectl.tar --root . --path .nkd/factory/packages/nkectl; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nkectl.status; fi
-      - name: Restore 'package/nkectl-release' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nkectl-release.status; elif [ ! -f .nkd/carriers/package-nkectl-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nkectl-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nkectl-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nkectl-release.status; fi
-      - name: Restore 'predicate/cwe' when produced
-        run: if [ '${{ needs.nkd-sign-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/predicate-cwe.status; elif [ ! -f .nkd/carriers/predicate-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/predicate-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/predicate-cwe.tar --root . --path .nkd/factory/predicates/cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/predicate-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/predicate-cwe.status; fi
-      - name: Restore 'predicate/nke-helm' when produced
-        run: if [ '${{ needs.nkd-sign-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/predicate-nke-helm.status; elif [ ! -f .nkd/carriers/predicate-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/predicate-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/predicate-nke-helm.tar --root . --path .nkd/factory/predicates/nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/predicate-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/predicate-nke-helm.status; fi
-      - name: Restore 'predicate/nkectl' when produced
-        run: if [ '${{ needs.nkd-sign-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/predicate-nkectl.status; elif [ ! -f .nkd/carriers/predicate-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/predicate-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/predicate-nkectl.tar --root . --path .nkd/factory/predicates/nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/predicate-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/predicate-nkectl.status; fi
-      - name: Restore 'publication/cwe' when produced
-        run: if [ '${{ needs.nkd-publish-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/publication-cwe.status; elif [ ! -f .nkd/carriers/publication-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/publication-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/publication-cwe.tar --root . --path .nkd/factory/publications/cwe.txt; then printf 'restored:success\n' > .nkd/restore-outcomes/publication-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/publication-cwe.status; fi
-      - name: Restore 'publication/nke-helm' when produced
-        run: if [ '${{ needs.nkd-publish-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/publication-nke-helm.status; elif [ ! -f .nkd/carriers/publication-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/publication-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nke-helm.tar --root . --path .nkd/factory/publications/nke-helm.txt; then printf 'restored:success\n' > .nkd/restore-outcomes/publication-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/publication-nke-helm.status; fi
-      - name: Restore 'publication/nkectl' when produced
-        run: if [ '${{ needs.nkd-publish-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/publication-nkectl.status; elif [ ! -f .nkd/carriers/publication-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/publication-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt; then printf 'restored:success\n' > .nkd/restore-outcomes/publication-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/publication-nkectl.status; fi
-      - name: Restore 'result/nke-cli/nkectl' when produced
-        run: if [ '${{ needs.nkd-nke-cli-build-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; elif [ ! -f .nkd/carriers/result-nke-cli-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/results/build-nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; fi
-      - name: Restore 'result/nke-control-plane/cwe' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-build-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; elif [ ! -f .nkd/carriers/result-nke-control-plane-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/results/build-cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; fi
-      - name: Restore 'result/nke-control-plane/nke-helm' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-build-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; elif [ ! -f .nkd/carriers/result-nke-control-plane-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/results/build-nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; fi
-      - name: Restore 'sbom/nke-cli' when produced
-        run: if [ '${{ needs.nkd-process-nke-cli-terminal-observe-nke-cli-sbom.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-nke-cli.status; elif [ ! -f .nkd/carriers/sbom-nke-cli.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-nke-cli.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-nke-cli.tar --root . --path .nkd/factory/nke-cli/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-nke-cli.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-nke-cli.status; fi
-      - name: Restore 'sbom/nke-control-plane' when produced
-        run: if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; elif [ ! -f .nkd/carriers/sbom-nke-control-plane.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; fi
-      - name: Restore 'signature/cwe' when produced
-        run: if [ '${{ needs.nkd-sign-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/signature-cwe.status; elif [ ! -f .nkd/carriers/signature-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/signature-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/signature-cwe.tar --root . --path .nkd/factory/signatures/cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/signature-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/signature-cwe.status; fi
-      - name: Restore 'signature/nke-helm' when produced
-        run: if [ '${{ needs.nkd-sign-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/signature-nke-helm.status; elif [ ! -f .nkd/carriers/signature-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/signature-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/signature-nke-helm.tar --root . --path .nkd/factory/signatures/nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/signature-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/signature-nke-helm.status; fi
-      - name: Restore 'signature/nkectl' when produced
-        run: if [ '${{ needs.nkd-sign-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/signature-nkectl.status; elif [ ! -f .nkd/carriers/signature-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/signature-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/signature-nkectl.tar --root . --path .nkd/factory/signatures/nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/signature-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/signature-nkectl.status; fi
-      - name: Restore 'source-receipt/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063' when produced
-        run: if [ '${{ needs.nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; elif [ ! -f .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar --root . --path .nkd/factory/nke-cli/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; fi
-      - name: Restore 'source-receipt/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; elif [ ! -f .nkd/carriers/source-receipt-nke-control-plane-fet-d1142b4e0bbb.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-d1142b4e0bbb.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; fi
-      - name: Restore 'source-receipt/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-fetch-source-54834-4fa958e0512c.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; elif [ ! -f .nkd/carriers/source-receipt-nke-control-plane-fet-2ebbea6b9857.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-2ebbea6b9857.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be-03b299ee6a33.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; fi
-      - name: Restore 'source/nke-cli/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063' when produced
-        run: if [ '${{ needs.nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; elif [ ! -f .nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar --root . --path .nkd/factory/nke-cli/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063; then printf 'restored:success\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; fi
-      - name: Restore 'source/nke-control-plane/fetch-source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; elif [ ! -f .nkd/carriers/source-nke-control-plane-fetch-sourc-d5a8439ec93e.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-d5a8439ec93e.tar --root . --path .nkd/factory/nke-control-plane/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063; then printf 'restored:success\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; fi
-      - name: Restore 'source/nke-control-plane/fetch-source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be' when produced
-        run: if [ '${{ needs.nkd-nke-control-plane-fetch-source-54834-4fa958e0512c.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; elif [ ! -f .nkd/carriers/source-nke-control-plane-fetch-sourc-318ab8d49282.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-318ab8d49282.tar --root . --path .nkd/factory/nke-control-plane/src/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be; then printf 'restored:success\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; fi
-      - name: Restore 'tool/cosign' when produced
-        run: if [ '${{ needs.nkd-tool-cosign.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/tool-cosign.status; elif [ ! -f .nkd/carriers/tool-cosign.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/tool-cosign.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64; then printf 'restored:success\n' > .nkd/restore-outcomes/tool-cosign.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/tool-cosign.status; fi
-      - name: Restore 'verification/cwe' when produced
-        run: if [ '${{ needs.nkd-verify-publication-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-cwe.status; elif [ ! -f .nkd/carriers/verification-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-cwe.tar --root . --path .nkd/factory/verifications/cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-cwe.status; fi
-      - name: Restore 'verification/nke-helm' when produced
-        run: if [ '${{ needs.nkd-verify-publication-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-nke-helm.status; elif [ ! -f .nkd/carriers/verification-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-nke-helm.tar --root . --path .nkd/factory/verifications/nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-nke-helm.status; fi
-      - name: Restore 'verification/nkectl' when produced
-        run: if [ '${{ needs.nkd-verify-publication-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-nkectl.status; elif [ ! -f .nkd/carriers/verification-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-nkectl.tar --root . --path .nkd/factory/verifications/nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-nkectl.status; fi
-      - name: Finalize lifecycle Run
+      - name: 'Recover nkectl (binary)'
+        run: |
+          if [ '${{ needs.nkd-nke-cli-build-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; elif [ ! -f .nkd/carriers/artifact-nke-cli-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/out/nkectl/nkectl; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-nke-cli-nkectl.status; fi
+          printf '%s: ' 'nkectl (binary)'
+          cat .nkd/restore-outcomes/artifact-nke-cli-nkectl.status
+      - name: 'Recover cwe (image export)'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-build-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; elif [ ! -f .nkd/carriers/artifact-nke-control-plane-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/out/cwe/cwe.oci.tar; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status; fi
+          printf '%s: ' 'cwe (image export)'
+          cat .nkd/restore-outcomes/artifact-nke-control-plane-cwe.status
+      - name: 'Recover nke-helm (source archive)'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-build-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; elif [ ! -f .nkd/carriers/artifact-nke-control-plane-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/out/nke-helm/nke-helm.tar; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status; fi
+          printf '%s: ' 'nke-helm (source archive)'
+          cat .nkd/restore-outcomes/artifact-nke-control-plane-nke-helm.status
+      - name: 'Recover artifact checks for nke-cli'
+        run: |
+          if [ '${{ needs.nkd-process-nke-cli-terminal-observe-nke-cli-sbom.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-nke-cli.status; elif [ ! -f .nkd/carriers/observation-nke-cli.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-nke-cli.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-nke-cli.tar --root . --path .nkd/factory/nke-cli/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-nke-cli.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-nke-cli.status; fi
+          printf '%s: ' 'artifact checks for nke-cli'
+          cat .nkd/restore-outcomes/observation-nke-cli.status
+      - name: 'Recover artifact checks for nke-control-plane'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; elif [ ! -f .nkd/carriers/observation-nke-control-plane.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-nke-control-plane.status; fi
+          printf '%s: ' 'artifact checks for nke-control-plane'
+          cat .nkd/restore-outcomes/observation-nke-control-plane.status
+      - name: 'Recover cwe (container image)'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-cwe.status; elif [ ! -f .nkd/carriers/package-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe.tar --root . --path .nkd/factory/packages/cwe; then printf 'restored:success\n' > .nkd/restore-outcomes/package-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-cwe.status; fi
+          printf '%s: ' 'cwe (container image)'
+          cat .nkd/restore-outcomes/package-cwe.status
+      - name: 'Recover cwe-release (publication bundle)'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-cwe-release.status; elif [ ! -f .nkd/carriers/package-cwe-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-cwe-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe-release.tar --root . --path .nkd/factory/packages/cwe-release; then printf 'restored:success\n' > .nkd/restore-outcomes/package-cwe-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-cwe-release.status; fi
+          printf '%s: ' 'cwe-release (publication bundle)'
+          cat .nkd/restore-outcomes/package-cwe-release.status
+      - name: 'Recover nke-helm (Helm bundle)'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nke-helm.status; elif [ ! -f .nkd/carriers/package-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nke-helm.tar --root . --path .nkd/factory/packages/nke-helm; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nke-helm.status; fi
+          printf '%s: ' 'nke-helm (Helm bundle)'
+          cat .nkd/restore-outcomes/package-nke-helm.status
+      - name: 'Recover nke-helm-release (publication bundle)'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nke-helm-release.status; elif [ ! -f .nkd/carriers/package-nke-helm-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nke-helm-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nke-helm-release.tar --root . --path .nkd/factory/packages/nke-helm-release; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nke-helm-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nke-helm-release.status; fi
+          printf '%s: ' 'nke-helm-release (publication bundle)'
+          cat .nkd/restore-outcomes/package-nke-helm-release.status
+      - name: 'Recover nkectl (binary bundle)'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nkectl.status; elif [ ! -f .nkd/carriers/package-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nkectl.tar --root . --path .nkd/factory/packages/nkectl; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nkectl.status; fi
+          printf '%s: ' 'nkectl (binary bundle)'
+          cat .nkd/restore-outcomes/package-nkectl.status
+      - name: 'Recover nkectl-release (publication bundle)'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-nkectl-release.status; elif [ ! -f .nkd/carriers/package-nkectl-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-nkectl-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-nkectl-release.tar --root . --path .nkd/factory/packages/nkectl-release; then printf 'restored:success\n' > .nkd/restore-outcomes/package-nkectl-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-nkectl-release.status; fi
+          printf '%s: ' 'nkectl-release (publication bundle)'
+          cat .nkd/restore-outcomes/package-nkectl-release.status
+      - name: 'Recover cwe (provenance)'
+        run: |
+          if [ '${{ needs.nkd-sign-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/predicate-cwe.status; elif [ ! -f .nkd/carriers/predicate-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/predicate-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/predicate-cwe.tar --root . --path .nkd/factory/predicates/cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/predicate-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/predicate-cwe.status; fi
+          printf '%s: ' 'cwe (provenance)'
+          cat .nkd/restore-outcomes/predicate-cwe.status
+      - name: 'Recover nke-helm (provenance)'
+        run: |
+          if [ '${{ needs.nkd-sign-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/predicate-nke-helm.status; elif [ ! -f .nkd/carriers/predicate-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/predicate-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/predicate-nke-helm.tar --root . --path .nkd/factory/predicates/nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/predicate-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/predicate-nke-helm.status; fi
+          printf '%s: ' 'nke-helm (provenance)'
+          cat .nkd/restore-outcomes/predicate-nke-helm.status
+      - name: 'Recover nkectl (provenance)'
+        run: |
+          if [ '${{ needs.nkd-sign-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/predicate-nkectl.status; elif [ ! -f .nkd/carriers/predicate-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/predicate-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/predicate-nkectl.tar --root . --path .nkd/factory/predicates/nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/predicate-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/predicate-nkectl.status; fi
+          printf '%s: ' 'nkectl (provenance)'
+          cat .nkd/restore-outcomes/predicate-nkectl.status
+      - name: 'Recover cwe (published reference)'
+        run: |
+          if [ '${{ needs.nkd-publish-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/publication-cwe.status; elif [ ! -f .nkd/carriers/publication-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/publication-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/publication-cwe.tar --root . --path .nkd/factory/publications/cwe.txt; then printf 'restored:success\n' > .nkd/restore-outcomes/publication-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/publication-cwe.status; fi
+          printf '%s: ' 'cwe (published reference)'
+          cat .nkd/restore-outcomes/publication-cwe.status
+      - name: 'Recover nke-helm (published reference)'
+        run: |
+          if [ '${{ needs.nkd-publish-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/publication-nke-helm.status; elif [ ! -f .nkd/carriers/publication-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/publication-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nke-helm.tar --root . --path .nkd/factory/publications/nke-helm.txt; then printf 'restored:success\n' > .nkd/restore-outcomes/publication-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/publication-nke-helm.status; fi
+          printf '%s: ' 'nke-helm (published reference)'
+          cat .nkd/restore-outcomes/publication-nke-helm.status
+      - name: 'Recover nkectl (published reference)'
+        run: |
+          if [ '${{ needs.nkd-publish-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/publication-nkectl.status; elif [ ! -f .nkd/carriers/publication-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/publication-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/publication-nkectl.tar --root . --path .nkd/factory/publications/nkectl.txt; then printf 'restored:success\n' > .nkd/restore-outcomes/publication-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/publication-nkectl.status; fi
+          printf '%s: ' 'nkectl (published reference)'
+          cat .nkd/restore-outcomes/publication-nkectl.status
+      - name: 'Recover build result for nkectl'
+        run: |
+          if [ '${{ needs.nkd-nke-cli-build-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; elif [ ! -f .nkd/carriers/result-nke-cli-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-cli-nkectl.tar --root . --path .nkd/factory/nke-cli/results/build-nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-nke-cli-nkectl.status; fi
+          printf '%s: ' 'build result for nkectl'
+          cat .nkd/restore-outcomes/result-nke-cli-nkectl.status
+      - name: 'Recover build result for cwe'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-build-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; elif [ ! -f .nkd/carriers/result-nke-control-plane-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-control-plane-cwe.tar --root . --path .nkd/factory/nke-control-plane/results/build-cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-cwe.status; fi
+          printf '%s: ' 'build result for cwe'
+          cat .nkd/restore-outcomes/result-nke-control-plane-cwe.status
+      - name: 'Recover build result for nke-helm'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-build-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; elif [ ! -f .nkd/carriers/result-nke-control-plane-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-nke-control-plane-nke-helm.tar --root . --path .nkd/factory/nke-control-plane/results/build-nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status; fi
+          printf '%s: ' 'build result for nke-helm'
+          cat .nkd/restore-outcomes/result-nke-control-plane-nke-helm.status
+      - name: 'Recover SBOMs for nke-cli'
+        run: |
+          if [ '${{ needs.nkd-process-nke-cli-terminal-observe-nke-cli-sbom.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-nke-cli.status; elif [ ! -f .nkd/carriers/sbom-nke-cli.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-nke-cli.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-nke-cli.tar --root . --path .nkd/factory/nke-cli/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-nke-cli.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-nke-cli.status; fi
+          printf '%s: ' 'SBOMs for nke-cli'
+          cat .nkd/restore-outcomes/sbom-nke-cli.status
+      - name: 'Recover SBOMs for nke-control-plane'
+        run: |
+          if [ '${{ needs.nkd-process-nke-control-plane-terminal-o-fc162219bb4f.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; elif [ ! -f .nkd/carriers/sbom-nke-control-plane.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-nke-control-plane.tar --root . --path .nkd/factory/nke-control-plane/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-nke-control-plane.status; fi
+          printf '%s: ' 'SBOMs for nke-control-plane'
+          cat .nkd/restore-outcomes/sbom-nke-control-plane.status
+      - name: 'Recover cwe (signature record)'
+        run: |
+          if [ '${{ needs.nkd-sign-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/signature-cwe.status; elif [ ! -f .nkd/carriers/signature-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/signature-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/signature-cwe.tar --root . --path .nkd/factory/signatures/cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/signature-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/signature-cwe.status; fi
+          printf '%s: ' 'cwe (signature record)'
+          cat .nkd/restore-outcomes/signature-cwe.status
+      - name: 'Recover nke-helm (signature record)'
+        run: |
+          if [ '${{ needs.nkd-sign-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/signature-nke-helm.status; elif [ ! -f .nkd/carriers/signature-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/signature-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/signature-nke-helm.tar --root . --path .nkd/factory/signatures/nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/signature-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/signature-nke-helm.status; fi
+          printf '%s: ' 'nke-helm (signature record)'
+          cat .nkd/restore-outcomes/signature-nke-helm.status
+      - name: 'Recover nkectl (signature record)'
+        run: |
+          if [ '${{ needs.nkd-sign-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/signature-nkectl.status; elif [ ! -f .nkd/carriers/signature-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/signature-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/signature-nkectl.tar --root . --path .nkd/factory/signatures/nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/signature-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/signature-nkectl.status; fi
+          printf '%s: ' 'nkectl (signature record)'
+          cat .nkd/restore-outcomes/signature-nkectl.status
+      - name: 'Recover source verification for nkectl (nke-cli)'
+        run: |
+          if [ '${{ needs.nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; elif [ ! -f .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-cli-fetch-source-a97eec4285f7.tar --root . --path .nkd/factory/nke-cli/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status; fi
+          printf '%s: ' 'source verification for nkectl (nke-cli)'
+          cat .nkd/restore-outcomes/source-receipt-nke-cli-fetch-source-a97eec4285f7.status
+      - name: 'Recover source verification for nke-helm (nke-control-plane)'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; elif [ ! -f .nkd/carriers/source-receipt-nke-control-plane-fet-d1142b4e0bbb.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-d1142b4e0bbb.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063-36d7a289f311.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status; fi
+          printf '%s: ' 'source verification for nke-helm (nke-control-plane)'
+          cat .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-d1142b4e0bbb.status
+      - name: 'Recover source verification for cwe (nke-control-plane)'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-fetch-source-54834-4fa958e0512c.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; elif [ ! -f .nkd/carriers/source-receipt-nke-control-plane-fet-2ebbea6b9857.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-nke-control-plane-fet-2ebbea6b9857.tar --root . --path .nkd/factory/nke-control-plane/source-receipts/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be-03b299ee6a33.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status; fi
+          printf '%s: ' 'source verification for cwe (nke-control-plane)'
+          cat .nkd/restore-outcomes/source-receipt-nke-control-plane-fet-2ebbea6b9857.status
+      - name: 'Recover source for nkectl (nke-cli)'
+        run: |
+          if [ '${{ needs.nkd-nke-cli-fetch-source-3ea7f3f2f2b97a1-2c6e14f977f6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; elif [ ! -f .nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.tar --root . --path .nkd/factory/nke-cli/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063; then printf 'restored:success\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status; fi
+          printf '%s: ' 'source for nkectl (nke-cli)'
+          cat .nkd/restore-outcomes/source-nke-cli-fetch-source-3ea7f3f2-b5e3d9f4e00c.status
+      - name: 'Recover source for nke-helm (nke-control-plane)'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-fetch-source-3ea7f-a8e6c8e8d3b6.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; elif [ ! -f .nkd/carriers/source-nke-control-plane-fetch-sourc-d5a8439ec93e.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-d5a8439ec93e.tar --root . --path .nkd/factory/nke-control-plane/src/source-3ea7f3f2f2b97a1ed907b967b81b06a737e4f6627af1a21a5443471b165cd063; then printf 'restored:success\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status; fi
+          printf '%s: ' 'source for nke-helm (nke-control-plane)'
+          cat .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-d5a8439ec93e.status
+      - name: 'Recover source for cwe (nke-control-plane)'
+        run: |
+          if [ '${{ needs.nkd-nke-control-plane-fetch-source-54834-4fa958e0512c.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; elif [ ! -f .nkd/carriers/source-nke-control-plane-fetch-sourc-318ab8d49282.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-nke-control-plane-fetch-sourc-318ab8d49282.tar --root . --path .nkd/factory/nke-control-plane/src/source-54834ede8b19817afab094efc31c4811ede17a6b2f6ac31fdf82db2a013014be; then printf 'restored:success\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status; fi
+          printf '%s: ' 'source for cwe (nke-control-plane)'
+          cat .nkd/restore-outcomes/source-nke-control-plane-fetch-sourc-318ab8d49282.status
+      - name: 'Recover cosign (tool)'
+        run: |
+          if [ '${{ needs.nkd-tool-cosign.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/tool-cosign.status; elif [ ! -f .nkd/carriers/tool-cosign.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/tool-cosign.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64; then printf 'restored:success\n' > .nkd/restore-outcomes/tool-cosign.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/tool-cosign.status; fi
+          printf '%s: ' 'cosign (tool)'
+          cat .nkd/restore-outcomes/tool-cosign.status
+      - name: 'Recover cwe (signature checks)'
+        run: |
+          if [ '${{ needs.nkd-verify-publication-cwe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-cwe.status; elif [ ! -f .nkd/carriers/verification-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-cwe.tar --root . --path .nkd/factory/verifications/cwe.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-cwe.status; fi
+          printf '%s: ' 'cwe (signature checks)'
+          cat .nkd/restore-outcomes/verification-cwe.status
+      - name: 'Recover nke-helm (signature checks)'
+        run: |
+          if [ '${{ needs.nkd-verify-publication-nke-helm.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-nke-helm.status; elif [ ! -f .nkd/carriers/verification-nke-helm.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-nke-helm.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-nke-helm.tar --root . --path .nkd/factory/verifications/nke-helm.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-nke-helm.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-nke-helm.status; fi
+          printf '%s: ' 'nke-helm (signature checks)'
+          cat .nkd/restore-outcomes/verification-nke-helm.status
+      - name: 'Recover nkectl (signature checks)'
+        run: |
+          if [ '${{ needs.nkd-verify-publication-nkectl.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-nkectl.status; elif [ ! -f .nkd/carriers/verification-nkectl.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-nkectl.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-nkectl.tar --root . --path .nkd/factory/verifications/nkectl.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-nkectl.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-nkectl.status; fi
+          printf '%s: ' 'nkectl (signature checks)'
+          cat .nkd/restore-outcomes/verification-nkectl.status
+      - name: Finalize Run and check completeness
         run: ./nkd-exec run finalize --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-github.yaml --plan .github/nkd-run/plan.json --attempt "${{ github.run_id }}-${{ github.run_attempt }}" --workspace .nkd/factory --out .nkd/run.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: Upload final Run record
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: ${{ always() }}
         with:
           name: nkd-lifecycle-run

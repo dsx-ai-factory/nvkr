@@ -72,13 +72,13 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 
 	var executed []string
 	for _, step := range job.Steps {
-		if strings.HasPrefix(step.Name, "Execute ") {
-			executed = append(executed, strings.TrimPrefix(step.Name, "Execute "))
+		if step.ID != "" {
+			executed = append(executed, step.ID)
 		}
 	}
 	wantExecuted := make([]string, 0, len(stage.Nodes))
 	for _, node := range stage.Nodes {
-		wantExecuted = append(wantExecuted, node.ID)
+		wantExecuted = append(wantExecuted, githubJobID(node.ID))
 		for _, output := range node.Outputs {
 			if !stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				t.Errorf("logical output %q is not uploaded from grouped stage %q", output, stage.ID)
@@ -157,7 +157,7 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 			job := document.Jobs[stage.ID]
 			var execute []int
 			for index, step := range job.Steps {
-				if strings.HasPrefix(step.Name, "Execute ") {
+				if step.ID != "" {
 					execute = append(execute, index)
 				}
 			}
@@ -201,7 +201,7 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 		{
 			name: "injected stage step",
 			mutate: func(raw []byte) []byte {
-				return bytes.Replace(raw, []byte("      - name: 'Execute "), []byte("      - name: Injected shell\n        run: printf injected\n      - name: 'Execute "), 1)
+				return bytes.Replace(raw, []byte("      - name: 'Fetch pinned source"), []byte("      - name: Injected shell\n        run: printf injected\n      - name: 'Fetch pinned source"), 1)
 			},
 		},
 		{

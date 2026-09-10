@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -300,7 +301,7 @@ func reproduceLifecyclePackage(ctx context.Context, plan *Plan, artifact Artifac
 	reproduced.Path = filepath.Join(stage, "output")
 	clone[artifact.ID] = reproduced
 	node := planNode(plan, artifact.Producer)
-	if err := executePackage(ctx, plan, node, clone); err != nil {
+	if err := executePackage(ctx, plan, node, clone, io.Discard); err != nil {
 		return "", err
 	}
 	switch artifact.Kind {

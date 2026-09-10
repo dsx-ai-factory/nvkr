@@ -207,6 +207,13 @@ same workspace bytes and consumer checks. Each logical output retains its carrie
 shared job makes its outputs unsuccessful for finalization, even if an earlier step uploaded a carrier.
 This provider scheduling choice does not change the logical graph or Recipe identity.
 
+GitHub job and step labels describe the operation and selected component or output. Grouped jobs disclose Helm
+image binding when present; stable execution step IDs and exact commands retain the graph binding independently
+of display names. Each execution step logs its start, node ID, successful outputs, elapsed seconds and exit
+status. Failure preserves the command's exit code and cannot print a successful completion. Packaging reports
+the actual bound image digest, and publication reports its persisted immutable reference. Logs are diagnostic,
+not authority receipts, and generated progress messages never dump credentials or environment variables.
+
 The finalizer batches downloads with an exact set of planned carrier names. It still restores every carrier
 and records its producer and restore outcome; a successful batch download alone proves no completeness.
 

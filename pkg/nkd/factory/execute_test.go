@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,10 +43,10 @@ func TestPublicationRootEnclosesAPTRepositoryAsOCIArtifact(t *testing.T) {
 	plan.Graph = ArtifactGraph{Nodes: []Node{aptNode, rootNode}, Artifacts: []Artifact{
 		artifacts["artifact/node/tool"], artifacts["package/worker-apt"], artifacts["package/root"],
 	}}
-	if err := executePackage(context.Background(), plan, aptNode, artifacts); err != nil {
+	if err := executePackage(context.Background(), plan, aptNode, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	if err := executePackage(context.Background(), plan, rootNode, artifacts); err != nil {
+	if err := executePackage(context.Background(), plan, rootNode, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	inspection, err := delivery.Inspect(context.Background(), filepath.FromSlash("outputs/root"))
@@ -85,7 +86,7 @@ func TestHelmPackageIsStableAcrossWorkspaceRelocationAndReclaimsCarrier(t *testi
 	if err := os.WriteFile(carrier, []byte("interrupted prior run"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := executePackage(context.Background(), plan, node, artifacts); err != nil {
+	if err := executePackage(context.Background(), plan, node, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	first, err := delivery.Inspect(context.Background(), canonicalOutput)
@@ -111,7 +112,7 @@ func TestHelmPackageIsStableAcrossWorkspaceRelocationAndReclaimsCarrier(t *testi
 	artifacts["artifact/aicr"] = Artifact{ID: "artifact/aicr", Name: "aicr", Kind: "aicr-bundle", Path: relocatedInput}
 	artifacts["package/gpu"] = Artifact{ID: "package/gpu", Name: "gpu-runtime", Kind: PackageHelm,
 		MediaType: packageMediaType(PackageHelm), Path: relocatedOutput, Producer: node.ID}
-	if err := executePackage(context.Background(), plan, node, artifacts); err != nil {
+	if err := executePackage(context.Background(), plan, node, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	second, err := delivery.Inspect(context.Background(), relocatedOutput)

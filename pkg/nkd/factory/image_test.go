@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,7 +64,7 @@ func TestImagePackageObservesProducerAndPreservesPublishedImage(t *testing.T) {
 	for _, a := range artifacts {
 		plan.Graph.Artifacts = append(plan.Graph.Artifacts, a)
 	}
-	if err := executePackage(ctx, plan, imageNode, artifacts); err != nil {
+	if err := executePackage(ctx, plan, imageNode, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	expected := LifecycleOutputPlan{Name: "cwe", Kind: "oci", ArtifactID: "package/cwe", RecipeDigest: recipeDigest, Components: []string{"cwe"}}
@@ -71,7 +72,7 @@ func TestImagePackageObservesProducerAndPreservesPublishedImage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := executePackage(ctx, plan, rootNode, artifacts); err != nil {
+	if err := executePackage(ctx, plan, rootNode, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	image, err := delivery.InspectPublishedContainerImage(ctx, artifacts["package/root"].Path, "cwe")

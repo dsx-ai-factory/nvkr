@@ -63,7 +63,7 @@ func TestGitHubSourceCredentialIsFetchStepOnly(t *testing.T) {
 				continue
 			}
 			found++
-			if job.Name != fetch.ID || step.Name != "Execute "+fetch.ID || job.If != "${{ "+githubExecutionCondition+" }}" {
+			if job.Name != githubNodeLabel(plan, fetch) || step.ID != githubJobID(fetch.ID) || job.If != "${{ "+githubExecutionCondition+" }}" {
 				t.Fatalf("credential exposed outside admitted source execution: %s / %s", job.Name, step.Name)
 			}
 		}

@@ -64,13 +64,14 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 	}
 
 	var rendered bytes.Buffer
-	fmt.Fprintln(&rendered, "      - name: Prepare restore outcomes\n        run: mkdir -p .nkd/restore-outcomes")
-	fmt.Fprintf(&rendered, "      - name: Download Run carriers\n        uses: %s\n        continue-on-error: true\n        with:\n          pattern: %s\n          path: .nkd/carriers\n          merge-multiple: 'true'\n",
+	fmt.Fprintln(&rendered, "      - name: Prepare artifact recovery\n        run: mkdir -p .nkd/restore-outcomes")
+	fmt.Fprintf(&rendered, "      - name: Download artifacts and evidence\n        uses: %s\n        continue-on-error: true\n        with:\n          pattern: %s\n          path: .nkd/carriers\n          merge-multiple: 'true'\n",
 		githubDownloadAction, yamlSingle(pattern))
 	for _, carrier := range carriers {
 		status := filepath.ToSlash(HostedRestoreOutcomePath(".nkd/factory", carrier.artifact.ID))
-		fmt.Fprintf(&rendered, "      - name: Restore %s when produced\n        run: if [ '${{ needs.%s.result }}' != 'success' ]; then printf 'job-failed\\n' > %s; elif [ ! -f %s ]; then printf 'missing\\n' > %s; elif ./nkd-exec transport-unpack --archive %s --root . --path %s; then printf 'restored:success\\n' > %s; else printf 'restore-failed\\n' > %s; fi\n",
-			yamlSingle(carrier.artifact.ID), carrier.job, shellQuote(status), shellQuote(carrier.path), shellQuote(status), shellQuote(carrier.path), shellQuote(carrier.artifact.Path), shellQuote(status), shellQuote(status))
+		fmt.Fprintf(&rendered, "      - name: %s\n        run: |\n          if [ '${{ needs.%s.result }}' != 'success' ]; then printf 'job-failed\\n' > %s; elif [ ! -f %s ]; then printf 'missing\\n' > %s; elif ./nkd-exec transport-unpack --archive %s --root . --path %s; then printf 'restored:success\\n' > %s; else printf 'restore-failed\\n' > %s; fi\n",
+			yamlSingle("Recover "+githubArtifactLabel(plan, carrier.artifact)), carrier.job, shellQuote(status), shellQuote(carrier.path), shellQuote(status), shellQuote(carrier.path), shellQuote(carrier.artifact.Path), shellQuote(status), shellQuote(status))
+		fmt.Fprintf(&rendered, "          printf '%%s: ' %s\n          cat %s\n", shellQuote(githubArtifactLabel(plan, carrier.artifact)), shellQuote(status))
 	}
 	out.Write(rendered.Bytes())
 	return nil

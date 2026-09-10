@@ -3,6 +3,7 @@ package factory
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -51,7 +52,7 @@ func lifecyclePackageFixture(t *testing.T, kind string) (*Plan, map[string]Artif
 	for _, id := range []string{"raw", "result", "package"} {
 		plan.Graph.Artifacts = append(plan.Graph.Artifacts, artifacts[id])
 	}
-	if err := executePackage(context.Background(), plan, node, artifacts); err != nil {
+	if err := executePackage(context.Background(), plan, node, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	return plan, artifacts

@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"net/http/httptest"
@@ -31,12 +32,16 @@ func TestPublicationExecutorPersistsExactRegistryIdentity(t *testing.T) {
 	plan := &Plan{ExecutionSettings: ExecutionSettings{Targets: map[string]Target{"registry": {Kind: TargetOCI, Ref: repository + ":run", Anonymous: true, PlainHTTP: true}}}}
 	node := Node{ID: "publish/record", Target: "registry", Inputs: []string{"input"}, Outputs: []string{"result"}}
 	artifacts := map[string]Artifact{"input": {Path: layout}, "result": {Path: output}}
-	if err := executePublish(t.Context(), plan, node, artifacts); err != nil {
+	var outputLog bytes.Buffer
+	if err := executePublish(t.Context(), plan, node, artifacts, &outputLog); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(output)
 	if err != nil || string(raw) != repository+"@"+result.RootDigest+"\n" {
 		t.Fatalf("published identity = %q, %v", raw, err)
+	}
+	if !strings.Contains(outputLog.String(), strings.TrimSpace(string(raw))) {
+		t.Fatalf("missing published identity log: %s", &outputLog)
 	}
 	pulled, err := delivery.Pull(t.Context(), strings.TrimSpace(string(raw)), filepath.Join(dir, "pulled"), delivery.RegistryOptions{Anonymous: true, PlainHTTP: true})
 	if err != nil || pulled.RootDigest != result.RootDigest {
@@ -64,7 +69,7 @@ func TestPublicationExecutorRejectsBeforeOutput(t *testing.T) {
 			if tc.nonUnary {
 				node.Inputs = nil
 			}
-			err := executePublish(t.Context(), plan, node, map[string]Artifact{"input": {Path: "missing-layout"}, "result": {Path: output}})
+			err := executePublish(t.Context(), plan, node, map[string]Artifact{"input": {Path: "missing-layout"}, "result": {Path: output}}, io.Discard)
 			assertFactoryErrorCode(t, err, tc.code)
 			if _, err := os.Stat(output); !os.IsNotExist(err) {
 				t.Fatalf("failed publication wrote result: %v", err)
