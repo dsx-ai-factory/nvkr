@@ -28,8 +28,9 @@ they are not separate authored public objects. The public entry point and genera
 
 The [first hosted Run](evidence/2026-09-09-github-run.md) passed bootstrap and regeneration but failed
 fetching the internal NKE source without a cross-repository credential. It uploaded a failed Run record.
-Successful source acquisition, GHCR publication and real OIDC signing remain unexercised. Protected-environment integration and automatic default-branch
-publication remain deferred in ADR-18. No signed publication exists for positive Release-consumer acceptance.
+The subsequent [authenticated fork Run](evidence/2026-09-09-github-authenticated-run.md) passed every job,
+including the CLI build, GHCR publication and complete Run finalization. Real OIDC signing, protected-environment
+integration and automatic default-branch publication remain deferred or unexercised in ADR-18. No signed publication exists for positive Release-consumer acceptance.
 
 ## Validation
 
@@ -40,7 +41,10 @@ allowed. NKE and AICR generation checks pass, including regression coverage for 
 execution guards. Changed-document relative links and `git diff --check` pass.
 
 The current NKE plan digest is
-`sha256:04a2fd55836d9bef3d3b34b52d5df6b9fb65a8ff6a6a265089203cc8a500d504`.
+`sha256:eb5425d44ec91650c3ddcce825f2274e567b6e64200b63ef22171bc59b018102`.
 
 GitHub Actions is enabled. Commit `3c55dcf` promoted the implementation and generated workflow to `main`;
 manual dispatch then exercised the hosted failure path described above.
+
+Commit `c15e534` added Environment-owned source mirroring and fetch-step authentication. Its generated Run
+and repository CI both passed on GitHub; the execution evidence records exact identities and dry-run limits.
