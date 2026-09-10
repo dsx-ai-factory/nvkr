@@ -2,7 +2,7 @@ apiVersion: nkd.dev/definition/v2
 kind: Definition
 metadata:
   name: nke-v1
-  description: Build and publish the NKE command line client from pinned source.
+  description: Build the NKE CLI, CWE runtime image and quickstart Helm bundle from pinned source.
 catalog:
   base: ./catalog
 recipes:
@@ -12,7 +12,24 @@ recipes:
       k8sVersion: 1.36.0
       os: ubuntu
       arch: amd64
+  - name: nke-control-plane
+    criteria:
+      category: platform-services
+      k8sVersion: 1.36.0
+      os: ubuntu
+      arch: amd64
 outputs:
+  - name: cwe
+    recipe: nke-control-plane
+    components: [cwe]
+    format: oci
+  - name: nke-helm
+    recipe: nke-control-plane
+    components: [nke-helm]
+    format: helm-oci
+    helm:
+      imageOutput: cwe
+      chart: 007-controller
   - name: nkectl
     recipe: nke-cli
     components: [nkectl]

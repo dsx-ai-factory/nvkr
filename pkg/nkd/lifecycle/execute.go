@@ -408,7 +408,7 @@ func observeOutput(ctx context.Context, workspace string, slot requiredOutput, a
 		if observation.Digest != digest || !equalStrings(observation.Components, components) {
 			return Artifact{}, e.New(e.CodeVerifyFailed, "output %q differs from its reproduced APT payload", slot.Name)
 		}
-	case factory.PackageHelm:
+	case factory.PackageHelm, factory.PackageImage:
 		observation, observeErr := observeTypedPackage()
 		if observeErr != nil {
 			return Artifact{}, observeErr

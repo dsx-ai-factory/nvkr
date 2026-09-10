@@ -136,6 +136,41 @@ func (plan Plan) Validate() error {
 	if err := plan.Graph.Validate(); err != nil {
 		return err
 	}
+	builds := map[string]ir.Node{}
+	for _, recipe := range plan.Recipes {
+		for _, node := range recipe.Graph.Nodes {
+			if node.Kind == ir.KindBuild {
+				builds[recipe.Name+"/"+node.ID] = node
+			}
+		}
+	}
+	for _, node := range plan.Graph.Nodes {
+		if node.HelmImage != nil {
+			if node.Kind != NodePackage || node.PackageKind != PackageHelm {
+				return e.New(e.CodePipelineDrift, "Helm binding on a non-Helm node")
+			}
+			artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
+			for _, artifact := range plan.Graph.Artifacts {
+				artifacts[artifact.ID] = artifact
+			}
+			var inputs []string
+			for _, id := range node.Inputs {
+				if artifacts[id].Kind != string(TierTerminalObservation) && artifacts[id].Kind != "producer-result" {
+					inputs = append(inputs, id)
+				}
+			}
+			if err := validatePackageInputs(PackageSpec{Kind: PackageHelm, HelmImage: node.HelmImage}, inputs, artifacts); err != nil {
+				return err
+			}
+		}
+		if node.Kind != NodeBuild {
+			continue
+		}
+		build, ok := builds[node.RecipeTarget+"/"+node.IRNode]
+		if !ok || node.Network != build.Network || node.Container != build.Toolchain || node.Platform != build.Platform {
+			return e.New(e.CodePipelineDrift, "build node %q changes its exact recipe execution settings", node.ID)
+		}
+	}
 	return plan.validateLifecyclePlans()
 }
 
@@ -217,6 +252,8 @@ func lifecyclePackageKind(kind string) string {
 		return PackageAPT
 	case "helm-oci":
 		return PackageHelm
+	case "oci":
+		return PackageImage
 	default:
 		return ""
 	}
@@ -289,7 +326,11 @@ func (graph ArtifactGraph) Validate() error {
 			if node.Network != ir.NetworkDefault {
 				return e.New(e.CodeInvalidCatalog, "artifact graph networked node %q does not declare default network", node.ID)
 			}
-		case NodeBuild, NodeAICR, NodeVerify, NodeSBOM, NodePackage, NodeComposition, NodeInventory:
+		case NodeBuild:
+			if node.Network != ir.NetworkNone && node.Network != ir.NetworkDefault {
+				return e.New(e.CodeInvalidCatalog, "artifact graph build node %q has an unknown network mode", node.ID)
+			}
+		case NodeAICR, NodeVerify, NodeSBOM, NodePackage, NodeComposition, NodeInventory:
 			if node.Network != ir.NetworkNone {
 				return e.New(e.CodeInvalidCatalog, "artifact graph isolated node %q does not declare network none", node.ID)
 			}

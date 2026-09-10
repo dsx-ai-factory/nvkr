@@ -518,7 +518,13 @@ func UnpackTransport(ctx context.Context, archive, root string, allowed []string
 		if entries > maxTransportEntries {
 			return e.New(e.CodeVerifyFailed, "transport exceeds %d entries", maxTransportEntries)
 		}
-		name, ok := safeArchiveName(header.Name, cleanAllowed)
+		memberName := header.Name
+		if header.Typeflag == tar.TypeDir {
+			// GNU tar terminates directory names with one slash. Normalize only
+			// that spelling before path validation and duplicate detection.
+			memberName = strings.TrimSuffix(memberName, "/")
+		}
+		name, ok := safeArchiveName(memberName, cleanAllowed)
 		if !ok || seen[name] {
 			return e.New(e.CodeVerifyFailed, "transport contains unexpected or duplicate path %q", header.Name)
 		}

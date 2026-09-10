@@ -3,10 +3,8 @@ kind: SourceBuildRegistry
 metadata:
   name: nke-v1
   description: >-
-    Production component catalog for the NKE CLI (nkectl). It is a FLAT, single-source
-    registry: one upstream monorepo (github.com/NVIDIA/nke), one recipe, one from-source
-    component. It fully replaces the embedded default catalog — the factory definition
-    selects it with `catalog.base: ./catalog`.
+    NKE components from one pinned upstream monorepo. The CLI uses an offline Go build;
+    CWE wraps the upstream Dockerfile in digest-pinned rootless BuildKit.
 sources:
   # NKE is a Go workspace MONOREPO that publishes per-module tags under a path prefix
   # (cli/v0.1.0-rc.2). tagPrefix makes that explicit: `catalog pin nke --tag v0.1.0-rc.2`
@@ -30,7 +28,48 @@ recipes:
   - id: nke-cli
     criteria: {category: operations, os: any, arch: amd64, k8sVersion: any}
     components: [nkectl]
+  - id: nke-control-plane
+    criteria: {category: platform-services, os: any, arch: amd64, k8sVersion: any}
+    components: [cwe, nke-helm]
 components:
+  cwe:
+    fromSource: true
+    source: nke
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
+    outputType: oci-image
+    writeDir: bin
+    artifactPath: bin/cwe.oci.tar
+    buildCommand:
+      - sh
+      - -ec
+      - >-
+        buildctl-daemonless.sh build --frontend dockerfile.v0
+        --local context=/src --local dockerfile=/src/controller
+        --opt platform=linux/amd64
+        --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
+        --opt "build-arg:GIT_VERSION=$GIT_VERSION"
+        --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+        --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
+    versionStamp:
+      BUILD_VERSION: "0.0.0-g{{slice .Commit 0 12}}"
+      GIT_VERSION: "{{.Commit}}"
+  nke-helm:
+    fromSource: true
+    source: nke
+    outputType: tarball
+    writeDir: bin
+    artifactPath: bin/nke-helm.tar
+    # Preserve the complete pinned quickstart tree, including dependency chart
+    # references and deployment scripts. This step needs no network.
+    buildCommand:
+      - sh
+      - -ec
+      - >-
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH"
+        --owner=0 --group=0 --numeric-owner
+        -C /src/generated/aicr/quickstart
+        -cf /src/bin/nke-helm.tar helm
   nkectl:
     fromSource: true
     source: nke

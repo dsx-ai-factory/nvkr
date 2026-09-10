@@ -335,12 +335,15 @@ milestone specification.
 
 ## Current support boundary
 
-This is a dated routing summary for 2026-09-08. It distinguishes useful implementation from complete external
+This is a dated routing summary for 2026-09-10. It distinguishes useful implementation from complete external
 acceptance; detailed module contracts remain in reconciliation.
 
 The seven-object workflow, local immutable attempts, scoped Release consumer, and both hosted renderers are
 implemented and contract-tested, including executable/APT/Helm GPU closure on amd64 and arm64 with controlled
-producers. Current signing-service and provider acceptance remains unverified. Full v1 release qualification,
+producers. Signed CLI publication and independent consumption have been exercised on GitHub. The rootless
+BuildKit wrapped-image mode has a passing local upstream CWE image build and runtime-payload smoke checks;
+the complete pinned quickstart Helm tree has also been bound to that image and rendered locally, with updated
+checksums and explicit deployment repository selection. Its generated combined pipeline still needs hosted acceptance. Full v1 release qualification, fused large-output
 wrapped execution, derived pin sets, registration and cluster qualification remain unimplemented. Qualified
 production flows remain capability-gated where authority adapters are absent. Air-gap execution is outside scope and its dormant implementation has been removed.
 

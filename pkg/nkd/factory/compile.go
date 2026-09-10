@@ -301,6 +301,9 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 		if err := validatePackageInputs(spec, inputs, artifacts); err != nil {
 			return nil, err
 		}
+		if spec.Kind == PackageImage && nodes[artifacts[inputs[0]].Producer].Kind != NodeBuild {
+			return nil, e.New(e.CodeEngineCapability, "image package %q currently requires a built OCI export; acquired layouts need a separate adapter", spec.Name)
+		}
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.
 		inputs = append(inputs, observationInputs(inputs, artifacts)...)
@@ -311,6 +314,7 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
+			HelmImage:    spec.HelmImage,
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
 			Inputs: inputs, Outputs: []string{artifactID}, Network: ir.NetworkNone, RunsOn: definition.RunsOn,
 			Container: definition.UtilityContainer, Platform: definition.UtilityPlatform}
@@ -357,7 +361,7 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 	for _, inputID := range inputs {
 		input := artifacts[inputID]
 		switch input.Kind {
-		case PackageBinaryBundle, PackageAPT, PackageHelm:
+		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageImage:
 		default:
 			continue
 		}
@@ -794,16 +798,44 @@ func observationInputs(inputs []string, artifacts map[string]Artifact) []string 
 }
 
 func validatePackageInputs(spec PackageSpec, inputs []string, artifacts map[string]Artifact) error {
+	if spec.HelmImage != nil {
+		if spec.Kind != PackageHelm || len(inputs) != 2 || !canonicalName.MatchString(spec.HelmImage.Chart) {
+			return e.New(e.CodeInvalidCatalog, "Helm image binding requires a source archive and one image package")
+		}
+		image, source := false, false
+		for _, id := range inputs {
+			artifact := artifacts[id]
+			if id == spec.HelmImage.Image && artifact.Kind == PackageImage {
+				image = true
+			} else if artifact.Kind == "tarball" && artifact.RecipeTarget != "" {
+				source = true
+			}
+		}
+		if !image || !source {
+			return e.New(e.CodeInvalidCatalog, "Helm image binding does not select exact typed inputs")
+		}
+		return nil
+	}
+	if spec.Kind == PackageHelm && len(inputs) != 1 {
+		return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", spec.Name)
+	}
+	if spec.Kind == PackageImage && len(inputs) != 1 {
+		return e.New(e.CodeInvalidCatalog, "container image package %q requires exactly one OCI export", spec.Name)
+	}
 	for _, id := range inputs {
 		artifact := artifacts[id]
 		switch spec.Kind {
+		case PackageImage:
+			if artifact.Kind != "oci-image" || artifact.RecipeTarget == "" {
+				return e.New(e.CodeInvalidCatalog, "container image package %q requires a recipe OCI image export", spec.Name)
+			}
 		case PackageAPT:
 			if artifact.Kind != "host-package" {
 				return e.New(e.CodeInvalidCatalog, "APT package %q input %s has kind %q, want host-package", spec.Name, id, artifact.Kind)
 			}
 		case PackageHelm:
-			if artifact.Kind != "aicr-bundle" {
-				return e.New(e.CodeInvalidCatalog, "Helm package %q input %s has kind %q, want aicr-bundle", spec.Name, id, artifact.Kind)
+			if artifact.Kind != "aicr-bundle" && (artifact.Kind != "tarball" || artifact.RecipeTarget == "") {
+				return e.New(e.CodeInvalidCatalog, "Helm package %q input %s requires an AICR tree or recipe source archive", spec.Name, id)
 			}
 		}
 	}
@@ -820,7 +852,7 @@ func validateRouteCompatibility(route Route, target Target, artifact Artifact) e
 			"delivery route %q requires an object-store publication adapter that is not implemented", route.Name)
 	case TargetOCI:
 		switch artifact.Kind {
-		case PackageBinaryBundle, PackageOCI, PackageHelm, "oci-image", "aicr-bundle":
+		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageImage, "oci-image", "aicr-bundle":
 		default:
 			return e.New(e.CodeInvalidCatalog, "delivery route %q sends unsupported %q to OCI target", route.Name, artifact.Kind)
 		}
@@ -830,6 +862,8 @@ func validateRouteCompatibility(route Route, target Target, artifact Artifact) e
 
 func packageMediaType(kind string) string {
 	switch kind {
+	case PackageImage:
+		return "application/vnd.oci.image.manifest.v1+json"
 	case PackageBinaryBundle:
 		return "application/vnd.nkd.binary-bundle.v1"
 	case PackageAPT:

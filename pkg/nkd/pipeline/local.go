@@ -382,6 +382,9 @@ func (l Local) Run(g *ir.Graph, recipeDigest string, opts RunOptions) (*Report, 
 	var selectedBuildNodes []ir.Node
 	for _, node := range g.Nodes {
 		if included[node.ID] && node.Kind == ir.KindBuild {
+			if err := admitBuildKit(node, opts); err != nil {
+				return rep, err
+			}
 			selectedBuildNodes = append(selectedBuildNodes, node)
 		}
 	}
@@ -872,6 +875,9 @@ func (l Local) verifyTree(dir string, n ir.Node, opts RunOptions) error {
 // over WriteDir, so any number of build nodes can run concurrently without clobbering
 // each other or mutating the shared source.
 func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
+	if err := admitBuildKit(n, opts); err != nil {
+		return nil, err
+	}
 	var executionIdentity profile.VerifiedNodeIdentity
 	if opts.execution != nil {
 		if err := opts.execution.receipt.RequireFor(opts.ctx(), opts.execution.profile, opts.execution.nodes); err != nil {
@@ -927,6 +933,16 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := os.MkdirAll(outRoot, 0o755); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "creating output dir for %s", n.Component)
 	}
+	mountOut := outRoot
+	promoteOutput := func() error { return nil }
+	if n.BuilderType == ir.BuilderBuildKit {
+		var cleanup func()
+		mountOut, promoteOutput, cleanup, err = prepareBuildKitOutput(opts.ctx(), outRoot)
+		if err != nil {
+			return nil, err
+		}
+		defer cleanup()
+	}
 
 	cname := containerName(n)
 	args := []string{"run", "--rm", "--name", cname}
@@ -955,6 +971,9 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	for _, ev := range n.Env {
 		args = append(args, "-e", ev.Name+"="+ev.Value)
 	}
+	if n.BuilderType == ir.BuilderBuildKit {
+		args = append(args, buildKitRuntimeArgs()...)
+	}
 	if isolated {
 		mountpoint, err := pathWithin(absSrc, n.WriteDir)
 		if err != nil {
@@ -963,7 +982,7 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		if err := os.MkdirAll(mountpoint, 0o755); err != nil {
 			return nil, e.Wrap(e.CodeBuildFailed, err, "preparing source mountpoint for %s", n.Component)
 		}
-		args = append(args, "-v", absSrc+":/src:ro", "-v", outRoot+":"+path.Join(n.Workdir, n.WriteDir))
+		args = append(args, "-v", absSrc+":/src:ro", "-v", mountOut+":"+path.Join(n.Workdir, n.WriteDir))
 	} else {
 		args = append(args, "-v", absSrc+":/src")
 	}
@@ -979,6 +998,9 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "building %s", n.Component)
 	}
 	opts.reap.forget(cname)
+	if err := promoteOutput(); err != nil {
+		return nil, err
+	}
 
 	binPath := artifactHostPath(opts, n)
 	artifactRel := artifactOutputRelative(n)

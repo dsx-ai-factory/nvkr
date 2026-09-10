@@ -88,11 +88,19 @@ type Tool struct {
 // DefinitionOutput is a named artifact slot frozen before a run. Components
 // selects exact outputs of one recipe; format selects the standard envelope.
 type DefinitionOutput struct {
-	Name       string     `json:"name"`
-	Recipe     string     `json:"recipe"`
-	Components []string   `json:"components,omitempty"`
-	Format     string     `json:"format"`
-	APT        *APTOutput `json:"apt,omitempty"`
+	Name       string      `json:"name"`
+	Recipe     string      `json:"recipe"`
+	Components []string    `json:"components,omitempty"`
+	Format     string      `json:"format"`
+	APT        *APTOutput  `json:"apt,omitempty"`
+	Helm       *HelmOutput `json:"helm,omitempty"`
+}
+
+// HelmOutput binds a rendered controller chart to another output's native image.
+// Chart names a direct child of the source archive's helm directory.
+type HelmOutput struct {
+	ImageOutput string `json:"imageOutput"`
+	Chart       string `json:"chart"`
 }
 
 type APTOutput struct {
@@ -284,11 +292,15 @@ func (definition Definition) Validate() error {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has unsupported format %q", output.Name, output.Format)
 		}
 		if output.Format == OutputHelm {
-			if len(output.Components) != 0 || selections[output.Recipe].AICRGenerator == "" {
-				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires an AICR recipe and no component join", output.Name)
+			generated := selections[output.Recipe].AICRGenerator != ""
+			if (generated && len(output.Components) != 0) || (!generated && len(output.Components) != 1) {
+				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires either an AICR recipe without components or one source archive component", output.Name)
 			}
 		} else if len(output.Components) == 0 {
 			return e.New(e.CodeInvalidCatalog, "definition output %q requires components", output.Name)
+		}
+		if output.Format == OutputOCI && len(output.Components) != 1 {
+			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
 		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {
@@ -296,6 +308,20 @@ func (definition Definition) Validate() error {
 			}
 		} else if output.APT != nil {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has APT-only settings", output.Name)
+		}
+		if output.Helm != nil {
+			if output.Format != OutputHelm || len(output.Components) != 1 || !namePattern.MatchString(output.Helm.Chart) {
+				return e.New(e.CodeInvalidCatalog, "definition output %q requires a source Helm archive and chart for image binding", output.Name)
+			}
+			found := false
+			for _, candidate := range definition.Outputs {
+				if candidate.Name == output.Helm.ImageOutput && candidate.Format == OutputOCI {
+					found = true
+				}
+			}
+			if !found {
+				return e.New(e.CodeInvalidCatalog, "definition Helm output %q references an unknown image output", output.Name)
+			}
 		}
 		if err := sortedUnique("output components", output.Components); err != nil {
 			return err

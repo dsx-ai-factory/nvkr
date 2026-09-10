@@ -143,6 +143,10 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 			builderType = ir.BuilderOCIHermetic
 		}
 		var flakeRef, flakeOutput, flakeLock string
+		buildNetwork := ir.NetworkNone
+		if builderType == ir.BuilderBuildKit {
+			buildNetwork = ir.NetworkDefault
+		}
 		if builderType == ir.BuilderNix && nc.Flake != nil {
 			flakeRef, flakeOutput, flakeLock = nc.Flake.Ref, nc.Flake.Output, nc.Flake.LockDigest
 			if nc.Flake.Image != "" {
@@ -160,7 +164,7 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 			FlakeLockDigest:  flakeLock,
 			Toolchain:        toolchain,
 			Platform:         "linux/" + arch,
-			Network:          ir.NetworkNone,
+			Network:          buildNetwork,
 			Env:              buildEnv(nc, r.Criteria),
 			Patches:          patchRefs(nc.Patches),
 			Command:          renderArchAll(nc.BuildCommand, arch),

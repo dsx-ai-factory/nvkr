@@ -17,11 +17,21 @@ sourceAccess:
     mirror: https://github.com/njhensley/nke
     credentialRef: github:NKE_SOURCE_TOKEN
 destinations:
+  ghcr-helm:
+    kind: oci
+    ref: ghcr.io/njhensley/nke-recipes/helm:development
+    credentialRef: github:GITHUB_TOKEN
+  ghcr-cwe:
+    kind: oci
+    ref: ghcr.io/njhensley/nke-recipes/cwe:development
+    credentialRef: github:GITHUB_TOKEN
   ghcr:
     kind: oci
     ref: ghcr.io/njhensley/nke-recipes/nkectl:v0.1.0-rc.2
     credentialRef: github:GITHUB_TOKEN
 publish:
+  cwe: ghcr-cwe
+  nke-helm: ghcr-helm
   nkectl: ghcr
 signing:
   mode: cosign

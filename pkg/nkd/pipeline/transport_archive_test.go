@@ -81,6 +81,9 @@ func TestTransportArchiveRejectsUntrustedTarStructures(t *testing.T) {
 	}{
 		{"traversal", []*tar.Header{{Name: "../escape", Typeflag: tar.TypeReg, Size: 1}}},
 		{"absolute", []*tar.Header{{Name: "/escape", Typeflag: tar.TypeReg, Size: 1}}},
+		{"directory-alias", []*tar.Header{{Name: "allowed", Typeflag: tar.TypeDir}, {Name: "allowed/", Typeflag: tar.TypeDir}}},
+		{"directory-traversal", []*tar.Header{{Name: "allowed/../escape/", Typeflag: tar.TypeDir}}},
+		{"directory-repeated-slash", []*tar.Header{{Name: "allowed//", Typeflag: tar.TypeDir}}},
 		{"unexpected", []*tar.Header{{Name: "other/file", Typeflag: tar.TypeReg, Size: 1}}},
 		{"hard-link", []*tar.Header{{Name: "allowed/hard", Typeflag: tar.TypeLink, Linkname: "allowed/file"}}},
 		{"escaping-symlink", []*tar.Header{{Name: "allowed/link", Typeflag: tar.TypeSymlink, Linkname: "../../escape"}}},

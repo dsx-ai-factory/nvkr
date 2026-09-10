@@ -67,9 +67,10 @@ type registryDoc struct {
 type rawComponent struct {
 	FromSource      bool               `json:"fromSource"`
 	Source          string             `json:"source,omitempty"`
-	Roles           []string           `json:"roles,omitempty"`       // node-role affinity (ADR-12 §3); composition, not identity
-	BuilderType     string             `json:"builderType,omitempty"` // oci-hermetic (default) | nix (ADR-10)
-	Flake           *FlakePin          `json:"flake,omitempty"`       // required iff builderType==nix
+	Roles           []string           `json:"roles,omitempty"`          // node-role affinity (ADR-12 §3); composition, not identity
+	BuilderType     string             `json:"builderType,omitempty"`    // oci-hermetic (default) | nix (ADR-10)
+	ToolchainImage  string             `json:"toolchainImage,omitempty"` // component-specific exact builder image
+	Flake           *FlakePin          `json:"flake,omitempty"`          // required iff builderType==nix
 	CGO             bool               `json:"cgo,omitempty"`
 	OutputType      string             `json:"outputType,omitempty"`
 	BuildCommand    []string           `json:"buildCommand,omitempty"`
@@ -377,6 +378,9 @@ func readLock(p DataProvider) (*PinLock, error) {
 }
 
 func resolveComponent(name string, raw rawComponent, sources map[string]Source, lock *PinLock) (Component, error) {
+	if raw.ToolchainImage != "" && !raw.FromSource {
+		return Component{}, e.New(e.CodeInvalidCatalog, "component %q: toolchain override requires a from-source build", name)
+	}
 	c := Component{
 		FromSource:      raw.FromSource,
 		Roles:           raw.Roles,
@@ -431,6 +435,10 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		c.ToolchainImage = src.ToolchainImage
 	}
 	c.ToolchainImages = src.ToolchainImagesByArch
+	if raw.ToolchainImage != "" {
+		c.ToolchainImage = raw.ToolchainImage
+		c.ToolchainImages = nil
+	}
 	c.Tag = pin.Tag
 	c.Commit = pin.Commit
 	c.TreeHash = pin.TreeHash
@@ -809,6 +817,10 @@ func validateComponent(name string, c Component) error {
 		return nil
 	}
 	switch c.BuilderType {
+	case BuilderBuildKit:
+		if c.Flake != nil || c.OutputType != "oci-image" {
+			return e.New(e.CodeInvalidCatalog, "component %q: rootless BuildKit requires an OCI image output and no flake", name)
+		}
 	case "", BuilderOCIHermetic: // empty defaults to oci-hermetic (the loader also fills it)
 		if c.Flake != nil {
 			return e.New(e.CodeInvalidCatalog,

@@ -48,6 +48,9 @@ var allowedBuildEnv = map[string]bool{
 	"NKECTL_COMMIT":       true,
 	"NKECTL_DATE":         true,
 	"NKECTL_CAPI_VERSION": true,
+	// Upstream CWE Dockerfile build arguments, rendered from the source lock.
+	"BUILD_VERSION": true,
+	"GIT_VERSION":   true,
 }
 
 var knownOutputTypes = map[string]bool{
@@ -346,9 +349,13 @@ func validateBuildNode(n Node) error {
 		return e.New(e.CodeInvalidCatalog,
 			"build node %q platform %q is not linux/amd64 or linux/arm64", n.ID, n.Platform)
 	}
-	if n.Network != NetworkNone {
+	wantNetwork := NetworkNone
+	if n.BuilderType == BuilderBuildKit {
+		wantNetwork = NetworkDefault
+	}
+	if n.Network != wantNetwork {
 		return e.New(e.CodeInvalidCatalog,
-			"build node %q network mode %q is unsafe; build requires %q", n.ID, n.Network, NetworkNone)
+			"build node %q network mode %q differs from builder mode %q", n.ID, n.Network, wantNetwork)
 	}
 	if err := validateBuildEnv(n.ID, arch, n.Env); err != nil {
 		return err
@@ -388,6 +395,15 @@ func validateBuildNode(n Node) error {
 		return e.New(e.CodeInvalidCatalog, "build node %q has no canonical component version", n.ID)
 	}
 	switch n.BuilderType {
+	case BuilderBuildKit:
+		if n.OutputType != "oci-image" || n.FlakeRef != "" || n.FlakeOutput != "" || n.FlakeLockDigest != "" {
+			return e.New(e.CodeInvalidCatalog, "rootless BuildKit node %q requires an OCI export and build arguments", n.ID)
+		}
+		for _, variable := range n.Env {
+			if variable.Name == "BUILDKITD_FLAGS" {
+				return e.New(e.CodeInvalidCatalog, "rootless BuildKit node %q may not override fixed daemon isolation", n.ID)
+			}
+		}
 	case BuilderOCIHermetic:
 		if n.FlakeRef != "" || n.FlakeOutput != "" || n.FlakeLockDigest != "" {
 			return e.New(e.CodeInvalidCatalog,

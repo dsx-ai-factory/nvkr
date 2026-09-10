@@ -17,6 +17,7 @@ import (
 const (
 	BuilderOCIHermetic = "oci-hermetic"
 	BuilderNix         = "nix"
+	BuilderBuildKit    = "buildkit-rootless"
 )
 
 // Metadata is descriptive catalog identity; it does not affect resolution.

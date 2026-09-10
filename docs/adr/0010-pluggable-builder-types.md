@@ -91,8 +91,18 @@ Each component has exactly one declared production source lane, separate from th
 | `acquired` | Digest-pinned upstream bytes; no build claim |
 
 The lane must agree in provenance, Release membership, evidence records, and milestone scope. Unknown or
-indeterminate lanes are definition errors. Wrapped builds are a deferred implementation, not a currently
-supported fourth qualified builder. Nix likewise has no qualified execution adapter yet.
+indeterminate lanes are definition errors. The `buildkit-rootless` builder implements the wrapped-build lane
+for OCI-export archives on Docker, locally and in generated lifecycle Runs. Other wrapped adapters and Nix
+qualified execution remain deferred. A component may select its own digest-pinned toolchain image while
+retaining the same pinned source as other components; this changes its Recipe identity, not its source pin.
+
+The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
+seccomp/AppArmor/system paths for user-namespace operation, the native snapshotter, no host runtime socket and
+no mounted credentials. Its writable output mount lives beneath a private host parent, is collected after
+container exit, and is then re-hashed and imported as an exact OCI export. The package inspector verifies the
+image manifest, platform, config and compressed/uncompressed layer identities. Neither those checks nor a
+signed production predicate claim hermeticity, independent reproduction, or qualified execution. Qualified
+and direct in-container execution reject this mode before source work.
 
 A wrapped build makes no NKD hermeticity claim and requires neither builder-profile preflight nor bit-identity
 comparison in v1. Fuse build, re-hash, Run record, publish, sign, and verify into one job for large artifacts,

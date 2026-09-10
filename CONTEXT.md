@@ -7,10 +7,13 @@ The public lifecycle is Definition → Run → Release; internal trust vocabular
 
 **Definition**:
 Authored product intent declaring named outputs, reusable recipe selections, packaging intent, and optional cluster views.
+Packaging intent may bind a Helm chart to a named image output; the resulting digest is content, while its
+deployment repository remains transport configuration.
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Recipe**:
 Reusable instructions for building or acquiring components from pinned inputs, including the outputs they must produce.
+Its declared builder mode distinguishes offline compilation from wrapped upstream builds with network access.
 _Avoid_: Product definition, run, release
 
 **Environment**:

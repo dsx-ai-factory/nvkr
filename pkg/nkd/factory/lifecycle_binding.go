@@ -108,6 +108,22 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		return nil
 	}
 	switch artifact.Kind {
+	case PackageImage:
+		if err := verifyRawResults(); err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		image, err := inspectFactoryImage(ctx, plan, artifact)
+		if err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		expectedDigest, err := reproduceLifecyclePackage(ctx, plan, artifact, artifacts)
+		if err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		if expectedDigest != image.RootDigest {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "image output %q differs from its observed producer archive", expected.Name)
+		}
+		return LifecyclePayloadObservation{Digest: image.RootDigest, Components: components}, nil
 	case PackageBinaryBundle:
 		bundle, result, err := delivery.InspectBinaryBundle(ctx, artifact.Path)
 		if err != nil {
@@ -151,15 +167,20 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		}
 		return LifecyclePayloadObservation{Digest: repository.Digest, Components: components}, nil
 	case PackageHelm:
+		if len(expected.Components) != 0 {
+			if err := verifyRawResults(); err != nil {
+				return LifecyclePayloadObservation{}, err
+			}
+		}
 		inspection, err := delivery.Inspect(ctx, artifact.Path)
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
 		expectedDigest, err := reproduceLifecyclePackage(ctx, plan, artifact, artifacts)
 		if err != nil || expectedDigest != inspection.RootDigest {
-			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced AICR package (%s != %s)", expected.Name, inspection.RootDigest, expectedDigest)
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced package (%s != %s)", expected.Name, inspection.RootDigest, expectedDigest)
 		}
-		return LifecyclePayloadObservation{Digest: inspection.RootDigest}, nil
+		return LifecyclePayloadObservation{Digest: inspection.RootDigest, Components: components}, nil
 	default:
 		return LifecyclePayloadObservation{}, e.New(e.CodeEngineCapability, "package kind %q cannot be observed for lifecycle output", artifact.Kind)
 	}
@@ -283,6 +304,12 @@ func reproduceLifecyclePackage(ctx context.Context, plan *Plan, artifact Artifac
 		return "", err
 	}
 	switch artifact.Kind {
+	case PackageImage:
+		image, err := inspectFactoryImage(ctx, plan, reproduced)
+		if err != nil {
+			return "", err
+		}
+		return image.RootDigest, nil
 	case PackageAPT:
 		result, err := delivery.InspectAPTRepository(ctx, reproduced.Path)
 		if err != nil {

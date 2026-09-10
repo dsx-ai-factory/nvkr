@@ -131,6 +131,10 @@ Isolation and the fixed environment/mount contract are identical across all engi
 ### 6. Lane lowering
 
 - `oci-hermetic` and proposed `nix` build nodes use helper-launched pinned toolchains; unsupported execution adapters fail admission.
+- `buildkit-rootless` is the networked wrapped OCI-export mode for generated lifecycle Runs (ADR-10).
+  The shared Docker launcher owns its fixed non-root isolation settings and child-process cleanup. Factory
+  build projections must match the embedded recipe IR's network, container and platform exactly. The qualified
+  pipeline emitter rejects this mode; it cannot silently render it as a network-denied build.
 - `prebuilt` nodes lower to acquire-and-digest-verify.
 - `exclusion` emits no node.
 

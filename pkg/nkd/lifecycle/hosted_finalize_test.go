@@ -44,6 +44,25 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
+	// This fixture isolates missing CLI signing evidence; other product outputs
+	// would fail earlier on their deliberately absent payloads.
+	var cliRecipes []RecipeSelection
+	for _, recipe := range definition.Recipes {
+		if recipe.Name == "nke-cli" {
+			cliRecipes = append(cliRecipes, recipe)
+		}
+	}
+	var cliOutputs []DefinitionOutput
+	for _, output := range definition.Outputs {
+		if output.Name == "nkectl" {
+			cliOutputs = append(cliOutputs, output)
+		}
+	}
+	definition.Recipes, definition.Outputs = cliRecipes, cliOutputs
+	definition.Catalog.Base = filepath.Join(repo, "definitions", "nke-v1", "catalog")
+	definitionPath = filepath.ToSlash(filepath.Join(caseRoot, "definition.json"))
+	writeCanonicalTestFile(t, definitionPath, definition)
+	environment.Publish = map[string]string{"nkectl": environment.Publish["nkectl"]}
 	pin := "sha256:" + strings.Repeat("1", 64)
 	environment.Signing.Mode, environment.Signing.CosignTool = factory.SigningModeCosign, "cosign"
 	environment.Tools = map[string]Tool{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,

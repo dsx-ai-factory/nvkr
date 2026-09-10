@@ -127,6 +127,18 @@ Payload identities survive publication unchanged. The outer OCI root separately 
 their exact realization (ADR-19). Consumer verification validates the complete closure before exposing accepted
 views. Plain `release inspect` is descriptive. No tag-based cosign signature substitutes for qualified clearance.
 
+Helm outputs accept either an AICR-generated tree or one observed source archive component. The latter carries
+a single `helm/` directory, extracted through the bounded transport adapter and repacked deterministically.
+Lifecycle observation checks the exact archive against its producer result and independently reproduces the
+publication payload. Optional Definition Helm settings select a chart and another named OCI output. The
+compiler adds that image package as an explicit dependency. The rendered-controller adapter checks the native
+image closure, embeds its manifest digest in the unique single-container Deployment, clears the default
+repository, and refreshes bundle checksums. The template requires a repository at deployment time, preserving
+artifact bytes across registry mirrors; a values override cannot replace its embedded digest. The adapter
+requires a plain rendered `templates/controller.yaml` and an image values mapping, rejecting ambiguity or
+pre-existing templates. Other chart shapes require a separate adapter. This does not establish external chart
+dependency availability or successful deployment.
+
 Push, sign and pull-back verification are separate effects: later failure may leave bytes or partial evidence in
 the registry. No atomic remote rollback or cross-run resume is claimed. A complete local Run does not establish
 the deferred qualification/manifest acceptance in ADR-16. Retention and recovery require deployment ownership.
@@ -193,6 +205,15 @@ reference, withdrawn target, mirror-location invariance and forged-adapter-recei
 - **ADR-16:** the completeness/promotion gate the release publish is bound to.
 
 ## Acceptance evidence
+
+The container-image delivery adapter has contract tests for exact OCI-export archive import, native image
+manifest/config/layer closure, decompressed layer identities, platform selection, safe archive members and
+unchanged image identities inside a publication root. Public OCI outputs lower to one built OCI-export
+component, checked against its producer bytes before publication; consumer projection checks the native image
+and its platform. The CWE producer is generated and its upstream Dockerfile was exercised locally; acquired-image
+layout conversion remains unavailable, and no combined image/chart hosted Run is yet recorded. Source Helm
+archive selection and exact producer observation have focused contract tests. This adapter does not mint qualified execution or
+release authority.
 
 Current contract evidence in `pkg/nkd/transport/*_test.go`, `pkg/nkd/release/*_test.go`, and
 `pkg/nkd/delivery/*_test.go` covers target exclusion from recipe identity, authorization-bound subjects,

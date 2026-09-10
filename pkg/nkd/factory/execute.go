@@ -368,6 +368,16 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		inputs = append(inputs, artifact)
 	}
 	switch node.PackageKind {
+	case PackageImage:
+		if len(inputs) != 1 || inputs[0].Kind != "oci-image" {
+			return e.New(e.CodeInvalidCatalog, "container image package %q requires one OCI export", node.ID)
+		}
+		digest, err := digestFactoryPath(ctx, inputs[0].Path)
+		if err != nil {
+			return err
+		}
+		_, err = delivery.ImportContainerImage(ctx, inputs[0].Path, digest, "linux/"+packageArch(plan, inputs), output.Path)
+		return err
 	case PackageBinaryBundle:
 		files := make([]delivery.BinaryFileInput, 0, len(inputs))
 		for _, input := range inputs {
@@ -408,8 +418,29 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		})
 		return err
 	case PackageHelm:
+		var imageDigest string
+		if node.HelmImage != nil {
+			var ids []string
+			for _, input := range inputs {
+				ids = append(ids, input.ID)
+			}
+			if err := validatePackageInputs(PackageSpec{Kind: PackageHelm, HelmImage: node.HelmImage}, ids, artifacts); err != nil {
+				return err
+			}
+			image, err := inspectFactoryImage(ctx, plan, artifacts[node.HelmImage.Image])
+			if err != nil {
+				return err
+			}
+			imageDigest = image.ManifestDigest
+			for _, input := range inputs {
+				if input.Kind == "tarball" {
+					inputs = []Artifact{input}
+					break
+				}
+			}
+		}
 		if len(inputs) != 1 {
-			return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one AICR tree", node.ID)
+			return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", node.ID)
 		}
 		archive := filepath.Join(filepath.Dir(output.Path), "."+output.Name+".aicr.tar")
 		// The transport archive is an internal carrier, not a graph output. Always
@@ -420,9 +451,18 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			return err
 		}
 		defer func() { _ = os.Remove(archive) }()
-		root, relative, err := lifecycleTransportMember(plan, inputs[0])
+		root, relative, cleanup, err := helmPackageTree(ctx, plan, inputs[0])
 		if err != nil {
 			return err
+		}
+		defer cleanup()
+		if node.HelmImage != nil {
+			if err := bindHelmImage(ctx, filepath.Join(root, relative), node.HelmImage.Chart, imageDigest); err != nil {
+				return err
+			}
+		}
+		if inputs[0].Kind == "tarball" {
+			archive = filepath.Join(root, "bundle.tar")
 		}
 		if err := pipeline.PackTransport(ctx, archive, root, []string{relative}); err != nil {
 			return err
@@ -452,6 +492,13 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			object := delivery.ObjectInput{Name: input.Name, Kind: input.Kind, Path: input.Path,
 				ArtifactType: input.MediaType, LayerMediaType: input.MediaType}
 			switch input.Kind {
+			case PackageImage:
+				image, err := inspectFactoryImage(ctx, plan, input)
+				if err != nil {
+					return err
+				}
+				object.Layout, object.SemanticDigest, object.BlobDigest = true, image.RootDigest, image.RootDigest
+				object.OS, object.Arch = image.OS, image.Arch
 			case PackageBinaryBundle:
 				_, inspected, err := delivery.InspectBinaryBundle(ctx, input.Path)
 				if err != nil {

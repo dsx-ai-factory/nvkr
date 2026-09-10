@@ -172,6 +172,10 @@ func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, v
 		if err := json.Unmarshal(raw, &manifest); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "decoding OCI artifact manifest")
 		}
+		if manifest.ArtifactType == "" && manifest.Config.MediaType == MediaImageConfig {
+			_, err := verifyImageManifest(ctx, root, manifest, visited)
+			return err
+		}
 		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.ArtifactType == "" {
 			return e.New(e.CodeVerifyFailed, "OCI artifact manifest has an invalid schema")
 		}

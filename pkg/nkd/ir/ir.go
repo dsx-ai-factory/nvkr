@@ -32,8 +32,9 @@ const (
 // build-semantic input carried in the IR, so it is part of recipeDigest: switching
 // a component's builder is a NEW recipe, never a variant (ADR-10 §4).
 const (
-	BuilderOCIHermetic = "oci-hermetic" // hermetic compile in a pinned toolchain container (the default)
-	BuilderNix         = "nix"          // produced from a locked flake in a pinned nix container
+	BuilderOCIHermetic = "oci-hermetic"      // hermetic compile in a pinned toolchain container (the default)
+	BuilderNix         = "nix"               // produced from a locked flake in a pinned nix container
+	BuilderBuildKit    = "buildkit-rootless" // networked wrapped Dockerfile build; not qualified execution
 )
 
 // Engine classes (ADR-07 §1) are the OBSERVED build substrate a component was

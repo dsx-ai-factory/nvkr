@@ -425,6 +425,11 @@ func LowerJobs(g *ir.Graph) ([]Job, error) {
 		return nil, err
 	}
 	nodes := sortedNodes(g)
+	for _, node := range nodes {
+		if node.BuilderType == ir.BuilderBuildKit {
+			return nil, e.New(e.CodeEngineCapability, "rootless BuildKit requires generated lifecycle Runs; qualified pipeline emission is unsupported")
+		}
+	}
 	nodesJSON, err := NodesJSON(g)
 	if err != nil {
 		return nil, err

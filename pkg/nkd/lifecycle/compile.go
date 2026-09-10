@@ -205,21 +205,21 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		closureInputs = append(closureInputs, "composition/"+view.Name)
 	}
 	for _, output := range outputs {
-		if output.Format == OutputOCI {
-			return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeEngineCapability,
-				"definition output %q format %q needs a typed OCI artifact adapter", output.Name, output.Format)
-		}
 		selectors := make([]string, 0, len(output.Components))
 		for _, component := range output.Components {
 			selectors = append(selectors, output.Recipe+"/"+component)
 		}
 		packageKind := factory.PackageBinaryBundle
 		switch output.Format {
+		case OutputOCI:
+			packageKind = factory.PackageImage
 		case OutputAPT:
 			packageKind = factory.PackageAPT
 		case OutputHelm:
 			packageKind = factory.PackageHelm
-			selectors = []string{output.Recipe + "/aicr-bundle"}
+			if len(output.Components) == 0 {
+				selectors = []string{output.Recipe + "/aicr-bundle"}
+			}
 		}
 		bundleName := output.Name
 		if packageNames[bundleName] {
@@ -228,6 +228,11 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		}
 		packageNames[bundleName] = true
 		packageSpec := factory.PackageSpec{Name: bundleName, Kind: packageKind, Inputs: selectors}
+		if output.Helm != nil {
+			image := "package/" + output.Helm.ImageOutput
+			packageSpec.HelmImage = &factory.HelmImageBinding{Image: image, Chart: output.Helm.Chart}
+			packageSpec.Inputs = append(packageSpec.Inputs, image)
+		}
 		if output.APT != nil {
 			packageSpec.Distribution, packageSpec.Component = output.APT.Distribution, output.APT.Component
 		}

@@ -258,7 +258,7 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 	}
 	artifacts := make([]Artifact, 0, len(binding.Outputs))
 	for _, output := range binding.Outputs {
-		if !namePattern.MatchString(output.Name) || (output.Kind != OutputExecutable && output.Kind != OutputAPT && output.Kind != OutputHelm) || !canonical.IsDigest(output.Digest) ||
+		if !namePattern.MatchString(output.Name) || (output.Kind != OutputExecutable && output.Kind != OutputAPT && output.Kind != OutputHelm && output.Kind != OutputOCI) || !canonical.IsDigest(output.Digest) ||
 			!canonical.IsDigest(output.RecipeDigest) || (output.Kind != OutputHelm && len(output.Components) == 0) {
 			return nil, "", nil, e.New(e.CodeVerifyFailed, "lifecycle output binding is malformed")
 		}
@@ -281,6 +281,17 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 		defer func() { _ = os.RemoveAll(extracted) }()
 		components := append([]string(nil), output.Components...)
 		switch output.Kind {
+		case OutputOCI:
+			if len(components) != 1 || output.TransportPath != "" {
+				return nil, "", nil, e.New(e.CodeVerifyFailed, "OCI output %q has an invalid member or transport binding", output.Name)
+			}
+			image, err := delivery.InspectPublishedContainerImage(ctx, layoutPath, output.Name)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			if image.RootDigest != output.Digest {
+				return nil, "", nil, e.New(e.CodeVerifyFailed, "OCI output %q differs from its image binding", output.Name)
+			}
 		case OutputExecutable:
 			destination := filepath.Join(extracted, "bundle")
 			bundle, err := delivery.ExtractBinaryBundle(ctx, layoutPath, output.Name, destination)
@@ -405,6 +416,8 @@ func lifecyclePublishedKind(kind string) string {
 		return factory.PackageAPT
 	case OutputHelm:
 		return factory.PackageHelm
+	case OutputOCI:
+		return factory.PackageImage
 	default:
 		return ""
 	}

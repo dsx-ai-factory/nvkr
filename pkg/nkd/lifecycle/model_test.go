@@ -104,7 +104,11 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	changed := environment
-	changed.Destinations = map[string]Destination{"local-registry": {Kind: factory.TargetOCI, Ref: "registry.example.test/other:v1", Anonymous: true}}
+	changed.Destinations = make(map[string]Destination, len(environment.Destinations))
+	for name, destination := range environment.Destinations {
+		changed.Destinations[name] = destination
+	}
+	changed.Destinations["local-registry"] = Destination{Kind: factory.TargetOCI, Ref: "registry.example.test/other:v1", Anonymous: true}
 	changedDigest, err := changed.Digest()
 	if err != nil {
 		t.Fatal(err)

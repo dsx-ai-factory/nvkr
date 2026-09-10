@@ -71,6 +71,7 @@ const (
 	PackageAPT          = "apt-repository"
 	PackageOCI          = "oci-root"
 	PackageHelm         = "helm-oci"
+	PackageImage        = "container-image"
 )
 
 const (
@@ -144,11 +145,18 @@ type RecipeTarget struct {
 // PackageSpec describes dataflow, not ordering. Inputs are artifact selectors:
 // target/component, target/*, target/aicr-bundle, or package/name.
 type PackageSpec struct {
-	Name         string   `json:"name"`
-	Kind         string   `json:"kind"`
-	Inputs       []string `json:"inputs"`
-	Distribution string   `json:"distribution,omitempty"`
-	Component    string   `json:"component,omitempty"`
+	HelmImage    *HelmImageBinding `json:"helmImage,omitempty"`
+	Name         string            `json:"name"`
+	Kind         string            `json:"kind"`
+	Inputs       []string          `json:"inputs"`
+	Distribution string            `json:"distribution,omitempty"`
+	Component    string            `json:"component,omitempty"`
+}
+
+// HelmImageBinding is compiler-owned package dataflow, not a publication route.
+type HelmImageBinding struct {
+	Image string `json:"image"`
+	Chart string `json:"chart"`
 }
 
 // ClusterSpec joins independently resolved recipe targets into one pre-release
@@ -476,25 +484,26 @@ type ArtifactGraph struct {
 }
 
 type Node struct {
-	ID               string   `json:"id"`
-	Kind             string   `json:"kind"`
-	RecipeTarget     string   `json:"recipeTarget,omitempty"`
-	IRNode           string   `json:"irNode,omitempty"`
-	PackageKind      string   `json:"packageKind,omitempty"`
-	Distribution     string   `json:"distribution,omitempty"`
-	PackageComponent string   `json:"packageComponent,omitempty"`
-	Target           string   `json:"target,omitempty"`
-	RunsOn           string   `json:"runsOn"`
-	Network          string   `json:"network,omitempty"`
-	Container        string   `json:"container,omitempty"`
-	Platform         string   `json:"platform,omitempty"`
-	URL              string   `json:"url,omitempty"`
-	Digest           string   `json:"digest,omitempty"`
-	Executable       string   `json:"executable,omitempty"`
-	ExecutableDigest string   `json:"executableDigest,omitempty"`
-	ToolFormat       string   `json:"toolFormat,omitempty"`
-	Inputs           []string `json:"inputs,omitempty"`
-	Outputs          []string `json:"outputs,omitempty"`
+	HelmImage        *HelmImageBinding `json:"helmImage,omitempty"`
+	ID               string            `json:"id"`
+	Kind             string            `json:"kind"`
+	RecipeTarget     string            `json:"recipeTarget,omitempty"`
+	IRNode           string            `json:"irNode,omitempty"`
+	PackageKind      string            `json:"packageKind,omitempty"`
+	Distribution     string            `json:"distribution,omitempty"`
+	PackageComponent string            `json:"packageComponent,omitempty"`
+	Target           string            `json:"target,omitempty"`
+	RunsOn           string            `json:"runsOn"`
+	Network          string            `json:"network,omitempty"`
+	Container        string            `json:"container,omitempty"`
+	Platform         string            `json:"platform,omitempty"`
+	URL              string            `json:"url,omitempty"`
+	Digest           string            `json:"digest,omitempty"`
+	Executable       string            `json:"executable,omitempty"`
+	ExecutableDigest string            `json:"executableDigest,omitempty"`
+	ToolFormat       string            `json:"toolFormat,omitempty"`
+	Inputs           []string          `json:"inputs,omitempty"`
+	Outputs          []string          `json:"outputs,omitempty"`
 }
 
 type Artifact struct {
@@ -596,7 +605,7 @@ func (definition CompileSpec) Validate() error {
 		}
 		seen[spec.Name] = true
 		switch spec.Kind {
-		case PackageBinaryBundle, PackageAPT, PackageOCI, PackageHelm:
+		case PackageBinaryBundle, PackageAPT, PackageOCI, PackageHelm, PackageImage:
 		default:
 			return e.New(e.CodeInvalidCatalog, "factory package %q has unsupported kind %q", spec.Name, spec.Kind)
 		}
@@ -605,6 +614,9 @@ func (definition CompileSpec) Validate() error {
 		}
 		if spec.Kind == PackageAPT && (spec.Distribution == "" || spec.Component == "") {
 			return e.New(e.CodeInvalidCatalog, "APT package %q requires distribution and component", spec.Name)
+		}
+		if spec.HelmImage != nil && (spec.Kind != PackageHelm || !canonicalName.MatchString(spec.HelmImage.Chart) || !strings.HasPrefix(spec.HelmImage.Image, "package/")) {
+			return e.New(e.CodeInvalidCatalog, "package %q has invalid Helm image binding", spec.Name)
 		}
 	}
 	return nil

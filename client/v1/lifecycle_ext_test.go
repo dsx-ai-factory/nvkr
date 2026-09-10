@@ -25,8 +25,17 @@ func TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	original := prepared.Description()
-	if original.Status != "pending" || original.Lane != "static-unqualified" || len(original.Expected) != 1 || len(original.Observed) != 0 {
+	definition, err := sdk.LoadDefinition(ctx, "definitions/nke-v1/definition.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if original.Status != "pending" || original.Lane != "static-unqualified" || len(original.Expected) != len(definition.Outputs) || len(original.Observed) != 0 {
 		t.Fatalf("prepared Run = %+v", original)
+	}
+	for i, output := range definition.Outputs {
+		if original.Expected[i].Name != output.Name || original.Expected[i].Kind != output.Format {
+			t.Fatalf("prepared Run omits or substitutes declared output %q", output.Name)
+		}
 	}
 	modified := prepared.Description()
 	modified.Expected[0].Components[0] = "substitute"

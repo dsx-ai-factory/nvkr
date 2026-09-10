@@ -1,10 +1,13 @@
-# `definitions/nke-v1` — NKE CLI Definition
+# `definitions/nke-v1` — Combined NKE Definition
 
-This production Definition builds `nkectl` from the pinned NKE source, observes its exact bytes, packages the named `nkectl` output, and can publish one signed OCI envelope. The reusable Recipe remains catalog-owned. Runtime, destination, and signing choices live in independently selected Environments, so they do not change the logical Recipe identity.
+This Definition builds `nkectl`, the complete upstream CWE runtime image, and the quickstart Helm bundle from
+one pinned NKE source. It observes all three named outputs and generates their OCI publication and signing
+jobs. Recipes remain catalog-owned. Runtime, destination, and signing choices live in independently selected
+Environments. Combined hosted acceptance remains pending; earlier signed CLI runs do not prove this graph.
 
 | File | Purpose |
 |---|---|
-| `definition.yaml` | Public Definition: Recipe selection and the named `nkectl` executable output. |
+| `definition.yaml` | Public Definition: Recipes, CLI/image/Helm outputs, and the Helm-to-image binding. |
 | `environment-local.yaml` | Local registry and dry-run signing settings. |
 | `environment-github.yaml` | Hosted GitHub destination and signing settings. |
 | `catalog/registry.yaml` | Catalog-owned NKE Recipe and source declaration. |
@@ -40,7 +43,34 @@ export GIT_CONFIG_KEY_0="url.$HOME/dev/code/github/NVIDIA/nke.insteadOf"
 export GIT_CONFIG_VALUE_0="https://github.com/NVIDIA/nke"
 ```
 
-The attempt record is `.nkd/runs/<attempt>/lifecycle.json`. It records the frozen expected `nkectl` output and the independently reopened payload observation. A dry-run signing Environment remains `static-unqualified`; it does not create a verified Release capability.
+The attempt record is `.nkd/runs/<attempt>/lifecycle.json`. It records all three frozen expected outputs and
+their independently reopened payload observations. A dry-run signing Environment remains `static-unqualified`;
+it does not create a verified Release capability. The CLI and source-chart archive builds are offline. CWE
+uses the pinned rootless BuildKit image with network access for the upstream Dockerfile's base images and
+Alpine packages; this wrapped build does not claim hermeticity or exact image reproduction.
+
+## Helm image binding
+
+The bundle preserves the complete upstream quickstart tree: three local charts and versioned references to
+external charts. It does not vendor those external charts. Packaging binds `007-controller` to the native CWE
+manifest digest produced by the same graph and refreshes `checksums.txt`. The adapter currently requires the
+plain rendered, single-container Deployment in `templates/controller.yaml`; ambiguous or already-templated
+input fails closed.
+
+After verifying and extracting the Release, supply its CWE repository as `image.repository` in deployment
+values. For this GitHub Environment that repository is `ghcr.io/njhensley/nke-recipes/cwe`. For example, rendering
+the extracted controller chart uses:
+
+```sh
+helm template controller ./helm/007-controller \
+  --set-string image.repository=ghcr.io/njhensley/nke-recipes/cwe
+```
+
+The immutable digest is embedded in the template; overriding `image.digest` cannot change it. The default
+repository is empty, so missing deployment configuration fails explicitly. When using the upstream `deploy.sh`,
+set the repository in the extracted controller `cluster-values.yaml` as a deployment overlay. Registry access
+for the target cluster remains deployment configuration. Rendering is not proof of service startup or a
+successful cluster deployment.
 
 ## Generate hosted CI
 
@@ -62,7 +92,8 @@ The pinned NKE source remains `cli/v0.1.0-rc.2`, commit `ed9fb09b04fd40bf331d25d
 
 The committed generated workflow is `.github/workflows/nkd-run.yml`, with exact inputs under
 `.github/nkd-run/`. Pull requests check regeneration only. To execute, dispatch the workflow on the default
-branch. The GitHub Environment targets `ghcr.io/njhensley/nke-recipes/nkectl` and uses the
+branch. The GitHub Environment targets the `nkectl`, `cwe` and `helm` repositories under
+`ghcr.io/njhensley/nke-recipes` and uses the
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
 environment `nkd-release` with a deployment branch policy admitting only `main`. Registry access and NKE source
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
