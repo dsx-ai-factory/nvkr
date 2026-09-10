@@ -65,8 +65,8 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	environment.Publish = map[string]string{"nkectl": environment.Publish["nkectl"]}
 	pin := "sha256:" + strings.Repeat("1", 64)
 	environment.Signing.Mode, environment.Signing.CosignTool = factory.SigningModeCosign, "cosign"
-	environment.Tools = map[string]Tool{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
-		ExecutablePath: "cosign", ExecutableDigest: pin}}
+	environment.Tools["cosign"] = Tool{Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", ArchiveDigest: pin,
+		ExecutablePath: "cosign", ExecutableDigest: pin}
 	environmentPath := filepath.ToSlash(filepath.Join(caseRoot, "environment.json"))
 	writeCanonicalTestFile(t, environmentPath, environment)
 	plan, err := Compile(ctx, definitionPath, definition, environmentPath, environment, "test")

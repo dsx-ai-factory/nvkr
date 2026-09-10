@@ -159,6 +159,33 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 				if err != nil || digest != entry.SBOMDigest {
 					return e.New(e.CodeVerifyFailed, "hosted per-artifact SBOM %q differs from its index", entry.Artifact)
 				}
+				if len(bom.Metadata.Component.Hashes) != 1 || "sha256:"+bom.Metadata.Component.Hashes[0].Content != entry.ArtifactSHA || bom.Metadata.Component.Name != entry.Artifact {
+					return e.New(e.CodeVerifyFailed, "hosted SBOM subject differs from its producer")
+				}
+				if plan.ExecutionSettings.SBOMTool != "" {
+					if len(bom.Components) == 0 {
+						return e.New(e.CodeProvenanceMissing, "hosted SBOM omits required dependency inventory")
+					}
+					method, scanner := "", ""
+					for _, property := range bom.Metadata.Props {
+						if property.Name == "nkd:dependencyInspection" {
+							method = property.Value
+						}
+						if property.Name == "nkd:dependencyScannerDigest" {
+							scanner = property.Value
+						}
+					}
+					kind := ""
+					for _, inputID := range node.Inputs {
+						input := artifacts[inputID]
+						if input.Component == entry.Artifact && input.Kind != "producer-result" {
+							kind = input.Kind
+						}
+					}
+					if (kind == "tarball" && method != "helm-manifests/v1") || (kind != "tarball" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.ExecutionSettings.SBOMTool))) {
+						return e.New(e.CodeVerifyFailed, "hosted SBOM inspection does not match the planned scanner")
+					}
+				}
 			}
 		}
 	}

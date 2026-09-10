@@ -111,6 +111,33 @@ per-recipe SBOM node after terminal observation. Each subject is the runner-obse
 also binds Recipe Digest. Resolved component declarations are frozen in the plan so the node needs no live
 catalog. Adding those declarations or outputs changes canonical plan identity and requires regeneration.
 
+An Environment may select a pinned Syft executable through `sbomTool` and `tools`. Both maintained NKE
+Environments require it. The graph then requires each observed payload and the acquired scanner as explicit
+SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismatched bytes, scanner errors and
+empty inventories fail closed. Without `sbomTool`, the existing declaration-only documents provide source
+metadata; they do not claim dependency inspection.
+
+For binaries and OCI image exports, the SBOM owner invokes the pinned scanner as an owned, bounded subprocess
+inside the offline utility container. Inputs are held and checked against producer digests. Syft's file resolver
+requires a pathname, so binary inspection uses a private read-only copy of held bytes and checks it again before
+acceptance; OCI inspection consumes the held descriptor directly. Scanner configuration and environment are
+isolated. The report is projected into deterministic component names, versions and package URLs. File-location
+records, temporary paths, timestamps and scanner-generated IDs are excluded. Scanner executable identity is
+recorded separately. Unknown versions remain unknown; they are never filled from unrelated module tags.
+
+For Helm source archives, a generic manifest reader inventories bundled `Chart.yaml` declarations, chart
+dependency declarations/locks, and external Helm references in AICR `recipe.yaml` exports. It never executes
+installation scripts or fetches external charts. Bundled charts, declared references and locked references are
+distinguished; an external reference does not establish the referenced chart's transitive contents. These
+documents describe the observed source archive before image-binding/package transformations.
+
+Per-artifact documents keep the subject in `metadata.component` and use `components` for discovered packages
+or declared chart dependencies. Stable `bom-ref` values distinguish versions with the same name. Root dependency
+edges cover the inventory; they assert artifact inclusion/reference, not invented package-to-package call graphs.
+The index binds the populated document digest. Hosted finalization rejects missing dependency inventories and
+wrong subject/scanner bindings when inspection was requested. This is package discovery, not vulnerability scanning
+or qualified reproduction. It does not claim dependencies absent from artifact metadata can be discovered.
+
 SBOMs assert composition. They remain `static-unqualified` in dry-run, and participate in pipeline-attested
 evidence only through the signed Run's subject-bound closure; generation alone is no signature or reproduction
 proof. Acquired components retain `evidence: none` unless pinned upstream evidence is declared. V1 does not

@@ -178,6 +178,7 @@ type ClusterSpec struct {
 // Runtime is the operator's container-runtime environment for the generated pipeline —
 // which runtime binary the helper orchestrates with and the pinned base/helper images.
 type ExecutionSettings struct {
+	SBOMTool   string   `json:"sbomTool,omitempty"`
 	APIVersion string   `json:"apiVersion"`
 	Kind       string   `json:"kind"`
 	Metadata   Metadata `json:"metadata"`
@@ -623,6 +624,9 @@ func (definition CompileSpec) Validate() error {
 }
 
 func (profile ExecutionSettings) Validate() error {
+	if profile.SBOMTool != "" && !canonicalName.MatchString(profile.SBOMTool) {
+		return e.New(e.CodeInvalidCatalog, "sbomTool must be a canonical tool name")
+	}
 	if profile.APIVersion != ExecutionSettingsAPIVersion || profile.Kind != ExecutionSettingsKind {
 		return e.New(e.CodeInvalidCatalog, "execution settings have unsupported apiVersion/kind %q/%q", profile.APIVersion, profile.Kind)
 	}

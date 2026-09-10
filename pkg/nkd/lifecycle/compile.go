@@ -169,6 +169,7 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 	}
 
 	delivery := factory.ExecutionSettings{
+		SBOMTool:   environment.SBOMTool,
 		APIVersion: factory.ExecutionSettingsAPIVersion, Kind: factory.ExecutionSettingsKind,
 		Metadata: factory.Metadata{Name: environment.Metadata.Name, Description: environment.Metadata.Description},
 		RunsOn:   environment.RunsOn, Targets: make(map[string]factory.Target, len(environment.Destinations)),

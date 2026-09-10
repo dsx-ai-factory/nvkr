@@ -953,6 +953,10 @@ func cloneBOM(bom *BOM) *BOM {
 	for i := range bom.Components {
 		copy.Components[i] = cloneComponent(bom.Components[i])
 	}
+	copy.Dependencies = make([]Dependency, len(bom.Dependencies))
+	for i, dependency := range bom.Dependencies {
+		copy.Dependencies[i] = Dependency{Ref: dependency.Ref, DependsOn: append([]string(nil), dependency.DependsOn...)}
+	}
 	return &copy
 }
 

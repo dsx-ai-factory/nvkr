@@ -286,6 +286,29 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 			return nil, err
 		}
 	}
+	if delivery.SBOMTool != "" {
+		if _, ok := definition.Tools[delivery.SBOMTool]; !ok {
+			return nil, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
+		}
+		for id, node := range nodes {
+			if node.Kind != NodeSBOM {
+				continue
+			}
+			components := map[string]bool{}
+			for _, input := range node.Inputs {
+				if artifacts[input].Kind == "producer-result" {
+					components[artifacts[input].Component] = true
+				}
+			}
+			for _, artifact := range artifacts {
+				if artifact.RecipeTarget == node.RecipeTarget && components[artifact.Component] && strings.HasPrefix(artifact.ID, "artifact/") {
+					node.Inputs = append(node.Inputs, artifact.ID)
+				}
+			}
+			node.Inputs = uniqueSorted(append(node.Inputs, "tool/"+delivery.SBOMTool))
+			nodes[id] = node
+		}
+	}
 	if err := addClusterCompositions(definition, plan, nodes, artifacts); err != nil {
 		return nil, err
 	}

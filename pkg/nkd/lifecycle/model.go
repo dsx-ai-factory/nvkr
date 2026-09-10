@@ -129,6 +129,7 @@ type ClusterMember struct {
 // Environment contains settings independently selected for one run. Publish
 // maps a Definition output name to a destination name; routine routes are derived.
 type Environment struct {
+	SBOMTool         string                  `json:"sbomTool,omitempty"`
 	APIVersion       string                  `json:"apiVersion"`
 	Kind             string                  `json:"kind"`
 	Metadata         Metadata                `json:"metadata"`
@@ -420,6 +421,11 @@ func (environment Environment) Validate() error {
 		case "oci", "apt", "object":
 		default:
 			return e.New(e.CodeUnsupported, "environment destination %q has unsupported kind %q", name, destination.Kind)
+		}
+	}
+	if environment.SBOMTool != "" {
+		if _, ok := environment.Tools[environment.SBOMTool]; !ok || !namePattern.MatchString(environment.SBOMTool) {
+			return e.New(e.CodeInvalidCatalog, "environment sbomTool must name a pinned tool")
 		}
 	}
 	if environment.Signing != nil {

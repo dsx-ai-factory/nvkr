@@ -14,6 +14,7 @@
 | Inspect actual past execution | Dated [evidence](evidence/) |
 | Understand retained modules and cleanup decisions | [Repository cleanup](repository-cleanup.md) |
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
+| Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
 | Build or contribute | [Development](../DEVELOPMENT.md), [contribution guide](../CONTRIBUTING.md) |
 
 ADRs contain current decisions directly. Update the owning ADR and reconciliation when changing a contract;

@@ -117,8 +117,12 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 		t.Fatal("definition and environment identities were not independently domain-separated")
 	}
 	signingEnvironment := environment
-	signingEnvironment.Tools = map[string]Tool{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz",
-		ArchiveDigest: "sha256:" + repeat("3", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + repeat("4", 64)}}
+	signingEnvironment.Tools = make(map[string]Tool, len(environment.Tools)+1)
+	for name, tool := range environment.Tools {
+		signingEnvironment.Tools[name] = tool
+	}
+	signingEnvironment.Tools["cosign"] = Tool{Format: factory.ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz",
+		ArchiveDigest: "sha256:" + repeat("3", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + repeat("4", 64)}
 	signingEnvironment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^builder$", Issuer: "issuer", CosignTool: "cosign"}
 	signingDigest, err := signingEnvironment.Digest()
 	if err != nil {

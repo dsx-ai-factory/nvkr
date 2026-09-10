@@ -53,6 +53,14 @@ Alpine packages; this wrapped build does not claim hermeticity or exact image re
 must support unprivileged overlayfs (Linux 5.11+ or an Ubuntu kernel); native snapshot fallback is disabled
 because full-tree copies can exhaust hosted-runner disk space.
 
+## Dependency SBOMs
+
+Both Environments enable dependency inspection with `sbomTool: syft`, acquired using exact archive and executable
+digests. The CLI and image SBOMs inventory packages discovered in their produced bytes. The Helm SBOM inventories
+bundled chart metadata and external chart references. See [dependency SBOMs](../../docs/dependency-sboms.md) for
+scope, limits and offline checks on actual artifacts. These populated documents supersede the source-metadata-only
+SBOMs emitted by earlier runs; existing signed publications are not modified.
+
 ## Helm image binding
 
 The bundle preserves the complete upstream quickstart tree: three local charts and versioned references to

@@ -136,6 +136,9 @@ func (plan Plan) Validate() error {
 	if err := plan.Graph.Validate(); err != nil {
 		return err
 	}
+	if err := plan.validateSBOMGraph(); err != nil {
+		return err
+	}
 	builds := map[string]ir.Node{}
 	for _, recipe := range plan.Recipes {
 		for _, node := range recipe.Graph.Nodes {

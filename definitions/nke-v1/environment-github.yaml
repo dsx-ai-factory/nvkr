@@ -7,7 +7,14 @@ utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abe
 utilityPlatform: linux/amd64
 runtime:
   runtime: docker
+sbomTool: syft
 tools:
+  syft:
+    format: tar-gzip
+    url: https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz
+    archiveDigest: sha256:8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3
+    executablePath: syft
+    executableDigest: sha256:abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f
   cosign:
     format: raw
     url: https://github.com/sigstore/cosign/releases/download/v2.6.3/cosign-linux-amd64

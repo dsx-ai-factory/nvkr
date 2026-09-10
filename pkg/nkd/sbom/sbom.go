@@ -31,7 +31,8 @@ type BOM struct {
 	// omitempty so a per-artifact SBOM (subject only in metadata.component) omits the
 	// key entirely rather than emitting an empty array — and so a nil vs. len-0 slice
 	// (e.g. from cloneBOM) canonicalizes identically.
-	Components []Component `json:"components,omitempty"`
+	Components   []Component  `json:"components,omitempty"`
+	Dependencies []Dependency `json:"dependencies,omitempty"`
 }
 
 type Metadata struct {
@@ -45,7 +46,13 @@ type ToolRef struct {
 	Name   string `json:"name"`
 }
 
+type Dependency struct {
+	Ref       string   `json:"ref"`
+	DependsOn []string `json:"dependsOn"`
+}
+
 type Component struct {
+	BOMRef     string     `json:"bom-ref,omitempty"`
 	Type       string     `json:"type"`
 	Name       string     `json:"name"`
 	Version    string     `json:"version,omitempty"`
@@ -115,8 +122,8 @@ func fromComponentForArch(nc catalog.NamedComponent, recipeDigest, artifactHash,
 		},
 		// A per-artifact SBOM's subject lives only in metadata.component (idiomatic
 		// CycloneDX). components[] is reserved for the subject's constituents/
-		// dependencies, which NKD does not yet enumerate — so it stays empty rather
-		// than restating the subject as its own component.
+		// dependencies, populated separately by artifact inspection. The declaration-only
+		// form stays empty rather than restating the subject as its own component.
 	}
 }
 
@@ -363,16 +370,18 @@ func (b *BOM) Validate() error {
 		if err := validateSBOMComponent(fmt.Sprintf("components[%d]", i), component); err != nil {
 			return err
 		}
-		if i > 0 && component.Name <= previous {
+		key := component.Name
+		if component.BOMRef != "" {
+			key = component.BOMRef
+		}
+		if i > 0 && key <= previous {
 			return e.New(e.CodeInvalidCatalog, "SBOM components must be strictly sorted and duplicate-free")
 		}
-		previous = component.Name
+		previous = key
 	}
 	if artifact != "" {
-		// A per-artifact SBOM carries its subject only in metadata.component; the
-		// inventory array is empty until NKD enumerates real dependencies.
-		if len(b.Components) != 0 {
-			return e.New(e.CodeUnverifiedRef, "per-artifact SBOM must carry its subject only in metadata.component")
+		if err := validateDependencies(b); err != nil {
+			return err
 		}
 		if b.Metadata.Component.Name != artifact {
 			return e.New(e.CodeUnverifiedRef, "per-artifact SBOM subject does not equal its metadata artifact binding")
@@ -410,7 +419,7 @@ func metadataBindings(properties []Property) (string, string, error) {
 }
 
 func validateSBOMComponent(field string, component Component) error {
-	if component.Type != "application" || !canonicalText(component.Name) {
+	if (component.Type != "application" && component.Type != "library" && component.Type != "container" && component.Type != "operating-system") || !canonicalText(component.Name) {
 		return e.New(e.CodeInvalidCatalog, "%s is not a canonical application component", field)
 	}
 	if component.Version != "" && !canonicalText(component.Version) {
