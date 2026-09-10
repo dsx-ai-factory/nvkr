@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 )
 
 const PromotionPolicySchemaVersion = "nkd.dev/promotion-policy/v1"

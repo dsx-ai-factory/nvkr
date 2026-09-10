@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/profile"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
 )
 
 func writeCLIProfile(t *testing.T, p profile.BuilderProfile) string {

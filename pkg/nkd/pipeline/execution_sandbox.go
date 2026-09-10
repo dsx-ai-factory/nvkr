@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // ExecutionSandboxMode is recorded in execution observations and builder profiles.

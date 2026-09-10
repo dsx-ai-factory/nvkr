@@ -11,14 +11,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
-	"github.com/nhensley/nkdctl/pkg/nkd/profile"
-	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 )
 
 func evidenceDigest(body []byte) string {

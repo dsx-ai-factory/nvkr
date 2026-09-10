@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // RegistryOptions selects transport only. PlainHTTP is deliberately explicit and

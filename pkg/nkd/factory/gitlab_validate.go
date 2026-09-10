@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"sigs.k8s.io/yaml"
 )
 

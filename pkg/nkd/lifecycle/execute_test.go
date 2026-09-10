@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/factory"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing.T) {

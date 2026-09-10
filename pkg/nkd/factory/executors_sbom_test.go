@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 // sbomTestPlan compiles the explicit node-worker catalog used by the other compile tests

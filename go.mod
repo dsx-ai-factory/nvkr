@@ -1,4 +1,4 @@
-module github.com/nhensley/nkdctl
+module github.com/NVIDIA/nke-recipes
 
 go 1.27.0
 

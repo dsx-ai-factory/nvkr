@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/factory"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/urfave/cli/v2"
 )
 

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func TestExecuteToolAcquireAcceptsExactRawExecutable(t *testing.T) {

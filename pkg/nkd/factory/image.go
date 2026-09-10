@@ -3,8 +3,8 @@ package factory
 import (
 	"context"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func inspectFactoryImage(ctx context.Context, plan *Plan, artifact Artifact) (delivery.ImageInspection, error) {

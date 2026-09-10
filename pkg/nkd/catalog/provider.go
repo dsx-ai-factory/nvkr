@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // RegistryFile is the hand-authored catalog entrypoint every provider serves.

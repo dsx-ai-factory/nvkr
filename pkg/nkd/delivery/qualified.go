@@ -3,12 +3,12 @@ package delivery
 import (
 	"context"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/cluster"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/internal/heldfile"
-	"github.com/nhensley/nkdctl/pkg/nkd/release"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 )
 
 const (

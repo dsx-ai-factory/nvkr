@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // WithDependencies attaches the inspected inventory to the exact existing subject.

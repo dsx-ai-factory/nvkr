@@ -5,7 +5,7 @@ package sign
 import (
 	"os"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func openPublicationRegular(path string) (*os.File, os.FileInfo, error) {

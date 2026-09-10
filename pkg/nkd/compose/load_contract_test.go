@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 type failingCatalogProvider struct {

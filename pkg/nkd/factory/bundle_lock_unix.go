@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
 

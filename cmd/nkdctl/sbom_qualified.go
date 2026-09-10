@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
-	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"golang.org/x/sys/unix"
 )
 

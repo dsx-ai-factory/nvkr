@@ -3,7 +3,7 @@ package cluster
 import (
 	"testing"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func code(err error) nkderr.Code {

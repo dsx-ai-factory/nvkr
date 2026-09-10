@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 const (

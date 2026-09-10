@@ -1,7 +1,7 @@
 package factory
 
 import (
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // EvidenceTier is the exact authority a factory plan, a generated pipeline, an

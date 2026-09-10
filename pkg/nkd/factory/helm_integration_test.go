@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 )
 
 // This opt-in integration test uses real produced inputs and a local Helm binary.

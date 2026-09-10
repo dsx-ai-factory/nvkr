@@ -15,12 +15,12 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
-	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {

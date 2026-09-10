@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/aicr"
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // Resolved is the single matched recipe with its components in a stable order and

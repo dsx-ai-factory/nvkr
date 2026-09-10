@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/assemble"
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/cluster"
-	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/release"
-	"github.com/nhensley/nkdctl/pkg/nkd/transport"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/transport"
 	"github.com/urfave/cli/v2"
 )
 

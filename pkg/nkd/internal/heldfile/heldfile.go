@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 )
 
 var (

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/internal/heldfile"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
 func objectPublicationFixture(t *testing.T) (string, []byte) {

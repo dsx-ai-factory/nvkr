@@ -3,7 +3,7 @@
 package pipeline
 
 import (
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func applyExecutionSandbox([]string) error {

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func TestPublicationRootEnclosesAPTRepositoryAsOCIArtifact(t *testing.T) {

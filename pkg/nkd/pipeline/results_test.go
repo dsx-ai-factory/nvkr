@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/profile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
 )
 
 func qualifiedResultOptions(t *testing.T, sourceRoot string) (ir.Node, RunOptions, profile.ExecutionReceipt) {

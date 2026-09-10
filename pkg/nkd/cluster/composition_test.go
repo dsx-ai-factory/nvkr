@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 )
 
 func compositionDigest(ch string) string { return "sha256:" + strings.Repeat(ch, 64) }

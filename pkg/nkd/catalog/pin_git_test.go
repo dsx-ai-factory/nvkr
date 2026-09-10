@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // Exercise the real Git transport locally, including annotated-tag peeling. The

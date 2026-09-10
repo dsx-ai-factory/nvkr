@@ -4,13 +4,13 @@ import (
 	"context"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
-	"github.com/nhensley/nkdctl/pkg/nkd/profile"
-	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 )
 
 // ValidationVectorInput identifies a signed vector and its detached verification

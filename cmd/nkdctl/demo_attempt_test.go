@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/lifecycle"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
 
 func TestDemoDefaultAttemptsAreAcceptedByRunPreparation(t *testing.T) {

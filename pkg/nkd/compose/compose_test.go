@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/aicr"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func boolp(b bool) *bool { return &b }

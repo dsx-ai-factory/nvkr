@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func acquisitionCatalogFixture(t *testing.T, url, digest string) string {

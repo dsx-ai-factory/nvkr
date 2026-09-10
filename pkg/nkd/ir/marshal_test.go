@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 )
 
 func TestLogicalIdentityDTOClassifiesEveryExecutionField(t *testing.T) {

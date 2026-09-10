@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func gitlabTestPlan(t *testing.T) *Plan {

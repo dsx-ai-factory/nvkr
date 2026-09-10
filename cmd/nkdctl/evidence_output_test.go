@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
 	"github.com/urfave/cli/v2"
 )
 

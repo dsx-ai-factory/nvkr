@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 // TestCommittedGraphDigestMatchesEmittedNodesDigest guards the trailing-newline drift: at

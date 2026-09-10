@@ -15,7 +15,7 @@ import (
 	"strings"
 	"unicode"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // Target names a destination and a credential reference, never a secret value.

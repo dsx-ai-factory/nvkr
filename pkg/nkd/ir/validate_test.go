@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 )
 
 func TestGraphAuthorityRejectsUnsafeCallerComposedSemantics(t *testing.T) {

@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/factory"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
-	"github.com/nhensley/nkdctl/pkg/nkd/provenance"
-	"github.com/nhensley/nkdctl/pkg/nkd/sign"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
 func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *testing.T) {

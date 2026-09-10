@@ -1,9 +1,9 @@
 package recipe
 
 import (
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // NodeSKU is a role PROJECTION (a view) of a resolved node-level recipe: the subset of

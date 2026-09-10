@@ -5,8 +5,8 @@ package pipeline
 import (
 	"context"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/internal/heldfile"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
 func snapshotMappedRunnerExecutableContext(ctx context.Context) (*heldfile.File, func(), error) {

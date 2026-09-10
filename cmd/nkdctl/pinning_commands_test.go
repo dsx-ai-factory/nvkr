@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func TestCatalogPinAndBumpPreserveExactLockState(t *testing.T) {

@@ -6,12 +6,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/status"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
-	"github.com/nhensley/nkdctl/pkg/nkd/vuln"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 )
 
 // AuthorizationDocumentSchema is the sole schema registration for signed

@@ -3,8 +3,8 @@ package client
 import (
 	"context"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/lifecycle"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
 
 // The lifecycle aliases are the SDK's public product vocabulary. Compiler

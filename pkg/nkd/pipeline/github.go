@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // GitHub is the GitHub Actions renderer for the shared ADR-18 job model, in the ADR-18 §8

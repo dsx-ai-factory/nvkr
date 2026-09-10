@@ -3,8 +3,8 @@ package attest
 import (
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/provenance"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
 )
 
 // ProvenanceIndex builds a declaration-only deterministic SLSA provenance index

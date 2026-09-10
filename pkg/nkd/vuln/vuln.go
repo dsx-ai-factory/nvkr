@@ -2,7 +2,7 @@
 // Scanner execution and advisory generation are outside the current product scope.
 package vuln
 
-import "github.com/nhensley/nkdctl/pkg/nkd/canonical"
+import "github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 
 const (
 	QualifiedReportSchemaVersion = "nkd.dev/vuln-report/v2"

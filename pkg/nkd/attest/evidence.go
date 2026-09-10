@@ -3,8 +3,8 @@ package attest
 import (
 	"sort"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/profile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
 )
 
 // EvidenceSchemaVersion identifies the evidence-bundle shape.

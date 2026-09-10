@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/assemble"
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/urfave/cli/v2"
 )
 

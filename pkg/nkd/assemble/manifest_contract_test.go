@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestDiskManifestRejectsInvalidSerializedDescriptions(t *testing.T) {

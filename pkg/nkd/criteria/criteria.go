@@ -7,7 +7,7 @@ package criteria
 import (
 	"sort"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // Wildcard is the explicit "matches anything" value; the empty string is treated

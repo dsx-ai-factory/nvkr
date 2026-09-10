@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // TestExecNodeLaunchOrchestratesContainer proves helper-orchestrated dispatch: with

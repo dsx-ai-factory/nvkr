@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/aicr"
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/compose"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 )
 
 // ADR-12 assigns category to recipe selection and role to SKU composition. Keep the

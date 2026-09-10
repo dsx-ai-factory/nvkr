@@ -3,7 +3,7 @@ package assemble
 import (
 	"context"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // This file implements NKD v1 §8.3.1's canonical-disk boundary — the reconciliation

@@ -3,7 +3,7 @@ package recipe
 import (
 	"sort"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // RequiredBuilders returns the distinct from-source builder types a resolved recipe

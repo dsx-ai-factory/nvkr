@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func requireCode(t *testing.T, err error, want nkderr.Code) {

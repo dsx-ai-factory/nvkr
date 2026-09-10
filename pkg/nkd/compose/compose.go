@@ -25,9 +25,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/aicr"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // Schema identifiers, mirroring AICR's RecipeMetadataKind / RecipeMixinKind.

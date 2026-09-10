@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
 func TestMappedRunnerSnapshotIgnoresExecutablePathReplacement(t *testing.T) {

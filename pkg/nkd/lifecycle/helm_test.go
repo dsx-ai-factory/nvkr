@@ -4,8 +4,8 @@ import (
 	"sort"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/factory"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 )
 
 func TestHelmImageDependency(t *testing.T) {

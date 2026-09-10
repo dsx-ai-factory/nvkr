@@ -11,7 +11,7 @@ import (
 	"path"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"sigs.k8s.io/yaml"
 )
 

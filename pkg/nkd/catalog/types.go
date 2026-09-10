@@ -7,9 +7,9 @@
 package catalog
 
 import (
-	"github.com/nhensley/nkdctl/pkg/nkd/aicr"
-	"github.com/nhensley/nkdctl/pkg/nkd/compose"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 )
 
 // From-source builder types (ADR-10). These mirror ir.Builder* — the catalog is the

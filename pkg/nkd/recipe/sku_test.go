@@ -3,8 +3,8 @@ package recipe
 import (
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 )
 
 // A category-model catalog (ADR-12): ONE `kubernetes` category recipe produces every

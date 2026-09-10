@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 )
 
 func signCode(err error) nkderr.Code {

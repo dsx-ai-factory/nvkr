@@ -15,10 +15,10 @@ import (
 	"unicode/utf8"
 
 	ociname "github.com/google/go-containerregistry/pkg/name"
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/compose"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"sigs.k8s.io/yaml"
 )
 

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func admitBuildKit(node ir.Node, opts RunOptions) error {

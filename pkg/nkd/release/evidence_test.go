@@ -10,13 +10,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
-	"github.com/nhensley/nkdctl/pkg/nkd/vuln"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 )
 
 type waiverVerifier struct {

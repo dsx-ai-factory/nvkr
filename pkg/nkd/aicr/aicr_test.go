@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
 func code(err error) nkderr.Code {

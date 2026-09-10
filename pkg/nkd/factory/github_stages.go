@@ -3,7 +3,7 @@ package factory
 import (
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // A stage is a scheduling choice, not a new graph or authority record. Only

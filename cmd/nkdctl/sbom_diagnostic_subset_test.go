@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	client "github.com/nhensley/nkdctl/client/v1"
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/profile"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
+	client "github.com/NVIDIA/nke-recipes/client/v1"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/urfave/cli/v2"
 )
 

@@ -5,12 +5,12 @@ import (
 	"os"
 	"sort"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/lifecycle"
-	"github.com/nhensley/nkdctl/pkg/nkd/release"
-	"github.com/nhensley/nkdctl/pkg/nkd/status"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
 	"github.com/urfave/cli/v2"
 )
 

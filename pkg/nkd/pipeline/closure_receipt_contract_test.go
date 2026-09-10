@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func pristineClosureFixture(t *testing.T) (ir.Node, string, RunOptions) {

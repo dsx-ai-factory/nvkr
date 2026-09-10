@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/status"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
 )
 
 // TagResolver resolves a mutable "name:tag" reference to its current immutable digest

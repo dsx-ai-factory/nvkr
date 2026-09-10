@@ -3,7 +3,7 @@ package recipe
 import (
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func mustCompile(t testing.TB, resolved *Resolved) *ir.Graph {

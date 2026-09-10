@@ -7,8 +7,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 )
 
 // goldenCase pins one resolved recipe's identity + component set.

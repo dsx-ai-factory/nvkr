@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/lifecycle"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
 
 func TestConsumerOptionsExposeNoCommandRunnerOrVerifierInjection(t *testing.T) {

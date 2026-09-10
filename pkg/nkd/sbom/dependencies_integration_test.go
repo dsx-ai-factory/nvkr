@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 )
 
 func TestRealArtifactDependencies(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // GitLab renders the currently admitted prebuilt provider lane in the ADR-18 §8

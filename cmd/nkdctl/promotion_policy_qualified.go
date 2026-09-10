@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/release"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 	"github.com/urfave/cli/v2"
 )
 

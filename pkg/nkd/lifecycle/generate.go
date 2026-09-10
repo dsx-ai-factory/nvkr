@@ -3,7 +3,7 @@ package lifecycle
 import (
 	"context"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 )
 
 // GenerateFiles renders or checks one hosted Run from authored lifecycle

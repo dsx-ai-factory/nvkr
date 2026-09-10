@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/factory"
-	"github.com/nhensley/nkdctl/pkg/nkd/lifecycle"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
 
 func lifecycleCommandRepo(t *testing.T) {

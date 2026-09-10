@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/assemble"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 )
 
 func TestBinaryBundlePublicationRootAndExtraction(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"testing"
 
-	client "github.com/nhensley/nkdctl/client/v1"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/lifecycle"
+	client "github.com/NVIDIA/nke-recipes/client/v1"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
 
 func TestSDKEnvironmentLoadPreservesDocumentIdentity(t *testing.T) {

@@ -3,8 +3,8 @@ package pipeline
 import (
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // validateGraphIdentity is the common execution/lowering gate. A recipeDigest is

@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/recipe"
-	"github.com/nhensley/nkdctl/pkg/nkd/vuln"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 	"github.com/urfave/cli/v2"
 )
 

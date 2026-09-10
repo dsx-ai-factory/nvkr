@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/sign"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 	"github.com/urfave/cli/v2"
 )
 

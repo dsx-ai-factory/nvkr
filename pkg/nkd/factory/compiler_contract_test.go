@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/cluster"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestClusterCompilerBindsExactRecipeAndSelectedRole(t *testing.T) {

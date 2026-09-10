@@ -19,10 +19,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/assemble"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
-	"github.com/nhensley/nkdctl/pkg/nkd/profile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
 )
 
 // ctx returns the run's context. Public execution entry points reject nil before

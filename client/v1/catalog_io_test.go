@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	client "github.com/nhensley/nkdctl/client/v1"
-	"github.com/nhensley/nkdctl/pkg/nkd/catalog"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	client "github.com/NVIDIA/nke-recipes/client/v1"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 type legacyCatalogProvider struct{ calls int }

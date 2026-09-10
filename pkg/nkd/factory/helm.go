@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 // helmPackageTree normalizes a generated tree or an observed source archive to

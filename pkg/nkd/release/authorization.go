@@ -6,13 +6,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/provenance"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
-	"github.com/nhensley/nkdctl/pkg/nkd/trust"
-	"github.com/nhensley/nkdctl/pkg/nkd/vuln"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 )
 
 const AuthorizationSchemaVersion = "nkd.dev/release-authorization/v7"

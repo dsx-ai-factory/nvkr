@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func TestExecNodeDryRun(t *testing.T) {

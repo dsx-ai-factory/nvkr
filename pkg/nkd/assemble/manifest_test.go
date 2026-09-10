@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // ADR-14 §1: the unified DiskManifest anchors on the logical digest of the decoded RAW

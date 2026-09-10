@@ -3,9 +3,9 @@ package client
 import (
 	"context"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/release"
-	"github.com/nhensley/nkdctl/pkg/nkd/transport"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/transport"
 )
 
 // AuthorizeReleaseRequest carries only opaque verified receipt capabilities and the

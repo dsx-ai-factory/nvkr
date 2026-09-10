@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // ExecNode is the shared from-source RUNNER mode (ADR-18 §2): it executes ONE IR node

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
-	"github.com/nhensley/nkdctl/pkg/nkd/provenance"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
-	"github.com/nhensley/nkdctl/pkg/nkd/sign"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
 // ValidateHostedRestores requires the generated finalizer to account for every

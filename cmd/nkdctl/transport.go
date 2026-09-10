@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/urfave/cli/v2"
 )
 

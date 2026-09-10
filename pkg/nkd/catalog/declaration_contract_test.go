@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestCatalogRejectsAmbiguousRecipeMembership(t *testing.T) {

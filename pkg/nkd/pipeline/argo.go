@@ -7,8 +7,8 @@ import (
 	"io"
 	"strings"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // Argo is the Argo Workflows renderer for the shared ADR-18 job model. It is not an

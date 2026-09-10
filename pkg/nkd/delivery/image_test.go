@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/assemble"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func imageFixture(t *testing.T) string {

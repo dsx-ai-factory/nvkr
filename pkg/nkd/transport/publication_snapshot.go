@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // snapshotPublication freezes every publication input in a private directory.

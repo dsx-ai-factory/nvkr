@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	client "github.com/nhensley/nkdctl/client/v1"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	client "github.com/NVIDIA/nke-recipes/client/v1"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput(t *testing.T) {

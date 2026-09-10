@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/assemble"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/urfave/cli/v2"
 )
 

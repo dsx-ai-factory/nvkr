@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // MeasureVerify is the DEFAULT, isolated verify path (ADR-04 §3): it re-hashes

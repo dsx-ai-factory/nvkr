@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestPinNetworkOperationsRejectCanceledContextBeforeSubprocess(t *testing.T) {

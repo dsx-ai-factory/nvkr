@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 // TestGitHubRefResolverAgainstFakeAPI exercises the real resolver end-to-end against a stand-in

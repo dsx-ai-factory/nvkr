@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/compose"
-	"github.com/nhensley/nkdctl/pkg/nkd/criteria"
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // bytesProvider serves a catalog from in-memory bytes, for exercising Load's parse

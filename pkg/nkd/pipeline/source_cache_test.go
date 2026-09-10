@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func TestLocalRunMaterializesSharedSourceOnce(t *testing.T) {

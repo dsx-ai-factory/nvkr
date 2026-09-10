@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	nkderr "github.com/nhensley/nkdctl/pkg/nkd/errors"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // a valid bare content digest (sha256:<64-hex>) for the no-compile lane.

@@ -3,10 +3,10 @@ package client
 import (
 	"context"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/attest"
-	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
-	"github.com/nhensley/nkdctl/pkg/nkd/provenance"
-	"github.com/nhensley/nkdctl/pkg/nkd/sbom"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 type localPublisherEvidenceAuthority struct {

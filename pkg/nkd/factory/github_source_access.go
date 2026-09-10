@@ -3,7 +3,7 @@ package factory
 import (
 	"strings"
 
-	"github.com/nhensley/nkdctl/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 const sourceTokenEnv = "NKD_SOURCE_TOKEN"
