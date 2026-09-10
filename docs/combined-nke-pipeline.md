@@ -1,211 +1,102 @@
-# Combined NKE pipeline implementation
+# Combined NKE pipeline
 
-## Requested outcome
+One maintained Definition builds the NKE CLI, complete upstream CWE runtime image and quickstart Helm bundle
+from NKE commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`. The generated workflow observes all three outputs,
+publishes them to GHCR, signs and verifies their publication envelopes, and must finalize a complete Run.
 
-One maintained Definition must build the NKE CLI, the CWE container image and the NKE Helm chart bundle.
-The generated GitHub workflow must observe, publish, sign and verify the resulting outputs and finalize a
-complete Run. A successful CLI-only run does not satisfy this change. Existing unrelated specification edits
-remain outside this implementation.
+## Implementation
 
-## Verified starting point
+`definitions/nke-v1/definition.yaml` selects two catalog Recipes: `nke-cli` produces `nkectl`, and
+`nke-control-plane` produces `cwe` plus `nke-helm`. Environment inputs select Docker, publication repositories
+and signing. The seven public objects and Definition → Run → Release lifecycle are unchanged.
 
-At the start of this work, the maintained `definitions/nke-v1` inputs selected only `nkectl`. The pinned NKE commit is
-`ed9fb09b04fd40bf331d25df2222206ffaca593e`; the local upstream checkout contains that commit. Inspection uses
-`git show` and an exported temporary tree, rather than changing the upstream checkout or treating its current
-HEAD as the pinned source.
+The CLI and source-chart archive build offline with the pinned Go toolchain. CWE wraps the upstream
+`controller/Dockerfile` using rootless BuildKit v0.33.0, pinned to
+`moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef`.
+Its explicit network access supports base images and Alpine packages. The rootless launcher requires overlayfs
+to avoid full-tree snapshot copies; unsupported kernels fail explicitly. This is the `pipeline-attested` wrapped
+build lane; it does not claim hermeticity or exact image reproduction. Unsupported runtimes fail admission.
 
-At that commit, `controller/Dockerfile` builds `controller/cmd/worker` with the vendored Go workspace.
-The final image also contains Alpine runtime packages, the digest-pinned SPIFFE JWT authentication helper,
-the controller UI, license files and an empty profiles directory. The existing diagnostic single-binary
-scratch-image assembler does not implement this runtime image.
+The delivery module imports the exact observed OCI archive through bounded, safe extraction. It verifies the
+single-platform native image index, manifest, config, compressed layers and uncompressed layer identities,
+rejecting platform mismatches, ambiguity and unreachable blobs. Lifecycle observation independently reopens
+the producer archive. Publication preserves the runnable image manifest and consumer checks bind its platform.
 
-The public lifecycle initially rejected `format: oci` during lowering. Helm output initially required an AICR
-generator and did not accept a chart from a fetched source tree. These were implementation gaps, not input
-typos; removing the rejection alone would not establish correct production, observation or consumption.
+The Helm producer archives the complete pinned `generated/aicr/quickstart/helm` tree with sorted names, fixed
+timestamps and numeric ownership. Its 48 files contain three local charts and versioned external chart
+references; external charts are not vendored. The Definition declares `imageOutput: cwe` and
+`chart: 007-controller`, creating an explicit package dependency. Packaging binds the chart's unique controller
+Deployment to the verified native image manifest, removes the development tag/default repository and refreshes
+all 47 checksum entries. Missing, ambiguous or already-templated Deployment inputs fail closed.
 
-The pinned source has both a standalone chart at `controller/deploy/charts/cloud-workflow-engine` and an
-AICR quickstart Helm tree at `generated/aicr/quickstart/helm`. The latter refers to external dependency charts
-and currently defaults to a different image repository and a development tag. Its image reference must be
-bound to the CWE image produced by the combined pipeline. With no scope clarification received, implementation
-uses the complete quickstart Helm tree as the default; the standalone CWE chart is not a substitute for it.
+Consumers supply the verified CWE repository as `image.repository`. The manifest digest is embedded in the
+Deployment template and cannot be replaced through `image.digest`. Rendering without a repository fails.
+See the [Definition README](../definitions/nke-v1/README.md) for generation and consumption commands.
 
-## Work and acceptance
+Generated Docker utility jobs use the runner's UID/GID so private package directories remain readable by later
+host transport steps. Each source fetch transports its exact receipt file, never the shared receipt directory.
+This preserves no-replace restoration when independent fetch jobs join at finalization. Receipt authentication
+remains owned by the pipeline module.
 
-1. Exercise the pinned CWE compilation offline using the existing exact Go toolchain image. This establishes
-   source/toolchain compatibility only; it is not a complete image build.
-2. Add the required typed image and source-chart production paths through the existing lifecycle and owning
-   executor modules. Preserve declared network/privilege, credential isolation, exact source/tool pins,
-   artifact observation, SBOM binding and failed-Run behavior. Update governing ADR contracts where needed.
-3. Extend the maintained combined Definition and Environment, deriving all generated files through the public
-   generation command. Retain CLI production and add separately identifiable image and chart outputs.
-4. Test the actual image configuration and runtime payload, chart contents and image binding, corrupted or
-   missing outputs, generated graph completeness and consumer behavior. Run the full repository gate,
-   workflow linters and exact regeneration checks before publishing changes.
-5. Execute the generated hosted workflow and record all three observed outputs, published immutable subjects,
-   real signatures/attestations and complete Run finalization. Pull and inspect the image and chart bundle;
-   controlled tests or unrelated earlier passing workflows cannot substitute for this evidence.
+## Validation
 
-## Current experiment
+The full local `make check` gate passed after the receipt fix: formatting, vet, golangci-lint, shellcheck and
+race-enabled tests, with 64.2% statement coverage. Linux pipeline/sign race checks, actionlint, yamllint and
+byte-exact generation checks passed. The corrected graph's 35 artifact paths have no exact or ancestor overlap.
 
-The initial temporary Docker build attempt failed before compilation because `/src/bin` did not exist inside
-the read-only source mount. The retry used a separate `/out` mount, leaving the source tree read-only and
-networking disabled, and completed successfully. It produced a 94 MiB static CWE binary from the pinned
-vendored workspace with the same exact Go toolchain used by the CLI. This proves compilation only, not the
-complete runtime image or its deployment.
+Contract tests cover native-image byte/platform/diff-ID validation, unsafe archives, substituted producer
+results, source Helm cardinality, image dependency lowering, Deployment ambiguity and checksum regeneration.
+A transport regression restores two independent source receipts into the same consumer workspace.
 
-The experiment's static Linux/amd64 ELF has SHA-256
-`1d3b5106915dc856327a8c474921e5a4d3004cb173a611e1c96f67088c2831e1`.
-Its temporary command stamped version `ed9fb09b`; this is experimental build evidence, not a published version.
+The real-input Helm test rendered all three local charts, rejected a missing repository and proved that a
+values digest override cannot replace the image binding. `TestPinnedNKEHelmBinding` is opt-in through
+`NKD_HELM_ARCHIVE` and `NKD_CWE_IMAGE_LAYOUT`; a skipped invocation does not prove external acceptance.
 
-## Implementation progress
+## Hosted attempts
 
-The delivery module now imports an observed OCI-export tar through held exact bytes, rejects unsafe/duplicate
-archive members, stages privately, and checks the image before exposing its layout. Image inspection binds the
-manifest, config, compressed layers and uncompressed layer identities, checks the requested Linux platform,
-rejects ambiguous indexes and unreachable blobs, and preserves the original runnable manifest. Publication
-closure inspection recognizes native OCI image manifests alongside existing delivery artifacts.
+| Run | Result and correction |
+|---|---|
+| [34430414883](https://github.com/njhensley/nke-recipes/actions/runs/34430414883), `d61ce88` | CLI and Helm source builds passed; CWE rejected the default Podman runtime. Both maintained Environments now select Docker, and graph admission rejects incompatible settings. The [failed Run record](evidence/2026-09-10-combined-first-failed-run.json) retains all three required outputs. |
+| [34430831748](https://github.com/njhensley/nke-recipes/actions/runs/34430831748), `16bbddb` | All three builds passed; CWE took 8m19s. Root-owned private image directories blocked host archive handoff. Generated Docker utilities now use runner ownership. A real Linux-volume experiment reproduced the failure and verified the correction. |
+| [34431910080](https://github.com/njhensley/nke-recipes/actions/runs/34431910080), `00656b2` | All builds, six package jobs, publication, signing and hosted verification passed. Independent consumers passed for all three repositories. Finalization failed because two source fetches restored the same receipt directory. Exact receipt-file carriers correct that collision. |
+| [34433727700](https://github.com/njhensley/nke-recipes/actions/runs/34433727700), `3c2afb2` | CWE exhausted runner disk space at the Go linker under the forced native snapshotter. The launcher now requires overlayfs; the receipt fix remains in place. No publication succeeded in this attempt. |
 
-Focused tests cover image publication identity preservation, platform/byte/diff-ID mismatches, unsafe archive
-paths, duplicate entries and immutable destinations. Public OCI outputs now lower to a typed image package
-and retain their enclosing publication route. Packaging imports the observed producer archive; lifecycle
-observation matches the producer record and independently re-imports it before accepting the image. Consumer
-projection checks the exact native image and its platform. Acquired-image layouts remain capability-gated;
-this initial producer contract requires a built OCI export archive.
+An offline replay of the second attempt's successful producer carriers also passed all six package/archive
+handoffs. It verifies the packaging path, not new hosted execution or signatures.
 
-Validation for this increment: the complete `make check` gate passed (64.0% coverage), affected-package tests
-and lint passed, and the maintained GitHub bundle still regenerates byte-for-byte. Focused lifecycle tests
-exercise lowering, producer substitution rejection and native-image consumer platform binding. No generated
-files have been changed and nothing from this increment has been committed or pushed.
+The third attempt published the common envelope digest
+`sha256:77b8f4f754820a0f59901e5f69a1ad1d49322f6d744cd9116ceb057ebf8e3504` to the `cwe`, `helm` and `nkectl`
+repositories under `ghcr.io/njhensley/nke-recipes`. Independent cosign signature and production-attestation
+checks and the public NKD `pipeline-attested` / `artifact-publication` consumer passed for all three references.
+Its native CWE manifest
+`sha256:38b30b65d4e8c333d9823f3376f9d623846c0474837e62182d973e4c8b7adecf` passed offline executable,
+SPIFFE helper, UI, profiles, license and CA checks, reporting `cloud-workflow-engine 0.0.0-ged9fb09b04fd`.
+The extracted CLI reported `nkectl v0.1.0-rc.2 (commit: ed9fb09b, built: 2026-08-18T15:22:55Z)`.
+The downloaded Helm tree passed all checksums and rendered all three local charts with that exact CWE digest.
+These successful publication checks do not change the third attempt's failed Run status.
 
-The full-image experiment uses official rootless BuildKit v0.33.0, pinned to
-`moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef`, with the
-[documented rootless container settings](https://github.com/moby/buildkit/blob/v0.33.0/docs/rootless.md).
-It invokes the upstream Dockerfile with a read-only source mount and a separate output directory. Its
-networked Dockerfile execution is an experiment for the wrapped-build lane, not a hermeticity claim.
+## Hosted storage regression
 
-The full upstream Dockerfile experiment passed. The OCI export archive has SHA-256
-`9ace99c1bb0cf365dbb12e508e15d188cc1a1c083833fa852d3c5e3c7d043193`; the importer verified its single-platform
-index `sha256:b3d7a4f873cf886bcff421cf8a1826480dc1193ebdf56b165fd534c1135286d2` and image manifest
-`sha256:0d88a6556b283072e856c7cf0bb7acce09cf3b5fd179aa6faf1ceb511bee2516`. Docker loaded that manifest, and
-offline smoke checks passed for the CWE executable, SPIFFE helper, UI, profiles directory, licenses, CA
-certificates and executable help. No database-backed service or cluster deployment was exercised.
+The fourth attempt failed with `mapping output file failed: no space left on device`. The forced native
+snapshotter copied the large source/toolchain tree across Dockerfile steps. A real Docker regression using
+the launcher's exact settings and a 16 MiB repeated-copy fixture failed a 64 MiB storage budget at 164,436 KiB.
+After switching only the snapshotter to overlayfs, it passed at 33,256 KiB. The test runs in about two seconds:
 
-The shared launcher now supports `buildkit-rootless`, with explicit network and rootless-container settings,
-private output staging and capability rejection for qualified/direct execution or unsupported runtimes. The
-maintained Definition and Environments now include CWE alongside the CLI; generation passed with plan digest
-`sha256:7ace7d7b4da9622446e501e6343eb7154eaa5e2fbbfa4e1d40f88da3c632c6a9`. This is an intermediate two-output
-pipeline. Chart production and binding, the complete three-output inputs, final gates and hosted validation
-remain outstanding. The full gate exposed three tests that assumed CLI-only product inputs; those fixtures
-were updated to either verify every declared output or isolate their intended CLI failure, and the focused
-rerun passed.
+```sh
+NKD_BUILDKIT_TEST_IMAGE=moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef \
+  go test ./pkg/nkd/pipeline -run TestBuildKitSnapshotStorageBudget -count=1 -v
+```
 
-The subsequent full `make check` passed (64.1% coverage). Uncached Linux/arm64 race tests for the pipeline and
-signing packages also passed, along with actionlint. These gates validate the intermediate CLI/CWE code and
-generated workflow; no hosted dispatch has been made for this change. Next is source quickstart Helm archive
-production, image-digest binding and inclusion as the third required output before final hosted acceptance.
+The [pinned BuildKit rootless documentation](https://github.com/moby/buildkit/blob/v0.33.0/docs/rootless.md)
+requires Linux 5.11+ or an Ubuntu kernel for unprivileged overlayfs. The launcher does not add privileged mode,
+a host socket, credentials or a FUSE device. Unsupported hosts fail instead of silently using native storage.
+The miniature storage test does not prove that the complete upstream CWE build fits a hosted runner; the next
+full hosted attempt must establish that separately.
 
-Source Helm output selection now accepts one archive component independently of an AICR generator. Packaging
-extracts the single `helm/` root with the shared bounded transport adapter and normalizes its carrier bytes.
-Observation binds the raw archive to its producer result and independently reproduces the package. Focused
-tests passed for selection cardinality, lowering, packaging/observation and substituted producer rejection.
-The first packaging test exposed the archive writer's requirement that its output live beneath the transport
-root; source packaging now writes the carrier inside its private staging directory.
+## Acceptance boundary
 
-The maintained Definition now selects `cwe`, `nke-helm` and `nkectl`. The third producer archives the complete
-pinned quickstart tree offline with sorted names, fixed timestamps and numeric ownership. Its standalone
-container experiment passed after moving its temporary output mount to `/out` (the exported read-only tree
-lacks the normal launcher's `bin` mountpoint). The archive has SHA-256
-`55164d5a876205ace8decd0b46f0640f69bab6926b16d98dabd02144c41f16fc`; all 48 files match the exported pinned
-source, including three local chart metadata files and the external dependency chart references. This does
-not mean those external charts were vendored or deployed.
-
-The three-output plan digest is `sha256:2ee9993c88afdaa60ee88a4bcd166ee6e0d4c3680ff31b064a236b2c5fde9641`.
-Byte-exact generation checking, actionlint, yamllint, source Helm boundary tests, factory/lifecycle/SDK tests
-and affected-package lint passed. Factory HTTP-listener tests required an unsandboxed rerun; that rerun passed.
-The quickstart values still need binding to the produced CWE image, including consistency of the bundle's
-checksums. No combined hosted dispatch or publication has occurred; final gates and external acceptance remain.
-
-Inspection of the pinned `007-controller/templates/controller.yaml` found that its Deployment hardcodes
-`ghcr.io/nvidia/nke-controller:0.0.0-dev`; it does not consult the adjacent `image` values. Updating values alone
-would therefore leave deployment on the old image. Binding must also make the rendered Deployment select the
-produced immutable image, keep checksum metadata consistent, and prove the result through Helm rendering.
-
-The full `make check` gate passed for this three-output increment (64.1% coverage). This validates source
-archive support and generated graph consistency; the hardcoded Deployment reference still prevents claiming
-the combined bundle is ready for hosted acceptance. All implementation changes remain uncommitted.
-
-The Definition now declares the Helm output's `imageOutput: cwe` and `chart: 007-controller`. Lowering makes
-the image package an explicit dependency. Packaging verifies that native image's closure, embeds its manifest
-digest in the unique rendered Deployment, removes the development tag and default repository, and regenerates
-checksums. Deployment must provide the verified Release's repository; changing that location does not change
-the bundle, and a Helm digest values override cannot replace the embedded digest.
-
-The real-input test initially found that GNU tar's `helm/` directory spelling was rejected by the shared
-transport reader. A producer transform experiment did not change GNU tar's spelling. The reader now normalizes
-one trailing slash only for directory entries before validation and duplicate detection. Contract negatives
-cover directory aliases, traversal and repeated slashes.
-
-`TestPinnedNKEHelmBinding` passed against the real source archive and previously verified upstream CWE image.
-All three local charts rendered with Helm; both the configured repository and a mirror rendered the exact
-image manifest `sha256:0d88a6556b283072e856c7cf0bb7acce09cf3b5fd179aa6faf1ceb511bee2516`. Rendering without
-a repository failed as intended, a digest override could not replace the binding, and all 47 checksum entries
-matched the packaged tree. This test is opt-in via `NKD_HELM_ARCHIVE` and `NKD_CWE_IMAGE_LAYOUT`; a normal
-skipped invocation is not external evidence. It proves rendering, not Kubernetes deployment or external chart
-download availability.
-
-The bound three-output plan is `sha256:b216647f9c78cc6d7dc8fc47bb369b21ee678317482993e5d2be206849f7c0c3`.
-The full gate passed (64.2% coverage), Linux pipeline/sign race checks passed, and generated-bundle checking,
-actionlint and yamllint passed. A subsequent strict multi-document parsing test covers commented YAML
-separators; the refreshed full gate and real-input Helm test also passed before commit. Local rendering used
-Helm `v4.2.3+g43e8b7f`. Hosted execution, publication, signing and independent consumption of the combined
-outputs remain outstanding.
-
-The first combined hosted run, [34430414883](https://github.com/njhensley/nke-recipes/actions/runs/34430414883),
-ran commit `d61ce88`. CLI and source Helm builds passed, but CWE failed before build execution because the
-Environment default selected Podman while rootless BuildKit requires Docker. Dependent publication/signing
-jobs were skipped; the workflow failed and retained a lifecycle artifact. Both maintained Environments now
-select Docker explicitly. Plan validation rejects incompatible BuildKit runtime settings before generation;
-the regression test checks Docker emission and rejection of Podman/default settings. The refreshed full gate
-passed (64.2% coverage), with actionlint and yamllint. The corrected plan digest is
-`sha256:6a99ce1837a0b3d059993478c56b2285ec20bb47b74cf1df4bd9f96f1592427a`.
-
-The first run's downloaded [failure record](evidence/2026-09-10-combined-first-failed-run.json) preserves all
-three required outputs, reports `status: failed` and `lane: static-unqualified`, and identifies the missing
-successful CWE carrier. It does not shrink the required output set to the successful CLI/Helm source builds.
-The corrected [run 34430831748](https://github.com/njhensley/nke-recipes/actions/runs/34430831748) executes
-commit `16bbddbaa5d08e4ca56a15ec8faabf7fbf491062`. All three builds passed; CWE took 8m19s and produced native
-manifest `sha256:43331f47936aab50e9566ca4b78c29c2920ce02b98f9359c57217f5354bab277`. The producer's OCI archive
-is 72,946,176 bytes with SHA-256 `6b271f2f4a01d3e8c953ae0e40578e1755d013bfab74192be539bc08e6873de1`.
-
-Control-plane terminal observation, SBOM generation and image import succeeded, but the host transport step
-could not reopen the imported layout: the Docker utility container had created its private directory as root.
-Generated Docker utility commands now select the host runner's UID/GID and `HOME=/tmp`, matching local
-execution. A real Docker Linux-volume experiment reproduced the root-owned failure and verified successful
-private-directory read/archive handoff between successive runner-owned processes. Generator tests, the full
-`make check` gate (64.2% coverage), exact generation checking, actionlint and yamllint passed before commit.
-The next hosted attempt remains pending. No publication/signing success is claimed for this run.
-
-Run [34431910080](https://github.com/njhensley/nke-recipes/actions/runs/34431910080) tests ownership-fix commit
-`00656b24e00e1bc0b2ac73b8fa5785b8fe594f06`. While it builds, an offline replay used the previous hosted run's
-successful artifact/result/observation/SBOM carriers with the current plan and helper. All six package/archive
-handoffs passed: CLI, native image, image-bound Helm, and the three derived publication envelopes. This replay
-does not authenticate a new hosted Run or publish/sign anything.
-
-The previous hosted CWE image also passed offline executable/helper/UI/license/CA checks and reported
-`cloud-workflow-engine 0.0.0-ged9fb09b04fd`. Extraction from the replayed publication payload preserved the
-image-bound Helm tree: all three local charts rendered, the controller referenced manifest `43331f47936aab50e9566ca4b78c29c2920ce02b98f9359c57217f5354bab277`,
-and all 47 checksums matched. Final acceptance still requires the live run's published subjects, signatures,
-complete Run record and independent consumption.
-
-Run `34431910080` completed all three builds, six package jobs and all publication, signing and verification
-jobs. Independent cosign signature/attestation checks and public NKD consumption passed for all three
-publication references. Finalization failed because two fetch jobs transported the same source-receipts
-directory. The compiler now selects each exact receipt file through the pipeline module's existing mapping;
-immutable restoration and authentication are unchanged. A regression test restores both independent receipts
-into one workspace. The corrected graph's 35 carrier paths have no exact or ancestor collisions.
-
-The published CWE manifest `sha256:38b30b65d4e8c333d9823f3376f9d623846c0474837e62182d973e4c8b7adecf`
-passed offline executable/helper/UI/license/CA checks. The downloaded Helm bundle passed all 47 checksums
-and rendered all three local charts, with the controller bound to that manifest. These publication checks do
-not turn the failed Run into a completed Run. The receipt correction passed the full local gate (64.2%
-coverage) and Linux pipeline/sign race checks; a new hosted attempt is required for final acceptance.
+Completion requires a successful combined hosted Run and independent consumption of that attempt's three
+published outputs. Earlier CLI-only runs and successful partial attempts are insufficient. No Kubernetes
+deployment, database-backed CWE service startup, external chart availability or qualified reproduction is
+claimed. The OS-image build continues to own the complete worker payload; individual worker packages are
+outside this pipeline change.

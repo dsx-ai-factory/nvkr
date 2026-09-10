@@ -24,11 +24,14 @@ func admitBuildKit(node ir.Node, opts RunOptions) error {
 
 // BuildKit runs as UID 1000, never as host/container root, with its documented
 // rootless namespace permissions. It gets neither a host runtime socket nor
-// credentials. The native snapshotter avoids a host /dev/fuse dependency.
+// credentials. Overlayfs avoids copying entire source/toolchain trees for each
+// Dockerfile step and requires a kernel supporting unprivileged overlay mounts.
+// It needs no /dev/fuse; an unsupported host fails rather than falling back to
+// the native snapshotter's unbounded full-tree copies.
 func buildKitRuntimeArgs() []string {
 	return []string{"--user", "1000:1000", "--security-opt", "seccomp=unconfined",
 		"--security-opt", "apparmor=unconfined", "--security-opt", "systempaths=unconfined",
-		"--entrypoint", "", "-e", "BUILDKITD_FLAGS=--oci-worker-snapshotter=native"}
+		"--entrypoint", "", "-e", "BUILDKITD_FLAGS=--oci-worker-snapshotter=overlayfs"}
 }
 
 // A private parent prevents other host users from reaching the writable mount.

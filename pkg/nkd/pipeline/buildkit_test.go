@@ -1,15 +1,73 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
 	"github.com/nhensley/nkdctl/pkg/nkd/ir"
 )
+
+// This opt-in Docker test exercises the real launch settings. Repeated Dockerfile
+// copies must not multiply storage for unchanged files on hosted runners.
+func TestBuildKitSnapshotStorageBudget(t *testing.T) {
+	image := os.Getenv("NKD_BUILDKIT_TEST_IMAGE")
+	if image == "" {
+		t.Skip("set NKD_BUILDKIT_TEST_IMAGE to the pinned rootless BuildKit image")
+	}
+	root := t.TempDir()
+	if err := os.Chmod(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "payload"), bytes.Repeat([]byte{0x5a}, 16<<20), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "marker"), []byte("snapshot\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dockerfile := "FROM scratch\nCOPY payload /payload\n"
+	for i := range 8 {
+		dockerfile += "COPY marker /marker" + strconv.Itoa(i) + "\n"
+	}
+	if err := os.WriteFile(filepath.Join(root, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	name := "nkd-storage-" + filepath.Base(filepath.Dir(root))
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_ = exec.CommandContext(ctx, "docker", "rm", "-f", name).Run()
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	args := []string{"run", "--rm", "--init", "--name", name, "--platform", "linux/amd64", "--network", "none"}
+	args = append(args, buildKitRuntimeArgs()...)
+	args = append(args, "-v", root+":/src:ro", image, "sh", "-ec",
+		"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local dockerfile=/src; "+
+			"find /home/user/.local/share/buildkit -name work -prune -o -type f -exec stat -c %b '{}' ';' > /tmp/blocks; "+
+			"awk '{blocks += $1} END {print \"NKD_STORAGE_KIB=\" blocks / 2}' /tmp/blocks")
+	raw, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("rootless build: %v\n%s", err, raw)
+	}
+	_, value, found := strings.Cut(string(raw), "NKD_STORAGE_KIB=")
+	if !found {
+		t.Fatalf("missing storage measurement: %s", raw)
+	}
+	kib, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || kib <= 0 || kib > 64*1024 {
+		t.Fatalf("16 MiB payload exceeded 64 MiB storage budget: %q (%v)", value, err)
+	}
+	t.Logf("BuildKit allocated %d KiB for the repeated-copy fixture", kib)
+}
 
 func TestBuildKitAdmission(t *testing.T) {
 	for _, tc := range []struct {
