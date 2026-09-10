@@ -15,7 +15,6 @@ package factory
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -23,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
 	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
 	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
 	"github.com/nhensley/nkdctl/pkg/nkd/internal/heldfile"
@@ -180,7 +180,7 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if err := writeFactoryFile(ctx, predicateOutput.Path, predicate, 0o644); err != nil {
 		return err
 	}
-	if err := writeFactoryFile(ctx, recordOutput.Path, append(raw, '\n'), 0o644); err != nil {
+	if err := writeFactoryFile(ctx, recordOutput.Path, raw, 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "signed %s (mode %s, dryRun %t): %s\n", node.ID, signing.Mode, record.DryRun, subject.Ref)
@@ -258,7 +258,7 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if err != nil {
 		return err
 	}
-	if err := writeFactoryFile(ctx, output.Path, append(raw, '\n'), 0o644); err != nil {
+	if err := writeFactoryFile(ctx, output.Path, raw, 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "verified %s (mode %s, dryRun %t): %s\n", node.ID, signing.Mode, verification.DryRun, subject.Ref)
@@ -490,7 +490,7 @@ func readSigningRecord(ctx context.Context, path string) (sign.SigningRecord, er
 		return sign.SigningRecord{}, err
 	}
 	var record sign.SigningRecord
-	if err := json.Unmarshal(raw, &record); err != nil {
+	if err := canonical.UnmarshalExact(raw, &record); err != nil {
 		return sign.SigningRecord{}, e.Wrap(e.CodePipelineDrift, err, "decoding signing record %s", path)
 	}
 	if err := record.Validate(); err != nil {

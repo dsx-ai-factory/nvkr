@@ -26,5 +26,22 @@ missing transport, and workflow commands outside the exact admitted rendering.
 
 ## Hosted outcome
 
-Pending the first dispatch of this configuration. The prior successful Run used dry-run signing and cannot
-establish real keyless-signing or consumer acceptance. See the [performance baseline](../github-run-performance.md).
+[Run 34421960532](https://github.com/njhensley/nke-recipes/actions/runs/34421960532), commit `4313817`,
+passed source fetch, CLI build, combined offline processing, publication, real keyless signing and registry
+signature/provenance verification. [Repository CI](https://github.com/njhensley/nke-recipes/actions/runs/34421939098)
+also passed. Run finalization correctly failed when the real verification record did not round-trip through
+its canonical decoder; this attempt is a failed Run, not a successful pipeline-attested Run.
+
+Published digest:
+`ghcr.io/njhensley/nke-recipes/nkectl@sha256:0c3d9a1ef83cc38542cc9d4d6b7abe3cf5d0ee585a1ce7228ed49c10cab03241`.
+
+The first experiment took 4m08s versus the 5m17s dry-run baseline, but its failure prevents treating it as a
+successful end-to-end comparison. Its combined post-build stage took 18s versus 90s across the corresponding
+critical-chain stages; finalization took 25s versus 34s, including restoration but failing record acceptance.
+Real signing took 30s and verification 21s, replacing baseline dry-run signing at 9s and verification at 14s.
+Tool acquisition took 14s alongside source/build preparation.
+
+An independent Linux cosign-only consumer attempted the exact digest using the existing local GHCR login.
+GHCR denied private-package access before signature retrieval. The temporary credential copy was removed;
+this check remains pending usable registry read access. No signature or policy failure is inferred from an
+access denial. See the [performance baseline](../github-run-performance.md).

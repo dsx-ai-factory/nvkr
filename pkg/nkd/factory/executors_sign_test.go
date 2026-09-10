@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/registry"
+	"github.com/nhensley/nkdctl/pkg/nkd/canonical"
 	"github.com/nhensley/nkdctl/pkg/nkd/delivery"
 	e "github.com/nhensley/nkdctl/pkg/nkd/errors"
 	"github.com/nhensley/nkdctl/pkg/nkd/pipeline"
@@ -280,6 +281,14 @@ func TestExecuteVerifyPublicationChecksTheRegistryAndFailsClosed(t *testing.T) {
 	if _, err := os.Stat(verificationPath); err != nil {
 		t.Fatalf("verification record was not written: %v", err)
 	}
+	verificationRaw, err := os.ReadFile(verificationPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var verification sign.VerificationRecord
+	if err := canonical.UnmarshalExact(verificationRaw, &verification); err != nil {
+		t.Fatalf("verification record is not canonical: %v", err)
+	}
 
 	t.Run("adapter refusal writes no record", func(t *testing.T) {
 		if err := os.Remove(verificationPath); err != nil {
@@ -318,7 +327,7 @@ func TestExecuteVerifyPublicationChecksTheRegistryAndFailsClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := writeFactoryFile(context.Background(), harness.artifacts["signature/publication"].Path,
-			append(raw, '\n'), 0o644); err != nil {
+			raw, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		err = executeVerifyPublication(context.Background(), harness.plan, verifyNode, harness.artifacts,
@@ -348,7 +357,7 @@ func TestExecuteVerifyPublicationChecksTheRegistryAndFailsClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := writeFactoryFile(context.Background(), harness.artifacts["signature/publication"].Path,
-			append(raw, '\n'), 0o644); err != nil {
+			raw, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		if err := executeVerifyPublication(context.Background(), harness.plan, verifyNode, harness.artifacts,
