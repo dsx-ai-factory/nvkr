@@ -38,17 +38,19 @@
 #   it changes.
 #
 # PLANNED CHECKS (not yet implemented; see the note at each stub)
-#   verify-licenses · workflows-regen · malware-scan (ClamAV)
+#   verify-licenses · lock-freshness · malware-scan (ClamAV)
 
 name: Merge Gate
 
-# The push trigger matters even though PRs are gated: a ruleset can be
-# bypassed, and a bypassed merge reports its required checks as "expected"
-# rather than running them. Without the push trigger those checks would not run
-# after the commit landed either.
+# The push trigger is not redundant with the pull_request one. Path filtering
+# keeps PR feedback cheap by only running checks whose inputs the PR touched,
+# which means a merge that is individually clean can still break a derived
+# artifact elsewhere in the tree — nothing re-checks the paths the PR did not
+# touch. The push run is that watchdog, and it forces every check-paths output
+# true because a merged commit has no base to diff against.
 #
-# Push runs force every check-paths output true, because a merged commit has no
-# base to diff against.
+# (The `Protect main` ruleset currently has no bypass actors, so this is not
+# about bypassed merges. Revisit if bypass is ever granted.)
 on:
   pull_request:
     branches:
@@ -91,6 +93,7 @@ jobs:
     outputs:
       code: ${{ github.event_name == 'push' && 'true' || steps.changes.outputs.code }}
       actions: ${{ github.event_name == 'push' && 'true' || steps.changes.outputs.actions }}
+      pipeline: ${{ github.event_name == 'push' && 'true' || steps.changes.outputs.pipeline }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,6 +129,18 @@ jobs:
             actions:
               - '.github/workflows/**'
               - '.github/actions/**'
+            pipeline:
+              # Everything `run generate` consumes or emits, plus the files that
+              # define the check itself, so a change to the gate cannot skip the
+              # gate it changes.
+              - 'definitions/**'
+              - '.github/workflows/nkd-run.yml'
+              - '.github/nkd-run/**'
+              - 'cmd/**'
+              - 'pkg/nkd/pipeline/**'
+              - 'toolchains/**'
+              - 'Makefile'
+              - '.github/workflows/merge-gate.yaml'
 
   # ---------------------------------------------------------------------------
   # Repository checks — the same gates `make check` runs locally, plus build
@@ -245,13 +260,46 @@ jobs:
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
-  # PLANNED: workflows-regen
+  # Generated-pipeline drift (ADR-21 §2)
   #
-  # Enforces the "one IR → many adapters" invariant: regenerate the workflows
-  # from the catalog and fail on any diff, so a hand-edited generated workflow
-  # cannot merge. Needs a `make workflows-check` target. This check has no AICR
-  # equivalent — it exists because this repository generates its own CI.
+  # The committed Run workflow and its plan must equal what `run generate`
+  # emits from the current Definition, Environment and catalog pins. ADR-21 §3
+  # relies on this to make a lock change unmergeable without the matching
+  # regeneration, so "forgot to regenerate" cannot merge.
+  #
+  # This check already ran on every PR inside the generated nkd-run workflow.
+  # It is restated here because `gate` is the only required status check, and a
+  # check outside the aggregate is advisory.
+  #
+  # Per ADR-21 §2 this job lives OUTSIDE the emitted pipeline and does not
+  # self-check recursively.
   # ---------------------------------------------------------------------------
+
+  workflows-regen:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.pipeline == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Verify committed Run generation is current
+        run: make workflows-check
+
+  workflows-regen-skip:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.pipeline != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "No pipeline inputs changed — regeneration check not required"
 
   # ---------------------------------------------------------------------------
   # Static analysis (CodeQL)
@@ -265,7 +313,13 @@ jobs:
 
   analyze:
     needs: [check-paths]
-    if: needs.check-paths.outputs.code == 'true'
+    # A fork PR never receives `security-events: write`, so the CodeQL upload
+    # cannot succeed there. Skipping keeps external contributions green; the
+    # analysis still runs on the copy-pr-bot mirror branch and on every push to
+    # main, so a fork PR cannot use this to land unanalysed code.
+    if: >-
+      needs.check-paths.outputs.code == 'true' &&
+      github.event.pull_request.head.repo.fork != true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -292,7 +346,9 @@ jobs:
 
   analyze-skip:
     needs: [check-paths]
-    if: needs.check-paths.outputs.code != 'true'
+    if: >-
+      needs.check-paths.outputs.code != 'true' ||
+      github.event.pull_request.head.repo.fork == true
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
@@ -319,6 +375,8 @@ jobs:
       - actionlint-skip
       - analyze
       - analyze-skip
+      - workflows-regen
+      - workflows-regen-skip
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:

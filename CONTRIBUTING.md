@@ -26,8 +26,8 @@ make check         # the full local gate: fmt-check + vet + lint + shellcheck + 
 
 ## Local development equals CI
 
-CI (`.github/workflows/ci.yml`) runs the same format, vet, lint, and race-test gates as `make check`,
-then also compiles the binary. Run `make check` and `make build` before opening a PR.
+CI (`.github/workflows/merge-gate.yaml`) runs the same format, vet, lint, and race-test gates as
+`make check`, then also compiles the binary. Run `make check` and `make build` before opening a PR.
 
 ## The invariants your change must respect
 

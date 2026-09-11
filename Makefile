@@ -86,6 +86,13 @@ tidy: ## Format + go mod tidy.
 	gofmt -s -w $(GOFILES)
 	go mod tidy
 
+.PHONY: workflows-check
+workflows-check: build ## Verify the committed Run generation matches the catalog (ADR-21 drift gate).
+	$(BIN) run generate --engine github \
+		--definition definitions/nke-v1/definition.yaml \
+		--environment definitions/nke-v1/environment-github.yaml \
+		--root . --check
+
 .PHONY: check
 check: fmt-check vet lint shellcheck test ## Full local gate — run before pushing.
 
