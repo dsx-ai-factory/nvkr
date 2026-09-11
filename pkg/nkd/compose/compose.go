@@ -211,7 +211,7 @@ func (s *Spec) Merge(other *Spec) error {
 		mergedProfile = cloneAICRProfile(other.AICRProfile)
 	}
 
-	constraintMap := make(map[string]Constraint, len(s.Constraints)+len(other.Constraints))
+	constraintMap := make(map[string]Constraint, len(s.Constraints))
 	for _, c := range s.Constraints {
 		if strings.TrimSpace(c.Name) == "" || c.Name != strings.TrimSpace(c.Name) {
 			return e.New(e.CodeInvalidCatalog, "composition constraint name %q is empty or has surrounding whitespace", c.Name)
@@ -232,7 +232,7 @@ func (s *Spec) Merge(other *Spec) error {
 		}
 		constraintMap[c.Name] = c
 	}
-	componentMap := make(map[string]ComponentRef, len(s.ComponentRefs)+len(other.ComponentRefs))
+	componentMap := make(map[string]ComponentRef, len(s.ComponentRefs))
 	for _, c := range s.ComponentRefs {
 		if strings.TrimSpace(c.Name) == "" || c.Name != strings.TrimSpace(c.Name) {
 			return e.New(e.CodeInvalidCatalog,
@@ -262,7 +262,7 @@ func (s *Spec) Merge(other *Spec) error {
 		}
 	}
 	mergedMixins := append([]string(nil), s.Mixins...)
-	seenMixins := make(map[string]bool, len(s.Mixins)+len(other.Mixins))
+	seenMixins := make(map[string]bool, len(s.Mixins))
 	for _, m := range s.Mixins {
 		if strings.TrimSpace(m) == "" || m != strings.TrimSpace(m) {
 			return e.New(e.CodeInvalidCatalog,
@@ -314,7 +314,7 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 		result.Enabled = overlay.Enabled
 	}
 	if len(overlay.Overrides) > 0 {
-		merged := make(map[string]any, len(result.Overrides)+len(overlay.Overrides))
+		merged := make(map[string]any, len(result.Overrides))
 		for k, v := range result.Overrides {
 			merged[k] = deepCopyAny(v)
 		}

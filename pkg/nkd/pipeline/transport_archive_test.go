@@ -86,6 +86,15 @@ func TestTransportArchiveRejectsUntrustedTarStructures(t *testing.T) {
 		{"directory-repeated-slash", []*tar.Header{{Name: "allowed//", Typeflag: tar.TypeDir}}},
 		{"unexpected", []*tar.Header{{Name: "other/file", Typeflag: tar.TypeReg, Size: 1}}},
 		{"hard-link", []*tar.Header{{Name: "allowed/hard", Typeflag: tar.TypeLink, Linkname: "allowed/file"}}},
+		{"absolute-symlink", []*tar.Header{{Name: "allowed/link", Typeflag: tar.TypeSymlink, Linkname: "/escape"}}},
+		{"symlink-parent-directory", []*tar.Header{
+			{Name: "allowed/link", Typeflag: tar.TypeSymlink, Linkname: "inside"},
+			{Name: "allowed/link/subdir", Typeflag: tar.TypeDir},
+		}},
+		{"symlink-parent-link", []*tar.Header{
+			{Name: "allowed/link", Typeflag: tar.TypeSymlink, Linkname: "inside"},
+			{Name: "allowed/link/child", Typeflag: tar.TypeSymlink, Linkname: "target"},
+		}},
 		{"escaping-symlink", []*tar.Header{{Name: "allowed/link", Typeflag: tar.TypeSymlink, Linkname: "../../escape"}}},
 		{"symlink-parent", []*tar.Header{
 			{Name: "allowed/dir", Typeflag: tar.TypeSymlink, Linkname: "inside"},
@@ -101,8 +110,8 @@ func TestTransportArchiveRejectsUntrustedTarStructures(t *testing.T) {
 			archive := filepath.Join(t.TempDir(), "bad.tar")
 			writeTestTar(t, archive, tc.headers)
 			root := t.TempDir()
-			if err := UnpackTransport(context.Background(), archive, root, []string{"allowed"}); err == nil {
-				t.Fatalf("untrusted %s carrier was accepted", tc.name)
+			if err := UnpackTransport(context.Background(), archive, root, []string{"allowed"}); transportCode(err) != nkderr.CodeVerifyFailed {
+				t.Fatalf("untrusted %s carrier error = %v, want verify-failed", tc.name, err)
 			}
 			if _, err := os.Lstat(filepath.Join(root, "allowed")); !os.IsNotExist(err) {
 				t.Fatalf("failed extraction published partial destination: %v", err)

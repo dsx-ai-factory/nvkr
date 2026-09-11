@@ -262,8 +262,7 @@ func ociVerifyAttestationArgs(ref string, policy VerifyPolicy) []string {
 // argv renders a complete recorded command line: the executable followed by its
 // arguments, so the record is a faithful description of one invocation.
 func argv(binary string, args []string) []string {
-	out := make([]string, 0, 1+len(args))
-	out = append(out, binary)
+	out := []string{binary}
 	return append(out, args...)
 }
 
@@ -784,7 +783,7 @@ func (s *CosignOCISigner) writeDockerConfig(ctx context.Context, workspace strin
 // keyless signing obtains its workload identity in GitHub Actions.
 func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 	scrubbed := qualifiedCosignEnvironment(base)
-	out := make([]string, 0, len(scrubbed)+1)
+	out := make([]string, 0, len(scrubbed))
 	for _, entry := range scrubbed {
 		name := entry
 		if i := strings.IndexByte(entry, '='); i >= 0 {

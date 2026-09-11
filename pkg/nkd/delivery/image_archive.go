@@ -63,6 +63,11 @@ func ImportContainerImage(ctx context.Context, archive, archiveDigest, platform,
 }
 
 func extractImageArchive(ctx context.Context, source io.Reader, root string) error {
+	directory, err := os.OpenRoot(root)
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "opening OCI image extraction root")
+	}
+	defer func() { _ = directory.Close() }()
 	reader := tar.NewReader(source)
 	seen := map[string]bool{}
 	var total int64
@@ -78,7 +83,7 @@ func extractImageArchive(ctx context.Context, source io.Reader, root string) err
 			return e.Wrap(e.CodeVerifyFailed, err, "reading OCI image archive")
 		}
 		name := strings.TrimSuffix(strings.TrimPrefix(header.Name, "./"), "/")
-		if name == "" || name != path.Clean(name) || strings.Contains(name, "\\") || seen[name] ||
+		if !filepath.IsLocal(name) || name != path.Clean(name) || strings.Contains(name, "\\") || seen[name] ||
 			len(seen) >= maxDeliveryObjects*8 || header.Size < 0 || header.Size > maxDeliveryFileBytes-total {
 			return e.New(e.CodeVerifyFailed, "OCI image archive contains an unsafe, duplicate or oversized entry")
 		}
@@ -95,7 +100,7 @@ func extractImageArchive(ctx context.Context, source io.Reader, root string) err
 			(!strings.HasPrefix(name, "blobs/sha256/") || !isDigest("sha256:"+blob))) {
 			return e.New(e.CodeVerifyFailed, "OCI image archive has unexpected member %q", name)
 		}
-		if err := writeImageArchiveMember(ctx, reader, filepath.Join(root, filepath.FromSlash(name))); err != nil {
+		if err := writeImageArchiveMember(ctx, reader, directory, filepath.FromSlash(name)); err != nil {
 			return err
 		}
 	}
@@ -105,13 +110,13 @@ func extractImageArchive(ctx context.Context, source io.Reader, root string) err
 	return nil
 }
 
-func writeImageArchiveMember(ctx context.Context, source io.Reader, destination string) error {
-	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-		return e.Wrap(e.CodeInternal, err, "creating OCI image blob directory")
+func writeImageArchiveMember(ctx context.Context, source io.Reader, root *os.Root, destination string) error {
+	if err := root.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "creating OCI image blob directory")
 	}
-	file, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	file, err := root.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 	if err != nil {
-		return e.Wrap(e.CodeInternal, err, "creating OCI image member")
+		return e.Wrap(e.CodeVerifyFailed, err, "creating OCI image member")
 	}
 	defer func() { _ = file.Close() }()
 	buffer := make([]byte, 128<<10)

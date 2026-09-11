@@ -498,6 +498,13 @@ func UnpackTransport(ctx context.Context, archive, root string, allowed []string
 	}
 	defer file.Close()
 
+	// Bind extraction writes to the held staging directory, including resolution
+	// through symlinks. Lexical validation alone is not a filesystem boundary.
+	stageRoot, err := os.OpenRoot(stage)
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "opening transport staging root")
+	}
+	defer func() { _ = stageRoot.Close() }()
 	tr := tar.NewReader(file)
 	seen := map[string]bool{}
 	directoryModes := map[string]fs.FileMode{}
@@ -525,7 +532,7 @@ func UnpackTransport(ctx context.Context, archive, root string, allowed []string
 			memberName = strings.TrimSuffix(memberName, "/")
 		}
 		name, ok := safeArchiveName(memberName, cleanAllowed)
-		if !ok || seen[name] {
+		if !ok || !filepath.IsLocal(name) || seen[name] {
 			return e.New(e.CodeVerifyFailed, "transport contains unexpected or duplicate path %q", header.Name)
 		}
 		seen[name] = true
@@ -536,12 +543,12 @@ func UnpackTransport(ctx context.Context, archive, root string, allowed []string
 		if err := noSymlinkParents(stage, destination); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "transport path %s has a symlink parent", name)
 		}
-		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+		if err := stageRoot.MkdirAll(filepath.Dir(filepath.FromSlash(name)), 0o755); err != nil {
 			return e.Wrap(e.CodeInternal, err, "creating transport staging parent")
 		}
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.Mkdir(destination, 0o700); err != nil && !os.IsExist(err) {
+			if err := stageRoot.Mkdir(filepath.FromSlash(name), 0o700); err != nil && !os.IsExist(err) {
 				return e.Wrap(e.CodeVerifyFailed, err, "creating transport directory %s", name)
 			}
 			directoryModes[name] = fs.FileMode(header.Mode) & 0o777
@@ -550,7 +557,7 @@ func UnpackTransport(ctx context.Context, archive, root string, allowed []string
 			if header.Size < 0 || header.Size > maxTransportBytes {
 				return e.New(e.CodeVerifyFailed, "transport file %s has invalid size %d", name, header.Size)
 			}
-			out, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, fs.FileMode(header.Mode)&0o777)
+			out, err := stageRoot.OpenFile(filepath.FromSlash(name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, fs.FileMode(header.Mode)&0o777)
 			if err != nil {
 				return e.Wrap(e.CodeVerifyFailed, err, "creating transport file %s", name)
 			}
@@ -581,7 +588,7 @@ func UnpackTransport(ctx context.Context, archive, root string, allowed []string
 			if !safeSymlinkWithin(filepath.ToSlash(filepath.Dir(name)), header.Linkname, base) {
 				return e.New(e.CodeVerifyFailed, "transport symlink %s escapes member root %s", name, base)
 			}
-			if err := os.Symlink(header.Linkname, destination); err != nil {
+			if err := stageRoot.Symlink(header.Linkname, filepath.FromSlash(name)); err != nil {
 				return e.Wrap(e.CodeVerifyFailed, err, "creating transport symlink %s", name)
 			}
 		default:
@@ -597,7 +604,7 @@ func UnpackTransport(ctx context.Context, archive, root string, allowed []string
 		if err := ctx.Err(); err != nil {
 			return e.Wrap(e.CodeTimeout, err, "unpacking transport canceled")
 		}
-		if err := os.Chmod(filepath.Join(stage, filepath.FromSlash(name)), directoryModes[name]); err != nil {
+		if err := stageRoot.Chmod(filepath.FromSlash(name), directoryModes[name]); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "setting transport directory mode %s", name)
 		}
 	}

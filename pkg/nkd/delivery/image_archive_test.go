@@ -114,3 +114,29 @@ func TestImportContainerImage(t *testing.T) {
 		})
 	}
 }
+
+// A preexisting parent symlink must not redirect an otherwise valid OCI member.
+func TestExtractImageArchiveConfinesWrites(t *testing.T) {
+	for _, parent := range []string{"blobs", "blobs/sha256"} {
+		t.Run(parent, func(t *testing.T) {
+			raw, _ := imageArchiveFixture(t, nil)
+			root, outside := t.TempDir(), t.TempDir()
+			link := filepath.Join(root, filepath.FromSlash(parent))
+			if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(outside, link); err != nil {
+				t.Fatal(err)
+			}
+			err := extractImageArchive(context.Background(), bytes.NewReader(raw), root)
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
+				t.Fatalf("error = %v, want verify-failed", err)
+			}
+			entries, err := os.ReadDir(outside)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("extraction wrote outside root: %v, %v", entries, err)
+			}
+		})
+	}
+}
