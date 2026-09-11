@@ -94,20 +94,23 @@ func (bundle BinaryBundle) Digest() (string, error) {
 // root. DescriptorDigest identifies its OCI manifest or nested index;
 // SemanticDigest identifies the NKD object or source bytes it represents.
 type PublishedObject struct {
-	Name             string `json:"name"`
-	Kind             string `json:"kind"`
-	ArtifactType     string `json:"artifactType"`
-	DescriptorDigest string `json:"descriptorDigest"`
-	SemanticDigest   string `json:"semanticDigest"`
-	BlobDigest       string `json:"blobDigest"`
-	Size             int64  `json:"size"`
-	OS               string `json:"os,omitempty"`
-	Arch             string `json:"arch,omitempty"`
+	Output           *OutputBinding   `json:"output,omitempty"`
+	Evidence         *EvidenceBinding `json:"evidence,omitempty"`
+	Name             string           `json:"name"`
+	Kind             string           `json:"kind"`
+	ArtifactType     string           `json:"artifactType"`
+	DescriptorDigest string           `json:"descriptorDigest"`
+	SemanticDigest   string           `json:"semanticDigest"`
+	BlobDigest       string           `json:"blobDigest"`
+	Size             int64            `json:"size"`
+	OS               string           `json:"os,omitempty"`
+	Arch             string           `json:"arch,omitempty"`
 }
 
 // PublicationRoot is the canonical config behind the immutable OCI index that an
 // operator pins. A tag may discover the index; it is never part of this identity.
 type PublicationRoot struct {
+	Release                 *ReleaseMetadata  `json:"release,omitempty"`
 	SchemaVersion           string            `json:"schemaVersion"`
 	Qualification           string            `json:"qualification"`
 	PublicationIdentity     string            `json:"publicationIdentity,omitempty"`
@@ -120,6 +123,9 @@ type PublicationRoot struct {
 }
 
 func (root PublicationRoot) Validate() error {
+	if err := validateReleaseMetadata(root); err != nil {
+		return err
+	}
 	if root.SchemaVersion != PublicationRootSchema {
 		return e.New(e.CodeVerifyFailed, "publication root schemaVersion %q is unsupported", root.SchemaVersion)
 	}

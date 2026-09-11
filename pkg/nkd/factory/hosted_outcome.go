@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
@@ -68,6 +68,7 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 		return filepath.Join(workspace, filepath.FromSlash(strings.TrimPrefix(clean, prefix+"/"))), nil
 	}
 	observedRecipes := map[string]bool{}
+	evidenceSets := map[string][]delivery.ObjectInput{}
 	for _, artifact := range artifacts {
 		path, err := local(artifact.Path)
 		if err != nil {
@@ -111,82 +112,11 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			}
 			observedRecipes[observation.RecipeDigest] = true
 		case "sbom-set":
-			raw, err := readSmallFactoryFile(ctx, filepath.Join(path, "index.json"), "hosted SBOM index")
+			evidence, err := sbomPublicationObjects(ctx, plan, artifact, artifacts, local)
 			if err != nil {
-				return e.Wrap(e.CodeProvenanceMissing, err, "reading hosted SBOM index")
-			}
-			var index sbom.Index
-			if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &index); err != nil {
-				return e.Wrap(e.CodeProvenanceMissing, err, "decoding hosted SBOM index")
-			}
-			if err := index.Validate(); err != nil {
 				return err
 			}
-			node := nodes[artifact.Producer]
-			results := map[string]pipeline.ArtifactResult{}
-			for _, inputID := range node.Inputs {
-				input := artifacts[inputID]
-				if input.Kind != "producer-result" {
-					continue
-				}
-				inputPath, err := local(input.Path)
-				if err != nil {
-					return err
-				}
-				result, err := readProducerResult(ctx, inputPath)
-				if err != nil {
-					return e.Wrap(e.CodeProvenanceMissing, err, "reading hosted producer result")
-				}
-				results[result.Component] = result
-			}
-			if len(results) != len(index.Entries) {
-				return e.New(e.CodeProvenanceMissing, "hosted SBOM index does not cover every producer result")
-			}
-			for _, entry := range index.Entries {
-				result, ok := results[entry.Artifact]
-				if !ok || entry.ArtifactSHA != result.SHA256 {
-					return e.New(e.CodeVerifyFailed, "hosted SBOM entry %q has the wrong subject", entry.Artifact)
-				}
-				bomRaw, err := readSmallFactoryFile(ctx, filepath.Join(path, entry.Artifact+".cdx.json"), "hosted per-artifact SBOM")
-				if err != nil {
-					return e.Wrap(e.CodeProvenanceMissing, err, "reading hosted per-artifact SBOM")
-				}
-				var bom sbom.BOM
-				if err := canonical.UnmarshalExact(bytes.TrimSuffix(bomRaw, []byte{'\n'}), &bom); err != nil {
-					return e.Wrap(e.CodeProvenanceMissing, err, "decoding hosted per-artifact SBOM")
-				}
-				digest, err := bom.Digest()
-				if err != nil || digest != entry.SBOMDigest {
-					return e.New(e.CodeVerifyFailed, "hosted per-artifact SBOM %q differs from its index", entry.Artifact)
-				}
-				if len(bom.Metadata.Component.Hashes) != 1 || "sha256:"+bom.Metadata.Component.Hashes[0].Content != entry.ArtifactSHA || bom.Metadata.Component.Name != entry.Artifact {
-					return e.New(e.CodeVerifyFailed, "hosted SBOM subject differs from its producer")
-				}
-				if plan.ExecutionSettings.SBOMTool != "" {
-					if len(bom.Components) == 0 {
-						return e.New(e.CodeProvenanceMissing, "hosted SBOM omits required dependency inventory")
-					}
-					method, scanner := "", ""
-					for _, property := range bom.Metadata.Props {
-						if property.Name == "nkd:dependencyInspection" {
-							method = property.Value
-						}
-						if property.Name == "nkd:dependencyScannerDigest" {
-							scanner = property.Value
-						}
-					}
-					kind := ""
-					for _, inputID := range node.Inputs {
-						input := artifacts[inputID]
-						if input.Component == entry.Artifact && input.Kind != "producer-result" {
-							kind = input.Kind
-						}
-					}
-					if (kind == "tarball" && method != "helm-manifests/v1") || (kind != "tarball" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.ExecutionSettings.SBOMTool))) {
-						return e.New(e.CodeVerifyFailed, "hosted SBOM inspection does not match the planned scanner")
-					}
-				}
-			}
+			evidenceSets[artifact.ID] = evidence
 		}
 	}
 	for _, recipe := range plan.Recipes {
@@ -195,6 +125,40 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 		}
 	}
 	for _, route := range plan.ExecutionSettings.Routes {
+		packageArtifact := artifacts[route.Input]
+		if packageArtifact.Kind == PackageOCI {
+			layout, err := local(packageArtifact.Path)
+			if err != nil {
+				return err
+			}
+			var expected []delivery.ObjectInput
+			packageNode := nodes[packageArtifact.Producer]
+			if len(plan.LifecycleOutputs) > 0 {
+				localized := make(map[string]Artifact, len(artifacts))
+				for id, artifact := range artifacts {
+					copy := artifact
+					copy.Path, err = local(artifact.Path)
+					if err != nil {
+						return err
+					}
+					localized[id] = copy
+				}
+				expected, err = releaseEvidenceObjects(ctx, plan, packageNode, localized)
+				if err != nil {
+					return err
+				}
+			} else {
+				for _, input := range packageNode.Inputs {
+					expected = append(expected, evidenceSets[input]...)
+				}
+			}
+			for _, evidence := range expected {
+				object, raw, err := delivery.ReadObject(ctx, layout, evidence.Name)
+				if err != nil || object.Kind != evidence.Kind || object.ArtifactType != evidence.ArtifactType || object.SemanticDigest != evidence.SemanticDigest || !bytes.Equal(raw, evidence.Bytes) {
+					return e.New(e.CodeVerifyFailed, "published SBOM evidence %q differs from finalized Run", evidence.Name)
+				}
+			}
+		}
 		publicationPath, err := local(artifacts["publication/"+route.Name].Path)
 		if err != nil {
 			return err

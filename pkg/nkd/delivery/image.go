@@ -66,16 +66,19 @@ func InspectPublishedContainerImage(ctx context.Context, root, name string) (Ima
 		(object.Arch != "amd64" && object.Arch != "arm64") || object.BlobDigest != object.DescriptorDigest {
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "publication has no exact native image binding for %q", name)
 	}
-	raw, err := readBlob(ctx, root, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
-	if err != nil {
-		return ImageInspection{}, err
+	descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size}
+	if publication.Root.Release == nil {
+		raw, err := readBlob(ctx, root, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+		if err != nil {
+			return ImageInspection{}, err
+		}
+		var index ociIndex
+		if err := json.Unmarshal(raw, &index); err != nil || index.SchemaVersion != 2 || index.MediaType != MediaOCIIndex ||
+			index.ArtifactType != "" || len(index.Manifests) != 1 || index.Manifests[0].MediaType != MediaOCIManifest {
+			return ImageInspection{}, e.New(e.CodeVerifyFailed, "published image %q has an ambiguous index", name)
+		}
+		descriptor = index.Manifests[0]
 	}
-	var index ociIndex
-	if err := json.Unmarshal(raw, &index); err != nil || index.SchemaVersion != 2 || index.MediaType != MediaOCIIndex ||
-		index.ArtifactType != "" || len(index.Manifests) != 1 || index.Manifests[0].MediaType != MediaOCIManifest {
-		return ImageInspection{}, e.New(e.CodeVerifyFailed, "published image %q has an ambiguous index", name)
-	}
-	descriptor := index.Manifests[0]
 	manifestRaw, err := readBlob(ctx, root, descriptor, 8<<20)
 	if err != nil {
 		return ImageInspection{}, err

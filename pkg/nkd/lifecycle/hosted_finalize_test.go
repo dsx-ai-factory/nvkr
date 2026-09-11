@@ -79,7 +79,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	member, outer, result := artifacts["package/nkectl"], artifacts["package/nkectl-release"], artifacts["result/nke-cli/nkectl"]
+	member, outer, result := artifacts["package/nkectl"], artifacts["package/release"], artifacts["result/nke-cli/nkectl"]
 	payloadPath := filepath.Join(caseRoot, "nkectl")
 	payload := []byte("synthetic hosted output")
 	if err := os.MkdirAll(filepath.Dir(payloadPath), 0o700); err != nil {
@@ -93,15 +93,18 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = delivery.BuildPublicationRoot(ctx, local(outer.Path), delivery.PublicationRequest{Objects: []delivery.ObjectInput{{Name: member.Name,
-		Kind: member.Kind, Path: local(member.Path), Layout: true, ArtifactType: member.MediaType,
-		SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}})
+	descriptor, err := delivery.PayloadDescriptor(ctx, local(member.Path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := testReleaseRequest(t, []Artifact{{Name: member.Name, Kind: OutputExecutable, Digest: descriptor.Digest, RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"nkectl"}}}, []delivery.ObjectInput{{Name: member.Name, Kind: member.Kind, Path: local(member.Path), Layout: true, ArtifactType: member.MediaType, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"nkectl": pipeline.FileDigest(payload)})
+	_, err = delivery.BuildPublicationRoot(ctx, local(outer.Path), request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	writeCanonicalTestFile(t, local(result.Path), pipeline.ArtifactResult{Component: "nkectl", SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))})
 	other := "sha256:" + strings.Repeat("9", 64)
-	verification := artifacts["verification/nkectl"]
+	verification := artifacts["verification/release"]
 	writeCanonicalTestFile(t, local(verification.Path), sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: "registry.example.test/unrelated@" + other, Digest: other, Identity: environment.Signing.Identity, Issuer: environment.Signing.Issuer,
 		PredicateType: sign.ProvenancePredicateType, SignatureVerified: true, AttestationVerified: true,
@@ -278,20 +281,20 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 			}
 		}
 	}
-	for _, id := range []string{"package/cli", "package/cli-release"} {
+	for _, id := range []string{"package/cli", "package/release"} {
 		if err := factory.ExecuteNode(ctx, plan, id, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	envelope, err := delivery.Inspect(ctx, artifacts["package/cli-release"].Path)
+	envelope, err := delivery.Inspect(ctx, artifacts["package/release"].Path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	reference := "registry.example.test/product/cli@" + envelope.RootDigest
-	if err := os.MkdirAll(filepath.Dir(artifacts["publication/cli"].Path), 0o700); err != nil {
+	reference := "registry.example.test/product/releases@" + envelope.RootDigest
+	if err := os.MkdirAll(filepath.Dir(artifacts["publication/release"].Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(artifacts["publication/cli"].Path, []byte(reference+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(artifacts["publication/release"].Path, []byte(reference+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	instant := time.Date(2026, time.September, 8, 12, 0, 0, 0, time.UTC)
@@ -300,16 +303,16 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 		t.Fatal(err)
 	}
 	predicate = append(predicate, '\n')
-	if err := os.MkdirAll(filepath.Dir(artifacts["predicate/cli"].Path), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(artifacts["predicate/release"].Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(artifacts["predicate/cli"].Path, predicate, 0o600); err != nil {
+	if err := os.WriteFile(artifacts["predicate/release"].Path, predicate, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	writeCanonicalTestFile(t, artifacts["signature/cli"].Path, sign.SigningRecord{SchemaVersion: sign.SigningRecordSchemaVersion,
+	writeCanonicalTestFile(t, artifacts["signature/release"].Path, sign.SigningRecord{SchemaVersion: sign.SigningRecordSchemaVersion,
 		Ref: reference, Digest: envelope.RootDigest, PredicateSHA256: pipeline.FileDigest(predicate), PredicateType: sign.ProvenancePredicateType,
 		Identity: environment.Signing.Identity, Issuer: environment.Signing.Issuer, Ran: [][]string{{"cosign", "sign"}}})
-	writeCanonicalTestFile(t, artifacts["verification/cli"].Path, sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
+	writeCanonicalTestFile(t, artifacts["verification/release"].Path, sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: reference, Digest: envelope.RootDigest, Identity: environment.Signing.Identity, Issuer: environment.Signing.Issuer,
 		PredicateType: sign.ProvenancePredicateType, SignatureVerified: true, AttestationVerified: true,
 		ObservedIdentity: "builder", ObservedIssuer: environment.Signing.Issuer, Ran: [][]string{{"cosign", "verify"}}})
@@ -331,10 +334,10 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 		t.Fatal(err)
 	}
 	forgedRaw = append(forgedRaw, '\n')
-	if err := os.WriteFile(artifacts["predicate/cli"].Path, forgedRaw, 0o600); err != nil {
+	if err := os.WriteFile(artifacts["predicate/release"].Path, forgedRaw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	writeCanonicalTestFile(t, artifacts["signature/cli"].Path, sign.SigningRecord{SchemaVersion: sign.SigningRecordSchemaVersion,
+	writeCanonicalTestFile(t, artifacts["signature/release"].Path, sign.SigningRecord{SchemaVersion: sign.SigningRecordSchemaVersion,
 		Ref: reference, Digest: envelope.RootDigest, PredicateSHA256: pipeline.FileDigest(forgedRaw), PredicateType: sign.ProvenancePredicateType,
 		Identity: environment.Signing.Identity, Issuer: environment.Signing.Issuer, Ran: [][]string{{"cosign", "sign"}}})
 	failed, err := FinalizeGenerated(ctx, "definition.json", "environment.json", "plan.json", "test", "forged-predicate", ".nkd/factory", ".nkd/failed-run.json")

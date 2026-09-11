@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
@@ -12,6 +13,7 @@ import (
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
@@ -55,6 +57,9 @@ func TestConsumerVerifiesExactSignedArtifactPublicationClosure(t *testing.T) {
 	}
 	if description.Subject != reference || description.Scope != ScopeArtifactPublication || len(description.Artifacts) != 1 || verifier.calls != 1 {
 		t.Fatalf("description=%+v calls=%d", description, verifier.calls)
+	}
+	if description.Artifacts[0].Reference != "registry.example.test/tools@"+description.Artifacts[0].Digest {
+		t.Fatal("verified view omits exact artifact reference", description)
 	}
 	if err := verified.Close(); err != nil {
 		t.Fatal(err)
@@ -191,7 +196,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 		t.Fatal(err)
 	}
 	helmPath := planned["package/gpu-runtime"].Path
-	helm, err := delivery.Inspect(ctx, helmPath)
+	helm, helmRaw, err := delivery.ReadArtifact(ctx, helmPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,33 +226,29 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	}
 	recipeAPT, recipeHelm := "sha256:"+repeat("5", 64), "sha256:"+repeat("6", 64)
 	artifacts := []Artifact{
-		{Name: "gpu-runtime", Kind: OutputHelm, Digest: helm.RootDigest, RecipeDigest: recipeHelm},
+		{Name: "gpu-runtime", Kind: OutputHelm, Digest: helm.Digest, RecipeDigest: recipeHelm},
 		{Name: "worker-apt", Kind: OutputAPT, Digest: apt.Digest, RecipeDigest: recipeAPT, Components: []string{"agent"}},
 	}
 	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: artifacts})
 	if err != nil {
 		t.Fatal(err)
 	}
-	binding := factory.LifecycleBinding{SchemaVersion: factory.LifecycleBindingSchema,
-		DefinitionDigest: "sha256:" + repeat("7", 64), EnvironmentDigest: "sha256:" + repeat("8", 64), ContentSubject: contentSubject,
-		Outputs: []factory.LifecycleBoundOutput{
-			{Name: "gpu-runtime", Kind: OutputHelm, Digest: helm.RootDigest, RecipeDigest: recipeHelm},
-			{Name: "worker-apt", Kind: OutputAPT, Digest: apt.Digest, RecipeDigest: recipeAPT, Components: []string{"agent"}, TransportPath: ".nkd/factory/packages/worker-apt"},
-		}}
-	bindingRaw, err := canonical.Marshal(binding)
+	helmIndex, err := os.ReadFile(filepath.Join(helmPath, "index.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	bindingDigest, err := canonical.Digest(canonical.KindLifecycleBinding, binding)
+	debRaw, err := os.ReadFile(deb)
 	if err != nil {
 		t.Fatal(err)
 	}
+	objects := []delivery.ObjectInput{
+		{Name: "gpu-runtime", Kind: factory.PackageHelm, Path: helmPath, Layout: true, ArtifactType: "application/vnd.nkd.aicr-helm-bundle.v1", SemanticDigest: pipeline.FileDigest(helmRaw), BlobDigest: pipeline.FileDigest(helmIndex)},
+		{Name: "worker-apt", Kind: factory.PackageAPT, ArtifactType: "application/vnd.nkd.apt-repository.v1", LayerMediaType: "application/vnd.nkd.apt-repository.v1.tar", SemanticDigest: apt.Digest, Bytes: aptRaw},
+	}
+	request := testReleaseRequest(t, artifacts, objects, map[string]string{"agent": pipeline.FileDigest(debRaw)})
+	request.Objects[1].Output.TransportPath = ".nkd/factory/packages/worker-apt"
 	layout := filepath.Join(root, "release")
-	publication, err := delivery.BuildPublicationRoot(ctx, layout, delivery.PublicationRequest{Objects: []delivery.ObjectInput{
-		{Name: "gpu-runtime", Kind: factory.PackageHelm, Path: helmPath, Layout: true, ArtifactType: "application/vnd.nkd.helm-oci.v1", SemanticDigest: helm.RootDigest, BlobDigest: helm.RootDigest},
-		{Name: "worker-apt", Kind: factory.PackageAPT, ArtifactType: "application/vnd.nkd.apt-repository.v1", LayerMediaType: "application/vnd.nkd.apt-repository.v1.tar", SemanticDigest: apt.Digest, BlobDigest: pipeline.FileDigest(aptRaw), Bytes: aptRaw},
-		{Name: "nkd-lifecycle", Kind: "lifecycle-binding", ArtifactType: "application/vnd.nkd.lifecycle-binding.v1+json", LayerMediaType: "application/vnd.nkd.lifecycle-binding.v1+json", SemanticDigest: bindingDigest, Bytes: bindingRaw},
-	}})
+	publication, err := delivery.BuildPublicationRoot(ctx, layout, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,24 +278,9 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	badBinding := binding
-	badBinding.ContentSubject = badContentSubject
-	badBinding.Outputs = append([]factory.LifecycleBoundOutput(nil), binding.Outputs...)
-	badBinding.Outputs[0].Digest = badArtifacts[0].Digest
-	badBindingRaw, err := canonical.Marshal(badBinding)
-	if err != nil {
-		t.Fatal(err)
-	}
-	badBindingDigest, err := canonical.Digest(canonical.KindLifecycleBinding, badBinding)
-	if err != nil {
-		t.Fatal(err)
-	}
+	request.Release.ContentSubject = badContentSubject
 	badLayout := filepath.Join(root, "tampered-release")
-	badPublication, err := delivery.BuildPublicationRoot(ctx, badLayout, delivery.PublicationRequest{Objects: []delivery.ObjectInput{
-		{Name: "gpu-runtime", Kind: factory.PackageHelm, Path: helmPath, Layout: true, ArtifactType: "application/vnd.nkd.helm-oci.v1", SemanticDigest: helm.RootDigest, BlobDigest: helm.RootDigest},
-		{Name: "worker-apt", Kind: factory.PackageAPT, ArtifactType: "application/vnd.nkd.apt-repository.v1", LayerMediaType: "application/vnd.nkd.apt-repository.v1.tar", SemanticDigest: apt.Digest, BlobDigest: pipeline.FileDigest(aptRaw), Bytes: aptRaw},
-		{Name: "nkd-lifecycle", Kind: "lifecycle-binding", ArtifactType: "application/vnd.nkd.lifecycle-binding.v1+json", LayerMediaType: "application/vnd.nkd.lifecycle-binding.v1+json", SemanticDigest: badBindingDigest, Bytes: badBindingRaw},
-	}})
+	badPublication, err := delivery.BuildPublicationRoot(ctx, badLayout, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,32 +313,90 @@ func testPublicationLayout(t *testing.T) (string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	artifact := Artifact{Name: "tools", Kind: OutputExecutable, Digest: bundle.RootDigest,
-		RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
-	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: []Artifact{artifact}})
+	descriptor, err := delivery.PayloadDescriptor(context.Background(), bundlePath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	binding := factory.LifecycleBinding{SchemaVersion: factory.LifecycleBindingSchema,
-		DefinitionDigest: "sha256:" + repeat("6", 64), EnvironmentDigest: "sha256:" + repeat("7", 64),
-		ContentSubject: contentSubject, Outputs: []factory.LifecycleBoundOutput{{Name: "tools", Kind: OutputExecutable,
-			Digest: bundle.RootDigest, RecipeDigest: artifact.RecipeDigest, Components: []string{"kubectl"}}}}
-	bindingRaw, err := canonical.Marshal(binding)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bindingDigest, err := canonical.Digest(canonical.KindLifecycleBinding, binding)
-	if err != nil {
-		t.Fatal(err)
-	}
+	artifact := Artifact{Name: "tools", Kind: OutputExecutable, Digest: descriptor.Digest, RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
+	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{Name: "tools", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"kubectl": pipeline.FileDigest([]byte("kubectl"))})
 	layout := filepath.Join(root, "publication")
-	publication, err := delivery.BuildPublicationRoot(context.Background(), layout, delivery.PublicationRequest{Objects: []delivery.ObjectInput{{
-		Name: "tools", Kind: "binary-bundle", Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle,
-		SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest,
-	}, {Name: "nkd-lifecycle", Kind: "lifecycle-binding", ArtifactType: "application/vnd.nkd.lifecycle-binding.v1+json",
-		LayerMediaType: "application/vnd.nkd.lifecycle-binding.v1+json", SemanticDigest: bindingDigest, Bytes: bindingRaw}}})
+	publication, err := delivery.BuildPublicationRoot(context.Background(), layout, request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return layout, publication.RootDigest
+}
+
+// testReleaseRequest creates real digest-bound evidence for consumer fixtures.
+func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.ObjectInput, subjects map[string]string) delivery.PublicationRequest {
+	t.Helper()
+	content, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: artifacts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := delivery.PublicationRequest{Release: &delivery.ReleaseMetadata{DefinitionDigest: "sha256:" + repeat("6", 64), EnvironmentDigest: "sha256:" + repeat("7", 64), ContentSubject: content}, Objects: objects}
+	add := func(bom *sbom.BOM, output, component, stage, kind, subject, input string) {
+		bound, err := sbom.ForSubject(bom, subject, stage, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := bound.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+		digest, err := bound.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		inspected := ""
+		if input != subject {
+			inspected = input
+		}
+		request.Objects = append(request.Objects, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(digest, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: digest, Bytes: raw, Evidence: &delivery.EvidenceBinding{Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspected}})
+	}
+	for i, artifact := range artifacts {
+		output := &delivery.OutputBinding{Repository: artifact.Name, Format: artifact.Kind, RecipeDigest: artifact.RecipeDigest, Components: artifact.Components}
+		request.Objects[i].Output = output
+		for _, component := range artifact.Components {
+			subject := subjects[component]
+			output.BuildSubjects = append(output.BuildSubjects, delivery.BuildSubject{Component: component, Digest: subject})
+			bom, err := sbom.NewSubject(artifact.RecipeDigest, component, subject)
+			if err != nil {
+				t.Fatal(err)
+			}
+			input, stage, kind := subject, "build-output", "file"
+			if artifact.Kind == OutputOCI {
+				subject, kind = artifact.Digest, "oci-manifest"
+			}
+			if artifact.Kind == OutputHelm {
+				stage, kind = "source-build", "source-archive"
+			}
+			add(bom, artifact.Name, component, stage, kind, subject, input)
+		}
+		if artifact.Kind == OutputHelm {
+			_, raw, err := delivery.ReadArtifact(context.Background(), objects[i].Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			subject := pipeline.FileDigest(raw)
+			path := filepath.Join(t.TempDir(), "chart.tar")
+			if err := os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			inventory, err := sbom.InspectDependencies(context.Background(), path, subject, "tarball", sbom.Scanner{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			bom, err := sbom.NewSubject(artifact.RecipeDigest, artifact.Name, subject)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bom, err = sbom.WithDependencies(bom, inventory.Components, inventory.Method, inventory.ScannerDigest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			add(bom, artifact.Name, artifact.Name, "packaging", "helm-bundle", subject, subject)
+		}
+	}
+	return request
 }

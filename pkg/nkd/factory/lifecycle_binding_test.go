@@ -2,7 +2,6 @@ package factory
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -104,21 +103,14 @@ func TestLifecyclePublicationRequiresDeclaredEvidence(t *testing.T) {
 			bindLifecycleClusterFixture(t, plan)
 			ctx := context.Background()
 			node := Node{Inputs: []string{"raw", "result", "package"}}
-			object, err := lifecyclePublicationObject(ctx, plan, node, artifacts)
+			binding, err := lifecyclePublicationBinding(ctx, plan, node, artifacts)
 			if err != nil {
 				t.Fatal(err)
 			}
-			var binding LifecycleBinding
-			if err := json.Unmarshal(object.Bytes, &binding); err != nil {
-				t.Fatal(err)
-			}
-			semantic, err := canonical.Digest(canonical.KindLifecycleBinding, binding)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if semantic != object.SemanticDigest || binding.SchemaVersion != LifecycleBindingSchema || len(binding.Outputs) != 1 || !canonical.IsDigest(binding.ContentSubject) {
+			if binding.SchemaVersion != LifecycleBindingSchema || len(binding.Outputs) != 1 || !canonical.IsDigest(binding.ContentSubject) {
 				t.Fatalf("binding = %+v", binding)
 			}
+
 			observed, err := ObserveLifecyclePayload(ctx, plan, plan.LifecycleOutputs[0], artifacts)
 			if err != nil {
 				t.Fatal(err)
@@ -133,7 +125,7 @@ func TestLifecyclePublicationRequiresDeclaredEvidence(t *testing.T) {
 				t.Fatal("APT transport path lost")
 			}
 			node.Inputs = []string{"raw", "package"}
-			_, err = lifecyclePublicationObject(ctx, plan, node, artifacts)
+			_, err = lifecyclePublicationBinding(ctx, plan, node, artifacts)
 			want := e.CodeVerifyFailed
 			if kind == "apt-repository" {
 				want = e.CodeReleaseIncomplete

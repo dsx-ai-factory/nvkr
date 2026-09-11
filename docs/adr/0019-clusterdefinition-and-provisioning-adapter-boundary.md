@@ -40,7 +40,8 @@ reference nor a caller-set readiness flag is an authority transition.
 
 Identity order is noncircular: named Artifacts retain their observed payload digest; canonical release content
 binds payload membership; cluster realization binds that content and exact composition; the enclosing OCI root
-carries those records and payloads. Evidence targets the content subject without including itself in that
+carries one authoritative metadata config with sibling repository/digest references and those relationships. A separate
+lifecycle-binding wrapper is not published; output descriptors and evidence membership belong to the release index. Evidence targets the content subject without including itself in that
 subject. Route verification checks the enclosing published digest separately. Consumers recompute composition
 and content identities and exact member joins before materialization. Storage paths are verifier-owned; names
 inside a publication cannot select arbitrary filesystem locations.

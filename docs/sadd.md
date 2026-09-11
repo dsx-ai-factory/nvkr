@@ -444,7 +444,8 @@ flowchart TB
   Fetch["Fetch pinned inputs"] --> Produce["Build or acquire"]
   Produce --> Observe["Re-hash and record"]
   Observe --> SBOM["Per-artifact SBOM and index"]
-  Observe --> Package["Package or compose"]
+  Observe --> Package["Package or compose; inventory final Helm package"]
+  SBOM --> Package
   Package --> Publish["Publish OCI bytes"]
   Publish --> Sign["Sign and attest"]
   Sign --> Verify["Pull back and verify"]
@@ -516,7 +517,9 @@ CLI and a digest-pinned acquired utility, then requests a binary bundle for one 
    component bytes. Terminal observation gates the per-recipe SBOM node, which binds per-artifact CycloneDX
    documents to observed digests and emits an aggregate index (ADR-13 §6).
 4. Packaging binds file names, modes, sizes and hashes into a Binary Bundle config and deterministic layer.
-   The package's OCI identity is distinct from either component hash and from the Recipe Digest.
+   The package's OCI identity is distinct from either component hash and from the Recipe Digest. The outer
+   release metadata references each deliverable in its own sibling repository and includes validated, stage-bound CycloneDX
+   documents. Its single metadata config owns outputs and evidence; build indexes stay internal.
 5. Publication produces a digest reference. Signing re-derives the routed layout identity and requires it to
    agree with the publication subject. The production predicate records plan and input identities; cosign binds
    it to the published subject. Pull-back verification checks the served manifest identity and signing policy.
@@ -524,8 +527,9 @@ CLI and a digest-pinned acquired utility, then requests a binary bundle for one 
    qualification verdict and a release-manifest entry; neither is implied by the artifact already being in OCI.
 
 The acquired component retains its acquisition-only claim. SBOM generation asserts composition; it neither
-verifies upstream signatures nor upgrades evidence. The implemented SBOM node produces documents and an index;
-this diagram does not imply that every generated SBOM is independently signed or routed to the registry.
+verifies upstream signatures nor upgrades evidence. The release index includes each required document once
+before signing, so the root signature covers its exact bytes. Helm source-archive and final bound-package
+inventories are separate claims; Run completion is not signed. See the [registry graph](publication-architecture.md). Build-only and dry-run outputs gain no signature.
 
 | Change to the example | Identity effect |
 |---|---|

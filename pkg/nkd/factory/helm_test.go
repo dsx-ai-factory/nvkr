@@ -178,11 +178,11 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inspection, err := delivery.Inspect(ctx, artifacts["package/charts"].Path)
+	inspection, err := delivery.PayloadDescriptor(ctx, artifacts["package/charts"].Path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if observed.Digest != inspection.RootDigest || len(observed.Components) != 1 || observed.Components[0] != "charts" {
+	if observed.Digest != inspection.Digest || len(observed.Components) != 1 || observed.Components[0] != "charts" {
 		t.Fatalf("observation: %#v", observed)
 	}
 	record.SHA256 = "sha256:" + strings.Repeat("b", 64)

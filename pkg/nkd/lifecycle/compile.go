@@ -237,26 +237,25 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 			packageSpec.Distribution, packageSpec.Component = output.APT.Distribution, output.APT.Component
 		}
 		compileSpec.Packages = append(compileSpec.Packages, packageSpec)
-		if environment.Publication == nil {
-			continue
-		}
-		publishTarget := output.Name
+
+	}
+	if environment.Publication != nil {
 		publication := environment.Publication
-		delivery.Targets[publishTarget] = factory.Target{Kind: factory.TargetOCI, Ref: publication.RepositoryPrefix + "/" + output.Name, CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}
-		packageName := releasePackageName(output.Name)
-		if authoredNames[packageName] || packageNames[packageName] {
+		delivery.Targets[publicationPackageName] = factory.Target{Kind: factory.TargetOCI, Ref: publication.RepositoryPrefix + "/releases",
+			CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}
+		delivery.Routes = []factory.Route{{Name: publicationPackageName, Input: "package/" + publicationPackageName, Target: publicationPackageName}}
+		if authoredNames[publicationPackageName] || authoredNames["releases"] {
 			return factory.CompileSpec{}, factory.ExecutionSettings{}, e.New(e.CodeInvalidCatalog,
-				"definition output %q derives release package name %q that collides with another output", output.Name, packageName)
+				"definition output %q collides with the generated publication package", publicationPackageName)
 		}
-		packageNames[packageName] = true
-		compileSpec.Packages = append(compileSpec.Packages, factory.PackageSpec{Name: packageName, Kind: factory.PackageOCI,
+		compileSpec.Packages = append(compileSpec.Packages, factory.PackageSpec{Name: publicationPackageName, Kind: factory.PackageOCI,
 			Inputs: append([]string(nil), closureInputs...)})
-		delivery.Routes = append(delivery.Routes, factory.Route{Name: output.Name, Input: "package/" + packageName, Target: publishTarget})
 	}
 	return compileSpec, delivery, nil
 }
 
-func releasePackageName(output string) string { return output + "-release" }
+// One closure is built and transported once; repository routes reuse its identity.
+const publicationPackageName = "release"
 
 func sortedMapKeys(source map[string]bool) []string {
 	keys := make([]string, 0, len(source))

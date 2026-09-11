@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -253,6 +254,18 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if !verification.DryRun && (!verification.SignatureVerified || !verification.AttestationVerified) {
 		return e.New(e.CodeVerifyFailed,
 			"factory verification node %q: %s was not verified against its identity policy", node.ID, subject.Ref)
+	}
+	// Authenticate the selected entry point first, then verify all repository-bound
+	// deliverables and release evidence before committing a successful record.
+	workspace, err := os.MkdirTemp("", "nkd-verify-release-*")
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "creating release verification workspace")
+	}
+	defer func() { _ = os.RemoveAll(workspace) }()
+	if _, err := delivery.Pull(ctx, subject.Ref, filepath.Join(workspace, "closure"), delivery.RegistryOptions{
+		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous, Username: registryUsername(target), Password: registryPassword(target),
+	}); err != nil {
+		return err
 	}
 	raw, err := verification.Canonical()
 	if err != nil {

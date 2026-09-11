@@ -79,7 +79,7 @@ func TestImagePackageObservesProducerAndPreservesPublishedImage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if image.RootDigest != observed.Digest || len(image.Entrypoint) != 1 || image.Entrypoint[0] != "/usr/local/bin/worker" {
+	if image.ManifestDigest != observed.Digest || len(image.Entrypoint) != 1 || image.Entrypoint[0] != "/usr/local/bin/worker" {
 		t.Fatalf("publication changed image: %#v", image)
 	}
 	record.SHA256 = "sha256:" + strings.Repeat("b", 64)

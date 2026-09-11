@@ -117,6 +117,9 @@ _Avoid_: Release reference, publication root, approval flag
 
 **Publication root**:
 The internal digest-pinned OCI entry point through which a consumer locates release content and its evidence closure.
+One release index owns deliverable names/digests and stage-bound SBOM membership. Each document appears once;
+per-recipe indexes remain internal handoffs. The root signature covers these bytes without making SBOMs new
+authored lifecycle objects or qualified evidence receipts. Run completion remains a separate claim.
 _Avoid_: Mutable tag, clearance, separately authored product object
 
 **Lifecycle status**:

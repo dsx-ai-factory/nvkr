@@ -144,6 +144,17 @@ func (plan Plan) Validate() error {
 	if err := plan.validateSBOMGraph(); err != nil {
 		return err
 	}
+	evidenceNodes, evidenceArtifacts := planIndex(&plan)
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind != NodePackage || node.PackageKind != PackageOCI {
+			continue
+		}
+		for _, required := range publicationSBOMInputs(packageProducerResults(node.Inputs, evidenceNodes, evidenceArtifacts), evidenceNodes, evidenceArtifacts) {
+			if !containsString(node.Inputs, required) {
+				return e.New(e.CodeProvenanceMissing, "publication %q omits required SBOM evidence %q", node.ID, required)
+			}
+		}
+	}
 	builds := map[string]ir.Node{}
 	for _, recipe := range plan.Recipes {
 		for _, node := range recipe.Graph.Nodes {

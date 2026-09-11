@@ -214,6 +214,10 @@ status. Failure preserves the command's exit code and cannot print a successful 
 the actual bound image digest, and publication reports its persisted immutable reference. Logs are diagnostic,
 not authority receipts, and generated progress messages never dump credentials or environment variables.
 
+The compiler creates one release package and one publish/sign/verify route. GitHub handoff artifacts remain
+internal job transfers, not additional deliverables. Product names do not cause duplicate copies of the full
+closure to be uploaded or published.
+
 The finalizer batches downloads with an exact set of planned carrier names. It still restores every carrier
 and records its producer and restore outcome; a successful batch download alone proves no completeness.
 

@@ -49,10 +49,12 @@ func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing
 		t.Fatal(err)
 	}
 	rootPath := filepath.Join(workspace, "outputs", "cli")
-	_, err = delivery.BuildPublicationRoot(context.Background(), rootPath, delivery.PublicationRequest{Objects: []delivery.ObjectInput{{
-		Name: "cli-bundle", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true,
-		ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundleResult.SemanticDigest, BlobDigest: bundleResult.RootDigest,
-	}}})
+	descriptor, err := delivery.PayloadDescriptor(context.Background(), bundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := testReleaseRequest(t, []Artifact{{Name: "cli-bundle", Kind: OutputExecutable, Digest: descriptor.Digest, RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}}, []delivery.ObjectInput{{Name: "cli-bundle", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundleResult.SemanticDigest, BlobDigest: bundleResult.RootDigest}}, map[string]string{"kubectl": producer.SHA256})
+	_, err = delivery.BuildPublicationRoot(context.Background(), rootPath, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +69,7 @@ func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if observed.Digest != bundleResult.RootDigest || !equalStrings(observed.Components, []string{"kubectl"}) {
+	if observed.Digest != descriptor.Digest || !equalStrings(observed.Components, []string{"kubectl"}) {
 		t.Fatalf("observed = %+v", observed)
 	}
 
@@ -281,15 +283,27 @@ func TestCompleteGPUPublicationClosureAcrossFormatsAndArchitectures(t *testing.T
 					}
 				}
 			}
-			for _, nodeID := range []string{"composition/gpu-tenant", "package/gpu-runtime", "package/worker-apt", "package/worker-binaries", "package/worker-binaries-release"} {
+			for _, nodeID := range []string{"composition/gpu-tenant", "package/gpu-runtime", "package/worker-apt", "package/worker-binaries", "package/release"} {
 				if err := factory.ExecuteNode(ctx, plan, nodeID, nil, nil); err != nil {
 					t.Fatalf("%s: %v", nodeID, err)
 				}
 			}
-			layout := artifacts["package/worker-binaries-release"].Path
+			layout := artifacts["package/release"].Path
 			inspection, err := delivery.Inspect(ctx, layout)
 			if err != nil {
 				t.Fatal(err)
+			}
+			shared := 0
+			for _, object := range inspection.Root.Objects {
+				if object.Evidence != nil && len(object.Evidence.Outputs) == 2 {
+					shared++
+				}
+				if object.Kind == "sbom-index" || object.Kind == "lifecycle-binding" {
+					t.Fatal("redundant release wrapper", object.Kind)
+				}
+			}
+			if shared == 0 {
+				t.Fatal("shared build SBOMs were not deduplicated across APT and binary outputs")
 			}
 			outputs, subject, clusters, err := artifactsFromBinding(ctx, layout, inspection)
 			if err != nil {

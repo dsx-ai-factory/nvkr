@@ -181,6 +181,9 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 	if err != nil {
 		return nil, err
 	}
+	if err := bindArtifactReferences(reference, inspection, artifacts); err != nil {
+		return nil, err
+	}
 	policyDigest, err := policy.Digest()
 	if err != nil {
 		return nil, err
@@ -208,24 +211,13 @@ func InspectReleaseLayout(ctx context.Context, reference, layoutPath string) ([]
 	if inspection.RootDigest != digest {
 		return nil, e.New(e.CodeVerifyFailed, "publication layout does not match requested reference")
 	}
-	return artifactsFromInspection(inspection)
-}
-
-func artifactsFromInspection(inspection delivery.Inspection) ([]Artifact, error) {
-	artifacts := make([]Artifact, 0, len(inspection.Root.Objects))
-	for _, object := range inspection.Root.Objects {
-		artifact := Artifact{Name: object.Name, Kind: object.Kind, Digest: object.BlobDigest}
-		if err := artifact.validate(); err != nil {
-			return nil, err
-		}
-		artifacts = append(artifacts, artifact)
+	artifacts, _, _, err := artifactsFromBinding(ctx, layoutPath, inspection)
+	if err != nil {
+		return nil, err
 	}
-	sort.Slice(artifacts, func(i, j int) bool {
-		if artifacts[i].Name != artifacts[j].Name {
-			return artifacts[i].Name < artifacts[j].Name
-		}
-		return artifacts[i].Kind < artifacts[j].Kind
-	})
+	if err := bindArtifactReferences(reference, inspection, artifacts); err != nil {
+		return nil, err
+	}
 	return artifacts, nil
 }
 
@@ -233,22 +225,22 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 	if layoutPath == "" {
 		return nil, "", nil, e.New(e.CodeVerifyFailed, "verified publication has no held layout path")
 	}
-	object, raw, err := delivery.ReadObject(ctx, layoutPath, "nkd-lifecycle")
-	if err != nil {
-		return nil, "", nil, err
-	}
-	if object.Kind != "lifecycle-binding" || object.ArtifactType != "application/vnd.nkd.lifecycle-binding.v1+json" {
-		return nil, "", nil, e.New(e.CodeVerifyFailed, "publication lifecycle binding has an unsupported type")
-	}
 	var binding factory.LifecycleBinding
-	if err := canonical.UnmarshalExact(raw, &binding); err != nil {
-		return nil, "", nil, e.Wrap(e.CodeVerifyFailed, err, "decoding lifecycle publication binding")
+	if metadata := inspection.Root.Release; metadata != nil {
+		binding = factory.LifecycleBinding{SchemaVersion: factory.LifecycleBindingSchema, DefinitionDigest: metadata.DefinitionDigest, EnvironmentDigest: metadata.EnvironmentDigest, ContentSubject: metadata.ContentSubject, Clusters: metadata.Clusters}
+		for _, object := range inspection.Root.Objects {
+			if output := object.Output; output != nil {
+				digest := object.DescriptorDigest
+				if output.Format == OutputAPT {
+					digest = object.SemanticDigest
+				}
+				binding.Outputs = append(binding.Outputs, factory.LifecycleBoundOutput{Name: object.Name, Kind: output.Format, Digest: digest, RecipeDigest: output.RecipeDigest, Components: output.Components, TransportPath: output.TransportPath})
+			}
+		}
+	} else {
+		return nil, "", nil, e.New(e.CodeVerifyFailed, "publication has no authoritative release metadata")
 	}
-	semantic, err := canonical.Digest(canonical.KindLifecycleBinding, binding)
-	if err != nil || semantic != object.SemanticDigest || binding.SchemaVersion != factory.LifecycleBindingSchema ||
-		!canonical.IsDigest(binding.DefinitionDigest) || !canonical.IsDigest(binding.EnvironmentDigest) {
-		return nil, "", nil, e.New(e.CodeVerifyFailed, "lifecycle publication binding identity is not exact")
-	}
+
 	objects := make(map[string]delivery.PublishedObject, len(inspection.Root.Objects))
 	for _, candidate := range inspection.Root.Objects {
 		if _, exists := objects[candidate.Name]; exists {
@@ -271,7 +263,7 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 	for _, output := range binding.Outputs {
 		published, ok := objects[output.Name]
 		if !ok || published.Kind != lifecyclePublishedKind(output.Kind) ||
-			(output.Kind != OutputAPT && published.BlobDigest != output.Digest) || (output.Kind == OutputAPT && published.SemanticDigest != output.Digest) {
+			(output.Kind != OutputAPT && published.DescriptorDigest != output.Digest) || (output.Kind == OutputAPT && published.SemanticDigest != output.Digest) {
 			return nil, "", nil, e.New(e.CodeVerifyFailed, "lifecycle output %q does not match its publication object", output.Name)
 		}
 		extracted, err := os.MkdirTemp(filepath.Dir(layoutPath), ".inspect-*")
@@ -402,7 +394,28 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 	if err := factory.ValidateLifecycleRealizations(compositionPlans, expectedOutputs, clusterPlans, boundOutputs); err != nil {
 		return nil, "", nil, err
 	}
-	if len(objects) != len(artifacts)+len(clusters)+1 {
+	evidenceCount := 0
+	if inspection.Root.Release != nil {
+		actual, err := delivery.Inspect(ctx, layoutPath)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		expectedDigest, err := inspection.Root.Digest()
+		if err != nil {
+			return nil, "", nil, err
+		}
+		actualDigest, err := actual.Root.Digest()
+		if err != nil || actualDigest != expectedDigest {
+			return nil, "", nil, e.New(e.CodeVerifyFailed, "release metadata differs from held layout")
+		}
+		for _, o := range actual.Root.Objects {
+			if o.Evidence != nil {
+				evidenceCount++
+			}
+		}
+	}
+
+	if len(objects) != len(artifacts)+len(clusters)+evidenceCount {
 		return nil, "", nil, e.New(e.CodeVerifyFailed, "publication closure contains objects outside its lifecycle binding")
 	}
 	return artifacts, contentSubject, clusters, nil
@@ -451,4 +464,21 @@ func referenceDigest(reference string) string {
 		return ""
 	}
 	return reference[strings.LastIndexByte(reference, '@')+1:]
+}
+
+// References are transport projections; content identity was verified from the
+// exact payload membership before these locators are added to the public view.
+func bindArtifactReferences(reference string, inspection delivery.Inspection, artifacts []Artifact) error {
+	refs, err := delivery.OutputReferences(reference, inspection)
+	if err != nil {
+		return err
+	}
+	for i := range artifacts {
+		ref, ok := refs[artifacts[i].Name]
+		if !ok {
+			return e.New(e.CodeVerifyFailed, "artifact has no bound repository")
+		}
+		artifacts[i].Reference = ref
+	}
+	return nil
 }

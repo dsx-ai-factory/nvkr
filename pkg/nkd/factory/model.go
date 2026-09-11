@@ -14,6 +14,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -438,21 +439,8 @@ type LifecycleBoundOutput struct {
 	TransportPath string   `json:"transportPath,omitempty"`
 }
 
-type LifecycleBoundCluster struct {
-	SchemaVersion     string                        `json:"schemaVersion"`
-	Name              string                        `json:"name"`
-	CompositionDigest string                        `json:"compositionDigest"`
-	ContentSubject    string                        `json:"contentSubject"`
-	Members           []LifecycleBoundClusterMember `json:"members"`
-}
-
-type LifecycleBoundClusterMember struct {
-	Output         string   `json:"output"`
-	ArtifactDigest string   `json:"artifactDigest"`
-	RecipeDigest   string   `json:"recipeDigest"`
-	Components     []string `json:"components"`
-	Role           string   `json:"role,omitempty"`
-}
+type LifecycleBoundCluster = delivery.ReleaseCluster
+type LifecycleBoundClusterMember = delivery.ReleaseClusterMember
 
 type RecipePlan struct {
 	Name                string                   `json:"name"`

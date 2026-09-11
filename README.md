@@ -27,8 +27,9 @@ binary/APT/Helm Release-consumer contracts are implemented. Linux verification r
 identity/issuer policy. The supported consumer scope authenticates artifact publication and build evidence.
 
 The project is not a production-complete release system. Earlier personal-namespace hosted runs demonstrated
-real keyless signing and independent consumption; the current NVIDIA inputs have not yet been exercised
-in a hosted Run, and organizational acceptance remains open. Full v1 release qualification/automation, wrapped OS builds and several
+real keyless signing and independent consumption. The first NVIDIA Run
+also passed independent signature/provenance verification, but omitted SBOMs from its signed closure. The new
+[single-entry release layout](docs/publication-architecture.md) requires a fresh hosted run; organizational acceptance remains open. Full v1 release qualification/automation, wrapped OS builds and several
 qualified authority adapters remain unavailable. Dry-run/local output is unqualified; a production signature
 does not prove exact-byte reproduction. See the [implementation and evidence record](docs/adr/reconciliation.md).
 

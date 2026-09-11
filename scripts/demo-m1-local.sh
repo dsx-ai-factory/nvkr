@@ -21,7 +21,7 @@ ATTEMPT=${ATTEMPT:-$(demo_default_attempt m1)}
 WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
 CONSUME=${CONSUME:-.nkd/m1-local-consume}
 DEFINITIONS=${DEFINITIONS:-definitions/nke-v1}
-ROUTE=${ROUTE:-nkectl}
+ROUTE=${ROUTE:-release}
 BUNDLE=${BUNDLE:-nkectl}
 RECIPE_TARGET=${RECIPE_TARGET:-nke-cli}
 JOBS=${JOBS:-1}
@@ -44,8 +44,8 @@ Usage: scripts/demo-m1-local.sh [options]
 
 Run the combined NKE local walkthrough (M1 requires the CLI slice only):
   pinned NKE sources -> CLI + CWE image + Helm bundle -> per-artifact SBOMs
-    -> OCI publication envelopes -> loopback registry -> dry-run signing records
-    -> pull the CLI publication by digest -> check SBOM digest -> run recovered nkectl
+    -> one OCI release index -> loopback registry -> dry-run signing records
+    -> pull the release by digest -> check SBOM digest -> run recovered nkectl
 
 The CLI build is offline; CWE uses network-enabled rootless BuildKit. All three
 outputs must complete, but pull-back and version checks cover the CLI only.

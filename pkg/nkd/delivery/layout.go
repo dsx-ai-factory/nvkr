@@ -88,6 +88,8 @@ type capturedBinary struct {
 // are nested by descriptor and copied as an exact closure; regular files become
 // one-layer OCI artifacts.
 type ObjectInput struct {
+	Output         *OutputBinding
+	Evidence       *EvidenceBinding
 	Name           string
 	Kind           string
 	Path           string
@@ -104,6 +106,7 @@ type ObjectInput struct {
 }
 
 type PublicationRequest struct {
+	Release                 *ReleaseMetadata
 	ReleaseSetDigest        string
 	InventoryDigest         string
 	ClusterDefinitionDigest string
@@ -123,7 +126,8 @@ type Inspection struct {
 }
 
 type layoutWriter struct {
-	root string
+	root  string
+	plain bool
 }
 
 // BuildBinaryBundle creates a deterministic OCI layout containing one typed
@@ -238,6 +242,7 @@ func BuildPublicationRoot(ctx context.Context, out string, request PublicationRe
 		return Result{}, e.New(e.CodeUnverifiedRef, "publication root input identities are incomplete or malformed")
 	}
 	root := PublicationRoot{SchemaVersion: PublicationRootSchema, Qualification: QualificationDiagnostic,
+		Release:          request.Release,
 		ReleaseSetDigest: request.ReleaseSetDigest, InventoryDigest: request.InventoryDigest,
 		ClusterDefinitionDigest: request.ClusterDefinitionDigest}
 	return buildPublicationRoot(ctx, out, root, request.Objects)
@@ -262,7 +267,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		return Result{}, err
 	}
 	defer cleanupStage()
-	writer := layoutWriter{root: stage}
+	writer := layoutWriter{root: stage, plain: root.Release != nil}
 	descriptors := make([]Descriptor, 0, len(objects)+1)
 	root.Objects = make([]PublishedObject, 0, len(objects))
 	previous := ""
@@ -274,7 +279,9 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		previous = key
 		var descriptor Descriptor
 		var blobDigest string
-		if input.Layout {
+		if input.Layout && root.Release != nil {
+			descriptor, blobDigest, err = writer.importFlatLayout(ctx, input)
+		} else if input.Layout {
 			descriptor, _, err = writer.importLayout(ctx, input.Path)
 			blobDigest = descriptor.Digest
 			if err == nil && input.BlobDigest != "" && descriptor.Digest != input.BlobDigest {
@@ -306,8 +313,11 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		if input.Arch != "" {
 			descriptor.Annotations["org.opencontainers.image.architecture"] = input.Arch
 		}
-		descriptors = append(descriptors, descriptor)
+		if input.Output == nil {
+			descriptors = append(descriptors, descriptor)
+		}
 		root.Objects = append(root.Objects, PublishedObject{Name: input.Name, Kind: input.Kind,
+			Output: input.Output, Evidence: input.Evidence,
 			ArtifactType: input.ArtifactType, DescriptorDigest: descriptor.Digest,
 			SemanticDigest: input.SemanticDigest, BlobDigest: blobDigest,
 			Size: descriptor.Size, OS: input.OS, Arch: input.Arch})
@@ -406,7 +416,12 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 	if err != nil {
 		return Descriptor{}, "", err
 	}
-	config, err := writer.addBlobBytes(configBytes, MediaDeliveryObjectConfig)
+	configType := MediaDeliveryObjectConfig
+	if writer.plain {
+		configBytes = []byte("{}")
+		configType = MediaEmptyConfig
+	}
+	config, err := writer.addBlobBytes(configBytes, configType)
 	if err != nil {
 		return Descriptor{}, "", err
 	}

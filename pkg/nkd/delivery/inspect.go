@@ -24,6 +24,12 @@ import (
 // Inspect verifies every descriptor reachable from the top-level index and then
 // rehydrates its one canonical publication-root config.
 func Inspect(ctx context.Context, root string) (Inspection, error) {
+	return inspectPublication(ctx, root, nil)
+}
+
+// fetchOutputs is used only by Pull to fill the private staging layout from the
+// exact signed sibling repository/digest bindings, before full closure checks.
+func inspectPublication(ctx context.Context, root string, fetchOutputs func(PublicationRoot) error) (Inspection, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
 	}
@@ -37,7 +43,12 @@ func Inspect(ctx context.Context, root string) (Inspection, error) {
 	rootDigest := digestBytes(raw)
 	visited := map[string]bool{}
 	var rootConfig Descriptor
+	direct := map[string]bool{}
 	for _, descriptor := range index.Manifests {
+		if direct[descriptor.Digest] {
+			return Inspection{}, e.New(e.CodeVerifyFailed, "publication index repeats a descriptor")
+		}
+		direct[descriptor.Digest] = true
 		if err := verifyDescriptor(ctx, root, descriptor, visited); err != nil {
 			return Inspection{}, err
 		}
@@ -59,9 +70,6 @@ func Inspect(ctx context.Context, root string) (Inspection, error) {
 			rootConfig = manifest.Config
 		}
 	}
-	if err := verifyBlobInventory(root, visited); err != nil {
-		return Inspection{}, err
-	}
 	if rootConfig.Digest == "" {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "publication index has no root config")
 	}
@@ -82,6 +90,27 @@ func Inspect(ctx context.Context, root string) (Inspection, error) {
 			descriptors[descriptor.Digest] = descriptor
 		}
 	}
+	if fetchOutputs != nil {
+		if err := fetchOutputs(publication); err != nil {
+			return Inspection{}, err
+		}
+	}
+	for _, object := range publication.Objects {
+		if object.Output == nil {
+			continue
+		}
+		if _, exists := descriptors[object.DescriptorDigest]; exists {
+			return Inspection{}, e.New(e.CodeVerifyFailed, "deliverable is duplicated in release repository")
+		}
+		descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
+		if err := verifyDescriptor(ctx, root, descriptor, visited); err != nil {
+			return Inspection{}, err
+		}
+		descriptors[descriptor.Digest] = descriptor
+	}
+	if err := verifyBlobInventory(root, visited); err != nil {
+		return Inspection{}, err
+	}
 	if len(descriptors) != len(publication.Objects) {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "publication-root object count does not match OCI descriptors")
 	}
@@ -90,14 +119,20 @@ func Inspect(ctx context.Context, root string) (Inspection, error) {
 		if !ok || descriptor.ArtifactType != object.ArtifactType || descriptor.Size != object.Size {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "publication object %q does not match its OCI descriptor", object.Name)
 		}
-		if descriptor.Annotations["dev.nkd.semantic.digest"] != object.SemanticDigest ||
+		if object.Output == nil && (descriptor.Annotations["dev.nkd.semantic.digest"] != object.SemanticDigest ||
 			descriptor.Annotations["dev.nkd.object.kind"] != object.Kind ||
-			descriptor.Annotations["org.opencontainers.image.title"] != object.Name {
+			descriptor.Annotations["org.opencontainers.image.title"] != object.Name) {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "publication object %q descriptor annotations do not match root semantics", object.Name)
+		}
+		if publication.Release != nil && descriptor.MediaType != MediaOCIManifest {
+			return Inspection{}, e.New(e.CodeVerifyFailed, "release objects must be direct manifests")
 		}
 		if err := verifyPublishedObjectBinding(ctx, root, object, descriptor); err != nil {
 			return Inspection{}, err
 		}
+	}
+	if err := verifyReleaseEvidence(ctx, root, publication); err != nil {
+		return Inspection{}, err
 	}
 	semantic, err := publication.Digest()
 	if err != nil {
@@ -124,7 +159,45 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 		return err
 	}
 	var manifest ociManifest
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || len(manifest.Layers) != 1 || manifest.Config.MediaType != MediaDeliveryObjectConfig {
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "decoding publication manifest")
+	}
+	if manifest.Config.MediaType == MediaImageConfig {
+		if object.ArtifactType != MediaOCIManifest || object.BlobDigest != descriptor.Digest {
+			return e.New(e.CodeVerifyFailed, "native image descriptor differs from release binding")
+		}
+		config, err := verifyImageManifest(ctx, root, manifest, map[string]bool{})
+		if err != nil {
+			return err
+		}
+		if config.OS != object.OS || config.Architecture != object.Arch {
+			return e.New(e.CodeVerifyFailed, "native image platform differs from release binding")
+		}
+		return nil
+	}
+	if manifest.Config.MediaType == MediaBinaryBundleConfig {
+		configRaw, err := readBlob(ctx, root, manifest.Config, 8<<20)
+		if err != nil {
+			return err
+		}
+		var bundle BinaryBundle
+		if err := canonical.UnmarshalExact(configRaw, &bundle); err != nil {
+			return e.Wrap(e.CodeVerifyFailed, err, "decoding binary config")
+		}
+		semantic, err := bundle.Digest()
+		if err != nil || semantic != object.SemanticDigest || manifest.ArtifactType != MediaBinaryBundle || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaBinaryBundleLayer || object.BlobDigest != descriptor.Digest {
+			return e.New(e.CodeVerifyFailed, "binary manifest differs from release binding")
+		}
+		return nil
+	}
+	if manifest.Config.MediaType == MediaEmptyConfig {
+		raw, err := readBlob(ctx, root, manifest.Config, 8<<20)
+		if err != nil || string(raw) != "{}" || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.ArtifactType != object.ArtifactType {
+			return e.New(e.CodeVerifyFailed, "artifact differs from release binding")
+		}
+		return nil
+	}
+	if len(manifest.Layers) != 1 || manifest.Config.MediaType != MediaDeliveryObjectConfig {
 		return e.New(e.CodeVerifyFailed, "publication object %q has an invalid delivery manifest", object.Name)
 	}
 	configRaw, err := readBlob(ctx, root, manifest.Config, 8<<20)
@@ -246,15 +319,20 @@ func ExtractBinaryBundle(ctx context.Context, layoutRoot, name, out string) (Bin
 	if object.Name == "" {
 		return BinaryBundle{}, e.New(e.CodeUnverifiedRef, "publication root has no binary bundle named %q", name)
 	}
-	indexRaw, err := readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, maxDeliveryFileBytes)
-	if err != nil {
-		return BinaryBundle{}, err
+	var manifestRaw []byte
+	if inspection.Root.Release != nil {
+		manifestRaw, err = readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+	} else {
+		indexRaw, readErr := readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+		if readErr != nil {
+			return BinaryBundle{}, readErr
+		}
+		var index ociIndex
+		if err := json.Unmarshal(indexRaw, &index); err != nil || len(index.Manifests) != 1 {
+			return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary layout must contain one manifest")
+		}
+		manifestRaw, err = readBlob(ctx, layoutRoot, index.Manifests[0], 8<<20)
 	}
-	var index ociIndex
-	if err := json.Unmarshal(indexRaw, &index); err != nil || len(index.Manifests) != 1 {
-		return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle index must contain exactly one manifest")
-	}
-	manifestRaw, err := readBlob(ctx, layoutRoot, index.Manifests[0], 8<<20)
 	if err != nil {
 		return BinaryBundle{}, err
 	}
@@ -305,50 +383,9 @@ func ExtractBinaryBundle(ctx context.Context, layoutRoot, name, out string) (Bin
 // root's name, kind, media type, semantic digest, byte digest, and size before the
 // destination becomes visible.
 func ExtractObject(ctx context.Context, layoutRoot, name, out string) (PublishedObject, error) {
-	inspection, err := Inspect(ctx, layoutRoot)
+	object, payload, err := ReadObject(ctx, layoutRoot, name)
 	if err != nil {
 		return PublishedObject{}, err
-	}
-	var object PublishedObject
-	for _, candidate := range inspection.Root.Objects {
-		if candidate.Name == name {
-			if object.Name != "" {
-				return PublishedObject{}, e.New(e.CodeVerifyFailed, "publication root repeats object name %q", name)
-			}
-			object = candidate
-		}
-	}
-	if object.Name == "" {
-		return PublishedObject{}, e.New(e.CodeUnverifiedRef, "publication root has no object named %q", name)
-	}
-	manifestRaw, err := readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIManifest,
-		Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
-	if err != nil {
-		return PublishedObject{}, err
-	}
-	var manifest ociManifest
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || manifest.ArtifactType != object.ArtifactType || len(manifest.Layers) != 1 {
-		return PublishedObject{}, e.New(e.CodeVerifyFailed, "publication object %q is not a single-payload delivery object", name)
-	}
-	configRaw, err := readBlob(ctx, layoutRoot, manifest.Config, 8<<20)
-	if err != nil {
-		return PublishedObject{}, err
-	}
-	var config objectConfig
-	if err := canonical.UnmarshalExact(configRaw, &config); err != nil {
-		return PublishedObject{}, e.Wrap(e.CodeVerifyFailed, err, "decoding delivery object config")
-	}
-	if config.SchemaVersion != ObjectConfigSchema || config.Name != object.Name || config.Kind != object.Kind ||
-		config.ArtifactType != object.ArtifactType || config.SemanticDigest != object.SemanticDigest ||
-		config.BlobDigest != manifest.Layers[0].Digest || config.Size != manifest.Layers[0].Size {
-		return PublishedObject{}, e.New(e.CodeVerifyFailed, "publication object %q config does not match its root binding", name)
-	}
-	payload, err := readBlob(ctx, layoutRoot, manifest.Layers[0], maxDeliveryFileBytes)
-	if err != nil {
-		return PublishedObject{}, err
-	}
-	if digestBytes(payload) != config.BlobDigest || int64(len(payload)) != config.Size {
-		return PublishedObject{}, e.New(e.CodeVerifyFailed, "publication object %q payload changed after verification", name)
 	}
 	if err := writeExtractedObject(ctx, out, payload); err != nil {
 		return PublishedObject{}, err

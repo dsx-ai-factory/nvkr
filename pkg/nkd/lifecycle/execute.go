@@ -179,7 +179,6 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 		if err := record.Validate(); err != nil {
 			return err
 		}
-		_, found := outputs[route.Name]
 		target := plan.ExecutionSettings.Targets[route.Target]
 		routed, routedFound := artifacts[route.Input]
 		if !routedFound || routed.Kind != factory.PackageOCI {
@@ -193,8 +192,21 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 		if inspectErr != nil {
 			return inspectErr
 		}
-		if !found || record.Digest != envelope.RootDigest || record.Ref != targetRepository(target.Ref)+"@"+envelope.RootDigest {
+		if record.Digest != envelope.RootDigest || record.Ref != targetRepository(target.Ref)+"@"+envelope.RootDigest {
 			return e.New(e.CodeVerifyFailed, "publication verification for %q does not bind the exact routed output", route.Name)
+		}
+		bound, _, _, err := artifactsFromBinding(ctx, routedPath, envelope)
+		if err != nil {
+			return err
+		}
+		if len(bound) != len(outputs) {
+			return e.New(e.CodeVerifyFailed, "publication does not cover every observed output")
+		}
+		for _, member := range bound {
+			observed, ok := outputs[member.Name]
+			if !ok || observed.Kind != member.Kind || observed.Digest != member.Digest || observed.RecipeDigest != member.RecipeDigest || !equalStrings(observed.Components, member.Components) {
+				return e.New(e.CodeVerifyFailed, "publication substitutes observed output %q", member.Name)
+			}
 		}
 		identity, regexErr := regexp.Compile(plan.ExecutionSettings.Signing.Identity)
 		if regexErr != nil {
@@ -368,7 +380,11 @@ func observeOutput(ctx context.Context, workspace string, slot requiredOutput, a
 				return Artifact{}, err
 			}
 		}
-		digest, semantic = result.RootDigest, result.SemanticDigest
+		descriptor, err := delivery.PayloadDescriptor(ctx, memberPath)
+		if err != nil {
+			return Artifact{}, err
+		}
+		digest, semantic = descriptor.Digest, result.SemanticDigest
 	case factory.PackageAPT:
 		repository, err := delivery.InspectAPTRepository(ctx, memberPath)
 		if err != nil {
@@ -437,7 +453,7 @@ func observeOutput(ctx context.Context, workspace string, slot requiredOutput, a
 		for _, object := range inspection.Root.Objects {
 			if object.Name == member.Name && object.Kind == member.Kind {
 				matches++
-				exact := object.BlobDigest == digest
+				exact := object.DescriptorDigest == digest
 				if member.Kind == factory.PackageAPT {
 					exact = object.SemanticDigest == semantic
 				}
