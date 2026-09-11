@@ -18,10 +18,19 @@
 # The LAST matching pattern wins, so the default is declared first and the
 # trust roots override it below.
 #
-# The principle: anything that determines WHAT GETS BUILT, WHAT IS TRUSTED, or
-# WHAT RUNS IN CI requires maintainer review. Ordinary implementation does not.
+# Every path currently resolves to @NVIDIA/nke-write. The path list below is
+# retained deliberately: it records which files are trust roots — anything that
+# determines WHAT GETS BUILT, WHAT IS TRUSTED, or WHAT RUNS IN CI — so that
+# tightening them later is a change of owner on known lines rather than a fresh
+# analysis.
 #
-# Roles are defined in GOVERNANCE.md. Both teams must hold write access to this
+# Why not @NVIDIA/nke-maintainer today: that team is org-wide (18 people, only
+# two of whom work on this repository), so routing trust roots there requests
+# review from people with no context while excluding contributors who have it.
+# An NKE-Recipes-scoped team does not exist at the org level. Revisit when one
+# does.
+#
+# Roles are defined in GOVERNANCE.md. The team must hold write access to this
 # repository or GitHub silently ignores the entry.
 
 # ---------------------------------------------------------------------------
@@ -31,47 +40,48 @@
 *                                       @NVIDIA/nke-write
 
 # ---------------------------------------------------------------------------
-# Trust roots — maintainer review required
+# Trust roots — same owner as the default today; tighten here when a
+# repository-scoped team exists
 # ---------------------------------------------------------------------------
 
 # The lock contract (ADR-22). A lock entry is the exact content identity of
 # something that will be built and published; changing one changes what ships.
-/definitions/**/catalog/pins.lock.yaml  @NVIDIA/nke-maintainer
+/definitions/**/catalog/pins.lock.yaml  @NVIDIA/nke-write
 
 # The registry: which components exist and their constraints. Paired with the
 # lock above under ADR-22's registry/lockfile split.
-/definitions/**/catalog/registry.yaml   @NVIDIA/nke-maintainer
+/definitions/**/catalog/registry.yaml   @NVIDIA/nke-write
 
 # Definition and Environment are Tier-1 inputs bound into `recipeDigest`
 # (ADR-11, ADR-12). A change here changes recipe identity.
-/definitions/**/definition.yaml         @NVIDIA/nke-maintainer
-/definitions/**/environment-*.yaml      @NVIDIA/nke-maintainer
+/definitions/**/definition.yaml         @NVIDIA/nke-write
+/definitions/**/environment-*.yaml      @NVIDIA/nke-write
 
 # Toolchain pins. A toolchain digest is a build-semantic input (ADR-10 §5) and
 # contaminates every artifact built with it.
-/toolchains/**/*.lock.json              @NVIDIA/nke-maintainer
+/toolchains/**/*.lock.json              @NVIDIA/nke-write
 
 # The design record. ADRs govern design and are what a change is reviewed
 # against; amending one is amending the contract.
-/docs/adr/                              @NVIDIA/nke-maintainer
+/docs/adr/                              @NVIDIA/nke-write
 
 # CI, workflows, and repository automation. This is the code that decides what
 # "passing" means, plus the generated Run pipeline and its plan.
-/.github/                               @NVIDIA/nke-maintainer
+/.github/                               @NVIDIA/nke-write
 
 # The CI contract: `make check` is what CI runs, so a Makefile change changes
 # the gate.
-/Makefile                               @NVIDIA/nke-maintainer
+/Makefile                               @NVIDIA/nke-write
 
 # Dependency surface. CONTRIBUTING names Apache-cleanliness a load-bearing
 # invariant, and it is enforced here by review until a license gate exists.
-/go.mod                                 @NVIDIA/nke-maintainer
-/go.sum                                 @NVIDIA/nke-maintainer
+/go.mod                                 @NVIDIA/nke-write
+/go.sum                                 @NVIDIA/nke-write
 
 # Licensing, security policy, governance, and this file.
-/LICENSE                                @NVIDIA/nke-maintainer
-/SECURITY.md                            @NVIDIA/nke-maintainer
-/GOVERNANCE.md                          @NVIDIA/nke-maintainer
-/MAINTAINERS.md                         @NVIDIA/nke-maintainer
-/CODE_OF_CONDUCT.md                     @NVIDIA/nke-maintainer
-/.github/CODEOWNERS                     @NVIDIA/nke-maintainer
+/LICENSE                                @NVIDIA/nke-write
+/SECURITY.md                            @NVIDIA/nke-write
+/GOVERNANCE.md                          @NVIDIA/nke-write
+/MAINTAINERS.md                         @NVIDIA/nke-write
+/CODE_OF_CONDUCT.md                     @NVIDIA/nke-write
+/.github/CODEOWNERS                     @NVIDIA/nke-write
