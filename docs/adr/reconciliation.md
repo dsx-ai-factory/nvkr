@@ -16,7 +16,7 @@ implementation. Contract tests, recorded external runs, and organizational accep
 | 09 Provenance | Deterministic reproduction and distinct SLSA production predicates; exact plan/dependency/subject checks during hosted finalization | Real signed hosted provenance and independent consumption exercised; ongoing provider/service acceptance remains operational |
 | 10 Builders | OCI source execution, digest-pinned acquisition and rootless BuildKit wrapped OCI exports; complete upstream CWE Dockerfile builds and offline payload checks passed locally and from the generated hosted Run | Qualified Nix closure observation, other wrapped adapters, fused large-output credential phases and `embeds` remain |
 | 11–12 Resolution/AICR | Layered conflict checks, category selection, role/cluster separation, exact AICR activation/generator identity; Linux held generator/render-tree contract | No cross-process qualified render-to-vector publisher; loader/library closure and real downstream activation remain |
-| 13 Evidence | Per-observed-artifact CycloneDX SBOM and per-recipe index; pinned offline Syft dependency discovery for binaries/images and Helm/AICR chart metadata discovery; exact payload/scanner inputs and shared packaging/finalization checks; one release index referencing required stage-bound CycloneDX attestation bundles beside their outputs and signed sibling output repository/digest bindings; internal indexes are not published; [all three real NKE artifacts inspected offline](../dependency-sboms.md); typed evidence and mirror-invariant qualified publisher evidence | NVIDIA Run 34540582090 independently verified signatures and provenance, but its SBOMs were outside the signed root. The single-entry layout, SBOM attestation bundles, and independent deliverable signing are locally contract-tested; a new hosted Run remains required. Qualified signed evidence-receipt publication, vulnerability scanner execution and advisory generation remain outside v1; acquired upstream signatures/provenance are not verified |
+| 13 Evidence | Per-observed-artifact CycloneDX SBOM and per-recipe index; pinned offline Syft dependency discovery for binaries/images and Helm/AICR chart metadata discovery; exact payload/scanner inputs and shared packaging/finalization checks; one release index referencing required stage-bound CycloneDX attestation bundles beside their outputs and signed sibling output repository/digest bindings; internal indexes are not published; [all three real NKE artifacts inspected offline](../dependency-sboms.md); typed evidence and mirror-invariant qualified publisher evidence | NVIDIA Run 34540582090 independently verified signatures and provenance, but its SBOMs were outside the signed root. Run 34631274098 published and signed the new layout but failed verification when cosign selected an SBOM bundle instead of legacy SLSA provenance. Cosign 3.1.3 with consistently published Sigstore bundles has pinned-binary local interoperability coverage; a successful new hosted Run remains required. Qualified signed evidence-receipt publication, vulnerability scanner execution and advisory generation remain outside v1; acquired upstream signatures/provenance are not verified |
 | 14 Delivery | Typed executable/APT/Helm layouts, including observed source Helm archives with exact producer checks and explicit image-package dependencies; resource-bounded RAW/ISO measurement; Linux held-qemu existing-envelope verification | Source quickstart archive, produced-image binding, checksums and all three local chart renders exercised from independently verified hosted publications. Disk/rootfs production, boot, encryption, unsigned-vector staging and qualified packaging fail admission; no masked-region support |
 | 15 Air gap | Outside current scope; former package, CLI and tests removed | No mirror or zero-egress lifecycle implementation |
 | 16 Release gates | Exact policy, reproduced-member, evidence/waiver, compatibility, conformance, trusted status and clearance contracts | No qualified production publication round trip; variant fallback is removed; incremental reuse remains diagnostic. V1 M3 qualification/M4 manifests are unimplemented |
@@ -56,6 +56,7 @@ The current content/demo cleanup has its own checks recorded under repository va
 
 | Record | What actually ran | Limit |
 |---|---|---|
+| [Cosign discovery failure, 2026-09-11](../evidence/2026-09-11-cosign-discovery-fix.md) | Run 34631274098 created SBOM bundles, published and signed the single-entry layout, then failed provenance verification; cosign 2.6.3 reproduced the exact error locally; cosign 3.1.3 passed standard bundle verification | Local-key interoperability and repository contracts; updated hosted keyless verification/finalization and independent GHCR acceptance remain unexercised |
 | [Separated repositories, 2026-09-10](../publication-architecture.md#local-validation) | Actual NVIDIA deliverables published once into distinct loopback repositories, metadata/evidence root published last, full cross-repository pull and exact artifact reference projection; absent copies in the release repository confirmed | Local and unsigned; GHCR permissions and hosted signing/finalization for the new locations remain unexercised |
 | [Combined NKE hosted Run, 2026-09-10](../evidence/2026-09-10-combined-run.md) | All 20 jobs passed: CLI/CWE/Helm builds, observed artifacts, image-bound charts, GHCR publication, real signing, verification and complete Run; all three independent consumers and downloaded payload checks passed | Pipeline-attested artifact-publication scope; no qualified reproduction or cluster/service deployment |
 | [Signed GitHub Run, 2026-09-10](../evidence/2026-09-10-github-signed-run.md) | All nine hosted jobs passed, real cosign signature/provenance verification, complete pipeline-attested Run and passing repository CI; 4m12s versus the 5m17s dry-run baseline | Independent cosign-only and public Release consumption passed after local GHCR login update; no qualified reproduction or full Release-scope acceptance |
@@ -82,6 +83,13 @@ image route remains unavailable until its receipt protocol exists.
 
 ## Repository validation
 
+The cosign 3.1.3 migration passed the full native gate, uncached unit tests, Linux sign/pipeline race tests,
+Actionlint and byte-exact generation. The official pinned binary passed local-key signature/SLSA/SBOM bundle
+interoperability, missing-evidence and wrong-subject negatives, and absence of legacy attachment tags.
+Identity extraction, output bounds and fail-closed cleanup have always-run contracts. Default yamllint has
+the same 187 formatting diagnostics as the baseline. The [migration evidence](../evidence/2026-09-11-cosign-discovery-fix.md)
+records the new pin and limits; hosted keyless verification/finalization with this pin remains unexercised.
+
 The current SBOM-attestation change passed the full native `make check` gate and uncached `go test ./... -count=1`,
 with 70.0% race-test coverage, actionlint and byte-exact workflow regeneration. Linux sign/SBOM race tests passed
 with networking disabled. An offline synthetic cosign 2.6.3 experiment used executable digest
@@ -90,7 +98,8 @@ standard bundle, recover its exact canonical document and verify an ephemeral lo
 explicitly omitted transparency logging; production keeps transparency and identity checks enabled. Native
 registry tests demonstrate attestation referrer discovery and absent copies in the release repository. Default
 yamllint formatting findings remain separate from the passing release gate. No hosted attestation-only release
-has been published or independently accepted yet.
+has been independently accepted yet. Run 34631274098 published and signed that layout but failed verification;
+the [discovery fix](../evidence/2026-09-11-cosign-discovery-fix.md) records its cause and local validation.
 
 On 2026-09-08 the consolidation/demo cleanup passed native `go test ./... -count=1`,
 `go test -race ./... -count=1`, `go vet ./...`, formatting, golangci-lint 2.13.1 built with Go 1.27,

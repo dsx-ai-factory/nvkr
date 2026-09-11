@@ -27,8 +27,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -231,32 +233,11 @@ func (r VerificationRecord) Canonical() ([]byte, error) {
 // ---------------------------------------------------------------------------
 
 func ociSignArgs(ref string) []string {
-	return []string{"sign", "--yes", ref}
+	return []string{"sign", "--yes", "--new-bundle-format", ref}
 }
 
 func ociAttestArgs(ref, predicatePath string) []string {
-	return []string{"attest", "--yes", "--type", CosignAttestationType, "--predicate", predicatePath, ref}
-}
-
-func ociVerifyArgs(ref string, policy VerifyPolicy) []string {
-	return []string{
-		"verify",
-		"--certificate-identity-regexp", policy.IdentityRegexp,
-		"--certificate-oidc-issuer", policy.Issuer,
-		"--output", "json",
-		ref,
-	}
-}
-
-func ociVerifyAttestationArgs(ref string, policy VerifyPolicy) []string {
-	return []string{
-		"verify-attestation",
-		"--type", CosignAttestationType,
-		"--certificate-identity-regexp", policy.IdentityRegexp,
-		"--certificate-oidc-issuer", policy.Issuer,
-		"--output", "json",
-		ref,
-	}
+	return []string{"attest", "--yes", "--new-bundle-format", "--type", CosignAttestationType, "--predicate", predicatePath, ref}
 }
 
 // argv renders a complete recorded command line: the executable followed by its
@@ -294,6 +275,9 @@ func resolvePolicy(policy VerifyPolicy, identity, issuer string) (VerifyPolicy, 
 	if policy.IdentityRegexp == "" || policy.Issuer == "" {
 		return VerifyPolicy{}, e.New(e.CodeTrustPolicyMissing,
 			"OCI verification requires both a certificate identity regexp and an OIDC issuer")
+	}
+	if _, err := regexp.Compile(policy.IdentityRegexp); err != nil {
+		return VerifyPolicy{}, e.Wrap(e.CodeTrustPolicyMissing, err, "invalid certificate identity policy")
 	}
 	return policy, nil
 }
@@ -383,9 +367,13 @@ func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy Verif
 		Issuer:        resolved.Issuer,
 		PredicateType: ProvenancePredicateType,
 		WouldRun: [][]string{
-			argv(DefaultBinary, ociVerifyArgs(subject.Ref, resolved)),
-			argv(DefaultBinary, ociVerifyAttestationArgs(subject.Ref, resolved)),
+			argv(DefaultBinary, ociDownloadBundleArgs(subject.Ref, CosignSignaturePredicateType)),
+			argv(DefaultBinary, ociVerifyBundleArgs(SignatureBundlePlaceholder, subject.Digest, CosignSignaturePredicateType, resolved)),
 		},
+	}
+	if resolved.RequireAttestation {
+		record.WouldRun = append(record.WouldRun, argv(DefaultBinary, ociDownloadBundleArgs(subject.Ref, ProvenancePredicateType)),
+			argv(DefaultBinary, ociVerifyBundleArgs(ProvenanceBundlePlaceholder, subject.Digest, ProvenancePredicateType, resolved)))
 	}
 	if err := record.Validate(); err != nil {
 		return VerificationRecord{}, err
@@ -580,9 +568,10 @@ func (s *CosignOCISigner) SignAndAttest(ctx context.Context, subject Subject, pr
 	return record, nil
 }
 
-// Verify runs `cosign verify` and, when the policy requires it,
-// `cosign verify-attestation`, then binds the parsed output back to the exact
-// subject digest.
+// Verify downloads only standard Sigstore bundles and authenticates their exact
+// bytes with cosign. Certificate claims come from the verified bundle, never
+// from presentation output or caller assertions. No artifact copy or legacy
+// attachment fallback is used.
 func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy VerifyPolicy) (VerificationRecord, error) {
 	if s == nil || s.runner == nil {
 		return VerificationRecord{}, e.New(e.CodeInternal, "cosign OCI signer is not initialized")
@@ -600,6 +589,8 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	if err != nil {
 		return VerificationRecord{}, err
 	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
 	workspace, cleanup, err := newPrivateWorkspace("nkd-cosign-oci-verify-*")
 	if err != nil {
 		return VerificationRecord{}, err
@@ -620,30 +611,20 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 		PredicateType: ProvenancePredicateType,
 	}
 
-	verifyArgs := ociVerifyArgs(subject.Ref, resolved)
-	stdout, err := s.capture(ctx, verifyArgs, environment)
+	identity, issuer, ran, err := s.verifyOCIBundles(ctx, subject, CosignSignaturePredicateType, resolved, workspace, environment)
 	if err != nil {
 		return VerificationRecord{}, err
 	}
-	record.Ran = append(record.Ran, argv(s.binary, verifyArgs))
-	identity, issuer, err := parseCosignVerifyOutput(stdout, subject.Digest)
-	if err != nil {
-		return VerificationRecord{}, err
-	}
+	record.Ran = ran
 	record.SignatureVerified = true
 	record.ObservedIdentity = identity
 	record.ObservedIssuer = issuer
-
 	if resolved.RequireAttestation {
-		attestationArgs := ociVerifyAttestationArgs(subject.Ref, resolved)
-		attestationOut, err := s.capture(ctx, attestationArgs, environment)
+		_, _, ran, err := s.verifyOCIBundles(ctx, subject, ProvenancePredicateType, resolved, workspace, environment)
 		if err != nil {
 			return VerificationRecord{}, err
 		}
-		record.Ran = append(record.Ran, argv(s.binary, attestationArgs))
-		if err := parseCosignAttestationOutput(attestationOut, subject.Digest); err != nil {
-			return VerificationRecord{}, err
-		}
+		record.Ran = append(record.Ran, ran...)
 		record.AttestationVerified = true
 	}
 	record.CosignVersion = s.detectVersion(ctx, environment)
@@ -656,7 +637,7 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 // capture runs one cosign subcommand and returns its stdout, mapping a non-zero
 // exit to the crypto-gate error code.
 func (s *CosignOCISigner) capture(ctx context.Context, args, environment []string) ([]byte, error) {
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr cosignOutputBuffer
 	if err := s.run(ctx, args, environment, &stdout, &stderr); err != nil {
 		if ctxErr := contextError(ctx); ctxErr != nil {
 			return nil, ctxErr
@@ -664,10 +645,30 @@ func (s *CosignOCISigner) capture(ctx context.Context, args, environment []strin
 		return nil, e.Wrap(e.CodeSignatureInvalid, err,
 			"cosign %s failed: %s", args[0], strings.TrimSpace(stderr.String()))
 	}
-	if int64(stdout.Len()) > maxCosignOutputBytes {
+	if stdout.exceeded || stderr.exceeded {
 		return nil, e.New(e.CodeSignatureInvalid, "cosign %s produced an oversized report", args[0])
 	}
 	return stdout.Bytes(), nil
+}
+
+// Bound memory while the subprocess is writing, including a registry-controlled
+// stream of bundles. A misbehaving injected runner cannot suppress the limit.
+type cosignOutputBuffer struct {
+	buffer   bytes.Buffer
+	exceeded bool
+}
+
+func (b *cosignOutputBuffer) Bytes() []byte  { return b.buffer.Bytes() }
+func (b *cosignOutputBuffer) String() string { return b.buffer.String() }
+
+func (b *cosignOutputBuffer) Write(p []byte) (int, error) {
+	remaining := int(maxCosignOutputBytes) - b.buffer.Len()
+	if len(p) > remaining {
+		b.exceeded = true
+		n, _ := b.buffer.Write(p[:remaining])
+		return n, io.ErrShortWrite
+	}
+	return b.buffer.Write(p)
 }
 
 // detectVersion is a best-effort introspection of the cosign build actually in
@@ -806,113 +807,12 @@ func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 // cosign JSON output
 // ---------------------------------------------------------------------------
 
-type cosignVerifyPayload struct {
-	Critical struct {
-		Image struct {
-			DockerManifestDigest string `json:"docker-manifest-digest"`
-		} `json:"image"`
-	} `json:"critical"`
-	Optional map[string]any `json:"optional"`
-}
-
-// parseCosignVerifyOutput binds cosign's report back to the exact digest that
-// was requested. cosign resolves the reference itself, so a report about any
-// other digest means the registry moved underneath the verification.
-func parseCosignVerifyOutput(raw []byte, digest string) (string, string, error) {
-	var payloads []cosignVerifyPayload
-	if err := json.Unmarshal(bytes.TrimSpace(raw), &payloads); err != nil {
-		return "", "", e.Wrap(e.CodeSignatureInvalid, err, "parsing cosign verify report")
-	}
-	if len(payloads) == 0 {
-		return "", "", e.New(e.CodeSignatureInvalid, "cosign verify reported no signatures")
-	}
-	for _, payload := range payloads {
-		if payload.Critical.Image.DockerManifestDigest != digest {
-			continue
-		}
-		identity, _ := payload.Optional["Subject"].(string)
-		issuer, _ := payload.Optional["Issuer"].(string)
-		return identity, issuer, nil
-	}
-	return "", "", e.New(e.CodeVerifyFailed,
-		"cosign verify reported no signature over the exact published digest %s", digest)
-}
-
-type cosignAttestationEnvelope struct {
-	PayloadType string `json:"payloadType"`
-	Payload     string `json:"payload"`
-}
-
 type inTotoStatement struct {
 	Type          string `json:"_type"`
 	PredicateType string `json:"predicateType"`
 	Subject       []struct {
 		Digest map[string]string `json:"digest"`
 	} `json:"subject"`
-}
-
-// parseCosignAttestationOutput requires at least one DSSE envelope whose
-// in-toto statement carries the SLSA provenance predicate type over the exact
-// published digest.
-func parseCosignAttestationOutput(raw []byte, digest string) error {
-	envelopes, err := decodeAttestationEnvelopes(raw)
-	if err != nil {
-		return err
-	}
-	if len(envelopes) == 0 {
-		return e.New(e.CodeSignatureInvalid, "cosign verify-attestation reported no attestations")
-	}
-	want := strings.TrimPrefix(digest, "sha256:")
-	for _, envelope := range envelopes {
-		payload, err := base64.StdEncoding.DecodeString(envelope.Payload)
-		if err != nil {
-			return e.Wrap(e.CodeSignatureInvalid, err, "decoding cosign attestation payload")
-		}
-		var statement inTotoStatement
-		if err := json.Unmarshal(payload, &statement); err != nil {
-			return e.Wrap(e.CodeSignatureInvalid, err, "parsing cosign attestation statement")
-		}
-		if statement.PredicateType != ProvenancePredicateType {
-			continue
-		}
-		for _, subject := range statement.Subject {
-			if subject.Digest["sha256"] == want {
-				return nil
-			}
-		}
-	}
-	return e.New(e.CodeVerifyFailed,
-		"cosign verify-attestation reported no %s attestation over the exact published digest %s",
-		ProvenancePredicateType, digest)
-}
-
-// decodeAttestationEnvelopes accepts both shapes cosign has emitted: a JSON
-// array of envelopes, and a stream of concatenated envelope objects.
-func decodeAttestationEnvelopes(raw []byte) ([]cosignAttestationEnvelope, error) {
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) == 0 {
-		return nil, e.New(e.CodeSignatureInvalid, "cosign verify-attestation produced no report")
-	}
-	if trimmed[0] == '[' {
-		var envelopes []cosignAttestationEnvelope
-		if err := json.Unmarshal(trimmed, &envelopes); err != nil {
-			return nil, e.Wrap(e.CodeSignatureInvalid, err, "parsing cosign attestation report")
-		}
-		return envelopes, nil
-	}
-	decoder := json.NewDecoder(bytes.NewReader(trimmed))
-	var envelopes []cosignAttestationEnvelope
-	for {
-		var envelope cosignAttestationEnvelope
-		err := decoder.Decode(&envelope)
-		if err == io.EOF {
-			return envelopes, nil
-		}
-		if err != nil {
-			return nil, e.Wrap(e.CodeSignatureInvalid, err, "parsing cosign attestation report")
-		}
-		envelopes = append(envelopes, envelope)
-	}
 }
 
 // ---------------------------------------------------------------------------

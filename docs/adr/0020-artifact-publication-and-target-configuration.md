@@ -159,7 +159,8 @@ construction and consumption. A protected pre-publication stage creates and veri
 assembling the final release metadata; production publication and authenticated consumption reject raw
 preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
 
-One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
+Signatures, SLSA provenance and SBOMs use the same standard Sigstore v0.3 bundle format as OCI referrers
+(ADR-04); their predicate types remain distinct. One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
 same root. Signature/attestation attachments stay outside the signed index to avoid circular identity. Each deliverable manifest also receives its own signature and subject-bound production attestation in its
 own repository for independent consumption. Signing processes deliverables before the root; hosted verification
 requires every child signature and attestation before recording success. The Release consumer still authenticates

@@ -74,7 +74,7 @@ func TestNewDryRunSignerRequiresIdentityAndIssuer(t *testing.T) {
 
 // The dry-run record is the artifact an operator reads to see exactly what a
 // real signing would have executed, so its bytes are pinned.
-const goldenDryRunSigningRecord = `{"digest":"sha256:5555555555555555555555555555555555555555555555555555555555555555","dryRun":true,"identity":"^https://github\\.com/NVIDIA/nke/\\.github/workflows/nkd-factory\\.yml@refs/heads/main$","issuer":"https://token.actions.githubusercontent.com","predicateSha256":"sha256:bcdd6c21cad365013c923099b02a83f925bc5eb3d702766d63e2e82a4b898b5a","predicateType":"https://slsa.dev/provenance/v1","ref":"127.0.0.1:5000/nke/nkectl@sha256:5555555555555555555555555555555555555555555555555555555555555555","schemaVersion":"nkd.dev/oci-signing-record/v1","wouldRun":[["cosign","sign","--yes","127.0.0.1:5000/nke/nkectl@sha256:5555555555555555555555555555555555555555555555555555555555555555"],["cosign","attest","--yes","--type","slsaprovenance1","--predicate","${NKD_PREDICATE_FILE}","127.0.0.1:5000/nke/nkectl@sha256:5555555555555555555555555555555555555555555555555555555555555555"]]}`
+const goldenDryRunSigningRecord = `{"digest":"sha256:5555555555555555555555555555555555555555555555555555555555555555","dryRun":true,"identity":"^https://github\\.com/NVIDIA/nke/\\.github/workflows/nkd-factory\\.yml@refs/heads/main$","issuer":"https://token.actions.githubusercontent.com","predicateSha256":"sha256:bcdd6c21cad365013c923099b02a83f925bc5eb3d702766d63e2e82a4b898b5a","predicateType":"https://slsa.dev/provenance/v1","ref":"127.0.0.1:5000/nke/nkectl@sha256:5555555555555555555555555555555555555555555555555555555555555555","schemaVersion":"nkd.dev/oci-signing-record/v1","wouldRun":[["cosign","sign","--yes","--new-bundle-format","127.0.0.1:5000/nke/nkectl@sha256:5555555555555555555555555555555555555555555555555555555555555555"],["cosign","attest","--yes","--new-bundle-format","--type","slsaprovenance1","--predicate","${NKD_PREDICATE_FILE}","127.0.0.1:5000/nke/nkectl@sha256:5555555555555555555555555555555555555555555555555555555555555555"]]}`
 
 func TestDryRunSignerRecordGolden(t *testing.T) {
 	signer, err := NewDryRunSigner(ociTestIdentity, ociTestIssuer)
@@ -98,40 +98,30 @@ func TestDryRunSignerRecordGolden(t *testing.T) {
 }
 
 func TestDryRunSignerVerifyRecord(t *testing.T) {
-	signer, err := NewDryRunSigner(ociTestIdentity, ociTestIssuer)
-	if err != nil {
-		t.Fatalf("NewDryRunSigner: %v", err)
-	}
-	record, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{RequireAttestation: true})
-	if err != nil {
-		t.Fatalf("Verify: %v", err)
-	}
-	if record.SignatureVerified || record.AttestationVerified {
-		t.Fatal("a dry-run verification must not claim verification")
-	}
-	if len(record.WouldRun) != 2 || len(record.Ran) != 0 {
-		t.Fatalf("wouldRun = %v ran = %v", record.WouldRun, record.Ran)
-	}
-	wantVerify := []string{
-		"cosign", "verify",
-		"--certificate-identity-regexp", ociTestIdentity,
-		"--certificate-oidc-issuer", ociTestIssuer,
-		"--output", "json", ociTestRef,
-	}
-	if strings.Join(record.WouldRun[0], "\x00") != strings.Join(wantVerify, "\x00") {
-		t.Fatalf("verify argv = %v, want %v", record.WouldRun[0], wantVerify)
-	}
-	wantAttestation := []string{
-		"cosign", "verify-attestation", "--type", "slsaprovenance1",
-		"--certificate-identity-regexp", ociTestIdentity,
-		"--certificate-oidc-issuer", ociTestIssuer,
-		"--output", "json", ociTestRef,
-	}
-	if strings.Join(record.WouldRun[1], "\x00") != strings.Join(wantAttestation, "\x00") {
-		t.Fatalf("verify-attestation argv = %v, want %v", record.WouldRun[1], wantAttestation)
-	}
-	if _, err := record.Canonical(); err != nil {
-		t.Fatalf("Canonical: %v", err)
+	for _, required := range []bool{false, true} {
+		t.Run(fmt.Sprint(required), func(t *testing.T) {
+			signer, err := NewDryRunSigner(ociTestIdentity, ociTestIssuer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := signer.Verify(t.Context(), ociSubject(), VerifyPolicy{RequireAttestation: required})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 2
+			if required {
+				want = 4
+			}
+			if len(record.WouldRun) != want || len(record.Ran) != 0 || record.SignatureVerified || record.AttestationVerified {
+				t.Fatalf("record: %+v", record)
+			}
+			if record.WouldRun[0][1] != "download" || record.WouldRun[1][1] != "verify-blob-attestation" {
+				t.Fatalf("commands: %v", record.WouldRun)
+			}
+			if err := record.Validate(); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -221,22 +211,7 @@ func (c *cosignStub) call(t *testing.T, subcommand string) recordedCall {
 	return recordedCall{}
 }
 
-const cosignVersionJSON = `{"gitVersion":"v2.4.1","goVersion":"go1.23.0"}`
-
-func cosignVerifyJSON(digest string) string {
-	payload := []map[string]any{{
-		"critical": map[string]any{"image": map[string]any{"docker-manifest-digest": digest}},
-		"optional": map[string]any{
-			"Subject": "https://github.com/NVIDIA/nke/.github/workflows/nkd-factory.yml@refs/heads/main",
-			"Issuer":  ociTestIssuer,
-		},
-	}}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		panic(err)
-	}
-	return string(raw)
-}
+const cosignVersionJSON = `{"gitVersion":"v3.1.3","goVersion":"go1.23.0"}`
 
 func cosignAttestationJSON(digest, predicateType string) string {
 	statement, err := json.Marshal(map[string]any{
@@ -298,13 +273,13 @@ func TestCosignOCISignAndAttestArgvContract(t *testing.T) {
 	}
 
 	sign := stub.call(t, "sign")
-	if strings.Join(sign.args, " ") != "sign --yes "+ociTestRef {
+	if strings.Join(sign.args, " ") != "sign --yes --new-bundle-format "+ociTestRef {
 		t.Fatalf("sign argv = %v", sign.args)
 	}
 	attest := stub.call(t, "attest")
-	if attest.args[0] != "attest" || attest.args[1] != "--yes" || attest.args[2] != "--type" ||
-		attest.args[3] != "slsaprovenance1" || attest.args[4] != "--predicate" ||
-		attest.args[len(attest.args)-1] != ociTestRef || len(attest.args) != 7 {
+	if attest.args[0] != "attest" || attest.args[1] != "--yes" || attest.args[2] != "--new-bundle-format" ||
+		attest.args[3] != "--type" || attest.args[4] != "slsaprovenance1" || attest.args[5] != "--predicate" ||
+		attest.args[len(attest.args)-1] != ociTestRef || len(attest.args) != 8 {
 		t.Fatalf("attest argv = %v", attest.args)
 	}
 	if string(observedPredicate) != ociTestPredicate {
@@ -313,7 +288,7 @@ func TestCosignOCISignAndAttestArgvContract(t *testing.T) {
 	if observedMode != 0o600 {
 		t.Fatalf("predicate file mode = %v, want 0600", observedMode)
 	}
-	if _, err := os.Stat(attest.args[5]); !os.IsNotExist(err) {
+	if _, err := os.Stat(attest.args[6]); !os.IsNotExist(err) {
 		t.Fatalf("the private predicate file outlived the operation: %v", err)
 	}
 
@@ -323,7 +298,7 @@ func TestCosignOCISignAndAttestArgvContract(t *testing.T) {
 	if record.Ran[0][0] != DefaultBinary || record.Ran[1][0] != DefaultBinary {
 		t.Fatalf("recorded argv must start with the executable: %v", record.Ran)
 	}
-	if record.CosignVersion != "v2.4.1" {
+	if record.CosignVersion != "v3.1.3" {
 		t.Fatalf("cosign version = %q", record.CosignVersion)
 	}
 	if record.PredicateSHA256 != digestBytes([]byte(ociTestPredicate)) {
@@ -341,123 +316,11 @@ func TestCosignOCISignAndAttestMapsFailureToCodedError(t *testing.T) {
 	requireSignCode(t, err, nkderr.CodeSignatureInvalid)
 }
 
-func TestCosignOCIVerifyArgvAndJSONParsing(t *testing.T) {
-	stub := &cosignStub{stdout: map[string]string{
-		"version":            cosignVersionJSON,
-		"verify":             cosignVerifyJSON(ociTestDigest),
-		"verify-attestation": cosignAttestationJSON(ociTestDigest, ProvenancePredicateType),
-	}}
-	signer := newStubbedSigner(t, stub, Credential{})
-	record, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{RequireAttestation: true})
-	if err != nil {
-		t.Fatalf("Verify: %v", err)
-	}
-	verify := stub.call(t, "verify")
-	want := []string{
-		"verify",
-		"--certificate-identity-regexp", ociTestIdentity,
-		"--certificate-oidc-issuer", ociTestIssuer,
-		"--output", "json", ociTestRef,
-	}
-	if strings.Join(verify.args, "\x00") != strings.Join(want, "\x00") {
-		t.Fatalf("verify argv = %v, want %v", verify.args, want)
-	}
-	attestation := stub.call(t, "verify-attestation")
-	wantAttestation := []string{
-		"verify-attestation", "--type", "slsaprovenance1",
-		"--certificate-identity-regexp", ociTestIdentity,
-		"--certificate-oidc-issuer", ociTestIssuer,
-		"--output", "json", ociTestRef,
-	}
-	if strings.Join(attestation.args, "\x00") != strings.Join(wantAttestation, "\x00") {
-		t.Fatalf("verify-attestation argv = %v, want %v", attestation.args, wantAttestation)
-	}
-	if !record.SignatureVerified || !record.AttestationVerified || record.DryRun {
-		t.Fatalf("record = %+v", record)
-	}
-	if record.ObservedIssuer != ociTestIssuer ||
-		record.ObservedIdentity != "https://github.com/NVIDIA/nke/.github/workflows/nkd-factory.yml@refs/heads/main" {
-		t.Fatalf("observed identity/issuer = %q %q", record.ObservedIdentity, record.ObservedIssuer)
-	}
-	if record.CosignVersion != "v2.4.1" || len(record.Ran) != 2 {
-		t.Fatalf("record = %+v", record)
-	}
-	if _, err := record.Canonical(); err != nil {
-		t.Fatalf("Canonical: %v", err)
-	}
-}
-
-func TestCosignOCIVerifySkipsAttestationUnlessRequired(t *testing.T) {
-	stub := &cosignStub{stdout: map[string]string{
-		"version": cosignVersionJSON,
-		"verify":  cosignVerifyJSON(ociTestDigest),
-	}}
-	signer := newStubbedSigner(t, stub, Credential{})
-	record, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{})
-	if err != nil {
-		t.Fatalf("Verify: %v", err)
-	}
-	if record.AttestationVerified {
-		t.Fatal("attestation must not be reported as verified when it was not checked")
-	}
-	for _, call := range stub.calls {
-		if call.args[0] == "verify-attestation" {
-			t.Fatal("verify-attestation ran without RequireAttestation")
-		}
-	}
-}
-
-func TestCosignOCIVerifyRefusesAReportAboutAnotherDigest(t *testing.T) {
-	other := "sha256:" + strings.Repeat("8", 64)
-	stub := &cosignStub{stdout: map[string]string{
-		"version": cosignVersionJSON,
-		"verify":  cosignVerifyJSON(other),
-	}}
-	signer := newStubbedSigner(t, stub, Credential{})
-	_, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{})
-	requireSignCode(t, err, nkderr.CodeVerifyFailed)
-}
-
-func TestCosignOCIVerifyRefusesAnUnexpectedPredicateType(t *testing.T) {
-	stub := &cosignStub{stdout: map[string]string{
-		"version":            cosignVersionJSON,
-		"verify":             cosignVerifyJSON(ociTestDigest),
-		"verify-attestation": cosignAttestationJSON(ociTestDigest, "https://slsa.dev/provenance/v0.2"),
-	}}
-	signer := newStubbedSigner(t, stub, Credential{})
-	_, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{RequireAttestation: true})
-	requireSignCode(t, err, nkderr.CodeVerifyFailed)
-}
-
-func TestCosignOCIVerifyRefusesUnparsableOutput(t *testing.T) {
-	stub := &cosignStub{stdout: map[string]string{
-		"version": cosignVersionJSON,
-		"verify":  "not json",
-	}}
-	signer := newStubbedSigner(t, stub, Credential{})
-	_, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{})
-	requireSignCode(t, err, nkderr.CodeSignatureInvalid)
-}
-
-func TestCosignOCIAttestationReportAcceptsBothCosignShapes(t *testing.T) {
-	single := cosignAttestationJSON(ociTestDigest, ProvenancePredicateType)
-	if err := parseCosignAttestationOutput([]byte(single), ociTestDigest); err != nil {
-		t.Fatalf("single envelope rejected: %v", err)
-	}
-	if err := parseCosignAttestationOutput([]byte(single+"\n"+single), ociTestDigest); err != nil {
-		t.Fatalf("envelope stream rejected: %v", err)
-	}
-	if err := parseCosignAttestationOutput([]byte("["+single+"]"), ociTestDigest); err != nil {
-		t.Fatalf("envelope array rejected: %v", err)
-	}
-	requireSignCode(t, parseCosignAttestationOutput(nil, ociTestDigest), nkderr.CodeSignatureInvalid)
-}
-
 // Credentials must reach cosign only through a private Docker config file.
 func TestCosignOCICredentialsNeverReachArgv(t *testing.T) {
 	stub := &cosignStub{stdout: map[string]string{
-		"version": cosignVersionJSON,
-		"verify":  cosignVerifyJSON(ociTestDigest),
+		"version":  cosignVersionJSON,
+		"download": testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer),
 	}}
 	credential := Credential{Registry: "ghcr.io", Username: "publisher-bot", Password: "s3cr3t-token"}
 	var configPath string
@@ -526,8 +389,8 @@ func TestCosignOCICredentialsNeverReachArgv(t *testing.T) {
 
 func TestCosignOCINoCredentialLeavesDockerConfigUnset(t *testing.T) {
 	stub := &cosignStub{stdout: map[string]string{
-		"version": cosignVersionJSON,
-		"verify":  cosignVerifyJSON(ociTestDigest),
+		"version":  cosignVersionJSON,
+		"download": testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer),
 	}}
 	signer := newStubbedSigner(t, stub, Credential{})
 	if _, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{}); err != nil {

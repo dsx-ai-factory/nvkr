@@ -534,7 +534,10 @@ inventories are separate claims; Run completion is not signed. See the [registry
 
 Independent artifact consumption uses a signature and subject-bound production attestation on each deliverable
 manifest in its own repository. The release signature remains the authority for membership and SBOM coverage;
-standalone artifact verification does not establish those release-wide claims (ADR-04/20). Hosted acceptance
+standalone artifact verification does not establish those release-wide claims (ADR-04/20). The pinned cosign 3.1.3
+adapter publishes signatures, production provenance and SBOMs as standard Sigstore bundles. It downloads only
+required bundles, verifies their exact bytes and predicate/subject bindings, and reads identity from the verified
+embedded certificate. Legacy attachment reports and artifact-copy verification are not supported. Hosted acceptance
 of the new signing layout remains pending.
 
 | Change to the example | Identity effect |
