@@ -666,6 +666,9 @@ ADR-18 §8's event policy is the admission contract for production rendering:
 | Default-branch push / manual dispatch on default ref | Publish, sign, attest and verify in a protected environment | Phase-scoped registry and OIDC access |
 | Git tag | No v1 signing trigger | No signing authorization from the tag |
 
+The current generated Run workflow is manual-only, with execution restricted to the default branch.
+Repository Merge Gate performs PR regeneration checks when generator inputs or outputs change.
+
 A renderer unable to express the required guards must reject the affected lane. This table states the contract;
 it is not proof that an unexercised workflow or the proposed fused job already enforces it in production.
 

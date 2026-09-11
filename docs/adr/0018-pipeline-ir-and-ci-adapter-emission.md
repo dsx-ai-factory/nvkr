@@ -185,15 +185,17 @@ output; omitting unsupported signing jobs silently is forbidden. Tekton/Argo fac
 | Default-branch push or manual dispatch on that ref | Publish/sign/attest/verify inside a protected environment; phase-scoped registry and OIDC credentials |
 | Git tag | No signing trigger |
 
-The current generated Run workflow admits a narrower subset: all pull requests perform only bootstrap and
-regeneration checks, and execution requires manual dispatch on the default branch. Default-branch push
+The current generated Run workflow is manual-only, and execution requires dispatch on the default branch.
+Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
+or outputs change. Default-branch push
 publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
 `nkd-release` GitHub deployment environment; operators must configure its deployment policy to admit only
 the default branch. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
 The SBOM job receives no registry credentials or package permissions. The verifier needs registry read
 access and obtains no identity token. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
-finalization still run after failures within an admitted execution; they do not run for static-only PR checks.
+finalization still run after failures within an admitted execution. The generated Run workflow does not
+start on pull requests.
 
 Identity is one committed workflow path and default ref; verification rejects PR refs. Protect workflow,
 generator, helper and signing code with branch protection and code ownership. Hosted source access uses a mirror

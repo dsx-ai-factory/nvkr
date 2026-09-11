@@ -76,7 +76,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	fmt.Fprintf(&body, "# planDigest: %s\n", planDigest)
 	fmt.Fprintf(&body, "# qualification: %s (runtime receipts are not fabricated)\n", plan.Qualification)
 	fmt.Fprintf(&body, "name: nkd-run-%s\n", plan.Name)
-	fmt.Fprintf(&body, "'on':\n  workflow_dispatch: {}\n  pull_request: {}\n")
+	fmt.Fprintf(&body, "'on':\n  workflow_dispatch: {}\n")
 	fmt.Fprintf(&body, "permissions:\n  contents: read\n\n")
 	fmt.Fprint(&body, "concurrency:\n  group: nkd-run-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: false\n")
 	fmt.Fprintf(&body, "jobs:\n")

@@ -99,7 +99,8 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 		{name: "setup-go-version", old: []byte("go-version-file: '.go-version'"), new: []byte("go-version-file: 'go.mod'")},
 		{name: "output", old: []byte("if-no-files-found: error"), new: []byte("if-no-files-found: ignore")},
 		{name: "checkout-credential", old: []byte("persist-credentials: 'false'"), new: []byte("persist-credentials: 'true'")},
-		{name: "pull-request-drift", old: []byte("pull_request: {}"), new: []byte("pull_request:\n    paths: ['README.md']")},
+		{name: "pull-request-trigger", code: e.CodeEngineCapability, old: []byte("workflow_dispatch: {}"), new: []byte("workflow_dispatch: {}\n  pull_request: {}")},
+		{name: "push-trigger", code: e.CodeEngineCapability, old: []byte("workflow_dispatch: {}"), new: []byte("workflow_dispatch: {}\n  push: {}")},
 		{name: "regeneration-gate", old: []byte("--root . --check"), new: []byte("--root . --dry-run")},
 	}
 	for _, test := range tests {

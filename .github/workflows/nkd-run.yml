@@ -4,7 +4,6 @@
 name: nkd-run-nke-v1
 'on':
   workflow_dispatch: {}
-  pull_request: {}
 permissions:
   contents: read
 

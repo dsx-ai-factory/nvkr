@@ -150,7 +150,12 @@ jobs:
               - '.github/workflows/nkd-run.yml'
               - '.github/nkd-run/**'
               - 'cmd/**'
-              - 'pkg/nkd/pipeline/**'
+              - 'client/**'
+              - 'internal/**'
+              - 'pkg/**'
+              - 'go.mod'
+              - 'go.sum'
+              - '.go-version'
               - 'toolchains/**'
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
@@ -280,9 +285,8 @@ jobs:
   # relies on this to make a lock change unmergeable without the matching
   # regeneration, so "forgot to regenerate" cannot merge.
   #
-  # This check already ran on every PR inside the generated nkd-run workflow.
-  # It is restated here because `gate` is the only required status check, and a
-  # check outside the aggregate is advisory.
+  # PR drift checks live here; the generated nkd-run workflow is manual-only.
+  # Including this job in `gate` makes generation drift a required merge check.
   #
   # Per ADR-21 §2 this job lives OUTSIDE the emitted pipeline and does not
   # self-check recursively.

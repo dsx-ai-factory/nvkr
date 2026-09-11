@@ -74,11 +74,8 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if _, ok := document.On["workflow_dispatch"]; !ok {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits workflow_dispatch")
 	}
-	if len(document.On) != 2 || document.Concurrency.Group != "nkd-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress {
-		return e.New(e.CodeEngineCapability, "GitHub Run requires explicit dispatch/PR triggers and non-canceling workflow concurrency")
-	}
-	if pullRequest, ok := document.On["pull_request"]; !ok || strings.TrimSpace(string(pullRequest)) != "{}" {
-		return e.New(e.CodeInvalidCatalog, "GitHub workflow must statically check every pull request for generation drift")
+	if len(document.On) != 1 || document.Concurrency.Group != "nkd-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress {
+		return e.New(e.CodeEngineCapability, "GitHub Run requires manual dispatch only and non-canceling workflow concurrency")
 	}
 	if !strings.Contains(string(workflow), "# qualification: "+plan.Qualification.String()) ||
 		!strings.Contains(string(workflow), "# planDigest: "+bundle.PlanDigest) {
