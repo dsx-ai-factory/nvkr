@@ -59,8 +59,15 @@ on:
       - main
   workflow_dispatch: {}
 
+# `pull-requests: read` is required by dorny/paths-filter: on a pull_request
+# event it lists changed files via GET /repos/{owner}/{repo}/pulls/{n}/files.
+# On a public repository that endpoint is readable without the scope, so a
+# workflow copied from one will fail here with "Resource not accessible by
+# integration" while working fine there. Granting it explicitly keeps this
+# correct whether or not the repository is public.
 permissions:
   contents: read
+  pull-requests: read
 
 # Push runs key on the SHA, not the ref, and never cancel. Superseding a PR's
 # older run is the point of cancel-in-progress; superseding a merged commit's
