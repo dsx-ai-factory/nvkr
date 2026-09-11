@@ -1,0 +1,252 @@
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Aggregate merge gate — the ONLY required status check in the main branch
+# ruleset. Every PR-gating check is either run or explicitly skipped here, and
+# the final "gate" job aggregates all results into a single pass/fail.
+#
+# WHY AN AGGREGATE GATE
+#   A required status check must be named in the branch ruleset. If each check
+#   is required individually, every new check needs a ruleset edit by someone
+#   with admin access, and a check that is skipped on a given PR reports
+#   "expected" forever and blocks the merge. Aggregating solves both: "gate" is
+#   the single required name, and skipped checks are represented by a companion
+#   job that always runs.
+#
+# TO ADD A NEW GATING CHECK
+#   1. Add a real job + companion -skip job with inverse `if:` conditions.
+#   2. Add both job names to the gate job's `needs:` list.
+#   3. Add a make target for it, so `make check` stays equal to CI
+#      (CONTRIBUTING.md, "Local development equals CI").
+#   No ruleset change is needed — "gate" is the only required check.
+#
+# A GATE MUST WATCH ITS OWN INPUTS
+#   Each path filter below watches not only the files a check examines but also
+#   the files that *define* the check — the Makefile recipe, the pinned tool
+#   version, and this workflow. Otherwise a change to a gate can skip the gate
+#   it changes.
+#
+# PLANNED CHECKS (not yet implemented; see the ordering note in each stub)
+#   actionlint · verify-licenses · workflows-regen · analyze (CodeQL) ·
+#   malware-scan (ClamAV)
+
+name: Merge Gate
+
+# The push trigger matters even though PRs are gated: a ruleset can be
+# bypassed, and a bypassed merge reports its required checks as "expected"
+# rather than running them. Without the push trigger those checks would not run
+# after the commit landed either.
+#
+# Push runs force every check-paths output true, because a merged commit has no
+# base to diff against.
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Push runs key on the SHA, not the ref, and never cancel. Superseding a PR's
+# older run is the point of cancel-in-progress; superseding a merged commit's
+# run is how a broken commit goes unverified.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Path classification — determines which checks run vs skip
+  # ---------------------------------------------------------------------------
+
+  check-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    # Every output is forced true on push. Path filtering exists to keep PR
+    # feedback cheap by diffing against the base; a push to main has no such
+    # base, and a watchdog that only re-checks the paths a merge happened to
+    # touch would miss exactly the case it is here for.
+    outputs:
+      code: ${{ github.event_name == 'push' && 'true' || steps.changes.outputs.code }}
+      actions: ${{ github.event_name == 'push' && 'true' || steps.changes.outputs.actions }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Skipped on push: the outputs above already force every category true,
+      # and on a push event this action diffs against github.event.before,
+      # which is all-zeros for a new branch and after history rewrites. The
+      # step then errors, failing check-paths and taking the whole gate down.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changes
+        if: github.event_name != 'push'
+        with:
+          filters: |
+            code:
+              # Everything the `check` job compiles, lints, or tests, plus the
+              # files that define the check itself: the Makefile recipes, the
+              # pinned Go toolchain, the lint configuration, and this workflow.
+              - 'client/**'
+              - 'cmd/**'
+              - 'internal/**'
+              - 'pkg/**'
+              - 'definitions/**'
+              - 'scripts/**'
+              - 'testdata/**'
+              - 'toolchains/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Makefile'
+              - '.go-version'
+              - '.golangci.yml'
+              - '.github/workflows/merge-gate.yaml'
+            actions:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+
+  # ---------------------------------------------------------------------------
+  # Repository checks — the same gates `make check` runs locally, plus build
+  # ---------------------------------------------------------------------------
+
+  check:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: fmt-check
+        run: make fmt-check
+
+      - name: vet
+        run: make vet
+
+      # golangci-lint-action v9 supports the golangci-lint v2 config schema
+      # (.golangci.yml `version: "2"`). SHA-pinned for supply-chain safety.
+      - name: lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.1
+
+      - name: shellcheck
+        run: make shellcheck
+
+      - name: test (race + coverage)
+        run: make test
+
+      - name: build
+        run: make build
+
+  check-skip:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "No code changes — repository checks not required"
+
+  # ---------------------------------------------------------------------------
+  # PLANNED: actionlint
+  #
+  # Highest value of the planned checks for this repository specifically,
+  # because workflows here are generated rather than hand-written: a malformed
+  # emission should fail the gate rather than land. Gate on the `actions`
+  # output, which check-paths already computes.
+  #
+  #   actionlint:
+  #     needs: [check-paths]
+  #     if: needs.check-paths.outputs.actions == 'true'
+  #   actionlint-skip:
+  #     needs: [check-paths]
+  #     if: needs.check-paths.outputs.actions != 'true'
+  #
+  # Install by pinned version with an upstream checksum verification rather
+  # than piping the installer script from the default branch.
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # PLANNED: verify-licenses
+  #
+  # CONTRIBUTING.md names "Apache-clean" a load-bearing invariant — no
+  # copyleft/BUSL dependency linked into the binary — and nothing currently
+  # enforces it. Needs a `make license-check` target first so the local gate
+  # and CI stay equal. Add a `deps` path filter watching go.mod, go.sum,
+  # Makefile, .go-version, and this workflow.
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # PLANNED: workflows-regen
+  #
+  # Enforces the "one IR → many adapters" invariant: regenerate the workflows
+  # from the catalog and fail on any diff, so a hand-edited generated workflow
+  # cannot merge. Needs a `make workflows-check` target. This check has no AICR
+  # equivalent — it exists because this repository generates its own CI.
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # PLANNED: analyze (CodeQL) and malware-scan (ClamAV)
+  #
+  # Both are straight ports from AICR's merge gate. CodeQL needs
+  # `security-events: write`, which a fork PR does not receive — it must
+  # therefore tolerate being skipped on fork runs, or run only via the
+  # copy-pr-bot mirror branch.
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # Aggregate gate — the single required status check
+  # ---------------------------------------------------------------------------
+
+  gate:
+    if: always()
+    needs:
+      - check-paths
+      - check
+      - check-skip
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Check gate
+        run: |
+          echo "Gate results:"
+          echo '${{ toJSON(needs) }}' | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+
+          # check-paths must succeed — if it fails, all downstream jobs are
+          # skipped (not failed), which would silently pass the gate.
+          if [ "${{ needs.check-paths.result }}" != "success" ]; then
+            echo "::error::check-paths did not succeed (result: ${{ needs.check-paths.result }})"
+            exit 1
+          fi
+
+          # Fail if ANY other dependency failed or was cancelled.
+          # Skipped is OK — it means the inverse job ran instead.
+          if echo '${{ toJSON(needs.*.result) }}' | jq -e 'map(select(. == "failure" or . == "cancelled")) | length > 0' > /dev/null; then
+            echo "::error::One or more gating checks failed or were cancelled"
+            exit 1
+          fi
+
+          echo "All gating checks passed."
