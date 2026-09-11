@@ -74,12 +74,60 @@ requirement. Worker binaries belong to the NKE OS-image build; add product outpu
    git commit -S -s -m "fix(pipeline): resolve action pins from the catalog"
    ```
    The `-s` adds a `Signed-off-by: Your Name <you@example.com>` line certifying you have the right to
-   contribute the change under Apache-2.0. Configure `git config user.name`/`user.email` first.
+   contribute the change under Apache-2.0. The `-S` cryptographically signs the commit. See
+   [Signing your commits](#signing-your-commits) for one-time setup — both are required.
 4. **Update authority and docs** when behavior changes: update the owning primary ADR directly when its decision
    changes; add an ADR only for a distinct decision, and update `docs/adr/reconciliation.md` when implementation maturity, evidence, or a disabled path
    changes. Current product requirements belong in the milestone specification; engineering contracts belong
    in the owning ADR. Superseded plans and requirement exports are available in Git history.
 5. Open the PR with a clear description of *what* and *why*; link any issue.
+
+## Signing your commits
+
+Every commit needs two independent things: a **DCO sign-off** (`-s`, a text trailer asserting you have the
+right to contribute the code) and a **cryptographic signature** (`-S`, proving the commit came from you).
+They are not substitutes for each other.
+
+### One-time setup
+
+Your signing identity must match the email you commit with, and that email must be verified on your GitHub
+account, or GitHub will show the commit as `Unverified`.
+
+```sh
+git config --global user.name  "Your Name"
+git config --global user.email "you@example.com"
+```
+
+**With GPG:**
+
+```sh
+gpg --full-generate-key                      # use the email configured above
+gpg --list-secret-keys --keyid-format=long   # copy the key ID after `sec   rsa4096/`
+git config --global user.signingkey <KEY_ID>
+git config --global commit.gpgsign true      # sign every commit without passing -S
+gpg --armor --export <KEY_ID>                # add at GitHub -> Settings -> SSH and GPG keys
+```
+
+**With SSH** (simpler if you already push over SSH):
+
+```sh
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+```
+
+Add the same public key to GitHub a second time, as a **Signing Key** — an Authentication Key alone does not
+verify commits.
+
+Confirm it works with `git log --show-signature -1` locally and a **Verified** badge on GitHub.
+
+### If you forgot
+
+```sh
+git commit --amend -S -s --no-edit                               # most recent commit
+git rebase --exec 'git commit --amend -S -s --no-edit' -i main   # a whole branch
+git push --force-with-lease
+```
 
 ## Commit messages
 
