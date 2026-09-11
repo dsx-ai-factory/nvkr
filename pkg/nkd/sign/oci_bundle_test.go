@@ -194,6 +194,49 @@ func TestOCIBundleRefusesSubstitutedClaims(t *testing.T) {
 	}
 }
 
+func TestOCIBundleFailureSummary(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		claimsRejected   int
+		verificationFail int
+	}{
+		{"no claims match", 2, 0},
+		{"mixed failures", 1, 1},
+		{"all crypto fail", 0, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bundles := make([]string, 0, 2)
+			for range tc.claimsRejected {
+				bundles = append(bundles, `{}`)
+			}
+			for range tc.verificationFail {
+				bundles = append(bundles, testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer))
+			}
+			stub := &cosignStub{stdout: map[string]string{"download": strings.Join(bundles, "\n")}}
+			attempted := 0
+			stub.onCall = func(call recordedCall) error {
+				if call.args[0] == "verify-blob-attestation" {
+					attempted++
+					return fmt.Errorf("crypto verification failed")
+				}
+				return nil
+			}
+			record, err := newStubbedSigner(t, stub, Credential{}).Verify(t.Context(), ociSubject(), VerifyPolicy{})
+			requireSignCode(t, err, e.CodeSignatureInvalid)
+			want := fmt.Sprintf("all 2 OCI bundles failed (%d rejected by claims checks, %d failed cosign verification); last failure:", tc.claimsRejected, tc.verificationFail)
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("missing failure summary %q: %v", want, err)
+			}
+			if attempted != tc.verificationFail {
+				t.Fatalf("cosign attempts = %d, want %d", attempted, tc.verificationFail)
+			}
+			if record.SignatureVerified || record.AttestationVerified || len(record.Ran) != 0 {
+				t.Fatal("returned partial verification success")
+			}
+		})
+	}
+}
+
 func TestOCIBundleDownloadRejectsLegacyAndMalformedReports(t *testing.T) {
 	for _, raw := range []string{"", "not json", "[]", cosignAttestationJSON(ociTestDigest, CosignSignaturePredicateType), strings.Repeat("{}\n", maxVerificationBundles+1), `{"mediaType":"a","mediaType":"b"}`} {
 		t.Run(fmt.Sprintf("%.30s", raw), func(t *testing.T) {

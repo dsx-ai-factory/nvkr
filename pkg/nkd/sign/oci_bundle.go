@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
@@ -149,9 +150,11 @@ func (s *CosignOCISigner) verifyOCIBundles(ctx context.Context, subject Subject,
 	}
 	ran := [][]string{argv(s.binary, download)}
 	var lastErr error
+	var claimsRejected, verificationFailed int
 	for _, bundle := range bundles {
 		identity, issuer, err := ociBundleClaims(bundle, subject.Digest, predicateType, policy)
 		if err != nil {
+			claimsRejected++
 			lastErr = err
 			continue
 		}
@@ -166,6 +169,7 @@ func (s *CosignOCISigner) verifyOCIBundles(ctx context.Context, subject Subject,
 				return "", "", nil, ctxErr
 			}
 			lastErr = err
+			verificationFailed++
 			continue
 		}
 		if err := assertPrivateFileUnchanged(path, bundle); err != nil {
@@ -173,5 +177,6 @@ func (s *CosignOCISigner) verifyOCIBundles(ctx context.Context, subject Subject,
 		}
 		return identity, issuer, ran, nil
 	}
-	return "", "", nil, lastErr
+	return "", "", nil, fmt.Errorf("all %d OCI bundles failed (%d rejected by claims checks, %d failed cosign verification); last failure: %w",
+		len(bundles), claimsRejected, verificationFailed, lastErr)
 }
