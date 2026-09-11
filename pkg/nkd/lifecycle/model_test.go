@@ -217,11 +217,11 @@ func TestLowerDerivesExecutableEnvelopeAndRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(definition.Packages) != 2 || definition.Packages[0].Name != "cli" ||
-		definition.Packages[0].Kind != factory.PackageBinaryBundle || definition.Packages[1].Name != "cli-release" ||
+		definition.Packages[0].Kind != factory.PackageBinaryBundle || definition.Packages[1].Name != "release" ||
 		definition.Packages[1].Kind != factory.PackageOCI {
 		t.Fatalf("derived packages = %#v", definition.Packages)
 	}
-	if len(delivery.Routes) != 1 || delivery.Routes[0] != (factory.Route{Name: "cli", Input: "package/cli-release", Target: "cli"}) {
+	if len(delivery.Routes) != 1 || delivery.Routes[0] != (factory.Route{Name: "release", Input: "package/release", Target: "release"}) {
 		t.Fatalf("derived routes = %#v", delivery.Routes)
 	}
 }

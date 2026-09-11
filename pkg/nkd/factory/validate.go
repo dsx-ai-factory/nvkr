@@ -135,6 +135,9 @@ func (plan Plan) Validate() error {
 		}
 		previousComposition = composition.Name
 	}
+	if err := plan.validateEvidenceAttestationGraph(); err != nil {
+		return err
+	}
 	if err := plan.validateSigningGraph(); err != nil {
 		return err
 	}
@@ -143,6 +146,17 @@ func (plan Plan) Validate() error {
 	}
 	if err := plan.validateSBOMGraph(); err != nil {
 		return err
+	}
+	evidenceNodes, evidenceArtifacts := planIndex(&plan)
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind != NodePackage || node.PackageKind != PackageOCI {
+			continue
+		}
+		for _, required := range publicationSBOMInputs(packageProducerResults(node.Inputs, evidenceNodes, evidenceArtifacts), evidenceNodes, evidenceArtifacts) {
+			if !containsString(node.Inputs, required) {
+				return e.New(e.CodeProvenanceMissing, "publication %q omits required SBOM evidence %q", node.ID, required)
+			}
+		}
 	}
 	builds := map[string]ir.Node{}
 	for _, recipe := range plan.Recipes {
@@ -286,7 +300,7 @@ func (plan Plan) validateSigningGraph() error {
 			continue
 		case NodeSign:
 			signed[node.Target] = true
-		case NodeVerifyPublication:
+		case NodeVerifyPublication, NodeAttestEvidence:
 		default:
 			continue
 		}
@@ -333,7 +347,7 @@ func (graph ArtifactGraph) Validate() error {
 			return e.New(e.CodeInvalidCatalog, "artifact graph nodes are not canonical")
 		}
 		switch node.Kind {
-		case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication:
+		case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence:
 			if node.Network != ir.NetworkDefault {
 				return e.New(e.CodeInvalidCatalog, "artifact graph networked node %q does not declare default network", node.ID)
 			}

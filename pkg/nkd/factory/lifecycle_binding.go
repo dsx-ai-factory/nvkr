@@ -13,10 +13,7 @@ import (
 )
 
 const (
-	lifecycleBindingName  = "nkd-lifecycle"
-	lifecycleBindingKind  = "lifecycle-binding"
-	lifecycleBindingMedia = "application/vnd.nkd.lifecycle-binding.v1+json"
-	clusterBindingSchema  = "nkd.dev/cluster-realization/v1"
+	clusterBindingSchema = "nkd.dev/cluster-realization/v1"
 )
 
 type lifecycleContent struct {
@@ -121,12 +118,12 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
-		if expectedDigest != image.RootDigest {
+		if expectedDigest != image.ManifestDigest {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "image output %q differs from its observed producer archive", expected.Name)
 		}
-		return LifecyclePayloadObservation{Digest: image.RootDigest, Components: components}, nil
+		return LifecyclePayloadObservation{Digest: image.ManifestDigest, Components: components}, nil
 	case PackageBinaryBundle:
-		bundle, result, err := delivery.InspectBinaryBundle(ctx, artifact.Path)
+		bundle, _, err := delivery.InspectBinaryBundle(ctx, artifact.Path)
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
@@ -153,7 +150,11 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		if !equalFactoryStrings(components, expected.Components) {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q members differ from its plan binding", expected.Name)
 		}
-		return LifecyclePayloadObservation{Digest: result.RootDigest, Components: components}, nil
+		descriptor, err := delivery.PayloadDescriptor(ctx, artifact.Path)
+		if err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		return LifecyclePayloadObservation{Digest: descriptor.Digest, Components: components}, nil
 	case PackageAPT:
 		repository, err := delivery.InspectAPTRepository(ctx, artifact.Path)
 		if err != nil {
@@ -173,21 +174,21 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 				return LifecyclePayloadObservation{}, err
 			}
 		}
-		inspection, err := delivery.Inspect(ctx, artifact.Path)
+		descriptor, err := delivery.PayloadDescriptor(ctx, artifact.Path)
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
 		expectedDigest, err := reproduceLifecyclePackage(ctx, plan, artifact, artifacts)
-		if err != nil || expectedDigest != inspection.RootDigest {
-			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced package (%s != %s)", expected.Name, inspection.RootDigest, expectedDigest)
+		if err != nil || expectedDigest != descriptor.Digest {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced package (%s != %s)", expected.Name, descriptor.Digest, expectedDigest)
 		}
-		return LifecyclePayloadObservation{Digest: inspection.RootDigest, Components: components}, nil
+		return LifecyclePayloadObservation{Digest: descriptor.Digest, Components: components}, nil
 	default:
 		return LifecyclePayloadObservation{}, e.New(e.CodeEngineCapability, "package kind %q cannot be observed for lifecycle output", artifact.Kind)
 	}
 }
 
-func lifecyclePublicationObject(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) (delivery.ObjectInput, error) {
+func lifecyclePublicationBinding(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) (LifecycleBinding, error) {
 	declared := make(map[string]bool, len(node.Inputs))
 	for _, input := range node.Inputs {
 		declared[input] = true
@@ -197,7 +198,7 @@ func lifecyclePublicationObject(ctx context.Context, plan *Plan, node Node, arti
 	for _, expected := range plan.LifecycleOutputs {
 		artifact, ok := artifacts[expected.ArtifactID]
 		if !ok || artifact.Kind != lifecyclePackageKind(expected.Kind) {
-			return delivery.ObjectInput{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no typed payload", expected.Name)
+			return LifecycleBinding{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no typed payload", expected.Name)
 		}
 		visible := make(map[string]Artifact, len(declared)+1)
 		visible[artifact.ID] = artifact
@@ -206,12 +207,12 @@ func lifecyclePublicationObject(ctx context.Context, plan *Plan, node Node, arti
 		}
 		observation, err := ObserveLifecyclePayload(ctx, plan, expected, visible)
 		if err != nil {
-			return delivery.ObjectInput{}, err
+			return LifecycleBinding{}, err
 		}
 		components := observation.Components
 		payloadDigest := observation.Digest
 		if !equalFactoryStrings(components, expected.Components) || payloadDigest == "" || expected.RecipeDigest == "" {
-			return delivery.ObjectInput{}, e.New(e.CodeVerifyFailed, "lifecycle output %q payload differs from its exact plan binding", expected.Name)
+			return LifecycleBinding{}, e.New(e.CodeVerifyFailed, "lifecycle output %q payload differs from its exact plan binding", expected.Name)
 		}
 		bound := LifecycleBoundOutput{Name: expected.Name, Kind: expected.Kind,
 			Digest: payloadDigest, RecipeDigest: expected.RecipeDigest, Components: append([]string(nil), components...)}
@@ -222,7 +223,7 @@ func lifecyclePublicationObject(ctx context.Context, plan *Plan, node Node, arti
 	}
 	sort.Slice(binding.Outputs, func(i, j int) bool { return binding.Outputs[i].Name < binding.Outputs[j].Name })
 	if err := ValidateLifecycleRealizations(plan.Compositions, plan.LifecycleOutputs, plan.LifecycleClusters, binding.Outputs); err != nil {
-		return delivery.ObjectInput{}, err
+		return LifecycleBinding{}, err
 	}
 	content := lifecycleContent{}
 	for _, output := range binding.Outputs {
@@ -231,7 +232,7 @@ func lifecyclePublicationObject(ctx context.Context, plan *Plan, node Node, arti
 	}
 	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, content)
 	if err != nil {
-		return delivery.ObjectInput{}, err
+		return LifecycleBinding{}, err
 	}
 	binding.ContentSubject = contentSubject
 	outputs := make(map[string]LifecycleBoundOutput, len(binding.Outputs))
@@ -247,18 +248,18 @@ func lifecyclePublicationObject(ctx context.Context, plan *Plan, node Node, arti
 			}
 		}
 		if composition == nil || composition.Digest != planned.CompositionDigest {
-			return delivery.ObjectInput{}, e.New(e.CodeVerifyFailed, "cluster %q differs from its exact composition plan", planned.Name)
+			return LifecycleBinding{}, e.New(e.CodeVerifyFailed, "cluster %q differs from its exact composition plan", planned.Name)
 		}
 		digest, err := composition.Composition.Digest()
 		if err != nil || digest != planned.CompositionDigest {
-			return delivery.ObjectInput{}, e.New(e.CodeVerifyFailed, "cluster %q composition bytes differ from its identity", planned.Name)
+			return LifecycleBinding{}, e.New(e.CodeVerifyFailed, "cluster %q composition bytes differ from its identity", planned.Name)
 		}
 		cluster := LifecycleBoundCluster{SchemaVersion: clusterBindingSchema, Name: planned.Name,
 			CompositionDigest: planned.CompositionDigest, ContentSubject: contentSubject}
 		for _, member := range planned.Members {
 			output, ok := outputs[member.Output]
 			if !ok {
-				return delivery.ObjectInput{}, e.New(e.CodeReleaseIncomplete, "cluster %q references missing output %q", planned.Name, member.Output)
+				return LifecycleBinding{}, e.New(e.CodeReleaseIncomplete, "cluster %q references missing output %q", planned.Name, member.Output)
 			}
 			cluster.Members = append(cluster.Members, LifecycleBoundClusterMember{Output: output.Name, ArtifactDigest: output.Digest,
 				RecipeDigest: output.RecipeDigest, Components: append([]string(nil), output.Components...), Role: member.Role})
@@ -270,21 +271,12 @@ func lifecyclePublicationObject(ctx context.Context, plan *Plan, node Node, arti
 			return cluster.Members[i].Role < cluster.Members[j].Role
 		})
 		if _, err := canonical.Digest(canonical.KindClusterRealization, cluster); err != nil {
-			return delivery.ObjectInput{}, err
+			return LifecycleBinding{}, err
 		}
 		binding.Clusters = append(binding.Clusters, cluster)
 	}
 	sort.Slice(binding.Clusters, func(i, j int) bool { return binding.Clusters[i].Name < binding.Clusters[j].Name })
-	raw, err := canonical.Marshal(binding)
-	if err != nil {
-		return delivery.ObjectInput{}, err
-	}
-	semantic, err := canonical.Digest(canonical.KindLifecycleBinding, binding)
-	if err != nil {
-		return delivery.ObjectInput{}, err
-	}
-	return delivery.ObjectInput{Name: lifecycleBindingName, Kind: lifecycleBindingKind, ArtifactType: lifecycleBindingMedia,
-		LayerMediaType: lifecycleBindingMedia, SemanticDigest: semantic, Bytes: raw}, nil
+	return binding, nil
 }
 
 func reproduceLifecyclePackage(ctx context.Context, plan *Plan, artifact Artifact, artifacts map[string]Artifact) (string, error) {
@@ -310,7 +302,7 @@ func reproduceLifecyclePackage(ctx context.Context, plan *Plan, artifact Artifac
 		if err != nil {
 			return "", err
 		}
-		return image.RootDigest, nil
+		return image.ManifestDigest, nil
 	case PackageAPT:
 		result, err := delivery.InspectAPTRepository(ctx, reproduced.Path)
 		if err != nil {
@@ -318,11 +310,11 @@ func reproduceLifecyclePackage(ctx context.Context, plan *Plan, artifact Artifac
 		}
 		return result.Digest, nil
 	case PackageHelm:
-		result, err := delivery.Inspect(ctx, reproduced.Path)
+		result, err := delivery.PayloadDescriptor(ctx, reproduced.Path)
 		if err != nil {
 			return "", err
 		}
-		return result.RootDigest, nil
+		return result.Digest, nil
 	default:
 		return "", e.New(e.CodeEngineCapability, "package kind %q cannot be reproduced for lifecycle binding", artifact.Kind)
 	}

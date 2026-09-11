@@ -2,7 +2,7 @@
 
 The script name is historical: `demo-m1-local.sh` now runs the combined NKE Definition, producing the NKE
 CLI, CWE runtime image, and quickstart Helm bundle. **M1 itself requires only the CLI vertical slice.** The
-script builds and publishes all three outputs, then inspects and consumes the CLI publication. It does not
+script builds all three outputs, publishes one release index, then extracts and consumes its CLI artifact. It does not
 independently pull or smoke-test the CWE image or render the Helm charts.
 
 Plans are `static-unqualified`; executed local Run records use `unqualified-local-execution`. Dry-run signing executes no cosign and produces no authenticated

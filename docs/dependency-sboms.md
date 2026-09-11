@@ -8,7 +8,8 @@ payloads plus their producer records. The implementation is selected by artifact
 |---|---|---|
 | CLI executable | Syft reads compiled binary metadata | Embedded Go modules and other recognizable binary packages |
 | OCI image export | Syft reads the final image filesystem | Installed OS packages and recognizable application dependencies |
-| Helm source archive | NKD reads Helm/AICR manifests | Bundled charts, chart dependencies/locks and declared external chart references |
+| Helm source archive | NKD reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
+| Bound Helm package | NKD re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
 
 The scanner executable is authenticated before use. Subject bytes must match the producer digest. Its output
 is normalized into CycloneDX 1.5: deterministic identities/order, package URLs, versions and artifact dependency
@@ -21,8 +22,20 @@ are references, not vendored packages; their transitive dependencies are not cla
 built source archive, preceding the separate image-binding and packaging operation.
 
 A Definition without `sbomTool` still emits declaration-only source metadata and does not claim dependency
-inspection. This does not enable vulnerability scanning or qualified reproduction. The existing SBOM outputs
-remain Run evidence; this change does not introduce separate SBOM signatures or OCI referrer publication.
+inspection. This does not enable vulnerability scanning or qualified reproduction.
+
+One release index references each required CycloneDX attestation bundle once in its owning artifact repository.
+The document appears only inside that signed statement; raw SBOM files remain private job handoffs. Its metadata records exact subject,
+covered stage, raw document digest, typed document identity and output membership. Build-time per-recipe
+indexes remain internal handoffs. Packaging verifies their recipe/producer/scanner bindings, transforms the
+documents to explicit stage subjects, and adds the final Helm packaging inventory. Before publication a
+separate stage creates and verifies subject-bound Sigstore bundles, then derives the final release index. The native CWE
+SBOM targets the delivered image manifest and records the scanned export digest. Signing the release index
+covers all these exact bytes recursively. Source-archive evidence is never relabeled as final-chart evidence.
+See [the registry graph](publication-architecture.md) for every remaining manifest and attachment.
+
+The change is locally contract-tested; the first NVIDIA Run predates it and has unsigned standalone SBOMs.
+Local publication and extraction were exercised with the separate-repository layout. A new hosted Run is required to demonstrate signed SBOM publication operationally.
 
 ## Verification on real outputs
 

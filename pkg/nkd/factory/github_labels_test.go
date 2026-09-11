@@ -23,8 +23,8 @@ func TestGitHubOperationLabels(t *testing.T) {
 		{"observation", Node{Kind: NodeVerify, RecipeTarget: "worker"}, "Verify built artifacts: worker"},
 		{"sbom", Node{Kind: NodeSBOM, RecipeTarget: "worker"}, "Generate SBOMs: worker"},
 		{"publish", Node{ID: "publish/worker", Kind: NodePublish}, "Publish worker"},
-		{"sign", Node{ID: "sign/worker", Kind: NodeSign}, "Sign and attest worker"},
-		{"verify publication", Node{ID: "verify-publication/worker", Kind: NodeVerifyPublication}, "Verify published signatures: worker"},
+		{"sign", Node{ID: "sign/worker", Kind: NodeSign}, "Sign and attest release and deliverables: worker"},
+		{"verify publication", Node{ID: "verify-publication/worker", Kind: NodeVerifyPublication}, "Verify release and deliverable signatures: worker"},
 		{"tool", Node{ID: "tool/cosign", Kind: NodeAcquire}, "Acquire pinned cosign"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

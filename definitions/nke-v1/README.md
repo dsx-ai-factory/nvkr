@@ -1,7 +1,7 @@
 # `definitions/nke-v1` — Combined NKE Definition
 
 This Definition builds `nkectl`, the complete upstream CWE runtime image, and the quickstart Helm bundle from
-independently pinned CLI and controller module tags in NKE. It observes all three named outputs and generates their OCI publication and signing
+independently pinned CLI and controller module tags in NKE. It observes all three named outputs and generates one shared OCI release publication and signing
 jobs. Recipes remain catalog-owned. Runtime, destination, and signing choices live in independently selected
 Environments. The [combined hosted run and independent consumers](../../docs/evidence/2026-09-10-combined-run.md)
 passed for all three outputs, including real signing and complete Run finalization. That recorded run predates
@@ -143,7 +143,7 @@ nkdctl catalog bump --dir definitions/nke-v1/catalog syft cosign
 ```
 
 Regenerate the workflow after changing the lock. Each Environment configures one
-`publication.repositoryPrefix`; repositories derive from Definition output names. Publication writes the
+`publication.repositoryPrefix`; the release index and SBOMs live under `<repositoryPrefix>/releases`, while each output has its own sibling repository. Publication writes the
 root by digest and records `<prefix>/<output>@sha256:…`. No mutable tag is updated automatically.
 
 ## GitHub action pins

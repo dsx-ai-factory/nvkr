@@ -19,17 +19,20 @@ func TestInspectReleaseLayoutReturnsExactSortedObjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].Name != "nkd-lifecycle" || got[1].Name != "tools" {
+	if len(got) != 1 || got[0].Name != "tools" {
 		t.Fatalf("wrong inspection scope: %+v", got)
+	}
+	if got[0].Reference != "registry.example.test/tools@"+got[0].Digest {
+		t.Fatal("missing artifact repository reference", got)
 	}
 	for _, artifact := range got {
 		found := false
 		for _, object := range inspection.Root.Objects {
 			if object.Name == artifact.Name {
-				found = artifact.Kind == object.Kind && artifact.Digest == object.BlobDigest
+				found = object.Output != nil && artifact.Kind == object.Output.Format && artifact.Digest == object.DescriptorDigest && artifact.RecipeDigest == object.Output.RecipeDigest
 			}
 		}
-		if !found || artifact.RecipeDigest != "" {
+		if !found {
 			t.Fatalf("inspection fabricated artifact binding: %+v", artifact)
 		}
 	}
@@ -89,7 +92,7 @@ func TestInspectionRejectsInvalidObjectIdentity(t *testing.T) {
 		{Name: "tools", Kind: "binary-bundle", BlobDigest: "invalid"},
 	} {
 		inspection := delivery.Inspection{Root: delivery.PublicationRoot{Objects: []delivery.PublishedObject{object}}}
-		got, err := artifactsFromInspection(inspection)
+		got, _, _, err := artifactsFromBinding(t.Context(), t.TempDir(), inspection)
 		assertCode(t, err, e.CodeVerifyFailed)
 		if got != nil {
 			t.Fatalf("invalid object returned artifacts: %+v", got)

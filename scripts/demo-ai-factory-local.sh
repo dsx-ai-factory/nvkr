@@ -108,7 +108,7 @@ args=(run local --definition "$DEFINITION" --environment "$ENVIRONMENT" --attemp
 [ "$PUBLISH" -eq 0 ] || args+=(--publish)
 "$NKD" "${args[@]}"
 
-ROOT="$WORK/packages/gpu-runtime-release"
+ROOT="$WORK/packages/release"
 [ -d "$ROOT" ] || demo_die "Run completed without the planned publication envelope: $ROOT"
 "$NKD" publish inspect --layout "$ROOT" --json > "$WORK/publication-inspection.json"
 
@@ -122,7 +122,7 @@ LOCAL AICR RUN COMPLETE — UNQUALIFIED-LOCAL-EXECUTION
   inspection:           $WORK/publication-inspection.json
 EOF_RESULT
 if [ "$PUBLISH" -eq 1 ]; then
-  printf '  published reference: %s\n' "$(tr -d '\n' < "$WORK/publications/gpu-runtime.txt")"
+  printf '  published reference: %s\n' "$(tr -d '\n' < "$WORK/publications/release.txt")"
 fi
 cat <<'EOF_NOTE'
 

@@ -108,6 +108,20 @@ signature/attestation storage. It is keyless only; the keyed/KMS fallback in §1
 qualified documents. Environment owns the exact lowercase SHA-256 pin of the cosign executable, its acquisition
 reference, expected identity, and issuer. Ambient PATH or a version string is not a pin.
 
+The pipeline signs and attests each deliverable manifest in its own repository, then the release index.
+The same Run-level production predicate is subject-bound separately to each manifest. Hosted verification
+requires all deliverable signatures and attestations as well as the root checks before recording success.
+Independent cosign consumption authenticates that artifact; release membership and required SBOM coverage
+still require the signed release index (ADR-20). No extra payload publication is introduced.
+
+SBOMs use a distinct standard CycloneDX predicate. Before publication the pinned signer creates a Sigstore
+v0.3 attestation bundle using `attest-blob --hash` for the exact already-inspected subject, then verifies it
+with `verify-blob-attestation` under the expected identity, issuer and normal transparency checks. The bundle
+must contain the exact canonical SBOM and one matching statement subject. Registry discovery uses an OCI
+referrer manifest beside the associated deliverable; source evidence retains its original source subject.
+Hosted pull-back verification independently checks every bundle. Keyless creation/verification remains
+Linux-only and raw preparation layouts cannot satisfy authenticated release consumption.
+
 The signer re-derives the subject from held artifact bytes and requires equality with the Run's observed subject.
 The subsequent verifier re-resolves the registry reference, recomputes the served manifest digest, and verifies
 both signature and subject-bound production provenance (ADR-09). A mismatch fails the Run and returns no

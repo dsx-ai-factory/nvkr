@@ -129,7 +129,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if node.Kind == NodePublish {
 			target := plan.ExecutionSettings.Targets[node.Target]
 			fmt.Fprintf(&body, "    permissions:\n      contents: read\n")
-			if target.CredentialRef != "" {
+			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence {
 				secret, ok := strings.CutPrefix(target.CredentialRef, "github:")
 				if !ok || !regexpSecret(secret) {
 					return nil, e.New(e.CodeInvalidCatalog, "GitHub target %q credentialRef must be github:SECRET_NAME", node.Target)
@@ -148,14 +148,14 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 					"GitHub node %q signs without a delivery signing profile", node.ID)
 			}
 			// Signing scopes are per-mode and per-kind, and `id-token: write` (the OIDC
-			// token keyless cosign exchanges for a certificate) is emitted only for NodeSign.
+			// token keyless cosign exchanges for a certificate) is emitted only for artifact signing and SBOM attestation.
 			permissions := githubSigningPermissions(node.Kind, signing.Mode)
 			fmt.Fprintf(&body, "    permissions:\n")
 			for _, name := range sortedKeys(permissions) {
 				fmt.Fprintf(&body, "      %s: %s\n", name, permissions[name])
 			}
 			target := plan.ExecutionSettings.Targets[node.Target]
-			if target.CredentialRef != "" {
+			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence {
 				secret, ok := strings.CutPrefix(target.CredentialRef, "github:")
 				if !ok || !regexpSecret(secret) {
 					return nil, e.New(e.CodeInvalidCatalog, "GitHub target %q credentialRef must be github:SECRET_NAME", node.Target)
@@ -252,10 +252,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 }
 
 // signFamilyNode reports whether a node kind belongs to the signing family: the
-// jobs that use a signing profile. Only NodeSign requests an OIDC identity token;
+// jobs that use a signing profile. Artifact signing and SBOM attestation request an OIDC identity token;
 // publication verification uses registry read access without minting credentials.
 func signFamilyNode(kind string) bool {
-	return kind == NodeSign || kind == NodeVerifyPublication
+	return kind == NodeSign || kind == NodeVerifyPublication || kind == NodeAttestEvidence
 }
 
 // githubSigningPermissions is the exact token scope set of one signing-family job.
@@ -270,6 +270,9 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 	}
 	if mode != SigningModeCosign {
 		return permissions
+	}
+	if kind == NodeAttestEvidence {
+		permissions["id-token"] = "write"
 	}
 	if kind == NodeSign {
 		permissions["id-token"] = "write"

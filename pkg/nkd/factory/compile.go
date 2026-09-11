@@ -354,6 +354,7 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 		inputs = append(inputs, observationInputs(inputs, artifacts)...)
 		if spec.Kind == PackageOCI {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
+			inputs = append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...)
 		}
 		inputs = uniqueSorted(inputs)
 		nodeID := "package/" + spec.Name
@@ -430,6 +431,26 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 		}
 	}
 	return uniqueSorted(results)
+}
+
+// Publication carries the complete evidence set for each contributing recipe.
+// Explicit edges make SBOM generation precede packaging and signing on every engine.
+func publicationSBOMInputs(inputs []string, nodes map[string]Node, artifacts map[string]Artifact) []string {
+	var result []string
+	for _, id := range inputs {
+		artifact := artifacts[id]
+		if artifact.Kind != "producer-result" {
+			continue
+		}
+		set := "sbom/" + artifact.RecipeTarget
+		result = append(result, set)
+		for _, input := range nodes[artifacts[set].Producer].Inputs {
+			if artifacts[input].Kind == "producer-result" {
+				result = append(result, input)
+			}
+		}
+	}
+	return uniqueSorted(result)
 }
 
 // orderPackageSpecs derives execution order from package artifact inputs. Authored

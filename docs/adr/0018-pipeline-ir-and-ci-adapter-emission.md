@@ -189,7 +189,8 @@ The current generated Run workflow admits a narrower subset: all pull requests p
 regeneration checks, and execution requires manual dispatch on the default branch. Default-branch push
 publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
 `nkd-release` GitHub deployment environment; operators must configure its deployment policy to admit only
-the default branch. Only the signing job receives OIDC minting permission. The verifier needs registry read
+the default branch. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
+The SBOM job receives no registry credentials or package permissions. The verifier needs registry read
 access and obtains no identity token. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
 finalization still run after failures within an admitted execution; they do not run for static-only PR checks.
@@ -213,6 +214,12 @@ of display names. Each execution step logs its start, node ID, successful output
 status. Failure preserves the command's exit code and cannot print a successful completion. Packaging reports
 the actual bound image digest, and publication reports its persisted immutable reference. Logs are diagnostic,
 not authority receipts, and generated progress messages never dump credentials or environment variables.
+
+The compiler creates a private release preparation, a production SBOM-attestation stage producing the
+final release package, and one publish/sign/verify route. The attestation stage binds and verifies each
+CycloneDX document before final release identity is derived. It adds one internal handoff. GitHub handoff artifacts remain
+internal job transfers, not additional deliverables. Product names do not cause duplicate copies of the full
+closure to be uploaded or published.
 
 The finalizer batches downloads with an exact set of planned carrier names. It still restores every carrier
 and records its producer and restore outcome; a successful batch download alone proves no completeness.

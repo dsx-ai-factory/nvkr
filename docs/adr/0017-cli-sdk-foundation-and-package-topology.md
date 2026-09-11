@@ -46,7 +46,10 @@ Normal commands are `definition validate|inspect`, `run plan|local|generate`, an
 `--definition` and `--environment`; catalog and Recipe maintenance remain available. Backward compatibility is not required. Remove superseded authoring APIs and wire fixtures; retain
 internal mechanics only when the current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
-policy (ADR-04), returning inspectable views plus a closeable capability. An external SDK test proves embedding
+policy (ADR-04), returning inspectable views plus a closeable capability. The reference selects the sole
+ADR-20 release index: delivery owns its one metadata/descriptor/evidence join; lifecycle projects named
+deliverables, exact sibling artifact references, and cluster realizations. Transport locators are excluded from
+the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
 
 ### 2. Context threading + subprocess cleanup-on-cancel

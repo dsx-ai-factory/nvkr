@@ -2,8 +2,8 @@ package factory
 
 // executors_sign.go owns the two post-publication factory nodes: `sign` binds a
 // signature and an SLSA v1 production attestation to the exact digest a route
-// published, and `verify-publication` re-resolves that digest at the registry and
-// checks the signing record against it.
+// published and each bound deliverable manifest. `verify-publication` checks the
+// root signing record, retrieves the full closure, and verifies every deliverable.
 //
 // Both are deliberately thin: every authority-bearing decision belongs to a deep
 // module elsewhere — pkg/nkd/delivery owns registry transport and layout identity,
@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -58,7 +59,11 @@ func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map
 			return nil, e.New(e.CodeTrustPolicyMissing,
 				"factory node %q signs with cosign but tool %q was never acquired", node.ID, signing.CosignTool)
 		}
-		credential, err := registryCredential(plan, node)
+		var credential sign.Credential
+		var err error
+		if node.Kind != NodeAttestEvidence {
+			credential, err = registryCredential(plan, node)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -150,6 +155,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			"factory sign node %q: routed layout digest %s does not equal published digest %s",
 			node.ID, inspection.RootDigest, subject.Digest)
 	}
+	if signing.Mode == SigningModeCosign && inspection.Root.Release != nil {
+		if err := delivery.RequireAttestedEvidence(inspection); err != nil {
+			return err
+		}
+	}
 	predicate, err := productionPredicateFor(plan, signing, startedOn, time.Now().UTC())
 	if err != nil {
 		return err
@@ -168,6 +178,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	}
 	if signer == nil {
 		return e.New(e.CodeInternal, "factory sign node %q resolved no signing adapter", node.ID)
+	}
+	// Each output is independently consumable from its own repository. Derive all
+	// subjects from the inspected closure before the first signing side effect.
+	if err := signPublicationOutputs(ctx, signer, subject.Ref, inspection, predicate, signing, stdout); err != nil {
+		return err
 	}
 	record, err := signer.SignAndAttest(ctx, subject, predicate)
 	if err != nil {
@@ -253,6 +268,27 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if !verification.DryRun && (!verification.SignatureVerified || !verification.AttestationVerified) {
 		return e.New(e.CodeVerifyFailed,
 			"factory verification node %q: %s was not verified against its identity policy", node.ID, subject.Ref)
+	}
+	// Authenticate the selected entry point first, then verify all repository-bound
+	// deliverables and release evidence before committing a successful record.
+	workspace, err := os.MkdirTemp("", "nkd-verify-release-*")
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "creating release verification workspace")
+	}
+	defer func() { _ = os.RemoveAll(workspace) }()
+	inspection, err := delivery.Pull(ctx, subject.Ref, filepath.Join(workspace, "closure"), delivery.RegistryOptions{
+		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous, Username: registryUsername(target), Password: registryPassword(target),
+	})
+	if err != nil {
+		return err
+	}
+	if signing.Mode == SigningModeCosign && inspection.Root.Release != nil {
+		if err := verifySBOMAttestations(ctx, signer, filepath.Join(workspace, "closure"), inspection); err != nil {
+			return err
+		}
+	}
+	if err := verifyPublicationOutputs(ctx, signer, subject.Ref, inspection, signing, stdout); err != nil {
+		return err
 	}
 	raw, err := verification.Canonical()
 	if err != nil {

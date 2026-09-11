@@ -36,7 +36,10 @@ cross-environment byte-identity.
 Environment (`nkd.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
 credential references and signing identity/issuer policy. `publication.repositoryPrefix` is an explicitly
 qualified, untagged repository prefix; credentials, anonymous access and plain HTTP are transport settings.
-When publication is configured, every named Definition output publishes under `<repositoryPrefix>/<output>`.
+When publication is configured, the release index, metadata and SBOMs publish under
+`<repositoryPrefix>/releases`. Each deliverable publishes once in `<repositoryPrefix>/<output-name>`. The signed
+release metadata binds canonical sibling repository names and manifest digests; no complete closure is copied
+into the product repositories.
 Omitting publication produces a build-only Run. Destinations and a separate output-to-destination map are
 not authored. The generated internal routes still bind exact package inputs and targets.
 
@@ -129,11 +132,44 @@ itself (SEC-09); signatures remain detached (SEC-03).
 
 NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI registry. ADR-04 owns keyless
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
-the root and exact lifecycle binding from named outputs; normal authors do not wire binary → root → route.
+one release index from named outputs; normal authors do not wire payload → root → route.
 
-Payload identities survive publication unchanged. The outer OCI root separately binds content, compositions and
-their exact realization (ADR-19). Consumer verification validates the complete closure before exposing accepted
-views. Plain `release inspect` is descriptive. No tag-based cosign signature substitutes for qualified clearance.
+The signed metadata references each deliverable manifest once in its own sibling repository: CLI binary bundle,
+unchanged native CWE image, and Helm artifact. The OCI index directly references only its metadata manifest. Helm has an empty-config artifact manifest and its final bound archive layer; its former
+nested publication root is removed. The native image is pullable from its own output repository by its manifest
+digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
+
+One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
+output names, sibling repository locators, descriptor identities, Recipe/component mappings, content subject, cluster realizations and
+required evidence membership. There is no separately published lifecycle-binding object. Output identity is
+the deliverable manifest digest (APT retains its typed repository identity); input layout-index hashes are not
+Artifact identities. The qualified representation in §4 remains a separate protocol, not a compatibility path
+for former pipeline publications. The current consumer rejects pipeline roots without this metadata.
+
+Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
+Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
+no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement
+subject remains the exact inventoried binary, native image manifest, or source/final archive. Shared evidence
+belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,
+canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; CWE inventories
+the native manifest and records the scanned OCI-export input; Helm has distinct source-archive and final-bound-
+package inventories. Identical evidence shared by output projections has one document with sorted output
+memberships. Per-recipe indexes stay internal. Missing, substituted, duplicate or unbound evidence fails
+construction and consumption. A protected pre-publication stage creates and verifies the bundles before
+assembling the final release metadata; production publication and authenticated consumption reject raw
+preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
+
+One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
+same root. Signature/attestation attachments stay outside the signed index to avoid circular identity. Each deliverable manifest also receives its own signature and subject-bound production attestation in its
+own repository for independent consumption. Signing processes deliverables before the root; hosted verification
+requires every child signature and attestation before recording success. The Release consumer still authenticates
+membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
+record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace, fetch every pinned manifest
+and verify its full payload/evidence closure before exposing accepted views. Metadata cannot redirect credentials
+to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their
+repositories, then publishes the release index last; hosted verification pulls the full distributed closure. Plain `release inspect` is descriptive and exposes deliverables, not
+SBOMs as extra products. No tag-based cosign signature substitutes for qualified clearance. The full graph and
+wrapper rationale are in [publication architecture](../publication-architecture.md).
 
 Helm outputs accept either an AICR-generated tree or one observed source archive component. The latter carries
 a single `helm/` directory, extracted through the bounded transport adapter and repacked deterministically.
@@ -220,7 +256,7 @@ unchanged image identities inside a publication root. Public OCI outputs lower t
 component, checked against its producer bytes before publication; consumer projection checks the native image
 and its platform. The [combined hosted Run](../evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
 source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
-finalization. Independent consumers authenticate all three exact publications; downloaded payload checks
+finalization. This historical layout had three duplicated publications. Independent consumers authenticated all three; downloaded payload checks
 exercise the native image, recovered CLI and rendered chart binding. Acquired-image layout conversion remains
 unavailable. Source Helm archive selection and exact producer observation also have focused contract tests.
 This adapter does not mint qualified execution or release authority.
@@ -231,6 +267,9 @@ exhaustive referrer matching, semantic-versus-blob digest separation, no implici
 APT layouts, recursive OCI closure verification, extraction, and rejection of missing, extra, or substituted
 bytes. The dated local NKE record in reconciliation establishes development registry interoperability for
 earlier inputs, not authenticated release publication or production-registry acceptance.
+
+The single-entry layout and stage-bound evidence require a new authorized hosted publication run; the earlier
+NVIDIA run does not establish their external behavior.
 
 Qualified end-to-end acceptance requires publishing one cleared mixed-artifact ReleaseSet to operator-selected targets,
 discovering every referrer by immutable digest, authenticating the downstream clearance, and proving that

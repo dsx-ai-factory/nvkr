@@ -6,6 +6,7 @@
 | Choose and run a demo | [Demo index](../scripts/README.md) |
 | Learn the seven public objects | [Domain vocabulary](../CONTEXT.md) |
 | Understand architecture and failure behavior | [SADD](sadd.md) |
+| Inspect the single release registry graph and signing scope | [Publication architecture](publication-architecture.md) |
 | Change an engineering contract | Current [ADRs](adr/); public lifecycle in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) |
 | Determine what works and what is deferred | [Implementation/evidence record](adr/reconciliation.md) |
 | Plan v1 delivery | [Milestones](milestones.md), [acceptance specification](epics-v1-spec.md) |
@@ -27,4 +28,4 @@ specification and owning ADRs. Older FR/SEC/UC identifiers in contracts and code
 the current documents state the requirements directly.
 
 Dated evidence is preserved with its original scope, rather than rewritten as current operational acceptance.
-Current architecture diagrams live in the SADD.
+Current architecture diagrams live in the SADD and the publication architecture document.

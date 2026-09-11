@@ -2,7 +2,9 @@
 
 One maintained Definition builds the NKE CLI, complete upstream CWE runtime image and quickstart Helm bundle
 from NKE commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`. The generated workflow observes all three outputs,
-publishes them to GHCR, signs and verifies their publication envelopes, and finalizes a complete Run.
+publishes one release index to GHCR, signs and verifies that entry point and each deliverable manifest, and finalizes a Run only after its
+required checks pass. The [single-entry layout](publication-architecture.md) has been rehearsed locally with
+actual NVIDIA payloads; its new hosted signing/finalization path still needs an authorized run.
 The [successful hosted run and independent consumption](evidence/2026-09-10-combined-run.md) establish this
 combined path at the `pipeline-attested` / `artifact-publication` scope for those recorded personal-namespace
 inputs. It predates the current NVIDIA migration and catalog/tool/action changes; it is not evidence of a new
@@ -11,7 +13,7 @@ hosted Run from the current checkout.
 ## Implementation
 
 `definitions/nke-v1/definition.yaml` selects two catalog Recipes: `nke-cli` produces `nkectl`, and
-`nke-control-plane` produces `cwe` plus `nke-helm`. Environment inputs select Docker, publication repositories
+`nke-control-plane` produces `cwe` plus `nke-helm`. Environment inputs select Docker, one publication namespace
 and signing. The seven public objects and Definition → Run → Release lifecycle are unchanged.
 
 The CLI and source-chart archive build offline with the pinned Go toolchain. CWE wraps the upstream
@@ -37,6 +39,12 @@ Consumers supply the verified CWE repository as `image.repository`. The manifest
 Deployment template and cannot be replaced through `image.digest`. Rendering without a repository fails.
 See the [Definition README](../definitions/nke-v1/README.md) for generation and consumption commands.
 
+Release metadata references the CLI, native CWE and Helm manifests in their own repositories. The release
+index contains only metadata, referencing four stage-bound SBOM attestation bundles in the artifact repositories. One metadata document owns names, digests and evidence membership; there is no nested Helm root or
+separate lifecycle-binding object. Source build indexes remain internal job handoffs. The final Helm inventory
+is generated after binding and is distinct from the source-archive inventory. The SBOM-attestation stage verifies the bundles before publication; the root signature covers their exact
+identities and required membership through metadata; it does not sign the subsequent Run completion record.
+
 Generated Docker utility jobs use the runner's UID/GID so private package directories remain readable by later
 host transport steps. Each source fetch transports its exact receipt file, never the shared receipt directory.
 This preserves no-replace restoration when independent fetch jobs join at finalization. Receipt authentication
@@ -44,9 +52,11 @@ remains owned by the pipeline module.
 
 ## Validation
 
-The full local `make check` gate passed after the receipt fix: formatting, vet, golangci-lint, shellcheck and
+The original receipt-fix validation recorded the full local `make check` gate: formatting, vet, golangci-lint, shellcheck and
 race-enabled tests, with 64.2% statement coverage. Linux pipeline/sign race checks, actionlint, yamllint and
 byte-exact generation checks passed. The corrected graph's 35 artifact paths have no exact or ancestor overlap.
+
+Current single-entry checks and real-output results are in the [publication validation summary](publication-architecture.md#local-validation).
 
 Contract tests cover native-image byte/platform/diff-ID validation, unsafe archives, substituted producer
 results, source Helm cardinality, image dependency lowering, Deployment ambiguity and checksum regeneration.

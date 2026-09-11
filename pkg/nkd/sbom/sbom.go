@@ -362,7 +362,22 @@ func (b *BOM) Validate() error {
 	if artifact != "" {
 		serialSeed += "/" + artifact
 	}
-	if b.SerialNumber != deriveURN(serialSeed) {
+	expectedSerial := deriveURN(serialSeed)
+	for _, prop := range b.Metadata.Props {
+		if prop.Name == "nkd:evidenceStage" {
+			if !validEvidenceStage(prop.Value) || artifact == "" || len(b.Metadata.Component.Hashes) != 1 {
+				return e.New(e.CodeVerifyFailed, "SBOM has an invalid stage binding")
+			}
+			expectedSerial, err = stageSerialNumber(recipeDigest, artifact, prop.Value, "sha256:"+b.Metadata.Component.Hashes[0].Content)
+			if err != nil {
+				return err
+			}
+		}
+		if prop.Name == "nkd:inspectionInputDigest" && !canonical.IsDigest(prop.Value) {
+			return e.New(e.CodeVerifyFailed, "SBOM inspection input is not exact")
+		}
+	}
+	if b.SerialNumber != expectedSerial {
 		return e.New(e.CodeUnverifiedRef, "SBOM serialNumber is not bound to its exact recipe/artifact identity")
 	}
 	previous := ""

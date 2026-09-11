@@ -144,7 +144,7 @@ type SourceAccess struct {
 	CredentialRef string `json:"credentialRef"`
 }
 
-// Publication selects one OCI namespace. Repositories derive from output names.
+// Publication selects one OCI namespace. Release metadata/evidence use /releases; outputs use named sibling repositories.
 type Publication struct {
 	RepositoryPrefix string `json:"repositoryPrefix"`
 	CredentialRef    string `json:"credentialRef,omitempty"`

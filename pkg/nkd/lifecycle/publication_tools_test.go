@@ -49,14 +49,22 @@ func TestCatalogToolsAndDerivedPublication(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(plan.ExecutionSettings.Targets) != 3 || len(plan.ExecutionSettings.Routes) != 3 {
-				t.Fatal("not all outputs routed")
+			if len(plan.ExecutionSettings.Targets) != 1 || len(plan.ExecutionSettings.Routes) != 1 {
+				t.Fatal("publication must have exactly one repository route")
 			}
-			for _, name := range []string{"cwe", "nke-helm", "nkectl"} {
-				if plan.ExecutionSettings.Targets[name].Ref != "127.0.0.1:5000/nke/"+name {
-					t.Fatalf("wrong target for %s", name)
+			if plan.ExecutionSettings.Targets["release"].Ref != "127.0.0.1:5000/nke/releases" || plan.ExecutionSettings.Routes[0].Input != "package/release" {
+				t.Fatal("wrong shared publication target")
+			}
+			roots := 0
+			for _, node := range plan.Graph.Nodes {
+				if node.Kind == "package" && node.PackageKind == "oci-root" {
+					roots++
 				}
 			}
+			if roots != 1 {
+				t.Fatalf("got %d publication roots, want one", roots)
+			}
+
 			found := false
 			for _, node := range plan.Graph.Nodes {
 				if node.ID == "tool/cosign" {

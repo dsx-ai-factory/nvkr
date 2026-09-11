@@ -89,7 +89,7 @@ func TestHelmPackageIsStableAcrossWorkspaceRelocationAndReclaimsCarrier(t *testi
 	if err := executePackage(context.Background(), plan, node, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	first, err := delivery.Inspect(context.Background(), canonicalOutput)
+	first, err := delivery.PayloadDescriptor(context.Background(), canonicalOutput)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,11 +115,11 @@ func TestHelmPackageIsStableAcrossWorkspaceRelocationAndReclaimsCarrier(t *testi
 	if err := executePackage(context.Background(), plan, node, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	second, err := delivery.Inspect(context.Background(), relocatedOutput)
+	second, err := delivery.PayloadDescriptor(context.Background(), relocatedOutput)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.RootDigest != second.RootDigest {
-		t.Fatalf("Helm payload changed across workspace relocation: %s != %s", first.RootDigest, second.RootDigest)
+	if first.Digest != second.Digest {
+		t.Fatalf("Helm payload changed across workspace relocation: %s != %s", first.Digest, second.Digest)
 	}
 }

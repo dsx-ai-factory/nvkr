@@ -104,6 +104,8 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 		return executePublish(ctx, plan, node, artifacts, stdout)
 	case NodeComposition:
 		return executeComposition(ctx, plan, node, artifacts)
+	case NodeAttestEvidence:
+		return executeAttestEvidence(ctx, plan, node, artifacts, productionOCISigner, stdout)
 	case NodeSign:
 		return executeSign(ctx, plan, node, artifacts, productionOCISigner, stdout)
 	case NodeVerifyPublication:
@@ -475,14 +477,38 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		if err != nil {
 			return err
 		}
-		_, err = delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Objects: []delivery.ObjectInput{{
+		_, err = delivery.BuildArtifact(ctx, output.Path, delivery.ObjectInput{
 			Name: output.Name, Kind: "aicr-bundle", Path: archive,
 			ArtifactType: output.MediaType, LayerMediaType: "application/vnd.nkd.aicr-bundle.v1.tar",
 			SemanticDigest: digest, BlobDigest: digest,
-		}}})
+		})
 		return err
 	case PackageOCI:
 		objects := make([]delivery.ObjectInput, 0, len(inputs))
+		if len(plan.LifecycleOutputs) > 0 {
+			evidence, err := releaseEvidenceObjects(ctx, plan, node, artifacts)
+			if err != nil {
+				return err
+			}
+			objects = append(objects, evidence...)
+		} else {
+			evidenceNames := map[string]bool{}
+			for _, input := range inputs {
+				if input.Kind != "sbom-set" {
+					continue
+				}
+				evidence, err := sbomPublicationObjects(ctx, plan, input, artifacts, func(path string) (string, error) { return path, nil })
+				if err != nil {
+					return err
+				}
+				for _, object := range evidence {
+					if !evidenceNames[object.Name] {
+						objects = append(objects, object)
+						evidenceNames[object.Name] = true
+					}
+				}
+			}
+		}
 		var temporaryArchives []string
 		defer func() {
 			for _, path := range temporaryArchives {
@@ -501,7 +527,7 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 				if err != nil {
 					return err
 				}
-				object.Layout, object.SemanticDigest, object.BlobDigest = true, image.RootDigest, image.RootDigest
+				object.Layout, object.SemanticDigest, object.BlobDigest = true, image.ManifestDigest, image.RootDigest
 				object.OS, object.Arch = image.OS, image.Arch
 			case PackageBinaryBundle:
 				_, inspected, err := delivery.InspectBinaryBundle(ctx, input.Path)
@@ -509,7 +535,17 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 					return err
 				}
 				object.Layout, object.SemanticDigest, object.BlobDigest = true, inspected.SemanticDigest, inspected.RootDigest
-			case PackageHelm, PackageOCI:
+			case PackageHelm:
+				_, payload, err := delivery.ReadArtifact(ctx, input.Path)
+				if err != nil {
+					return err
+				}
+				object.Layout, object.SemanticDigest = true, pipeline.FileDigest(payload)
+				object.BlobDigest, err = digestFactoryPath(ctx, filepath.Join(input.Path, "index.json"))
+				if err != nil {
+					return err
+				}
+			case PackageOCI:
 				inspected, err := delivery.Inspect(ctx, input.Path)
 				if err != nil {
 					return err
@@ -546,14 +582,45 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			}
 			objects = append(objects, object)
 		}
+		var metadata *delivery.ReleaseMetadata
 		if len(plan.LifecycleOutputs) > 0 {
-			binding, err := lifecyclePublicationObject(ctx, plan, node, artifacts)
+			binding, err := lifecyclePublicationBinding(ctx, plan, node, artifacts)
 			if err != nil {
 				return err
 			}
-			objects = append(objects, binding)
+			metadata = &delivery.ReleaseMetadata{DefinitionDigest: binding.DefinitionDigest, EnvironmentDigest: binding.EnvironmentDigest, ContentSubject: binding.ContentSubject, Clusters: binding.Clusters}
+			for i := range objects {
+				for _, output := range binding.Outputs {
+					if objects[i].Name == output.Name {
+						objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind, RecipeDigest: output.RecipeDigest, Components: output.Components, TransportPath: output.TransportPath}
+						for _, component := range output.Components {
+							for _, inputID := range node.Inputs {
+								input := artifacts[inputID]
+								if input.Kind != "producer-result" || input.Component != component {
+									continue
+								}
+								matchingRecipe := false
+								for _, recipe := range plan.Recipes {
+									if recipe.Name == input.RecipeTarget && recipe.RecipeDigest == output.RecipeDigest {
+										matchingRecipe = true
+									}
+								}
+								if !matchingRecipe {
+									continue
+								}
+								result, err := readProducerResult(ctx, input.Path)
+								if err != nil {
+									return err
+								}
+								objects[i].Output.BuildSubjects = append(objects[i].Output.BuildSubjects, delivery.BuildSubject{Component: component, Digest: result.SHA256})
+							}
+						}
+
+					}
+				}
+			}
 		}
-		_, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Objects: objects})
+		_, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
 		return err
 	default:
 		return e.New(e.CodeEngineCapability, "factory package kind %q has no adapter", node.PackageKind)
@@ -647,6 +714,15 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	if target.CredentialRef != "" && (username == "" || password == "") {
 		return e.New(e.CodeTrustPolicyMissing,
 			"factory publication target %q requires its configured username and credential", node.Target)
+	}
+	if plan.ExecutionSettings.Signing != nil && plan.ExecutionSettings.Signing.Mode == SigningModeCosign && len(plan.LifecycleOutputs) > 0 {
+		inspection, err := delivery.Inspect(ctx, artifacts[node.Inputs[0]].Path)
+		if err != nil {
+			return err
+		}
+		if err := delivery.RequireAttestedEvidence(inspection); err != nil {
+			return err
+		}
 	}
 	ref, err := delivery.Push(ctx, artifacts[node.Inputs[0]].Path, target.Ref, delivery.RegistryOptions{
 		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,

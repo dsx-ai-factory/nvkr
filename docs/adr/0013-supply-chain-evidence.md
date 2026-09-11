@@ -138,9 +138,29 @@ The index binds the populated document digest. Hosted finalization rejects missi
 wrong subject/scanner bindings when inspection was requested. This is package discovery, not vulnerability scanning
 or qualified reproduction. It does not claim dependencies absent from artifact metadata can be discovered.
 
-SBOMs assert composition. They remain `static-unqualified` in dry-run, and participate in pipeline-attested
-evidence only through the signed Run's subject-bound closure; generation alone is no signature or reproduction
-proof. Acquired components retain `evidence: none` unless pinned upstream evidence is declared. V1 does not
+SBOMs assert composition. Packaging requires the contributing recipes' SBOM sets and producer records
+as explicit graph inputs. The shared packaging/finalization validator checks exact recipe, subject, document
+and requested scanner identities. Per-recipe indexes are internal handoffs only. The authoritative release index
+owns published evidence membership (ADR-20 §6); every required document is referenced once in its owning artifact repository and carries explicit
+subject kind/digest and stage. A shared file inventory may serve multiple output projections without duplication.
+CLI evidence covers the built binary. Native-image evidence targets its exact manifest and records the verified
+OCI-export input used by the scanner. Helm source evidence remains bound to the source archive; a separate
+packaging inventory reads the final bound archive after image binding and checksum refresh. That inventory
+covers chart declarations/references, not an execution or scan of referenced image contents.
+
+Each production document is published only inside a CycloneDX attestation in a Sigstore v0.3 bundle.
+An explicit pre-publication job creates and verifies those bundles with the configured workflow identity,
+issuer and transparency policy. Bundles are OCI referrers in their owning output repositories; an association
+to the final Helm manifest never changes the source-archive subject of source evidence. The release signature
+covers their exact manifest/blob identities and the canonical document digests through release metadata.
+Independent consumers verify the bundle's statement subject and signature. No extra signature on the SBOM
+wrapper or raw published document is required.
+Consumers derive mandatory evidence slots from output membership and reject missing, duplicate, substituted
+or unbound documents and stages. Finalization compares the published documents with the validated source
+handoffs and final package inventory. The current consumer has no old-layout fallback. This establishes
+pipeline artifact-publication evidence, not qualified receipts, vulnerability clearance or signed completion.
+
+SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature or reproduction proof. Acquired components retain `evidence: none` unless pinned upstream evidence is declared. V1 does not
 verify upstream signatures/provenance on acquisition. Vulnerability scanning stays outside v1.
 Curated/embedded aggregates use dependency edges from aggregate to members (ADR-10/22).
 

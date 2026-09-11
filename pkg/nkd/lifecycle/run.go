@@ -59,7 +59,7 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 		memberArtifactID := artifactID
 		if output.Format == OutputExecutable || output.Format == OutputOCI {
 			if environment.Publication != nil {
-				artifactID = "package/" + releasePackageName(output.Name)
+				artifactID = "package/" + publicationPackageName
 			}
 		}
 		componentResults := make([]string, 0, len(output.Components))
