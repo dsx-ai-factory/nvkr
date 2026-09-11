@@ -81,7 +81,7 @@ func (s *CosignOCISigner) VerifySBOM(ctx context.Context, digest string, bundle 
 	if err := writePrivateFile(ctx, path, bundle); err != nil {
 		return err
 	}
-	args := []string{"verify-blob-attestation", "--bundle", path, "--type", "cyclonedx", "--digest", strings.TrimPrefix(digest, "sha256:"), "--digestAlg", "sha256", "--certificate-identity-regexp", s.identity, "--certificate-oidc-issuer", s.issuer}
+	args := ociVerifyBundleArgs(path, digest, sbom.CycloneDXPredicateType, VerifyPolicy{IdentityRegexp: s.identity, Issuer: s.issuer})
 	if _, err := s.capture(ctx, args, ociCosignEnvironment(os.Environ(), "")); err != nil {
 		return err
 	}

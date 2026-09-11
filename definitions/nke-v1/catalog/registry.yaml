@@ -90,7 +90,7 @@ sources:
     repo: https://github.com/actions/upload-artifact
     constraint: 7.x
   cosign:
-    constraint: 2.6.x
+    constraint: 3.1.x
     repo: https://github.com/sigstore/cosign
     tool:
       executablePath: cosign-linux-amd64

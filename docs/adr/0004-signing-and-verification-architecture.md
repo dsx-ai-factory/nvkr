@@ -103,10 +103,27 @@ Trust must originate from **outside** the verified object. Resolution precedence
 
 ### 5. Pipeline-attested OCI signing and consumer verification
 
-The v1 registry signer uses cosign-native `sign` and `attest` on each pushed digest, with cosign 2.x tag-based
-signature/attestation storage. It is keyless only; the keyed/KMS fallback in §1 applies solely to detached
-qualified documents. Environment owns the exact lowercase SHA-256 pin of the cosign executable, its acquisition
-reference, expected identity, and issuer. Ambient PATH or a version string is not a pin.
+The v1 registry signer uses the catalog-pinned cosign 3.1.3 executable. Artifact signatures, SLSA production
+provenance and CycloneDX SBOMs all use standard Sigstore v0.3 DSSE bundles published as OCI referrers.
+`sign` and `attest` explicitly select bundle format; SBOM creation uses `attest-blob` with the same format.
+The signature predicate is `https://sigstore.dev/cosign/sign/v1`; SLSA and CycloneDX retain their distinct
+standard predicate types. One evidence class cannot satisfy another.
+
+Verification downloads only the required signature/provenance bundles using cosign's predicate-filtered
+`download attestation`, then verifies their exact bytes with `verify-blob-attestation`, the expected digest,
+identity and issuer. It reads observed identity/issuer from the embedded certificate in those same verified
+bytes, never from cosign's presentation output or statement annotations. Legacy reports and public-key
+bundles cannot satisfy this keyless policy. Registry order is normalized; bounded candidates are checked
+against the externally selected policy, and success requires an authenticated bundle for each required type.
+The adapter bounds download output, candidate count and verification duration, uses private temporary bundle
+files, checks them for mutation and removes them on success or failure. It does not download artifact payloads
+or use a local-image snapshot. Missing evidence fails without a partial successful record or legacy fallback.
+Previously published legacy signature/provenance attachments must be reissued as bundles.
+
+The adapter is keyless only; the keyed/KMS fallback in §1 applies solely to detached qualified documents.
+Catalog tool sources and locks own the acquisition reference and exact executable digest; Environment selects
+the expected identity and issuer. Ambient PATH or a version string is not a pin. Production retains normal
+transparency checks. Local-key tests deliberately substitute fixture trust and do not establish hosted acceptance.
 
 The pipeline signs and attests each deliverable manifest in its own repository, then the release index.
 The same Run-level production predicate is subject-bound separately to each manifest. Hosted verification
@@ -131,8 +148,9 @@ never argv. Dry-run executes no signer and contacts no registry for signing; it 
 
 Build identity is a fixed committed workflow path and default-branch ref under an explicit issuer. The separate
 recipe/evidence qualification workflow has its own identity; build provenance and qualification evidence cannot
-substitute for one another. Consumer instructions publish both identities and retain stock `cosign verify` and
-`cosign verify-attestation --type slsaprovenance1` as supported independent verification paths. An NKD reader is
+substitute for one another. Consumer instructions publish both identities and use stock
+`cosign verify-attestation` with the explicit signature or SLSA predicate type. Downloaded bundles are also
+independently verifiable with `verify-blob-attestation` and an independently selected digest. An NKD reader is
 a convenience, never a mandatory trust service. Event and credential admission are owned by ADR-18.
 
 A Verification Policy explicitly selects lane and acceptance scope:

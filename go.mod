@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/google/go-containerregistry v0.22.1
 	github.com/urfave/cli/v2 v2.27.7
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 	sigs.k8s.io/yaml v1.6.0
 )
 

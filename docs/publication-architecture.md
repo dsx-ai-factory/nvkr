@@ -118,10 +118,11 @@ claim, and none of these checks establishes qualified reproduction, vulnerabilit
 ## Independent consumption
 
 Use a trusted cosign installation and an externally selected workflow identity/issuer. Artifact signatures and
-SLSA attestations remain independently verifiable at the deliverable's exact manifest reference:
+SLSA attestations are standard Sigstore v0.3 bundles under the cosign 3.1.3 contract. Select each required
+predicate explicitly at the deliverable's exact manifest reference:
 
 ```sh
-cosign verify \
+cosign verify-attestation --type https://sigstore.dev/cosign/sign/v1 \
   --certificate-identity 'https://github.com/NVIDIA/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 cosign verify-attestation --type slsaprovenance1 \
@@ -144,6 +145,11 @@ trusting the downloaded bundle. For CWE it is the native manifest digest; for CL
 or archive digest. Referrer discovery alone establishes no trust. The registry adapter uses the standard
 referrers API or the library's OCI fallback index; discovery indexes are not additional SBOM documents.
 
+The NKD adapter downloads only the required signature and provenance bundles, verifies their exact bytes with
+`verify-blob-attestation`, and derives identity from the embedded certificate after successful verification.
+It does not copy the artifact or fall back to legacy attachments. Existing legacy signatures/provenance must
+be reissued as bundles before the updated consumer can accept them.
+
 ## Validation boundary
 
 Contract tests cover missing, substituted, duplicate and unbound evidence, wrong subjects/stages/documents,
@@ -163,5 +169,5 @@ The earlier loopback rehearsal at
 predates SBOM co-location and attestations. It demonstrated recovery of the original CLI/Helm bytes and exact
 CWE binding, but its five-manifest release index is not the current layout.
 
-See the pinned [cosign attestation options](https://github.com/sigstore/cosign/blob/v2.6.3/cmd/cosign/cli/options/attest_blob.go)
-and [verification options](https://github.com/sigstore/cosign/blob/v2.6.3/cmd/cosign/cli/options/verify.go) for the adapter's command contract.
+See the pinned [cosign attestation options](https://github.com/sigstore/cosign/blob/v3.1.3/cmd/cosign/cli/options/attest_blob.go)
+and [verification options](https://github.com/sigstore/cosign/blob/v3.1.3/cmd/cosign/cli/options/verify.go) for the adapter's command contract.
