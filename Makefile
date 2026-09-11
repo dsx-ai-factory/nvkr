@@ -87,8 +87,16 @@ tidy: ## Format + go mod tidy.
 	go mod tidy
 
 .PHONY: workflows-check
-workflows-check: build ## Verify the committed Run generation matches the catalog (ADR-21 drift gate).
-	$(BIN) run generate --engine github \
+workflows-check: ## Verify the committed Run generation matches the catalog (ADR-21 drift gate).
+	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
+	@# in .github/nkd-run/plan.json as `generatorVersion`. Building via `make build`,
+	@# whose version comes from `git describe`, therefore always reports drift. Build
+	@# the generator with the same canonical version string the generated Run
+	@# workflow uses, so this target is reproducible locally and in CI.
+	CGO_ENABLED=0 go build -trimpath \
+		-ldflags '-X main.version=dev -X main.commit=unknown' \
+		-o bin/nkd-exec ./cmd/nkdctl
+	bin/nkd-exec run generate --engine github \
 		--definition definitions/nke-v1/definition.yaml \
 		--environment definitions/nke-v1/environment-github.yaml \
 		--root . --check
