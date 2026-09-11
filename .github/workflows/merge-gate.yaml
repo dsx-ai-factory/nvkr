@@ -37,9 +37,8 @@
 #   version, and this workflow. Otherwise a change to a gate can skip the gate
 #   it changes.
 #
-# PLANNED CHECKS (not yet implemented; see the ordering note in each stub)
-#   actionlint · verify-licenses · workflows-regen · analyze (CodeQL) ·
-#   malware-scan (ClamAV)
+# PLANNED CHECKS (not yet implemented; see the note at each stub)
+#   verify-licenses · workflows-regen · malware-scan (ClamAV)
 
 name: Merge Gate
 
@@ -178,23 +177,62 @@ jobs:
       - run: echo "No code changes — repository checks not required"
 
   # ---------------------------------------------------------------------------
-  # PLANNED: actionlint
+  # Workflow linting
   #
-  # Highest value of the planned checks for this repository specifically,
-  # because workflows here are generated rather than hand-written: a malformed
-  # emission should fail the gate rather than land. Gate on the `actions`
-  # output, which check-paths already computes.
-  #
-  #   actionlint:
-  #     needs: [check-paths]
-  #     if: needs.check-paths.outputs.actions == 'true'
-  #   actionlint-skip:
-  #     needs: [check-paths]
-  #     if: needs.check-paths.outputs.actions != 'true'
-  #
-  # Install by pinned version with an upstream checksum verification rather
-  # than piping the installer script from the default branch.
+  # Highest value on this repository specifically: workflows here are generated
+  # rather than hand-written, so a malformed emission should fail the gate
+  # rather than land.
   # ---------------------------------------------------------------------------
+
+  actionlint:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.actions == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install actionlint
+        # Pinned by version, with the downloaded binary verified against the
+        # upstream-published checksum file. The upstream one-liner installer
+        # pipes a script from the default branch into bash and downloads the
+        # binary with no checksum verification.
+        env:
+          ACTIONLINT_VERSION: '1.7.12'
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          TAR="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          TMP="$(mktemp -d)"
+          curl -fsSL -o "${TMP}/${TAR}" "${BASE}/${TAR}"
+          curl -fsSL -o "${TMP}/checksums.txt" "${BASE}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          EXPECTED=$(awk -v t="${TAR}" '$2 == t {print $1}' "${TMP}/checksums.txt")
+          if [[ -z "${EXPECTED}" ]]; then
+            echo "::error::no checksum entry for ${TAR} in upstream checksums.txt"
+            exit 1
+          fi
+          ACTUAL=$(sha256sum "${TMP}/${TAR}" | awk '{print $1}')
+          if [[ "${ACTUAL}" != "${EXPECTED}" ]]; then
+            echo "::error::actionlint checksum mismatch: expected ${EXPECTED}, got ${ACTUAL}"
+            exit 1
+          fi
+          tar -xzf "${TMP}/${TAR}" -C "${TMP}" actionlint
+          mv "${TMP}/actionlint" "${PWD}/actionlint"
+          rm -rf "${TMP}"
+          echo "${PWD}" >> "$GITHUB_PATH"
+
+      - name: Run actionlint
+        run: actionlint -color
+
+  actionlint-skip:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.actions != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "No workflow/action changes — actionlint not required"
 
   # ---------------------------------------------------------------------------
   # PLANNED: verify-licenses
@@ -216,12 +254,55 @@ jobs:
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
-  # PLANNED: analyze (CodeQL) and malware-scan (ClamAV)
+  # Static analysis (CodeQL)
   #
-  # Both are straight ports from AICR's merge gate. CodeQL needs
-  # `security-events: write`, which a fork PR does not receive — it must
-  # therefore tolerate being skipped on fork runs, or run only via the
-  # copy-pr-bot mirror branch.
+  # Uploading results needs `security-events: write`. On a private or internal
+  # repository that also requires GitHub Advanced Security; on a public one it
+  # is free, which is why a workflow copied from a public repository can pass
+  # there and fail here. A fork PR never receives the scope, so this job must
+  # be allowed to fail on fork runs or be reached via the copy-pr-bot mirror.
+  # ---------------------------------------------------------------------------
+
+  analyze:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: go
+
+      - run: go build ./...
+
+      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+
+  analyze-skip:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "No code changes — CodeQL not required"
+
+  # ---------------------------------------------------------------------------
+  # PLANNED: malware-scan (ClamAV)
+  #
+  # A port of AICR's 197-line composite action; kept separate because it
+  # introduces a new local action rather than reusing an upstream one.
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
@@ -234,6 +315,10 @@ jobs:
       - check-paths
       - check
       - check-skip
+      - actionlint
+      - actionlint-skip
+      - analyze
+      - analyze-skip
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
