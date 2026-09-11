@@ -13,7 +13,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     # Generated workflow pins must change through NKD inputs and regeneration.
-    # Keep Dependabot updates for the handwritten ci.yml workflow.
+    # Keep Dependabot updates for the handwritten merge-gate.yaml workflow.
     exclude-paths:
       - .github/workflows/nkd-run.yml
     schedule:
