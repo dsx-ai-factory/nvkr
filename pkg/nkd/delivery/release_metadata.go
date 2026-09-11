@@ -52,6 +52,7 @@ type BuildSubject struct {
 // EvidenceBinding describes exactly which stage and bytes a document inventories.
 // DescriptorDigest and BlobDigest on the enclosing object bind the document.
 type EvidenceBinding struct {
+	DocumentDigest        string   `json:"documentDigest"`
 	Outputs               []string `json:"outputs"`
 	Component             string   `json:"component"`
 	Stage                 string   `json:"stage"`

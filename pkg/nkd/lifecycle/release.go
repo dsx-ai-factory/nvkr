@@ -177,6 +177,9 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 	if inspection.RootDigest != digest {
 		return nil, e.New(e.CodeVerifyFailed, "materialized publication root %s differs from requested subject %s", inspection.RootDigest, digest)
 	}
+	if err := delivery.RequireAttestedEvidence(inspection); err != nil {
+		return nil, err
+	}
 	artifacts, contentSubject, clusters, err := artifactsFromBinding(ctx, materialized.path, inspection)
 	if err != nil {
 		return nil, err

@@ -121,7 +121,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	signJobs := make(map[string]bool, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
-		if node.Kind == NodeSign {
+		if node.Kind == NodeSign || node.Kind == NodeAttestEvidence {
 			signJobs[nodeJobs[node.ID]] = true
 		}
 	}
@@ -269,7 +269,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			if !strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "" {
 				return e.New(e.CodeEngineCapability, "GitHub anonymous publish job %q has unnecessary packages permission", jobID)
 			}
-			if target.CredentialRef != "" && job.Env["NKD_CREDENTIAL"] == "" {
+			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence && job.Env["NKD_CREDENTIAL"] == "" {
 				return e.New(e.CodeEngineCapability, "GitHub publish job %q omits its credential reference", jobID)
 			}
 		}
@@ -277,6 +277,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			if plan.ExecutionSettings.Signing == nil {
 				return e.New(e.CodeTrustPolicyMissing,
 					"GitHub signing job %q has no delivery signing profile", jobID)
+			}
+			if node.Kind == NodeAttestEvidence && (job.Env["NKD_CREDENTIAL"] != "" || job.Env["NKD_REGISTRY_USER"] != "") {
+				return e.New(e.CodeEngineCapability, "SBOM attestation job must not receive registry credentials")
 			}
 			expected := githubSigningPermissions(node.Kind, plan.ExecutionSettings.Signing.Mode)
 			if len(job.Permissions) != len(expected) {
@@ -291,7 +294,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				}
 			}
 			target := plan.ExecutionSettings.Targets[node.Target]
-			if target.CredentialRef != "" && job.Env["NKD_CREDENTIAL"] == "" {
+			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence && job.Env["NKD_CREDENTIAL"] == "" {
 				return e.New(e.CodeEngineCapability, "GitHub signing job %q omits its credential reference", jobID)
 			}
 		}

@@ -680,7 +680,7 @@ func failedLocalDependency(graph ArtifactGraph, node Node, status map[string]str
 // the dry-run listing and the executing loop.
 func requiresPublication(kind string) bool {
 	switch kind {
-	case NodePublish, NodeSign, NodeVerifyPublication:
+	case NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence:
 		return true
 	default:
 		return false

@@ -24,10 +24,12 @@ built source archive, preceding the separate image-binding and packaging operati
 A Definition without `sbomTool` still emits declaration-only source metadata and does not claim dependency
 inspection. This does not enable vulnerability scanning or qualified reproduction.
 
-One release index includes each required CycloneDX document once. Its metadata records exact subject,
+One release index references each required CycloneDX attestation bundle once in its owning artifact repository.
+The document appears only inside that signed statement; raw SBOM files remain private job handoffs. Its metadata records exact subject,
 covered stage, raw document digest, typed document identity and output membership. Build-time per-recipe
 indexes remain internal handoffs. Packaging verifies their recipe/producer/scanner bindings, transforms the
-published documents to explicit stage subjects, and adds the final Helm packaging inventory. The native CWE
+documents to explicit stage subjects, and adds the final Helm packaging inventory. Before publication a
+separate stage creates and verifies subject-bound Sigstore bundles, then derives the final release index. The native CWE
 SBOM targets the delivered image manifest and records the scanned export digest. Signing the release index
 covers all these exact bytes recursively. Source-archive evidence is never relabeled as final-chart evidence.
 See [the registry graph](publication-architecture.md) for every remaining manifest and attachment.

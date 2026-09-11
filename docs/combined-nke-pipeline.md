@@ -2,7 +2,7 @@
 
 One maintained Definition builds the NKE CLI, complete upstream CWE runtime image and quickstart Helm bundle
 from NKE commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`. The generated workflow observes all three outputs,
-publishes one release index to GHCR, signs and verifies that entry point, and finalizes a Run only after its
+publishes one release index to GHCR, signs and verifies that entry point and each deliverable manifest, and finalizes a Run only after its
 required checks pass. The [single-entry layout](publication-architecture.md) has been rehearsed locally with
 actual NVIDIA payloads; its new hosted signing/finalization path still needs an authorized run.
 The [successful hosted run and independent consumption](evidence/2026-09-10-combined-run.md) establish this
@@ -40,10 +40,10 @@ Deployment template and cannot be replaced through `image.digest`. Rendering wit
 See the [Definition README](../definitions/nke-v1/README.md) for generation and consumption commands.
 
 Release metadata references the CLI, native CWE and Helm manifests in their own repositories. The release
-index contains its metadata and four stage-bound SBOMs once. One metadata document owns names, digests and evidence membership; there is no nested Helm root or
+index contains only metadata, referencing four stage-bound SBOM attestation bundles in the artifact repositories. One metadata document owns names, digests and evidence membership; there is no nested Helm root or
 separate lifecycle-binding object. Source build indexes remain internal job handoffs. The final Helm inventory
-is generated after binding and is distinct from the source-archive inventory. The root signature covers required
-evidence recursively; it does not sign the subsequent Run completion record.
+is generated after binding and is distinct from the source-archive inventory. The SBOM-attestation stage verifies the bundles before publication; the root signature covers their exact
+identities and required membership through metadata; it does not sign the subsequent Run completion record.
 
 Generated Docker utility jobs use the runner's UID/GID so private package directories remain readable by later
 host transport steps. Each source fetch transports its exact receipt file, never the shared receipt directory.

@@ -527,9 +527,15 @@ CLI and a digest-pinned acquired utility, then requests a binary bundle for one 
    qualification verdict and a release-manifest entry; neither is implied by the artifact already being in OCI.
 
 The acquired component retains its acquisition-only claim. SBOM generation asserts composition; it neither
-verifies upstream signatures nor upgrades evidence. The release index includes each required document once
-before signing, so the root signature covers its exact bytes. Helm source-archive and final bound-package
+verifies upstream signatures nor upgrades evidence. The release metadata references each required document once in its owning artifact repository
+as a subject-bound CycloneDX attestation bundle. Attestations are created and verified before deriving
+the final release index, so its signature covers each exact bundle and document digest. Helm source-archive and final bound-package
 inventories are separate claims; Run completion is not signed. See the [registry graph](publication-architecture.md). Build-only and dry-run outputs gain no signature.
+
+Independent artifact consumption uses a signature and subject-bound production attestation on each deliverable
+manifest in its own repository. The release signature remains the authority for membership and SBOM coverage;
+standalone artifact verification does not establish those release-wide claims (ADR-04/20). Hosted acceptance
+of the new signing layout remains pending.
 
 | Change to the example | Identity effect |
 |---|---|

@@ -50,10 +50,12 @@ func githubNodeLabel(plan *Plan, node Node) string {
 		return "Package " + name
 	case NodePublish:
 		return "Publish " + name
+	case NodeAttestEvidence:
+		return "Create and verify SBOM attestations: " + name
 	case NodeSign:
-		return "Sign and attest " + name
+		return "Sign and attest release and deliverables: " + name
 	case NodeVerifyPublication:
-		return "Verify published signatures: " + name
+		return "Verify release and deliverable signatures: " + name
 	case NodeComposition:
 		return "Assemble cluster: " + name
 	case NodeAICR:

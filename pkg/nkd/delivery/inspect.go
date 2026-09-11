@@ -96,7 +96,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 		}
 	}
 	for _, object := range publication.Objects {
-		if object.Output == nil {
+		if object.Output == nil && object.Evidence == nil {
 			continue
 		}
 		if _, exists := descriptors[object.DescriptorDigest]; exists {
@@ -119,7 +119,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 		if !ok || descriptor.ArtifactType != object.ArtifactType || descriptor.Size != object.Size {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "publication object %q does not match its OCI descriptor", object.Name)
 		}
-		if object.Output == nil && (descriptor.Annotations["dev.nkd.semantic.digest"] != object.SemanticDigest ||
+		if object.Output == nil && object.Evidence == nil && (descriptor.Annotations["dev.nkd.semantic.digest"] != object.SemanticDigest ||
 			descriptor.Annotations["dev.nkd.object.kind"] != object.Kind ||
 			descriptor.Annotations["org.opencontainers.image.title"] != object.Name) {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "publication object %q descriptor annotations do not match root semantics", object.Name)

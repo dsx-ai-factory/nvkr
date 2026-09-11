@@ -36,11 +36,13 @@ type Descriptor struct {
 }
 
 type ociManifest struct {
-	SchemaVersion int          `json:"schemaVersion"`
-	MediaType     string       `json:"mediaType"`
-	ArtifactType  string       `json:"artifactType"`
-	Config        Descriptor   `json:"config"`
-	Layers        []Descriptor `json:"layers"`
+	Annotations   map[string]string `json:"annotations,omitempty"`
+	Subject       *Descriptor       `json:"subject,omitempty"`
+	SchemaVersion int               `json:"schemaVersion"`
+	MediaType     string            `json:"mediaType"`
+	ArtifactType  string            `json:"artifactType"`
+	Config        Descriptor        `json:"config"`
+	Layers        []Descriptor      `json:"layers"`
 }
 
 type ociIndex struct {
@@ -88,6 +90,8 @@ type capturedBinary struct {
 // are nested by descriptor and copied as an exact closure; regular files become
 // one-layer OCI artifacts.
 type ObjectInput struct {
+	annotations    map[string]string
+	subject        *Descriptor
 	Output         *OutputBinding
 	Evidence       *EvidenceBinding
 	Name           string
@@ -257,6 +261,9 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 	}
 	objects := append([]ObjectInput(nil), requested...)
 	sort.Slice(objects, func(i, j int) bool {
+		if (objects[i].Evidence == nil) != (objects[j].Evidence == nil) {
+			return objects[i].Evidence == nil
+		}
 		if objects[i].Name != objects[j].Name {
 			return objects[i].Name < objects[j].Name
 		}
@@ -277,6 +284,15 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 			return Result{}, e.New(e.CodeInvalidCatalog, "publication repeats object %s/%s", input.Name, input.Kind)
 		}
 		previous = key
+		if input.Evidence != nil {
+			binding := *input.Evidence
+			input.Evidence = &binding
+			owner, ownerErr := evidenceOwner(root.Objects, input.Evidence)
+			if ownerErr != nil {
+				return Result{}, ownerErr
+			}
+			input.subject = &Descriptor{MediaType: MediaOCIManifest, Digest: owner.DescriptorDigest, Size: owner.Size}
+		}
 		var descriptor Descriptor
 		var blobDigest string
 		if input.Layout && root.Release != nil {
@@ -294,6 +310,9 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		}
 		if err != nil {
 			return Result{}, err
+		}
+		if input.Evidence != nil && input.Evidence.DocumentDigest == "" && input.ArtifactType == "application/vnd.cyclonedx+json" {
+			input.Evidence.DocumentDigest = blobDigest
 		}
 		if !isDigest(input.SemanticDigest) {
 			return Result{}, e.New(e.CodeUnverifiedRef, "publication object %q requires an exact semantic digest", input.Name)
@@ -313,7 +332,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		if input.Arch != "" {
 			descriptor.Annotations["org.opencontainers.image.architecture"] = input.Arch
 		}
-		if input.Output == nil {
+		if input.Output == nil && input.Evidence == nil {
 			descriptors = append(descriptors, descriptor)
 		}
 		root.Objects = append(root.Objects, PublishedObject{Name: input.Name, Kind: input.Kind,
@@ -322,27 +341,44 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 			SemanticDigest: input.SemanticDigest, BlobDigest: blobDigest,
 			Size: descriptor.Size, OS: input.OS, Arch: input.Arch})
 	}
+	rootDigest, rootSemantic, err := writer.writePublicationMetadata(root, descriptors)
+	if err != nil {
+		return Result{}, err
+	}
+	if inspection, err := Inspect(ctx, stage); err != nil || inspection.RootDigest != rootDigest {
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{}, e.New(e.CodeVerifyFailed, "staged publication-root layout changed before commit")
+	}
+	if err := commit(); err != nil {
+		return Result{}, err
+	}
+	return Result{LayoutPath: out, RootDigest: rootDigest, SemanticDigest: rootSemantic}, nil
+}
+
+func (writer layoutWriter) writePublicationMetadata(root PublicationRoot, descriptors []Descriptor) (string, string, error) {
 	sortObjects(root.Objects)
 	if err := root.Validate(); err != nil {
-		return Result{}, err
+		return "", "", err
 	}
 	rootSemantic, err := root.Digest()
 	if err != nil {
-		return Result{}, err
+		return "", "", err
 	}
 	rootBytes, err := canonical.Marshal(root)
 	if err != nil {
-		return Result{}, err
+		return "", "", err
 	}
 	config, err := writer.addBlobBytes(rootBytes, MediaPublicationRootConfig)
 	if err != nil {
-		return Result{}, err
+		return "", "", err
 	}
 	rootManifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest,
 		ArtifactType: MediaPublicationRoot, Config: config, Layers: []Descriptor{}}
 	rootDescriptor, err := writer.addJSONBlob(rootManifest, MediaOCIManifest)
 	if err != nil {
-		return Result{}, err
+		return "", "", err
 	}
 	rootDescriptor.ArtifactType = MediaPublicationRoot
 	rootDescriptor.Annotations = map[string]string{"org.opencontainers.image.title": "publication-root", "dev.nkd.semantic.digest": rootSemantic}
@@ -357,18 +393,9 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		}}
 	rootDigest, err := writer.writeIndex(index)
 	if err != nil {
-		return Result{}, err
+		return "", "", err
 	}
-	if inspection, err := Inspect(ctx, stage); err != nil || inspection.RootDigest != rootDigest {
-		if err != nil {
-			return Result{}, err
-		}
-		return Result{}, e.New(e.CodeVerifyFailed, "staged publication-root layout changed before commit")
-	}
-	if err := commit(); err != nil {
-		return Result{}, err
-	}
-	return Result{LayoutPath: out, RootDigest: rootDigest, SemanticDigest: rootSemantic}, nil
+	return rootDigest, rootSemantic, nil
 }
 
 func (writer layoutWriter) addFileObject(ctx context.Context, input ObjectInput) (Descriptor, string, error) {
@@ -426,7 +453,7 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 		return Descriptor{}, "", err
 	}
 	manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: input.ArtifactType,
-		Config: config, Layers: []Descriptor{layer}}
+		Config: config, Layers: []Descriptor{layer}, Subject: input.subject, Annotations: input.annotations}
 	descriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
 	if err != nil {
 		return Descriptor{}, "", err

@@ -103,7 +103,8 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			want, ok := expected[key]
 			single := binding
 			single.Outputs = []string{outputName}
-			if outputName <= previousOutput || !ok || seen[key] || !reflect.DeepEqual(single, want) || object.Kind != "sbom" || object.ArtifactType != "application/vnd.cyclonedx+json" {
+			single.DocumentDigest = ""
+			if outputName <= previousOutput || !ok || seen[key] || !reflect.DeepEqual(single, want) || object.Kind != "sbom" || (object.ArtifactType != "application/vnd.cyclonedx+json" && object.ArtifactType != sbom.BundleMediaType) {
 				return e.New(e.CodeVerifyFailed, "missing, duplicate or substituted evidence binding %q", key)
 			}
 			previousOutput = outputName
@@ -113,12 +114,28 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		if err != nil {
 			return err
 		}
-		if len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != "application/vnd.cyclonedx+json" {
+		owner, err := evidenceOwner(publication.Objects, object.Evidence)
+		if err != nil {
+			return err
+		}
+		if manifest.Subject == nil || manifest.Subject.Digest != owner.DescriptorDigest || manifest.Subject.Size != owner.Size || manifest.Subject.MediaType != MediaOCIManifest {
+			return e.New(e.CodeVerifyFailed, "SBOM attachment is not bound to its associated deliverable")
+		}
+		if len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != object.ArtifactType {
 			return e.New(e.CodeVerifyFailed, "SBOM manifest has an invalid payload")
 		}
 		raw, err := readBlob(ctx, root, manifest.Layers[0], 8<<20)
 		if err != nil {
 			return err
+		}
+		if object.ArtifactType == sbom.BundleMediaType {
+			raw, err = sbom.AttestedDocument(raw, binding.SubjectDigest)
+			if err != nil {
+				return err
+			}
+		}
+		if digestBytes(raw) != binding.DocumentDigest {
+			return e.New(e.CodeVerifyFailed, "SBOM document digest differs from its release binding")
 		}
 		var bom sbom.BOM
 		if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &bom); err != nil {

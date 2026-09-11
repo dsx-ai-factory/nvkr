@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-09-10. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
+Reviewed 2026-09-11. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
 Each ADR contains its current lane-specific decision; no amendment chain is needed. Code/tests establish
 implementation. Contract tests, recorded external runs, and organizational acceptance are separate facts.
 
@@ -16,7 +16,7 @@ implementation. Contract tests, recorded external runs, and organizational accep
 | 09 Provenance | Deterministic reproduction and distinct SLSA production predicates; exact plan/dependency/subject checks during hosted finalization | Real signed hosted provenance and independent consumption exercised; ongoing provider/service acceptance remains operational |
 | 10 Builders | OCI source execution, digest-pinned acquisition and rootless BuildKit wrapped OCI exports; complete upstream CWE Dockerfile builds and offline payload checks passed locally and from the generated hosted Run | Qualified Nix closure observation, other wrapped adapters, fused large-output credential phases and `embeds` remain |
 | 11–12 Resolution/AICR | Layered conflict checks, category selection, role/cluster separation, exact AICR activation/generator identity; Linux held generator/render-tree contract | No cross-process qualified render-to-vector publisher; loader/library closure and real downstream activation remain |
-| 13 Evidence | Per-observed-artifact CycloneDX SBOM and per-recipe index; pinned offline Syft dependency discovery for binaries/images and Helm/AICR chart metadata discovery; exact payload/scanner inputs and shared packaging/finalization checks; one release index with required stage-bound SBOM documents and signed sibling output repository/digest bindings; internal indexes are not published; [all three real NKE artifacts inspected offline](../dependency-sboms.md); typed evidence and mirror-invariant qualified publisher evidence | NVIDIA Run 34540582090 independently verified signatures and provenance, but its SBOMs were outside the signed root. The single-entry publication layout is locally contract-tested; a new hosted Run remains required. Separate signed evidence-receipt/referrer publication, vulnerability scanner execution and advisory generation remain outside v1; acquired upstream signatures/provenance are not verified |
+| 13 Evidence | Per-observed-artifact CycloneDX SBOM and per-recipe index; pinned offline Syft dependency discovery for binaries/images and Helm/AICR chart metadata discovery; exact payload/scanner inputs and shared packaging/finalization checks; one release index referencing required stage-bound CycloneDX attestation bundles beside their outputs and signed sibling output repository/digest bindings; internal indexes are not published; [all three real NKE artifacts inspected offline](../dependency-sboms.md); typed evidence and mirror-invariant qualified publisher evidence | NVIDIA Run 34540582090 independently verified signatures and provenance, but its SBOMs were outside the signed root. The single-entry layout, SBOM attestation bundles, and independent deliverable signing are locally contract-tested; a new hosted Run remains required. Qualified signed evidence-receipt publication, vulnerability scanner execution and advisory generation remain outside v1; acquired upstream signatures/provenance are not verified |
 | 14 Delivery | Typed executable/APT/Helm layouts, including observed source Helm archives with exact producer checks and explicit image-package dependencies; resource-bounded RAW/ISO measurement; Linux held-qemu existing-envelope verification | Source quickstart archive, produced-image binding, checksums and all three local chart renders exercised from independently verified hosted publications. Disk/rootfs production, boot, encryption, unsigned-vector staging and qualified packaging fail admission; no masked-region support |
 | 15 Air gap | Outside current scope; former package, CLI and tests removed | No mirror or zero-egress lifecycle implementation |
 | 16 Release gates | Exact policy, reproduced-member, evidence/waiver, compatibility, conformance, trusted status and clearance contracts | No qualified production publication round trip; variant fallback is removed; incremental reuse remains diagnostic. V1 M3 qualification/M4 manifests are unimplemented |
@@ -82,6 +82,16 @@ image route remains unavailable until its receipt protocol exists.
 
 ## Repository validation
 
+The current SBOM-attestation change passed the full native `make check` gate and uncached `go test ./... -count=1`,
+with 70.0% race-test coverage, actionlint and byte-exact workflow regeneration. Linux sign/SBOM race tests passed
+with networking disabled. An offline synthetic cosign 2.6.3 experiment used executable digest
+`sha256:7c78a7f2efc00088bd788a758db6e0928e79f3e0eb83eb5d3c499ed98da4c4f4`, matching the catalog, to create a
+standard bundle, recover its exact canonical document and verify an ephemeral local-key signature. That fixture
+explicitly omitted transparency logging; production keeps transparency and identity checks enabled. Native
+registry tests demonstrate attestation referrer discovery and absent copies in the release repository. Default
+yamllint formatting findings remain separate from the passing release gate. No hosted attestation-only release
+has been published or independently accepted yet.
+
 On 2026-09-08 the consolidation/demo cleanup passed native `go test ./... -count=1`,
 `go test -race ./... -count=1`, `go vet ./...`, formatting, golangci-lint 2.13.1 built with Go 1.27,
 ShellCheck and `git diff --check`. Linux/arm64 sign/pipeline race tests also passed in Go 1.27 with container
@@ -124,7 +134,8 @@ Current authoring uses catalog source/lock entries for tool releases and Definit
 Environment publication is one untagged repository prefix with generated output routes. Tool asset pinning
 was exercised against official Syft, cosign and AICR releases. Digest-only publication is covered by a local
 registry round trip; the first NVIDIA hosted publication was independently verified, but the new single-entry SBOM-covered layout
-requires a fresh hosted run.
+requires a fresh hosted run. The current SBOM-attestation path has synthetic local-key format/verification
+evidence with pinned cosign and Linux signing race coverage; these do not establish keyless/transparency acceptance.
 
 GitHub action dependencies now use catalog source constraints and the same pin/bump lock writer. Run plans
 carry resolved action commits; both GitHub renderers admit repository and major-version contracts before

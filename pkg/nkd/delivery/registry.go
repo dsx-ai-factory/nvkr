@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"os"
+	"sort"
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -72,13 +73,15 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 		ref = ref.Context().Digest(digest.String())
 	}
 	remoteOptions := registryOptions(ctx, options)
-	references, err := outputReferences(ref, inspection.Root, options.PlainHTTP)
+	references, err := publicationReferences(ref, inspection.Root, options.PlainHTTP)
 	if err != nil {
 		return "", err
 	}
 	// Publish payloads first; the release index becomes discoverable only after all
 	// referenced manifests are uploaded and checked at their own immutable refs.
-	for _, object := range inspection.Root.Objects {
+	objects := append([]PublishedObject(nil), inspection.Root.Objects...)
+	sort.SliceStable(objects, func(i, j int) bool { return objects[i].Evidence == nil && objects[j].Evidence != nil })
+	for _, object := range objects {
 		child, ok := references[object.Name]
 		if !ok {
 			continue
@@ -148,7 +151,7 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 		return Inspection{}, e.Wrap(e.CodeUnavailable, err, "materializing OCI release root")
 	}
 	inspection, err := inspectPublication(ctx, stage, func(publication PublicationRoot) error {
-		references, err := outputReferences(ref, publication, options.PlainHTTP)
+		references, err := publicationReferences(ref, publication, options.PlainHTTP)
 		if err != nil {
 			return err
 		}

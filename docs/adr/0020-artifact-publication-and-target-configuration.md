@@ -135,7 +135,7 @@ signature/attestation storage and ADR-16 owns evidence tiers and full release ac
 one release index from named outputs; normal authors do not wire payload → root → route.
 
 The signed metadata references each deliverable manifest once in its own sibling repository: CLI binary bundle,
-unchanged native CWE image, and Helm artifact. The OCI index directly references only metadata and evidence. Helm has an empty-config artifact manifest and its final bound archive layer; its former
+unchanged native CWE image, and Helm artifact. The OCI index directly references only its metadata manifest. Helm has an empty-config artifact manifest and its final bound archive layer; its former
 nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
@@ -146,16 +146,24 @@ the deliverable manifest digest (APT retains its typed repository identity); inp
 Artifact identities. The qualified representation in §4 remains a separate protocol, not a compatibility path
 for former pipeline publications. The current consumer rejects pipeline roots without this metadata.
 
-Each required SBOM is a single CycloneDX layer in an empty-config manifest. Membership binds its exact
-subject, stage, document blob digest and typed identity. The CLI inventories its exact binary; CWE inventories
+Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
+Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
+no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement
+subject remains the exact inventoried binary, native image manifest, or source/final archive. Shared evidence
+belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,
+canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; CWE inventories
 the native manifest and records the scanned OCI-export input; Helm has distinct source-archive and final-bound-
 package inventories. Identical evidence shared by output projections has one document with sorted output
 memberships. Per-recipe indexes stay internal. Missing, substituted, duplicate or unbound evidence fails
-construction and consumption. Finalization regenerates this join from handoffs and rejects disagreement.
+construction and consumption. A protected pre-publication stage creates and verifies the bundles before
+assembling the final release metadata; production publication and authenticated consumption reject raw
+preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
 
-One root signature covers evidence through OCI descriptors and output repository/digest bindings through metadata; one SLSA attestation targets that
-same root. Signature/attestation attachments stay outside the signed index to avoid circular identity. No
-additional child signatures are required for this consumer scope. Run completion is a separate descriptive
+One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
+same root. Signature/attestation attachments stay outside the signed index to avoid circular identity. Each deliverable manifest also receives its own signature and subject-bound production attestation in its
+own repository for independent consumption. Signing processes deliverables before the root; hosted verification
+requires every child signature and attestation before recording success. The Release consumer still authenticates
+membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
 record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace, fetch every pinned manifest
 and verify its full payload/evidence closure before exposing accepted views. Metadata cannot redirect credentials
 to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their

@@ -131,8 +131,24 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			if err != nil {
 				return err
 			}
+			if plan.ExecutionSettings.Signing != nil && plan.ExecutionSettings.Signing.Mode == SigningModeCosign && len(plan.LifecycleOutputs) > 0 {
+				inspection, err := delivery.Inspect(ctx, layout)
+				if err != nil {
+					return err
+				}
+				if err := delivery.RequireAttestedEvidence(inspection); err != nil {
+					return err
+				}
+			}
 			var expected []delivery.ObjectInput
 			packageNode := nodes[packageArtifact.Producer]
+			if packageNode.Kind == NodeAttestEvidence {
+				prepared, err := signNodeInput(packageNode, artifacts, PackageOCI)
+				if err != nil {
+					return err
+				}
+				packageNode = nodes[prepared.Producer]
+			}
 			if len(plan.LifecycleOutputs) > 0 {
 				localized := make(map[string]Artifact, len(artifacts))
 				for id, artifact := range artifacts {
@@ -153,8 +169,8 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 				}
 			}
 			for _, evidence := range expected {
-				object, raw, err := delivery.ReadObject(ctx, layout, evidence.Name)
-				if err != nil || object.Kind != evidence.Kind || object.ArtifactType != evidence.ArtifactType || object.SemanticDigest != evidence.SemanticDigest || !bytes.Equal(raw, evidence.Bytes) {
+				object, raw, err := delivery.EvidenceDocument(ctx, layout, evidence.Name)
+				if err != nil || object.Kind != evidence.Kind || object.SemanticDigest != evidence.SemanticDigest || !bytes.Equal(raw, evidence.Bytes) {
 					return e.New(e.CodeVerifyFailed, "published SBOM evidence %q differs from finalized Run", evidence.Name)
 				}
 			}

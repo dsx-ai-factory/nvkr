@@ -98,9 +98,13 @@ func TestConsumerRejectsDuplicateOCIEvidenceDescriptor(t *testing.T) {
 		t.Fatal(err)
 	}
 	descriptors := index["manifests"].([]any)
-	for _, descriptor := range descriptors {
-		if descriptor.(map[string]any)["artifactType"] == "application/vnd.cyclonedx+json" {
-			index["manifests"] = append(descriptors, descriptor)
+	inspection, err := delivery.Inspect(t.Context(), layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, object := range inspection.Root.Objects {
+		if object.Evidence != nil {
+			index["manifests"] = append(descriptors, map[string]any{"mediaType": delivery.MediaOCIManifest, "artifactType": object.ArtifactType, "digest": object.DescriptorDigest, "size": object.Size})
 			break
 		}
 	}

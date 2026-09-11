@@ -286,6 +286,11 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 			t.Fatal(err)
 		}
 	}
+	if prepared, ok := artifacts["prepared/release"]; ok {
+		if _, err := delivery.AttestEvidence(ctx, prepared.Path, artifacts["package/release"].Path, fixtureSBOMAttestation(t)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	envelope, err := delivery.Inspect(ctx, artifacts["package/release"].Path)
 	if err != nil {
 		t.Fatal(err)

@@ -252,6 +252,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	layout, publication = attestFixtureLayout(t, layout)
 	reference := "registry.example.test/product@" + publication.RootDigest
 	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: reference, Digest: publication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
@@ -284,6 +285,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	badLayout, badPublication = attestFixtureLayout(t, badLayout)
 	badReference := "registry.example.test/product@" + badPublication.RootDigest
 	badVerifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: badReference, Digest: badPublication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
@@ -301,6 +303,13 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 }
 
 func testPublicationLayout(t *testing.T) (string, string) {
+	t.Helper()
+	source, _ := testPreparedPublicationLayout(t)
+	layout, result := attestFixtureLayout(t, source)
+	return layout, result.RootDigest
+}
+
+func testPreparedPublicationLayout(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()
 	source := filepath.Join(root, "kubectl")

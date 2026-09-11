@@ -84,6 +84,9 @@ func Compile(ctx context.Context, definitionPath string, definition Definition,
 	}
 	plan.DefinitionPath = filepath.ToSlash(filepath.Clean(definitionPath))
 	plan.EnvironmentPath = filepath.ToSlash(filepath.Clean(environmentPath))
+	if err := factory.BindEvidenceAttestation(plan); err != nil {
+		return nil, err
+	}
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}

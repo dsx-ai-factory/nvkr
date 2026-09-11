@@ -104,6 +104,8 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 		return executePublish(ctx, plan, node, artifacts, stdout)
 	case NodeComposition:
 		return executeComposition(ctx, plan, node, artifacts)
+	case NodeAttestEvidence:
+		return executeAttestEvidence(ctx, plan, node, artifacts, productionOCISigner, stdout)
 	case NodeSign:
 		return executeSign(ctx, plan, node, artifacts, productionOCISigner, stdout)
 	case NodeVerifyPublication:
@@ -712,6 +714,15 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	if target.CredentialRef != "" && (username == "" || password == "") {
 		return e.New(e.CodeTrustPolicyMissing,
 			"factory publication target %q requires its configured username and credential", node.Target)
+	}
+	if plan.ExecutionSettings.Signing != nil && plan.ExecutionSettings.Signing.Mode == SigningModeCosign && len(plan.LifecycleOutputs) > 0 {
+		inspection, err := delivery.Inspect(ctx, artifacts[node.Inputs[0]].Path)
+		if err != nil {
+			return err
+		}
+		if err := delivery.RequireAttestedEvidence(inspection); err != nil {
+			return err
+		}
 	}
 	ref, err := delivery.Push(ctx, artifacts[node.Inputs[0]].Path, target.Ref, delivery.RegistryOptions{
 		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,

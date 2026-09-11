@@ -135,6 +135,9 @@ func (plan Plan) Validate() error {
 		}
 		previousComposition = composition.Name
 	}
+	if err := plan.validateEvidenceAttestationGraph(); err != nil {
+		return err
+	}
 	if err := plan.validateSigningGraph(); err != nil {
 		return err
 	}
@@ -297,7 +300,7 @@ func (plan Plan) validateSigningGraph() error {
 			continue
 		case NodeSign:
 			signed[node.Target] = true
-		case NodeVerifyPublication:
+		case NodeVerifyPublication, NodeAttestEvidence:
 		default:
 			continue
 		}
@@ -344,7 +347,7 @@ func (graph ArtifactGraph) Validate() error {
 			return e.New(e.CodeInvalidCatalog, "artifact graph nodes are not canonical")
 		}
 		switch node.Kind {
-		case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication:
+		case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence:
 			if node.Network != ir.NetworkDefault {
 				return e.New(e.CodeInvalidCatalog, "artifact graph networked node %q does not declare default network", node.ID)
 			}
