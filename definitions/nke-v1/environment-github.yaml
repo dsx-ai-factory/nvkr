@@ -9,12 +9,12 @@ publication:
 runtime:
   runtime: docker
 signing:
-  identity: ^https://github\.com/NVIDIA/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/main$
+  identity: ^https://github\.com/dsx-ai-factory/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/main$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
 sourceAccess:
-  https://github.com/NVIDIA/nke:
+  https://github.com/dsx-ai-factory/nke:
     credentialRef: github:NKE_SOURCE_TOKEN
-    mirror: https://github.com/NVIDIA/nke
+    mirror: https://github.com/dsx-ai-factory/nke
 utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
 utilityPlatform: linux/amd64

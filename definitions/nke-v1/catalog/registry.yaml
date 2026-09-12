@@ -99,12 +99,12 @@ sources:
       url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
   nke:
     constraint: 0.1.x
-    repo: https://github.com/NVIDIA/nke
+    repo: https://github.com/dsx-ai-factory/nke
     tagPrefix: cli/
     toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
   nke-controller:
     constraint: 0.1.x
-    repo: https://github.com/NVIDIA/nke
+    repo: https://github.com/dsx-ai-factory/nke
     tagPrefix: controller/
     toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
   syft:
