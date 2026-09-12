@@ -18,3 +18,8 @@ updates:
       - .github/workflows/nkd-run.yml
     schedule:
       interval: weekly
+    # One PR per round: github/codeql-action init and analyze must move together,
+    # or analyze rejects the configuration the newer init wrote (#14, #15).
+    groups:
+      github-actions:
+        patterns: ["*"]

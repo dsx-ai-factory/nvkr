@@ -5,7 +5,7 @@ metadata:
   name: nke-github
 publication:
   credentialRef: github:GITHUB_TOKEN
-  repositoryPrefix: ghcr.io/nvidia/nke-recipes
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nke-recipes
 runtime:
   runtime: docker
 signing:

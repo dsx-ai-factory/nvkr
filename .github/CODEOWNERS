@@ -18,13 +18,13 @@
 # The LAST matching pattern wins, so the default is declared first and the
 # trust roots override it below.
 #
-# Every path currently resolves to @NVIDIA/nke-write. The path list below is
+# Every path currently resolves to @dsx-ai-factory/nke-write. The path list below is
 # retained deliberately: it records which files are trust roots — anything that
 # determines WHAT GETS BUILT, WHAT IS TRUSTED, or WHAT RUNS IN CI — so that
 # tightening them later is a change of owner on known lines rather than a fresh
 # analysis.
 #
-# Why not @NVIDIA/nke-maintainer today: that team is org-wide (18 people, only
+# Why not @dsx-ai-factory/nke-maintainer today: that team is org-wide (18 people, only
 # two of whom work on this repository), so routing trust roots there requests
 # review from people with no context while excluding contributors who have it.
 # An NKE-Recipes-scoped team does not exist at the org level. Revisit when one
@@ -37,7 +37,7 @@
 # Default — all trusted contributors
 # ---------------------------------------------------------------------------
 
-*                                       @NVIDIA/nke-write
+*                                       @dsx-ai-factory/nke-write
 
 # ---------------------------------------------------------------------------
 # Trust roots — same owner as the default today; tighten here when a
@@ -46,42 +46,42 @@
 
 # The lock contract (ADR-22). A lock entry is the exact content identity of
 # something that will be built and published; changing one changes what ships.
-/definitions/**/catalog/pins.lock.yaml  @NVIDIA/nke-write
+/definitions/**/catalog/pins.lock.yaml  @dsx-ai-factory/nke-write
 
 # The registry: which components exist and their constraints. Paired with the
 # lock above under ADR-22's registry/lockfile split.
-/definitions/**/catalog/registry.yaml   @NVIDIA/nke-write
+/definitions/**/catalog/registry.yaml   @dsx-ai-factory/nke-write
 
 # Definition and Environment are Tier-1 inputs bound into `recipeDigest`
 # (ADR-11, ADR-12). A change here changes recipe identity.
-/definitions/**/definition.yaml         @NVIDIA/nke-write
-/definitions/**/environment-*.yaml      @NVIDIA/nke-write
+/definitions/**/definition.yaml         @dsx-ai-factory/nke-write
+/definitions/**/environment-*.yaml      @dsx-ai-factory/nke-write
 
 # Toolchain pins. A toolchain digest is a build-semantic input (ADR-10 §5) and
 # contaminates every artifact built with it.
-/toolchains/**/*.lock.json              @NVIDIA/nke-write
+/toolchains/**/*.lock.json              @dsx-ai-factory/nke-write
 
 # The design record. ADRs govern design and are what a change is reviewed
 # against; amending one is amending the contract.
-/docs/adr/                              @NVIDIA/nke-write
+/docs/adr/                              @dsx-ai-factory/nke-write
 
 # CI, workflows, and repository automation. This is the code that decides what
 # "passing" means, plus the generated Run pipeline and its plan.
-/.github/                               @NVIDIA/nke-write
+/.github/                               @dsx-ai-factory/nke-write
 
 # The CI contract: `make check` is what CI runs, so a Makefile change changes
 # the gate.
-/Makefile                               @NVIDIA/nke-write
+/Makefile                               @dsx-ai-factory/nke-write
 
 # Dependency surface. CONTRIBUTING names Apache-cleanliness a load-bearing
 # invariant, and it is enforced here by review until a license gate exists.
-/go.mod                                 @NVIDIA/nke-write
-/go.sum                                 @NVIDIA/nke-write
+/go.mod                                 @dsx-ai-factory/nke-write
+/go.sum                                 @dsx-ai-factory/nke-write
 
 # Licensing, security policy, governance, and this file.
-/LICENSE                                @NVIDIA/nke-write
-/SECURITY.md                            @NVIDIA/nke-write
-/GOVERNANCE.md                          @NVIDIA/nke-write
-/MAINTAINERS.md                         @NVIDIA/nke-write
-/CODE_OF_CONDUCT.md                     @NVIDIA/nke-write
-/.github/CODEOWNERS                     @NVIDIA/nke-write
+/LICENSE                                @dsx-ai-factory/nke-write
+/SECURITY.md                            @dsx-ai-factory/nke-write
+/GOVERNANCE.md                          @dsx-ai-factory/nke-write
+/MAINTAINERS.md                         @dsx-ai-factory/nke-write
+/CODE_OF_CONDUCT.md                     @dsx-ai-factory/nke-write
+/.github/CODEOWNERS                     @dsx-ai-factory/nke-write
