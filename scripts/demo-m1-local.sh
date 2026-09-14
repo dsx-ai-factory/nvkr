@@ -64,7 +64,7 @@ Options:
 Environment:
   NKE_LOCAL_CLONE   path to a local github.com/NVIDIA/nke clone. When set, git is
                     redirected to it for this process only, via GIT_CONFIG_COUNT.
-                    The catalog keeps its https://github.com/NVIDIA/nke identity and
+                    The catalog keeps its https://github.com/dsx-ai-factory/nke identity and
                     the user's own git configuration is never modified.
 
 Requires docker with rootless BuildKit/overlayfs support, git, curl, a Go toolchain,
@@ -119,9 +119,9 @@ if [ -n "${NKE_LOCAL_CLONE:-}" ]; then
   NKE_LOCAL_CLONE=$(demo_absolute_path "$NKE_LOCAL_CLONE")
   export GIT_CONFIG_COUNT=1
   export GIT_CONFIG_KEY_0="url.${NKE_LOCAL_CLONE}.insteadOf"
-  export GIT_CONFIG_VALUE_0="https://github.com/NVIDIA/nke"
+  export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nke"
   printf 'git transport redirected for this process only: %s -> %s\n' \
-    "https://github.com/NVIDIA/nke" "$NKE_LOCAL_CLONE"
+    "https://github.com/dsx-ai-factory/nke" "$NKE_LOCAL_CLONE"
 fi
 
 demo_section "1/8  Start or reuse the loopback OCI registry"

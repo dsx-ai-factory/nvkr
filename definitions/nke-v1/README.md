@@ -42,7 +42,7 @@ To use a local NKE clone without changing catalog identity, scope Git's `instead
 ```sh
 export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="url.$HOME/dev/code/github/NVIDIA/nke.insteadOf"
-export GIT_CONFIG_VALUE_0="https://github.com/NVIDIA/nke"
+export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nke"
 ```
 
 The attempt record is `.nkd/runs/<attempt>/lifecycle.json`. It records all three frozen expected outputs and
