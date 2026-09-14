@@ -86,6 +86,10 @@ tidy: ## Format + go mod tidy.
 	gofmt -s -w $(GOFILES)
 	go mod tidy
 
+.PHONY: notices
+notices: ## Regenerate THIRD_PARTY_NOTICES.md from the linked module set.
+	./scripts/gen-notices.sh
+
 .PHONY: workflows-check
 workflows-check: ## Verify the committed Run generation matches the catalog (ADR-21 drift gate).
 	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
