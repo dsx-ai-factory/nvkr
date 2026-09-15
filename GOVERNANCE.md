@@ -20,7 +20,7 @@ contribute.
 
 ### Code Owners
 
-Trusted contributors (the `@NVIDIA/nke-write` team) who review and approve pull
+Trusted contributors (the `@dsx-ai-factory/nke-write` team) who review and approve pull
 requests for the paths they own. Code ownership is declared per path in
 [`.github/CODEOWNERS`](.github/CODEOWNERS), which GitHub uses to request reviews
 automatically. Code owners keep their areas healthy and mentor contributors.

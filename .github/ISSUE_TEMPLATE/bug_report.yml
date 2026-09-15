@@ -135,7 +135,8 @@ body:
     id: command
     attributes:
       label: Command / Request Used
-      description: Paste the exact CLI command(s) or API request(s) that triggered the issue.
+      description: Paste the exact CLI command(s) or API request(s) that triggered
+        the issue. Redact any credentials or secrets, including tokens in URLs.
       placeholder: |
         ```bash
         nkectl recipe --snapshot ... --intent training
