@@ -12,13 +12,21 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 )
 
-// From-source builder types (ADR-10). These mirror ir.Builder* — the catalog is the
-// authoring surface, the IR the lowered form; both must agree.
+// From-source builder types (ADR-10). Executable builders mirror ir.Builder*;
+// schema-only builders fail at the recipe compiler capability boundary.
 const (
 	BuilderOCIHermetic = "oci-hermetic"
 	BuilderNix         = "nix"
 	BuilderBuildKit    = "buildkit-rootless"
+	BuilderVMImage     = "vm-image"
 )
+
+// DiskSpec describes the disk payload emitted by a component. It is required
+// exactly when OutputType is disk-image.
+type DiskSpec struct {
+	Format     string `json:"format"`
+	Encryption string `json:"encryption"`
+}
 
 // Metadata is descriptive catalog identity; it does not affect resolution.
 type Metadata struct {
@@ -164,8 +172,8 @@ type Component struct {
 	// role filter), NOT recipe selection, and does not affect recipeDigest. Empty means
 	// role-agnostic (present in every SKU).
 	Roles []string `json:"roles,omitempty"`
-	// BuilderType selects the from-source build substrate (ADR-10): "oci-hermetic"
-	// (default) or "nix". It is a build-semantic input and flows into recipeDigest.
+	// BuilderType selects the from-source build substrate (ADR-10). It is a
+	// build-semantic input and flows into recipeDigest.
 	BuilderType string `json:"builderType,omitempty"`
 	// Flake pins a nix builder's locked flake (set only when BuilderType==nix).
 	Flake *FlakePin `json:"flake,omitempty"`
@@ -182,6 +190,7 @@ type Component struct {
 	ToolchainImages map[string]string `json:"toolchainImages,omitempty"`
 	CGO             bool              `json:"cgo,omitempty"`
 	OutputType      string            `json:"outputType,omitempty"`
+	Disk            *DiskSpec         `json:"disk,omitempty"`
 	BuildCommand    []string          `json:"buildCommand,omitempty"`
 	ArtifactPath    string            `json:"artifactPath,omitempty"`
 	WriteDir        string            `json:"writeDir,omitempty"`        // writable output subdir; enables parallel-safe isolation

@@ -68,11 +68,12 @@ type rawComponent struct {
 	FromSource      bool               `json:"fromSource"`
 	Source          string             `json:"source,omitempty"`
 	Roles           []string           `json:"roles,omitempty"`          // node-role affinity (ADR-12 §3); composition, not identity
-	BuilderType     string             `json:"builderType,omitempty"`    // oci-hermetic (default) | nix (ADR-10)
+	BuilderType     string             `json:"builderType,omitempty"`    // oci-hermetic (default) | nix | buildkit-rootless | vm-image (ADR-10)
 	ToolchainImage  string             `json:"toolchainImage,omitempty"` // component-specific exact builder image
 	Flake           *FlakePin          `json:"flake,omitempty"`          // required iff builderType==nix
 	CGO             bool               `json:"cgo,omitempty"`
 	OutputType      string             `json:"outputType,omitempty"`
+	Disk            *DiskSpec          `json:"disk,omitempty"`
 	BuildCommand    []string           `json:"buildCommand,omitempty"`
 	ArtifactPath    string             `json:"artifactPath,omitempty"`
 	WriteDir        string             `json:"writeDir,omitempty"`
@@ -411,6 +412,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		Flake:           raw.Flake,
 		CGO:             raw.CGO,
 		OutputType:      raw.OutputType,
+		Disk:            raw.Disk,
 		BuildCommand:    raw.BuildCommand,
 		ArtifactPath:    raw.ArtifactPath,
 		WriteDir:        raw.WriteDir,
@@ -816,6 +818,23 @@ func validateComponent(name string, c Component) error {
 		}
 		seenRoles[r] = struct{}{}
 	}
+	if c.OutputType == "disk-image" {
+		if !c.FromSource {
+			return e.New(e.CodeInvalidCatalog, "component %q: disk-image is supported only in the from-source lane", name)
+		}
+		if c.Disk == nil {
+			return e.New(e.CodeInvalidCatalog, "component %q: outputType disk-image requires disk settings", name)
+		}
+		if c.Disk.Format != "qcow2" || (c.Disk.Encryption != "none" && c.Disk.Encryption != "luks2") {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: disk requires format qcow2 and encryption none or luks2", name)
+		}
+	} else if c.Disk != nil {
+		return e.New(e.CodeInvalidCatalog, "component %q: disk settings require outputType disk-image", name)
+	}
+	if c.BuilderType == BuilderVMImage && !c.FromSource {
+		return e.New(e.CodeInvalidCatalog, "component %q: vm-image builder requires a from-source component", name)
+	}
 	// A component occupies exactly one lane: from-source XOR prebuilt XOR exclusion.
 	// Declaring more than one (e.g. a prebuilt block plus a leftover exclusionReason, or
 	// fromSource plus prebuilt) is contradictory and fails closed — the excluded/ambiguous
@@ -858,9 +877,13 @@ func validateComponent(name string, c Component) error {
 		if err := validateFlake(name, c.Flake); err != nil {
 			return err
 		}
+	case BuilderVMImage:
+		if c.Flake != nil || c.OutputType != "disk-image" {
+			return e.New(e.CodeInvalidCatalog, "component %q: vm-image builder requires a disk-image output and no flake", name)
+		}
 	default:
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: unknown builderType %q (want oci-hermetic or nix)", name, c.BuilderType)
+			"component %q: unknown builderType %q (want oci-hermetic, nix, buildkit-rootless, or vm-image)", name, c.BuilderType)
 	}
 	if c.Repo == "" {
 		return e.New(e.CodeUnpinnedSource, "component %q: source has no repo", name)

@@ -48,6 +48,21 @@ with different delivery models.
 `kubernetes`. Both are catalog-content choices and are easily adjusted. Cluster-level categories carry
 `outputType` = helm-chart (packaged as OCI) + oci-image; node-level categories carry deb / nix / disk.
 
+An `os` Recipe may temporarily represent a source-owned node-image aggregate, such as the current NKE disk,
+even when its build embeds Kubernetes and networking payloads. One category per Recipe classifies the selectable
+output, not every traced material packaged inside it. Embedded members retain their own material and SBOM
+relationships rather than becoming extra public outputs.
+Plain and FDE disks are separate catalog components selected by separate single-component outputs. They are not
+criteria axes, public variants, or booleans. Criteria select the catalog recipe; for the current binding,
+`os: ubuntu` is selector metadata. The existing typed `{{.Arch}}` token in the catalog argument vector and
+artifact path is resolved from the selected architecture. No other Make value is inferred from criteria. Future
+lowering must bind the selected architecture, resolved command, guest architecture, and observed output, and
+reject any disagreement; an argument-vector literal alone is not evidence of the guest architecture.
+
+The existing exact-or-wildcard `k8sVersion` rule is unchanged. Versions discovered inside a disk belong to its
+authenticated inventory. Matching a cluster against a finite embedded-version set requires a separate contract
+and is not implemented; authoring a disk does not make that compatibility claim.
+
 ### 3. Role and cluster type are composition, not recipe axes
 
 - **`role` (`control-plane` | `worker` | `gpu-worker`)** filters *node-level* category artifacts into a Node SKU.
@@ -124,8 +139,9 @@ silently wildcarded.
 ## Consequences
 
 **Positive**
-- One recipe = one stack layer, a clean reproducibility boundary: the `kubernetes` layer can be a nix flake while
-  `os` is a disk image (ADR-10), independently.
+- One recipe = one stack layer remains the target reproducibility boundary: the `kubernetes` layer can be a nix
+  flake while `os` is a disk image (ADR-10), independently. The current NKE aggregate OS Recipe is an explicit
+  compatibility exception while its embedded components are separated into independently realized layers.
 - Categories are built once and composed differently per node role and cluster type — no rebuild to re-compose.
 - The node-level / cluster-level split maps cleanly onto the two delivery phases (provision, then helm-deploy).
 - AICR labels and transport stay out of recipe identity, output-affecting activation inputs are bound, and core

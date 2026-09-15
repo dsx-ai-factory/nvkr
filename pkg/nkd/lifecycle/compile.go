@@ -38,6 +38,12 @@ func Compile(ctx context.Context, definitionPath string, definition Definition,
 	if err := environment.Validate(); err != nil {
 		return nil, err
 	}
+	for _, output := range definition.Outputs {
+		if output.Format == OutputDiskImage {
+			return nil, e.New(e.CodeEngineCapability,
+				"disk-image output %q is declared but execution is not implemented", output.Name)
+		}
+	}
 	compileSpec, delivery, err := lower(definition, environment)
 	if err != nil {
 		return nil, err

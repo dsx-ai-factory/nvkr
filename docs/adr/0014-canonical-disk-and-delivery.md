@@ -15,7 +15,8 @@
 
 NKD turns verified artifacts into deterministic delivery artifacts: packages, images, and bootable node disks.
 The disk story has a load-bearing boundary — RAW is the only canonical disk artifact. Delivery is packages-first
-and BYO-OS, and a Node SKU is a role-filtered composition of node-level category artifacts (ADR-12). This ADR
+and BYO-OS as the target model, while the current NKE compatibility path ships a source-owned aggregate image.
+A Node SKU is a role-filtered composition of node-level category artifacts (ADR-12). This ADR
 fixes the canonical disk model, the envelope-verification mechanism, the encryption boundary, and the
 delivery/SKU model.
 
@@ -24,11 +25,24 @@ delivery/SKU model.
 ### 1. RAW-canonical; derived envelopes verified by the decoded logical digest
 
 The **RAW logical byte stream is the canonical disk artifact**. `qcow2`, `vmdk`, and `vhd` are **derived
-envelopes**, verified by **decoding** them and hashing the **decoded logical stream** — never the container-file
-bytes, which carry non-reproducible padding and UUIDs. A `DiskManifest` records `{ logicalDigest (over the
+envelopes**. Qualified reproduction is verified by **decoding** them and hashing the **decoded logical stream**,
+never by substituting container-file bytes, which carry non-reproducible padding and UUIDs. A `DiskManifest` records `{ logicalDigest (over the
 decoded RAW LBA stream), block manifest, optional per-file content manifest, envelope refs (container digest =
-provenance only), pre-encryption boundary, role }`. Byte-identity attaches to the decoded logical stream; a
-divergence names the first divergent block or path.
+exact delivery identity and provenance, not qualified reproduction identity), pre-encryption boundary, role }`.
+Qualified reproduction identity attaches to the decoded logical stream; a divergence names the first divergent
+block or path.
+
+Exact delivery identity is separate from qualified reproduction identity. The SHA-256 of a QCOW2 file names the
+exact delivered container bytes and the full-disk SBOM subject. An OCI manifest that carries those bytes has a
+different digest. A future qualified claim names the decoded canonical RAW identity as well; none of these
+digests may be substituted for another.
+
+At NKE commit `6df693a`, the [Make target](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
+produces a QCOW2 and the [hosted workflow](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)
+later creates the published QCOW2 with another `qemu-img convert -c`. Source inspection alone does not establish
+byte parity between the Make-path file and the published file, so NKD must not claim it. Parity requires a
+source-owned finalization entrypoint or an explicit pinned transform followed by exact output verification. NKD
+must not silently copy workflow shell into an adapter.
 
 ### 2. Envelope codec seam + determinism spikes
 
@@ -68,10 +82,17 @@ encrypted or LUKS bytes **fails closed** with a distinct coded error: ciphertext
 a reproduction. **FDE is an off-by-default overlay** applied *after* the canonical pre-encryption RAW digest is
 computed and attested, and the encrypted output gets its own **non-reproduction** identity.
 
+The authoring schema can represent the current NKE `luks2` component without asserting that qualified boundary.
+The [current FDE design](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/docs/full-disk-encryption.md#L14-L34)
+ships a shared unlock-capable passphrase in a LUKS slot and GRUB until first-boot TPM binding succeeds. ADR-20's
+no-secret rule therefore prohibits its publication unchanged. Schema validity is not publication acceptance.
+
 ### 4. Delivery: packages-first, role-subset Node SKUs, ISO, provisioning bundles
 
-- **Packages-first / BYO-OS.** Node-level categories deliver as **`.deb` / `nix` packages plus control-plane OCI
-  images**, installed post-provision and decoupled from the base OS.
+- **Packages-first / BYO-OS.** Node-level categories normally deliver as **`.deb` / `nix` packages plus
+  control-plane OCI images**, installed post-provision and decoupled from the base OS. The NKE aggregate disk is
+  an explicit compatibility output. Its embedded inputs may still be built or acquired as traced materials,
+  verified, and included in the disk SBOM; baking them does not erase their identities.
 - **Node SKU = role-filtered subset.** A Node SKU (`control-plane`, `worker`, `gpu-worker`) is the role-filtered
   subset of node-level category artifacts (ADR-12), assembled deterministically through a **staging manifest
   hashed into the artifact** — so a control-plane disk or package set is distinct from a worker one and
@@ -105,12 +126,14 @@ computed and attested, and the encrypted output gets its own **non-reproduction*
 
 ## Alternatives considered
 
-- **Hash the container (`qcow2`) file bytes.** Rejected — non-reproducible writer metadata; this is the reason
-  RAW is canonical.
+- **Use the container (`qcow2`) file digest as qualified reproduction identity.** Rejected because writer
+  metadata can vary; this is why RAW is canonical. Hashing QCOW2 bytes remains required for exact delivery
+  identity and the SBOM subject.
 - **Treat ISO as a derived envelope decoded to RAW.** Rejected — an ISO is not a block image of the RAW, so there
   is no meaningful decode-to-RAW.
-- **Bake the substrate into a kitchen-sink image.** Rejected — packages-first, thin-base, BYO-OS is the primary
-  delivery.
+- **Make aggregate baked images the primary delivery model.** Rejected — packages-first, thin-base, BYO-OS is
+  the target delivery. The current NKE aggregate disk remains an explicit compatibility output while its
+  embedded components are separated into independent layers.
 
 ## De-risking spikes
 

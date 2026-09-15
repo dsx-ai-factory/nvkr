@@ -22,6 +22,15 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 	if r == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "cannot compile a nil resolved recipe")
 	}
+	for _, component := range r.Components {
+		if !component.FromSource && component.Prebuilt == nil && component.ExclusionReason != "" {
+			continue
+		}
+		if component.OutputType == "disk-image" || component.BuilderType == catalog.BuilderVMImage {
+			return nil, e.New(e.CodeEngineCapability,
+				"component %q declares disk-image build capability, which is not implemented", component.Name)
+		}
+	}
 	// The graph's Criteria is its identity frame and lands verbatim in the committed
 	// nodes.json. Role and clusterType are composition/delivery axes that recipeDigest
 	// deliberately excludes (they never select a build), so carrying them here would make

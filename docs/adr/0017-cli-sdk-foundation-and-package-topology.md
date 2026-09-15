@@ -32,6 +32,13 @@ remain explicit. Ambiguous/duplicate selections, missing components, conflicting
 fail with coded errors. Existing catalog criteria remain explicit; recipe reuse does not require general product
 imports. Definitions are selected directly by file.
 
+`format: disk-image` is an authoring contract for exactly one selected component, and its referenced
+RecipeSelection must use `criteria.category: os`. Plain and FDE outputs select different catalog components;
+Definition has no disk variant, encryption boolean, build command, or Packer field. Catalog owns disk metadata
+and production details. In this first contract, Definition and catalog validation are supported, while Recipe
+lowering and `run plan|local|generate` fail with `engine-capability` before graph construction, source access, or
+output work.
+
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools such as the AICR generator stay in the Recipe/composition identity they affect.
 Changing transport or signing configuration cannot silently change logical Recipe identity.

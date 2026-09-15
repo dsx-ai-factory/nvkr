@@ -31,6 +31,7 @@ const (
 	OutputOCI                = "oci"
 	OutputAPT                = "apt-repository"
 	OutputHelm               = "helm-oci"
+	OutputDiskImage          = "disk-image"
 	LaneQualified            = "qualified"
 	LanePipeline             = "pipeline-attested"
 	LaneUnqualified          = "static-unqualified"
@@ -280,7 +281,7 @@ func (definition Definition) Validate() error {
 		if !namePattern.MatchString(output.Name) || output.Name <= previous || outputs[output.Name] || !recipes[output.Recipe] {
 			return e.New(e.CodeInvalidCatalog, "definition output %q is invalid, repeated, empty, or references an unknown recipe", output.Name)
 		}
-		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm {
+		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has unsupported format %q", output.Name, output.Format)
 		}
 		if output.Format == OutputHelm {
@@ -293,6 +294,9 @@ func (definition Definition) Validate() error {
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
+		}
+		if output.Format == OutputDiskImage && (len(output.Components) != 1 || selections[output.Recipe].Criteria.Category != "os") {
+			return e.New(e.CodeInvalidCatalog, "definition disk-image output %q requires exactly one component from an os recipe", output.Name)
 		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {

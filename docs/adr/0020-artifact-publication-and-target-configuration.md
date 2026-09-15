@@ -68,6 +68,14 @@ OCI closure; an APT tree inside it is not an enabled direct APT-server publisher
 store targets remain separately capability-gated adapters. Credential values never enter serialized inputs.
 Transport settings stay replaceable by environment owners.
 
+The disk target is a future OCI evidence and control root over an exact QCOW2 payload. An optional S3 object and
+CDN URL are projections of those same payload bytes, not alternate Recipe identities. The signed root must bind
+the payload digest, exact object route, and authenticated upload/read-back result before a consumer may accept
+the projection. Object-store credentials remain Environment references and cannot enter the disk, evidence, or
+route metadata. The first disk authoring contract adds no object-store schema, OCI disk wrapper, signing route,
+publisher, or consumer adapter; all remain capability-gated. An FDE payload containing an unlock credential
+cannot pass the existing no-secret publication rule.
+
 ### 3. The emitted publish phase
 
 The generated pipeline gains a **publish phase after the unconditional terminal verify**:

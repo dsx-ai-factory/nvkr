@@ -1,4 +1,4 @@
-# ADR-10 — Pluggable builder types (OCI-hermetic · Nix · prebuilt)
+# ADR-10 — Pluggable builder types (OCI-hermetic · Nix · VM image · prebuilt)
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
 - **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
@@ -32,7 +32,8 @@ linked into the core, exactly as other external tools are treated. That satisfie
 constraint, and Nix can enter the reproducibility boundary only after its execution and observation adapters pass acceptance.
 
 1. **Taxonomy (two axes).** An acquisition **lane** — `from-source` XOR `prebuilt` XOR `exclusion` — remains the
-   top-level discriminator. A **builder type** refines *from-source only*: `builderType ∈ {oci-hermetic, nix}`.
+   top-level discriminator. A **builder type** refines *from-source only*:
+   `builderType ∈ {oci-hermetic, nix, buildkit-rootless, vm-image}`.
    The `prebuilt` lane is restricted to byte-preserving fetch plus digest verification. Repackaging,
    normalization, conversion, patching, or any other byte transformation is a build node with a builder type,
    pinned transformation inputs, and profile-bound output (ADR-07); it cannot be hidden inside `prebuilt`
@@ -96,6 +97,34 @@ for OCI-export archives on Docker, locally and in generated lifecycle Runs. Othe
 qualified execution remain deferred. A component may select its own digest-pinned toolchain image while
 retaining the same pinned source as other components; this changes its Recipe identity, not its source pin.
 
+### Disk-image authoring contract
+
+`disk-image` is an output semantic, independent of how its bytes are obtained. Every such component declares
+`disk: {format: qcow2, encryption: none|luks2}`. `vm-image` is one from-source builder for that output; it is not implied by
+`disk-image`, so another admitted builder or a future digest-pinned acquisition lane can produce the same output
+type. The first schema admits only the from-source form; acquired disks remain unsupported. Conversely,
+`vm-image` is valid only for a from-source disk component. Its catalog entry owns the pinned source and toolchain,
+exact source-owned argument vector, and artifact path. NKD does not infer Packer commands or invoke an upstream
+workflow. These fields are Recipe inputs once disk lowering is admitted; the schema-only contract mints no
+Recipe identity for a disk.
+
+For the [NKE Makefile at commit `6df693a`](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185),
+a future catalog entry binds two source-owned Make targets. Plain and FDE are separate selectable components,
+not a public boolean or variant. The existing typed architecture token is resolved from Recipe criteria:
+
+```text
+make -C os-image/packer os-image-non-fde ARCH={{.Arch}}
+  -> os-image/packer/output-non-fde/nke-node-non-fde-ubuntu-26.04.1-{{.Arch}}.qcow2
+make -C os-image/packer os-image-fde ARCH={{.Arch}}
+  -> os-image/packer/output-fde/nke-node-fde-ubuntu-26.04.1-{{.Arch}}.qcow2
+```
+
+The current NKE release matrix realizes plain amd64, FDE amd64, and plain arm64. It does not validate or publish
+FDE arm64. Definition output selection records that supported matrix without duplicating components per
+architecture. These bindings are authoring data only; Recipe lowering, VM execution, and disk collection remain
+capability-gated. An override that changes NKE's derived output filename must also change the catalog artifact
+path; NKD never guesses it.
+
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
 seccomp/AppArmor/system paths for user-namespace operation, the overlayfs snapshotter, no host runtime socket
 and no mounted credentials. Rootless overlay mounts require a supporting kernel (Linux 5.11+ or Ubuntu,
@@ -124,10 +153,11 @@ owner's duty. Where ADR-22's curated set exists, derive `embeds` from it and re-
 ## Consequences
 
 **Positive**
-- `from-source` gains two strong-guarantee sub-types; `prebuilt` remains the weak lane.
+- `from-source` retains two strong-guarantee sub-types and adds a capability-gated VM-image authoring type;
+  `prebuilt` remains the weak lane.
 - Hard-to-reproduce upstreams become buildable via Nix without changing the trust model.
-- Verification, attestation, and the CI-adapter contract are **unchanged**; the change is confined to the build
-  step.
+- Builder-type selection does not weaken the existing verification, attestation, or CI-adapter contracts;
+  disk evidence, canonical delivery, and publication contracts are owned by ADR-13, ADR-14, and ADR-20.
 - NKD becomes builder-agnostic — additional builder types plug in at the same seam.
 
 **Negative / costs**

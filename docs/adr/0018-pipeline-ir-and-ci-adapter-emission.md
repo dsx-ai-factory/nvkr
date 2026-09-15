@@ -138,6 +138,13 @@ Isolation and the fixed environment/mount contract are identical across all engi
 - `prebuilt` nodes lower to acquire-and-digest-verify.
 - `exclusion` emits no node.
 
+`vm-image` and `disk-image` do not lower in the first authoring contract. Admission fails with
+`CodeEngineCapability` before source, subprocess, or output work. A future VM Plan must type and bind the guest
+and host architectures, CPU, memory, scratch and output storage, required devices such as KVM, acceleration
+fallback, network mode, privilege, timeout, and authenticated runtime-host observations. It must carry the exact
+catalog-owned source entrypoint and artifact path. Adapters may transport that Plan, but may not reconstruct
+Packer commands, invoke an upstream workflow, or weaken a missing device or isolation requirement.
+
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the
 local runner's ownership contract. Private package layouts must remain reopenable by later host transport
 steps. Rootless Podman's existing user mapping is retained; the rootless BuildKit build container keeps its

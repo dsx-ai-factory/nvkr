@@ -117,6 +117,15 @@ SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismat
 empty inventories fail closed. Without `sbomTool`, the existing declaration-only documents provide source
 metadata; they do not claim dependency inspection.
 
+A `disk-image` admitted for execution or publication requires a full CycloneDX inventory whose subject is the
+exact delivered QCOW2 payload digest. It combines an authenticated trace of every fetched or built material with
+read-only inspection of the final disk, then reconciles both views. The material collector, disk codec/inspector,
+and package scanner are pinned tools and explicit Plan inputs. Missing tools or trace members, unreadable
+filesystems, unsupported encryption, scanner failure, or disagreement fails closed at admission or inspection.
+A catalog declaration may validate without those tools, but it is not a disk SBOM and cannot compile or publish.
+Disk Plan lowering, material tracing, inspection, reconciliation, and evidence publication are not implemented
+by the authoring schema.
+
 For binaries and OCI image exports, the SBOM owner invokes the pinned scanner as an owned, bounded subprocess
 inside the offline utility container. Inputs are held and checked against producer digests. Syft's file resolver
 requires a pathname, so binary inspection uses a private read-only copy of held bytes and checks it again before
