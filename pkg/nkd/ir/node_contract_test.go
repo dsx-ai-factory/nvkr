@@ -44,12 +44,22 @@ func TestBuildNodeRejectsInvalidExecutionFields(t *testing.T) {
 
 func TestExecutionRequirementsAreAdmittedOnlyOnBuildNodes(t *testing.T) {
 	requirements := &execution.Requirements{Resources: &execution.ResourceRequest{MemoryMiB: 4096}}
-	for _, index := range []int{1, 2} {
-		node := sample().Nodes[index]
-		node.Requirements = execution.Clone(requirements)
-		if err := node.Validate(); err == nil || !strings.Contains(err.Error(), "forbidden field requirements") {
-			t.Fatalf("%s node accepted an unprojectable execution requirement: %v", node.Kind, err)
-		}
+	for _, test := range []struct {
+		name string
+		node Node
+	}{
+		{name: KindFetch, node: sample().Nodes[1]},
+		{name: KindPull, node: validRawPullNode()},
+		{name: KindVerify, node: sample().Nodes[2]},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			test.node.Requirements = execution.Clone(requirements)
+			err := test.node.Validate()
+			assertIRCode(t, err, e.CodeInvalidCatalog)
+			if !strings.Contains(err.Error(), "forbidden field requirements") {
+				t.Fatalf("%s node rejected execution requirements for the wrong reason: %v", test.node.Kind, err)
+			}
+		})
 	}
 
 	build := sample().Nodes[0]
@@ -109,7 +119,7 @@ func TestPullNodeRequiresExactAcquisitionShape(t *testing.T) {
 		{"host package forbidden environment", func(n *Node) { n.OutputType = "host-package"; n.Env = []EnvVar{{Name: "HOME", Value: "/tmp"}} }, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			n := Node{ID: "pull-tool", Kind: KindPull, Component: "tool", Artifact: "https://example.invalid/tool", Digest: "sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Network: NetworkDefault, Version: "1.0.0", OutputType: "raw", ArtifactPath: "tool"}
+			n := validRawPullNode()
 			if tc.change != nil {
 				tc.change(&n)
 			}
@@ -122,6 +132,21 @@ func TestPullNodeRequiresExactAcquisitionShape(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func validRawPullNode() Node {
+	return Node{
+		ID:           "pull-tool",
+		Kind:         KindPull,
+		Component:    "tool",
+		Artifact:     "https://example.invalid/tool",
+		Digest:       "sha256:" + strings.Repeat("a", 64),
+		Platform:     "linux/amd64",
+		Network:      NetworkDefault,
+		Version:      "1.0.0",
+		OutputType:   "raw",
+		ArtifactPath: "tool",
 	}
 }
 

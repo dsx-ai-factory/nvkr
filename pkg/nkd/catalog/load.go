@@ -822,10 +822,21 @@ func validateVMImageBuildRequirements(name string, requirements *execution.Requi
 			"component %q: vm-image builder requires generic buildRequirements", name)
 	}
 	resources := requirements.Resources
-	if resources == nil || resources.CPUMillis == 0 || resources.MemoryMiB == 0 ||
-		resources.EphemeralStorageMiB == 0 {
+	if resources == nil {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: vm-image buildRequirements require positive CPU, memory, and ephemeral storage", name)
+			"component %q: vm-image buildRequirements require a resource request", name)
+	}
+	if resources.CPUMillis == 0 {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: vm-image buildRequirements require positive CPU", name)
+	}
+	if resources.MemoryMiB == 0 {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: vm-image buildRequirements require positive memory", name)
+	}
+	if resources.EphemeralStorageMiB == 0 {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: vm-image buildRequirements require positive ephemeral storage", name)
 	}
 	if len(requirements.AllowedHostPlatforms) == 0 {
 		return e.New(e.CodeInvalidCatalog,
@@ -847,6 +858,12 @@ func validateVMImageBuildRequirements(name string, requirements *execution.Requi
 // architectures; preferred and forbidden policies retain their declared TCG route.
 func ValidateVMImageHostRoute(name string, component Component, guestArch string) error {
 	if component.BuilderType != BuilderVMImage {
+		// TODO(execution-class admission): Before any adapter admits non-nil
+		// execution requirements, define in ADR-18 whether an ordinary builder's
+		// Recipe architecture constrains its runner host, then enforce required-KVM
+		// host matching here or in the authenticated Environment matcher. Today only
+		// vm-image defines that architecture as a guest/host relationship, and every
+		// current adapter rejects non-nil requirements before work or output.
 		return nil
 	}
 	if component.BuildRequirements == nil {

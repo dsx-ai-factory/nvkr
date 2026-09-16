@@ -171,12 +171,13 @@ func TestDiskImageSchemaValidation(t *testing.T) {
 		{"disk on another output", func(c *Component) { c.OutputType = "raw" }, ""},
 		{"vm builder on another output", func(c *Component) { c.BuilderType = BuilderVMImage; c.OutputType = "raw"; c.Disk = nil }, ""},
 		{"vm builder without build requirements", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements = nil }, "generic buildRequirements"},
+		{"vm builder without resource request", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.Resources = nil }, "resource request"},
 		{"vm builder without CPU", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.Resources.CPUMillis = 0 }, "positive CPU"},
-		{"vm builder without memory", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.Resources.MemoryMiB = 0 }, "positive CPU"},
+		{"vm builder without memory", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.Resources.MemoryMiB = 0 }, "positive memory"},
 		{"vm builder without ephemeral storage", func(c *Component) {
 			c.BuilderType = BuilderVMImage
 			c.BuildRequirements.Resources.EphemeralStorageMiB = 0
-		}, "positive CPU"},
+		}, "positive ephemeral storage"},
 		{"vm builder without host platform", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.AllowedHostPlatforms = nil }, "allowed host platform"},
 		{"vm builder without KVM policy", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.Capabilities = nil }, "KVM capability policy"},
 		{"vm builder without timeout", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.TimeoutSeconds = 0 }, "positive executor timeout"},
@@ -277,5 +278,29 @@ func TestVMImageHostRouteAndToolchainValidation(t *testing.T) {
 	requiredCrossArch.BuildRequirements.Capabilities[0].Policy = execution.CapabilityPreferred
 	if err := validate(requiredCrossArch, "arm64"); err != nil {
 		t.Fatalf("preferred KVM cross-architecture route rejected: %v", err)
+	}
+}
+
+func TestNonVMRequiredKVMHostRouteRemainsDeferred(t *testing.T) {
+	component := goodComponent()
+	component.BuildRequirements = &execution.Requirements{
+		AllowedHostPlatforms: []execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+		Capabilities: []execution.CapabilityRequirement{{
+			Name: execution.CapabilityKVM, Policy: execution.CapabilityRequired,
+		}},
+	}
+	cat := base(component)
+	cat.Recipes[0].Criteria.Arch = "arm64"
+
+	// ADR-18 defines the recipe-architecture/runner-host relationship only for
+	// vm-image. Preserve the authored requirement for future Environment matching
+	// without inventing guest semantics for an ordinary builder. The pipeline and
+	// factory adapter suites independently prove that every current adapter rejects
+	// this non-nil request before execution or output.
+	if err := cat.Validate(); err != nil {
+		t.Fatalf("ordinary builder requirements were given VM guest semantics: %v", err)
+	}
+	if got := cat.Components["x"].BuildRequirements; !execution.Equal(got, component.BuildRequirements) {
+		t.Fatalf("ordinary builder requirements were not preserved for adapter admission: %#v", got)
 	}
 }
