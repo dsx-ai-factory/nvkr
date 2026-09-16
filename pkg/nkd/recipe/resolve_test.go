@@ -11,6 +11,13 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
+const (
+	testVMRepo      = "https://github.com/example/node-image"
+	testVMCommit    = "1111111111111111111111111111111111111111"
+	testVMTree      = "2222222222222222222222222222222222222222"
+	testVMToolchain = "example.invalid/nkd-vm-builder@sha256:59b8183301af6dc358c9258d7b2ab0ee1a9363618552334fb3b160d454cbda72"
+)
+
 func layeredKubernetesFixture(t *testing.T) *catalog.Catalog {
 	t.Helper()
 	cat, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
@@ -76,6 +83,39 @@ func TestResolveNoMatch(t *testing.T) {
 	_, err := Resolve(cat, criteria.Criteria{Category: "kubernetes"}, nil)
 	if code(err) != nkderr.CodeNoMatch {
 		t.Fatalf("want CodeNoMatch, got %v", err)
+	}
+}
+
+func TestResolveRejectsRequiredKVMWithoutSameArchitectureHostRoute(t *testing.T) {
+	component := catalog.Component{
+		FromSource: true, BuilderType: catalog.BuilderVMImage, OutputType: "disk-image",
+		Disk: &catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
+		VMImage: &catalog.VMImageRequirements{
+			AllowedHostArchs: []string{"amd64"}, MinHostCPUs: 1, MinHostMemoryMiB: 1,
+			MinScratchMiB: 1, MinOutputMiB: 1, KVM: catalog.VMKVMRequired,
+			Network: catalog.VMNetworkDefault, TimeoutSeconds: 1,
+		},
+		Repo: testVMRepo, Commit: testVMCommit, TreeHash: testVMTree,
+		ToolchainImages: map[string]string{
+			"amd64": testVMToolchain,
+		},
+		BuildCommand: []string{"make", "image"}, ArtifactPath: "out/image.qcow2", SourceDate: 1733939955,
+	}
+	makeCatalog := func(c catalog.Component) *catalog.Catalog {
+		return &catalog.Catalog{
+			Recipes: []catalog.Recipe{{
+				ID: "os", Criteria: criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "any"}, Components: []string{"image"},
+			}},
+			Components: map[string]catalog.Component{"image": c},
+		}
+	}
+	query := criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "arm64"}
+	if resolved, err := Resolve(makeCatalog(component), query, nil); code(err) != nkderr.CodeInvalidCatalog || resolved != nil {
+		t.Fatalf("required KVM route = %#v, %v; want no result and %s", resolved, err, nkderr.CodeInvalidCatalog)
+	}
+	component.VMImage.KVM = catalog.VMKVMOptional
+	if resolved, err := Resolve(makeCatalog(component), query, nil); err != nil || resolved == nil {
+		t.Fatalf("optional KVM must retain the cross-architecture TCG route: %#v, %v", resolved, err)
 	}
 }
 

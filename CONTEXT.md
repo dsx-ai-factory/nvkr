@@ -157,6 +157,8 @@ An ordered, predecessor-bound catalog change replacing a complete component prod
 _Avoid_: Recipe layer, role selection
 
 **VM-image builder**:
-A from-source builder capability for a disk-image output. The catalog binds its exact source-owned entrypoint
-and artifact path; typed VM lowering and execution remain separately admitted capabilities.
+A from-source builder declaration for a disk-image output. The catalog binds its exact source-owned entrypoint,
+artifact path, and typed host-route and resource requirements; Recipe criteria supplies the separate guest/output
+architecture. Concrete host/toolchain selection and authenticated runtime observations belong to a future
+admitted VM Plan and executor.
 _Avoid_: Disk format, public output format, virtual machine artifact

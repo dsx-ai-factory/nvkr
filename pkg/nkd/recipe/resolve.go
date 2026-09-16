@@ -3,6 +3,7 @@
 package recipe
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -107,19 +108,8 @@ func Resolve(cat *catalog.Catalog, query criteria.Criteria, reserved map[string]
 		if !ok {
 			return nil, e.New(e.CodeInvalidCatalog, "recipe %q references unknown component %q", win.ID, n)
 		}
-		// Per-arch pin gate for the no-compile lane: a prebuilt component must have a
-		// pinned digest for the RESOLVED arch, else fail closed — never acquire an
-		// unpinned artifact (NKD-FR-BLD-051). This mirrors the from-source lane's
-		// requirement that every build resolve a digest-pinned toolchain.
-		if c.Prebuilt != nil {
-			if _, ok := c.Prebuilt.Digests[resolved.Arch]; !ok {
-				return nil, e.New(e.CodeUnpinnedSource,
-					"prebuilt component %q has no pinned digest for arch %q (run: nkdctl catalog pin-artifacts)", n, resolved.Arch)
-			}
-		} else if c.FromSource {
-			if err := requireToolchainForArch(n, c, resolved.Arch); err != nil {
-				return nil, err
-			}
+		if err := requireResolvedComponentRoute(n, c, resolved.Arch); err != nil {
+			return nil, err
 		}
 		comps = append(comps, catalog.NamedComponent{Name: n, Component: c})
 	}
@@ -159,6 +149,41 @@ func requireToolchainForArch(name string, c catalog.Component, arch string) erro
 	}
 	return e.New(e.CodeUnpinnedSource,
 		"from-source component %q has no digest-pinned toolchain for arch %q", name, arch)
+}
+
+// requireResolvedComponentRoute closes the architecture-specific pin and host-route
+// requirements after criteria are concrete. Catalog validation has already proved
+// that every component occupies exactly one source lane.
+func requireResolvedComponentRoute(name string, c catalog.Component, arch string) error {
+	switch {
+	case c.Prebuilt != nil:
+		if c.Prebuilt.Digests[arch] == "" {
+			return e.New(e.CodeUnpinnedSource,
+				"prebuilt component %q has no pinned digest for arch %q (run: nkdctl catalog pin-artifacts)", name, arch)
+		}
+		return nil
+	case !c.FromSource:
+		return nil
+	case c.BuilderType == catalog.BuilderVMImage:
+		return requireVMHostRoute(name, c, arch)
+	default:
+		return requireToolchainForArch(name, c, arch)
+	}
+}
+
+// requireVMHostRoute rejects an impossible hardware-acceleration declaration at
+// the resolved-criteria seam. KVM can accelerate only a same-architecture guest;
+// optional and forbidden modes retain their declared TCG route.
+func requireVMHostRoute(name string, c catalog.Component, guestArch string) error {
+	if c.VMImage == nil || c.VMImage.KVM != catalog.VMKVMRequired {
+		return nil
+	}
+	if criteria.IsWildcard(guestArch) || !slices.Contains(c.VMImage.AllowedHostArchs, guestArch) {
+		return e.New(e.CodeInvalidCatalog,
+			"vm-image component %q requires KVM but has no same-architecture host route for guest architecture %q",
+			name, guestArch)
+	}
+	return nil
 }
 
 // resolveLayered resolves a composition-layered catalog: it composes the base/overlay/
@@ -213,15 +238,8 @@ func resolveLayered(cat *catalog.Catalog, query criteria.Criteria, reserved map[
 		return nil, err
 	}
 	for _, nc := range comps {
-		if nc.Prebuilt != nil {
-			if _, ok := nc.Prebuilt.Digests[resolved.Arch]; !ok {
-				return nil, e.New(e.CodeUnpinnedSource,
-					"prebuilt component %q has no pinned digest for arch %q (run: nkdctl catalog pin-artifacts)", nc.Name, resolved.Arch)
-			}
-		} else if nc.FromSource {
-			if err := requireToolchainForArch(nc.Name, nc.Component, resolved.Arch); err != nil {
-				return nil, err
-			}
+		if err := requireResolvedComponentRoute(nc.Name, nc.Component, resolved.Arch); err != nil {
+			return nil, err
 		}
 	}
 	return &Resolved{RecipeID: coordinate(resolved), Criteria: resolved,

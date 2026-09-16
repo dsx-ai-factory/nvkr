@@ -21,6 +21,34 @@ const (
 	BuilderVMImage     = "vm-image"
 )
 
+// VM-image authoring vocabulary. The catalog declares the host routes and resources
+// a source-owned VM build requires. Guest architecture is deliberately absent: a
+// future admitted lowering must derive it from the selecting recipe's criteria.
+const (
+	VMKVMRequired  = "required"
+	VMKVMOptional  = "optional"
+	VMKVMForbidden = "forbidden"
+
+	VMNetworkDefault = "default"
+	VMNetworkNone    = "none"
+)
+
+// VMImageRequirements is the schema-only execution and resource requirements
+// declaration for a vm-image builder. It is not capability proof. KVM records
+// whether hardware acceleration is mandatory, preferred with TCG fallback, or
+// forbidden. AllowedHostArchs is a sorted, duplicate-free set. Recipe compilation
+// remains capability-gated until a VM executor is admitted.
+type VMImageRequirements struct {
+	AllowedHostArchs []string `json:"allowedHostArchs"`
+	MinHostCPUs      uint32   `json:"minHostCPUs"`
+	MinHostMemoryMiB uint64   `json:"minHostMemoryMiB"`
+	MinScratchMiB    uint64   `json:"minScratchMiB"`
+	MinOutputMiB     uint64   `json:"minOutputMiB"`
+	KVM              string   `json:"kvm"`
+	Network          string   `json:"network"`
+	TimeoutSeconds   uint64   `json:"timeoutSeconds"`
+}
+
 // DiskSpec describes the disk payload emitted by a component. It is required
 // exactly when OutputType is disk-image.
 type DiskSpec struct {
@@ -57,11 +85,13 @@ type Source struct {
 	TagPrefix          string `json:"tagPrefix,omitempty"`
 	ToolchainImage     string `json:"toolchainImage,omitempty"`     // explicit digest pin (arch-agnostic or single-arch)
 	ToolchainBaseImage string `json:"toolchainBaseImage,omitempty"` // resolve <base>:<.go-version> digest on pin
-	// ToolchainImagesByArch pins a NATIVE toolchain per target arch (arch -> digest).
-	// It is the multi-arch, model-(B) form: the build for arch X uses the X-native
-	// toolchain image and runs on an X platform, so compilation is native (no
-	// cross-compilation). When set, it takes precedence over ToolchainImage for arches
-	// it lists (NKD-NFR-093 typed-axis extension).
+	// ToolchainImagesByArch declares a digest-pinned toolchain candidate per
+	// execution-platform arch (arch -> digest). For ordinary builders the execution
+	// and target architectures are the same. For vm-image the key is a permitted host
+	// architecture, while the guest/output architecture comes from Recipe criteria.
+	// Runtime platform compatibility is authenticated only during admission. When set,
+	// the map takes precedence over ToolchainImage for arches it lists
+	// (NKD-NFR-093 typed-axis extension).
 	ToolchainImagesByArch map[string]string `json:"toolchainImagesByArch,omitempty"`
 	VendorCommand         []string          `json:"vendorCommand,omitempty"` // run in the fetch step (network) to vendor deps for a non-vendored repo
 }
@@ -172,9 +202,12 @@ type Component struct {
 	// role filter), NOT recipe selection, and does not affect recipeDigest. Empty means
 	// role-agnostic (present in every SKU).
 	Roles []string `json:"roles,omitempty"`
-	// BuilderType selects the from-source build substrate (ADR-10). It is a
-	// build-semantic input and flows into recipeDigest.
+	// BuilderType selects the from-source build substrate (ADR-10). An admitted
+	// executable builder type is a build-semantic input and flows into recipeDigest;
+	// vm-image remains catalog-snapshot identity only until its lowering is admitted.
 	BuilderType string `json:"builderType,omitempty"`
+	// VMImage is required exactly when BuilderType is vm-image.
+	VMImage *VMImageRequirements `json:"vmImage,omitempty"`
 	// Flake pins a nix builder's locked flake (set only when BuilderType==nix).
 	Flake *FlakePin `json:"flake,omitempty"`
 
@@ -185,8 +218,11 @@ type Component struct {
 	TreeHash       string  `json:"treeHash,omitempty"` // expected source tree hash
 	Patches        []Patch `json:"patches,omitempty"`
 	ToolchainImage string  `json:"toolchainImage,omitempty"` // must be @sha256: digest
-	// ToolchainImages is the resolved per-arch native toolchain set (arch -> digest);
-	// Compile selects the entry for the recipe's arch, falling back to ToolchainImage.
+	// ToolchainImages is the resolved set of digest-pinned toolchain candidates per
+	// execution arch (arch -> digest). Ordinary compilation selects the recipe's target
+	// arch. A future VM Plan selects an allowed host arch and authenticates platform
+	// compatibility; VM authoring never indexes this map with the guest arch.
+	// ToolchainImage is the scalar fallback.
 	ToolchainImages map[string]string `json:"toolchainImages,omitempty"`
 	CGO             bool              `json:"cgo,omitempty"`
 	OutputType      string            `json:"outputType,omitempty"`

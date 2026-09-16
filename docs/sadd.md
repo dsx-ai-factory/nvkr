@@ -239,8 +239,12 @@ Required membership exists before execution, so omitting a failed output cannot 
 Specialized byte-changing transformations remain explicit product intent.
 
 A `disk-image` named output selects exactly one component from an `os` Recipe and remains independent of its
-producer. The catalog's `vm-image` builder capability binds the disk metadata, exact source-owned entrypoint,
-and artifact path. The current aggregate NKE OS Recipe is an explicit compatibility exception to the target
+producer. The catalog's `vm-image` builder authoring contract binds the disk metadata, exact source-owned
+entrypoint and artifact path, allowed execution-host architectures and digest-pin coverage for each host route,
+minimum resources, KVM policy, network mode, and timeout. Recipe criteria supplies the separate guest/output
+architecture. These requirements affect catalog identity; they are not a selected host, authenticated toolchain
+platform, runtime observation, capability proof, or VM Plan. The current aggregate NKE OS Recipe is an explicit
+compatibility exception to the target
 one-Recipe-per-stack-layer model; embedded components retain their identities and evidence relationships while
 they are separated into independently realized layers. Disk lowering and VM execution remain capability-gated.
 

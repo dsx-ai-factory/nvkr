@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-09-15. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
+Reviewed 2026-09-16. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
 Each ADR contains its current lane-specific decision; no amendment chain is needed. Code/tests establish
 implementation. Contract tests, recorded external runs, and organizational acceptance are separate facts.
 
@@ -8,9 +8,11 @@ implementation. Contract tests, recorded external runs, and organizational accep
 
 Public lifecycle disk-output support currently stops at authoring-schema validation. Public single-component
 `os` outputs and catalog
-`disk-image`/`vm-image` metadata are accepted, then Recipe and lifecycle compilation fail closed before graph or
-source work. Disk lowering, VM execution, full-disk SBOM generation, OCI or object-store publication, and
-finite-set cluster compatibility are unimplemented. No existing NKE OS build or publication is claimed.
+`disk-image`/`vm-image` metadata plus typed host-route and resource requirements are accepted and included in
+catalog snapshot identity. Recipe and lifecycle compilation then fail closed before graph or source work. No VM
+Plan, host selection, capability proof, disk lowering, VM execution, full-disk SBOM generation, OCI or
+object-store publication, or finite-set cluster compatibility is implemented. No existing NKE OS build or
+publication is claimed.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
@@ -20,7 +22,7 @@ finite-set cluster compatibility are unimplemented. No existing NKE OS build or 
 | 06 Status | Exact checkpoints/declarations, pinned time authority, anti-rollback high-water/CAS contracts | Production discovery/time adapters and rotation; v1 manifest tags, revocation and channel concurrency are unimplemented |
 | 07–08 Reproduction | Linux stage-two receipts bind actual helper/runtime/image and terminal bytes; deterministic comparisons and profile matching | Other-platform authority, provider receipts, qualified helper-image admission, independent two-machine bake-off and causal profile graduation |
 | 09 Provenance | Deterministic reproduction and distinct SLSA production predicates; exact plan/dependency/subject checks during hosted finalization | Real signed hosted provenance and independent consumption exercised; ongoing provider/service acceptance remains operational |
-| 10 Builders | OCI source execution, digest-pinned acquisition and rootless BuildKit wrapped OCI exports; complete upstream CWE Dockerfile builds and offline payload checks passed locally and from the generated hosted Run; `vm-image` and disk metadata authoring validation | Disk lowering, acquisition, VM execution and collection; qualified Nix closure observation, other wrapped adapters, fused large-output credential phases and `embeds` remain |
+| 10 Builders | OCI source execution, digest-pinned acquisition and rootless BuildKit wrapped OCI exports; complete upstream CWE Dockerfile builds and offline payload checks passed locally and from the generated hosted Run; `vm-image` disk metadata, host-route, resource, KVM, network, timeout, and host-route toolchain-pin coverage validation | Disk lowering, acquisition, VM Plan selection, toolchain-platform and capability proof, execution and collection; qualified Nix closure observation, other wrapped adapters, fused large-output credential phases and `embeds` remain |
 | 11–12 Resolution/AICR | Layered conflict checks, category selection, role/cluster separation, exact AICR activation/generator identity; Linux held generator/render-tree contract | Embedded-version finite-set compatibility; no cross-process qualified render-to-vector publisher; loader/library closure and real downstream activation remain |
 | 13 Evidence | Per-observed-artifact CycloneDX SBOM and per-recipe index; pinned offline Syft dependency discovery for binaries/images and Helm/AICR chart metadata discovery; exact payload/scanner inputs and shared packaging/finalization checks; one release index referencing required stage-bound CycloneDX attestation bundles beside their outputs and signed sibling output repository/digest bindings; internal indexes are not published; [all three real NKE artifacts inspected offline](../dependency-sboms.md); typed evidence and mirror-invariant qualified publisher evidence | Full-disk material tracing, inspection, reconciliation and CycloneDX evidence are unimplemented. NVIDIA Run 34540582090 independently verified signatures and provenance, but its SBOMs were outside the signed root. Run 34631274098 published and signed the new layout but failed verification when cosign selected an SBOM bundle instead of legacy SLSA provenance. Cosign 3.1.3 with consistently published Sigstore bundles has pinned-binary local interoperability coverage; a successful new hosted Run remains required. Qualified signed evidence-receipt publication, vulnerability scanner execution and advisory generation remain outside v1; acquired upstream signatures/provenance are not verified |
 | 14 Delivery | Typed executable/APT/Helm layouts, including observed source Helm archives with exact producer checks and explicit image-package dependencies; resource-bounded RAW/ISO measurement; Linux held-qemu existing-envelope verification | Source quickstart archive, produced-image binding, checksums and all three local chart renders exercised from independently verified hosted publications. Disk/rootfs production, boot, encryption, unsigned-vector staging and qualified packaging fail admission; no masked-region support |

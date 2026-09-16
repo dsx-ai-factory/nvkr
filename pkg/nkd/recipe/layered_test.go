@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // ADR-12 assigns category to recipe selection and role to SKU composition. Keep the
@@ -81,6 +82,45 @@ func TestLayeredCategoryInferenceRequiresExactlyOneDeclaredCategory(t *testing.T
 	}, nil)
 	if code(err) != "NKD-E-AMBIGUOUS" {
 		t.Fatalf("omitted category in multi-category catalog did not fail ambiguous: %v", err)
+	}
+}
+
+func TestResolveLayeredValidatesVMHostRouteAfterComposition(t *testing.T) {
+	component := catalog.Component{
+		FromSource: true, BuilderType: catalog.BuilderVMImage, OutputType: "disk-image",
+		Disk: &catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
+		VMImage: &catalog.VMImageRequirements{
+			AllowedHostArchs: []string{"amd64"}, MinHostCPUs: 1, MinHostMemoryMiB: 1,
+			MinScratchMiB: 1, MinOutputMiB: 1, KVM: catalog.VMKVMOptional,
+			Network: catalog.VMNetworkDefault, TimeoutSeconds: 1,
+		},
+		Repo: testVMRepo, Commit: testVMCommit, TreeHash: testVMTree,
+		ToolchainImages: map[string]string{
+			"amd64": testVMToolchain,
+		},
+		BuildCommand: []string{"make", "image"}, ArtifactPath: "out/image.qcow2", SourceDate: 1733939955,
+	}
+	makeCatalog := func(kvm string) *catalog.Catalog {
+		base := &compose.RecipeMetadata{Kind: compose.RecipeMetadataKind, APIVersion: compose.APIVersion}
+		base.Metadata.Name = "base"
+		base.Spec.ComponentRefs = []compose.ComponentRef{{Name: "image"}}
+		overlay := &compose.RecipeMetadata{Kind: compose.RecipeMetadataKind, APIVersion: compose.APIVersion}
+		overlay.Metadata.Name = "os-arm64"
+		overlay.Spec.Criteria = &criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "arm64"}
+		overlay.Spec.ComponentRefs = []compose.ComponentRef{{
+			Name: "image", Overrides: map[string]any{"vmImage": map[string]any{"kvm": kvm}},
+		}}
+		return &catalog.Catalog{
+			Layers:     &compose.Store{Base: base, Overlays: map[string]*compose.RecipeMetadata{"os-arm64": overlay}},
+			Components: map[string]catalog.Component{"image": component},
+		}
+	}
+	query := criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "arm64"}
+	if resolved, err := Resolve(makeCatalog(catalog.VMKVMRequired), query, nil); code(err) != nkderr.CodeInvalidCatalog || resolved != nil {
+		t.Fatalf("layered required-KVM route = %#v, %v; want no result and %s", resolved, err, nkderr.CodeInvalidCatalog)
+	}
+	if resolved, err := Resolve(makeCatalog(catalog.VMKVMOptional), query, nil); err != nil || resolved == nil {
+		t.Fatalf("layered optional KVM must retain the cross-architecture TCG route: %#v, %v", resolved, err)
 	}
 }
 

@@ -108,6 +108,17 @@ exact source-owned argument vector, and artifact path. NKD does not infer Packer
 workflow. These fields are Recipe inputs once disk lowering is admitted; the schema-only contract mints no
 Recipe identity for a disk.
 
+A `vm-image` component also carries a required `vmImage` requirements block: a nonempty, sorted and
+duplicate-free `allowedHostArchs` set; positive `minHostCPUs`, `minHostMemoryMiB`, `minScratchMiB`,
+`minOutputMiB`, and `timeoutSeconds`; `kvm` set to `required`, `optional`, or `forbidden`; and `network` set to
+`default` or `none`. Recipe criteria supplies the guest/output architecture. For this builder, per-architecture
+toolchain pins are keyed by execution-host architecture, and every allowed host route must have an exact pin or
+the scalar toolchain fallback. Resolution never indexes that set with the guest architecture. Required KVM needs
+a same-architecture host route, optional KVM permits a TCG route, and forbidden KVM admits only TCG. These
+authoring values change catalog snapshot identity, but they do not select or authenticate a host, prove a
+capability, or mint a VM Plan, graph, or Recipe identity. Future VM admission selects the concrete host and
+toolchain and binds host and guest separately.
+
 For the [NKE Makefile at commit `6df693a`](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185),
 a future catalog entry binds two source-owned Make targets. Plain and FDE are separate selectable components,
 not a public boolean or variant. The existing typed architecture token is resolved from Recipe criteria:

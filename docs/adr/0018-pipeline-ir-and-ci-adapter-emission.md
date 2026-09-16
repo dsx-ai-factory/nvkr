@@ -139,11 +139,16 @@ Isolation and the fixed environment/mount contract are identical across all engi
 - `exclusion` emits no node.
 
 `vm-image` and `disk-image` do not lower in the first authoring contract. Admission fails with
-`CodeEngineCapability` before source, subprocess, or output work. A future VM Plan must type and bind the guest
-and host architectures, CPU, memory, scratch and output storage, required devices such as KVM, acceleration
-fallback, network mode, privilege, timeout, and authenticated runtime-host observations. It must carry the exact
-catalog-owned source entrypoint and artifact path. Adapters may transport that Plan, but may not reconstruct
-Packer commands, invoke an upstream workflow, or weaken a missing device or isolation requirement.
+`CodeEngineCapability` before source, subprocess, or output work. The catalog authors VM host-route, minimum
+resource, KVM, network, timeout, exact source-entrypoint, artifact-path, and toolchain-pin requirements; those
+declarations are not capability proof. A future VM Plan derives the guest architecture from Recipe criteria,
+selects one allowed host architecture and its matching pinned toolchain, and binds host and guest separately.
+The Plan carries the exact catalog-authored requirements, source entrypoint, artifact path, and selected
+toolchain; it also binds additional admission-resolved guest topology, devices, privilege, and concrete
+acceleration selection. The runtime adapter then authenticates the actual host architecture and capacity,
+toolchain platform, KVM/device availability, and enforced network and timeout. Adapters may transport that Plan,
+but may not reconstruct Packer commands, invoke an upstream workflow, or weaken a missing device or isolation
+requirement.
 
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the
 local runner's ownership contract. Private package layouts must remain reopenable by later host transport
