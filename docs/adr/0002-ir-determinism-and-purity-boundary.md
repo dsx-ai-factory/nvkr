@@ -87,9 +87,10 @@ An automated two-part guard enforces the boundary; documentation alone does not:
 - **Static check** — forbids nondeterministic sources (wall-clock reads, randomness, UUID generation, hostname,
   host-environment-into-identity) in the identity-producing code paths. Any use is allowlisted only with an
   explicit justifying note.
-- **Empirical invariance test** — mutates host, clock, and observed builder facts and asserts the Recipe Digest
-  and unaffected T2 records are byte-stable. Mutating a **pinned content input** changes Recipe identity; mutating
-  an authored execution request changes its catalog and Plan identities without changing Recipe identity.
+- **Empirical invariance and sensitivity tests**: `TestDigestHostInvariance` mutates host- and clock-related
+  process environment values and asserts that the Recipe Digest is byte-stable. Separate tests assert that
+  mutating a **pinned content input** changes Recipe identity, while mutating an authored execution request changes
+  catalog and Plan identities and full executable graph bytes without changing Recipe identity.
 
 ## Consequences
 

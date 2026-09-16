@@ -69,12 +69,11 @@ func assertRecipeIdentityFieldRules(t *testing.T, full, logical reflect.Type,
 	}
 }
 
-// TestDigestHostInvariance is the ADR-02 §3 empirical purity guard (the
-// "mutate host/clock/builder facts → identity byte-stable" direction). The IR
-// carries no host/clock/random field by construction, so perturbing the process
-// environment — hostname, user, home, timezone, a fake clock var — must not move
-// the recipe identity by a single byte. The complementary "mutate a pinned input
-// → identity changes" direction is TestDigestStableAndSensitive.
+// TestDigestHostInvariance is the ADR-02 §4 empirical purity guard for process
+// environment values related to the host and clock. The IR carries no host,
+// clock, or random field by construction, so perturbing hostname, user, home,
+// timezone, and a source-date environment value must not move Recipe identity.
+// Separate tests cover pinned-input sensitivity and execution-requirement projection.
 func TestDigestHostInvariance(t *testing.T) {
 	before, err := sample().Digest()
 	if err != nil {
