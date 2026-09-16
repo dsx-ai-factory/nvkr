@@ -61,6 +61,45 @@ func TestCurrentPipelineAdaptersRejectExecutionRequirements(t *testing.T) {
 	}
 }
 
+func TestGeneratedPipelineValidatesGraphBeforeCapabilityAdmission(t *testing.T) {
+	toolchain := "example.test/toolchain@sha256:" + strings.Repeat("c", 64)
+	fetch := testFetchNode("fetch-source", "https://example.test/source", testSourceCommit, testSourceTree,
+		"source", toolchain, "")
+	build := completeTestBuild(ir.Node{ID: "build-artifact", Kind: ir.KindBuild, Component: "artifact"}, fetch)
+	graph := testSourceGraph("invalid-requirements", fetch, build)
+	foundFetch := false
+	for i := range graph.Nodes {
+		if graph.Nodes[i].Kind == ir.KindFetch {
+			graph.Nodes[i].Requirements = &execution.Requirements{
+				Resources: &execution.ResourceRequest{MemoryMiB: 4096},
+			}
+			foundFetch = true
+			break
+		}
+	}
+	if !foundFetch {
+		t.Fatal("test graph has no fetch node")
+	}
+
+	for _, test := range []struct {
+		name     string
+		graph    *ir.Graph
+		wantText string
+	}{
+		{name: "nil graph", wantText: "IR graph is nil"},
+		{name: "requirements on fetch", graph: graph, wantText: "forbidden field requirements"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := GeneratedPipelineBytes(context.Background(), "test", "sha256:"+strings.Repeat("a", 64),
+				"invalid-requirements", test.graph, []byte("body\n"))
+			if code(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("invalid graph returned %v, want %s containing %q",
+					err, nkderr.CodeInvalidCatalog, test.wantText)
+			}
+		})
+	}
+}
+
 func TestTerminalVerificationRejectsExecutionRequirementsBeforeQualificationOrPathAccess(t *testing.T) {
 	work := filepath.Join(t.TempDir(), "work")
 	node, opts, _ := qualifiedResultOptions(t, filepath.Join(work, "src"))

@@ -16,7 +16,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
-	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	ociname "github.com/google/go-containerregistry/pkg/name"
@@ -380,7 +380,7 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 		sort.Strings(archs)
 		for _, arch := range archs {
 			ref := src.ToolchainImagesByArch[arch]
-			if !nkderr.ValidArch(arch) {
+			if !criteria.ValidArch(arch) {
 				return e.New(e.CodeInvalidCatalog,
 					"catalog source %q has a toolchain for unsupported v1 arch %q", sourceName, arch)
 			}
@@ -738,7 +738,7 @@ func (cat *Catalog) Validate() error {
 			return e.New(e.CodeInvalidCatalog, "duplicate recipe id %q", r.ID)
 		}
 		seen[r.ID] = true
-		if err := nkderr.CheckReserved(r.Reserved); err != nil {
+		if err := criteria.CheckReserved(r.Reserved); err != nil {
 			return err
 		}
 		// Composition is an inert v1 hook: recognized but not yet active. A populated
@@ -771,10 +771,10 @@ func (cat *Catalog) Validate() error {
 				return e.New(e.CodeUnpinnedSource,
 					"recipe %q: aicrProfile generatorDigest %q is not a bare sha256:<64-hex> pin", r.ID, a.GeneratorDigest)
 			}
-			if err := nkderr.ValidateAICRValues(a.Service, a.Accelerator, a.OS, a.Intent, a.Platform); err != nil {
+			if err := criteria.ValidateAICRValues(a.Service, a.Accelerator, a.OS, a.Intent, a.Platform); err != nil {
 				return e.Wrap(e.CodeInvalidCatalog, err, "recipe %q aicrProfile", r.ID)
 			}
-			if !nkderr.IsWildcard(r.Criteria.OS) && r.Criteria.OS != a.OS {
+			if !criteria.IsWildcard(r.Criteria.OS) && r.Criteria.OS != a.OS {
 				return e.New(e.CodeInvalidCatalog,
 					"recipe %q criteria os %q conflicts with aicrProfile os %q", r.ID, r.Criteria.OS, a.OS)
 			}
@@ -802,7 +802,7 @@ func (cat *Catalog) Validate() error {
 			if !ok {
 				return e.New(e.CodeInvalidCatalog, "recipe %q references unknown component %q", r.ID, cn)
 			}
-			if !nkderr.IsWildcard(r.Criteria.Arch) {
+			if !criteria.IsWildcard(r.Criteria.Arch) {
 				if err := ValidateVMImageHostRoute(cn, component, r.Criteria.Arch); err != nil {
 					return e.Wrap(e.CodeInvalidCatalog, err,
 						"recipe %q cannot realize component %q", r.ID, cn)
@@ -997,7 +997,7 @@ func validateComponent(name string, c Component) error {
 		}
 		sort.Strings(archs)
 		for _, a := range archs {
-			if !nkderr.ValidArch(a) {
+			if !criteria.ValidArch(a) {
 				return e.New(e.CodeInvalidCatalog,
 					"component %q: toolchain map has unsupported v1 arch %q", name, a)
 			}

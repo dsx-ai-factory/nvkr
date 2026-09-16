@@ -81,46 +81,70 @@ type LogicalGraph struct {
 	Nodes         []LogicalNode          `json:"nodes"`
 }
 
-type identityFieldClass uint8
+type recipeIdentityFieldRule uint8
 
 const (
-	identityLogical identityFieldClass = iota + 1
-	identityContentReference
-	identityTransport
-	identityComposition
-	identityExecution
+	includeLogicalValueInRecipeIdentity recipeIdentityFieldRule = iota + 1
+	includeContentReferenceInRecipeIdentity
+	excludeTransportFromRecipeIdentity
+	excludeCompositionFromRecipeIdentity
+	excludeExecutionMetadataFromRecipeIdentity
 )
 
-// These exhaustive classifications are checked reflectively in marshal_test.go.
-// They make adding a field to an execution type a deliberate identity-boundary
+// These exhaustive rules are checked reflectively in marshal_test.go.
+// They make adding a field to a full graph type a deliberate Recipe-identity boundary
 // decision instead of silently inheriting a serializer's behavior.
-var nodeIdentityFieldClass = map[string]identityFieldClass{
-	"ID": identityLogical, "Kind": identityLogical, "Needs": identityLogical,
-	"Requirements": identityExecution,
-	"Repo":         identityTransport, "Commit": identityLogical, "TreeHash": identityLogical,
-	"Dest": identityLogical, "VendorCmd": identityLogical,
-	"VendorImage": identityContentReference,
-	"Artifact":    identityTransport, "Digest": identityLogical,
-	"Component": identityLogical, "BuilderType": identityLogical,
-	"FlakeRef": identityTransport, "FlakeOutput": identityLogical,
-	"FlakeLockDigest": identityLogical, "Toolchain": identityContentReference,
-	"Platform": identityLogical, "Network": identityLogical, "Env": identityLogical,
-	"Patches": identityLogical, "Command": identityLogical, "Workdir": identityLogical,
-	"SourceDest": identityLogical, "SourceCommit": identityLogical,
-	"SourceTreeHash": identityLogical, "VendorSpecDigest": identityLogical,
-	"SourceReadOnly": identityLogical, "WriteDir": identityLogical,
-	"OutputType": identityLogical, "ArtifactPath": identityLogical, "Version": identityLogical,
+var nodeRecipeIdentityRules = map[string]recipeIdentityFieldRule{
+	"ID":               includeLogicalValueInRecipeIdentity,
+	"Kind":             includeLogicalValueInRecipeIdentity,
+	"Needs":            includeLogicalValueInRecipeIdentity,
+	"Requirements":     excludeExecutionMetadataFromRecipeIdentity,
+	"Repo":             excludeTransportFromRecipeIdentity,
+	"Commit":           includeLogicalValueInRecipeIdentity,
+	"TreeHash":         includeLogicalValueInRecipeIdentity,
+	"Dest":             includeLogicalValueInRecipeIdentity,
+	"VendorCmd":        includeLogicalValueInRecipeIdentity,
+	"VendorImage":      includeContentReferenceInRecipeIdentity,
+	"Artifact":         excludeTransportFromRecipeIdentity,
+	"Digest":           includeLogicalValueInRecipeIdentity,
+	"Component":        includeLogicalValueInRecipeIdentity,
+	"BuilderType":      includeLogicalValueInRecipeIdentity,
+	"FlakeRef":         excludeTransportFromRecipeIdentity,
+	"FlakeOutput":      includeLogicalValueInRecipeIdentity,
+	"FlakeLockDigest":  includeLogicalValueInRecipeIdentity,
+	"Toolchain":        includeContentReferenceInRecipeIdentity,
+	"Platform":         includeLogicalValueInRecipeIdentity,
+	"Network":          includeLogicalValueInRecipeIdentity,
+	"Env":              includeLogicalValueInRecipeIdentity,
+	"Patches":          includeLogicalValueInRecipeIdentity,
+	"Command":          includeLogicalValueInRecipeIdentity,
+	"Workdir":          includeLogicalValueInRecipeIdentity,
+	"SourceDest":       includeLogicalValueInRecipeIdentity,
+	"SourceCommit":     includeLogicalValueInRecipeIdentity,
+	"SourceTreeHash":   includeLogicalValueInRecipeIdentity,
+	"VendorSpecDigest": includeLogicalValueInRecipeIdentity,
+	"SourceReadOnly":   includeLogicalValueInRecipeIdentity,
+	"WriteDir":         includeLogicalValueInRecipeIdentity,
+	"OutputType":       includeLogicalValueInRecipeIdentity,
+	"ArtifactPath":     includeLogicalValueInRecipeIdentity,
+	"Version":          includeLogicalValueInRecipeIdentity,
 }
 
-var criteriaIdentityFieldClass = map[string]identityFieldClass{
-	"Category": identityLogical, "Role": identityComposition,
-	"K8sVersion": identityLogical, "OS": identityLogical, "Arch": identityLogical,
-	"ClusterType": identityComposition,
+var criteriaRecipeIdentityRules = map[string]recipeIdentityFieldRule{
+	"Category":    includeLogicalValueInRecipeIdentity,
+	"Role":        excludeCompositionFromRecipeIdentity,
+	"K8sVersion":  includeLogicalValueInRecipeIdentity,
+	"OS":          includeLogicalValueInRecipeIdentity,
+	"Arch":        includeLogicalValueInRecipeIdentity,
+	"ClusterType": excludeCompositionFromRecipeIdentity,
 }
 
-var graphIdentityFieldClass = map[string]identityFieldClass{
-	"SchemaVersion": identityLogical, "RecipeID": identityLogical,
-	"Criteria": identityLogical, "AICR": identityLogical, "Nodes": identityLogical,
+var graphRecipeIdentityRules = map[string]recipeIdentityFieldRule{
+	"SchemaVersion": includeLogicalValueInRecipeIdentity,
+	"RecipeID":      includeLogicalValueInRecipeIdentity,
+	"Criteria":      includeLogicalValueInRecipeIdentity,
+	"AICR":          includeLogicalValueInRecipeIdentity,
+	"Nodes":         includeLogicalValueInRecipeIdentity,
 }
 
 // Normalize enforces a canonical ordering on the graph: nodes by ID, and within

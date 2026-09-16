@@ -106,7 +106,8 @@ func (plan Plan) Validate() error {
 		if len(recipePlan.Components) == 0 && recipePlan.Graph.AICR == nil {
 			return e.New(e.CodeInvalidCatalog, "factory recipe target %q selects no components", recipePlan.Name)
 		}
-		if !sort.StringsAreSorted(recipePlan.Components) || !sort.StringsAreSorted(recipePlan.AllComponents) {
+		if !sort.StringsAreSorted(recipePlan.Components) || hasAdjacentDuplicate(recipePlan.Components) ||
+			!sort.StringsAreSorted(recipePlan.AllComponents) || hasAdjacentDuplicate(recipePlan.AllComponents) {
 			return e.New(e.CodeInvalidCatalog, "factory recipe target %q components are not canonical", recipePlan.Name)
 		}
 		for _, node := range recipePlan.Graph.Nodes {

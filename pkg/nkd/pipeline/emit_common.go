@@ -64,10 +64,11 @@ func GeneratedPipelineBytes(ctx context.Context, engine, recipeDigest, recipeID 
 	if err := requireEmitterContext(ctx); err != nil {
 		return nil, err
 	}
-	if g != nil {
-		if err := rejectUnsupportedExecutionRequirements(g.Nodes, "generated pipeline rendering"); err != nil {
-			return nil, err
-		}
+	if err := g.Validate(); err != nil {
+		return nil, err
+	}
+	if err := rejectUnsupportedExecutionRequirements(g.Nodes, "generated pipeline rendering"); err != nil {
+		return nil, err
 	}
 	nodes, err := NodesJSON(g)
 	if err != nil {

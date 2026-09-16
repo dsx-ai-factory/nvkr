@@ -129,8 +129,9 @@ Current package-level evidence includes:
 
 - the explicit `ir.LogicalGraph` / `ir.LogicalNode` identity DTOs, which cannot represent source, artifact, or
   flake transport locators;
-- `pkg/nkd/ir/marshal_test.go::TestLogicalIdentityDTOClassifiesEveryExecutionField`, whose reflection coverage
-  makes every new execution field declare its T1/content-reference/transport/composition class;
+- `pkg/nkd/ir/marshal_test.go::TestRecipeIdentityFieldRulesCoverEveryGraphField`, whose reflection coverage
+  makes every full-graph field declare whether Recipe identity includes its logical value or content reference,
+  or excludes it as transport, composition, or execution metadata;
 - `pkg/nkd/ir/validate_test.go::TestGraphDigestRemainsTransportIndependentAfterFullValidation`, which proves
   independently relocated full execution graphs project to identical logical bytes and `recipeDigest`; and
 - `pkg/nkd/ir/marshal_test.go::TestDigestHostInvariance` plus the static guard in

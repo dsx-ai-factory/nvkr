@@ -107,7 +107,7 @@ func TestResolveNoMatch(t *testing.T) {
 	}
 }
 
-func TestResolveRejectsRequiredKVMWithoutSameArchitectureHostRoute(t *testing.T) {
+func TestResolveVMImageKVMHostRoutes(t *testing.T) {
 	makeCatalog := func(component catalog.Component) *catalog.Catalog {
 		return &catalog.Catalog{
 			Recipes: []catalog.Recipe{{
@@ -117,26 +117,50 @@ func TestResolveRejectsRequiredKVMWithoutSameArchitectureHostRoute(t *testing.T)
 		}
 	}
 	query := criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "arm64"}
-	requiredCrossArch := testVMImageComponent(
-		[]execution.HostPlatform{execution.HostPlatformLinuxAMD64},
-		execution.CapabilityRequired,
-	)
-	if resolved, err := Resolve(makeCatalog(requiredCrossArch), query, nil); code(err) != nkderr.CodeInvalidCatalog || resolved != nil {
-		t.Fatalf("required KVM cross-architecture route = %#v, %v; want no result and %s", resolved, err, nkderr.CodeInvalidCatalog)
-	}
-	requiredNative := testVMImageComponent(
-		[]execution.HostPlatform{execution.HostPlatformLinuxAMD64, execution.HostPlatformLinuxARM64},
-		execution.CapabilityRequired,
-	)
-	if resolved, err := Resolve(makeCatalog(requiredNative), query, nil); err != nil || resolved == nil {
-		t.Fatalf("required KVM native route = %#v, %v; want success", resolved, err)
-	}
-	preferredCrossArch := testVMImageComponent(
-		[]execution.HostPlatform{execution.HostPlatformLinuxAMD64},
-		execution.CapabilityPreferred,
-	)
-	if resolved, err := Resolve(makeCatalog(preferredCrossArch), query, nil); err != nil || resolved == nil {
-		t.Fatalf("preferred KVM must retain the cross-architecture TCG route: %#v, %v", resolved, err)
+	for _, test := range []struct {
+		name     string
+		hosts    []execution.HostPlatform
+		policy   execution.CapabilityPolicy
+		wantCode nkderr.Code
+	}{
+		{
+			name:     "required cross-architecture",
+			hosts:    []execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+			policy:   execution.CapabilityRequired,
+			wantCode: nkderr.CodeInvalidCatalog,
+		},
+		{
+			name: "required native",
+			hosts: []execution.HostPlatform{
+				execution.HostPlatformLinuxAMD64,
+				execution.HostPlatformLinuxARM64,
+			},
+			policy: execution.CapabilityRequired,
+		},
+		{
+			name:   "preferred cross-architecture",
+			hosts:  []execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+			policy: execution.CapabilityPreferred,
+		},
+		{
+			name:   "forbidden cross-architecture",
+			hosts:  []execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+			policy: execution.CapabilityForbidden,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			component := testVMImageComponent(test.hosts, test.policy)
+			resolved, err := Resolve(makeCatalog(component), query, nil)
+			if test.wantCode != "" {
+				if code(err) != test.wantCode || resolved != nil {
+					t.Fatalf("Resolve() = %#v, %v; want no result and %s", resolved, err, test.wantCode)
+				}
+				return
+			}
+			if err != nil || resolved == nil {
+				t.Fatalf("Resolve() = %#v, %v; want success", resolved, err)
+			}
+		})
 	}
 }
 

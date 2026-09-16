@@ -31,7 +31,15 @@ func TestPlanRejectsSubstitutedInputsAndRecipeBindings(t *testing.T) {
 		{"substituted recipe ID", func(p *Plan) { p.Recipes[0].RecipeID = "other" }, e.CodeUnverifiedRef, "graph identity"},
 		{"empty selection", func(p *Plan) { p.Recipes[0].Components = nil }, e.CodeInvalidCatalog, "selects no components"},
 		{"unordered selection", func(p *Plan) { p.Recipes[0].Components = []string{"z", "a"} }, e.CodeInvalidCatalog, "not canonical"},
+		{"duplicate selection", func(p *Plan) {
+			components := p.Recipes[0].Components
+			p.Recipes[0].Components = append([]string{components[0]}, components...)
+		}, e.CodeInvalidCatalog, "not canonical"},
 		{"unordered full membership", func(p *Plan) { p.Recipes[0].AllComponents = []string{"z", "a"} }, e.CodeInvalidCatalog, "not canonical"},
+		{"duplicate full membership", func(p *Plan) {
+			components := p.Recipes[0].AllComponents
+			p.Recipes[0].AllComponents = append([]string{components[0]}, components...)
+		}, e.CodeInvalidCatalog, "not canonical"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := buildOnlyPlan(t, DefaultRunsOn)

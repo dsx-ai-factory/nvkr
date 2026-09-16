@@ -16,48 +16,91 @@ func TestDiskImageCatalogSchemaAndIdentity(t *testing.T) {
 	registry := `apiVersion: nkd.dev/catalog/v1
 kind: SourceBuildRegistry
 sources:
-  image-source: {repo: https://github.com/example/node-image, toolchainImage: ` + vmToolchain + `}
+  image-source:
+    repo: https://github.com/example/node-image
+    toolchainImage: ` + vmToolchain + `
 recipes:
   - id: node-amd64
-    criteria: {category: os, os: ubuntu, arch: amd64}
-    components: [node-fde, node-plain]
+    criteria:
+      category: os
+      os: ubuntu
+      arch: amd64
+    components:
+      - node-fde
+      - node-plain
   - id: node-arm64
-    criteria: {category: os, os: ubuntu, arch: arm64}
-    components: [node-plain]
+    criteria:
+      category: os
+      os: ubuntu
+      arch: arm64
+    components:
+      - node-plain
 components:
   node-fde:
     fromSource: true
     source: image-source
     builderType: vm-image
     outputType: disk-image
-    disk: {format: qcow2, encryption: luks2}
+    disk:
+      format: qcow2
+      encryption: luks2
     buildRequirements:
       # Schema-fixture values only, not an NKE production runner profile.
-      resources: {cpuMillis: 4000, memoryMiB: 8192, ephemeralStorageMiB: 32768}
-      allowedHostPlatforms: [linux/amd64, linux/arm64]
-      capabilities: [{name: kvm, policy: preferred}]
+      resources:
+        cpuMillis: 4000
+        memoryMiB: 8192
+        ephemeralStorageMiB: 32768
+      allowedHostPlatforms:
+        - linux/amd64
+        - linux/arm64
+      capabilities:
+        - name: kvm
+          policy: preferred
       timeoutSeconds: 10800
-    buildCommand: [make, -C, image, image-fde, "ARCH={{.Arch}}"]
+    buildCommand:
+      - make
+      - "-C"
+      - image
+      - image-fde
+      - "ARCH={{.Arch}}"
     artifactPath: "image/output-fde/node-{{.Arch}}.qcow2"
   node-plain:
     fromSource: true
     source: image-source
     builderType: vm-image
     outputType: disk-image
-    disk: {format: qcow2, encryption: none}
+    disk:
+      format: qcow2
+      encryption: none
     buildRequirements:
       # Schema-fixture values only, not an NKE production runner profile.
-      resources: {cpuMillis: 4000, memoryMiB: 8192, ephemeralStorageMiB: 32768}
-      allowedHostPlatforms: [linux/amd64, linux/arm64]
-      capabilities: [{name: kvm, policy: preferred}]
+      resources:
+        cpuMillis: 4000
+        memoryMiB: 8192
+        ephemeralStorageMiB: 32768
+      allowedHostPlatforms:
+        - linux/amd64
+        - linux/arm64
+      capabilities:
+        - name: kvm
+          policy: preferred
       timeoutSeconds: 18000
-    buildCommand: [make, -C, image, image-plain, "ARCH={{.Arch}}"]
+    buildCommand:
+      - make
+      - "-C"
+      - image
+      - image-plain
+      - "ARCH={{.Arch}}"
     artifactPath: "image/output-plain/node-{{.Arch}}.qcow2"
 `
 	lock := `apiVersion: nkd.dev/lock/v1
 kind: PinLock
 pins:
-  image-source: {tag: v1.0.0, commit: ` + goodCommit + `, treeHash: ` + goodTree + `, sourceDateEpoch: 1733939955}
+  image-source:
+    tag: v1.0.0
+    commit: ` + goodCommit + `
+    treeHash: ` + goodTree + `
+    sourceDateEpoch: 1733939955
 `
 	load := func(t *testing.T) *Catalog {
 		t.Helper()
@@ -221,6 +264,15 @@ func TestVMImageHostRouteAndToolchainValidation(t *testing.T) {
 	requiredCrossArch.BuildRequirements.Capabilities[0].Policy = execution.CapabilityRequired
 	if err := validate(requiredCrossArch, "arm64"); catalogErrorCode(err) != nkderr.CodeInvalidCatalog {
 		t.Fatalf("required KVM without a same-architecture host route returned %v", err)
+	}
+	requiredNative := requiredCrossArch
+	requiredNative.BuildRequirements = execution.Clone(requiredCrossArch.BuildRequirements)
+	requiredNative.BuildRequirements.AllowedHostPlatforms = []execution.HostPlatform{
+		execution.HostPlatformLinuxAMD64,
+		execution.HostPlatformLinuxARM64,
+	}
+	if err := validate(requiredNative, "arm64"); err != nil {
+		t.Fatalf("required KVM with a same-architecture host route rejected: %v", err)
 	}
 	requiredCrossArch.BuildRequirements.Capabilities[0].Policy = execution.CapabilityPreferred
 	if err := validate(requiredCrossArch, "arm64"); err != nil {

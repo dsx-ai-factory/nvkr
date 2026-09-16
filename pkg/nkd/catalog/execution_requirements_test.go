@@ -14,18 +14,27 @@ func TestBuildRequirementsLoadStrictlyAndAffectCatalogIdentity(t *testing.T) {
 	registry := `apiVersion: nkd.dev/catalog/v1
 kind: SourceBuildRegistry
 sources:
-  source: {repo: https://example.test/source, toolchainImage: ` + goodImage + `}
+  source:
+    repo: https://example.test/source
+    toolchainImage: ` + goodImage + `
 recipes:
   - id: requirements
-    criteria: {category: kubernetes, os: ubuntu, arch: amd64}
-    components: [artifact]
+    criteria:
+      category: kubernetes
+      os: ubuntu
+      arch: amd64
+    components:
+      - artifact
 components:
   artifact:
     fromSource: true
     source: source
     outputType: raw
     buildRequirements:
-      resources: {cpuMillis: 2000, memoryMiB: 4096, ephemeralStorageMiB: 8192}
+      resources:
+        cpuMillis: 2000
+        memoryMiB: 4096
+        ephemeralStorageMiB: 8192
       allowedHostPlatforms:
         - linux/amd64
         - linux/arm64
@@ -33,14 +42,19 @@ components:
         - name: kvm
           policy: preferred
       timeoutSeconds: 7200
-    buildCommand: [make]
+    buildCommand:
+      - make
     writeDir: out
     artifactPath: out/artifact
 `
 	lock := `apiVersion: nkd.dev/lock/v1
 kind: PinLock
 pins:
-  source: {tag: v1.0.0, commit: ` + goodCommit + `, treeHash: ` + goodTree + `, sourceDateEpoch: 1733939955}
+  source:
+    tag: v1.0.0
+    commit: ` + goodCommit + `
+    treeHash: ` + goodTree + `
+    sourceDateEpoch: 1733939955
 `
 	load := func(t *testing.T, authored string) *Catalog {
 		t.Helper()
@@ -70,7 +84,7 @@ pins:
 	if !execution.Equal(got, want) {
 		t.Fatalf("loaded build requirements = %#v, want %#v", got, want)
 	}
-	unknown := strings.Replace(registry, "cpuMillis: 2000", "cpuMillis: 2000, futureResource: 1", 1)
+	unknown := strings.Replace(registry, "cpuMillis: 2000", "cpuMillis: 2000\n        futureResource: 1", 1)
 	if _, err := LoadContext(context.Background(), bytesProvider{
 		RegistryFile: []byte(unknown), LockFile: []byte(lock),
 	}); catalogErrorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "futureResource") {
