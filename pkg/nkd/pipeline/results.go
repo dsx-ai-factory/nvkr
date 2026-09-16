@@ -31,6 +31,15 @@ func (l Local) VerifyResults(g *ir.Graph, recipeDigest, resultsDir string, opts 
 	if err != nil {
 		return &Report{}, err
 	}
+	selectedNodes := make([]ir.Node, 0, len(g.Nodes))
+	for _, node := range g.Nodes {
+		if included[node.ID] {
+			selectedNodes = append(selectedNodes, node)
+		}
+	}
+	if err := rejectUnsupportedExecutionRequirements(selectedNodes, "terminal result verification"); err != nil {
+		return &Report{}, err
+	}
 	if resultsDir == "" {
 		resultsDir = filepath.Join(filepath.Dir(opts.SourceRoot), "results")
 	}

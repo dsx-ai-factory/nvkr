@@ -64,6 +64,11 @@ func GeneratedPipelineBytes(ctx context.Context, engine, recipeDigest, recipeID 
 	if err := requireEmitterContext(ctx); err != nil {
 		return nil, err
 	}
+	if g != nil {
+		if err := rejectUnsupportedExecutionRequirements(g.Nodes, "generated pipeline rendering"); err != nil {
+			return nil, err
+		}
+	}
 	nodes, err := NodesJSON(g)
 	if err != nil {
 		return nil, err
@@ -332,6 +337,9 @@ func validateEmitterContract(g *ir.Graph, runnerDigest string, verify Verificati
 	if err := g.Validate(); err != nil {
 		return err
 	}
+	if err := rejectUnsupportedExecutionRequirements(g.Nodes, "pipeline emission"); err != nil {
+		return err
+	}
 	if graphHasBuild(g) {
 		return e.New(e.CodeEngineCapability,
 			"from-source emission requires a provider execution-attestation adapter that measures the actual runner, engine-selected container manifest, toolchain, sandbox, and closure before artifact work; no such adapter is configured")
@@ -422,6 +430,9 @@ func LowerJobs(g *ir.Graph) ([]Job, error) {
 		return nil, e.New(e.CodeInvalidCatalog, "pipeline lowering requires an IR graph")
 	}
 	if err := g.Validate(); err != nil {
+		return nil, err
+	}
+	if err := rejectUnsupportedExecutionRequirements(g.Nodes, "pipeline job lowering"); err != nil {
 		return nil, err
 	}
 	nodes := sortedNodes(g)

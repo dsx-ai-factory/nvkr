@@ -256,6 +256,9 @@ func admitLocalPlan(ctx context.Context, plan *Plan, options LocalRunOptions) er
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if err := rejectUnsupportedPlanRequirements(plan, "local factory execution"); err != nil {
+		return err
+	}
 	if len(plan.ExecutionSettings.SourceAccess) != 0 {
 		return e.New(e.CodeEngineCapability,
 			"local execution does not support Environment.sourceAccess authentication")

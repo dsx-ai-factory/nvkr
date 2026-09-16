@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 // From-source builder types (ADR-10). Executable builders mirror ir.Builder*;
@@ -20,34 +21,6 @@ const (
 	BuilderBuildKit    = "buildkit-rootless"
 	BuilderVMImage     = "vm-image"
 )
-
-// VM-image authoring vocabulary. The catalog declares the host routes and resources
-// a source-owned VM build requires. Guest architecture is deliberately absent: a
-// future admitted lowering must derive it from the selecting recipe's criteria.
-const (
-	VMKVMRequired  = "required"
-	VMKVMOptional  = "optional"
-	VMKVMForbidden = "forbidden"
-
-	VMNetworkDefault = "default"
-	VMNetworkNone    = "none"
-)
-
-// VMImageRequirements is the schema-only execution and resource requirements
-// declaration for a vm-image builder. It is not capability proof. KVM records
-// whether hardware acceleration is mandatory, preferred with TCG fallback, or
-// forbidden. AllowedHostArchs is a sorted, duplicate-free set. Recipe compilation
-// remains capability-gated until a VM executor is admitted.
-type VMImageRequirements struct {
-	AllowedHostArchs []string `json:"allowedHostArchs"`
-	MinHostCPUs      uint32   `json:"minHostCPUs"`
-	MinHostMemoryMiB uint64   `json:"minHostMemoryMiB"`
-	MinScratchMiB    uint64   `json:"minScratchMiB"`
-	MinOutputMiB     uint64   `json:"minOutputMiB"`
-	KVM              string   `json:"kvm"`
-	Network          string   `json:"network"`
-	TimeoutSeconds   uint64   `json:"timeoutSeconds"`
-}
 
 // DiskSpec describes the disk payload emitted by a component. It is required
 // exactly when OutputType is disk-image.
@@ -85,13 +58,10 @@ type Source struct {
 	TagPrefix          string `json:"tagPrefix,omitempty"`
 	ToolchainImage     string `json:"toolchainImage,omitempty"`     // explicit digest pin (arch-agnostic or single-arch)
 	ToolchainBaseImage string `json:"toolchainBaseImage,omitempty"` // resolve <base>:<.go-version> digest on pin
-	// ToolchainImagesByArch declares a digest-pinned toolchain candidate per
-	// execution-platform arch (arch -> digest). For ordinary builders the execution
-	// and target architectures are the same. For vm-image the key is a permitted host
-	// architecture, while the guest/output architecture comes from Recipe criteria.
-	// Runtime platform compatibility is authenticated only during admission. When set,
-	// the map takes precedence over ToolchainImage for arches it lists
-	// (NKD-NFR-093 typed-axis extension).
+	// ToolchainImagesByArch pins a toolchain per execution-host architecture. For
+	// ordinary builders execution and target architecture are the same. A vm-image
+	// builder may target a different guest architecture under its declared KVM/TCG
+	// policy. When set, this map takes precedence over ToolchainImage for listed arches.
 	ToolchainImagesByArch map[string]string `json:"toolchainImagesByArch,omitempty"`
 	VendorCommand         []string          `json:"vendorCommand,omitempty"` // run in the fetch step (network) to vendor deps for a non-vendored repo
 }
@@ -202,12 +172,13 @@ type Component struct {
 	// role filter), NOT recipe selection, and does not affect recipeDigest. Empty means
 	// role-agnostic (present in every SKU).
 	Roles []string `json:"roles,omitempty"`
-	// BuilderType selects the from-source build substrate (ADR-10). An admitted
-	// executable builder type is a build-semantic input and flows into recipeDigest;
-	// vm-image remains catalog-snapshot identity only until its lowering is admitted.
+	// BuilderType selects the from-source build substrate (ADR-10). It is a
+	// build-semantic input and flows into recipeDigest.
 	BuilderType string `json:"builderType,omitempty"`
-	// VMImage is required exactly when BuilderType is vm-image.
-	VMImage *VMImageRequirements `json:"vmImage,omitempty"`
+	// BuildRequirements declares the generic runner contract for this component's
+	// build step. It is operational metadata, not builder-specific behavior or proof
+	// that a selected runner satisfies the request.
+	BuildRequirements *execution.Requirements `json:"buildRequirements,omitempty"`
 	// Flake pins a nix builder's locked flake (set only when BuilderType==nix).
 	Flake *FlakePin `json:"flake,omitempty"`
 
@@ -218,11 +189,9 @@ type Component struct {
 	TreeHash       string  `json:"treeHash,omitempty"` // expected source tree hash
 	Patches        []Patch `json:"patches,omitempty"`
 	ToolchainImage string  `json:"toolchainImage,omitempty"` // must be @sha256: digest
-	// ToolchainImages is the resolved set of digest-pinned toolchain candidates per
-	// execution arch (arch -> digest). Ordinary compilation selects the recipe's target
-	// arch. A future VM Plan selects an allowed host arch and authenticates platform
-	// compatibility; VM authoring never indexes this map with the guest arch.
-	// ToolchainImage is the scalar fallback.
+	// ToolchainImages is the resolved per-execution-arch toolchain set. Ordinary
+	// compilation selects the Recipe arch. Future VM admission selects one eligible
+	// host platform independently from the guest/output arch.
 	ToolchainImages map[string]string `json:"toolchainImages,omitempty"`
 	CGO             bool              `json:"cgo,omitempty"`
 	OutputType      string            `json:"outputType,omitempty"`

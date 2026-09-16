@@ -239,12 +239,10 @@ Required membership exists before execution, so omitting a failed output cannot 
 Specialized byte-changing transformations remain explicit product intent.
 
 A `disk-image` named output selects exactly one component from an `os` Recipe and remains independent of its
-producer. The catalog's `vm-image` builder authoring contract binds the disk metadata, exact source-owned
-entrypoint and artifact path, allowed execution-host architectures and digest-pin coverage for each host route,
-minimum resources, KVM policy, network mode, and timeout. Recipe criteria supplies the separate guest/output
-architecture. These requirements affect catalog identity; they are not a selected host, authenticated toolchain
-platform, runtime observation, capability proof, or VM Plan. The current aggregate NKE OS Recipe is an explicit
-compatibility exception to the target
+producer. The catalog's `vm-image` builder capability binds the disk metadata, exact source-owned entrypoint,
+artifact path, and a complete generic build-runner request with resources, eligible host platform, KVM policy,
+and timeout. Required KVM needs an eligible host with the resolved guest architecture; VM toolchain pins follow
+the eligible host platform. The current aggregate NKE OS Recipe is an explicit compatibility exception to the target
 one-Recipe-per-stack-layer model; embedded components retain their identities and evidence relationships while
 they are separated into independently realized layers. Disk lowering and VM execution remain capability-gated.
 
@@ -283,6 +281,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Responsibility | Owning modules under `pkg/nkd` | Boundary |
 |---|---|---|
 | Canonical identity and resolution | `canonical`, `ir`, `criteria`, `catalog`, `compose`, `recipe` | Authenticate and normalize inputs into deterministic logical identities |
+| Execution requirements | `execution` | Own reusable per-step runner request shape; grant no runner capability |
 | Public lifecycle | `lifecycle` | Own Definition/Environment preparation, required-output construction, Run and Release views; delegate authority |
 | Compilation and execution | `factory` | Join resolved recipes into an artifact graph; render and execute admitted nodes |
 | Qualified graph execution | `pipeline` | Graph admission, runtime observations, terminal receipts, and provider transport |
@@ -719,6 +718,20 @@ does not establish that a large-image workflow fits a hosted runner.
 For a wrapped job, capacity planning must include materialized sources, toolchains, build scratch, produced image,
 package representation and verification temporaries that coexist. Fusion removes repeated job transfer, not these
 storage requirements. No numeric capacity or duration target is invented here.
+
+Runner requirements are modeled with a generic per-step request, not as builder-specific metadata. Minimum CPU,
+memory and ephemeral storage, eligible host platforms, typed host capabilities, and an executor wall-time budget
+form the reusable shape. Host platform is distinct from target/toolchain platform, and build network remains an
+existing IR semantic. The currently admitted authoring path is a producer-authored from-source build: its request
+is bound catalog → build IR → Plan but excluded from Recipe identity. Other node kinds reject the field until
+their compiler projections exist. A present empty request is invalid; zero leaves an individual resource or
+timeout unconstrained. Current adapters reject selected builds carrying a request because `runsOn` is not
+capacity proof.
+
+Environment execution classes, request matching, deterministic resolution of preferred capabilities, and
+authenticated runtime observation remain deferred. So do VM topology beyond the required-KVM
+same-architecture invariant, arbitrary devices, privilege, nested virtualization, NUMA, accelerators, and
+provider-specific lowering. Produced-artifact size remains an artifact and transport budget.
 
 ### High Availability {#high-availability}
 

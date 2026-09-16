@@ -156,9 +156,14 @@ _Avoid_: Partial release, component catalog overlay
 An ordered, predecessor-bound catalog change replacing a complete component producer.
 _Avoid_: Recipe layer, role selection
 
+**Execution requirements**:
+A deterministic per-step request for minimum CPU, memory, and ephemeral storage, eligible runner-host
+platforms, typed host capabilities, and an executor wall-time budget. It is carried in the full IR and Plan,
+does not enter Recipe identity, and is not proof that a runner satisfies it.
+_Avoid_: Runner observation, target/toolchain platform, build network, builder-specific settings, output size
+
 **VM-image builder**:
-A from-source builder declaration for a disk-image output. The catalog binds its exact source-owned entrypoint,
-artifact path, and typed host-route and resource requirements; Recipe criteria supplies the separate guest/output
-architecture. Concrete host/toolchain selection and authenticated runtime observations belong to a future
-admitted VM Plan and executor.
+A from-source builder capability for a disk-image output. The catalog binds its exact source-owned entrypoint
+and artifact path. Generic build requirements use the shared execution contract; typed VM lowering and
+execution remain separately admitted capabilities.
 _Avoid_: Disk format, public output format, virtual machine artifact

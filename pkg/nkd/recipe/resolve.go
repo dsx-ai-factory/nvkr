@@ -3,7 +3,6 @@
 package recipe
 
 import (
-	"slices"
 	"sort"
 	"strings"
 
@@ -151,39 +150,23 @@ func requireToolchainForArch(name string, c catalog.Component, arch string) erro
 		"from-source component %q has no digest-pinned toolchain for arch %q", name, arch)
 }
 
-// requireResolvedComponentRoute closes the architecture-specific pin and host-route
-// requirements after criteria are concrete. Catalog validation has already proved
-// that every component occupies exactly one source lane.
-func requireResolvedComponentRoute(name string, c catalog.Component, arch string) error {
+// requireResolvedComponentRoute closes architecture-specific artifact, toolchain,
+// and VM host-route requirements after Recipe criteria is concrete.
+func requireResolvedComponentRoute(name string, component catalog.Component, arch string) error {
 	switch {
-	case c.Prebuilt != nil:
-		if c.Prebuilt.Digests[arch] == "" {
+	case component.Prebuilt != nil:
+		if component.Prebuilt.Digests[arch] == "" {
 			return e.New(e.CodeUnpinnedSource,
 				"prebuilt component %q has no pinned digest for arch %q (run: nkdctl catalog pin-artifacts)", name, arch)
 		}
 		return nil
-	case !c.FromSource:
+	case !component.FromSource:
 		return nil
-	case c.BuilderType == catalog.BuilderVMImage:
-		return requireVMHostRoute(name, c, arch)
+	case component.BuilderType == catalog.BuilderVMImage:
+		return catalog.ValidateVMImageHostRoute(name, component, arch)
 	default:
-		return requireToolchainForArch(name, c, arch)
+		return requireToolchainForArch(name, component, arch)
 	}
-}
-
-// requireVMHostRoute rejects an impossible hardware-acceleration declaration at
-// the resolved-criteria seam. KVM can accelerate only a same-architecture guest;
-// optional and forbidden modes retain their declared TCG route.
-func requireVMHostRoute(name string, c catalog.Component, guestArch string) error {
-	if c.VMImage == nil || c.VMImage.KVM != catalog.VMKVMRequired {
-		return nil
-	}
-	if criteria.IsWildcard(guestArch) || !slices.Contains(c.VMImage.AllowedHostArchs, guestArch) {
-		return e.New(e.CodeInvalidCatalog,
-			"vm-image component %q requires KVM but has no same-architecture host route for guest architecture %q",
-			name, guestArch)
-	}
-	return nil
 }
 
 // resolveLayered resolves a composition-layered catalog: it composes the base/overlay/

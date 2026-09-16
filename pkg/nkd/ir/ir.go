@@ -8,6 +8,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 // SchemaVersion identifies the IR shape; it participates in the digest so a schema
@@ -100,6 +101,11 @@ type Node struct {
 	ID    string   `json:"id"`
 	Kind  string   `json:"kind"`
 	Needs []string `json:"needs,omitempty"` // upstream node IDs (sorted)
+	// Requirements is the deterministic runner request for this step. Build nodes are
+	// the currently admitted kind; other kinds fail closed until their compiler
+	// projection exists. It travels with executable bytes but is excluded from
+	// recipeDigest because it does not describe the content produced by the recipe.
+	Requirements *execution.Requirements `json:"requirements,omitempty"`
 
 	// fetch
 	Repo        string   `json:"repo,omitempty"`

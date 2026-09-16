@@ -6,6 +6,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"sigs.k8s.io/yaml"
 )
 
@@ -87,6 +88,7 @@ const (
 	identityContentReference
 	identityTransport
 	identityComposition
+	identityExecution
 )
 
 // These exhaustive classifications are checked reflectively in marshal_test.go.
@@ -94,7 +96,8 @@ const (
 // decision instead of silently inheriting a serializer's behavior.
 var nodeIdentityFieldClass = map[string]identityFieldClass{
 	"ID": identityLogical, "Kind": identityLogical, "Needs": identityLogical,
-	"Repo": identityTransport, "Commit": identityLogical, "TreeHash": identityLogical,
+	"Requirements": identityExecution,
+	"Repo":         identityTransport, "Commit": identityLogical, "TreeHash": identityLogical,
 	"Dest": identityLogical, "VendorCmd": identityLogical,
 	"VendorImage": identityContentReference,
 	"Artifact":    identityTransport, "Digest": identityLogical,
@@ -141,6 +144,7 @@ func (g Graph) normalizedCopy() Graph {
 	for i := range c.Nodes {
 		c.Nodes[i].Needs = append([]string(nil), g.Nodes[i].Needs...)
 		c.Nodes[i].Env = append([]EnvVar(nil), g.Nodes[i].Env...)
+		c.Nodes[i].Requirements = execution.Clone(g.Nodes[i].Requirements)
 	}
 	c.Normalize()
 	return c

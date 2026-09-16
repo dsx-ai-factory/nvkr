@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -35,6 +36,10 @@ func TestArtifactGraphValidatesExecutionAndDataflowBindings(t *testing.T) {
 		{"unsafe runner", func(g *ArtifactGraph) { g.Nodes[0].RunsOn = "ubuntu\ninjected" }, e.CodeInvalidCatalog, "runner"},
 		{"unpinned container", func(g *ArtifactGraph) { g.Nodes[0].Container = "golang:latest" }, e.CodeUnpinnedSource, "unpinned"},
 		{"wrong platform", func(g *ArtifactGraph) { g.Nodes[0].Platform = "darwin/arm64" }, e.CodeInvalidCatalog, "platform"},
+		{"requirements on non-build node", func(g *ArtifactGraph) {
+			g.Nodes[0].Kind = NodePackage
+			g.Nodes[0].Requirements = &execution.Requirements{TimeoutSeconds: 1}
+		}, e.CodeInvalidCatalog, "only on build"},
 		{"unknown network", func(g *ArtifactGraph) { g.Nodes[0].Network = "host" }, e.CodeInvalidCatalog, "network"},
 		{"missing execution identity", func(g *ArtifactGraph) { g.Nodes[0].IRNode = "" }, e.CodeEngineCapability, "execution inputs"},
 		{"unknown kind", func(g *ArtifactGraph) { g.Nodes[0].Kind = "unknown" }, e.CodeInvalidCatalog, "kind"},

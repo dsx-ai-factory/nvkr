@@ -139,16 +139,37 @@ Isolation and the fixed environment/mount contract are identical across all engi
 - `exclusion` emits no node.
 
 `vm-image` and `disk-image` do not lower in the first authoring contract. Admission fails with
-`CodeEngineCapability` before source, subprocess, or output work. The catalog authors VM host-route, minimum
-resource, KVM, network, timeout, exact source-entrypoint, artifact-path, and toolchain-pin requirements; those
-declarations are not capability proof. A future VM Plan derives the guest architecture from Recipe criteria,
-selects one allowed host architecture and its matching pinned toolchain, and binds host and guest separately.
-The Plan carries the exact catalog-authored requirements, source entrypoint, artifact path, and selected
-toolchain; it also binds additional admission-resolved guest topology, devices, privilege, and concrete
-acceleration selection. The runtime adapter then authenticates the actual host architecture and capacity,
-toolchain platform, KVM/device availability, and enforced network and timeout. Adapters may transport that Plan,
-but may not reconstruct Packer commands, invoke an upstream workflow, or weaken a missing device or isolation
-requirement.
+`CodeEngineCapability` before source, subprocess, or output work. Runner requirements are not VM-image-specific
+metadata. The generic `execution.Requirements` shape carries minimum CPU, memory and ephemeral-storage capacity,
+an optional sorted OR-set of eligible runner-host platforms, typed capability policies, and an exact
+executor-owned wall-time budget. `kvm` is the first admitted capability with `required`, `preferred`, and
+`forbidden` policies. Host platform is distinct from the IR target/toolchain platform. Network mode remains the
+existing T1 IR field and is not duplicated in execution requirements.
+
+The currently admitted authoring path is deliberately narrower: a from-source catalog producer authors
+`buildRequirements`, and compilation copies it unchanged into the corresponding build node in the full IR and
+Plan. It changes catalog and Plan identity but is structurally excluded from Recipe identity. Other node kinds
+reject the field until their compiler projection and admission semantics exist. The request is optional for
+ordinary from-source builders. A `vm-image` producer requires positive values for all three resources, at least
+one eligible host platform, an explicit KVM policy, and a positive timeout. Host-platform and capability sets are
+sorted and duplicate-free. Unknown platforms, capability names, and policies fail closed.
+For a `vm-image` build, required KVM also requires an eligible host platform with the resolved guest
+architecture. Preferred or forbidden KVM may retain a cross-architecture TCG route. Per-architecture VM
+toolchain pins follow those eligible execution-host platforms, not the guest architecture.
+
+The current Environment has no authenticated execution-class inventory, and `runsOn` is only a route label.
+Therefore every current local or hosted adapter rejects a selected build with nonempty execution requirements
+before execution or emitted output. A future Environment advertises named execution classes containing a route
+label, host platform, allocatable resources, exposed capabilities, and provider timeout support. The Plan binds
+each requested node to one exact satisfying class and resolves a `preferred` capability choice deterministically.
+Runtime admission authenticates the realized host platform, allocation, capability exposure, and enforced
+deadline before work; the provider's outer job timeout must permit the authored executor budget.
+
+VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, privilege, nested
+virtualization, NUMA, accelerators, requirements on non-build nodes, Environment matching, runtime
+authentication, and provider-specific lowering remain deferred. Produced-artifact size remains an artifact and
+transport budget. An adapter may not reconstruct Packer commands, invoke an upstream workflow, or weaken a
+request; a grouped provider job must satisfy every member node.
 
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the
 local runner's ownership contract. Private package layouts must remain reopenable by later host transport

@@ -196,6 +196,10 @@ func (n Node) Validate() error {
 	if err := validateNeeds(n); err != nil {
 		return err
 	}
+	if err := n.Requirements.Validate(); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err,
+			"IR node %q has invalid execution requirements", n.ID)
+	}
 	switch n.Kind {
 	case KindFetch:
 		return validateFetchNode(n)
@@ -326,6 +330,7 @@ func VendorSpecIdentity(command []string, image string) (string, error) {
 
 func validateBuildNode(n Node) error {
 	if err := rejectUnexpectedNodeFields(n, allowFields(
+		"requirements",
 		"component", "builderType", "flakeRef", "flakeOutput", "flakeLockDigest",
 		"toolchain", "platform", "network", "env", "patches", "command", "workdir",
 		"sourceDest", "sourceCommit", "sourceTreeHash", "vendorSpecDigest",

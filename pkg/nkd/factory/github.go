@@ -45,6 +45,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if err := rejectUnsupportedPlanRequirements(plan, "GitHub generation"); err != nil {
+		return nil, err
+	}
 	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {
 		return nil, e.New(e.CodeEngineCapability, "GitHub generation requires repository-relative definition and delivery source paths")
 	}

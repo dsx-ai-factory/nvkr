@@ -12,11 +12,13 @@
 
 ## Context
 
-The **Recipe Digest** is the digest of the fully-resolved, compiled build graph. NKD's define-once /
-publish-many model and its zero-binary trust both depend on that identity being a **pure function of resolved
-inputs only**. If a host, clock, random, builder, or generated-identifier value leaks into it, the identity
-becomes host-dependent and the trust model collapses. The SRD states this directly: output-affecting clock,
-randomness, host, and automatically generated identifier values are prohibited from the deterministic definition.
+The **Recipe Digest** is the digest of the logical T1 projection of a fully resolved, compiled build graph.
+The full executable graph may also carry deterministic T2 execution metadata that Plan identity binds but Recipe
+identity excludes. NKD's define-once / publish-many model and its zero-binary trust both depend on Recipe identity
+being a **pure function of resolved content inputs only**. If a host, clock, random, builder observation, or
+generated-identifier value leaks into it, the identity becomes host-dependent and the trust model collapses. The
+SRD states this directly: output-affecting clock, randomness, host, and automatically generated identifier values
+are prohibited from the deterministic definition.
 
 The subtlety is that some values *look* like a clock but are pinned inputs — the source-date derived from a
 pinned commit — while others are genuine host observations that must be recorded somewhere and must never touch
@@ -33,20 +35,21 @@ Every field lives in exactly one tier:
   digest; `nix` container-image digest + flake lock), prebuilt content digests, the **builder type**, the pinned
   normalization / build-flag environment allowlist, and platform/architecture. A network URL, registry host,
   mirror path, credential reference, or other transport locator is never a T1 field.
-- **T2 — signed metadata, deterministic, *not* in the Recipe Digest**: the Recipe Digest itself, the expected
-  per-artifact digests, the **builder-profile identity**, the conformance claim, the ValidationVector reference,
-  and the accelerated-runtime reference. These are signed **detached** — never embedded in the bytes the
-  identity covers.
+- **T2 — deterministic metadata, *not* in the Recipe Digest**: the Recipe Digest itself, the expected
+  per-artifact digests, the **builder-profile identity**, deterministic execution requirements and their
+  Plan bindings, the conformance claim, the ValidationVector reference, and the accelerated-runtime reference.
+  Authority-bearing T2 records are signed **detached** — never embedded in the bytes the identity covers.
 - **T3 — detached, non-identity record** (may carry host/clock/builder facts; **may be independently signed**):
   the signed build-observations attestation (observed host, actual build times, **observed engine class**), and
   lifecycle times (variant expiry, status effective-time). Operator-supplied lifecycle times are **inputs**,
   never wall-clock reads. Observed wall-clock build times appear **only** in the non-reproducible observations
   attestation, never in an identity or an enforcement path.
 
-### 2. Identity is over the resolved graph; pin-derived time is an input, host time is not
+### 2. Identity is over the resolved logical graph; pin-derived time is an input, host time is not
 
-- The Recipe Digest is the digest of the **resolved/compiled** graph — *after* composition and pin resolution,
-  not of the authored recipe. Two authored recipes that resolve to the same pinned graph share one identity.
+- The Recipe Digest is the digest of the **resolved/compiled logical T1 projection** — *after* composition and
+  pin resolution, not of the authored recipe or every field in the executable document. Two authored recipes
+  that resolve to the same pinned logical graph share one identity.
 - A value **derived from a pin**, such as the source-date taken from the pinned commit's committer date, is a
   **deterministic input** and belongs in T1.
 - The **host wall clock, hostname, home directory, host timezone, and kernel** are observations. They are
@@ -71,6 +74,12 @@ This separation is structural: the type passed to Recipe Digest computation cont
 A sanitizer that deletes URL fields immediately before hashing is not sufficient, because a newly added locator
 could otherwise leak into identity unnoticed.
 
+A producer's execution requirements are carried in the full executable graph and compiled Plan, while the
+logical Recipe projection cannot represent them. Changing resources, eligible host platforms, typed capability
+policy, or executor timeout changes catalog and Plan identities without changing what the Recipe builds. The
+request is not capability proof: Environment matching and authenticated runtime observations are separate
+execution-admission records (ADR-18).
+
 ### 4. Enforceable purity guard
 
 An automated two-part guard enforces the boundary; documentation alone does not:
@@ -78,8 +87,9 @@ An automated two-part guard enforces the boundary; documentation alone does not:
 - **Static check** — forbids nondeterministic sources (wall-clock reads, randomness, UUID generation, hostname,
   host-environment-into-identity) in the identity-producing code paths. Any use is allowlisted only with an
   explicit justifying note.
-- **Empirical invariance test** — mutates host, clock, and builder facts and asserts the Recipe Digest **and**
-  the T2 signed-metadata bytes are byte-stable, while mutating any **pinned** input **does** change the identity.
+- **Empirical invariance test** — mutates host, clock, and observed builder facts and asserts the Recipe Digest
+  and unaffected T2 records are byte-stable. Mutating a **pinned content input** changes Recipe identity; mutating
+  an authored execution request changes its catalog and Plan identities without changing Recipe identity.
 
 ## Consequences
 

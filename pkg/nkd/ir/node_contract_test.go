@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 func TestBuildNodeRejectsInvalidExecutionFields(t *testing.T) {
@@ -38,6 +39,23 @@ func TestBuildNodeRejectsInvalidExecutionFields(t *testing.T) {
 			tc.change(&n)
 			assertIRCode(t, n.Validate(), tc.code)
 		})
+	}
+}
+
+func TestExecutionRequirementsAreAdmittedOnlyOnBuildNodes(t *testing.T) {
+	requirements := &execution.Requirements{Resources: &execution.ResourceRequest{MemoryMiB: 4096}}
+	for _, index := range []int{1, 2} {
+		node := sample().Nodes[index]
+		node.Requirements = execution.Clone(requirements)
+		if err := node.Validate(); err == nil || !strings.Contains(err.Error(), "forbidden field requirements") {
+			t.Fatalf("%s node accepted an unprojectable execution requirement: %v", node.Kind, err)
+		}
+	}
+
+	build := sample().Nodes[0]
+	build.Requirements = execution.Clone(requirements)
+	if err := build.Validate(); err != nil {
+		t.Fatalf("build node rejected generic execution requirements: %v", err)
 	}
 }
 

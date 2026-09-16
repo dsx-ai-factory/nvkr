@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
@@ -721,7 +722,8 @@ func addRecipeDataflow(targetSpec RecipeTarget, graph *ir.Graph, selected map[st
 			output := "artifact/" + target + "/" + irNode.Component
 			result := "result/" + target + "/" + irNode.Component
 			nodes[nodeID] = Node{ID: nodeID, Kind: NodeBuild, RecipeTarget: target, IRNode: irNode.ID,
-				Network: irNode.Network, Container: irNode.Toolchain, Platform: irNode.Platform,
+				Requirements: execution.Clone(irNode.Requirements),
+				Network:      irNode.Network, Container: irNode.Toolchain, Platform: irNode.Platform,
 				RunsOn: targetSpec.RunsOn, Inputs: inputs, Outputs: []string{output, result}}
 			artifacts[output] = Artifact{ID: output, Name: irNode.Component, Kind: irNode.OutputType,
 				MediaType: artifactMediaType(irNode.OutputType), Producer: nodeID, RecipeTarget: target,

@@ -9,6 +9,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -34,10 +35,11 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 	// The graph's Criteria is its identity frame and lands verbatim in the committed
 	// nodes.json. Role and clusterType are composition/delivery axes that recipeDigest
 	// deliberately excludes (they never select a build), so carrying them here would make
-	// two role-SKUs of one category share a recipeDigest yet emit different nodes.json —
-	// an execution document not uniquely determined by the identity it claims. Clear them
-	// so nodes.json is identity-determined; SKU/role selection is applied downstream at
-	// delivery (FilterByRole / --only), not by mutating the build graph.
+	// two role-SKUs of one category share a recipeDigest yet change the logical T1 graph.
+	// Clear them so the logical projection is identity-determined; the full executable
+	// graph may additionally carry T2 execution requirements bound by Plan identity.
+	// SKU/role selection is applied downstream at delivery (FilterByRole / --only), not
+	// by mutating the logical build graph.
 	identityFrame := r.Criteria
 	identityFrame.Role = ""
 	identityFrame.ClusterType = ""
@@ -166,6 +168,7 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 			ID:               bid,
 			Kind:             ir.KindBuild,
 			Needs:            []string{fid},
+			Requirements:     execution.Clone(nc.BuildRequirements),
 			Component:        nc.Name,
 			BuilderType:      builderType,
 			FlakeRef:         flakeRef,

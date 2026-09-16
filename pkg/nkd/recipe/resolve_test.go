@@ -8,6 +8,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -17,6 +18,26 @@ const (
 	testVMTree      = "2222222222222222222222222222222222222222"
 	testVMToolchain = "example.invalid/nkd-vm-builder@sha256:59b8183301af6dc358c9258d7b2ab0ee1a9363618552334fb3b160d454cbda72"
 )
+
+func testVMImageComponent(hosts []execution.HostPlatform, policy execution.CapabilityPolicy) catalog.Component {
+	return catalog.Component{
+		FromSource: true, BuilderType: catalog.BuilderVMImage, OutputType: "disk-image",
+		Disk: &catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
+		BuildRequirements: &execution.Requirements{
+			Resources: &execution.ResourceRequest{
+				CPUMillis: 1000, MemoryMiB: 1024, EphemeralStorageMiB: 4096,
+			},
+			AllowedHostPlatforms: hosts,
+			Capabilities: []execution.CapabilityRequirement{{
+				Name: execution.CapabilityKVM, Policy: policy,
+			}},
+			TimeoutSeconds: 3600,
+		},
+		Repo: testVMRepo, Commit: testVMCommit, TreeHash: testVMTree,
+		ToolchainImage: testVMToolchain,
+		BuildCommand:   []string{"make", "image"}, ArtifactPath: "out/image.qcow2", SourceDate: 1733939955,
+	}
+}
 
 func layeredKubernetesFixture(t *testing.T) *catalog.Catalog {
 	t.Helper()
@@ -87,35 +108,35 @@ func TestResolveNoMatch(t *testing.T) {
 }
 
 func TestResolveRejectsRequiredKVMWithoutSameArchitectureHostRoute(t *testing.T) {
-	component := catalog.Component{
-		FromSource: true, BuilderType: catalog.BuilderVMImage, OutputType: "disk-image",
-		Disk: &catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
-		VMImage: &catalog.VMImageRequirements{
-			AllowedHostArchs: []string{"amd64"}, MinHostCPUs: 1, MinHostMemoryMiB: 1,
-			MinScratchMiB: 1, MinOutputMiB: 1, KVM: catalog.VMKVMRequired,
-			Network: catalog.VMNetworkDefault, TimeoutSeconds: 1,
-		},
-		Repo: testVMRepo, Commit: testVMCommit, TreeHash: testVMTree,
-		ToolchainImages: map[string]string{
-			"amd64": testVMToolchain,
-		},
-		BuildCommand: []string{"make", "image"}, ArtifactPath: "out/image.qcow2", SourceDate: 1733939955,
-	}
-	makeCatalog := func(c catalog.Component) *catalog.Catalog {
+	makeCatalog := func(component catalog.Component) *catalog.Catalog {
 		return &catalog.Catalog{
 			Recipes: []catalog.Recipe{{
 				ID: "os", Criteria: criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "any"}, Components: []string{"image"},
 			}},
-			Components: map[string]catalog.Component{"image": c},
+			Components: map[string]catalog.Component{"image": component},
 		}
 	}
 	query := criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "arm64"}
-	if resolved, err := Resolve(makeCatalog(component), query, nil); code(err) != nkderr.CodeInvalidCatalog || resolved != nil {
-		t.Fatalf("required KVM route = %#v, %v; want no result and %s", resolved, err, nkderr.CodeInvalidCatalog)
+	requiredCrossArch := testVMImageComponent(
+		[]execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+		execution.CapabilityRequired,
+	)
+	if resolved, err := Resolve(makeCatalog(requiredCrossArch), query, nil); code(err) != nkderr.CodeInvalidCatalog || resolved != nil {
+		t.Fatalf("required KVM cross-architecture route = %#v, %v; want no result and %s", resolved, err, nkderr.CodeInvalidCatalog)
 	}
-	component.VMImage.KVM = catalog.VMKVMOptional
-	if resolved, err := Resolve(makeCatalog(component), query, nil); err != nil || resolved == nil {
-		t.Fatalf("optional KVM must retain the cross-architecture TCG route: %#v, %v", resolved, err)
+	requiredNative := testVMImageComponent(
+		[]execution.HostPlatform{execution.HostPlatformLinuxAMD64, execution.HostPlatformLinuxARM64},
+		execution.CapabilityRequired,
+	)
+	if resolved, err := Resolve(makeCatalog(requiredNative), query, nil); err != nil || resolved == nil {
+		t.Fatalf("required KVM native route = %#v, %v; want success", resolved, err)
+	}
+	preferredCrossArch := testVMImageComponent(
+		[]execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+		execution.CapabilityPreferred,
+	)
+	if resolved, err := Resolve(makeCatalog(preferredCrossArch), query, nil); err != nil || resolved == nil {
+		t.Fatalf("preferred KVM must retain the cross-architecture TCG route: %#v, %v", resolved, err)
 	}
 }
 

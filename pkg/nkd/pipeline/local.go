@@ -379,6 +379,15 @@ func (l Local) Run(g *ir.Graph, recipeDigest string, opts RunOptions) (*Report, 
 	if err != nil {
 		return rep, err
 	}
+	selectedNodes := make([]ir.Node, 0, len(g.Nodes))
+	for _, node := range g.Nodes {
+		if included[node.ID] {
+			selectedNodes = append(selectedNodes, node)
+		}
+	}
+	if err := rejectUnsupportedExecutionRequirements(selectedNodes, "local pipeline execution"); err != nil {
+		return rep, err
+	}
 	var selectedBuildNodes []ir.Node
 	for _, node := range g.Nodes {
 		if included[node.ID] && node.Kind == ir.KindBuild {

@@ -20,9 +20,22 @@ import (
 // planned carrier. The status is descriptive; the typed validators below still
 // reopen the restored bytes before a Run can complete.
 func ValidateHostedRestores(ctx context.Context, workspace string, plan *Plan) error {
+	if ctx == nil {
+		return e.New(e.CodeUsage, "hosted restore validation requires a context")
+	}
 	if plan == nil {
 		return e.New(e.CodeUsage, "hosted restore validation requires a plan")
 	}
+	if err := plan.Validate(); err != nil {
+		return err
+	}
+	if err := rejectUnsupportedPlanRequirements(plan, "hosted restore validation"); err != nil {
+		return err
+	}
+	return validateHostedRestores(ctx, workspace, plan)
+}
+
+func validateHostedRestores(ctx context.Context, workspace string, plan *Plan) error {
 	for _, artifact := range plan.Graph.Artifacts {
 		if err := ctx.Err(); err != nil {
 			return e.Wrap(e.CodeTimeout, err, "validating hosted restore outcomes")
@@ -48,9 +61,22 @@ func HostedRestoreOutcomePath(workspace, artifactID string) string {
 // ValidateHostedOutcomes reopens the complete generated job output set using
 // the owning factory schemas before a hosted Run may describe success.
 func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) error {
+	if ctx == nil {
+		return e.New(e.CodeUsage, "hosted outcome validation requires a context")
+	}
 	if plan == nil {
 		return e.New(e.CodeUsage, "hosted outcome validation requires a plan")
 	}
+	if err := plan.Validate(); err != nil {
+		return err
+	}
+	if err := rejectUnsupportedPlanRequirements(plan, "hosted outcome validation"); err != nil {
+		return err
+	}
+	return validateHostedOutcomes(ctx, workspace, plan)
+}
+
+func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) error {
 	artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact

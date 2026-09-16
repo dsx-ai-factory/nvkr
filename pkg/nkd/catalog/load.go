@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/fs"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -19,6 +18,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	ociname "github.com/google/go-containerregistry/pkg/name"
 	"sigs.k8s.io/yaml"
 )
@@ -66,23 +66,24 @@ type registryDoc struct {
 // rawComponent is a component as authored: it references a source by name and
 // carries version-stamp templates, not resolved pins.
 type rawComponent struct {
-	FromSource      bool                 `json:"fromSource"`
-	Source          string               `json:"source,omitempty"`
-	Roles           []string             `json:"roles,omitempty"`          // node-role affinity (ADR-12 §3); composition, not identity
-	BuilderType     string               `json:"builderType,omitempty"`    // oci-hermetic (default) | nix | buildkit-rootless | vm-image (ADR-10)
-	VMImage         *VMImageRequirements `json:"vmImage,omitempty"`        // required iff builderType==vm-image
-	ToolchainImage  string               `json:"toolchainImage,omitempty"` // component-specific exact builder image
-	Flake           *FlakePin            `json:"flake,omitempty"`          // required iff builderType==nix
-	CGO             bool                 `json:"cgo,omitempty"`
-	OutputType      string               `json:"outputType,omitempty"`
-	Disk            *DiskSpec            `json:"disk,omitempty"`
-	BuildCommand    []string             `json:"buildCommand,omitempty"`
-	ArtifactPath    string               `json:"artifactPath,omitempty"`
-	WriteDir        string               `json:"writeDir,omitempty"`
-	VersionStamp    map[string]string    `json:"versionStamp,omitempty"` // Go text/template values
-	Patches         []patchDeclaration   `json:"patches,omitempty"`
-	Prebuilt        *Prebuilt            `json:"prebuilt,omitempty"` // the no-compile lane
-	ExclusionReason string               `json:"exclusionReason,omitempty"`
+	FromSource      bool               `json:"fromSource"`
+	Source          string             `json:"source,omitempty"`
+	Roles           []string           `json:"roles,omitempty"`          // node-role affinity (ADR-12 §3); composition, not identity
+	BuilderType     string             `json:"builderType,omitempty"`    // oci-hermetic (default) | nix | buildkit-rootless | vm-image (ADR-10)
+	ToolchainImage  string             `json:"toolchainImage,omitempty"` // component-specific exact builder image
+	Flake           *FlakePin          `json:"flake,omitempty"`          // required iff builderType==nix
+	CGO             bool               `json:"cgo,omitempty"`
+	OutputType      string             `json:"outputType,omitempty"`
+	Disk            *DiskSpec          `json:"disk,omitempty"`
+	BuildCommand    []string           `json:"buildCommand,omitempty"`
+	ArtifactPath    string             `json:"artifactPath,omitempty"`
+	WriteDir        string             `json:"writeDir,omitempty"`
+	VersionStamp    map[string]string  `json:"versionStamp,omitempty"` // Go text/template values
+	Patches         []patchDeclaration `json:"patches,omitempty"`
+	Prebuilt        *Prebuilt          `json:"prebuilt,omitempty"` // the no-compile lane
+	ExclusionReason string             `json:"exclusionReason,omitempty"`
+
+	BuildRequirements *execution.Requirements `json:"buildRequirements,omitempty"` // generic build-step runner request
 }
 
 // patchDeclaration is the authored patch shape. It intentionally has no content
@@ -411,7 +412,6 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		FromSource:      raw.FromSource,
 		Roles:           raw.Roles,
 		BuilderType:     raw.BuilderType,
-		VMImage:         raw.VMImage,
 		Flake:           raw.Flake,
 		CGO:             raw.CGO,
 		OutputType:      raw.OutputType,
@@ -420,6 +420,8 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		ArtifactPath:    raw.ArtifactPath,
 		WriteDir:        raw.WriteDir,
 		ExclusionReason: raw.ExclusionReason,
+
+		BuildRequirements: execution.Clone(raw.BuildRequirements),
 	}
 	// Default the from-source builder to oci-hermetic so existing catalogs need no
 	// edit; nix is opt-in per component (ADR-10 §3).
@@ -800,12 +802,11 @@ func (cat *Catalog) Validate() error {
 			if !ok {
 				return e.New(e.CodeInvalidCatalog, "recipe %q references unknown component %q", r.ID, cn)
 			}
-			if component.VMImage != nil && component.VMImage.KVM == VMKVMRequired &&
-				!nkderr.IsWildcard(r.Criteria.Arch) &&
-				!slices.Contains(component.VMImage.AllowedHostArchs, r.Criteria.Arch) {
-				return e.New(e.CodeInvalidCatalog,
-					"recipe %q selects guest architecture %q for component %q, but required KVM has no same-architecture host route",
-					r.ID, r.Criteria.Arch, cn)
+			if !nkderr.IsWildcard(r.Criteria.Arch) {
+				if err := ValidateVMImageHostRoute(cn, component, r.Criteria.Arch); err != nil {
+					return e.Wrap(e.CodeInvalidCatalog, err,
+						"recipe %q cannot realize component %q", r.ID, cn)
+				}
 			}
 		}
 	}
@@ -815,42 +816,62 @@ func (cat *Catalog) Validate() error {
 // validNodeRoles is the ADR-12 §3 role-affinity domain.
 var validNodeRoles = map[string]bool{"control-plane": true, "worker": true, "gpu-worker": true}
 
-func validateVMImageRequirements(name string, requirements *VMImageRequirements) error {
+func validateVMImageBuildRequirements(name string, requirements *execution.Requirements) error {
 	if requirements == nil {
-		return e.New(e.CodeInvalidCatalog, "component %q: vm-image builder requires vmImage settings", name)
-	}
-	if len(requirements.AllowedHostArchs) == 0 {
-		return e.New(e.CodeInvalidCatalog, "component %q: vmImage.allowedHostArchs must not be empty", name)
-	}
-	previous := ""
-	for _, arch := range requirements.AllowedHostArchs {
-		if !nkderr.ValidArch(arch) {
-			return e.New(e.CodeInvalidCatalog,
-				"component %q: vmImage allowed host architecture %q is unsupported", name, arch)
-		}
-		if previous != "" && arch <= previous {
-			return e.New(e.CodeInvalidCatalog,
-				"component %q: vmImage.allowedHostArchs must be sorted and duplicate-free", name)
-		}
-		previous = arch
-	}
-	if requirements.MinHostCPUs == 0 || requirements.MinHostMemoryMiB == 0 ||
-		requirements.MinScratchMiB == 0 || requirements.MinOutputMiB == 0 ||
-		requirements.TimeoutSeconds == 0 {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: vmImage host CPU, host memory, scratch, output, and timeout requirements must be positive", name)
+			"component %q: vm-image builder requires generic buildRequirements", name)
 	}
-	if requirements.Network != VMNetworkDefault && requirements.Network != VMNetworkNone {
+	resources := requirements.Resources
+	if resources == nil || resources.CPUMillis == 0 || resources.MemoryMiB == 0 ||
+		resources.EphemeralStorageMiB == 0 {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: vmImage network %q is unsupported; want default or none", name, requirements.Network)
+			"component %q: vm-image buildRequirements require positive CPU, memory, and ephemeral storage", name)
 	}
-	switch requirements.KVM {
-	case VMKVMRequired, VMKVMOptional, VMKVMForbidden:
-	default:
+	if len(requirements.AllowedHostPlatforms) == 0 {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: vmImage kvm mode %q is unsupported", name, requirements.KVM)
+			"component %q: vm-image buildRequirements require an allowed host platform", name)
+	}
+	if len(requirements.Capabilities) != 1 || requirements.Capabilities[0].Name != execution.CapabilityKVM {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: vm-image buildRequirements require an explicit KVM capability policy", name)
+	}
+	if requirements.TimeoutSeconds == 0 {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: vm-image buildRequirements require a positive executor timeout", name)
 	}
 	return nil
+}
+
+// ValidateVMImageHostRoute closes the guest/host relationship only after Recipe
+// criteria supplies a concrete guest architecture. KVM acceleration cannot cross
+// architectures; preferred and forbidden policies retain their declared TCG route.
+func ValidateVMImageHostRoute(name string, component Component, guestArch string) error {
+	if component.BuilderType != BuilderVMImage {
+		return nil
+	}
+	if component.BuildRequirements == nil {
+		return e.New(e.CodeInvalidCatalog,
+			"vm-image component %q has no build requirements", name)
+	}
+	policy := execution.CapabilityPolicy("")
+	for _, capability := range component.BuildRequirements.Capabilities {
+		if capability.Name == execution.CapabilityKVM {
+			policy = capability.Policy
+			break
+		}
+	}
+	if policy != execution.CapabilityRequired {
+		return nil
+	}
+	expected := execution.HostPlatform("linux/" + guestArch)
+	for _, platform := range component.BuildRequirements.AllowedHostPlatforms {
+		if platform == expected {
+			return nil
+		}
+	}
+	return e.New(e.CodeInvalidCatalog,
+		"vm-image component %q requires KVM but has no same-architecture host platform for guest architecture %q",
+		name, guestArch)
 }
 
 func validateComponent(name string, c Component) error {
@@ -866,6 +887,16 @@ func validateComponent(name string, c Component) error {
 				"component %q: role affinity %q appears more than once", name, r)
 		}
 		seenRoles[r] = struct{}{}
+	}
+	if c.BuildRequirements != nil {
+		if !c.FromSource {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: buildRequirements require a from-source component", name)
+		}
+		if err := c.BuildRequirements.Validate(); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"component %q has invalid buildRequirements", name)
+		}
 	}
 	if c.OutputType == "disk-image" {
 		if !c.FromSource {
@@ -883,9 +914,6 @@ func validateComponent(name string, c Component) error {
 	}
 	if c.BuilderType == BuilderVMImage && !c.FromSource {
 		return e.New(e.CodeInvalidCatalog, "component %q: vm-image builder requires a from-source component", name)
-	}
-	if c.BuilderType != BuilderVMImage && c.VMImage != nil {
-		return e.New(e.CodeInvalidCatalog, "component %q: vmImage settings require the vm-image builder", name)
 	}
 	// A component occupies exactly one lane: from-source XOR prebuilt XOR exclusion.
 	// Declaring more than one (e.g. a prebuilt block plus a leftover exclusionReason, or
@@ -933,12 +961,12 @@ func validateComponent(name string, c Component) error {
 		if c.Flake != nil || c.OutputType != "disk-image" {
 			return e.New(e.CodeInvalidCatalog, "component %q: vm-image builder requires a disk-image output and no flake", name)
 		}
+		if err := validateVMImageBuildRequirements(name, c.BuildRequirements); err != nil {
+			return err
+		}
 		if c.CGO || c.WriteDir != "" {
 			return e.New(e.CodeInvalidCatalog,
 				"component %q: vm-image builder may not declare CGO or a container writeDir", name)
-		}
-		if err := validateVMImageRequirements(name, c.VMImage); err != nil {
-			return err
 		}
 	default:
 		return e.New(e.CodeInvalidCatalog,
@@ -994,15 +1022,16 @@ func validateComponent(name string, c Component) error {
 				"component %q: toolchain %q is not pinned by @sha256: digest", name, c.ToolchainImage)
 		}
 	}
-	// VM toolchain maps are keyed by execution host, not by the guest/output
-	// architecture selected by Recipe criteria. Every declared host route must be
-	// pin-covered now; a future VM Plan selects and authenticates one concrete route.
+	// VM-image toolchains execute on the runner host, while Recipe criteria names
+	// the guest/output architecture. Every eligible host platform needs an exact
+	// toolchain pin unless the scalar fallback covers all routes.
 	if c.BuilderType == BuilderVMImage && c.ToolchainImage == "" {
-		for _, hostArch := range c.VMImage.AllowedHostArchs {
+		for _, platform := range c.BuildRequirements.AllowedHostPlatforms {
+			hostArch := strings.TrimPrefix(string(platform), "linux/")
 			if c.ToolchainImages[hostArch] == "" {
 				return e.New(e.CodeUnpinnedSource,
-					"component %q: vmImage allowed host architecture %q has no digest-pinned toolchain route",
-					name, hostArch)
+					"component %q: allowed host platform %q has no digest-pinned toolchain route",
+					name, platform)
 			}
 		}
 	}

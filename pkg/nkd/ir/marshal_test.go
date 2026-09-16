@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 func TestLogicalIdentityDTOClassifiesEveryExecutionField(t *testing.T) {
@@ -52,7 +53,7 @@ func assertIdentityClassification(t *testing.T, execution, logical reflect.Type,
 			if logicalField.Tag.Get("json") != field.Tag.Get("json") {
 				t.Fatalf("T1 %s field %s changed canonical key in %s", execution.Name(), field.Name, logical.Name())
 			}
-		case identityTransport, identityComposition:
+		case identityTransport, identityComposition, identityExecution:
 			if represented {
 				t.Fatalf("non-T1 %s field %s leaked into %s", execution.Name(), field.Name, logical.Name())
 			}
@@ -204,6 +205,46 @@ func TestDigestStableAndSensitive(t *testing.T) {
 	d3, _ := g2.Digest()
 	if d3 == d1 {
 		t.Fatal("digest did not change when a pinned commit changed")
+	}
+}
+
+func TestExecutionRequirementsChangeFullGraphButNotRecipeIdentity(t *testing.T) {
+	base := sample()
+	baseDigest, err := base.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseBytes, err := base.CanonicalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	requested := sample()
+	requested.Nodes[0].Requirements = &execution.Requirements{
+		Resources: &execution.ResourceRequest{
+			CPUMillis: 2000, MemoryMiB: 4096, EphemeralStorageMiB: 8192,
+		},
+		AllowedHostPlatforms: []execution.HostPlatform{
+			execution.HostPlatformLinuxAMD64, execution.HostPlatformLinuxARM64,
+		},
+		Capabilities: []execution.CapabilityRequirement{{
+			Name: execution.CapabilityKVM, Policy: execution.CapabilityPreferred,
+		}},
+		TimeoutSeconds: 7200,
+	}
+	requestedDigest, err := requested.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestedBytes, err := requested.CanonicalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requestedDigest != baseDigest {
+		t.Fatalf("execution request changed recipe identity: %s != %s", requestedDigest, baseDigest)
+	}
+	if string(requestedBytes) == string(baseBytes) {
+		t.Fatal("execution request was omitted from the full executable graph")
 	}
 }
 

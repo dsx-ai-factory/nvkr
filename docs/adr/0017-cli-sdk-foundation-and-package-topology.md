@@ -95,7 +95,7 @@ is no permissive production default that can manufacture authority.
 
 ### 4. Package topology and single-owner rule
 
-- A documented **single-owner package map** — `canonical`, `ir`, `recipe`, `pipeline`, `attest`, `release`,
+- A documented **single-owner package map** — `canonical`, `execution`, `ir`, `recipe`, `pipeline`, `attest`, `release`,
   `status`, `provenance`, `sbom`, `vuln`, and `trust`. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
   own a competing schema, verifier, receipt constructor, or policy decision. Remaining multi-step command

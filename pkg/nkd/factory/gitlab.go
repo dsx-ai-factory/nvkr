@@ -35,6 +35,9 @@ func RenderGitLab(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if err := rejectUnsupportedPlanRequirements(plan, "GitLab generation"); err != nil {
+		return nil, err
+	}
 	if len(plan.ExecutionSettings.SourceAccess) != 0 {
 		return nil, e.New(e.CodeEngineCapability,
 			"GitLab generation does not support Environment.sourceAccess authentication")

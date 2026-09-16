@@ -6,6 +6,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -160,8 +161,38 @@ func (plan Plan) Validate() error {
 	}
 	builds := map[string]ir.Node{}
 	for _, recipe := range plan.Recipes {
+		selected := make(map[string]struct{}, len(recipe.Components))
+		for _, name := range recipe.Components {
+			selected[name] = struct{}{}
+		}
+		components := make(map[string]*execution.Requirements, len(recipe.ResolvedComponents))
+		for _, component := range recipe.ResolvedComponents {
+			if _, selectedComponent := selected[component.Name]; !selectedComponent {
+				return e.New(e.CodePipelineDrift,
+					"recipe %q retains unselected resolved component %q", recipe.Name, component.Name)
+			}
+			if _, duplicate := components[component.Name]; duplicate {
+				return e.New(e.CodePipelineDrift,
+					"recipe %q repeats resolved component %q", recipe.Name, component.Name)
+			}
+			components[component.Name] = component.BuildRequirements
+		}
+		for name := range selected {
+			if _, ok := components[name]; !ok {
+				return e.New(e.CodePipelineDrift,
+					"recipe %q has no resolved component %q", recipe.Name, name)
+			}
+		}
 		for _, node := range recipe.Graph.Nodes {
 			if node.Kind == ir.KindBuild {
+				if _, selectedComponent := selected[node.Component]; !selectedComponent {
+					continue
+				}
+				requirements := components[node.Component]
+				if !execution.Equal(node.Requirements, requirements) {
+					return e.New(e.CodePipelineDrift,
+						"recipe %q build node %q changes its catalog execution requirements", recipe.Name, node.ID)
+				}
 				builds[recipe.Name+"/"+node.ID] = node
 			}
 		}
@@ -189,7 +220,8 @@ func (plan Plan) Validate() error {
 			continue
 		}
 		build, ok := builds[node.RecipeTarget+"/"+node.IRNode]
-		if !ok || node.Network != build.Network || node.Container != build.Toolchain || node.Platform != build.Platform {
+		if !ok || node.Network != build.Network || node.Container != build.Toolchain || node.Platform != build.Platform ||
+			!execution.Equal(node.Requirements, build.Requirements) {
 			return e.New(e.CodePipelineDrift, "build node %q changes its exact recipe execution settings", node.ID)
 		}
 		if build.BuilderType == ir.BuilderBuildKit && plan.ExecutionSettings.RuntimeBinary() != "docker" {
@@ -342,6 +374,14 @@ func (graph ArtifactGraph) Validate() error {
 		}
 		if node.Platform != "" && node.Platform != "linux/amd64" && node.Platform != "linux/arm64" {
 			return e.New(e.CodeInvalidCatalog, "artifact graph node %q has unsupported platform %q", node.ID, node.Platform)
+		}
+		if node.Kind != NodeBuild && node.Requirements != nil {
+			return e.New(e.CodeInvalidCatalog,
+				"artifact graph execution requirements are supported only on build node %q", node.ID)
+		}
+		if err := node.Requirements.Validate(); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"artifact graph node %q has invalid execution requirements", node.ID)
 		}
 		if index > 0 && graph.Nodes[index-1].ID >= node.ID {
 			return e.New(e.CodeInvalidCatalog, "artifact graph nodes are not canonical")

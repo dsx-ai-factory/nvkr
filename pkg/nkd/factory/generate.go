@@ -155,6 +155,17 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if err := rejectUnsupportedPlanRequirements(plan, bundle.Engine+" bundle validation"); err != nil {
+		return nil, err
+	}
+	expectedPlanDigest, err := plan.Digest()
+	if err != nil {
+		return nil, err
+	}
+	if bundle.PlanDigest != expectedPlanDigest {
+		return nil, e.New(e.CodePipelineDrift,
+			"%s bundle planDigest does not match the authoritative plan", bundle.Engine)
+	}
 	expectedFiles := map[string]bool{bundle.WorkflowPath: true, bundle.PlanPath: true}
 	for _, recipe := range plan.Recipes {
 		expectedFiles[filepath.ToSlash(filepath.Join(bundle.GraphDir, recipe.Name+".json"))] = true
@@ -183,8 +194,11 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 		return nil, e.Wrap(e.CodePipelineDrift, err, "decoding generated factory plan")
 	}
 	digest, err := decodedPlan.Digest()
-	if err != nil || digest != bundle.PlanDigest {
+	if err != nil || digest != expectedPlanDigest {
 		return nil, e.New(e.CodePipelineDrift, "generated factory plan does not match planDigest")
+	}
+	if err := rejectUnsupportedPlanRequirements(&decodedPlan, bundle.Engine+" bundle validation"); err != nil {
+		return nil, err
 	}
 	for _, recipe := range plan.Recipes {
 		path := filepath.ToSlash(filepath.Join(bundle.GraphDir, recipe.Name+".json"))
@@ -192,8 +206,16 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 		if !ok {
 			return nil, e.New(e.CodePipelineDrift, "%s bundle omits graph for target %q", bundle.Engine, recipe.Name)
 		}
+		expectedGraph, err := recipe.Graph.CanonicalJSON()
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(raw, expectedGraph) {
+			return nil, e.New(e.CodePipelineDrift,
+				"generated graph for %q does not match the authoritative full graph", recipe.Name)
+		}
 		var graph ir.Graph
-		if err := canonical.UnmarshalExact(bytes.TrimSpace(raw), &graph); err != nil {
+		if err := canonical.UnmarshalExact(raw, &graph); err != nil {
 			return nil, e.Wrap(e.CodePipelineDrift, err, "decoding generated graph for %q", recipe.Name)
 		}
 		if err := graph.Validate(); err != nil {

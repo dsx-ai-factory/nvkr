@@ -52,7 +52,7 @@ func TestHostedRestoresRequireEverySuccessfulCarrier(t *testing.T) {
 			if tc.canceled {
 				cancel()
 			}
-			err := ValidateHostedRestores(ctx, workspace, plan)
+			err := validateHostedRestores(ctx, workspace, plan)
 			if tc.code == "" {
 				if err != nil {
 					t.Fatal(err)
@@ -114,7 +114,7 @@ func TestHostedObservationReopensExactInputs(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(workspace, "observation.json"), raw, 0600); err != nil {
 				t.Fatal(err)
 			}
-			err = ValidateHostedOutcomes(context.Background(), workspace, plan)
+			err = validateHostedOutcomes(context.Background(), workspace, plan)
 			if tc.code == "" {
 				if err != nil {
 					t.Fatal(err)

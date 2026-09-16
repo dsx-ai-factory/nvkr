@@ -75,6 +75,9 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if err := rejectUnsupportedPlanRequirements(plan, "factory execute-node"); err != nil {
+		return err
+	}
 	nodes, artifacts := planIndex(plan)
 	node, ok := nodes[nodeID]
 	if !ok {

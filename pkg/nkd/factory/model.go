@@ -16,6 +16,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -495,6 +496,8 @@ type Node struct {
 	ToolFormat       string            `json:"toolFormat,omitempty"`
 	Inputs           []string          `json:"inputs,omitempty"`
 	Outputs          []string          `json:"outputs,omitempty"`
+
+	Requirements *execution.Requirements `json:"requirements,omitempty"`
 }
 
 type Artifact struct {
