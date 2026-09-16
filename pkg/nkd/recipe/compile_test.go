@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -32,5 +33,25 @@ func TestCompileRejectsUnimplementedDiskCapabilityBeforeGraphConstruction(t *tes
 				t.Fatalf("error = %v, want %s", err, nkderr.CodeEngineCapability)
 			}
 		})
+	}
+}
+
+func TestCompileSkipsExcludedDiskCapability(t *testing.T) {
+	graph, err := Compile(&Resolved{RecipeID: "disk", Criteria: criteria.Criteria{
+		Category: "os",
+		OS:       "ubuntu",
+		Arch:     "amd64",
+	}, Components: []catalog.NamedComponent{{
+		Name: "image",
+		Component: catalog.Component{
+			OutputType:      "disk-image",
+			ExclusionReason: "not built",
+		},
+	}}})
+	if err != nil {
+		t.Fatalf("compile excluded disk recipe: %v", err)
+	}
+	if len(graph.Nodes) != 1 || graph.Nodes[0].Kind != ir.KindVerify || len(graph.Nodes[0].Needs) != 0 {
+		t.Fatalf("excluded disk emitted executable nodes: %#v", graph.Nodes)
 	}
 }

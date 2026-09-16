@@ -238,6 +238,12 @@ publication routes, and required output slots, then joins independently observed
 Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
 Specialized byte-changing transformations remain explicit product intent.
 
+A `disk-image` named output selects exactly one component from an `os` Recipe and remains independent of its
+producer. The catalog's `vm-image` builder capability binds the disk metadata, exact source-owned entrypoint,
+and artifact path. The current aggregate NKE OS Recipe is an explicit compatibility exception to the target
+one-Recipe-per-stack-layer model; embedded components retain their identities and evidence relationships while
+they are separated into independently realized layers. Disk lowering and VM execution remain capability-gated.
+
 One authored cluster view resolves to an immutable composition, including exact recipes, roles, frame, and AICR
 inputs. Its generated release binding checks the exact selected members. This preserves the difference between
 intent and realization without requiring a second ClusterDefinition document or a caller-supplied ready flag.
@@ -491,10 +497,11 @@ compatibility, conformance, evidence, policy and status requirements must all ho
 binds the manifest, exact artifacts/evidence and clearance without circular signing; the consumer authenticates
 that closure before treating it as a cleared release (ADR-20).
 
-For disk artifacts, RAW logical bytes define canonical identity; qcow2 and other delivery envelopes are checked
-through their decoded representation. Encryption creates a distinct identity outside pre-encryption reproduction
-(ADR-14). Variance classification cannot currently authorize release. Nix is a selected qualified builder design,
-but its execution capability is unavailable.
+For disk artifacts, exact qcow2 bytes define delivery integrity and the CycloneDX subject, while decoded RAW
+logical bytes define qualified-reproduction identity. These digests are separate and never substituted for one
+another; authenticated evidence binds the delivery envelope to its decoded representation. Encryption creates a
+distinct identity outside pre-encryption reproduction (ADR-14). Variance classification cannot currently
+authorize release. Nix is a selected qualified builder design, but its execution capability is unavailable.
 
 A generated cluster realization maps the exact composition to accepted Release members for a downstream
 provisioner. Qualified cluster publication records remain descriptions until authenticated. The proposed ADR-19 §4

@@ -44,6 +44,17 @@ _Avoid_: Signing configuration, verification result, producer assertion
 A Definition's declaration of selected components and the artifact format they must produce.
 _Avoid_: Observed artifact, delivery route
 
+**Disk-image output**:
+A named output containing exactly one component selected by an `os` Recipe. The disk format and encryption
+metadata describe the delivered bytes independently of the builder that produces them.
+_Avoid_: Container image, builder type, running node
+
+**Aggregate compatibility OS Recipe**:
+The explicit temporary exception in which the current NKE OS Recipe produces one baked disk containing several
+stack layers. Embedded components retain their own identities and evidence relationships while the target model
+separates them into independently realized Recipe layers.
+_Avoid_: Ordinary one-layer Recipe, qualified release evidence
+
 **Cluster view**:
 A named composition inside a Definition that maps recipe components to node roles and cluster-level requirements; its realization binds those selections to exact Release artifacts.
 Members reference named outputs. Node roles and cluster type belong to this view, not to recipe selections.
@@ -144,3 +155,8 @@ _Avoid_: Partial release, component catalog overlay
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer.
 _Avoid_: Recipe layer, role selection
+
+**VM-image builder**:
+A from-source builder capability for a disk-image output. The catalog binds its exact source-owned entrypoint
+and artifact path; typed VM lowering and execution remain separately admitted capabilities.
+_Avoid_: Disk format, public output format, virtual machine artifact

@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -93,29 +94,32 @@ func TestDiskImageSchemaValidation(t *testing.T) {
 		return cat.Validate()
 	}
 	tests := []struct {
-		name string
-		edit func(*Component)
+		name     string
+		edit     func(*Component)
+		wantText string
 	}{
-		{"missing disk", func(c *Component) { c.Disk = nil }},
-		{"unsupported format", func(c *Component) { c.Disk.Format = "raw" }},
-		{"unsupported encryption", func(c *Component) { c.Disk.Encryption = "aes" }},
-		{"disk on another output", func(c *Component) { c.OutputType = "raw" }},
-		{"vm builder on another output", func(c *Component) { c.BuilderType = BuilderVMImage; c.OutputType = "raw"; c.Disk = nil }},
+		{"missing disk", func(c *Component) { c.Disk = nil }, ""},
+		{"unsupported format", func(c *Component) { c.Disk.Format = "raw" }, ""},
+		{"unsupported encryption", func(c *Component) { c.Disk.Encryption = "aes" }, ""},
+		{"disk on another output", func(c *Component) { c.OutputType = "raw" }, ""},
+		{"vm builder on another output", func(c *Component) { c.BuilderType = BuilderVMImage; c.OutputType = "raw"; c.Disk = nil }, ""},
 		{"vm builder not from source", func(c *Component) {
 			c.BuilderType = BuilderVMImage
 			c.FromSource = false
 			c.ExclusionReason = "not built"
-		}},
+			c.OutputType = "host-package"
+			c.Disk = nil
+		}, "vm-image builder requires a from-source component"},
 		{"excluded disk", func(c *Component) {
 			c.FromSource = false
 			c.ExclusionReason = "not built"
-		}},
+		}, ""},
 		{"prebuilt disk", func(c *Component) {
 			c.FromSource = false
 			c.Prebuilt = &Prebuilt{URL: "https://example.test/image.qcow2", Digests: map[string]string{
 				"amd64": "sha256:59b8183301af6dc358c9258d7b2ab0ee1a9363618552334fb3b160d454cbda72",
 			}, Evidence: &ExternalEvidence{None: true}}
-		}},
+		}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -126,6 +130,9 @@ func TestDiskImageSchemaValidation(t *testing.T) {
 			err := validate(component)
 			if coded, ok := err.(*nkderr.Error); !ok || coded.Code != nkderr.CodeInvalidCatalog {
 				t.Fatalf("error = %v, want %s", err, nkderr.CodeInvalidCatalog)
+			}
+			if tt.wantText != "" && !strings.Contains(err.Error(), tt.wantText) {
+				t.Fatalf("error = %v, want text %q", err, tt.wantText)
 			}
 		})
 	}
