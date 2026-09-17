@@ -62,7 +62,8 @@ func bindTestPlanExecution(t *testing.T, plan *Plan, recipeIndex, irIndex, nodeI
 
 	irNode := &plan.Recipes[recipeIndex].Graph.Nodes[irIndex]
 	irNode.Requirements = execution.Clone(requirements)
-	binding, err := execution.Match(irNode.Requirements, plan.ExecutionSettings.ExecutionClasses, execution.MatchOptions{})
+	binding, err := execution.Match(
+		irNode.Requirements, plan.ExecutionSettings.ExecutionClasses, matchOptionsForBuildNode(*irNode))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,6 +71,39 @@ func bindTestPlanExecution(t *testing.T, plan *Plan, recipeIndex, irIndex, nodeI
 	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(requirements)
 	plan.Graph.Nodes[nodeIndex].ExecutionBinding = execution.CloneBinding(binding)
 	plan.Graph.Nodes[nodeIndex].RunsOn = binding.Class.RunsOn
+}
+
+func bindFirstTestPlanExecution(t *testing.T, plan *Plan, requirements *execution.Requirements) int {
+	t.Helper()
+	for recipeIndex := range plan.Recipes {
+		recipe := &plan.Recipes[recipeIndex]
+		for irIndex := range recipe.Graph.Nodes {
+			irNode := &recipe.Graph.Nodes[irIndex]
+			if irNode.Kind != ir.KindBuild {
+				continue
+			}
+			for nodeIndex := range plan.Graph.Nodes {
+				node := &plan.Graph.Nodes[nodeIndex]
+				if node.RecipeTarget != recipe.Name || node.IRNode != irNode.ID {
+					continue
+				}
+				bindTestPlanExecution(t, plan, recipeIndex, irIndex, nodeIndex, requirements)
+				for componentIndex := range recipe.ResolvedComponents {
+					component := &recipe.ResolvedComponents[componentIndex]
+					if component.Name == irNode.Component {
+						component.BuildRequirements = execution.Clone(requirements)
+						if err := plan.Validate(); err != nil {
+							t.Fatalf("bound test Plan is invalid: %v", err)
+						}
+						return nodeIndex
+					}
+				}
+				t.Fatalf("recipe %q has no resolved component %q", recipe.Name, irNode.Component)
+			}
+		}
+	}
+	t.Fatal("test plan has no projected build node")
+	return -1
 }
 
 func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
@@ -290,6 +324,30 @@ func TestPlanValidationRejectsExecutionBindingOnUnselectedBuild(t *testing.T) {
 	}
 
 	assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
+}
+
+func TestPlanValidationRejectsExecutionRouteDrift(t *testing.T) {
+	plan := buildOnlyPlan(t, "generic")
+	nodeIndex := bindFirstTestPlanExecution(t, plan, testExecutionRequirements())
+
+	plan.Graph.Nodes[nodeIndex].RunsOn = "substituted-route"
+	assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
+}
+
+func TestPlanValidationRejectsUnsatisfiedExecutionClassInventory(t *testing.T) {
+	plan := buildOnlyPlan(t, "generic")
+	bindFirstTestPlanExecution(t, plan, testExecutionRequirements())
+
+	for index := range plan.ExecutionSettings.ExecutionClasses {
+		plan.ExecutionSettings.ExecutionClasses[index].Resources.MemoryMiB = 1
+	}
+	digest, err := plan.ExecutionSettings.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.ExecutionSettingsDigest = digest
+
+	assertFactoryErrorCode(t, plan.Validate(), e.CodeEngineCapability)
 }
 
 func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {

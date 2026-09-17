@@ -201,7 +201,7 @@ func (plan Plan) Validate() error {
 						"recipe %q build node %q changes its catalog execution requirements", recipe.Name, node.ID)
 				}
 				expectedBinding, matchErr := execution.Match(
-					node.Requirements, plan.ExecutionSettings.ExecutionClasses, execution.MatchOptions{})
+					node.Requirements, plan.ExecutionSettings.ExecutionClasses, matchOptionsForBuildNode(node))
 				if matchErr != nil {
 					return e.Wrap(e.CodeEngineCapability, matchErr,
 						"recipe %q build node %q has no admitted execution class", recipe.Name, node.ID)

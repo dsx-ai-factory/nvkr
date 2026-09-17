@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"strings"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -110,6 +109,7 @@ func TestMatchExecutionClass(t *testing.T) {
 		{name: "required capability unavailable", request: testRequirements(CapabilityRequired), wantCode: nkderr.CodeEngineCapability, editClasses: func(classes []Class) []Class { return classes[:1] }},
 		{name: "class inventory omitted", request: testRequirements(CapabilityPreferred), wantCode: nkderr.CodeEngineCapability, editClasses: func([]Class) []Class { return nil }},
 		{name: "required platform unavailable", request: testRequirements(CapabilityPreferred), options: MatchOptions{RequiredHostPlatform: HostPlatformLinuxARM64}, wantCode: nkderr.CodeEngineCapability, editClasses: func(classes []Class) []Class { return classes[:1] }},
+		{name: "unsupported required platform", request: testRequirements(CapabilityPreferred), options: MatchOptions{RequiredHostPlatform: "linux/riscv64"}, wantCode: nkderr.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input := append([]Class(nil), classes...)
@@ -164,19 +164,64 @@ func TestBindingValidationRejectsSubstitution(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, test := range []struct {
-		name string
-		edit func(*Binding)
+		name     string
+		edit     func(*Binding)
+		wantCode nkderr.Code
 	}{
-		{name: "missing resolution", edit: func(binding *Binding) { binding.Capabilities = nil }},
-		{name: "changed resolution", edit: func(binding *Binding) { binding.Capabilities[0].Enabled = false }},
-		{name: "insufficient memory", edit: func(binding *Binding) { binding.Class.Resources.MemoryMiB = 1 }},
-		{name: "insufficient timeout", edit: func(binding *Binding) { binding.Class.MaxTimeoutSeconds = 1 }},
+		{name: "missing resolution", edit: func(binding *Binding) { binding.Capabilities = nil }, wantCode: nkderr.CodeInvalidCatalog},
+		{name: "changed resolution", edit: func(binding *Binding) { binding.Capabilities[0].Enabled = false }, wantCode: nkderr.CodeInvalidCatalog},
+		{name: "insufficient memory", edit: func(binding *Binding) { binding.Class.Resources.MemoryMiB = 1 }, wantCode: nkderr.CodeEngineCapability},
+		{name: "insufficient timeout", edit: func(binding *Binding) { binding.Class.MaxTimeoutSeconds = 1 }, wantCode: nkderr.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			changed := CloneBinding(binding)
 			test.edit(changed)
-			if err := changed.ValidateFor(request); err == nil || !strings.Contains(err.Error(), "execution") {
-				t.Fatalf("substituted binding accepted: %v", err)
+			if err := changed.ValidateFor(request); errorCode(err) != test.wantCode {
+				t.Fatalf("error = %v, want %s", err, test.wantCode)
+			}
+		})
+	}
+}
+
+func TestBindingValidateForGuards(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		binding      *Binding
+		requirements *Requirements
+		wantCode     nkderr.Code
+	}{
+		{
+			name:         "nil binding with requirements",
+			requirements: testRequirements(CapabilityPreferred),
+			wantCode:     nkderr.CodeEngineCapability,
+		},
+		{
+			name:     "binding with nil requirements",
+			binding:  &Binding{Class: testClass("tcg", HostPlatformLinuxAMD64, false)},
+			wantCode: nkderr.CodeInvalidCatalog,
+		},
+		{
+			name: "required capability absent",
+			binding: &Binding{
+				Class:        testClass("tcg", HostPlatformLinuxAMD64, false),
+				Capabilities: []CapabilityResolution{{Name: CapabilityKVM, Enabled: false}},
+			},
+			requirements: testRequirements(CapabilityRequired),
+			wantCode:     nkderr.CodeEngineCapability,
+		},
+		{
+			name: "forbidden capability exposed",
+			binding: &Binding{
+				Class:        testClass("kvm", HostPlatformLinuxAMD64, true),
+				Capabilities: []CapabilityResolution{{Name: CapabilityKVM, Enabled: true}},
+			},
+			requirements: testRequirements(CapabilityForbidden),
+			wantCode:     nkderr.CodeEngineCapability,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.binding.ValidateFor(test.requirements); errorCode(err) != test.wantCode {
+				t.Fatalf("error = %v, want %s", err, test.wantCode)
 			}
 		})
 	}
