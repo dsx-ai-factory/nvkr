@@ -194,10 +194,11 @@ make -C os-image/packer os-image-fde ARCH={{.Arch}}
 The current NKE release matrix realizes plain amd64, FDE amd64, and plain arm64. It does not validate or publish
 FDE arm64. Definition output selection records that supported matrix without duplicating components per
 architecture. A maintained NKE recipe may instead select the `packer` driver after NKE exposes an authenticated
-staged-material input and private-output contract in its source-owned HCL. That catalog choice changes Recipe
-identity; it does not remove or invalidate the standalone Make entrypoint. These bindings are authoring data
-only; command and Packer Recipe lowering, VM execution, and disk collection remain capability-gated. An override
-that changes NKE's derived output filename must also change the catalog artifact path; NKD never guesses it.
+staged-material input and private-output contract in its source-owned HCL. That catalog choice changes catalog
+snapshot identity now and, once disk lowering is admitted, changes Recipe identity. It does not remove or
+invalidate the standalone Make entrypoint. These bindings are authoring data only; command and Packer Recipe
+lowering, VM execution, and disk collection remain capability-gated. An override that changes NKE's derived
+output filename must also change the catalog artifact path; NKD never guesses it.
 
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
 seccomp/AppArmor/system paths for user-namespace operation, the overlayfs snapshotter, no host runtime socket
