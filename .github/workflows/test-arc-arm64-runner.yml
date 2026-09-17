@@ -1,0 +1,16 @@
+name: Test ARC arm64 runner (throwaway)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: arc-arm64-cpu16-stg
+    steps:
+      - name: Runner info
+        run: |
+          uname -a
+          nproc
+          free -h
+      - name: Docker info
+        run: docker info
