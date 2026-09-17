@@ -17,7 +17,7 @@ maintainers are.
 | [@xdu31](https://github.com/xdu31) | Jayson Du |
 
 Service accounts (for example `svcsectool`) are not maintainers. See
-[GOVERNANCE.md](GOVERNANCE.md#maintainers).
+[GOVERNANCE.md](GOVERNANCE.md#maintainer-roster).
 
 
 ## Maintainer Responsibilities
@@ -42,7 +42,7 @@ Maintainers are selected based on:
 To be considered, contributors should:
 
 1. Have made significant contributions to the project
-2. Demonstrated understanding of the [Design Principles](CONTRIBUTING.md#design-principles)
+2. Demonstrated understanding of the [Design Principles](AGENTS.md#design-principles)
 3. Been nominated by an existing maintainer
 4. Received approval from a two-thirds supermajority of current maintainers (see [GOVERNANCE.md](GOVERNANCE.md#adding-and-removing-maintainers))
 

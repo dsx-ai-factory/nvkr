@@ -25,7 +25,7 @@ Related: <!-- #123 or N/A -->
 - [ ] Catalog data — pins (`pins.lock.yaml`)
 - [ ] Catalog data — registry: sources, constraints, build commands (`registry.yaml`)
 - [ ] Recipes — overlays / mixins
-- [ ] CLI (`cmd/`, `pkg/cli`)
+- [ ] CLI (`cmd/nkdctl`)
 - [ ] Generator / pipeline emission
 - [ ] Signing, provenance, or evidence
 - [ ] ADRs (`docs/adr/`)
@@ -40,8 +40,8 @@ Related: <!-- #123 or N/A -->
 ## Testing
 
 ```bash
-# Commands run
-make fmt-check vet lint shellcheck test build
+# Commands run (the canonical local gate)
+make check
 ```
 
 <!-- Summarize test results or paste relevant output -->

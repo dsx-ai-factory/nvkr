@@ -8,8 +8,9 @@ For the current roster and maintainer responsibilities, see
 
 ## Roles
 
-NKE Recipes uses three roles. They map directly to the project's GitHub teams and to
-[`.github/CODEOWNERS`](.github/CODEOWNERS).
+NKE Recipes uses three roles. Code-owner review routing is declared in
+[`.github/CODEOWNERS`](.github/CODEOWNERS), which currently resolves every path to the
+org-wide `@dsx-ai-factory/nke-write` team pending a repository-scoped one.
 
 ### Contributors
 
@@ -29,7 +30,11 @@ automatically. Code owners keep their areas healthy and mentor contributors.
 
 Maintainers have merge rights, make and
 ratify project decisions, manage releases, and own this governance process —
-including adding and removing maintainers. Maintainers are also code owners.
+including adding and removing maintainers. Maintainers exercise this authority
+through merge rights and the governance vote below, not through a distinct
+[`.github/CODEOWNERS`](.github/CODEOWNERS) entry: code-owner review currently routes
+to the org-wide `@dsx-ai-factory/nke-write` team, which is broader than the maintainer
+roster (see [MAINTAINERS.md](MAINTAINERS.md#current-maintainers)).
 
 ## Areas of Ownership
 
@@ -37,13 +42,16 @@ Path-level ownership is authoritative in
 [`.github/CODEOWNERS`](.github/CODEOWNERS). At a high level the project is
 organized into:
 
-- **Recipes and evidence** — `recipes/**` (maintainer-reviewed; the evidence
-  allowlist is the trust root).
+- **Recipes, catalog, and evidence** — `definitions/**` (Definition, Environment,
+  `registry.yaml`, and the `pins.lock.yaml` trust roots under ADR-22).
 - **Core engine** — recipe resolution, bundling, collection, and validation
-  (`pkg/**`).
-- **CLI and API server** — `cmd/**`, `pkg/cli`, `pkg/server`.
-- **Supply chain and CI** — release, attestation, and workflow tooling.
-- **Documentation** — `docs/**` and the root project docs.
+  (`pkg/nkd/**`).
+- **CLI** — `cmd/nkdctl`.
+- **Toolchains** — pinned build inputs (`toolchains/**`).
+- **Supply chain and CI** — release, attestation, and workflow tooling
+  (`.github/**`, `Makefile`).
+- **Documentation and design record** — `docs/**`, the ADRs under `docs/adr/`,
+  and the root project docs.
 
 Maintainers hold cross-cutting responsibility across all areas.
 
@@ -107,7 +115,7 @@ onboarding process when they return to active participation.
 Amendments follow the supermajority rule above: a pull request plus approval from
 a two-thirds supermajority of non-emeritus maintainers.
 
-## Maintainers
+## Maintainer Roster
 
 The current maintainers, sorted by GitHub
 handle. [MAINTAINERS.md](MAINTAINERS.md) is the authoritative roster; this table
@@ -127,5 +135,6 @@ is a convenience snapshot.
 > below three, where every one of them collapses to unanimity.
 
 Service accounts are not maintainers. `svcsectool` is authorized to approve fork
-CI runs via [`.github/copy-pr-bot.yaml`](.github/copy-pr-bot.yaml) but holds no
-governance role: it cannot participate in lazy consensus, vote, or veto.
+CI runs through the copy-pr-bot fork-CI mirror but holds no governance role: it
+cannot participate in lazy consensus, vote, or veto. (Fork-CI approval is not yet
+configured via a committed `.github/copy-pr-bot.yaml`.)

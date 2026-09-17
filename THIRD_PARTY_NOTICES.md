@@ -8,11 +8,18 @@ This file lists modules linked into the `nkdctl` binary. Tools invoked as
 separate processes (the Go and GCC toolchains, `cosign`, `syft`, `docker`, and
 the `aicr` CLI) are not linked and are not covered here.
 
+The License column in the Summary is a best-effort SPDX guess from each
+license's opening text; the reproduced license and NOTICE text below it is the
+authoritative record. Only each module's top-level LICENSE/NOTICE is
+reproduced — a module that vendors sub-tree licenses under a different license
+(for example an Apache-2.0 subtree inside a BSD module) is not fully covered
+by that reproduction.
+
 Regenerate with `make notices`.
 
 ## Summary
 
-| Module | Version | License |
+| Module | Version | License (heuristic) |
 |---|---|---|
 | `github.com/cpuguy83/go-md2man/v2` | v2.0.7 | MIT |
 | `github.com/docker/cli` | v29.7.2+incompatible | Apache-2.0 |
