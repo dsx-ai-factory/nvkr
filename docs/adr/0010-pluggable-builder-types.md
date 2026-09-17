@@ -118,7 +118,11 @@ invocation mechanism, not a builder type or an output semantic:
   authoring-only until this ADR and the catalog add an explicit typed handoff before lowering is admitted.
 - `packer` invokes a pinned Packer executable against a source-owned HCL project and one exact Packer build name.
   NKD does not generate, rewrite, or interpret HCL. Packer plugins and the VM toolchain are authenticated parts
-  of the pre-realized toolchain closure, not downloads discovered during image construction.
+  of the pre-realized toolchain closure, not downloads discovered during image construction. The Packer
+  executable and every host executable that Packer or a plugin resolves through `PATH` are exact-digest inputs;
+  admitted execution constructs `PATH` only from that held closure and never exposes the ambient host path.
+  Shebang executables fail capability admission because holding the script bytes does not authenticate their
+  absolute interpreter; a future script lane must bind that interpreter as part of the realized runtime closure.
 
 The direct-Packer authoring form names only the stable boundary that future lowering must enforce:
 
@@ -126,7 +130,7 @@ The direct-Packer authoring form names only the stable boundary that future lowe
 builderType: vm-image
 packer:
   projectPath: os-image/packer
-  buildName: qemu.nke-non-fde
+  buildName: nke-node-non-fde.qemu.nke-non-fde
   architectureVariable: architecture
   materialManifestVariable: material_manifest
   outputDirectoryVariable: output_directory
@@ -145,7 +149,9 @@ format, line/paragraph-separator and non-ASCII space-separator characters, disti
 `buildName` selection without list or glob syntax. It does not parse HCL or claim
 that the named build or variables exist. Before any image construction or output collection, admitted lowering
 must invoke the pinned Packer executable's `validate` command against the pinned project, the exact build name,
-and the declared variable bindings, and fail closed on any diagnostic. `artifactPath` is relative to the private
+and the declared variable bindings, and fail closed on any diagnostic, including a warning returned with exit
+status zero when `-only` matches no build. For a named HCL build block, the selector is the complete compiled
+name (for example `nke-node-non-fde.qemu.nke-non-fde`), not only the source type and source name. `artifactPath` is relative to the private
 output directory bound through `outputDirectoryVariable`. The three variable names are explicit and distinct, so
 NKD never guesses source-owned HCL names. `packer.variables` contains only public literal strings. It is not a
 credential channel, and future invocation records expose these values. The pinned Packer subprocess remains

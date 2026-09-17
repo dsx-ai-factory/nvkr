@@ -60,7 +60,7 @@ components:
       timeoutSeconds: 10800
     packer:
       projectPath: os-image/packer
-      buildName: qemu.nke-non-fde
+      buildName: nke-node-non-fde.qemu.nke-non-fde
       architectureVariable: architecture
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
@@ -93,7 +93,7 @@ pins:
 	cat := load(t, registry)
 	component := cat.Components["node-image"]
 	if component.Packer == nil || component.Packer.ProjectPath != "os-image/packer" ||
-		component.Packer.BuildName != "qemu.nke-non-fde" ||
+		component.Packer.BuildName != "nke-node-non-fde.qemu.nke-non-fde" ||
 		component.Packer.ArchitectureVariable != "architecture" ||
 		component.Packer.MaterialManifestVariable != "material_manifest" ||
 		component.Packer.OutputDirectoryVariable != "output_directory" {
@@ -107,7 +107,7 @@ pins:
 		t.Fatalf("loaded component lost its declared material or variable bindings: %#v", component)
 	}
 
-	unknown := strings.Replace(registry, "buildName: qemu.nke-non-fde", "buildName: qemu.nke-non-fde\n      futureOption: true", 1)
+	unknown := strings.Replace(registry, "buildName: nke-node-non-fde.qemu.nke-non-fde", "buildName: nke-node-non-fde.qemu.nke-non-fde\n      futureOption: true", 1)
 	if _, err := LoadContext(context.Background(), bytesProvider{
 		RegistryFile: []byte(unknown), LockFile: []byte(lock),
 	}); catalogErrorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "futureOption") {
@@ -128,7 +128,7 @@ pins:
 		name, old, replacement string
 	}{
 		{name: "project path", old: "projectPath: os-image/packer", replacement: "projectPath: image/packer"},
-		{name: "build name", old: "buildName: qemu.nke-non-fde", replacement: "buildName: qemu.nke-fde"},
+		{name: "build name", old: "buildName: nke-node-non-fde.qemu.nke-non-fde", replacement: "buildName: nke-node-fde.qemu.nke-fde"},
 		{name: "architecture variable", old: "architectureVariable: architecture", replacement: "architectureVariable: target_arch"},
 		{name: "material manifest variable", old: "materialManifestVariable: material_manifest", replacement: "materialManifestVariable: inputs_manifest"},
 		{name: "output directory variable", old: "outputDirectoryVariable: output_directory", replacement: "outputDirectoryVariable: build_output"},
@@ -168,7 +168,7 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 	valid.BuildCommand = nil
 	valid.Packer = &PackerConfig{
 		ProjectPath:              "os-image/packer",
-		BuildName:                "qemu.nke-non-fde",
+		BuildName:                "nke-node-non-fde.qemu.nke-non-fde",
 		ArchitectureVariable:     "architecture",
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
