@@ -7,6 +7,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 )
 
@@ -184,7 +185,8 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		SBOMTool:   definition.SBOMTool,
 		APIVersion: factory.ExecutionSettingsAPIVersion, Kind: factory.ExecutionSettingsKind,
 		Metadata: factory.Metadata{Name: environment.Metadata.Name, Description: environment.Metadata.Description},
-		RunsOn:   environment.RunsOn, Targets: make(map[string]factory.Target, len(definition.Outputs)),
+		RunsOn:   environment.RunsOn, ExecutionClasses: execution.CloneClasses(environment.ExecutionClasses),
+		Targets:      make(map[string]factory.Target, len(definition.Outputs)),
 		SourceAccess: make(map[string]factory.SourceAccess, len(environment.SourceAccess)),
 		Runtime: factory.RuntimeProfile{Runtime: environment.Runtime.Runtime, RuntimeImage: environment.Runtime.RuntimeImage,
 			HelperImage: environment.Runtime.HelperImage, BuilderImage: environment.Runtime.BuilderImage,

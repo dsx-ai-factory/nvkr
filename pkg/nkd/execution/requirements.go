@@ -9,6 +9,10 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
+// maxTimeoutSeconds is the largest whole-second timeout that a future runtime
+// adapter can safely convert to a time.Duration after validation succeeds.
+const maxTimeoutSeconds uint64 = (1<<63 - 1) / 1_000_000_000
+
 // HostPlatform is the execution host operating system and architecture. It is
 // deliberately distinct from an IR node's target/toolchain platform.
 type HostPlatform string
@@ -67,8 +71,9 @@ type Requirements struct {
 	TimeoutSeconds       uint64                  `json:"timeoutSeconds,omitempty"`
 }
 
-// Validate checks only the request shape. Runner selection and capability proof are
-// separate admission steps owned by the execution adapter.
+// Validate checks only the request shape. Deterministic execution-class selection is
+// compiler-owned; runtime realization, capability proof, and enforcement remain
+// separate adapter responsibilities.
 func (requirements *Requirements) Validate() error {
 	if requirements == nil {
 		return nil
@@ -132,6 +137,10 @@ func (requirements *Requirements) Validate() error {
 	}
 
 	if requirements.TimeoutSeconds > 0 {
+		if requirements.TimeoutSeconds > maxTimeoutSeconds {
+			return e.New(e.CodeInvalidCatalog,
+				"execution timeoutSeconds exceeds the supported duration")
+		}
 		hasConstraint = true
 	}
 	if !hasConstraint {
@@ -157,7 +166,7 @@ func Clone(requirements *Requirements) *Requirements {
 }
 
 // Equal compares exact declared requirements. It does not perform capacity
-// satisfaction; a future Environment matcher owns greater-than-or-equal admission.
+// satisfaction; Match owns greater-than-or-equal class selection.
 func Equal(left, right *Requirements) bool {
 	if left == nil || right == nil {
 		return left == nil && right == nil

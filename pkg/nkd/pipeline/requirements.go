@@ -6,8 +6,8 @@ import (
 )
 
 // rejectUnsupportedExecutionRequirements is the admission boundary until an
-// adapter can match a request to an Environment execution class and authenticate
-// the effective allocation. Structural validation and identity inspection remain
+// adapter can authenticate and enforce the compiler-selected Environment class on
+// the realized runtime. Structural validation and identity inspection remain
 // available, but no adapter may silently ignore a request.
 func rejectUnsupportedExecutionRequirements(nodes []ir.Node, adapter string) error {
 	for _, node := range nodes {

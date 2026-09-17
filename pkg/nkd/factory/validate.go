@@ -161,7 +161,9 @@ func (plan Plan) Validate() error {
 		}
 	}
 	builds := map[string]ir.Node{}
+	recipeRunsOn := map[string]string{}
 	for _, recipe := range plan.Recipes {
+		recipeRunsOn[recipe.Name] = recipe.RunsOn
 		selected := make(map[string]struct{}, len(recipe.Components))
 		for _, name := range recipe.Components {
 			selected[name] = struct{}{}
@@ -187,12 +189,26 @@ func (plan Plan) Validate() error {
 		for _, node := range recipe.Graph.Nodes {
 			if node.Kind == ir.KindBuild {
 				if _, selectedComponent := selected[node.Component]; !selectedComponent {
+					if node.ExecutionBinding != nil {
+						return e.New(e.CodePipelineDrift,
+							"recipe %q unselected build node %q has an execution-class binding", recipe.Name, node.ID)
+					}
 					continue
 				}
 				requirements := components[node.Component]
 				if !execution.Equal(node.Requirements, requirements) {
 					return e.New(e.CodePipelineDrift,
 						"recipe %q build node %q changes its catalog execution requirements", recipe.Name, node.ID)
+				}
+				expectedBinding, matchErr := execution.Match(
+					node.Requirements, plan.ExecutionSettings.ExecutionClasses, execution.MatchOptions{})
+				if matchErr != nil {
+					return e.Wrap(e.CodeEngineCapability, matchErr,
+						"recipe %q build node %q has no admitted execution class", recipe.Name, node.ID)
+				}
+				if !execution.EqualBinding(node.ExecutionBinding, expectedBinding) {
+					return e.New(e.CodePipelineDrift,
+						"recipe %q build node %q changes its deterministic execution-class binding", recipe.Name, node.ID)
 				}
 				builds[recipe.Name+"/"+node.ID] = node
 			}
@@ -222,8 +238,17 @@ func (plan Plan) Validate() error {
 		}
 		build, ok := builds[node.RecipeTarget+"/"+node.IRNode]
 		if !ok || node.Network != build.Network || node.Container != build.Toolchain || node.Platform != build.Platform ||
-			!execution.Equal(node.Requirements, build.Requirements) {
+			!execution.Equal(node.Requirements, build.Requirements) ||
+			!execution.EqualBinding(node.ExecutionBinding, build.ExecutionBinding) {
 			return e.New(e.CodePipelineDrift, "build node %q changes its exact recipe execution settings", node.ID)
+		}
+		expectedRunsOn := recipeRunsOn[node.RecipeTarget]
+		if build.ExecutionBinding != nil {
+			expectedRunsOn = build.ExecutionBinding.Class.RunsOn
+		}
+		if node.RunsOn != expectedRunsOn {
+			return e.New(e.CodePipelineDrift,
+				"build node %q changes its deterministic execution route", node.ID)
 		}
 		if build.BuilderType == ir.BuilderBuildKit && plan.ExecutionSettings.RuntimeBinary() != "docker" {
 			return e.New(e.CodeEngineCapability, "rootless BuildKit node %q requires the Docker runtime in its Environment", node.ID)
@@ -376,13 +401,19 @@ func (graph ArtifactGraph) Validate() error {
 		if node.Platform != "" && node.Platform != "linux/amd64" && node.Platform != "linux/arm64" {
 			return e.New(e.CodeInvalidCatalog, "artifact graph node %q has unsupported platform %q", node.ID, node.Platform)
 		}
-		if node.Kind != NodeBuild && node.Requirements != nil {
+		if node.Kind != NodeBuild && (node.Requirements != nil || node.ExecutionBinding != nil) {
 			return e.New(e.CodeInvalidCatalog,
-				"artifact graph execution requirements are supported only on build node %q", node.ID)
+				"artifact graph execution requirements and bindings are supported only on build node %q", node.ID)
 		}
 		if err := node.Requirements.Validate(); err != nil {
 			return e.Wrap(e.CodeInvalidCatalog, err,
 				"artifact graph node %q has invalid execution requirements", node.ID)
+		}
+		if node.ExecutionBinding != nil {
+			if err := node.ExecutionBinding.ValidateFor(node.Requirements); err != nil {
+				return e.Wrap(e.CodeInvalidCatalog, err,
+					"artifact graph node %q has invalid execution binding", node.ID)
+			}
 		}
 		if index > 0 && graph.Nodes[index-1].ID >= node.ID {
 			return e.New(e.CodeInvalidCatalog, "artifact graph nodes are not canonical")

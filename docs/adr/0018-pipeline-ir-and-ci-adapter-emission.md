@@ -157,17 +157,28 @@ For a `vm-image` build, required KVM also requires an eligible host platform wit
 architecture. Preferred or forbidden KVM may retain a cross-architecture TCG route. Per-architecture VM
 toolchain pins follow those eligible execution-host platforms, not the guest architecture.
 
-The current Environment has no authenticated execution-class inventory, and `runsOn` is only a route label.
-Therefore every current local or hosted adapter rejects a selected build with nonempty execution requirements
-before execution or emitted output. A future Environment advertises named execution classes containing a route
-label, host platform, allocatable resources, exposed capabilities, and provider timeout support. The Plan binds
-each requested node to one exact satisfying class and resolves a `preferred` capability choice deterministically.
-Runtime admission authenticates the realized host platform, allocation, capability exposure, and enforced
-deadline before work; the provider's outer job timeout must permit the authored executor budget.
+An Environment may advertise a canonical, nonempty inventory of named execution classes. Each class binds one
+unique route label to a host platform, allocatable resources, exposed capabilities, and a maximum executor
+timeout. Omission preserves the existing `runsOn` path for unconstrained nodes; an explicitly empty inventory is
+invalid. Class names and capability sets are sorted and duplicate-free, route labels are unique, and unknown or
+unrepresentable values fail validation.
+
+Compilation filters by every hard request, prefers classes exposing each `preferred` capability, and breaks equal
+scores by canonical class name. It copies the selected class and resolved capability choice into the full IR and
+Plan, routes that node through the selected class, and does not infer an ordinary build host from target/toolchain
+architecture. Plan admission recomputes the deterministic selection from the exact Environment inventory and
+rejects a substituted class, route, request, or binding. The class inventory affects Environment,
+execution-settings, and Plan identities; the selected binding affects full-IR bytes and Plan identity. Neither
+enters Recipe identity.
+
+Execution-class declarations are planning input, not runtime proof. Every current local or hosted adapter still
+rejects a selected build with nonempty execution requirements before execution or emitted output. A future runtime
+adapter must authenticate the realized host platform, allocation, capability exposure, and enforced deadline
+before work; a provider's outer job timeout must permit the authored executor budget.
 
 VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, privilege, nested
-virtualization, NUMA, accelerators, requirements on non-build nodes, Environment matching, runtime
-authentication, and provider-specific lowering remain deferred. Produced-artifact size remains an artifact and
+virtualization, NUMA, accelerators, requirements on non-build nodes, runtime authentication, and provider-specific
+lowering remain deferred. Produced-artifact size remains an artifact and
 transport budget. An adapter may not reconstruct Packer commands, invoke an upstream workflow, or weaken a
 request; a grouped provider job must satisfy every member node.
 

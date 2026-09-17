@@ -192,6 +192,10 @@ type ExecutionSettings struct {
 	// GitLab tag such as "generic"). The runner is environment config, not recipe identity, so
 	// it may be set per-delivery without duplicating the definition or perturbing recipeDigest.
 	RunsOn string `json:"runsOn,omitempty"`
+	// ExecutionClasses is the exact Environment-advertised inventory available to
+	// deterministic per-step matching. These declarations are planning inputs, not
+	// runtime proof that a selected host satisfies them.
+	ExecutionClasses []execution.Class `json:"executionClasses,omitempty"`
 	// Targets and Routes are OPTIONAL: a delivery with no routes is a valid build-only profile
 	// that publishes nothing (the generated pipeline builds and packages, but pushes nowhere).
 	Targets map[string]Target `json:"targets,omitempty"`
@@ -497,7 +501,8 @@ type Node struct {
 	Inputs           []string          `json:"inputs,omitempty"`
 	Outputs          []string          `json:"outputs,omitempty"`
 
-	Requirements *execution.Requirements `json:"requirements,omitempty"`
+	Requirements     *execution.Requirements `json:"requirements,omitempty"`
+	ExecutionBinding *execution.Binding      `json:"executionBinding,omitempty"`
 }
 
 type Artifact struct {
@@ -628,6 +633,9 @@ func (profile ExecutionSettings) Validate() error {
 	}
 	if strings.ContainsAny(profile.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "execution settings runsOn label must not contain control characters")
+	}
+	if err := execution.ValidateClasses(profile.ExecutionClasses); err != nil {
+		return err
 	}
 	for source, access := range profile.SourceAccess {
 		if err := validateSourceAccessURL("source", source); err != nil {

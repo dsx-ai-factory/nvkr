@@ -48,6 +48,16 @@ func TestUnsetRunsOnDefaultsToGenericRunner(t *testing.T) {
 		if node.RunsOn != DefaultRunsOn {
 			t.Fatalf("node %q RunsOn = %q, want default %q", node.ID, node.RunsOn, DefaultRunsOn)
 		}
+		if node.ExecutionBinding != nil {
+			t.Fatalf("unconstrained node %q received execution binding %#v", node.ID, node.ExecutionBinding)
+		}
+	}
+	for _, recipe := range plan.Recipes {
+		for _, node := range recipe.Graph.Nodes {
+			if node.ExecutionBinding != nil {
+				t.Fatalf("unconstrained IR node %q received execution binding %#v", node.ID, node.ExecutionBinding)
+			}
+		}
 	}
 }
 

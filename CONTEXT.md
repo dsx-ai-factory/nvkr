@@ -162,6 +162,16 @@ platforms, typed host capabilities, and an executor wall-time budget. It is carr
 does not enter Recipe identity, and is not proof that a runner satisfies it.
 _Avoid_: Runner observation, target/toolchain platform, build network, builder-specific settings, output size
 
+**Execution class**:
+An Environment declaration binding one named route to host platform, allocatable resources, exposed capabilities,
+and a timeout ceiling. It is a deterministic planning input, not proof about the host eventually selected.
+_Avoid_: Runtime observation, target/toolchain platform, provider attestation
+
+**Execution binding**:
+The compiler-selected exact execution class and resolved preferred-capability choice for one requested Plan node.
+Plan validation recomputes the selection from the Environment inventory; the binding remains outside Recipe identity.
+_Avoid_: Runtime proof, authored requirement, mutable runner label
+
 **VM-image builder**:
 A from-source builder capability for a disk-image output. The catalog binds its exact source-owned entrypoint
 and artifact path. Generic build requirements use the shared execution contract; typed VM lowering and

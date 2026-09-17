@@ -30,6 +30,7 @@ func TestRequirementsValidation(t *testing.T) {
 		{name: "unknown capability policy", requirements: &Requirements{Capabilities: []CapabilityRequirement{{Name: CapabilityKVM, Policy: "maybe"}}}, wantCode: nkderr.CodeInvalidCatalog},
 		{name: "duplicate capability", requirements: &Requirements{Capabilities: []CapabilityRequirement{{Name: CapabilityKVM, Policy: CapabilityPreferred}, {Name: CapabilityKVM, Policy: CapabilityRequired}}}, wantCode: nkderr.CodeInvalidCatalog},
 		{name: "timeout only", requirements: &Requirements{TimeoutSeconds: 7200}},
+		{name: "timeout overflow", requirements: &Requirements{TimeoutSeconds: maxTimeoutSeconds + 1}, wantCode: nkderr.CodeInvalidCatalog},
 		{name: "complete", requirements: &Requirements{Resources: &ResourceRequest{
 			CPUMillis: 4000, MemoryMiB: 8192, EphemeralStorageMiB: 32768,
 		}, AllowedHostPlatforms: []HostPlatform{HostPlatformLinuxAMD64, HostPlatformLinuxARM64},
