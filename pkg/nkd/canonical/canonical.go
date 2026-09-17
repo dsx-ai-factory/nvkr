@@ -104,13 +104,17 @@ const (
 	KindRuntimeIdentity        = "nkd.execution.runtime-identity/v1"
 )
 
+// KindBuildMaterialManifest identifies deterministic execution-local component
+// inputs. It is separate from ADR-14's final node-SKU staging manifest.
+const KindBuildMaterialManifest = "nkd.build-material-manifest/v1"
+
 // registeredKinds is the private authority registry used by Digest.
 var registeredKinds = [...]string{
 	KindRecipe, KindBuilderProfile, KindValidationVector, KindEvidence, KindPublisherEvidence, KindReproductionObservation, KindPromotionPolicy,
 	KindReproductionResult, KindCompatibilityResult, KindConformanceResult, KindEvidenceWaiver, KindProvenance, KindProvenanceStatement,
 	KindSBOM, KindSBOMIndex, KindVulnReport, KindBundle, KindInventory,
 	KindReleaseSet, KindClearance, KindStatus, KindStatusCheckpoint, KindTrustedTime, KindPublication, KindPublicationManifest, KindPublicationRoot, KindBinaryBundle, KindAPTRepository, KindClusterDefinition, KindClusterComposition,
-	KindDiskManifest, KindStagingManifest,
+	KindDiskManifest, KindStagingManifest, KindBuildMaterialManifest,
 	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput, KindAICRBundle,
 	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindExecutionSettings, KindCompileSpec, KindRunPlan, KindFactoryObservation,
 	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindClusterRealization, KindLifecycleBinding,

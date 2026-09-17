@@ -119,6 +119,41 @@ func TestResolveLayeredValidatesVMHostRouteAfterComposition(t *testing.T) {
 	}
 }
 
+func TestResolveLayeredRequiresDeclaredMaterialComponents(t *testing.T) {
+	image := testVMImageComponent(
+		[]execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+		execution.CapabilityPreferred,
+	)
+	image.Materials = map[string]string{"agent-package": "agent"}
+	agent := catalog.Component{
+		FromSource: true, OutputType: "host-package",
+		Repo: testVMRepo, Commit: testVMCommit, TreeHash: testVMTree,
+		ToolchainImage: testVMToolchain, BuildCommand: []string{"make", "agent"},
+		ArtifactPath: "out/agent.deb", SourceDate: 1733939955,
+	}
+	base := &compose.RecipeMetadata{Kind: compose.RecipeMetadataKind, APIVersion: compose.APIVersion}
+	base.Metadata.Name = "base"
+	base.Spec.ComponentRefs = []compose.ComponentRef{{Name: "image"}}
+	overlay := &compose.RecipeMetadata{Kind: compose.RecipeMetadataKind, APIVersion: compose.APIVersion}
+	overlay.Metadata.Name = "os-amd64"
+	overlay.Spec.Criteria = &criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "amd64"}
+	cat := &catalog.Catalog{
+		Layers: &compose.Store{Base: base, Overlays: map[string]*compose.RecipeMetadata{
+			"os-amd64": overlay,
+		}},
+		Components: map[string]catalog.Component{"agent": agent, "image": image},
+	}
+	query := criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "amd64"}
+	if resolved, err := Resolve(cat, query, nil); resolved != nil || code(err) != nkderr.CodeInvalidCatalog ||
+		!strings.Contains(err.Error(), "incomplete material set") {
+		t.Fatalf("layered recipe omitted a declared material: %#v, %v", resolved, err)
+	}
+	base.Spec.ComponentRefs = append(base.Spec.ComponentRefs, compose.ComponentRef{Name: "agent"})
+	if resolved, err := Resolve(cat, query, nil); err != nil || resolved == nil {
+		t.Fatalf("layered recipe with complete material set was rejected: %#v, %v", resolved, err)
+	}
+}
+
 func TestResolveLayeredAICRProfileCarriesActivationIntoRecipeIdentity(t *testing.T) {
 	profile := &aicr.Profile{
 		Identity:        "h100-eks-ubuntu-training",

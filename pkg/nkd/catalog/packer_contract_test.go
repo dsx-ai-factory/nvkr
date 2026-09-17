@@ -23,8 +23,22 @@ recipes:
       os: ubuntu
       arch: amd64
     components:
+      - agent-package
       - node-image
+      - runtime-package
 components:
+  agent-package:
+    fromSource: true
+    source: image-source
+    outputType: host-package
+    buildCommand: [make, agent-package]
+    artifactPath: out/agent.deb
+  runtime-package:
+    fromSource: true
+    source: image-source
+    outputType: host-package
+    buildCommand: [make, runtime-package]
+    artifactPath: out/runtime.deb
   node-image:
     fromSource: true
     source: image-source
@@ -50,6 +64,10 @@ components:
       architectureVariable: architecture
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
+      variables:
+        image_variant: standard
+    materials:
+      agent-package: agent-package
     artifactPath: output/node-{{.Arch}}.qcow2
 `
 	lock := `apiVersion: nkd.dev/lock/v1
@@ -84,6 +102,10 @@ pins:
 	if len(component.BuildCommand) != 0 {
 		t.Fatalf("direct Packer component unexpectedly has buildCommand: %#v", component.BuildCommand)
 	}
+	if component.Materials["agent-package"] != "agent-package" ||
+		component.Packer.Variables["image_variant"] != "standard" {
+		t.Fatalf("loaded component lost its declared material or variable bindings: %#v", component)
+	}
 
 	unknown := strings.Replace(registry, "buildName: qemu.nke-non-fde", "buildName: qemu.nke-non-fde\n      futureOption: true", 1)
 	if _, err := LoadContext(context.Background(), bytesProvider{
@@ -91,7 +113,13 @@ pins:
 	}); catalogErrorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "futureOption") {
 		t.Fatalf("unknown nested Packer field was not rejected strictly: %v", err)
 	}
-
+	duplicateBinding := strings.Replace(registry, "agent-package: agent-package",
+		"agent-package: agent-package\n      agent-package: agent-package", 1)
+	if _, err := LoadContext(context.Background(), bytesProvider{
+		RegistryFile: []byte(duplicateBinding), LockFile: []byte(lock),
+	}); catalogErrorCode(err) != nkderr.CodeInvalidCatalog {
+		t.Fatalf("duplicate material binding was not rejected strictly: %v", err)
+	}
 	before, err := cat.SnapshotDigest()
 	if err != nil {
 		t.Fatal(err)
@@ -104,6 +132,10 @@ pins:
 		{name: "architecture variable", old: "architectureVariable: architecture", replacement: "architectureVariable: target_arch"},
 		{name: "material manifest variable", old: "materialManifestVariable: material_manifest", replacement: "materialManifestVariable: inputs_manifest"},
 		{name: "output directory variable", old: "outputDirectoryVariable: output_directory", replacement: "outputDirectoryVariable: build_output"},
+		{name: "material binding name", old: "agent-package: agent-package", replacement: "host-agent-package: agent-package"},
+		{name: "material component", old: "agent-package: agent-package", replacement: "agent-package: runtime-package"},
+		{name: "Packer variable name", old: "image_variant: standard", replacement: "node_variant: standard"},
+		{name: "Packer variable value", old: "image_variant: standard", replacement: "image_variant: minimal"},
 	} {
 		t.Run(test.name+" changes snapshot identity", func(t *testing.T) {
 			changed := load(t, strings.Replace(registry, test.old, test.replacement, 1))
@@ -297,42 +329,63 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			edit: func(component *Component) {
 				component.Packer.ArchitectureVariable = ""
 			},
-			wantText: "control-free Packer variable name",
+			wantText: "reserved variable name",
+		},
+		{
+			name: "delimiter in architecture variable",
+			edit: func(component *Component) {
+				component.Packer.ArchitectureVariable = "architecture=other"
+			},
+			wantText: "reserved variable name",
 		},
 		{
 			name: "control character in material manifest variable",
 			edit: func(component *Component) {
 				component.Packer.MaterialManifestVariable = "material\nmanifest"
 			},
-			wantText: "control-free Packer variable name",
+			wantText: "reserved variable name",
+		},
+		{
+			name: "delimiter in material manifest variable",
+			edit: func(component *Component) {
+				component.Packer.MaterialManifestVariable = "material_manifest=other"
+			},
+			wantText: "reserved variable name",
 		},
 		{
 			name: "invalid UTF-8 output variable",
 			edit: func(component *Component) {
 				component.Packer.OutputDirectoryVariable = string([]byte{0xff})
 			},
-			wantText: "control-free Packer variable name",
+			wantText: "reserved variable name",
+		},
+		{
+			name: "delimiter in output directory variable",
+			edit: func(component *Component) {
+				component.Packer.OutputDirectoryVariable = "output_directory=other"
+			},
+			wantText: "reserved variable name",
 		},
 		{
 			name: "variable exceeds bound",
 			edit: func(component *Component) {
 				component.Packer.OutputDirectoryVariable = strings.Repeat("a", 129)
 			},
-			wantText: "control-free Packer variable name",
+			wantText: "reserved variable name",
 		},
 		{
 			name: "duplicate architecture and material variables",
 			edit: func(component *Component) {
 				component.Packer.MaterialManifestVariable = component.Packer.ArchitectureVariable
 			},
-			wantText: "must be distinct",
+			wantText: "reserved variable name",
 		},
 		{
 			name: "duplicate material and output variables",
 			edit: func(component *Component) {
 				component.Packer.OutputDirectoryVariable = component.Packer.MaterialManifestVariable
 			},
-			wantText: "must be distinct",
+			wantText: "reserved variable name",
 		},
 		{
 			name: "absolute artifact path",

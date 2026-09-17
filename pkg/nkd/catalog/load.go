@@ -20,6 +20,8 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	ociname "github.com/google/go-containerregistry/pkg/name"
 	"sigs.k8s.io/yaml"
 )
@@ -78,6 +80,7 @@ type rawComponent struct {
 	Disk            *DiskSpec          `json:"disk,omitempty"`
 	Packer          *PackerConfig      `json:"packer,omitempty"`
 	BuildCommand    []string           `json:"buildCommand,omitempty"`
+	Materials       map[string]string  `json:"materials,omitempty"`
 	ArtifactPath    string             `json:"artifactPath,omitempty"`
 	WriteDir        string             `json:"writeDir,omitempty"`
 	VersionStamp    map[string]string  `json:"versionStamp,omitempty"` // Go text/template values
@@ -418,8 +421,9 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		CGO:             raw.CGO,
 		OutputType:      raw.OutputType,
 		Disk:            raw.Disk,
-		Packer:          raw.Packer,
+		Packer:          clonePackerConfig(raw.Packer),
 		BuildCommand:    raw.BuildCommand,
+		Materials:       cloneStringMap(raw.Materials),
 		ArtifactPath:    raw.ArtifactPath,
 		WriteDir:        raw.WriteDir,
 		ExclusionReason: raw.ExclusionReason,
@@ -735,6 +739,9 @@ func (cat *Catalog) Validate() error {
 			return err
 		}
 	}
+	if err := validateMaterialGraph(cat.Components); err != nil {
+		return err
+	}
 
 	seen := map[string]bool{}
 	for _, r := range cat.Recipes {
@@ -816,6 +823,14 @@ func (cat *Catalog) Validate() error {
 				}
 			}
 		}
+		selected := make([]NamedComponent, 0, len(componentRefs))
+		for componentName := range componentRefs {
+			selected = append(selected, NamedComponent{Name: componentName, Component: cat.Components[componentName]})
+		}
+		if err := ValidateMaterialSet(selected); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"recipe %q has an incomplete material set", r.ID)
+		}
 	}
 	return nil
 }
@@ -864,7 +879,7 @@ const (
 	maxPackerProjectPathBytes  = 4096
 	maxPackerArtifactPathBytes = 4096
 	maxPackerBuildNameBytes    = 256
-	maxPackerVariableNameBytes = 128
+	maxMaterialComponentBytes  = 256
 )
 
 func validatePackerConfig(name string, config *PackerConfig) error {
@@ -879,28 +894,31 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 			"component %q: packer.buildName %q must be a bounded exact Packer build name without list or glob syntax",
 			name, config.BuildName)
 	}
-	variables := []struct {
-		field string
-		value string
-	}{
-		{field: "architectureVariable", value: config.ArchitectureVariable},
-		{field: "materialManifestVariable", value: config.MaterialManifestVariable},
-		{field: "outputDirectoryVariable", value: config.OutputDirectoryVariable},
+	variableNames := sortedStringKeys(config.Variables)
+	publicVariables := make([]packertransport.Variable, 0, len(variableNames))
+	for _, variableName := range variableNames {
+		publicVariables = append(publicVariables, packertransport.Variable{
+			Name: variableName, Value: config.Variables[variableName],
+		})
 	}
-	for _, variable := range variables {
-		if !validPackerTransportValue(variable.value, maxPackerVariableNameBytes) {
-			return e.New(e.CodeInvalidCatalog,
-				"component %q: packer.%s %q must be a bounded, control-free Packer variable name",
-				name, variable.field, variable.value)
-		}
-	}
-	if config.ArchitectureVariable == config.MaterialManifestVariable ||
-		config.ArchitectureVariable == config.OutputDirectoryVariable ||
-		config.MaterialManifestVariable == config.OutputDirectoryVariable {
-		return e.New(e.CodeInvalidCatalog,
-			"component %q: Packer architecture, material manifest, and output directory variables must be distinct", name)
+	if err := packertransport.ValidateVariables([]string{
+		config.ArchitectureVariable,
+		config.MaterialManifestVariable,
+		config.OutputDirectoryVariable,
+	}, publicVariables); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err,
+			"component %q has invalid Packer variable bindings", name)
 	}
 	return nil
+}
+
+func clonePackerConfig(config *PackerConfig) *PackerConfig {
+	if config == nil {
+		return nil
+	}
+	cloned := *config
+	cloned.Variables = cloneStringMap(config.Variables)
+	return &cloned
 }
 
 // validPackerTransportValue enforces only transport-safety properties NKD owns. The
@@ -909,6 +927,123 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 func validPackerTransportValue(value string, maxBytes int) bool {
 	return value != "" && len(value) <= maxBytes && utf8.ValidString(value) &&
 		strings.IndexFunc(value, unicode.IsControl) == -1
+}
+
+func validateMaterialBindings(name string, component Component) error {
+	if len(component.Materials) == 0 {
+		return nil
+	}
+	if component.BuilderType != BuilderVMImage {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: material bindings require builderType vm-image", name)
+	}
+	boundComponents := make(map[string]string, len(component.Materials))
+	for _, binding := range sortedStringKeys(component.Materials) {
+		materialComponent := component.Materials[binding]
+		if _, err := material.StagingPath(binding); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"component %q has invalid material binding name", name)
+		}
+		if !validPackerTransportValue(materialComponent, maxMaterialComponentBytes) ||
+			materialComponent != strings.TrimSpace(materialComponent) {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: material binding %q has invalid component name %q", name, binding, materialComponent)
+		}
+		if materialComponent == name {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: material binding %q refers to itself", name, binding)
+		}
+		if previous, duplicate := boundComponents[materialComponent]; duplicate {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: material bindings %q and %q ambiguously select component %q",
+				name, previous, binding, materialComponent)
+		}
+		boundComponents[materialComponent] = binding
+	}
+	return nil
+}
+
+func sortedStringKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// ValidateMaterialSet verifies one resolved Recipe's complete component set. It
+// validates declarations rather than authenticating artifact bytes; execution must
+// bind each edge to a verified producer observation before staging.
+func ValidateMaterialSet(components []NamedComponent) error {
+	selected := make(map[string]Component, len(components))
+	for _, component := range components {
+		if strings.TrimSpace(component.Name) == "" || component.Name != strings.TrimSpace(component.Name) {
+			return e.New(e.CodeInvalidCatalog,
+				"resolved material set has invalid component name %q", component.Name)
+		}
+		if _, duplicate := selected[component.Name]; duplicate {
+			return e.New(e.CodeInvalidCatalog,
+				"resolved material set repeats component %q", component.Name)
+		}
+		if err := validateComponent(component.Name, component.Component); err != nil {
+			return err
+		}
+		selected[component.Name] = component.Component
+	}
+	return validateMaterialGraph(selected)
+}
+
+func validateMaterialGraph(components map[string]Component) error {
+	names := make([]string, 0, len(components))
+	for name := range components {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		for _, binding := range sortedStringKeys(components[name].Materials) {
+			targetName := components[name].Materials[binding]
+			target, ok := components[targetName]
+			if !ok {
+				return e.New(e.CodeInvalidCatalog,
+					"component %q material binding %q references unknown component %q", name, binding, targetName)
+			}
+			if !target.FromSource && target.Prebuilt == nil {
+				return e.New(e.CodeInvalidCatalog,
+					"component %q material binding %q references excluded component %q", name, binding, targetName)
+			}
+		}
+	}
+
+	const (
+		unvisited = iota
+		visiting
+		visited
+	)
+	state := make(map[string]int, len(components))
+	var visit func(string) error
+	visit = func(name string) error {
+		switch state[name] {
+		case visiting:
+			return e.New(e.CodeInvalidCatalog, "material dependency cycle includes component %q", name)
+		case visited:
+			return nil
+		}
+		state[name] = visiting
+		for _, binding := range sortedStringKeys(components[name].Materials) {
+			if err := visit(components[name].Materials[binding]); err != nil {
+				return err
+			}
+		}
+		state[name] = visited
+		return nil
+	}
+	for _, name := range names {
+		if err := visit(name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ValidateVMImageHostRoute closes the guest/host relationship only after Recipe
@@ -990,6 +1125,9 @@ func validateComponent(name string, c Component) error {
 	if c.Packer != nil && c.BuilderType != BuilderVMImage {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: packer producer requires builderType vm-image", name)
+	}
+	if err := validateMaterialBindings(name, c); err != nil {
+		return err
 	}
 	if c.BuilderType == BuilderVMImage && !c.FromSource {
 		return e.New(e.CodeInvalidCatalog, "component %q: vm-image builder requires a from-source component", name)

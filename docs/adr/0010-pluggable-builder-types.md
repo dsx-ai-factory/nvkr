@@ -111,8 +111,11 @@ A `vm-image` component selects exactly one producer form. The existing `buildCom
 command form; the presence of a `packer` object represents the direct-Packer form. A producer form is an
 invocation mechanism, not a builder type or an output semantic:
 
-- `command` executes one exact source-owned argument vector. The executable may be `make`, a repository script,
-  or another pinned entrypoint. NKD does not interpret the Makefile or script.
+- `command` records one exact source-owned argument vector. The executable may be `make`, a repository script,
+  or another pinned entrypoint. The current argument contract has only the existing `{{.Arch}}` substitution; it
+  has no material-manifest placeholder, fixed path, positional argument, or environment-variable handoff. NKD
+  does not infer one or interpret the Makefile or script. Material-bearing command producers therefore remain
+  authoring-only until this ADR and the catalog add an explicit typed handoff before lowering is admitted.
 - `packer` invokes a pinned Packer executable against a source-owned HCL project and one exact Packer build name.
   NKD does not generate, rewrite, or interpret HCL. Packer plugins and the VM toolchain are authenticated parts
   of the pre-realized toolchain closure, not downloads discovered during image construction.
@@ -127,6 +130,10 @@ packer:
   architectureVariable: architecture
   materialManifestVariable: material_manifest
   outputDirectoryVariable: output_directory
+  variables:
+    image_variant: standard
+materials:
+  agent-package: nke-agent
 artifactPath: nke-node.qcow2
 ```
 
@@ -139,20 +146,33 @@ that the named build or variables exist. Before any image construction or output
 must invoke the pinned Packer executable's `validate` command against the pinned project, the exact build name,
 and the declared variable bindings, and fail closed on any diagnostic. `artifactPath` is relative to the private
 output directory bound through `outputDirectoryVariable`. The three variable names are explicit and distinct, so
-NKD never guesses source-owned HCL names.
+NKD never guesses source-owned HCL names. `packer.variables` contains only public literal strings. It is not a
+credential channel, and future invocation records expose these values. The pinned Packer subprocess remains
+authoritative for checking their names and values against source-owned HCL declarations.
 
-This first authoring slice does not accept arbitrary Packer variable values or component-material edges. Those
-must become typed catalog bindings, validation, graph edges, and identity inputs before direct Packer lowering is
-admitted. Source-owned HCL defaults do not authorize NKD to infer or fetch undeclared build materials.
+`materials` is a one-to-one map from a source-owned binding name to another component in the same resolved
+Recipe. The target may be a from-source build or a digest-pinned acquisition. Unknown, excluded, self-referential,
+duplicate-target, cyclic, or omitted targets fail catalog or Recipe resolution. The declaration does not create a
+second component graph or implicitly add components to a Recipe; it adds typed edges between the Recipe's existing
+component outputs. Source-owned HCL defaults do not authorize NKD to infer or fetch undeclared build materials.
 
 Before either driver may lower, required component outputs must be built or acquired, verified, and assembled
-into a deterministic staged-material manifest. Admitted lowering must bind only declared inputs and variables,
-provide a private output location, invoke the selected driver through the shared runner, collect the declared
-artifact, and recompute its exact bytes. A driver may not replace a staged material with an undeclared network
-fetch. The catalog entry owns the pinned source and toolchain, selected driver, exact entrypoint or Packer project
-and build name, and artifact path. The future admitted catalog contract also owns material and customer-variable
-bindings. These fields become Recipe inputs only after disk lowering is admitted; the schema-only contract mints
-no Recipe identity for a disk.
+into a deterministic build-material manifest. Each entry binds its source-owned binding name, observed component
+name, output kind, exact artifact digest, and a slash-relative path derived from the binding name beneath a private
+staging root. Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
+deterministic description, not an authenticated receipt; admitted execution must derive it from authenticated
+producer observations and bind the exact serialized file bytes before invoking a subprocess. Direct Packer will
+receive the private absolute manifest path through its declared `materialManifestVariable`. The command/Make form
+has no equivalent executable handoff in the current schema and therefore cannot lower a material-bearing command.
+Adding one requires a typed authored field and identity/lowering contract; an adapter may not invent a conventional
+path, append an argument, or inject an undeclared environment variable.
+
+Admitted lowering must bind only declared inputs and variables, provide a private output location, invoke the
+selected driver through the shared runner, collect the declared artifact, and recompute its exact bytes. A driver
+may not replace a staged material with an undeclared network fetch. The catalog entry owns the pinned source and
+toolchain, selected driver, exact entrypoint or Packer project and build name, artifact path, material edges, and
+public Packer-variable values. These fields affect resolved Catalog identity now and become Recipe inputs only
+after disk lowering is admitted; the schema-only contract mints no Recipe identity for a disk.
 
 The executable name grants no evidence lane. A Make-driven image may qualify when its exact command, staged
 materials, toolchain closure, enforced isolation, output collection, disk inspection, and reproduction evidence

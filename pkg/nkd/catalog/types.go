@@ -42,6 +42,11 @@ type PackerConfig struct {
 	ArchitectureVariable     string `json:"architectureVariable"`
 	MaterialManifestVariable string `json:"materialManifestVariable"`
 	OutputDirectoryVariable  string `json:"outputDirectoryVariable"`
+	// Variables are public, literal string values passed to source-owned Packer
+	// variables. They are build inputs, not a secret channel; future lowering must
+	// expose them in the invocation record and let the pinned Packer executable
+	// validate them against the source-owned HCL declarations.
+	Variables map[string]string `json:"variables,omitempty"`
 }
 
 // Metadata is descriptive catalog identity; it does not affect resolution.
@@ -215,6 +220,11 @@ type Component struct {
 	// BuildCommand route remains authoritative. The two forms are mutually exclusive.
 	Packer       *PackerConfig `json:"packer,omitempty"`
 	BuildCommand []string      `json:"buildCommand,omitempty"`
+	// Materials binds source-owned input names to other component outputs in the
+	// same resolved Recipe. Each component may be bound exactly once. Future VM
+	// lowering turns these declarations into build-graph edges and stages only the
+	// verified outputs named here.
+	Materials map[string]string `json:"materials,omitempty"`
 	// For direct Packer, ArtifactPath is relative to the private output directory.
 	// Other builders retain their existing workspace-relative interpretation.
 	ArtifactPath  string            `json:"artifactPath,omitempty"`

@@ -174,8 +174,16 @@ _Avoid_: Runtime proof, authored requirement, mutable runner label
 
 **VM-image producer form**:
 The catalog-selected invocation contract within a VM-image component: either an exact command argument vector or
-a direct-Packer project, build name, and variable bindings.
+a direct-Packer project, build name, and public variable bindings. Material bindings are shared authoring data,
+but only direct Packer currently names an explicit manifest handoff; command/Make lowering remains unavailable
+until it gains a typed handoff instead of an inferred argument or environment variable.
 _Avoid_: Builder type, output format, evidence lane
+
+**Build-material manifest**:
+A deterministic description of one producer's declared component inputs: binding name, observed component name,
+output kind, exact artifact digest, and a slash-relative path beneath a private staging root. It is not an
+authenticated observation or a host-path authority.
+_Avoid_: Node-SKU staging manifest, producer receipt, absolute staging path
 
 **VM-image builder**:
 A from-source builder capability for a disk-image output. The catalog binds one VM-image producer form and its
