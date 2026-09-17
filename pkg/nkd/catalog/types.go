@@ -36,9 +36,9 @@ type DiskSpec struct {
 // directory. NKD does not synthesize or interpret HCL.
 type PackerConfig struct {
 	ProjectPath string `json:"projectPath"`
-	// BuildSelector is the exact HCL source selector future lowering passes to
-	// Packer's -only option. Wildcards and selector lists are not accepted.
-	BuildSelector            string `json:"buildSelector"`
+	// BuildName is the exact compiled build name future lowering passes through
+	// Packer's -only option. Wildcards and build-name lists are not accepted.
+	BuildName                string `json:"buildName"`
 	ArchitectureVariable     string `json:"architectureVariable"`
 	MaterialManifestVariable string `json:"materialManifestVariable"`
 	OutputDirectoryVariable  string `json:"outputDirectoryVariable"`

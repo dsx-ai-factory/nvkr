@@ -89,7 +89,7 @@ func TestCompileRejectsUnimplementedDiskCapabilityBeforeGraphConstruction(t *tes
 	validPacker.ArtifactPath = "node-{{.Arch}}.qcow2"
 	validPacker.Packer = &catalog.PackerConfig{
 		ProjectPath:              "os-image/packer",
-		BuildSelector:            "qemu.nke-node",
+		BuildName:                "qemu.nke-non-fde",
 		ArchitectureVariable:     "architecture",
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
@@ -124,7 +124,7 @@ func TestDirectPackerProducerRequiresVMImageBuilderCapability(t *testing.T) {
 			BuilderType: catalog.BuilderVMImage,
 			Packer: &catalog.PackerConfig{
 				ProjectPath:              "os-image/packer",
-				BuildSelector:            "qemu.nke-node",
+				BuildName:                "qemu.nke-non-fde",
 				ArchitectureVariable:     "architecture",
 				MaterialManifestVariable: "material_manifest",
 				OutputDirectoryVariable:  "output_directory",

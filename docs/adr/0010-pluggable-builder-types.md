@@ -113,7 +113,7 @@ invocation mechanism, not a builder type or an output semantic:
 
 - `command` executes one exact source-owned argument vector. The executable may be `make`, a repository script,
   or another pinned entrypoint. NKD does not interpret the Makefile or script.
-- `packer` invokes a pinned Packer executable against a source-owned HCL project and an exact build selector.
+- `packer` invokes a pinned Packer executable against a source-owned HCL project and one exact Packer build name.
   NKD does not generate, rewrite, or interpret HCL. Packer plugins and the VM toolchain are authenticated parts
   of the pre-realized toolchain closure, not downloads discovered during image construction.
 
@@ -123,17 +123,23 @@ The direct-Packer authoring form names only the stable boundary that future lowe
 builderType: vm-image
 packer:
   projectPath: os-image/packer
-  buildSelector: qemu.nke-node
+  buildName: qemu.nke-non-fde
   architectureVariable: architecture
   materialManifestVariable: material_manifest
   outputDirectoryVariable: output_directory
 artifactPath: nke-node.qcow2
 ```
 
-`projectPath` is relative to the pinned source root. `buildSelector` is the exact HCL source selector future
-lowering passes to Packer's `-only` option; wildcards and selector lists are forbidden. `artifactPath` is relative
-to the private output directory bound through `outputDirectoryVariable`. The three variable names are explicit
-and distinct, so NKD never guesses source-owned HCL names.
+`projectPath` is relative to the pinned source root. `buildName` is the exact compiled build name future lowering
+passes as one `-only=<buildName>` argument; Packer documents names such as
+`my_build.amazon-ebs.first-example`. NKD rejects Packer's list and glob selection syntax because one component
+produces one declared artifact. Catalog loading
+checks only bounded, UTF-8, control-free argument transport and distinct bindings. It does not parse HCL or claim
+that the named build or variables exist. Before any image construction or output collection, admitted lowering
+must invoke the pinned Packer executable's `validate` command against the pinned project, the exact build name,
+and the declared variable bindings, and fail closed on any diagnostic. `artifactPath` is relative to the private
+output directory bound through `outputDirectoryVariable`. The three variable names are explicit and distinct, so
+NKD never guesses source-owned HCL names.
 
 This first authoring slice does not accept arbitrary Packer variable values or component-material edges. Those
 must become typed catalog bindings, validation, graph edges, and identity inputs before direct Packer lowering is
@@ -144,7 +150,7 @@ into a deterministic staged-material manifest. Admitted lowering must bind only 
 provide a private output location, invoke the selected driver through the shared runner, collect the declared
 artifact, and recompute its exact bytes. A driver may not replace a staged material with an undeclared network
 fetch. The catalog entry owns the pinned source and toolchain, selected driver, exact entrypoint or Packer project
-selector, and artifact path. The future admitted catalog contract also owns material and customer-variable
+and build name, and artifact path. The future admitted catalog contract also owns material and customer-variable
 bindings. These fields become Recipe inputs only after disk lowering is admitted; the schema-only contract mints
 no Recipe identity for a disk.
 

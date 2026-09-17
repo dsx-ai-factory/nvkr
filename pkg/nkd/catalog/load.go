@@ -12,6 +12,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -31,8 +32,6 @@ var (
 	// locally-built toolchain used by the local engine. A tag (e.g. golang:1.23.3)
 	// matches neither and fails closed (NKD-FR-RC-024, NKD-FR-BLD-010).
 	digestPinned   = regexp.MustCompile(`(?:@|^)sha256:[0-9a-f]{64}$`)
-	packerSelector = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9][A-Za-z0-9_-]*)+$`)
-	packerVariable = regexp.MustCompile(`^[\p{L}_][\p{L}\p{N}_-]*$`)
 	knownOutputSet = map[string]bool{
 		"host-package": true, "oci-image": true, "disk-image": true, "raw": true, "tarball": true,
 	}
@@ -866,9 +865,10 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: packer.projectPath %q is not a clean source-relative path", name, config.ProjectPath)
 	}
-	if len(config.BuildSelector) > 256 || !packerSelector.MatchString(config.BuildSelector) {
+	if !validPackerArgument(config.BuildName, 256) || strings.ContainsAny(config.BuildName, ",*?[]\\") {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: packer.buildSelector %q is not a bounded exact HCL source selector", name, config.BuildSelector)
+			"component %q: packer.buildName %q must be a bounded exact Packer build name without list or glob syntax",
+			name, config.BuildName)
 	}
 	variables := []struct {
 		field string
@@ -879,9 +879,9 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 		{field: "outputDirectoryVariable", value: config.OutputDirectoryVariable},
 	}
 	for _, variable := range variables {
-		if utf8.RuneCountInString(variable.value) > 128 || !packerVariable.MatchString(variable.value) {
+		if !validPackerArgument(variable.value, 128) {
 			return e.New(e.CodeInvalidCatalog,
-				"component %q: packer.%s %q is not a bounded supported HCL variable identifier",
+				"component %q: packer.%s %q must be a bounded, control-free Packer variable name",
 				name, variable.field, variable.value)
 		}
 	}
@@ -892,6 +892,14 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 			"component %q: Packer architecture, material manifest, and output directory variables must be distinct", name)
 	}
 	return nil
+}
+
+// validPackerArgument enforces only transport-safety properties NKD owns. The
+// pinned Packer subprocess remains authoritative for project, build-name, and
+// variable semantics; catalog loading deliberately does not reimplement HCL.
+func validPackerArgument(value string, maxBytes int) bool {
+	return value != "" && len(value) <= maxBytes && utf8.ValidString(value) &&
+		strings.IndexFunc(value, unicode.IsControl) == -1
 }
 
 // ValidateVMImageHostRoute closes the guest/host relationship only after Recipe

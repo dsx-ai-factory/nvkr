@@ -46,7 +46,7 @@ components:
       timeoutSeconds: 10800
     packer:
       projectPath: os-image/packer
-      buildSelector: qemu.nke-node
+      buildName: qemu.nke-non-fde
       architectureVariable: architecture
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
@@ -75,7 +75,7 @@ pins:
 	cat := load(t, registry)
 	component := cat.Components["node-image"]
 	if component.Packer == nil || component.Packer.ProjectPath != "os-image/packer" ||
-		component.Packer.BuildSelector != "qemu.nke-node" ||
+		component.Packer.BuildName != "qemu.nke-non-fde" ||
 		component.Packer.ArchitectureVariable != "architecture" ||
 		component.Packer.MaterialManifestVariable != "material_manifest" ||
 		component.Packer.OutputDirectoryVariable != "output_directory" {
@@ -85,7 +85,7 @@ pins:
 		t.Fatalf("direct Packer component unexpectedly has buildCommand: %#v", component.BuildCommand)
 	}
 
-	unknown := strings.Replace(registry, "buildSelector: qemu.nke-node", "buildSelector: qemu.nke-node\n      futureOption: true", 1)
+	unknown := strings.Replace(registry, "buildName: qemu.nke-non-fde", "buildName: qemu.nke-non-fde\n      futureOption: true", 1)
 	if _, err := LoadContext(context.Background(), bytesProvider{
 		RegistryFile: []byte(unknown), LockFile: []byte(lock),
 	}); catalogErrorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "futureOption") {
@@ -100,7 +100,7 @@ pins:
 		name, old, replacement string
 	}{
 		{name: "project path", old: "projectPath: os-image/packer", replacement: "projectPath: image/packer"},
-		{name: "build selector", old: "buildSelector: qemu.nke-node", replacement: "buildSelector: qemu.nke-node-fde"},
+		{name: "build name", old: "buildName: qemu.nke-non-fde", replacement: "buildName: qemu.nke-fde"},
 		{name: "architecture variable", old: "architectureVariable: architecture", replacement: "architectureVariable: target_arch"},
 		{name: "material manifest variable", old: "materialManifestVariable: material_manifest", replacement: "materialManifestVariable: inputs_manifest"},
 		{name: "output directory variable", old: "outputDirectoryVariable: output_directory", replacement: "outputDirectoryVariable: build_output"},
@@ -136,7 +136,7 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 	valid.BuildCommand = nil
 	valid.Packer = &PackerConfig{
 		ProjectPath:              "os-image/packer",
-		BuildSelector:            "qemu.nke-node",
+		BuildName:                "qemu.nke-non-fde",
 		ArchitectureVariable:     "architecture",
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
@@ -149,19 +149,13 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 	if err := validate(valid); err != nil {
 		t.Fatalf("valid direct Packer producer rejected: %v", err)
 	}
-	hyphenatedVariable := valid
-	hyphenatedPacker := *valid.Packer
-	hyphenatedPacker.ArchitectureVariable = "target-arch"
-	hyphenatedVariable.Packer = &hyphenatedPacker
-	if err := validate(hyphenatedVariable); err != nil {
-		t.Fatalf("valid HCL variable identifier with a hyphen rejected: %v", err)
-	}
-	unicodeVariable := valid
-	unicodePacker := *valid.Packer
-	unicodePacker.ArchitectureVariable = "архитектура"
-	unicodeVariable.Packer = &unicodePacker
-	if err := validate(unicodeVariable); err != nil {
-		t.Fatalf("valid Unicode HCL variable identifier rejected: %v", err)
+	opaquePackerNames := valid
+	opaquePackerConfig := *valid.Packer
+	opaquePackerConfig.BuildName = "image.qemu.nke-non-fde"
+	opaquePackerConfig.ArchitectureVariable = "target-arch"
+	opaquePackerNames.Packer = &opaquePackerConfig
+	if err := validate(opaquePackerNames); err != nil {
+		t.Fatalf("transport-safe Packer-owned names rejected: %v", err)
 	}
 	rootProject := valid
 	rootPacker := *valid.Packer
@@ -228,67 +222,67 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			wantText: "clean source-relative path",
 		},
 		{
-			name: "empty selector",
+			name: "empty build name",
 			edit: func(component *Component) {
-				component.Packer.BuildSelector = ""
+				component.Packer.BuildName = ""
 			},
-			wantText: "exact HCL source selector",
+			wantText: "exact Packer build name",
 		},
 		{
-			name: "wildcard selector",
+			name: "wildcard build selection",
 			edit: func(component *Component) {
-				component.Packer.BuildSelector = "qemu.*"
+				component.Packer.BuildName = "qemu.*"
 			},
-			wantText: "exact HCL source selector",
+			wantText: "without list or glob syntax",
 		},
 		{
-			name: "selector list",
+			name: "build-name list",
 			edit: func(component *Component) {
-				component.Packer.BuildSelector = "qemu.node,qemu.fde"
+				component.Packer.BuildName = "qemu.node,qemu.fde"
 			},
-			wantText: "exact HCL source selector",
+			wantText: "without list or glob syntax",
 		},
 		{
-			name: "selector with an empty segment",
+			name: "build name with control character",
 			edit: func(component *Component) {
-				component.Packer.BuildSelector = "qemu..node"
+				component.Packer.BuildName = "qemu.node\n"
 			},
-			wantText: "exact HCL source selector",
+			wantText: "exact Packer build name",
 		},
 		{
-			name: "selector exceeds bound",
+			name: "build name exceeds bound",
 			edit: func(component *Component) {
-				component.Packer.BuildSelector = strings.Repeat("a", 255) + ".b"
+				component.Packer.BuildName = strings.Repeat("a", 257)
 			},
-			wantText: "exact HCL source selector",
+			wantText: "exact Packer build name",
 		},
 		{
-			name: "invalid architecture variable",
+			name: "empty architecture variable",
 			edit: func(component *Component) {
-				component.Packer.ArchitectureVariable = "9arch"
+				component.Packer.ArchitectureVariable = ""
 			},
-			wantText: "HCL variable identifier",
+			wantText: "control-free Packer variable name",
 		},
 		{
-			name: "invalid material manifest variable",
+			name: "control character in material manifest variable",
 			edit: func(component *Component) {
-				component.Packer.MaterialManifestVariable = "material manifest"
+				component.Packer.MaterialManifestVariable = "material\nmanifest"
 			},
-			wantText: "HCL variable identifier",
+			wantText: "control-free Packer variable name",
 		},
 		{
-			name: "invalid output variable",
+			name: "invalid UTF-8 output variable",
 			edit: func(component *Component) {
-				component.Packer.OutputDirectoryVariable = ""
+				component.Packer.OutputDirectoryVariable = string([]byte{0xff})
 			},
-			wantText: "HCL variable identifier",
+			wantText: "control-free Packer variable name",
 		},
 		{
 			name: "variable exceeds bound",
 			edit: func(component *Component) {
 				component.Packer.OutputDirectoryVariable = strings.Repeat("a", 129)
 			},
-			wantText: "HCL variable identifier",
+			wantText: "control-free Packer variable name",
 		},
 		{
 			name: "duplicate architecture and material variables",
