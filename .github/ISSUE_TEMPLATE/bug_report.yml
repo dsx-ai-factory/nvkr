@@ -1,0 +1,164 @@
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      options:
+        - label: I searched existing issues and found no duplicates
+          required: true
+        - label: I can reproduce this issue consistently
+          required: true
+        - label: This is not a security vulnerability (report those to [NVIDIA PSIRT](https://www.nvidia.com/object/submit-security-vulnerability.html), not through GitHub)
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened and what did you expect?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: How severe is this issue for you?
+      options:
+        - Blocking (cannot proceed)
+        - High (major functionality broken)
+        - Medium (workaround exists)
+        - Low (minor issue)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Catalog — pins (pins.lock.yaml)
+        - Catalog — registry (sources / constraints / build commands)
+        - Recipes — overlays / mixins
+        - CLI (nkectl)
+        - Generator / pipeline emission
+        - Signing / provenance / evidence
+        - Docs / examples
+        - Other / Unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Regression?
+      description: Did this work in a previous version?
+      options:
+        - "Yes, this worked before (please specify version below)"
+        - "No, this is a new use case"
+        - "Unknown / first time using this feature"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Step one
+        2. Step two
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        - NKE Recipes version (CLI `nkectl --version`, API image tag, or commit SHA):
+        - Install method (release binary / build from source / container image):
+        - Platform (eks/gke/aks/oke/ocp/kind/lke/bcm/rke2/generic/k0s/other):
+        - Kubernetes version:
+        - OS (ubuntu/cos/other) + version:
+        - Kernel version:
+        - GPU type (h100/h200/gb200/b200/a100/l40/l40s/rtx-pro-6000/vr200/other):
+        - Workload intent (training/inference):
+      value: |
+        - NKE Recipes version (CLI `nkectl --version`, API image tag, or commit SHA):
+        - Install method (release binary / build from source / container image):
+        - Platform (eks/gke/aks/oke/ocp/kind/lke/bcm/rke2/generic/k0s/other):
+        - Kubernetes version:
+        - OS (ubuntu/cos/other) + version:
+        - Kernel version:
+        - GPU type (h100/h200/gb200/b200/a100/l40/l40s/rtx-pro-6000/vr200/other):
+        - Workload intent (training/inference):
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command / Request Used
+      description: Paste the exact CLI command(s) or API request(s) that triggered
+        the issue. Redact any credentials or secrets, including tokens in URLs.
+      placeholder: |
+        ```bash
+        nkectl recipe --snapshot ... --intent training
+        ```
+
+        ```bash
+        curl "http://localhost:8080/v1/recipe?..."
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Error Output
+      description: Include relevant logs or error messages. Redact any credentials or secrets.
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Anything else that might help (regression? recent upgrade? related issues?).
+    validations:
+      required: false

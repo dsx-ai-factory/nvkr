@@ -99,6 +99,7 @@ var nodeRecipeIdentityRules = map[string]recipeIdentityFieldRule{
 	"Kind":             includeLogicalValueInRecipeIdentity,
 	"Needs":            includeLogicalValueInRecipeIdentity,
 	"Requirements":     excludeExecutionMetadataFromRecipeIdentity,
+	"ExecutionBinding": excludeExecutionMetadataFromRecipeIdentity,
 	"Repo":             excludeTransportFromRecipeIdentity,
 	"Commit":           includeLogicalValueInRecipeIdentity,
 	"TreeHash":         includeLogicalValueInRecipeIdentity,
@@ -169,6 +170,7 @@ func (g Graph) normalizedCopy() Graph {
 		c.Nodes[i].Needs = append([]string(nil), g.Nodes[i].Needs...)
 		c.Nodes[i].Env = append([]EnvVar(nil), g.Nodes[i].Env...)
 		c.Nodes[i].Requirements = execution.Clone(g.Nodes[i].Requirements)
+		c.Nodes[i].ExecutionBinding = execution.CloneBinding(g.Nodes[i].ExecutionBinding)
 	}
 	c.Normalize()
 	return c

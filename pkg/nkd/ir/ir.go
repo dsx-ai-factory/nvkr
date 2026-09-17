@@ -1,7 +1,8 @@
 // Package ir defines nkdctl's engine-neutral pipeline IR: the fully-pinned build
 // DAG that is the single source of truth for emission, build, and verification
-// (SRD §4.5, §5.1). The IR contains no host/clock/random values, so its
-// deterministic serialization yields a stable recipeDigest.
+// (SRD §4.5, §5.1). The full IR may carry compiler-selected Environment metadata,
+// but contains no runtime-observed host, clock, or random values. Recipe identity
+// is derived from the deterministic content view defined in marshal.go.
 package ir
 
 import (
@@ -106,6 +107,10 @@ type Node struct {
 	// projection exists. It travels with executable bytes but is excluded from
 	// recipeDigest because it does not describe the content produced by the recipe.
 	Requirements *execution.Requirements `json:"requirements,omitempty"`
+	// ExecutionBinding is the exact Environment execution class selected by the
+	// factory compiler. It is executable Plan metadata and is excluded from Recipe
+	// identity. An unbound graph remains valid before Environment compilation.
+	ExecutionBinding *execution.Binding `json:"executionBinding,omitempty"`
 
 	// fetch
 	Repo        string   `json:"repo,omitempty"`

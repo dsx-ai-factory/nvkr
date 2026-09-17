@@ -70,10 +70,10 @@ func assertRecipeIdentityFieldRules(t *testing.T, full, logical reflect.Type,
 }
 
 // TestDigestHostInvariance is the ADR-02 §4 empirical purity guard for process
-// environment values related to the host and clock. The IR carries no host,
-// clock, or random field by construction, so perturbing hostname, user, home,
+// environment values related to the host and clock. The IR carries no runtime-
+// observed host, clock, or random field, so perturbing hostname, user, home,
 // timezone, and a source-date environment value must not move Recipe identity.
-// Separate tests cover pinned-input sensitivity and execution-requirement projection.
+// Separate tests cover pinned-input sensitivity and execution-metadata projection.
 func TestDigestHostInvariance(t *testing.T) {
 	before, err := sample().Digest()
 	if err != nil {
@@ -245,6 +245,34 @@ func TestExecutionRequirementsChangeFullGraphButNotRecipeIdentity(t *testing.T) 
 	}
 	if string(requestedBytes) == string(baseBytes) {
 		t.Fatal("execution request was omitted from the full executable graph")
+	}
+
+	bound := requested
+	binding, err := execution.Match(bound.Nodes[0].Requirements, []execution.Class{{
+		Name: "local", RunsOn: "local", HostPlatform: execution.HostPlatformLinuxAMD64,
+		Resources: execution.ResourceCapacity{
+			CPUMillis: 4000, MemoryMiB: 8192, EphemeralStorageMiB: 16384,
+		},
+		Capabilities:      []execution.CapabilityName{execution.CapabilityKVM},
+		MaxTimeoutSeconds: 14400,
+	}}, execution.MatchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound.Nodes[0].ExecutionBinding = binding
+	boundDigest, err := bound.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	boundBytes, err := bound.CanonicalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if boundDigest != requestedDigest {
+		t.Fatalf("execution binding changed recipe identity: %s != %s", boundDigest, requestedDigest)
+	}
+	if string(boundBytes) == string(requestedBytes) {
+		t.Fatal("execution binding was omitted from the full executable graph")
 	}
 }
 

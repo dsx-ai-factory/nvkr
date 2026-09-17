@@ -99,6 +99,7 @@ jobs:
       code: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.code }}
       actions: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.actions }}
       pipeline: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.pipeline }}
+      notices: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.notices }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -157,6 +158,22 @@ jobs:
               - 'go.sum'
               - '.go-version'
               - 'toolchains/**'
+              - 'Makefile'
+              - '.github/workflows/merge-gate.yaml'
+            notices:
+              # The linked-module set derives from the full import graph of
+              # ./cmd/nkdctl, plus the generator itself and the committed
+              # notices file. Watching the dependency surface catches a new
+              # dependency added without rerunning `make notices`.
+              - 'THIRD_PARTY_NOTICES.md'
+              - 'scripts/gen-notices.sh'
+              - 'scripts/gen_notices.py'
+              - 'go.mod'
+              - 'go.sum'
+              - 'cmd/**'
+              - 'pkg/**'
+              - 'internal/**'
+              - 'client/**'
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
 
@@ -319,6 +336,39 @@ jobs:
       - run: echo "No pipeline inputs changed — regeneration check not required"
 
   # ---------------------------------------------------------------------------
+  # Third-party notices drift — THIRD_PARTY_NOTICES.md must regenerate
+  # byte-for-byte from the linked module set, the same "local equals CI" and
+  # "generated files regenerate byte-for-byte" contract workflows-check
+  # enforces. Adding a dependency without rerunning `make notices` fails here.
+  # ---------------------------------------------------------------------------
+
+  notices-regen:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.notices == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Verify THIRD_PARTY_NOTICES.md is current
+        run: make notices-check
+
+  notices-regen-skip:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.notices != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "No dependency or notices inputs changed — notices check not required"
+
+  # ---------------------------------------------------------------------------
   # Static analysis (CodeQL)
   #
   # Uploading results needs `security-events: write`. On a private or internal
@@ -394,6 +444,8 @@ jobs:
       - analyze-skip
       - workflows-regen
       - workflows-regen-skip
+      - notices-regen
+      - notices-regen-skip
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:

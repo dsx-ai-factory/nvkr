@@ -24,8 +24,14 @@ artifacts before it is usable by a downstream system. NKD does not provision or 
 
 The [local Environment](../definitions/nke-v1/environment-local.yaml) supplies execution settings and a local
 registry destination. The [GitHub Environment](../definitions/nke-v1/environment-github.yaml) supplies the
-corresponding hosted-run settings. Environments own the publication namespace, credentials and signing identity policy. Catalog sources and
-locks own tool versions and byte pins; Definition selects the scanner, signer and generators by name.
+corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
+host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
+binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
+planning input, not proof that a runtime supplied the declared capacity or capability; current execution adapters
+still reject selected builds with requirements until they can authenticate and enforce the selected binding.
+
+Environments also own the publication namespace, credentials, and signing identity policy. Catalog sources and
+locks own tool versions and byte pins; Definition selects the scanner, signer, and generators by name.
 Output-affecting recipe tools remain part of build identity.
 
 A destination or signing-setting change can change the prepared execution and generated workflow while

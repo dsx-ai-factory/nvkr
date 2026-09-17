@@ -77,8 +77,8 @@ could otherwise leak into identity unnoticed.
 A producer's execution requirements are carried in the full executable graph and compiled Plan, while the
 logical Recipe projection cannot represent them. Changing resources, eligible host platforms, typed capability
 policy, or executor timeout changes catalog and Plan identities without changing what the Recipe builds. The
-request is not capability proof: Environment matching and authenticated runtime observations are separate
-execution-admission records (ADR-18).
+request is not capability proof: compilation deterministically binds an Environment execution class into Plan
+identity, while authenticated runtime observations remain a separate execution-admission record (ADR-18).
 
 ### 4. Enforceable purity guard
 

@@ -14,6 +14,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
@@ -124,12 +125,13 @@ type ClusterMember struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
-	APIVersion       string   `json:"apiVersion"`
-	Kind             string   `json:"kind"`
-	Metadata         Metadata `json:"metadata"`
-	RunsOn           string   `json:"runsOn,omitempty"`
-	UtilityContainer string   `json:"utilityContainer"`
-	UtilityPlatform  string   `json:"utilityPlatform"`
+	APIVersion       string            `json:"apiVersion"`
+	Kind             string            `json:"kind"`
+	Metadata         Metadata          `json:"metadata"`
+	RunsOn           string            `json:"runsOn,omitempty"`
+	ExecutionClasses []execution.Class `json:"executionClasses,omitempty"`
+	UtilityContainer string            `json:"utilityContainer"`
+	UtilityPlatform  string            `json:"utilityPlatform"`
 
 	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
 	Publication  *Publication            `json:"publication,omitempty"`
@@ -390,6 +392,9 @@ func (environment Environment) Validate() error {
 	}
 	if strings.ContainsAny(environment.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "environment runner contains control characters")
+	}
+	if err := execution.ValidateClasses(environment.ExecutionClasses); err != nil {
+		return err
 	}
 	for source, access := range environment.SourceAccess {
 		if err := validateHTTPSURL("environment sourceAccess source", source); err != nil {

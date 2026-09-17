@@ -330,12 +330,18 @@ func VendorSpecIdentity(command []string, image string) (string, error) {
 
 func validateBuildNode(n Node) error {
 	if err := rejectUnexpectedNodeFields(n, allowFields(
-		"requirements",
+		"requirements", "executionBinding",
 		"component", "builderType", "flakeRef", "flakeOutput", "flakeLockDigest",
 		"toolchain", "platform", "network", "env", "patches", "command", "workdir",
 		"sourceDest", "sourceCommit", "sourceTreeHash", "vendorSpecDigest",
 		"sourceReadOnly", "writeDir", "outputType", "artifactPath", "version")); err != nil {
 		return err
+	}
+	if n.ExecutionBinding != nil {
+		if err := n.ExecutionBinding.ValidateFor(n.Requirements); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"build node %q has invalid execution binding", n.ID)
+		}
 	}
 	if !canonicalNodeID.MatchString(n.Component) || n.ID != "build-"+n.Component {
 		return e.New(e.CodeInvalidCatalog,

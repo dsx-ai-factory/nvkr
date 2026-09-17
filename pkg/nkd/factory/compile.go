@@ -177,6 +177,10 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 	if err := delivery.Validate(); err != nil {
 		return nil, err
 	}
+	// The Plan owns its class inventory. ExecutionSettings is passed by value, but
+	// both this slice and each class's capability slice would otherwise alias the
+	// caller and permit post-compilation mutation of executable Plan identity.
+	delivery.ExecutionClasses = execution.CloneClasses(delivery.ExecutionClasses)
 	if stack == nil || stack.Catalog == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "factory compilation requires a resolved catalog stack")
 	}
@@ -291,6 +295,10 @@ func compileWithTargetStacks(ctx context.Context, definition CompileSpec, delive
 			selectedSet[component.Name] = true
 		}
 		sort.Strings(selectedNames)
+		if err := bindRecipeExecution(graph, selectedSet, delivery.ExecutionClasses); err != nil {
+			return nil, e.Wrap(e.CodeEngineCapability, err,
+				"factory recipe target %q cannot satisfy execution requirements", target.Name)
+		}
 		aicrIdentity := ""
 		if resolved.AICRProfile != nil {
 			aicrIdentity = resolved.AICRProfile.Identity
@@ -721,10 +729,14 @@ func addRecipeDataflow(targetSpec RecipeTarget, graph *ir.Graph, selected map[st
 			}
 			output := "artifact/" + target + "/" + irNode.Component
 			result := "result/" + target + "/" + irNode.Component
+			runsOn := targetSpec.RunsOn
+			if irNode.ExecutionBinding != nil {
+				runsOn = irNode.ExecutionBinding.Class.RunsOn
+			}
 			nodes[nodeID] = Node{ID: nodeID, Kind: NodeBuild, RecipeTarget: target, IRNode: irNode.ID,
-				Requirements: execution.Clone(irNode.Requirements),
-				Network:      irNode.Network, Container: irNode.Toolchain, Platform: irNode.Platform,
-				RunsOn: targetSpec.RunsOn, Inputs: inputs, Outputs: []string{output, result}}
+				Requirements: execution.Clone(irNode.Requirements), ExecutionBinding: execution.CloneBinding(irNode.ExecutionBinding),
+				Network: irNode.Network, Container: irNode.Toolchain, Platform: irNode.Platform,
+				RunsOn: runsOn, Inputs: inputs, Outputs: []string{output, result}}
 			artifacts[output] = Artifact{ID: output, Name: irNode.Component, Kind: irNode.OutputType,
 				MediaType: artifactMediaType(irNode.OutputType), Producer: nodeID, RecipeTarget: target,
 				Component: irNode.Component, Path: factoryBuildArtifactPath(target, irNode)}

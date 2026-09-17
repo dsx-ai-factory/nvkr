@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
 	"testing"
@@ -28,6 +29,83 @@ func testExecutionRequirements() *execution.Requirements {
 	}
 }
 
+func testExecutionClasses() []execution.Class {
+	return []execution.Class{
+		{
+			Name: "alpha-tcg", RunsOn: "linux-amd64-tcg", HostPlatform: execution.HostPlatformLinuxAMD64,
+			Resources: execution.ResourceCapacity{
+				CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536,
+			},
+			MaxTimeoutSeconds: 14400,
+		},
+		{
+			Name: "beta-kvm", RunsOn: "linux-amd64-kvm", HostPlatform: execution.HostPlatformLinuxAMD64,
+			Resources: execution.ResourceCapacity{
+				CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536,
+			},
+			Capabilities:      []execution.CapabilityName{execution.CapabilityKVM},
+			MaxTimeoutSeconds: 14400,
+		},
+	}
+}
+
+func bindTestPlanExecution(t *testing.T, plan *Plan, recipeIndex, irIndex, nodeIndex int,
+	requirements *execution.Requirements,
+) {
+	t.Helper()
+	plan.ExecutionSettings.ExecutionClasses = testExecutionClasses()
+	digest, err := plan.ExecutionSettings.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.ExecutionSettingsDigest = digest
+
+	irNode := &plan.Recipes[recipeIndex].Graph.Nodes[irIndex]
+	irNode.Requirements = execution.Clone(requirements)
+	binding, err := execution.Match(
+		irNode.Requirements, plan.ExecutionSettings.ExecutionClasses, matchOptionsForBuildNode(*irNode))
+	if err != nil {
+		t.Fatal(err)
+	}
+	irNode.ExecutionBinding = binding
+	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(requirements)
+	plan.Graph.Nodes[nodeIndex].ExecutionBinding = execution.CloneBinding(binding)
+	plan.Graph.Nodes[nodeIndex].RunsOn = binding.Class.RunsOn
+}
+
+func bindFirstTestPlanExecution(t *testing.T, plan *Plan, requirements *execution.Requirements) int {
+	t.Helper()
+	for recipeIndex := range plan.Recipes {
+		recipe := &plan.Recipes[recipeIndex]
+		for irIndex := range recipe.Graph.Nodes {
+			irNode := &recipe.Graph.Nodes[irIndex]
+			if irNode.Kind != ir.KindBuild {
+				continue
+			}
+			for nodeIndex := range plan.Graph.Nodes {
+				node := &plan.Graph.Nodes[nodeIndex]
+				if node.RecipeTarget != recipe.Name || node.IRNode != irNode.ID {
+					continue
+				}
+				bindTestPlanExecution(t, plan, recipeIndex, irIndex, nodeIndex, requirements)
+				for componentIndex := range recipe.ResolvedComponents {
+					component := &recipe.ResolvedComponents[componentIndex]
+					if component.Name == irNode.Component {
+						component.BuildRequirements = execution.Clone(requirements)
+						if err := plan.Validate(); err != nil {
+							t.Fatalf("bound test Plan is invalid: %v", err)
+						}
+						return nodeIndex
+					}
+				}
+				t.Fatalf("recipe %q has no resolved component %q", recipe.Name, irNode.Component)
+			}
+		}
+	}
+	t.Fatal("test plan has no projected build node")
+	return -1
+}
+
 func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
 	base, err := catalog.LoadContext(context.Background(), testCatalogProvider(t))
 	if err != nil {
@@ -50,34 +128,231 @@ func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
 		Packages: []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
 	}
 	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "requirements"}}
+		Metadata: Metadata{Name: "requirements"}, ExecutionClasses: testExecutionClasses()}
 	plan, err := Compile(context.Background(), definition, delivery, stack, "v0.0.0 (test)")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var recipeRequest, planRequest *execution.Requirements
+	var recipeBinding, planBinding *execution.Binding
+	var planRunsOn string
 	for _, node := range plan.Recipes[0].Graph.Nodes {
 		if node.Kind == ir.KindBuild && node.Component == "kubelet" {
 			recipeRequest = node.Requirements
+			recipeBinding = node.ExecutionBinding
 		}
 	}
 	for _, node := range plan.Graph.Nodes {
 		if node.Kind == NodeBuild && node.RecipeTarget == "worker" && node.IRNode == "build-kubelet" {
 			planRequest = node.Requirements
+			planBinding = node.ExecutionBinding
+			planRunsOn = node.RunsOn
 		}
 	}
 	if !execution.Equal(recipeRequest, component.BuildRequirements) || !execution.Equal(planRequest, component.BuildRequirements) {
 		t.Fatalf("requirements were not preserved catalog -> IR -> Plan: IR=%#v Plan=%#v", recipeRequest, planRequest)
 	}
+	if !execution.EqualBinding(recipeBinding, planBinding) || recipeBinding == nil ||
+		recipeBinding.Class.Name != "beta-kvm" || planRunsOn != recipeBinding.Class.RunsOn {
+		t.Fatalf("execution binding was not preserved: IR=%#v Plan=%#v runsOn=%q", recipeBinding, planBinding, planRunsOn)
+	}
+	before, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delivery.ExecutionClasses[1].Resources.MemoryMiB = 1
+	delivery.ExecutionClasses[1].Capabilities[0] = "changed-after-compile"
+	if err := plan.Validate(); err != nil {
+		t.Fatalf("caller mutation changed the compiled Plan: %v", err)
+	}
+	after, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("caller-owned execution class storage aliases the compiled Plan")
+	}
+	unsatisfied := plan.ExecutionSettings
+	unsatisfied.ExecutionClasses = execution.CloneClasses(plan.ExecutionSettings.ExecutionClasses)
+	unsatisfied.ExecutionClasses[0].Resources.MemoryMiB = 1
+	unsatisfied.ExecutionClasses[1].Resources.MemoryMiB = 1
+	if failed, compileErr := Compile(context.Background(), definition, unsatisfied, stack, "v0.0.0 (test)"); failed != nil {
+		t.Fatalf("unsatisfied execution requirements returned a partial Plan: %#v", failed)
+	} else {
+		assertFactoryErrorCode(t, compileErr, e.CodeEngineCapability)
+	}
+}
+
+func TestExecutionClassFieldsChangeExecutionSettingsIdentity(t *testing.T) {
+	base := ExecutionSettings{
+		APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
+		Metadata: Metadata{Name: "identity"}, ExecutionClasses: testExecutionClasses(),
+	}
+	baseline, err := base.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name   string
+		change func(*execution.Class)
+	}{
+		{name: "name", change: func(class *execution.Class) { class.Name = "gamma-kvm" }},
+		{name: "route", change: func(class *execution.Class) { class.RunsOn = "other-kvm" }},
+		{name: "host platform", change: func(class *execution.Class) { class.HostPlatform = execution.HostPlatformLinuxARM64 }},
+		{name: "CPU", change: func(class *execution.Class) { class.Resources.CPUMillis++ }},
+		{name: "memory", change: func(class *execution.Class) { class.Resources.MemoryMiB++ }},
+		{name: "ephemeral storage", change: func(class *execution.Class) { class.Resources.EphemeralStorageMiB++ }},
+		{name: "capabilities", change: func(class *execution.Class) { class.Capabilities = nil }},
+		{name: "timeout", change: func(class *execution.Class) { class.MaxTimeoutSeconds++ }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changed := base
+			changed.ExecutionClasses = execution.CloneClasses(base.ExecutionClasses)
+			test.change(&changed.ExecutionClasses[1])
+			digest, err := changed.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if digest == baseline {
+				t.Fatalf("changing execution class %s did not change ExecutionSettings identity", test.name)
+			}
+		})
+	}
+}
+
+func TestPlanValidationRejectsAlternativeSatisfyingExecutionClass(t *testing.T) {
+	plan := buildOnlyPlan(t, "generic")
+	recipeIndex, irIndex, nodeIndex := -1, -1, -1
+	for i := range plan.Recipes {
+		for j := range plan.Recipes[i].Graph.Nodes {
+			candidate := &plan.Recipes[i].Graph.Nodes[j]
+			if candidate.Kind != ir.KindBuild {
+				continue
+			}
+			recipeIndex, irIndex = i, j
+			for k := range plan.Graph.Nodes {
+				if plan.Graph.Nodes[k].RecipeTarget == plan.Recipes[i].Name && plan.Graph.Nodes[k].IRNode == candidate.ID {
+					nodeIndex = k
+					break
+				}
+			}
+			break
+		}
+		if nodeIndex >= 0 {
+			break
+		}
+	}
+	if recipeIndex < 0 || irIndex < 0 || nodeIndex < 0 {
+		t.Fatal("test plan has no projected build node")
+	}
+
+	requirements := testExecutionRequirements()
+	classes := testExecutionClasses()
+	classes[0].Capabilities = []execution.CapabilityName{execution.CapabilityKVM}
+	plan.ExecutionSettings.ExecutionClasses = classes
+	settingsDigest, err := plan.ExecutionSettings.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.ExecutionSettingsDigest = settingsDigest
+	irNode := &plan.Recipes[recipeIndex].Graph.Nodes[irIndex]
+	irNode.Requirements = execution.Clone(requirements)
+	for i := range plan.Recipes[recipeIndex].ResolvedComponents {
+		if plan.Recipes[recipeIndex].ResolvedComponents[i].Name == irNode.Component {
+			plan.Recipes[recipeIndex].ResolvedComponents[i].BuildRequirements = execution.Clone(requirements)
+		}
+	}
+	expected, err := execution.Match(requirements, classes, execution.MatchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expected.Class.Name != "alpha-tcg" {
+		t.Fatalf("deterministic tie selected %q, want alpha-tcg", expected.Class.Name)
+	}
+	irNode.ExecutionBinding = expected
+	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(requirements)
+	plan.Graph.Nodes[nodeIndex].ExecutionBinding = execution.CloneBinding(expected)
+	plan.Graph.Nodes[nodeIndex].RunsOn = expected.Class.RunsOn
+	if err := plan.Validate(); err != nil {
+		t.Fatal(err)
+	}
+
+	alternative, err := execution.Match(requirements, classes[1:], execution.MatchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	irNode.ExecutionBinding = alternative
+	plan.Graph.Nodes[nodeIndex].ExecutionBinding = execution.CloneBinding(alternative)
+	plan.Graph.Nodes[nodeIndex].RunsOn = alternative.Class.RunsOn
+	assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
+}
+
+func TestPlanValidationRejectsExecutionBindingOnUnselectedBuild(t *testing.T) {
+	plan := buildOnlyPlan(t, "generic")
+	selected := make(map[string]struct{}, len(plan.Recipes[0].Components))
+	for _, component := range plan.Recipes[0].Components {
+		selected[component] = struct{}{}
+	}
+
+	var unselected *ir.Node
+	for i := range plan.Recipes[0].Graph.Nodes {
+		node := &plan.Recipes[0].Graph.Nodes[i]
+		if node.Kind != ir.KindBuild {
+			continue
+		}
+		if _, ok := selected[node.Component]; !ok {
+			unselected = node
+			break
+		}
+	}
+	if unselected == nil {
+		t.Fatal("test plan has no unselected build node")
+	}
+
+	plan.ExecutionSettings.ExecutionClasses = testExecutionClasses()
+	settingsDigest, err := plan.ExecutionSettings.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.ExecutionSettingsDigest = settingsDigest
+	unselected.Requirements = testExecutionRequirements()
+	unselected.ExecutionBinding, err = execution.Match(
+		unselected.Requirements, plan.ExecutionSettings.ExecutionClasses, execution.MatchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
+}
+
+func TestPlanValidationRejectsExecutionRouteDrift(t *testing.T) {
+	plan := buildOnlyPlan(t, "generic")
+	nodeIndex := bindFirstTestPlanExecution(t, plan, testExecutionRequirements())
+
+	plan.Graph.Nodes[nodeIndex].RunsOn = "substituted-route"
+	assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
+}
+
+func TestPlanValidationRejectsUnsatisfiedExecutionClassInventory(t *testing.T) {
+	plan := buildOnlyPlan(t, "generic")
+	bindFirstTestPlanExecution(t, plan, testExecutionRequirements())
+
+	for index := range plan.ExecutionSettings.ExecutionClasses {
+		plan.ExecutionSettings.ExecutionClasses[index].Resources.MemoryMiB = 1
+	}
+	digest, err := plan.ExecutionSettings.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.ExecutionSettingsDigest = digest
+
+	assertFactoryErrorCode(t, plan.Validate(), e.CodeEngineCapability)
 }
 
 func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
-	baselineDigest, err := plan.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
+	recipeDigest := plan.Recipes[0].RecipeDigest
 
 	recipeIndex, irIndex, nodeIndex := -1, -1, -1
 	for i := range plan.Recipes {
@@ -115,9 +390,19 @@ func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {
 		t.Fatal("recipe plan does not retain its resolved build component")
 	}
 
-	irNode.Requirements = testExecutionRequirements()
+	plan.ExecutionSettings.ExecutionClasses = testExecutionClasses()
+	settingsDigest, err := plan.ExecutionSettings.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.ExecutionSettingsDigest = settingsDigest
+	baselineDigest, err := plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bindTestPlanExecution(t, plan, recipeIndex, irIndex, nodeIndex, testExecutionRequirements())
 	plan.Recipes[recipeIndex].ResolvedComponents[componentIndex].BuildRequirements = execution.Clone(irNode.Requirements)
-	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(irNode.Requirements)
 	if err := plan.Validate(); err != nil {
 		t.Fatalf("bound generic requirements made the Plan invalid: %v", err)
 	}
@@ -128,10 +413,12 @@ func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {
 	if requestedDigest == baselineDigest {
 		t.Fatal("generic execution requirements did not affect Plan identity")
 	}
+	if plan.Recipes[recipeIndex].RecipeDigest != recipeDigest {
+		t.Fatal("execution binding changed the frozen Recipe identity")
+	}
 	bind := func(requirements *execution.Requirements) {
-		irNode.Requirements = execution.Clone(requirements)
+		bindTestPlanExecution(t, plan, recipeIndex, irIndex, nodeIndex, requirements)
 		plan.Recipes[recipeIndex].ResolvedComponents[componentIndex].BuildRequirements = execution.Clone(requirements)
-		plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(requirements)
 	}
 	for _, test := range []struct {
 		name string
@@ -206,6 +493,17 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 		t.Fatal("test plan has no build node")
 	}
 	recipeNode.Requirements = testExecutionRequirements()
+	plan.ExecutionSettings.ExecutionClasses = testExecutionClasses()
+	settingsDigest, err := plan.ExecutionSettings.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.ExecutionSettingsDigest = settingsDigest
+	recipeNode.ExecutionBinding, err = execution.Match(
+		recipeNode.Requirements, plan.ExecutionSettings.ExecutionClasses, execution.MatchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	componentBound := false
 	for i := range plan.Recipes[0].ResolvedComponents {
 		component := &plan.Recipes[0].ResolvedComponents[i]
@@ -223,6 +521,8 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 		node := &plan.Graph.Nodes[i]
 		if node.RecipeTarget == plan.Recipes[0].Name && node.IRNode == recipeNode.ID {
 			node.Requirements = execution.Clone(recipeNode.Requirements)
+			node.ExecutionBinding = execution.CloneBinding(recipeNode.ExecutionBinding)
+			node.RunsOn = recipeNode.ExecutionBinding.Class.RunsOn
 			factoryNodeID = node.ID
 			break
 		}
@@ -282,6 +582,7 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 	for i := range plan.Graph.Nodes {
 		if plan.Graph.Nodes[i].ID == factoryNodeID {
 			plan.Graph.Nodes[i].Requirements = nil
+			plan.Graph.Nodes[i].ExecutionBinding = nil
 			break
 		}
 	}
