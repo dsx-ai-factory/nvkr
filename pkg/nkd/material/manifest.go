@@ -153,8 +153,14 @@ func (manifest *Manifest) Digest() (string, error) {
 	return canonical.Digest(canonical.KindBuildMaterialManifest, manifest)
 }
 
-// StagingPath derives the canonical slash-relative path for one binding. It
-// validates the source name and the encoded filesystem segment, but does not join
+// StagingPath derives the canonical slash-relative path for one binding. A
+// binding is a logical name, not a filesystem path. filepath.Clean and
+// filepath.Join would interpret slashes and dot segments and would make the
+// result host-dependent. PathEscape instead encodes the complete binding as one
+// portable path segment. Callers must use percent escapes as literal filename
+// characters and must not URL-decode the returned path before materialization.
+//
+// StagingPath validates the source name and encoded segment, but does not join
 // the path to or grant access beneath any caller-provided staging root.
 func StagingPath(binding string) (string, error) {
 	if !canonicalText(binding, maxMaterialNameBytes) {
