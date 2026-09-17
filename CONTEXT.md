@@ -162,8 +162,13 @@ platforms, typed host capabilities, and an executor wall-time budget. It is carr
 does not enter Recipe identity, and is not proof that a runner satisfies it.
 _Avoid_: Runner observation, target/toolchain platform, build network, builder-specific settings, output size
 
+**VM-image producer form**:
+The catalog-selected invocation contract within a VM-image component: either an exact command argument vector or
+a direct-Packer project, build name, and variable bindings.
+_Avoid_: Builder type, output format, evidence lane
+
 **VM-image builder**:
-A from-source builder capability for a disk-image output. The catalog binds its exact source-owned entrypoint
-and artifact path. Generic build requirements use the shared execution contract; typed VM lowering and
-execution remain separately admitted capabilities.
+A from-source builder capability for a disk-image output. The catalog binds one VM-image producer form and its
+artifact path. Generic build requirements use the shared execution contract; typed VM lowering and execution
+remain separately admitted capabilities.
 _Avoid_: Disk format, public output format, virtual machine artifact

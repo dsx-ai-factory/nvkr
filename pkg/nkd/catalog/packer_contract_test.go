@@ -141,6 +141,7 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
 	}
+	valid.ArtifactPath = "output/node-{{.Arch}}.qcow2"
 	validate := func(component Component) error {
 		cat := base(component)
 		cat.Recipes[0].Criteria.Category = "os"
@@ -222,6 +223,20 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			wantText: "clean source-relative path",
 		},
 		{
+			name: "project path with control character",
+			edit: func(component *Component) {
+				component.Packer.ProjectPath = "os-image/\npacker"
+			},
+			wantText: "clean source-relative path",
+		},
+		{
+			name: "project path exceeds bound",
+			edit: func(component *Component) {
+				component.Packer.ProjectPath = strings.Repeat("a", maxPackerProjectPathBytes+1)
+			},
+			wantText: "clean source-relative path",
+		},
+		{
 			name: "empty build name",
 			edit: func(component *Component) {
 				component.Packer.BuildName = ""
@@ -239,6 +254,27 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			name: "build-name list",
 			edit: func(component *Component) {
 				component.Packer.BuildName = "qemu.node,qemu.fde"
+			},
+			wantText: "without list or glob syntax",
+		},
+		{
+			name: "question-mark build selection",
+			edit: func(component *Component) {
+				component.Packer.BuildName = "qemu.node?"
+			},
+			wantText: "without list or glob syntax",
+		},
+		{
+			name: "bracket build selection",
+			edit: func(component *Component) {
+				component.Packer.BuildName = "qemu.[nf]de"
+			},
+			wantText: "without list or glob syntax",
+		},
+		{
+			name: "backslash build selection",
+			edit: func(component *Component) {
+				component.Packer.BuildName = `qemu.node\fde`
 			},
 			wantText: "without list or glob syntax",
 		},
@@ -309,6 +345,13 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			name: "traversing artifact path",
 			edit: func(component *Component) {
 				component.ArtifactPath = "../node.qcow2"
+			},
+			wantText: "relative to the private output directory",
+		},
+		{
+			name: "output-directory artifact path",
+			edit: func(component *Component) {
+				component.ArtifactPath = "."
 			},
 			wantText: "relative to the private output directory",
 		},

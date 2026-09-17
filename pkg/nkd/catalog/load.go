@@ -860,12 +860,20 @@ func validateVMImageBuildRequirements(name string, requirements *execution.Requi
 	return nil
 }
 
+const (
+	maxPackerProjectPathBytes  = 4096
+	maxPackerBuildNameBytes    = 256
+	maxPackerVariableNameBytes = 128
+)
+
 func validatePackerConfig(name string, config *PackerConfig) error {
-	if !validSourceRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
+	if !validPackerTransportValue(config.ProjectPath, maxPackerProjectPathBytes) ||
+		!validSourceRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: packer.projectPath %q is not a clean source-relative path", name, config.ProjectPath)
 	}
-	if !validPackerArgument(config.BuildName, 256) || strings.ContainsAny(config.BuildName, ",*?[]\\") {
+	if !validPackerTransportValue(config.BuildName, maxPackerBuildNameBytes) ||
+		strings.ContainsAny(config.BuildName, ",*?[]\\") {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: packer.buildName %q must be a bounded exact Packer build name without list or glob syntax",
 			name, config.BuildName)
@@ -879,7 +887,7 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 		{field: "outputDirectoryVariable", value: config.OutputDirectoryVariable},
 	}
 	for _, variable := range variables {
-		if !validPackerArgument(variable.value, 128) {
+		if !validPackerTransportValue(variable.value, maxPackerVariableNameBytes) {
 			return e.New(e.CodeInvalidCatalog,
 				"component %q: packer.%s %q must be a bounded, control-free Packer variable name",
 				name, variable.field, variable.value)
@@ -894,10 +902,10 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 	return nil
 }
 
-// validPackerArgument enforces only transport-safety properties NKD owns. The
+// validPackerTransportValue enforces only transport-safety properties NKD owns. The
 // pinned Packer subprocess remains authoritative for project, build-name, and
 // variable semantics; catalog loading deliberately does not reimplement HCL.
-func validPackerArgument(value string, maxBytes int) bool {
+func validPackerTransportValue(value string, maxBytes int) bool {
 	return value != "" && len(value) <= maxBytes && utf8.ValidString(value) &&
 		strings.IndexFunc(value, unicode.IsControl) == -1
 }

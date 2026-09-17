@@ -239,9 +239,10 @@ Required membership exists before execution, so omitting a failed output cannot 
 Specialized byte-changing transformations remain explicit product intent.
 
 A `disk-image` named output selects exactly one component from an `os` Recipe and remains independent of its
-producer. The catalog's `vm-image` builder capability binds the disk metadata, exact source-owned entrypoint,
-artifact path, and a complete generic build-runner request with resources, eligible host platform, KVM policy,
-and timeout. Required KVM needs an eligible host with the resolved guest architecture; VM toolchain pins follow
+producer. The catalog's `vm-image` builder capability binds the disk metadata, one selected producer form, its
+exact source-owned command or Packer project, build name, and variable bindings, the artifact path, and a complete
+generic build-runner request with resources, eligible host platform, KVM policy, and timeout. Required KVM needs
+an eligible host with the resolved guest architecture; VM toolchain pins follow
 the eligible host platform. The current aggregate NKE OS Recipe is an explicit compatibility exception to the target
 one-Recipe-per-stack-layer model; embedded components retain their identities and evidence relationships while
 they are separated into independently realized layers. Disk lowering and VM execution remain capability-gated.
