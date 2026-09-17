@@ -2,6 +2,9 @@ name: Test ARC arm64 runner (throwaway)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - sujanrao/test-arc-arm64-runner
 
 jobs:
   smoke-test:
