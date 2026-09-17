@@ -29,6 +29,21 @@ type DiskSpec struct {
 	Encryption string `json:"encryption"`
 }
 
+// PackerConfig selects the direct-Packer producer for a vm-image component. The
+// HCL project remains source-owned and is addressed relative to the pinned source
+// root. The contract names the variables that future admitted lowering must use for
+// architecture, an authenticated local-material manifest, and a private output
+// directory. NKD does not synthesize or interpret HCL.
+type PackerConfig struct {
+	ProjectPath string `json:"projectPath"`
+	// BuildSelector is the exact HCL source selector future lowering passes to
+	// Packer's -only option. Wildcards and selector lists are not accepted.
+	BuildSelector            string `json:"buildSelector"`
+	ArchitectureVariable     string `json:"architectureVariable"`
+	MaterialManifestVariable string `json:"materialManifestVariable"`
+	OutputDirectoryVariable  string `json:"outputDirectoryVariable"`
+}
+
 // Metadata is descriptive catalog identity; it does not affect resolution.
 type Metadata struct {
 	Name        string `json:"name,omitempty"`
@@ -196,12 +211,17 @@ type Component struct {
 	CGO             bool              `json:"cgo,omitempty"`
 	OutputType      string            `json:"outputType,omitempty"`
 	Disk            *DiskSpec         `json:"disk,omitempty"`
-	BuildCommand    []string          `json:"buildCommand,omitempty"`
-	ArtifactPath    string            `json:"artifactPath,omitempty"`
-	WriteDir        string            `json:"writeDir,omitempty"`        // writable output subdir; enables parallel-safe isolation
-	VendorCommand   []string          `json:"vendorCommand,omitempty"`   // from the source: vendor step for non-vendored repos
-	SourceDate      int64             `json:"sourceDateEpoch,omitempty"` // committer %ct of Commit
-	VersionStamp    map[string]string `json:"versionStamp,omitempty"`    // rendered -X-style stamps
+	// Packer selects direct Packer execution for vm-image. When nil, the existing
+	// BuildCommand route remains authoritative. The two forms are mutually exclusive.
+	Packer       *PackerConfig `json:"packer,omitempty"`
+	BuildCommand []string      `json:"buildCommand,omitempty"`
+	// For direct Packer, ArtifactPath is relative to the private output directory.
+	// Other builders retain their existing workspace-relative interpretation.
+	ArtifactPath  string            `json:"artifactPath,omitempty"`
+	WriteDir      string            `json:"writeDir,omitempty"`        // writable output subdir; enables parallel-safe isolation
+	VendorCommand []string          `json:"vendorCommand,omitempty"`   // from the source: vendor step for non-vendored repos
+	SourceDate    int64             `json:"sourceDateEpoch,omitempty"` // committer %ct of Commit
+	VersionStamp  map[string]string `json:"versionStamp,omitempty"`    // rendered -X-style stamps
 
 	// prebuilt (the no-compile lane): set when this component is acquired, not built.
 	// The URL/Image templates are already version-rendered (only {{.Arch}} may remain);

@@ -165,10 +165,18 @@ each requested node to one exact satisfying class and resolves a `preferred` cap
 Runtime admission authenticates the realized host platform, allocation, capability exposure, and enforced
 deadline before work; the provider's outer job timeout must permit the authored executor budget.
 
+Future `vm-image` lowering dispatches the typed producer driver owned by ADR-10. The `command` driver executes the
+exact authored argument vector and can therefore invoke Make. The `packer` driver invokes the pinned Packer
+executable against the selected source-owned HCL project without parsing or generating HCL. Both receive only
+authenticated staged materials and declared variable bindings, use the same admitted execution class and network
+policy, write into a private output location, and return the declared disk through the same collection boundary.
+The shared runner owns this driver lowering. A CI adapter may transport its typed inputs and outputs, but it may
+not render an independent Make or Packer command.
+
 VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, privilege, nested
 virtualization, NUMA, accelerators, requirements on non-build nodes, Environment matching, runtime
 authentication, and provider-specific lowering remain deferred. Produced-artifact size remains an artifact and
-transport budget. An adapter may not reconstruct Packer commands, invoke an upstream workflow, or weaken a
+transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or weaken a
 request; a grouped provider job must satisfy every member node.
 
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the

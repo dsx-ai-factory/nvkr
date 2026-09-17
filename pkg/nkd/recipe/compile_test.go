@@ -84,13 +84,24 @@ func TestCompileRejectsUnimplementedDiskCapabilityBeforeGraphConstruction(t *tes
 		ArtifactPath:   "os-image/packer/output-non-fde/node-{{.Arch}}.qcow2",
 		SourceDate:     1,
 	}
+	validPacker := validVM
+	validPacker.BuildCommand = nil
+	validPacker.ArtifactPath = "node-{{.Arch}}.qcow2"
+	validPacker.Packer = &catalog.PackerConfig{
+		ProjectPath:              "os-image/packer",
+		BuildSelector:            "qemu.nke-node",
+		ArchitectureVariable:     "architecture",
+		MaterialManifestVariable: "material_manifest",
+		OutputDirectoryVariable:  "output_directory",
+	}
 	tests := []struct {
 		name      string
 		component catalog.Component
 	}{
 		{name: "disk output", component: catalog.Component{FromSource: true, OutputType: "disk-image"}},
 		{name: "VM builder", component: catalog.Component{FromSource: true, BuilderType: catalog.BuilderVMImage}},
-		{name: "complete VM disk producer", component: validVM},
+		{name: "complete command VM disk producer", component: validVM},
+		{name: "complete Packer VM disk producer", component: validPacker},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -102,6 +113,27 @@ func TestCompileRejectsUnimplementedDiskCapabilityBeforeGraphConstruction(t *tes
 				t.Fatalf("unsupported disk capability produced an executable graph: %#v", graph)
 			}
 		})
+	}
+}
+
+func TestDirectPackerProducerRequiresVMImageBuilderCapability(t *testing.T) {
+	resolved := &Resolved{RecipeID: "packer", Components: []catalog.NamedComponent{{
+		Name: "image",
+		Component: catalog.Component{
+			FromSource:  true,
+			BuilderType: catalog.BuilderVMImage,
+			Packer: &catalog.PackerConfig{
+				ProjectPath:              "os-image/packer",
+				BuildSelector:            "qemu.nke-node",
+				ArchitectureVariable:     "architecture",
+				MaterialManifestVariable: "material_manifest",
+				OutputDirectoryVariable:  "output_directory",
+			},
+		},
+	}}}
+	builders := RequiredBuilders(resolved)
+	if len(builders) != 1 || builders[0] != catalog.BuilderVMImage {
+		t.Fatalf("direct Packer producer requires builders %v, want [%s]", builders, catalog.BuilderVMImage)
 	}
 }
 

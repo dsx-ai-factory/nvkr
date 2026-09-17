@@ -50,7 +50,9 @@ constraint, and Nix can enter the reproducibility boundary only after its execut
 4. **Identity.** The builder type and its pins — the container-image digest and flake lock for `nix`, the
    toolchain digest for `oci-hermetic` — are **build-semantic inputs**, part of the IR and therefore of
    `recipeDigest`. Switching a component's builder produces a **new `recipeDigest`, i.e. a new recipe** — never a
-   "variant" (variants cover same-recipe *representation* drift only).
+   "variant" (variants cover same-recipe *representation* drift only). Once `vm-image` lowering is admitted,
+   its selected producer form, exact source-owned entrypoint, declared variable and material bindings, pinned
+   toolchain closure, and output contract are likewise build-semantic inputs.
 
 5. **Verification is builder-agnostic.** Verify recomputes and compares **artifact digests** and is indifferent to
    how an artifact was produced. The trust, attestation, and verification model is therefore unchanged; a builder
@@ -100,13 +102,58 @@ retaining the same pinned source as other components; this changes its Recipe id
 ### Disk-image authoring contract
 
 `disk-image` is an output semantic, independent of how its bytes are obtained. Every such component declares
-`disk: {format: qcow2, encryption: none|luks2}`. `vm-image` is one from-source builder for that output; it is not implied by
-`disk-image`, so another admitted builder or a future digest-pinned acquisition lane can produce the same output
-type. The first schema admits only the from-source form; acquired disks remain unsupported. Conversely,
-`vm-image` is valid only for a from-source disk component. Its catalog entry owns the pinned source and toolchain,
-exact source-owned argument vector, and artifact path. NKD does not infer Packer commands or invoke an upstream
-workflow. These fields are Recipe inputs once disk lowering is admitted; the schema-only contract mints no
-Recipe identity for a disk.
+`disk: {format: qcow2, encryption: none|luks2}`. `vm-image` is one generic from-source builder class for that
+output; it is not implied by `disk-image`, so another admitted builder or a future digest-pinned acquisition lane
+can produce the same output type. The first schema admits only the from-source form; acquired disks remain
+unsupported. Conversely, `vm-image` is valid only for a from-source disk component.
+
+A `vm-image` component selects exactly one producer form. The existing `buildCommand` field represents the
+command form; the presence of a `packer` object represents the direct-Packer form. A producer form is an
+invocation mechanism, not a builder type or an output semantic:
+
+- `command` executes one exact source-owned argument vector. The executable may be `make`, a repository script,
+  or another pinned entrypoint. NKD does not interpret the Makefile or script.
+- `packer` invokes a pinned Packer executable against a source-owned HCL project and an exact build selector.
+  NKD does not generate, rewrite, or interpret HCL. Packer plugins and the VM toolchain are authenticated parts
+  of the pre-realized toolchain closure, not downloads discovered during image construction.
+
+The direct-Packer authoring form names only the stable boundary that future lowering must enforce:
+
+```yaml
+builderType: vm-image
+packer:
+  projectPath: os-image/packer
+  buildSelector: qemu.nke-node
+  architectureVariable: architecture
+  materialManifestVariable: material_manifest
+  outputDirectoryVariable: output_directory
+artifactPath: nke-node.qcow2
+```
+
+`projectPath` is relative to the pinned source root. `buildSelector` is the exact HCL source selector future
+lowering passes to Packer's `-only` option; wildcards and selector lists are forbidden. `artifactPath` is relative
+to the private output directory bound through `outputDirectoryVariable`. The three variable names are explicit
+and distinct, so NKD never guesses source-owned HCL names.
+
+This first authoring slice does not accept arbitrary Packer variable values or component-material edges. Those
+must become typed catalog bindings, validation, graph edges, and identity inputs before direct Packer lowering is
+admitted. Source-owned HCL defaults do not authorize NKD to infer or fetch undeclared build materials.
+
+Before either driver may lower, required component outputs must be built or acquired, verified, and assembled
+into a deterministic staged-material manifest. Admitted lowering must bind only declared inputs and variables,
+provide a private output location, invoke the selected driver through the shared runner, collect the declared
+artifact, and recompute its exact bytes. A driver may not replace a staged material with an undeclared network
+fetch. The catalog entry owns the pinned source and toolchain, selected driver, exact entrypoint or Packer project
+selector, and artifact path. The future admitted catalog contract also owns material and customer-variable
+bindings. These fields become Recipe inputs only after disk lowering is admitted; the schema-only contract mints
+no Recipe identity for a disk.
+
+The executable name grants no evidence lane. A Make-driven image may qualify when its exact command, staged
+materials, toolchain closure, enforced isolation, output collection, disk inspection, and reproduction evidence
+satisfy the same contracts as a direct Packer build. A direct Packer invocation receives no weaker controls and
+no qualification merely because NKD recognizes its driver. Networked or opaque acquisition inside either driver
+remains pipeline-attested or fails qualified admission, according to the selected lane. Make also remains a valid
+command entrypoint for non-VM builders under their existing contracts.
 
 Runner capacity is not part of `vm-image`. A from-source component may declare generic `buildRequirements`
 using ADR-18's per-step execution contract. A `vm-image` producer must use that same generic type to declare a
@@ -127,8 +174,9 @@ are measured. Guest vCPU, guest memory, and logical disk size are not host reque
 an artifact and transport concern rather than a runner-capacity field.
 
 For the [NKE Makefile at commit `6df693a`](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185),
-a future catalog entry binds two source-owned Make targets. Plain and FDE are separate selectable components,
-not a public boolean or variant. The existing typed architecture token is resolved from Recipe criteria:
+the following source-owned targets illustrate the `command` driver. Plain and FDE are separate selectable
+components, not a public boolean or variant. The existing typed architecture token is resolved from Recipe
+criteria:
 
 ```text
 make -C os-image/packer os-image-non-fde ARCH={{.Arch}}
@@ -139,9 +187,11 @@ make -C os-image/packer os-image-fde ARCH={{.Arch}}
 
 The current NKE release matrix realizes plain amd64, FDE amd64, and plain arm64. It does not validate or publish
 FDE arm64. Definition output selection records that supported matrix without duplicating components per
-architecture. These bindings are authoring data only; Recipe lowering, VM execution, and disk collection remain
-capability-gated. An override that changes NKE's derived output filename must also change the catalog artifact
-path; NKD never guesses it.
+architecture. A maintained NKE recipe may instead select the `packer` driver after NKE exposes an authenticated
+staged-material input and private-output contract in its source-owned HCL. That catalog choice changes Recipe
+identity; it does not remove or invalidate the standalone Make entrypoint. These bindings are authoring data
+only; command and Packer Recipe lowering, VM execution, and disk collection remain capability-gated. An override
+that changes NKE's derived output filename must also change the catalog artifact path; NKD never guesses it.
 
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
 seccomp/AppArmor/system paths for user-namespace operation, the overlayfs snapshotter, no host runtime socket

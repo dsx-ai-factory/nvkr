@@ -31,6 +31,8 @@ var (
 	// locally-built toolchain used by the local engine. A tag (e.g. golang:1.23.3)
 	// matches neither and fails closed (NKD-FR-RC-024, NKD-FR-BLD-010).
 	digestPinned   = regexp.MustCompile(`(?:@|^)sha256:[0-9a-f]{64}$`)
+	packerSelector = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9][A-Za-z0-9_-]*)+$`)
+	packerVariable = regexp.MustCompile(`^[\p{L}_][\p{L}\p{N}_-]*$`)
 	knownOutputSet = map[string]bool{
 		"host-package": true, "oci-image": true, "disk-image": true, "raw": true, "tarball": true,
 	}
@@ -75,6 +77,7 @@ type rawComponent struct {
 	CGO             bool               `json:"cgo,omitempty"`
 	OutputType      string             `json:"outputType,omitempty"`
 	Disk            *DiskSpec          `json:"disk,omitempty"`
+	Packer          *PackerConfig      `json:"packer,omitempty"`
 	BuildCommand    []string           `json:"buildCommand,omitempty"`
 	ArtifactPath    string             `json:"artifactPath,omitempty"`
 	WriteDir        string             `json:"writeDir,omitempty"`
@@ -416,6 +419,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		CGO:             raw.CGO,
 		OutputType:      raw.OutputType,
 		Disk:            raw.Disk,
+		Packer:          raw.Packer,
 		BuildCommand:    raw.BuildCommand,
 		ArtifactPath:    raw.ArtifactPath,
 		WriteDir:        raw.WriteDir,
@@ -521,7 +525,11 @@ func resolvePatches(p DataProvider, component string, c *Component, decls []patc
 }
 
 func validPatchPath(name string) bool {
-	return name != "." && fs.ValidPath(name) && !strings.Contains(name, `\`)
+	return name != "." && validSourceRelativePath(name)
+}
+
+func validSourceRelativePath(name string) bool {
+	return fs.ValidPath(name) && !strings.Contains(name, `\`)
 }
 
 // resolvePrebuilt resolves a no-compile component: it takes the version pin from the
@@ -853,6 +861,39 @@ func validateVMImageBuildRequirements(name string, requirements *execution.Requi
 	return nil
 }
 
+func validatePackerConfig(name string, config *PackerConfig) error {
+	if !validSourceRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: packer.projectPath %q is not a clean source-relative path", name, config.ProjectPath)
+	}
+	if len(config.BuildSelector) > 256 || !packerSelector.MatchString(config.BuildSelector) {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: packer.buildSelector %q is not a bounded exact HCL source selector", name, config.BuildSelector)
+	}
+	variables := []struct {
+		field string
+		value string
+	}{
+		{field: "architectureVariable", value: config.ArchitectureVariable},
+		{field: "materialManifestVariable", value: config.MaterialManifestVariable},
+		{field: "outputDirectoryVariable", value: config.OutputDirectoryVariable},
+	}
+	for _, variable := range variables {
+		if utf8.RuneCountInString(variable.value) > 128 || !packerVariable.MatchString(variable.value) {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: packer.%s %q is not a bounded supported HCL variable identifier",
+				name, variable.field, variable.value)
+		}
+	}
+	if config.ArchitectureVariable == config.MaterialManifestVariable ||
+		config.ArchitectureVariable == config.OutputDirectoryVariable ||
+		config.MaterialManifestVariable == config.OutputDirectoryVariable {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: Packer architecture, material manifest, and output directory variables must be distinct", name)
+	}
+	return nil
+}
+
 // ValidateVMImageHostRoute closes the guest/host relationship only after Recipe
 // criteria supplies a concrete guest architecture. KVM acceleration cannot cross
 // architectures; preferred and forbidden policies retain their declared TCG route.
@@ -929,6 +970,10 @@ func validateComponent(name string, c Component) error {
 	} else if c.Disk != nil {
 		return e.New(e.CodeInvalidCatalog, "component %q: disk settings require outputType disk-image", name)
 	}
+	if c.Packer != nil && c.BuilderType != BuilderVMImage {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: packer producer requires builderType vm-image", name)
+	}
 	if c.BuilderType == BuilderVMImage && !c.FromSource {
 		return e.New(e.CodeInvalidCatalog, "component %q: vm-image builder requires a from-source component", name)
 	}
@@ -984,6 +1029,17 @@ func validateComponent(name string, c Component) error {
 		if c.CGO || c.WriteDir != "" {
 			return e.New(e.CodeInvalidCatalog,
 				"component %q: vm-image builder may not declare CGO or a container writeDir", name)
+		}
+		commandProducer := len(c.BuildCommand) != 0
+		packerProducer := c.Packer != nil
+		if commandProducer == packerProducer {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: vm-image requires exactly one producer, buildCommand or packer", name)
+		}
+		if packerProducer {
+			if err := validatePackerConfig(name, c.Packer); err != nil {
+				return err
+			}
 		}
 	default:
 		return e.New(e.CodeInvalidCatalog,
@@ -1052,7 +1108,7 @@ func validateComponent(name string, c Component) error {
 			}
 		}
 	}
-	if len(c.BuildCommand) == 0 {
+	if len(c.BuildCommand) == 0 && c.Packer == nil {
 		return e.New(e.CodeInvalidCatalog, "component %q: empty buildCommand", name)
 	}
 	for _, s := range c.BuildCommand {
@@ -1065,6 +1121,11 @@ func validateComponent(name string, c Component) error {
 	}
 	if err := checkArchTokens(name, "artifactPath", c.ArtifactPath); err != nil {
 		return err
+	}
+	if c.Packer != nil && (c.ArtifactPath == "." || !validSourceRelativePath(c.ArtifactPath)) {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: direct Packer artifactPath %q is not a clean path relative to the private output directory",
+			name, c.ArtifactPath)
 	}
 	// outputType is a required pin field: it selects the delivery form (and its
 	// packager) and CGO lane, so a missing one is fail-closed rather than defaulted
