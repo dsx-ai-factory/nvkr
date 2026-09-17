@@ -862,6 +862,7 @@ func validateVMImageBuildRequirements(name string, requirements *execution.Requi
 
 const (
 	maxPackerProjectPathBytes  = 4096
+	maxPackerArtifactPathBytes = 4096
 	maxPackerBuildNameBytes    = 256
 	maxPackerVariableNameBytes = 128
 )
@@ -1138,7 +1139,8 @@ func validateComponent(name string, c Component) error {
 	if err := checkArchTokens(name, "artifactPath", c.ArtifactPath); err != nil {
 		return err
 	}
-	if c.Packer != nil && (c.ArtifactPath == "." || !validSourceRelativePath(c.ArtifactPath)) {
+	if c.Packer != nil && (!validPackerTransportValue(c.ArtifactPath, maxPackerArtifactPathBytes) ||
+		c.ArtifactPath == "." || !validSourceRelativePath(c.ArtifactPath)) {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: direct Packer artifactPath %q is not a clean path relative to the private output directory",
 			name, c.ArtifactPath)

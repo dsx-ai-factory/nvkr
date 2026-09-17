@@ -349,6 +349,20 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			wantText: "relative to the private output directory",
 		},
 		{
+			name: "artifact path with control character",
+			edit: func(component *Component) {
+				component.ArtifactPath = "output/\nnode.qcow2"
+			},
+			wantText: "relative to the private output directory",
+		},
+		{
+			name: "artifact path exceeds bound",
+			edit: func(component *Component) {
+				component.ArtifactPath = strings.Repeat("a", maxPackerArtifactPathBytes+1)
+			},
+			wantText: "relative to the private output directory",
+		},
+		{
 			name: "output-directory artifact path",
 			edit: func(component *Component) {
 				component.ArtifactPath = "."

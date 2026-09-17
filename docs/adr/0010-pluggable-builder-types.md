@@ -133,8 +133,8 @@ artifactPath: nke-node.qcow2
 `projectPath` is relative to the pinned source root. `buildName` is the exact compiled build name future lowering
 passes as one `-only=<buildName>` argument; Packer documents names such as
 `my_build.amazon-ebs.first-example`. NKD rejects Packer's list and glob selection syntax because one component
-produces one declared artifact. Catalog loading
-checks only bounded, UTF-8, control-free argument transport and distinct bindings. It does not parse HCL or claim
+produces one declared artifact. Catalog loading checks bounded, UTF-8, control-free argument transport, distinct
+bindings, and exact `buildName` selection without list or glob syntax. It does not parse HCL or claim
 that the named build or variables exist. Before any image construction or output collection, admitted lowering
 must invoke the pinned Packer executable's `validate` command against the pinned project, the exact build name,
 and the declared variable bindings, and fail closed on any diagnostic. `artifactPath` is relative to the private
