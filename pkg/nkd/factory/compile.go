@@ -145,10 +145,6 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 	if err != nil {
 		return nil, err
 	}
-	runsOn := delivery.RunsOn
-	if runsOn == "" {
-		runsOn = DefaultRunsOn
-	}
 	snapshot, err := catalog.ApplyStack(stack.Catalog)
 	if err != nil {
 		return nil, err
@@ -173,13 +169,6 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		DefinitionPath: definitionPath, EnvironmentPath: environmentPath,
 		CatalogDigest: stack.Digest, CatalogSnapshot: snapshot.Catalog, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),
 		Targets: targets, Routes: routes, Graph: ArtifactGraph{SchemaVersion: ArtifactGraphSchema}}
-	artifacts := map[string]Artifact{}
-	nodes := map[string]Node{}
-	for _, name := range sortedKeys(tools) {
-		node, artifact := compileToolOperation(name, tools[name], runsOn)
-		nodes[node.ID] = node
-		artifacts[artifact.ID] = artifact
-	}
 	for _, target := range definition.Outputs {
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "factory compilation canceled")
@@ -252,13 +241,55 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 			// ones with a producer-result carrying an observed digest (ADR-13).
 			ResolvedComponents: append([]catalog.NamedComponent(nil), selected.Components...),
 			AICRProfileName:    aicrProfile(target), AICRProfileIdentity: aicrIdentity, Graph: graph})
-		if err := addBuildDataflow(target, runsOn, graph, selectedSet, delivery.UtilityContainer, delivery.UtilityPlatform, nodes, artifacts); err != nil {
-			return nil, err
+		plan.LifecycleOutputs = append(plan.LifecycleOutputs, LifecycleOutputPlan{Name: target.Name, Kind: target.Format, ArtifactID: "package/" + target.Name, BuildDigest: buildDigest, Components: append([]string(nil), target.Components...)})
+	}
+	plan.Graph, err = compileArtifactGraph(*plan, tools, packageSpecs)
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.Validate(); err != nil {
+		return nil, err
+	}
+	return plan, nil
+}
+
+// compileArtifactGraph is the single derivation of executable scheduler nodes,
+// artifacts and their exact edges from admitted inputs and resolved producers.
+// It ignores the supplied Graph and never mutates the caller's Plan.
+func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSpecs []packageSpec) (ArtifactGraph, error) {
+	definition, delivery := plan.Definition, plan.Environment
+	runsOn := delivery.RunsOn
+	if runsOn == "" {
+		runsOn = DefaultRunsOn
+	}
+	plan.Graph = ArtifactGraph{SchemaVersion: ArtifactGraphSchema}
+	artifacts := map[string]Artifact{}
+	nodes := map[string]Node{}
+	for _, name := range sortedKeys(tools) {
+		node, artifact := compileToolOperation(name, tools[name], runsOn)
+		nodes[node.ID] = node
+		artifacts[artifact.ID] = artifact
+	}
+	builds := make(map[string]BuildPlan, len(plan.Builds))
+	for _, build := range plan.Builds {
+		builds[build.Name] = build
+	}
+	for _, target := range definition.Outputs {
+		build, ok := builds[target.Name]
+		if !ok || build.Graph == nil {
+			return ArtifactGraph{}, e.New(e.CodePipelineDrift, "output %q has no resolved producer graph", target.Name)
+		}
+		selected := make(map[string]bool, len(build.Components))
+		for _, name := range build.Components {
+			selected[name] = true
+		}
+		if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, nodes, artifacts); err != nil {
+			return ArtifactGraph{}, err
 		}
 	}
 	if definition.SBOMTool != "" {
 		if _, ok := tools[definition.SBOMTool]; !ok {
-			return nil, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
+			return ArtifactGraph{}, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
 		}
 		for id, node := range nodes {
 			if node.Kind != NodeSBOM {
@@ -282,18 +313,18 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 
 	packages, err := orderPackageSpecs(packageSpecs)
 	if err != nil {
-		return nil, err
+		return ArtifactGraph{}, err
 	}
 	for _, spec := range packages {
 		inputs, err := expandSelectors(spec.Inputs, artifacts)
 		if err != nil {
-			return nil, e.Wrap(e.CodeInvalidCatalog, err, "factory package %q", spec.Name)
+			return ArtifactGraph{}, e.Wrap(e.CodeInvalidCatalog, err, "factory package %q", spec.Name)
 		}
 		if err := validatePackageInputs(spec, inputs, artifacts); err != nil {
-			return nil, err
+			return ArtifactGraph{}, err
 		}
 		if spec.Kind == PackageImage && nodes[artifacts[inputs[0]].Producer].Kind != NodeBuild {
-			return nil, e.New(e.CodeEngineCapability, "image package %q currently requires a built OCI export; acquired layouts need a separate adapter", spec.Name)
+			return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q currently requires a built OCI export; acquired layouts need a separate adapter", spec.Name)
 		}
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.
@@ -314,19 +345,19 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 			MediaType: packageMediaType(spec.Kind), Path: filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", spec.Name)), Producer: nodeID}
 	}
 
-	routes = append([]Route(nil), routes...)
+	routes := append([]Route(nil), plan.Routes...)
 	sort.Slice(routes, func(i, j int) bool { return routes[i].Name < routes[j].Name })
 	for _, route := range routes {
 		inputs, err := expandSelectors([]string{route.Input}, artifacts)
 		if err != nil {
-			return nil, e.Wrap(e.CodeInvalidCatalog, err, "delivery route %q", route.Name)
+			return ArtifactGraph{}, e.Wrap(e.CodeInvalidCatalog, err, "delivery route %q", route.Name)
 		}
 		if len(inputs) != 1 {
-			return nil, e.New(e.CodeInvalidCatalog, "delivery route %q must select exactly one artifact, got %d", route.Name, len(inputs))
+			return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "delivery route %q must select exactly one artifact, got %d", route.Name, len(inputs))
 		}
 		target := plan.Targets[route.Target]
 		if err := validateRouteCompatibility(route, target, artifacts[inputs[0]]); err != nil {
-			return nil, err
+			return ArtifactGraph{}, err
 		}
 		nodeID := "publish/" + route.Name
 		outputID := "publication/" + route.Name
@@ -335,27 +366,17 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		artifacts[outputID] = Artifact{ID: outputID, Name: route.Name, Kind: "published-reference",
 			Producer: nodeID, Target: route.Target,
 			Path: filepath.ToSlash(filepath.Join(".nkd", "factory", "publications", route.Name+".txt"))}
-		if err := addSigningDataflow(plan, runsOn, route, inputs[0], outputID, nodes, artifacts); err != nil {
-			return nil, err
+		if err := addSigningDataflow(&plan, runsOn, route, inputs[0], outputID, nodes, artifacts); err != nil {
+			return ArtifactGraph{}, err
 		}
 	}
 
 	plan.Graph.Nodes = mapNodes(nodes)
 	plan.Graph.Artifacts = mapArtifacts(artifacts)
-	for _, output := range definition.Outputs {
-		for _, build := range plan.Builds {
-			if build.Name == output.Name {
-				plan.LifecycleOutputs = append(plan.LifecycleOutputs, LifecycleOutputPlan{Name: output.Name, Kind: output.Format, ArtifactID: "package/" + output.Name, BuildDigest: build.BuildDigest, Components: append([]string(nil), output.Components...)})
-			}
-		}
+	if err := bindEvidenceAttestation(&plan); err != nil {
+		return ArtifactGraph{}, err
 	}
-	if err := bindEvidenceAttestation(plan); err != nil {
-		return nil, err
-	}
-	if err := plan.Validate(); err != nil {
-		return nil, err
-	}
-	return plan, nil
+	return plan.Graph, nil
 }
 
 func packageProducerResults(inputs []string, nodes map[string]Node, artifacts map[string]Artifact) []string {

@@ -145,9 +145,9 @@ type Plan struct {
 	// compiled identity, so the same release attests the same planDigest from any
 	// workspace and agrees with `factory validate` and the CI run.
 	identityDigest string
-	// toolWorkspace is set only by local relocation after validating the compiled
-	// plan. Serialized plans cannot use it to substitute acquired executable paths.
-	toolWorkspace string
+	// workspace is set only by local relocation after validating the compiled
+	// plan. Serialized plans cannot use it to substitute artifact paths.
+	workspace string
 }
 
 type LifecycleOutputPlan struct {

@@ -72,9 +72,6 @@ func (plan Plan) Validate() error {
 	if !reflect.DeepEqual(plan.Targets, targets) || !reflect.DeepEqual(plan.Routes, routes) {
 		return e.New(e.CodeUnverifiedRef, "run plan publication routing differs from its authored environment")
 	}
-	if err := plan.validateCompiledOperations(packages); err != nil {
-		return err
-	}
 	if len(plan.LifecycleOutputs) != len(plan.Definition.Outputs) || len(plan.Builds) != len(plan.Definition.Outputs) {
 		return e.New(e.CodeUnverifiedRef, "run plan omits or adds authored output slots")
 	}
@@ -161,9 +158,6 @@ func (plan Plan) Validate() error {
 		return err
 	}
 	if err := plan.Graph.Validate(); err != nil {
-		return err
-	}
-	if err := plan.validateToolOperations(); err != nil {
 		return err
 	}
 	if err := plan.validateSBOMGraph(); err != nil {
@@ -267,24 +261,20 @@ func (plan Plan) Validate() error {
 			return e.New(e.CodeEngineCapability, "rootless BuildKit node %q requires the Docker runtime in its Environment", node.ID)
 		}
 	}
-	return plan.validateLifecyclePlans()
+	if err := plan.validateLifecyclePlans(); err != nil {
+		return err
+	}
+	return plan.validateCompiledGraph(packages)
 }
 
-// validateToolOperations rederives the complete executable tool set from the
-// catalog snapshots already checked against their identities above. A digest on
-// an acquisition node alone cannot authorize a different executable.
-func (plan Plan) validateToolOperations() error {
+// validateCompiledGraph checks the complete compiler-owned operation set after
+// authenticating the authored inputs, catalog snapshots and producer selections.
+func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 	outputCatalogs := make(map[string]*catalog.Catalog, len(plan.Builds))
 	for _, build := range plan.Builds {
 		outputCatalogs[build.Name] = build.CatalogSnapshot
-	}
-	for _, output := range plan.Definition.Outputs {
-		if output.Catalog == nil {
-			digest, err := outputCatalogs[output.Name].SnapshotDigest()
-			if err != nil {
-				return err
-			}
-			if digest != plan.CatalogDigest {
+		for _, output := range plan.Definition.Outputs {
+			if output.Name == build.Name && output.Catalog == nil && build.CatalogDigest != plan.CatalogDigest {
 				return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", output.Name)
 			}
 		}
@@ -293,75 +283,37 @@ func (plan Plan) validateToolOperations() error {
 	if err != nil {
 		return err
 	}
-	nodes, artifacts := planIndex(&plan)
-	runsOn := plan.Environment.RunsOn
-	if runsOn == "" {
-		runsOn = DefaultRunsOn
+	expected, err := compileArtifactGraph(plan, tools, packages)
+	if err != nil {
+		return err
 	}
-	for _, name := range sortedKeys(tools) {
-		expectedNode, expectedArtifact := compileToolOperation(name, tools[name], runsOn)
-		if plan.toolWorkspace != "" {
-			path, err := relocatedFactoryPath(expectedArtifact.Path, plan.toolWorkspace)
+	if len(plan.Graph.Nodes) != len(expected.Nodes) || len(plan.Graph.Artifacts) != len(expected.Artifacts) {
+		return e.New(e.CodePipelineDrift, "run plan operation or artifact set differs from its compiler-derived graph")
+	}
+	for i, want := range expected.Nodes {
+		actual := plan.Graph.Nodes[i]
+		// Omitted empty inputs can be nil after decoding. All nonempty edges and
+		// their canonical ordering remain exact; graph validation rejects duplicates.
+		if len(actual.Inputs) == 0 {
+			actual.Inputs = nil
+		}
+		if len(want.Inputs) == 0 {
+			want.Inputs = nil
+		}
+		if !reflect.DeepEqual(actual, want) {
+			return e.New(e.CodePipelineDrift, "operation %q differs from compiler-derived operation %q", actual.ID, want.ID)
+		}
+	}
+	for i, want := range expected.Artifacts {
+		if plan.workspace != "" {
+			path, err := relocatedFactoryPath(want.Path, plan.workspace)
 			if err != nil {
 				return err
 			}
-			expectedArtifact.Path = filepath.ToSlash(path)
+			want.Path = filepath.ToSlash(path)
 		}
-		actualNode := nodes[expectedNode.ID]
-		// Empty omitted inputs survive JSON round trips as nil slices.
-		if len(actualNode.Inputs) == 0 {
-			actualNode.Inputs = nil
-		}
-		if !reflect.DeepEqual(actualNode, expectedNode) || !reflect.DeepEqual(artifacts[expectedArtifact.ID], expectedArtifact) {
-			return e.New(e.CodePipelineDrift, "tool operation %q differs from its selected catalog pin", name)
-		}
-	}
-	for _, node := range plan.Graph.Nodes {
-		if (node.Kind == NodeAcquire && node.IRNode == "") || strings.HasPrefix(node.ID, "tool/") {
-			if _, ok := tools[strings.TrimPrefix(node.ID, "tool/")]; !ok || !strings.HasPrefix(node.ID, "tool/") {
-				return e.New(e.CodePipelineDrift, "unselected executable tool operation %q", node.ID)
-			}
-		}
-	}
-	for _, artifact := range plan.Graph.Artifacts {
-		if artifact.Kind == "pipeline-tool" || strings.HasPrefix(artifact.ID, "tool/") {
-			if _, ok := tools[strings.TrimPrefix(artifact.ID, "tool/")]; !ok || !strings.HasPrefix(artifact.ID, "tool/") {
-				return e.New(e.CodePipelineDrift, "unselected executable tool artifact %q", artifact.ID)
-			}
-		}
-	}
-	return nil
-}
-
-// validateCompiledOperations keeps derived packaging and utility execution bound
-// to the admitted authored inputs. Runtime changes cannot silently leave stale
-// per-operation settings in an otherwise valid generated Plan.
-func (plan Plan) validateCompiledOperations(packages []packageSpec) error {
-	nodes := make(map[string]Node, len(plan.Graph.Nodes))
-	runsOn := plan.Environment.RunsOn
-	if runsOn == "" {
-		runsOn = DefaultRunsOn
-	}
-	for _, node := range plan.Graph.Nodes {
-		nodes[node.ID] = node
-		if node.IRNode != "" {
-			continue
-		}
-		if node.RunsOn != runsOn {
-			return e.New(e.CodePipelineDrift, "utility operation %q changes its Environment runner", node.ID)
-		}
-		if node.Network == ir.NetworkNone {
-			if node.Container != plan.Environment.UtilityContainer || node.Platform != plan.Environment.UtilityPlatform {
-				return e.New(e.CodePipelineDrift, "utility operation %q changes its Environment container or platform", node.ID)
-			}
-		} else if node.Container != "" || node.Platform != "" {
-			return e.New(e.CodePipelineDrift, "networked operation %q introduces undeclared container execution", node.ID)
-		}
-	}
-	for _, spec := range packages {
-		node, ok := nodes["package/"+spec.Name]
-		if !ok || node.Kind != NodePackage || node.PackageKind != spec.Kind || node.Distribution != spec.Distribution || node.PackageComponent != spec.Component || !reflect.DeepEqual(node.HelmImage, spec.HelmImage) {
-			return e.New(e.CodePipelineDrift, "package operation %q differs from its authored output", spec.Name)
+		if plan.Graph.Artifacts[i] != want {
+			return e.New(e.CodePipelineDrift, "artifact %q differs from compiler-derived artifact %q", plan.Graph.Artifacts[i].ID, want.ID)
 		}
 	}
 	return nil

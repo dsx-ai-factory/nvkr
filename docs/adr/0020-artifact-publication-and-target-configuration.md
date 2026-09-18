@@ -44,6 +44,9 @@ release metadata binds canonical sibling repository names and manifest digests; 
 into the product repositories.
 Omitting publication produces a build-only Run. Destinations and a separate output-to-destination map are
 not authored. The generated internal routes still bind exact package inputs and targets.
+Each derived route owns exactly one publisher and its publication reference. When signing is configured,
+its sign and verification operations bind that same route's package, reference and signature artifacts.
+Another publisher or signer cannot acquire route authority merely by naming an existing target.
 
 The publisher uploads each publication root by its content digest, without creating or advancing `latest`,
 a fixed version tag, or a development tag. It returns the digest-pinned reference recorded in the Run.
