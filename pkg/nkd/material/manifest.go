@@ -8,11 +8,10 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 )
 
 const (
@@ -89,7 +88,7 @@ func (manifest *Manifest) Validate() error {
 			"build material manifest schemaVersion %q is unsupported", manifest.SchemaVersion)
 	}
 	if manifest.Materials == nil {
-		return e.New(e.CodeProvenanceMissing,
+		return e.New(e.CodeInvalidCatalog,
 			"build material manifest materials must be an explicit array")
 	}
 	components := make(map[string]string, len(manifest.Materials))
@@ -113,7 +112,7 @@ func (manifest *Manifest) Validate() error {
 		}
 		components[entry.Component] = entry.Binding
 		if !canonical.IsDigest(entry.Digest) {
-			return e.New(e.CodeUnverifiedRef,
+			return e.New(e.CodeInvalidCatalog,
 				"build material %q has no exact artifact digest", entry.Binding)
 		}
 		wantPath, err := StagingPath(entry.Binding)
@@ -126,6 +125,8 @@ func (manifest *Manifest) Validate() error {
 				"build material %q path %q is not its deterministic staging path %q",
 				entry.Binding, entry.Path, wantPath)
 		}
+		// StagingPath is injective today. Retain this independent check so a future
+		// path-contract change cannot silently alias two material bindings.
 		if previous, duplicate := paths[entry.Path]; duplicate {
 			return e.New(e.CodeInvalidCatalog,
 				"build materials %q and %q share staging path %q", previous, entry.Binding, entry.Path)
@@ -185,6 +186,5 @@ func StagingPath(binding string) (string, error) {
 }
 
 func canonicalText(value string, maxBytes int) bool {
-	return value != "" && len(value) <= maxBytes && utf8.ValidString(value) &&
-		value == strings.TrimSpace(value) && strings.IndexFunc(value, unicode.IsControl) == -1
+	return safetext.Valid(value, maxBytes, false) && value == strings.TrimSpace(value)
 }

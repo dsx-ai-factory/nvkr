@@ -140,8 +140,9 @@ artifactPath: nke-node.qcow2
 `projectPath` is relative to the pinned source root. `buildName` is the exact compiled build name future lowering
 passes as one `-only=<buildName>` argument; Packer documents names such as
 `my_build.amazon-ebs.first-example`. NKD rejects Packer's list and glob selection syntax because one component
-produces one declared artifact. Catalog loading checks bounded, UTF-8, control-free argument transport, distinct
-bindings, and exact `buildName` selection without list or glob syntax. It does not parse HCL or claim
+produces one declared artifact. Catalog loading checks bounded UTF-8 argument transport that rejects control,
+format, line/paragraph-separator and non-ASCII space-separator characters, distinct bindings, and exact
+`buildName` selection without list or glob syntax. It does not parse HCL or claim
 that the named build or variables exist. Before any image construction or output collection, admitted lowering
 must invoke the pinned Packer executable's `validate` command against the pinned project, the exact build name,
 and the declared variable bindings, and fail closed on any diagnostic. `artifactPath` is relative to the private
@@ -159,13 +160,18 @@ component outputs. Source-owned HCL defaults do not authorize NKD to infer or fe
 Before either driver may lower, required component outputs must be built or acquired, verified, and assembled
 into a deterministic build-material manifest. Each entry binds its source-owned binding name, observed component
 name, output kind, exact artifact digest, and a slash-relative path derived from the binding name beneath a private
-staging root. Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
+staging root. Binding, component and kind text use the same display-safe UTF-8 policy as producer transport.
+Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
 deterministic description, not an authenticated receipt; admitted execution must derive it from authenticated
 producer observations and bind the exact serialized file bytes before invoking a subprocess. Direct Packer will
 receive the private absolute manifest path through its declared `materialManifestVariable`. The command/Make form
 has no equivalent executable handoff in the current schema and therefore cannot lower a material-bearing command.
 Adding one requires a typed authored field and identity/lowering contract; an adapter may not invent a conventional
 path, append an argument, or inject an undeclared environment variable.
+
+Malformed manifest schema or fields, including an absent explicit materials array or malformed digest text, fail
+as `invalid-catalog`. They are description-shape failures, not missing provenance or a failed authenticated
+reference verification.
 
 Admitted lowering must bind only declared inputs and variables, provide a private output location, invoke the
 selected driver through the shared runner, collect the declared artifact, and recompute its exact bytes. A driver

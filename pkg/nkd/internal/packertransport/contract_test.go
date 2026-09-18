@@ -23,13 +23,35 @@ func TestValidateVariablesSharesOneBoundedArgvNamespace(t *testing.T) {
 			wantText: "reserved variable name",
 		},
 		{
+			name: "duplicate reserved name", reserved: []string{"architecture", "architecture"},
+			wantText: "is duplicated",
+		},
+		{
 			name: "delimiter in public name", reserved: validReserved,
 			public:   []Variable{{Name: "image_variant=other", Value: "value"}},
 			wantText: "public variable name",
 		},
 		{
+			name: "display control in public name", reserved: validReserved,
+			public:   []Variable{{Name: "image\u202evariant", Value: "value"}},
+			wantText: "public variable name",
+		},
+		{
+			name: "display control in public value", reserved: validReserved,
+			public:   []Variable{{Name: "image_variant", Value: "safe\u200bunsafe"}},
+			wantText: "value that is not transport-safe",
+		},
+		{
 			name: "reserved collision", reserved: validReserved,
 			public:   []Variable{{Name: "architecture", Value: "arm64"}},
+			wantText: "duplicates another binding",
+		},
+		{
+			name: "duplicate public name", reserved: validReserved,
+			public: []Variable{
+				{Name: "image_variant", Value: "standard"},
+				{Name: "image_variant", Value: "fde"},
+			},
 			wantText: "duplicates another binding",
 		},
 		{

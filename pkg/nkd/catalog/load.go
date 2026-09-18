@@ -12,7 +12,6 @@ import (
 	"strings"
 	"text/template"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -21,6 +20,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	ociname "github.com/google/go-containerregistry/pkg/name"
 	"sigs.k8s.io/yaml"
@@ -827,6 +827,9 @@ func (cat *Catalog) Validate() error {
 		for componentName := range componentRefs {
 			selected = append(selected, NamedComponent{Name: componentName, Component: cat.Components[componentName]})
 		}
+		// Keep the public resolved-set validator self-contained at this boundary.
+		// Global component and graph validation above makes some checks redundant,
+		// but a completeness-only shortcut here would let the two seams drift.
 		if err := ValidateMaterialSet(selected); err != nil {
 			return e.Wrap(e.CodeInvalidCatalog, err,
 				"recipe %q has an incomplete material set", r.ID)
@@ -925,8 +928,7 @@ func clonePackerConfig(config *PackerConfig) *PackerConfig {
 // pinned Packer subprocess remains authoritative for project, build-name, and
 // variable semantics; catalog loading deliberately does not reimplement HCL.
 func validPackerTransportValue(value string, maxBytes int) bool {
-	return value != "" && len(value) <= maxBytes && utf8.ValidString(value) &&
-		strings.IndexFunc(value, unicode.IsControl) == -1
+	return safetext.Valid(value, maxBytes, false)
 }
 
 func validateMaterialBindings(name string, component Component) error {

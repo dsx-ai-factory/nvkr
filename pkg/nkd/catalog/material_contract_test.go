@@ -76,6 +76,24 @@ func TestVMMaterialBindingValidation(t *testing.T) {
 			wantText: "material binding name",
 		},
 		{
+			name: "invalid target component name",
+			mutate: func(catalog *Catalog) {
+				image := catalog.Components["image"]
+				image.Materials = map[string]string{"agent-package": " agent"}
+				catalog.Components["image"] = image
+			},
+			wantText: "invalid component name",
+		},
+		{
+			name: "display control in target component name",
+			mutate: func(catalog *Catalog) {
+				image := catalog.Components["image"]
+				image.Materials = map[string]string{"agent-package": "agent\u202e"}
+				catalog.Components["image"] = image
+			},
+			wantText: "invalid component name",
+		},
+		{
 			name: "binding exceeds encoded path segment",
 			mutate: func(catalog *Catalog) {
 				image := catalog.Components["image"]
@@ -126,6 +144,15 @@ func TestVMMaterialBindingValidation(t *testing.T) {
 			wantText: "material dependency cycle",
 		},
 		{
+			name: "three component cycle",
+			mutate: func(catalog *Catalog) {
+				catalog.Components["image"] = vmMaterialComponent(map[string]string{"agent": "agent"})
+				catalog.Components["agent"] = vmMaterialComponent(map[string]string{"runtime": "runtime"})
+				catalog.Components["runtime"] = vmMaterialComponent(map[string]string{"image": "image"})
+			},
+			wantText: "material dependency cycle",
+		},
+		{
 			name: "recipe omits material",
 			mutate: func(catalog *Catalog) {
 				catalog.Recipes[0].Components = []string{"image", "runtime"}
@@ -168,7 +195,9 @@ func TestPackerPublicVariableValidation(t *testing.T) {
 		{name: "empty name", variables: map[string]string{"": "value"}, wantText: "variable name"},
 		{name: "delimiter in name", variables: map[string]string{"image_variant=other": "value"}, wantText: "variable name"},
 		{name: "control in name", variables: map[string]string{"image\nvariant": "value"}, wantText: "variable name"},
+		{name: "display control in name", variables: map[string]string{"image\u202evariant": "value"}, wantText: "variable name"},
 		{name: "control in value", variables: map[string]string{"image_variant": "unsafe\nvalue"}, wantText: "not transport-safe"},
+		{name: "display control in value", variables: map[string]string{"image_variant": "safe\u200bunsafe"}, wantText: "not transport-safe"},
 		{name: "oversized value", variables: map[string]string{"image_variant": strings.Repeat("x", packertransport.MaxVariableValueBytes+1)}, wantText: "not transport-safe"},
 		{name: "too many variables", variables: catalogPackerVariables(packertransport.MaxPublicVariables+1, 0), wantText: "variable bound"},
 		{name: "aggregate argv too large", variables: catalogPackerVariables(17, packertransport.MaxVariableValueBytes), wantText: "argv bound"},
@@ -199,10 +228,22 @@ func catalogPackerVariables(count, valueBytes int) map[string]string {
 	return variables
 }
 
-func TestValidateMaterialSetRejectsDuplicateResolvedComponents(t *testing.T) {
+func TestValidateMaterialSetRejectsInvalidOrDuplicateResolvedComponents(t *testing.T) {
 	component := NamedComponent{Name: "agent", Component: goodComponent()}
-	err := ValidateMaterialSet([]NamedComponent{component, component})
-	if catalogErrorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "repeats component") {
-		t.Fatalf("duplicate resolved component error = %v", err)
+	for _, test := range []struct {
+		name       string
+		components []NamedComponent
+		wantText   string
+	}{
+		{name: "empty name", components: []NamedComponent{{Name: "", Component: goodComponent()}}, wantText: "invalid component name"},
+		{name: "surrounding whitespace", components: []NamedComponent{{Name: " agent", Component: goodComponent()}}, wantText: "invalid component name"},
+		{name: "duplicate", components: []NamedComponent{component, component}, wantText: "repeats component"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateMaterialSet(test.components)
+			if catalogErrorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("validation error = %v, want %s containing %q", err, nkderr.CodeInvalidCatalog, test.wantText)
+			}
+		})
 	}
 }

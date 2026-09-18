@@ -318,6 +318,13 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			wantText: "exact Packer build name",
 		},
 		{
+			name: "build name with display control",
+			edit: func(component *Component) {
+				component.Packer.BuildName = "qemu.\u202enode"
+			},
+			wantText: "exact Packer build name",
+		},
+		{
 			name: "build name exceeds bound",
 			edit: func(component *Component) {
 				component.Packer.BuildName = strings.Repeat("a", 257)
@@ -378,14 +385,14 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			edit: func(component *Component) {
 				component.Packer.MaterialManifestVariable = component.Packer.ArchitectureVariable
 			},
-			wantText: "reserved variable name",
+			wantText: "is duplicated",
 		},
 		{
 			name: "duplicate material and output variables",
 			edit: func(component *Component) {
 				component.Packer.OutputDirectoryVariable = component.Packer.MaterialManifestVariable
 			},
-			wantText: "reserved variable name",
+			wantText: "is duplicated",
 		},
 		{
 			name: "absolute artifact path",

@@ -15,11 +15,12 @@ func TestManifestIsDeterministicAndDerivesRelativePaths(t *testing.T) {
 	digestA := "sha256:" + strings.Repeat("a", 64)
 	digestB := "sha256:" + strings.Repeat("b", 64)
 	forward := []Observation{
+		{Binding: ".", Component: "dot-configuration", Kind: "raw", Digest: "sha256:" + strings.Repeat("d", 64)},
 		{Binding: "..", Component: "configuration", Kind: "raw", Digest: "sha256:" + strings.Repeat("c", 64)},
 		{Binding: "runtime package/arm64", Component: "runtime", Kind: "host-package", Digest: digestB},
 		{Binding: "agent-package", Component: "agent", Kind: "host-package", Digest: digestA},
 	}
-	reverse := []Observation{forward[2], forward[1], forward[0]}
+	reverse := []Observation{forward[3], forward[2], forward[1], forward[0]}
 
 	first, err := NewManifest(forward)
 	if err != nil {
@@ -49,11 +50,17 @@ func TestManifestIsDeterministicAndDerivesRelativePaths(t *testing.T) {
 		t.Fatalf("input order changed manifest identity:\n%s\n%s", firstBytes, secondBytes)
 	}
 	wantPaths := []string{
+		"materials/%2E",
 		"materials/%2E%2E",
 		"materials/agent-package",
 		"materials/runtime%20package%2Farm64",
 	}
-	gotPaths := []string{first.Materials[0].Path, first.Materials[1].Path, first.Materials[2].Path}
+	gotPaths := []string{
+		first.Materials[0].Path,
+		first.Materials[1].Path,
+		first.Materials[2].Path,
+		first.Materials[3].Path,
+	}
 	if !reflect.DeepEqual(gotPaths, wantPaths) {
 		t.Fatalf("derived paths = %v, want %v", gotPaths, wantPaths)
 	}
@@ -74,6 +81,11 @@ func TestManifestIsDeterministicAndDerivesRelativePaths(t *testing.T) {
 }
 
 func TestManifestValidationFailsClosed(t *testing.T) {
+	var absent *Manifest
+	if got := errorCode(absent.Validate()); got != e.CodeInvalidCatalog {
+		t.Fatalf("nil Manifest.Validate() code = %s, want %s", got, e.CodeInvalidCatalog)
+	}
+
 	valid, err := NewManifest([]Observation{
 		{Binding: "agent", Component: "agent-component", Kind: "host-package", Digest: "sha256:" + strings.Repeat("a", 64)},
 		{Binding: "runtime", Component: "runtime-component", Kind: "raw", Digest: "sha256:" + strings.Repeat("b", 64)},
@@ -88,15 +100,17 @@ func TestManifestValidationFailsClosed(t *testing.T) {
 		want   e.Code
 	}{
 		{name: "schema", mutate: func(manifest *Manifest) { manifest.SchemaVersion = "unknown" }, want: e.CodeInvalidCatalog},
-		{name: "empty", mutate: func(manifest *Manifest) { manifest.Materials = nil }, want: e.CodeProvenanceMissing},
+		{name: "nil materials", mutate: func(manifest *Manifest) { manifest.Materials = nil }, want: e.CodeInvalidCatalog},
 		{name: "binding metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Binding = " agent" }, want: e.CodeInvalidCatalog},
+		{name: "binding display control", mutate: func(manifest *Manifest) { manifest.Materials[0].Binding = "agent\u202e" }, want: e.CodeInvalidCatalog},
 		{name: "component metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Component = "agent\ncomponent" }, want: e.CodeInvalidCatalog},
+		{name: "component display control", mutate: func(manifest *Manifest) { manifest.Materials[0].Component = "agent\u202ecomponent" }, want: e.CodeInvalidCatalog},
 		{name: "kind metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Kind = "" }, want: e.CodeInvalidCatalog},
-		{name: "digest", mutate: func(manifest *Manifest) { manifest.Materials[0].Digest = "sha256:not-exact" }, want: e.CodeUnverifiedRef},
+		{name: "digest", mutate: func(manifest *Manifest) { manifest.Materials[0].Digest = "sha256:not-exact" }, want: e.CodeInvalidCatalog},
 		{name: "order", mutate: func(manifest *Manifest) {
 			manifest.Materials[0], manifest.Materials[1] = manifest.Materials[1], manifest.Materials[0]
 		}, want: e.CodeInvalidCatalog},
-		{name: "duplicate binding", mutate: func(manifest *Manifest) {
+		{name: "duplicate binding rejected before path collision", mutate: func(manifest *Manifest) {
 			manifest.Materials[1].Binding = manifest.Materials[0].Binding
 			manifest.Materials[1].Path = manifest.Materials[0].Path
 		}, want: e.CodeInvalidCatalog},
@@ -113,6 +127,9 @@ func TestManifestValidationFailsClosed(t *testing.T) {
 			}
 			if raw, err := candidate.Marshal(); raw != nil || errorCode(err) != test.want {
 				t.Fatalf("invalid manifest serialized as %q with %v", raw, err)
+			}
+			if digest, err := candidate.Digest(); digest != "" || errorCode(err) != test.want {
+				t.Fatalf("invalid manifest acquired digest %q with %v", digest, err)
 			}
 		})
 	}

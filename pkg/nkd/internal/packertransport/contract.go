@@ -7,8 +7,8 @@ package packertransport
 import (
 	"fmt"
 	"strings"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 )
 
 const (
@@ -84,6 +84,5 @@ func ValidVariableValue(value string) bool {
 }
 
 func validTransport(value string, maxBytes int, allowEmpty bool) bool {
-	return (allowEmpty || value != "") && len(value) <= maxBytes && utf8.ValidString(value) &&
-		strings.IndexFunc(value, unicode.IsControl) == -1
+	return safetext.Valid(value, maxBytes, allowEmpty)
 }
