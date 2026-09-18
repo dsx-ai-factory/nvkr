@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"sigs.k8s.io/yaml"
@@ -28,10 +27,8 @@ func githubTestPlan(t *testing.T) *Plan {
 		Metadata: Metadata{Name: "github-static"}, RunsOn: "ubuntu-24.04", Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
 		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
 		UtilityPlatform:  "linux/amd64",
-		Recipes: []RecipeTarget{{Name: "worker", Criteria: criteria.Criteria{
-			Category: "kubernetes", Role: "worker", K8sVersion: "1.34.0", OS: "ubuntu", Arch: "amd64",
-		}}},
-		Packages: []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
+		Builds:           []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
+		Packages:         []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
 	}
 	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
 		Metadata: Metadata{Name: "prod"}, Targets: map[string]Target{

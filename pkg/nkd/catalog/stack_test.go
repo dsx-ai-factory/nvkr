@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 )
 
 func TestCatalogStackReplacesOneProducerWithoutForkingCatalog(t *testing.T) {
@@ -57,13 +57,11 @@ func TestCatalogStackReplacesOneProducerWithoutForkingCatalog(t *testing.T) {
 		t.Fatalf("containerd was not replaced as a clean prebuilt lane: %#v", got)
 	}
 
-	resolved, err := recipe.Resolve(stack.Catalog, criteria.Criteria{
-		Category: "kubernetes", Role: "worker", K8sVersion: "1.34.0", OS: "ubuntu", Arch: "amd64",
-	}, nil)
+	resolved, err := buildgraph.Resolve(stack.Catalog, buildgraph.Selection{Components: []string{"containerd", "kubectl"}, Platform: "linux/amd64"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,6 +105,41 @@ func TestCatalogStackRejectsReplayAndUnknownReplacement(t *testing.T) {
 	}
 }
 
+func TestCatalogStackPreservesProducerContract(t *testing.T) {
+	base, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := base.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name string
+		edit func(*catalog.Component)
+	}{
+		{"targets", func(c *catalog.Component) { c.Platforms = []string{"linux/amd64"} }},
+		{"output type", func(c *catalog.Component) { c.OutputType = "raw" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			component := base.Components["kubectl"]
+			test.edit(&component)
+			overlay := catalog.Overlay{
+				APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind,
+				Name: "changed-contract", RequiresCatalogDigest: digest,
+				Components: map[string]catalog.ComponentReplacement{"kubectl": {Component: &component}},
+			}
+			stack, err := catalog.ApplyStack(base, overlay)
+			if stack != nil || errorCode(err) != nkderr.CodeInvalidCatalog {
+				t.Fatalf("changed producer contract produced stack=%+v, err=%v", stack, err)
+			}
+			if after, err := base.SnapshotDigest(); err != nil || after != digest {
+				t.Fatalf("rejected replacement mutated base catalog: %s, %v", after, err)
+			}
+		})
+	}
+}
+
 func TestLoadOverlayContextIsStrictAndNoFollow(t *testing.T) {
 	base, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
 	if err != nil {
@@ -137,6 +170,18 @@ components:
 	overlay, err := catalog.LoadOverlayContext(context.Background(), path)
 	if err != nil || overlay.Name != "supplier" {
 		t.Fatalf("load overlay: %#v %v", overlay, err)
+	}
+	for _, field := range []string{"roles: [worker]", "category: os", "component: {category: os}", "component: {roles: [worker]}"} {
+		t.Run("removed "+field, func(t *testing.T) {
+			changed := strings.Replace(raw, "    version:", "    "+field+"\n    version:", 1)
+			if err := os.WriteFile(path, []byte(changed), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := catalog.LoadOverlayContext(context.Background(), path)
+			if errorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "unknown field") {
+				t.Fatalf("retired classification did not fail strict decoding: %v", err)
+			}
+		})
 	}
 	link := filepath.Join(dir, "link.yaml")
 	if err := os.Symlink(path, link); err != nil {

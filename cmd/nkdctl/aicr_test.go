@@ -22,7 +22,7 @@ func TestAICRBundlingArgumentsComeFromDigestBoundActivation(t *testing.T) {
 	}
 	activation := &ir.AICRActivation{
 		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-		Platform: "dynamo", RecipeDigest: digest, GeneratorDigest: generatorDigest,
+		Platform: "dynamo", ProfileDigest: digest, GeneratorDigest: generatorDigest,
 	}
 	p, err := profileFromActivation(label, activation)
 	if err != nil {
@@ -30,7 +30,7 @@ func TestAICRBundlingArgumentsComeFromDigestBoundActivation(t *testing.T) {
 	}
 	if p.Service != activation.Service || p.Accelerator != activation.Accelerator ||
 		p.OS != activation.OS || p.Intent != activation.Intent ||
-		p.Platform != activation.Platform || p.Digest != activation.RecipeDigest ||
+		p.Platform != activation.Platform || p.Digest != activation.ProfileDigest ||
 		p.GeneratorDigest != activation.GeneratorDigest {
 		t.Fatalf("AICR output inputs did not come from the graph activation: %+v", p)
 	}
@@ -74,9 +74,7 @@ func TestAICRPreviewLabelsOutputUnqualified(t *testing.T) {
 	runErr := app.Run([]string{
 		"nkdctl", "aicr", "bundle", "--print",
 		"--data", filepath.Join("..", "..", "testdata", "examples", "operator-catalog"),
-		"--category", "accelerated-runtime", "--arch", "amd64",
-		"--accelerator", "h100", "--service", "eks", "--intent", "training",
-		"--os", "ubuntu", "--k8s", "1.32.0",
+		"--aicr-profile", "h100-runtime", "--platform", "linux/amd64",
 	})
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)

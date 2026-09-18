@@ -60,10 +60,9 @@ type terminalArtifactView struct {
 }
 
 type terminalReceiptView struct {
-	RecipeID     string                 `json:"recipeId"`
-	RecipeDigest string                 `json:"recipeDigest"`
-	Nodes        []NodeResult           `json:"nodes"`
-	Artifacts    []terminalArtifactView `json:"artifacts"`
+	BuildDigest string                 `json:"buildDigest"`
+	Nodes       []NodeResult           `json:"nodes"`
+	Artifacts   []terminalArtifactView `json:"artifacts"`
 }
 
 func issueTerminalReceipt(
@@ -323,8 +322,8 @@ func terminalReceiptBinding(report *Report, captured []terminalArtifact) (string
 		return "", e.New(e.CodeVerifyFailed, "report contains artifacts outside the terminal producer selection")
 	}
 	return canonical.Digest(terminalReceiptDomain, terminalReceiptView{
-		RecipeID: report.RecipeID, RecipeDigest: report.RecipeDigest,
-		Nodes: append([]NodeResult(nil), report.Nodes...), Artifacts: views,
+		BuildDigest: report.BuildDigest,
+		Nodes:       append([]NodeResult(nil), report.Nodes...), Artifacts: views,
 	})
 }
 

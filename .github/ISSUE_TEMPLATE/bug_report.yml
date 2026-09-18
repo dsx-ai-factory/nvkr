@@ -58,8 +58,8 @@ body:
       options:
         - Catalog — pins (pins.lock.yaml)
         - Catalog — registry (sources / constraints / build commands)
-        - Recipes — overlays / mixins
-        - CLI (nkectl)
+        - Definitions — output selection / catalog substitutions
+        - CLI (nkdctl)
         - Generator / pipeline emission
         - Signing / provenance / evidence
         - Docs / examples
@@ -111,7 +111,7 @@ body:
     attributes:
       label: Environment
       placeholder: |
-        - NKE Recipes version (CLI `nkectl --version`, API image tag, or commit SHA):
+        - NKE Recipes version (CLI `nkdctl --version` or commit SHA):
         - Install method (release binary / build from source / container image):
         - Platform (eks/gke/aks/oke/ocp/kind/lke/bcm/rke2/generic/k0s/other):
         - Kubernetes version:
@@ -120,7 +120,7 @@ body:
         - GPU type (h100/h200/gb200/b200/a100/l40/l40s/rtx-pro-6000/vr200/other):
         - Workload intent (training/inference):
       value: |
-        - NKE Recipes version (CLI `nkectl --version`, API image tag, or commit SHA):
+        - NKE Recipes version (CLI `nkdctl --version` or commit SHA):
         - Install method (release binary / build from source / container image):
         - Platform (eks/gke/aks/oke/ocp/kind/lke/bcm/rke2/generic/k0s/other):
         - Kubernetes version:
@@ -139,11 +139,7 @@ body:
         the issue. Redact any credentials or secrets, including tokens in URLs.
       placeholder: |
         ```bash
-        nkectl recipe --snapshot ... --intent training
-        ```
-
-        ```bash
-        curl "http://localhost:8080/v1/recipe?..."
+        nkdctl resolve --data path/to/catalog --component kubectl --platform linux/amd64
         ```
     validations:
       required: false

@@ -77,8 +77,8 @@ export GIT_CONFIG_KEY_0="url.file://$UPSTREAM.insteadOf"
 export GIT_CONFIG_VALUE_0='https://github.com/kubernetes-sigs/cri-tools'
 
 "$NKD" catalog validate --data "$CATALOG"
-OLD_DIGEST=$("$NKD" resolve --data "$CATALOG" --category kubernetes --role worker --k8s 1.32.0 --arch amd64 -o digest)
-"$NKD" resolve --data "$CATALOG" --category kubernetes --role worker --k8s 1.32.0 --arch amd64 -o nodes > "$WORK/ir-before.json"
+OLD_DIGEST=$("$NKD" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o digest)
+"$NKD" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o nodes > "$WORK/ir-before.json"
 LOCK="$CATALOG/pins.lock.yaml"
 LOCK_BEFORE=$(demo_sha256 "$LOCK")
 
@@ -94,9 +94,9 @@ printf '%s\n' "$CHECK_OUTPUT"
 demo_section "3/6  Commit the exact v1.34.1 pin through the lock writer"
 "$NKD" catalog pin --dir "$CATALOG" --tag v1.34.1 crictl
 "$NKD" catalog validate --data "$CATALOG"
-NEW_DIGEST=$("$NKD" resolve --data "$CATALOG" --category kubernetes --role worker --k8s 1.32.0 --arch amd64 -o digest)
-[ "$NEW_DIGEST" != "$OLD_DIGEST" ] || demo_die "source pin changed without changing recipeDigest"
-"$NKD" resolve --data "$CATALOG" --category kubernetes --role worker --k8s 1.32.0 --arch amd64 -o nodes > "$WORK/ir-after.json"
+NEW_DIGEST=$("$NKD" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o digest)
+[ "$NEW_DIGEST" != "$OLD_DIGEST" ] || demo_die "source pin changed without changing buildDigest"
+"$NKD" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o nodes > "$WORK/ir-after.json"
 
 demo_section "4/6  Inspect the resolved-IR change"
 set +e
@@ -105,7 +105,7 @@ DIFF_STATUS=$?
 set -e
 [ "$DIFF_STATUS" -eq 1 ] || demo_die "IR diff exited $DIFF_STATUS; want changed bytes"
 cat "$WORK/ir-diff.txt"
-"$NKD" resolve --data "$CATALOG" --category kubernetes --role worker --k8s 1.32.0 --arch amd64 \
+"$NKD" resolve --data "$CATALOG" --component crictl --platform linux/amd64 \
   -o nodes > "$WORK/ir-repeated.json"
 cmp "$WORK/ir-after.json" "$WORK/ir-repeated.json"
 
@@ -125,11 +125,11 @@ demo_section "6/6  Summarize the identity change"
 cat <<EOF
 UNQUALIFIED CATALOG-MAINTENANCE DEMO COMPLETE
   isolated catalog: $CATALOG
-  old recipeDigest: $OLD_DIGEST
-  new recipeDigest: $NEW_DIGEST
+  old buildDigest: $OLD_DIGEST
+  new buildDigest: $NEW_DIGEST
   IR diff:          $WORK/ir-diff.txt
 
-The machine-managed lock changed only after the preview gate, the resulting recipe
+The machine-managed lock changed only after the preview gate, the resulting build
 identity changed, and a malformed hand edit failed closed. No signed catalog release
 or production promotion was created.
 EOF

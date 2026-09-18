@@ -30,7 +30,7 @@ func TestGraphAuthorityRejectsUnsafeCallerComposedSemantics(t *testing.T) {
 				t.Fatal("unsafe graph passed semantic validation")
 			}
 			if _, err := graph.Digest(); err == nil {
-				t.Fatal("unsafe graph gained a recipe digest")
+				t.Fatal("unsafe graph gained a build digest")
 			}
 			if _, err := graph.CanonicalJSON(); err == nil {
 				t.Fatal("unsafe graph gained executable canonical JSON")

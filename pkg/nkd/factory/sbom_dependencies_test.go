@@ -22,7 +22,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 	}{
 		{"complete", "", ""},
 		{"missing scanner", "tool/syft", e.CodeEngineCapability},
-		{"missing payload", "artifact/nke-control-plane/cwe", e.CodeProvenanceMissing},
+		{"missing payload", "artifact/cwe/cwe", e.CodeProvenanceMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
@@ -35,7 +35,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 			if tc.omit != "" {
 				for i := range plan.Graph.Nodes {
 					node := &plan.Graph.Nodes[i]
-					if node.ID == "nke-control-plane/sbom" {
+					if node.ID == "cwe/sbom" {
 						var inputs []string
 						for _, input := range node.Inputs {
 							if input != tc.omit {
@@ -100,7 +100,7 @@ func TestRealArtifactsThroughSBOMExecutor(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, candidate := range artifacts {
-			if candidate.Kind == "producer-result" && candidate.Component == artifact.Component && candidate.RecipeTarget == artifact.RecipeTarget {
+			if candidate.Kind == "producer-result" && candidate.Component == artifact.Component && candidate.BuildTarget == artifact.BuildTarget {
 				if err := writeFactoryFile(t.Context(), candidate.Path, encoded, 0o644); err != nil {
 					t.Fatal(err)
 				}

@@ -10,23 +10,22 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
 const (
-	CompileSpecAPIVersion       = "nkd.dev/compile-spec/v1"
+	CompileSpecAPIVersion       = "nkd.dev/compile-spec/v3"
 	CompileSpecKind             = "CompileSpec"
 	ExecutionSettingsAPIVersion = "nkd.dev/execution-settings/v1"
 	ExecutionSettingsKind       = "ExecutionSettings"
-	PlanSchemaVersion           = "nkd.dev/run-plan/v1"
-	ArtifactGraphSchema         = "nkd.dev/artifact-graph/v1"
+	PlanSchemaVersion           = "nkd.dev/run-plan/v3"
+	ArtifactGraphSchema         = "nkd.dev/artifact-graph/v3"
 	MaxDefinitionBytes          = int64(4 << 20)
 	// DefaultRunsOn is the runner an unset definition.runsOn falls back to. ADR-18 §8
 	// runs on a GENERIC hosted runner — the helper orchestrates the pinned container itself —
@@ -42,15 +41,14 @@ const (
 	NodeAICR    = "aicr-render"
 	NodeVerify  = "terminal-observe"
 	// NodeSBOM emits a deterministic CycloneDX SBOM per built artifact plus an
-	// aggregate index for one recipe target (ADR-13 §1, re-entered into v1 by
+	// aggregate index for one build target (ADR-13 §1, re-entered into v1 by
 	// ADR-13). It runs after that target's terminal observation because it binds
 	// each component's SBOM to the runner-observed artifact digest that observation
 	// gates. It asserts composition only, never signature or reproduction.
-	NodeSBOM        = "sbom"
-	NodePackage     = "package"
-	NodePublish     = "publish"
-	NodeComposition = "composition"
-	NodeInventory   = "inventory"
+	NodeSBOM      = "sbom"
+	NodePackage   = "package"
+	NodePublish   = "publish"
+	NodeInventory = "inventory"
 	// NodeSign binds a signature and an SLSA production attestation to the exact
 	// published OCI digest of one route. It runs after that route's publication
 	// because it consumes the published reference as data.
@@ -94,19 +92,18 @@ type Metadata struct {
 
 // CompileSpec is the compiler-owned handoff derived from a public Definition.
 // Publication destinations stay in ExecutionSettings so changing registries cannot
-// perturb recipeDigest.
+// perturb buildDigest.
 type CompileSpec struct {
 	APIVersion       string          `json:"apiVersion"`
 	Kind             string          `json:"kind"`
 	Metadata         Metadata        `json:"metadata"`
-	RunsOn           string          `json:"runsOn"`           // default GitHub runner for packaging/publication and recipe targets
+	RunsOn           string          `json:"runsOn"`           // default GitHub runner for packaging/publication and build targets
 	UtilityContainer string          `json:"utilityContainer"` // exact image for offline non-build nodes
 	UtilityPlatform  string          `json:"utilityPlatform"`  // linux/amd64 or linux/arm64
 	Catalog          CatalogStack    `json:"catalog"`
 	Tools            map[string]Tool `json:"tools,omitempty"`
 	SelectedTools    []string        `json:"selectedTools,omitempty"`
-	Recipes          []RecipeTarget  `json:"recipes"`
-	Clusters         []ClusterSpec   `json:"clusters,omitempty"`
+	Builds           []BuildTarget   `json:"builds"`
 	Packages         []PackageSpec   `json:"packages,omitempty"`
 }
 
@@ -128,21 +125,16 @@ type CatalogStack struct {
 	Overlays []string `json:"overlays,omitempty"`
 }
 
-// RecipeTarget gives one resolved recipe/SKU a stable operator name. Reserved holds
-// exact AICR axes (service, accelerator, intent, platform).
-type RecipeTarget struct {
-	Name          string            `json:"name"`
-	Catalog       *CatalogStack     `json:"catalog,omitempty"` // optional recipe-specific catalog stack
-	Criteria      criteria.Criteria `json:"criteria"`
-	Reserved      map[string]string `json:"reserved,omitempty"`
-	AICRGenerator string            `json:"aicrGenerator,omitempty"` // exact pipeline tool providing the pinned generator executable
-	RunsOn        string            `json:"runsOn"`                  // operator-selected CI runner label/tag
-	// LifecycleComponents is the compiler handoff from public Definition outputs.
-	// It is never authored or serialized: Definition identity already binds the
-	// requested output members, while the full resolved Recipe and its digest stay
-	// unchanged. A non-nil value limits execution to those exact members and their
-	// transitive source dependencies.
-	LifecycleComponents []string `json:"-"`
+// BuildTarget is compiler-derived from one Definition output, never authored independently.
+type BuildTarget struct {
+	Bundle        *aicr.BundleInputs `json:"bundle,omitempty"`
+	Name          string             `json:"name"`
+	Catalog       *CatalogStack      `json:"catalog,omitempty"`
+	Components    []string           `json:"components"`
+	Platform      string             `json:"platform"`
+	AICRProfile   string             `json:"aicrProfile,omitempty"`
+	AICRGenerator string             `json:"aicrGenerator,omitempty"`
+	RunsOn        string             `json:"runsOn"`
 }
 
 // PackageSpec describes dataflow, not ordering. Inputs are artifact selectors:
@@ -162,20 +154,6 @@ type HelmImageBinding struct {
 	Chart string `json:"chart"`
 }
 
-// ClusterSpec joins independently resolved recipe targets into one pre-release
-// tenant/operator definition. It produces ClusterComposition rather than inventing
-// a ReleaseSet before runtime artifact and evidence digests exist.
-type ClusterSpec struct {
-	Name                   string                    `json:"name"`
-	Type                   string                    `json:"type"`
-	CNI                    string                    `json:"cni,omitempty"`
-	RecipeTargets          []string                  `json:"recipeTargets"`
-	RoleBindings           []cluster.RoleBinding     `json:"roleBindings"`
-	ClusterCategories      []string                  `json:"clusterCategories,omitempty"`
-	AICRBundle             *cluster.AICRBundleInputs `json:"aicrBundle,omitempty"`
-	ValidationRequirements []string                  `json:"validationRequirements,omitempty"`
-}
-
 // ExecutionSettings is the compiler-owned handoff derived from a public Environment.
 // Routes bind artifact/package selectors to named targets; credentials remain references.
 // Runtime is the operator's container-runtime environment for the generated pipeline —
@@ -189,8 +167,8 @@ type ExecutionSettings struct {
 	// the canonical repository URL carried by fetch nodes.
 	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
 	// RunsOn optionally overrides the definition's default runner for THIS environment (e.g. a
-	// GitLab tag such as "generic"). The runner is environment config, not recipe identity, so
-	// it may be set per-delivery without duplicating the definition or perturbing recipeDigest.
+	// GitLab tag such as "generic"). The runner is environment config, not build identity, so
+	// it may be set per-delivery without duplicating the definition or perturbing buildDigest.
 	RunsOn string `json:"runsOn,omitempty"`
 	// ExecutionClasses is the exact Environment-advertised inventory available to
 	// deterministic per-step matching. These declarations are planning inputs, not
@@ -202,9 +180,9 @@ type ExecutionSettings struct {
 	Routes  []Route           `json:"routes,omitempty"`
 	Runtime RuntimeProfile    `json:"runtime,omitempty"`
 	// Signing is the OPTIONAL publication signing policy for this environment. It is
-	// delivery configuration, never recipe identity: which identity signs, and where
+	// delivery configuration, never build identity: which identity signs, and where
 	// its certificates come from, is a property of the environment that publishes,
-	// so turning signing on cannot perturb recipeDigest. Absent (the zero value)
+	// so turning signing on cannot perturb buildDigest. Absent (the zero value)
 	// means the plan emits no sign or verify-publication node at all.
 	Signing *SigningProfile `json:"signing,omitempty"`
 }
@@ -279,8 +257,8 @@ func (signing *SigningProfile) Validate(targets map[string]Target, routes []Rout
 }
 
 // RuntimeProfile is the ADR-18 §8 runtime environment. It is delivery/environment config, not
-// recipe identity: it lives in Environment execution settings, so
-// changing the runtime or repinning an image cannot perturb recipeDigest. It is the home
+// build identity: it lives in Environment execution settings, so
+// changing the runtime or repinning an image cannot perturb buildDigest. It is the home
 // for the values that were previously a hardcoded emitter constant, so `run generate`
 // sources them from the operator's config.
 type RuntimeProfile struct {
@@ -303,15 +281,15 @@ type RuntimeProfile struct {
 	// docker:dind daemon so the helper's `docker run` has a daemon to reach. Environment config.
 	Services []string `json:"services,omitempty"`
 	// Variables are CI job variables set on every node job (e.g. DOCKER_HOST, DOCKER_TLS_CERTDIR).
-	// Environment config, not recipe identity.
+	// Environment config, not build identity.
 	Variables map[string]string `json:"variables,omitempty"`
 	// Setup is a before_script run on every node job before the helper — e.g. `docker login`
 	// so the dind daemon can pull a private, digest-pinned toolchain from the operator registry.
-	// Environment config, never recipe identity (it authenticates transport, it does not build).
+	// Environment config, never build identity (it authenticates transport, it does not build).
 	Setup []string `json:"setup,omitempty"`
 	// ToolchainRegistry is the operator registry that materialized the custom toolchains (those
-	// the recipe pins registry-agnostically as `nkd-toolchain-*@sha256:…`). At compile time it
-	// is prepended to those refs (digest preserved, so recipeDigest is unaffected — the same
+	// the build pins registry-agnostically as `nkd-toolchain-*@sha256:…`). At compile time it
+	// is prepended to those refs (digest preserved, so buildDigest is unaffected — the same
 	// transport-vs-identity split as airgap relocation). Engine/operator environment config.
 	ToolchainRegistry string `json:"toolchainRegistry,omitempty"`
 }
@@ -383,10 +361,8 @@ type Plan struct {
 	ExecutionSettingsDigest string                       `json:"executionSettingsDigest"`
 	EnvironmentDigest       string                       `json:"environmentDigest,omitempty"`
 	ExecutionSettings       ExecutionSettings            `json:"executionSettings"`
-	Recipes                 []RecipePlan                 `json:"recipes"`
-	Compositions            []CompositionPlan            `json:"compositions,omitempty"`
+	Builds                  []BuildPlan                  `json:"builds"`
 	LifecycleOutputs        []LifecycleOutputPlan        `json:"lifecycleOutputs,omitempty"`
-	LifecycleClusters       []LifecycleClusterPlan       `json:"lifecycleClusters,omitempty"`
 	Graph                   ArtifactGraph                `json:"graph"`
 
 	// identityDigest is the digest of this plan AS COMPILED, carried across the local
@@ -403,74 +379,53 @@ type Plan struct {
 }
 
 type LifecycleOutputPlan struct {
-	Name         string   `json:"name"`
-	Kind         string   `json:"kind"`
-	ArtifactID   string   `json:"artifactId"`
-	RecipeDigest string   `json:"recipeDigest"`
-	Components   []string `json:"components"`
+	Name        string   `json:"name"`
+	Kind        string   `json:"kind"`
+	ArtifactID  string   `json:"artifactId"`
+	BuildDigest string   `json:"buildDigest"`
+	Components  []string `json:"components"`
 }
 
-type LifecycleClusterPlan struct {
-	Name              string                   `json:"name"`
-	CompositionDigest string                   `json:"compositionDigest"`
-	Members           []LifecycleClusterMember `json:"members"`
-}
-
-type LifecycleClusterMember struct {
-	Output string `json:"output"`
-	Role   string `json:"role,omitempty"`
-}
-
-const LifecycleBindingSchema = "nkd.dev/lifecycle-binding/v1"
+const LifecycleBindingSchema = "nkd.dev/lifecycle-binding/v3"
 
 // LifecycleBinding is generated content carried inside a signed publication
-// root. It preserves authored output names and exact cluster membership without
+// root. It preserves authored output names and exact build membership without
 // exposing compiler graph joins to consumers.
 type LifecycleBinding struct {
-	SchemaVersion     string                  `json:"schemaVersion"`
-	DefinitionDigest  string                  `json:"definitionDigest"`
-	EnvironmentDigest string                  `json:"environmentDigest"`
-	ContentSubject    string                  `json:"contentSubject"`
-	Outputs           []LifecycleBoundOutput  `json:"outputs"`
-	Clusters          []LifecycleBoundCluster `json:"clusters,omitempty"`
+	SchemaVersion     string                 `json:"schemaVersion"`
+	DefinitionDigest  string                 `json:"definitionDigest"`
+	EnvironmentDigest string                 `json:"environmentDigest"`
+	ContentSubject    string                 `json:"contentSubject"`
+	Outputs           []LifecycleBoundOutput `json:"outputs"`
 }
 
 type LifecycleBoundOutput struct {
 	Name          string   `json:"name"`
 	Kind          string   `json:"kind"`
 	Digest        string   `json:"digest"`
-	RecipeDigest  string   `json:"recipeDigest"`
+	BuildDigest   string   `json:"buildDigest"`
 	Components    []string `json:"components"`
 	TransportPath string   `json:"transportPath,omitempty"`
 }
 
-type LifecycleBoundCluster = delivery.ReleaseCluster
-type LifecycleBoundClusterMember = delivery.ReleaseClusterMember
-
-type RecipePlan struct {
+type BuildPlan struct {
 	Name                string                   `json:"name"`
 	CatalogDigest       string                   `json:"catalogDigest"`
 	AppliedOverlays     []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`
-	RecipeID            string                   `json:"recipeId"`
-	RecipeDigest        string                   `json:"recipeDigest"`
-	Criteria            criteria.Criteria        `json:"criteria"`
+	BuildDigest         string                   `json:"buildDigest"`
+	Platform            string                   `json:"platform"`
+	CatalogSnapshot     *catalog.Catalog         `json:"catalogSnapshot"`
 	RunsOn              string                   `json:"runsOn"`
 	Components          []string                 `json:"components,omitempty"`
-	AllComponents       []string                 `json:"allComponents,omitempty"`
+	AICRProfileName     string                   `json:"aicrProfileName,omitempty"`
 	AICRProfileIdentity string                   `json:"aicrProfileIdentity,omitempty"`
-	// ResolvedComponents is the exact resolved catalog component set this recipe
+	// ResolvedComponents is the exact resolved catalog component set this build
 	// compiled from. It is persisted so the SBOM node (ADR-13) can build a
 	// faithful CycloneDX document at node-execution time, where the catalog is not
 	// reachable — the container-isolated executor only ever sees this plan. Adding
 	// it is the reason the plan identity digest moved when SBOM re-entered v1.
 	ResolvedComponents []catalog.NamedComponent `json:"resolvedComponents,omitempty"`
 	Graph              *ir.Graph                `json:"executionGraph"`
-}
-
-type CompositionPlan struct {
-	Name        string                     `json:"name"`
-	Digest      string                     `json:"digest"`
-	Composition cluster.ClusterComposition `json:"composition"`
 }
 
 type ArtifactGraph struct {
@@ -483,7 +438,7 @@ type Node struct {
 	HelmImage        *HelmImageBinding `json:"helmImage,omitempty"`
 	ID               string            `json:"id"`
 	Kind             string            `json:"kind"`
-	RecipeTarget     string            `json:"recipeTarget,omitempty"`
+	BuildTarget      string            `json:"buildTarget,omitempty"`
 	IRNode           string            `json:"irNode,omitempty"`
 	PackageKind      string            `json:"packageKind,omitempty"`
 	Distribution     string            `json:"distribution,omitempty"`
@@ -506,15 +461,15 @@ type Node struct {
 }
 
 type Artifact struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Kind         string `json:"kind"`
-	MediaType    string `json:"mediaType,omitempty"`
-	Path         string `json:"path,omitempty"`
-	Producer     string `json:"producer"`
-	RecipeTarget string `json:"recipeTarget,omitempty"`
-	Component    string `json:"component,omitempty"`
-	Target       string `json:"target,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	MediaType   string `json:"mediaType,omitempty"`
+	Path        string `json:"path,omitempty"`
+	Producer    string `json:"producer"`
+	BuildTarget string `json:"buildTarget,omitempty"`
+	Component   string `json:"component,omitempty"`
+	Target      string `json:"target,omitempty"`
 }
 
 var canonicalName = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
@@ -541,8 +496,8 @@ func (definition CompileSpec) Validate() error {
 		(definition.UtilityPlatform != "linux/amd64" && definition.UtilityPlatform != "linux/arm64") {
 		return e.New(e.CodeUnpinnedSource, "compile spec requires a digest-pinned utilityContainer and linux/amd64|linux/arm64 utilityPlatform")
 	}
-	if len(definition.Recipes) == 0 {
-		return e.New(e.CodeInvalidCatalog, "compile spec requires at least one recipe target")
+	if len(definition.Builds) == 0 {
+		return e.New(e.CodeInvalidCatalog, "compile spec requires at least one build target")
 	}
 	for name, tool := range definition.Tools {
 		if tool.Format != ToolFormatRaw && tool.Format != ToolFormatTarGzip {
@@ -564,36 +519,23 @@ func (definition CompileSpec) Validate() error {
 		}
 	}
 	seen := map[string]bool{}
-	for _, target := range definition.Recipes {
-		if !canonicalName.MatchString(target.Name) || seen[target.Name] {
-			return e.New(e.CodeInvalidCatalog, "factory recipe target name %q is invalid or repeated", target.Name)
+	for _, buildTarget := range definition.Builds {
+		if !canonicalName.MatchString(buildTarget.Name) || seen[buildTarget.Name] {
+			return e.New(e.CodeInvalidCatalog, "factory build target name %q is invalid or repeated", buildTarget.Name)
 		}
-		seen[target.Name] = true
-		if err := target.Criteria.ValidateActive(); err != nil {
+		seen[buildTarget.Name] = true
+		if err := target.ValidatePlatform(buildTarget.Platform); err != nil {
 			return err
 		}
-		if target.Catalog != nil && target.Catalog.Base == "" {
-			return e.New(e.CodeInvalidCatalog, "factory recipe target %q has an empty catalog override", target.Name)
+		if buildTarget.Catalog != nil && buildTarget.Catalog.Base == "" {
+			return e.New(e.CodeInvalidCatalog, "factory build target %q has an empty catalog override", buildTarget.Name)
 		}
-		if strings.ContainsAny(target.RunsOn, "\r\n\x00") {
-			return e.New(e.CodeInvalidCatalog, "factory recipe target %q has an unsafe runsOn label", target.Name)
+		if strings.ContainsAny(buildTarget.RunsOn, "\r\n\x00") {
+			return e.New(e.CodeInvalidCatalog, "factory build target %q has an unsafe runsOn label", buildTarget.Name)
 		}
-		if target.AICRGenerator != "" {
-			if _, ok := definition.Tools[target.AICRGenerator]; !ok {
-				return e.New(e.CodeInvalidCatalog, "factory recipe target %q references unknown AICR tool %q", target.Name, target.AICRGenerator)
-			}
-		}
-	}
-	recipeTargets := seen
-	seen = map[string]bool{}
-	for _, clusterSpec := range definition.Clusters {
-		if !canonicalName.MatchString(clusterSpec.Name) || seen[clusterSpec.Name] || len(clusterSpec.RecipeTargets) == 0 {
-			return e.New(e.CodeInvalidCatalog, "factory cluster name %q is invalid/repeated or has no recipe targets", clusterSpec.Name)
-		}
-		seen[clusterSpec.Name] = true
-		for _, target := range clusterSpec.RecipeTargets {
-			if !recipeTargets[target] {
-				return e.New(e.CodeInvalidCatalog, "factory cluster %q references unknown recipe target %q", clusterSpec.Name, target)
+		if buildTarget.AICRGenerator != "" {
+			if _, ok := definition.Tools[buildTarget.AICRGenerator]; !ok {
+				return e.New(e.CodeInvalidCatalog, "factory build target %q references unknown AICR tool %q", buildTarget.Name, buildTarget.AICRGenerator)
 			}
 		}
 	}

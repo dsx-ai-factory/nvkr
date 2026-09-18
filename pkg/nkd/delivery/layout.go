@@ -110,11 +110,10 @@ type ObjectInput struct {
 }
 
 type PublicationRequest struct {
-	Release                 *ReleaseMetadata
-	ReleaseSetDigest        string
-	InventoryDigest         string
-	ClusterDefinitionDigest string
-	Objects                 []ObjectInput
+	Release          *ReleaseMetadata
+	ReleaseSetDigest string
+	InventoryDigest  string
+	Objects          []ObjectInput
 }
 
 type Result struct {
@@ -241,14 +240,12 @@ func BuildPublicationRoot(ctx context.Context, out string, request PublicationRe
 		return Result{}, e.New(e.CodeUsage, "publication root requires 1..%d objects", maxDeliveryObjects)
 	}
 	if (request.ReleaseSetDigest == "") != (request.InventoryDigest == "") ||
-		(request.ReleaseSetDigest != "" && (!isDigest(request.ReleaseSetDigest) || !isDigest(request.InventoryDigest))) ||
-		(request.ClusterDefinitionDigest != "" && !isDigest(request.ClusterDefinitionDigest)) {
+		(request.ReleaseSetDigest != "" && (!isDigest(request.ReleaseSetDigest) || !isDigest(request.InventoryDigest))) {
 		return Result{}, e.New(e.CodeUnverifiedRef, "publication root input identities are incomplete or malformed")
 	}
 	root := PublicationRoot{SchemaVersion: PublicationRootSchema, Qualification: QualificationDiagnostic,
 		Release:          request.Release,
-		ReleaseSetDigest: request.ReleaseSetDigest, InventoryDigest: request.InventoryDigest,
-		ClusterDefinitionDigest: request.ClusterDefinitionDigest}
+		ReleaseSetDigest: request.ReleaseSetDigest, InventoryDigest: request.InventoryDigest}
 	return buildPublicationRoot(ctx, out, root, request.Objects)
 }
 

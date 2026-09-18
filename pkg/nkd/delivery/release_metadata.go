@@ -10,26 +10,9 @@ import (
 // ReleaseMetadata is the release-wide context stored in the sole release index
 // metadata document. Output identities and evidence membership live on Objects.
 type ReleaseMetadata struct {
-	DefinitionDigest  string           `json:"definitionDigest"`
-	EnvironmentDigest string           `json:"environmentDigest"`
-	ContentSubject    string           `json:"contentSubject"`
-	Clusters          []ReleaseCluster `json:"clusters,omitempty"`
-}
-
-type ReleaseCluster struct {
-	SchemaVersion     string                 `json:"schemaVersion"`
-	Name              string                 `json:"name"`
-	CompositionDigest string                 `json:"compositionDigest"`
-	ContentSubject    string                 `json:"contentSubject"`
-	Members           []ReleaseClusterMember `json:"members"`
-}
-
-type ReleaseClusterMember struct {
-	Output         string   `json:"output"`
-	ArtifactDigest string   `json:"artifactDigest"`
-	RecipeDigest   string   `json:"recipeDigest"`
-	Components     []string `json:"components"`
-	Role           string   `json:"role,omitempty"`
+	DefinitionDigest  string `json:"definitionDigest"`
+	EnvironmentDigest string `json:"environmentDigest"`
+	ContentSubject    string `json:"contentSubject"`
 }
 
 // OutputBinding adds meaning to the object's one descriptor; it does not repeat
@@ -38,7 +21,7 @@ type OutputBinding struct {
 	// Repository is a sibling repository name relative to the release repository namespace.
 	Repository    string         `json:"repository"`
 	Format        string         `json:"format"`
-	RecipeDigest  string         `json:"recipeDigest"`
+	BuildDigest   string         `json:"buildDigest"`
 	Components    []string       `json:"components"`
 	TransportPath string         `json:"transportPath,omitempty"`
 	BuildSubjects []BuildSubject `json:"buildSubjects,omitempty"`
@@ -77,15 +60,15 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			return e.New(e.CodeVerifyFailed, "duplicate release object name")
 		}
 		names[o.Name] = true
-		if o.Output == nil && o.Evidence == nil && o.Kind != "cluster-composition" {
-			return e.New(e.CodeVerifyFailed, "release object has no declared role")
+		if o.Output == nil && o.Evidence == nil {
+			return e.New(e.CodeVerifyFailed, "release object has no output or evidence binding")
 		}
 
 		if o.Output == nil {
 			continue
 		}
-		if o.Evidence != nil || !canonical.IsDigest(o.Output.RecipeDigest) {
-			return e.New(e.CodeVerifyFailed, "release object has conflicting output/evidence roles")
+		if o.Evidence != nil || !canonical.IsDigest(o.Output.BuildDigest) {
+			return e.New(e.CodeVerifyFailed, "release object has conflicting output/evidence bindings")
 		}
 		if _, ok := outputs[o.Name]; ok {
 			return e.New(e.CodeVerifyFailed, "duplicate release output")

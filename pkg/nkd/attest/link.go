@@ -51,14 +51,13 @@ func (m *Manifest) ProvenanceIndex(g *ir.Graph, profileDigest string) *provenanc
 			BuilderType: c.BuilderType, Deps: deps,
 		})
 	}
-	return provenance.BuildIndex(m.RecipeDigest, profileDigest, arts)
+	return provenance.BuildIndex(m.BuildDigest, profileDigest, arts)
 }
 
 // LinkEvidence computes and attaches the aggregate evidence digests to the vector
 // (ADR-05 §1/§4): the SBOM digest (caller-supplied, deterministic), the provenance
-// index digest, and the evidence-bundle aggregate digest. e2e/cluster conformance
-// digests are handed off separately (ADR-16) and left untouched. Fail-closed on a
-// serialization error.
+// index digest, and the evidence-bundle aggregate digest. Release conformance is
+// independently authenticated (ADR-16). Fail-closed on a serialization error.
 func (m *Manifest) LinkEvidence(g *ir.Graph, profileDigest, sbomDigest string, bundle *EvidenceBundle) error {
 	prov := m.ProvenanceIndex(g, profileDigest)
 	provDigest, err := prov.Digest()
@@ -67,8 +66,6 @@ func (m *Manifest) LinkEvidence(g *ir.Graph, profileDigest, sbomDigest string, b
 	}
 	ev := &EvidenceRef{SBOMDigest: sbomDigest, ProvenanceDigest: provDigest}
 	if m.Evidence != nil {
-		ev.E2ETestDigest = m.Evidence.E2ETestDigest
-		ev.ClusterValidationDigest = m.Evidence.ClusterValidationDigest
 		ev.VulnReportDigest = m.Evidence.VulnReportDigest
 	}
 	var bundleDigest string

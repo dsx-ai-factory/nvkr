@@ -8,7 +8,6 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
@@ -43,7 +42,7 @@ func emitDiskManifest(c *cli.Context) error {
 		return e.New(e.CodeUnsupported,
 			"assemble --from-raw supports canonical raw/iso manifests and qualified qcow2 envelope verification, not format %q", format)
 	}
-	m, err := assemble.NewDiskManifestContext(c.Context, diskKind, c.String("role"), raw, c.Int("block-size"))
+	m, err := assemble.NewDiskManifestContext(c.Context, diskKind, raw, c.Int("block-size"))
 	if err != nil {
 		return err
 	}
@@ -70,7 +69,7 @@ func emitDiskManifest(c *cli.Context) error {
 			return err
 		}
 	}
-	fmt.Printf("DiskManifest %s (%s, role=%q, %d bytes, logical %s)\n", dg, m.DiskKind, m.Role, m.VirtualSizeBytes, m.LogicalDigest)
+	fmt.Printf("DiskManifest %s (%s, %d bytes, logical %s)\n", dg, m.DiskKind, m.VirtualSizeBytes, m.LogicalDigest)
 	return nil
 }
 
@@ -132,24 +131,21 @@ func verifyDecode(c *cli.Context, want *attest.Manifest, envelope string) error 
 // RAW/ISO bytes and, on Linux, verifies a derived qcow2 through the held codec seam.
 func cmdAssemble() *cli.Command {
 	flags := []cli.Flag{
-		&cli.StringFlag{Name: "role", Usage: "optional role recorded in the disk manifest"},
 		&cli.StringFlag{Name: "format", Required: true, Usage: "raw | iso | qcow2 for existing-byte measurement; producer formats currently fail closed"},
 		// disk (raw/qcow2/iso)
 		&cli.BoolFlag{Name: "boot", Usage: "reserved; fails closed until a qualified boot-observation adapter exists"},
 		&cli.IntFlag{Name: "boot-timeout", Value: 900},
 		&cli.BoolFlag{Name: "encrypt", Usage: "reserved; fails closed until a qualified post-attestation encryption adapter exists"},
 		&cli.StringFlag{Name: "from", Usage: "reserved input for the disabled --encrypt adapter"},
-		// Unified DiskManifest + node-SKU staging manifest (ADR-14 §1/§4).
+		// Unified DiskManifest for existing disk bytes (ADR-14 §1).
 		&cli.StringFlag{Name: "from-raw", Usage: "emit a unified DiskManifest for this canonical RAW/ISO stream (ADR-14 §1)"},
 		&cli.StringFlag{Name: "envelope", Usage: "with --from-raw: also verify this derived envelope decodes to the canonical logical digest and record it as provenance"},
 		&cli.IntFlag{Name: "block-size", Value: 1 << 20,
 			Usage: fmt.Sprintf("with --from-raw (raw): per-block manifest size in bytes (%d..%d; at most %d blocks)",
 				assemble.MinDiskBlockSizeBytes, assemble.MaxDiskBlockSizeBytes, assemble.MaxDiskManifestBlocks)},
 		&cli.StringFlag{Name: "manifest-out", Usage: "with --from-raw: write the DiskManifest here"},
-		&cli.StringFlag{Name: "staging-out", Usage: "reserved; fails closed until authenticated vector equality is available"},
 		&cli.StringFlag{Name: "qemu-img", Value: assemble.QemuImgDefault, Usage: "with --envelope: the qemu-img binary (shelled)"},
 		&cli.StringFlag{Name: "qemu-img-digest", Usage: "with --envelope: exact sha256 digest of the qemu-img executable"},
-		&cli.StringFlag{Name: "expected-digests", Usage: "with --staging-out: the vector binding each SKU member's built artifact digest"},
 	}
 	return &cli.Command{
 		Name:  "assemble",
@@ -166,10 +162,6 @@ func cmdAssemble() *cli.Command {
 			if c.Bool("boot") {
 				return e.New(e.CodeEngineCapability,
 					"assemble --boot is disabled until a qualified boot observer can return authenticated execution evidence")
-			}
-			if c.String("staging-out") != "" {
-				return e.New(e.CodeEngineCapability,
-					"assemble --staging-out is disabled until an authenticated validation-vector receipt is exact-matched to the resolved recipe before SKU binding")
 			}
 			// Existing canonical RAW/ISO bytes may still be measured into the typed
 			// DiskManifest; this is the supported non-producer path.
@@ -270,7 +262,6 @@ func publishRootCmd() *cli.Command {
 			&cli.StringSliceFlag{Name: "bundle", Usage: "NAME=OCI_LAYOUT (repeatable)"},
 			&cli.StringFlag{Name: "inventory", Usage: "canonical Inventory JSON"},
 			&cli.StringFlag{Name: "release-set", Usage: "canonical ReleaseSet JSON"},
-			&cli.StringFlag{Name: "cluster-definition", Usage: "canonical ClusterDefinition JSON"},
 			&cli.StringFlag{Name: "out", Required: true, Usage: "new OCI layout directory"},
 		},
 		Action: func(c *cli.Context) error {
@@ -301,7 +292,7 @@ func publishRootCmd() *cli.Command {
 				}
 				request.InventoryDigest = digest
 				request.Objects = append(request.Objects, delivery.ObjectInput{Name: "inventory", Kind: "inventory", Path: path,
-					ArtifactType: "application/vnd.nkd.inventory.v2+json", LayerMediaType: "application/vnd.nkd.inventory.v2+json", SemanticDigest: digest})
+					ArtifactType: delivery.MediaInventory, LayerMediaType: delivery.MediaInventory, SemanticDigest: digest})
 			}
 			if path := c.String("release-set"); path != "" {
 				var set release.ReleaseSet
@@ -317,23 +308,7 @@ func publishRootCmd() *cli.Command {
 				}
 				request.ReleaseSetDigest = digest
 				request.Objects = append(request.Objects, delivery.ObjectInput{Name: "release-set", Kind: "release-set", Path: path,
-					ArtifactType: "application/vnd.nkd.release-set.v2+json", LayerMediaType: "application/vnd.nkd.release-set.v2+json", SemanticDigest: digest})
-			}
-			if path := c.String("cluster-definition"); path != "" {
-				var definition cluster.ClusterDefinition
-				if err := readCanonicalJSONContext(c.Context, path, &definition); err != nil {
-					return err
-				}
-				digest, err := definition.Digest()
-				if err != nil {
-					return err
-				}
-				if request.ReleaseSetDigest == "" || definition.ReleaseSetRef != request.ReleaseSetDigest {
-					return e.New(e.CodeUnverifiedRef, "ClusterDefinition releaseSetRef does not match --release-set")
-				}
-				request.ClusterDefinitionDigest = digest
-				request.Objects = append(request.Objects, delivery.ObjectInput{Name: "cluster-definition", Kind: "cluster-definition", Path: path,
-					ArtifactType: "application/vnd.nkd.cluster-definition.v1+json", LayerMediaType: "application/vnd.nkd.cluster-definition.v1+json", SemanticDigest: digest})
+					ArtifactType: delivery.MediaReleaseSet, LayerMediaType: delivery.MediaReleaseSet, SemanticDigest: digest})
 			}
 			result, err := delivery.BuildPublicationRoot(c.Context, c.String("out"), request)
 			if err != nil {

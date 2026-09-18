@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -196,13 +195,12 @@ func TestRunPullLaneRawBinary(t *testing.T) {
 	defer srv.Close()
 
 	mk := func(digest string) *ir.Graph {
-		return &ir.Graph{SchemaVersion: ir.SchemaVersion, RecipeID: "p",
-			Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"}, Nodes: []ir.Node{
-				{ID: "pull-tool", Kind: ir.KindPull, Component: "tool", OutputType: "raw",
-					Network: ir.NetworkDefault, Platform: "linux/amd64", Artifact: srv.URL + "/tool",
-					Digest: digest, ArtifactPath: "tool", Version: "1.0.0"},
-				{ID: "verify", Kind: ir.KindVerify, Needs: []string{"pull-tool"}},
-			}}
+		return &ir.Graph{SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64", Nodes: []ir.Node{
+			{ID: "pull-tool", Kind: ir.KindPull, Component: "tool", OutputType: "raw",
+				Network: ir.NetworkDefault, Platform: "linux/amd64", Artifact: srv.URL + "/tool",
+				Digest: digest, ArtifactPath: "tool", Version: "1.0.0"},
+			{ID: "verify", Kind: ir.KindVerify, Needs: []string{"pull-tool"}},
+		}}
 	}
 	root := filepath.Join(t.TempDir(), "src")
 

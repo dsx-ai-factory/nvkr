@@ -5,28 +5,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 func TestBuildRequirementsLoadStrictlyAndAffectCatalogIdentity(t *testing.T) {
-	registry := `apiVersion: nkd.dev/catalog/v1
+	registry := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   source:
     repo: https://example.test/source
     toolchainImage: ` + goodImage + `
-recipes:
-  - id: requirements
-    criteria:
-      category: kubernetes
-      os: ubuntu
-      arch: amd64
-    components:
-      - artifact
 components:
   artifact:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: source
     outputType: raw
@@ -122,7 +114,7 @@ pins:
 	}
 }
 
-func TestBuildRequirementsValidationAndLayeredOverride(t *testing.T) {
+func TestBuildRequirementsValidation(t *testing.T) {
 	request := &execution.Requirements{
 		Resources: &execution.ResourceRequest{
 			CPUMillis: 2000, MemoryMiB: 4096, EphemeralStorageMiB: 8192,
@@ -160,30 +152,4 @@ func TestBuildRequirementsValidationAndLayeredOverride(t *testing.T) {
 		})
 	}
 
-	component := goodComponent()
-	component.BuildRequirements = execution.Clone(request)
-	cat := base(component)
-	got, err := cat.ComposeComponents([]compose.ComponentRef{{Name: "x", Overrides: map[string]any{
-		"buildRequirements": map[string]any{"resources": map[string]any{"memoryMiB": 16384}},
-	}}})
-	if err != nil || len(got) != 1 {
-		t.Fatalf("nested build requirement override = %#v, %v", got, err)
-	}
-	resources := got[0].BuildRequirements.Resources
-	if resources.CPUMillis != 2000 || resources.MemoryMiB != 16384 || resources.EphemeralStorageMiB != 8192 {
-		t.Fatalf("nested override lost untouched resources: %#v", resources)
-	}
-	if !execution.Equal(got[0].BuildRequirements, &execution.Requirements{
-		Resources: &execution.ResourceRequest{
-			CPUMillis: 2000, MemoryMiB: 16384, EphemeralStorageMiB: 8192,
-		},
-		AllowedHostPlatforms: request.AllowedHostPlatforms,
-		Capabilities:         request.Capabilities,
-		TimeoutSeconds:       request.TimeoutSeconds,
-	}) {
-		t.Fatalf("nested override lost untouched runner requirements: %#v", got[0].BuildRequirements)
-	}
-	if cat.Components["x"].BuildRequirements.Resources.MemoryMiB != 4096 {
-		t.Fatal("applying a build requirement override mutated the source catalog")
-	}
 }

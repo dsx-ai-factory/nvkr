@@ -14,8 +14,9 @@ The [2026-09-08 local evidence](evidence/2026-09-08-m1-public-lifecycle-local.md
 checkout's combined local journey. Real hosted signing and independent consumption were subsequently
 [recorded for the combined outputs](evidence/2026-09-10-combined-run.md) in the personal GitHub namespace.
 Those records precede the current NVIDIA migration and catalog/tool/action changes. The subsequent
-[demo audit](evidence/2026-09-10-demo-language-audit.md) records a passing combined local execution with the
-current inputs, including CLI pull-back and version checks.
+[demo audit](evidence/2026-09-10-demo-language-audit.md) records a passing combined local execution with its
+recorded inputs, including CLI pull-back and version checks. The current Definition v4/catalog v3 migration
+requires its own local record; these earlier runs are not transferred to the new schemas.
 
 ## Prepare and run
 
@@ -53,7 +54,7 @@ cleanup command. See `--help` for the path options.
 | Build and validate | Definition, catalog pins and local Environment | The current checkout accepts the intended pinned inputs |
 | Check hosted generation | Committed GitHub bundle drift check | Hosted workflow bytes match the current inputs; no provider job is run |
 | Execute | `lifecycle.json` in the new attempt | All three required outputs must complete; observations and failures are recorded |
-| Inspect SBOM | CLI Recipe `sbom/index.json` and component documents | The CLI bill of materials names the observed binary digest and includes configured dependency inspection |
+| Inspect SBOM | CLI output `nkectl/sbom/index.json` and component documents | The CLI bill of materials names the observed binary digest and includes configured dependency inspection |
 | Inspect signing | `signatures/`, `predicates/`, `verifications/` | Dry-run records name the published digest and exact predicate bytes; signature verification remains false |
 | Pull by digest | Published reference and extracted `nkectl` | Registry bytes round-trip and the recovered binary digest matches the SBOM subject |
 | Execute recovered binary | Version output in the pinned amd64 container | The published package contains a runnable NKE CLI with the expected upstream version |
@@ -64,7 +65,9 @@ historical node counts, workspace names and digests are not stable expectations 
 Inspect [the NKE inputs](../definitions/nke-v1/README.md) to show the authorship split: Definition owns the
 output selection and packaging; Environment owns runtime, publication namespace, credentials and signing identity. The catalog owns source,
 tool and action pins; the Definition selects tools by purpose. Compiler output
-contains the package graph and publication envelope, so users do not wire those records manually.
+contains the package graph and publication envelope, so users do not wire those records manually. There are no
+cluster-view, deployment-role or category inputs; output completeness and exact evidence membership remain
+mandatory. Deployment topology belongs to the downstream consumer.
 
 ## Production acceptance
 

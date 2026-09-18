@@ -85,8 +85,8 @@ func TestTerminalReceiptRequireConsumesSamePrivateOCISnapshot(t *testing.T) {
 	digest := writeMinimalOCILayout(t, live)
 	node, artifact := terminalPullFixture(digest, live)
 	report := &Report{
-		RecipeID: "terminal-snapshot", RecipeDigest: "sha256:" + repeatHex("a"),
-		Artifacts: []ArtifactResult{artifact},
+		BuildDigest: "sha256:" + repeatHex("a"),
+		Artifacts:   []ArtifactResult{artifact},
 	}
 	receipt, err := issueTerminalReceipt(context.Background(), report,
 		map[string]ir.Node{node.ID: node}, map[string]bool{node.ID: true}, RunOptions{})

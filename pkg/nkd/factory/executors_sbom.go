@@ -1,10 +1,10 @@
 package factory
 
-// executors_sbom.go owns the per-recipe SBOM node. ADR-13 §1 (re-entered into v1
+// executors_sbom.go owns the per-build SBOM node. ADR-13 §1 (re-entered into v1
 // by ADR-13) requires a deterministic CycloneDX SBOM per built artifact plus
 // an aggregate index. pkg/nkd/sbom owns the document shape and its validation;
 // what this file owns is the JOIN: reading each built component's observed digest
-// from the producer-result this recipe already wrote, pairing it with the plan's
+// from the producer-result this build already wrote, pairing it with the plan's
 // persisted resolved composition, and refusing to emit a subject the run never
 // observed. It signs nothing and asserts composition only — the output is
 // static-unqualified evidence, never a signature or a reproduction claim.
@@ -15,26 +15,26 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
-	var recipePlan *RecipePlan
-	for i := range plan.Recipes {
-		if plan.Recipes[i].Name == node.RecipeTarget {
-			recipePlan = &plan.Recipes[i]
+	var buildPlan *BuildPlan
+	for i := range plan.Builds {
+		if plan.Builds[i].Name == node.BuildTarget {
+			buildPlan = &plan.Builds[i]
 			break
 		}
 	}
-	if recipePlan == nil {
-		return e.New(e.CodePipelineDrift, "factory sbom node %q names unknown recipe target %q", node.ID, node.RecipeTarget)
+	if buildPlan == nil {
+		return e.New(e.CodePipelineDrift, "factory sbom node %q names unknown build target %q", node.ID, node.BuildTarget)
 	}
-	if len(recipePlan.ResolvedComponents) == 0 {
+	if len(buildPlan.ResolvedComponents) == 0 {
 		return e.New(e.CodePipelineDrift, "factory sbom node %q has no resolved components to bill", node.ID)
 	}
 
@@ -50,19 +50,18 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 		if err != nil {
 			return err
 		}
-		if result.Component == "" || result.Component != artifact.Component || artifact.RecipeTarget != node.RecipeTarget || hashes[result.Component] != "" || !canonical.IsDigest(result.SHA256) {
+		if result.Component == "" || result.Component != artifact.Component || artifact.BuildTarget != node.BuildTarget || hashes[result.Component] != "" || !canonical.IsDigest(result.SHA256) {
 			return e.New(e.CodePipelineDrift,
 				"factory sbom node %q input %s carries no exact component digest", node.ID, input)
 		}
 		hashes[result.Component] = result.SHA256
 	}
 
-	resolved := &recipe.Resolved{
-		RecipeID:   recipePlan.RecipeID,
-		Criteria:   recipePlan.Criteria,
-		Components: recipePlan.ResolvedComponents,
+	resolved := &buildgraph.Resolved{
+		Platform:   buildPlan.Platform,
+		Components: buildPlan.ResolvedComponents,
 	}
-	boms, index, err := sbom.PerArtifact(resolved, recipePlan.RecipeDigest, hashes)
+	boms, index, err := sbom.PerArtifact(resolved, buildPlan.BuildDigest, hashes)
 	if err != nil {
 		return e.Wrap(e.CodeProvenanceMissing, err, "factory sbom node %q", node.ID)
 	}
@@ -79,7 +78,7 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			var payload Artifact
 			for _, input := range node.Inputs {
 				candidate := artifacts[input]
-				if candidate.Component == entry.Artifact && candidate.RecipeTarget == node.RecipeTarget && candidate.Kind != "producer-result" {
+				if candidate.Component == entry.Artifact && candidate.BuildTarget == node.BuildTarget && candidate.Kind != "producer-result" {
 					if payload.ID != "" {
 						return e.New(e.CodeProvenanceMissing, "ambiguous SBOM payload for %q", entry.Artifact)
 					}
@@ -146,8 +145,8 @@ func (plan *Plan) validateSBOMGraph() error {
 		if artifact.Kind != "producer-result" {
 			continue
 		}
-		node, ok := nodes[artifact.RecipeTarget+"/sbom"]
-		if !ok || node.Kind != NodeSBOM || node.RecipeTarget != artifact.RecipeTarget || !containsString(node.Inputs, artifact.ID) {
+		node, ok := nodes[artifact.BuildTarget+"/sbom"]
+		if !ok || node.Kind != NodeSBOM || node.BuildTarget != artifact.BuildTarget || !containsString(node.Inputs, artifact.ID) {
 			return e.New(e.CodeProvenanceMissing, "dependency SBOM graph omits producer %q", artifact.ID)
 		}
 	}
@@ -166,7 +165,7 @@ func (plan *Plan) validateSBOMGraph() error {
 			matches := 0
 			for _, candidateID := range node.Inputs {
 				candidate := artifacts[candidateID]
-				if candidate.Component == result.Component && candidate.RecipeTarget == node.RecipeTarget && candidate.Kind != "producer-result" {
+				if candidate.Component == result.Component && candidate.BuildTarget == node.BuildTarget && candidate.Kind != "producer-result" {
 					if candidate.Kind != "host-package" && candidate.Kind != "oci-image" && candidate.Kind != "tarball" {
 						return e.New(e.CodeEngineCapability, "SBOM dependency inspection does not support %q", candidate.Kind)
 					}
@@ -182,7 +181,7 @@ func (plan *Plan) validateSBOMGraph() error {
 }
 
 // readProducerResult admits the canonical pipeline.ArtifactResult that a build or
-// pull node wrote for one component (persistRecipeResults marshaled it), so the
+// pull node wrote for one component (persistBuildResults marshaled it), so the
 // observed digest the SBOM binds is the runner's, never a declaration.
 func readProducerResult(ctx context.Context, path string) (pipeline.ArtifactResult, error) {
 	raw, err := readSmallFactoryFile(ctx, path, "factory-producer-result")

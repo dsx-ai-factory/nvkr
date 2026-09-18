@@ -12,14 +12,12 @@ import (
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-const lockTestRegistry = `apiVersion: nkd.dev/catalog/v1
+const lockTestRegistry = `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   s: {repo: https://github.com/example/source}
-recipes:
-  - {id: r, criteria: {category: kubernetes}, components: [x]}
 components:
-  x: {fromSource: false, exclusionReason: test-only}
+  x: {platforms: [linux/amd64, linux/arm64], fromSource: false, exclusionReason: test-only}
 `
 
 func lockPin(tag, commitByte string, epoch int64) Pin {
@@ -59,7 +57,7 @@ func TestLockSchemaDispatchIsExact(t *testing.T) {
 func TestCatalogSchemaDispatchIsExact(t *testing.T) {
 	validLock := lockYAML("  s: {tag: v1.0.0, commit: " + strings.Repeat("a", 40) + ", treeHash: " + strings.Repeat("f", 40) + ", sourceDateEpoch: 1}\n")
 	for _, reg := range [][]byte{
-		bytes.Replace([]byte(lockTestRegistry), []byte("nkd.dev/catalog/v1"), []byte("nkd.dev/catalog/v2"), 1),
+		bytes.Replace([]byte(lockTestRegistry), []byte("nkd.dev/catalog/v3"), []byte("nkd.dev/catalog/v4"), 1),
 		bytes.Replace([]byte(lockTestRegistry), []byte("SourceBuildRegistry"), []byte("FutureRegistry"), 1),
 	} {
 		if _, err := LoadContext(context.Background(), bytesProvider{RegistryFile: reg, LockFile: validLock}); codeOf(err) != nkderr.CodeInvalidCatalog {
@@ -101,8 +99,8 @@ func TestLockRejectsOrphanArtifactAndUnknownArchitecture(t *testing.T) {
 	}
 
 	prebuiltRegistry := strings.Replace(lockTestRegistry,
-		"x: {fromSource: false, exclusionReason: test-only}",
-		"x: {source: s, outputType: raw, prebuilt: {url: https://example.invalid/x, evidence: {none: true}}}", 1)
+		"x: {platforms: [linux/amd64, linux/arm64], fromSource: false, exclusionReason: test-only}",
+		"x: {platforms: [linux/amd64, linux/arm64], source: s, outputType: raw, prebuilt: {url: https://example.invalid/x, evidence: {none: true}}}", 1)
 	if _, err := LoadContext(context.Background(), bytesProvider{RegistryFile: []byte(prebuiltRegistry), LockFile: lockYAML(sourcePin)}); codeOf(err) != nkderr.CodeUnpinnedSource {
 		t.Fatalf("missing declared prebuilt artifact pin must fail closed, got %v", err)
 	}

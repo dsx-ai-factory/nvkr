@@ -22,9 +22,9 @@ func authenticatedSourcePlan(t *testing.T) (*Plan, Node, string) {
 		if node.Kind != NodeFetch {
 			continue
 		}
-		for _, recipe := range plan.Recipes {
-			for _, source := range recipe.Graph.Nodes {
-				if recipe.Name != node.RecipeTarget || source.ID != node.IRNode {
+		for _, build := range plan.Builds {
+			for _, source := range build.Graph.Nodes {
+				if build.Name != node.BuildTarget || source.ID != node.IRNode {
 					continue
 				}
 				plan.ExecutionSettings.SourceAccess = map[string]SourceAccess{

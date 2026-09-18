@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/catalog/v1
+apiVersion: nkd.dev/catalog/v3
 components:
   cni-plugins:
     artifactPath: bin/bridge
@@ -8,10 +8,9 @@ components:
     cgo: false
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: cni-plugins
     writeDir: bin
   containerd:
@@ -30,10 +29,9 @@ components:
     cgo: false
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: containerd
     writeDir: bin
   coredns:
@@ -50,8 +48,9 @@ components:
     cgo: false
     fromSource: true
     outputType: oci-image
-    roles:
-    - control-plane
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: coredns
     writeDir: bin
   crictl:
@@ -68,10 +67,9 @@ components:
     cgo: false
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: crictl
     writeDir: bin
   etcd:
@@ -84,8 +82,9 @@ components:
     cgo: false
     fromSource: true
     outputType: oci-image
-    roles:
-    - control-plane
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: etcd
     writeDir: bin
   helm:
@@ -102,8 +101,9 @@ components:
     cgo: false
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: helm
     writeDir: bin
   kube-apiserver:
@@ -115,8 +115,9 @@ components:
     cgo: false
     fromSource: true
     outputType: oci-image
-    roles:
-    - control-plane
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     versionStamp:
       KUBE_GIT_COMMIT: '{{.Commit}}'
@@ -134,8 +135,9 @@ components:
     cgo: false
     fromSource: true
     outputType: oci-image
-    roles:
-    - control-plane
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     versionStamp:
       KUBE_GIT_COMMIT: '{{.Commit}}'
@@ -153,10 +155,9 @@ components:
     cgo: false
     fromSource: true
     outputType: oci-image
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     versionStamp:
       KUBE_GIT_COMMIT: '{{.Commit}}'
@@ -174,8 +175,9 @@ components:
     cgo: false
     fromSource: true
     outputType: oci-image
-    roles:
-    - control-plane
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     versionStamp:
       KUBE_GIT_COMMIT: '{{.Commit}}'
@@ -193,10 +195,9 @@ components:
     cgo: false
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     versionStamp:
       KUBE_GIT_COMMIT: '{{.Commit}}'
@@ -214,10 +215,9 @@ components:
     cgo: false
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     versionStamp:
       KUBE_GIT_COMMIT: '{{.Commit}}'
@@ -235,10 +235,9 @@ components:
     cgo: true
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     versionStamp:
       CC: gcc
@@ -258,8 +257,9 @@ components:
     cgo: false
     fromSource: true
     outputType: oci-image
-    roles:
-    - control-plane
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: kubernetes
     writeDir: out
   runc:
@@ -272,10 +272,9 @@ components:
     cgo: true
     fromSource: true
     outputType: host-package
-    roles:
-    - control-plane
-    - worker
-    - gpu-worker
+    platforms:
+    - linux/amd64
+    - linux/arm64
     source: runc
     writeDir: out
 kind: SourceBuildRegistry
@@ -287,22 +286,6 @@ metadata:
     catalog pin/bump`), so a version bump touches only the lock. See docs/versioning.md.
   name: nkd-default
 sources:
-  checkout:
-    kind: github-action
-    repo: https://github.com/actions/checkout
-    constraint: 7.x
-  download-artifact:
-    kind: github-action
-    repo: https://github.com/actions/download-artifact
-    constraint: 8.x
-  setup-go:
-    kind: github-action
-    repo: https://github.com/actions/setup-go
-    constraint: 7.x
-  upload-artifact:
-    kind: github-action
-    repo: https://github.com/actions/upload-artifact
-    constraint: 7.x
   aicr:
     constraint: 0.18.x
     repo: https://github.com/NVIDIA/aicr
@@ -311,6 +294,10 @@ sources:
       format: tar-gzip
       platform: linux/amd64
       url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_amd64.tar.gz
+  checkout:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/checkout
   cni-plugins:
     constraint: 1.7.x
     repo: https://github.com/containernetworking/plugins
@@ -331,6 +318,10 @@ sources:
     constraint: 1.34.x
     repo: https://github.com/kubernetes-sigs/cri-tools
     toolchainImage: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
+  download-artifact:
+    constraint: 8.x
+    kind: github-action
+    repo: https://github.com/actions/download-artifact
   etcd:
     constraint: 3.5.x
     repo: https://github.com/etcd-io/etcd
@@ -359,3 +350,11 @@ sources:
     toolchainImagesByArch:
       amd64: nkd-toolchain-cgo@sha256:d9ca6b8de5ae00fd2b25c2768652adb92e86c44db199c51520730cbc31f3f0ac
       arm64: nkd-toolchain-cgo@sha256:e2d93f718fc21fa61f9157c54e03336daf7649b0f9a866667e35dec51fecc56a
+  setup-go:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/setup-go
+  upload-artifact:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/upload-artifact

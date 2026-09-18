@@ -26,15 +26,14 @@ and defines the digest-authentication chain.
 
 ### 1. The ValidationVector *is* the expected-digests manifest
 
-**One** signed object binds one Resolved Recipe and one builder profile to expected artifacts and evidence. There
+**One** signed object binds one resolved build graph and one builder profile to expected artifacts and evidence. There
 is no separate “manifest” beside the vector. Its `schemaVersion` is the **versioned public contract** FR-22 calls
 for.
 
 ```
 ValidationVector {
   schemaVersion
-  recipeId
-  recipeDigest
+  buildDigest
   builderProfile { id, digest, hostControl }     # binds the from-source subset only (ADR-07)
   components [ { name, outputType, toolchain, inputDigest,
                  builderType, engineClass, sha256 } ]
@@ -45,9 +44,10 @@ ValidationVector {
 ```
 
 The `builderProfile` binding covers only the from-source subset; an all-prebuilt vector carries none (ADR-07).
-The exact `components` set is part of vector identity. A role or component subset is therefore published only as
+The exact `components` set is part of vector identity. A component subset is therefore published only as
 a distinct subset-scoped vector with its own subset-scoped evidence aggregates, and reproducing a subset can
-never satisfy comparison against a full vector. The vector is serialized and digested through the canonical codec
+never satisfy comparison against a full vector. A direct output's selected producer set is complete; no deployment metadata
+filters it into a subset. The vector is serialized and digested through the canonical codec
 (ADR-01) and stays operator-replaceable via `schemaVersion`.
 
 ### 2. ReleaseSet + Inventory, required set derived from the Inventory
@@ -55,15 +55,15 @@ never satisfy comparison against a full vector. The vector is serialized and dig
 ```
 ReleaseSet {
   schemaVersion, version
-  members [ { component, role, arch, version,
-              recipeDigest, vectorDigest, resolvedInputDigest,
+  members [ { component, arch, version,
+              buildDigest, vectorDigest, resolvedInputDigest,
               profileDigest, artifactDigests[] } ]
   inventoryRef            # inventory digest, bound into the ReleaseSet digest
 }
 
 Inventory {
   schemaVersion, version
-  components [ { name, role, versionConstraint,
+  components [ { name, versionConstraint,
                  requiredArtifacts, artifactKinds,
                  externalSBOMRef, externalSBOMDigest,
                  externalProvenanceRef, externalProvenanceDigest,
@@ -75,6 +75,11 @@ Inventory {
 The **required set is derived from the Inventory**, not hand-listed in the ReleaseSet — one source of truth for
 completeness (ADR-16) and compatibility. `inventoryRef` binds into the ReleaseSet digest, so rebinding a
 different Inventory yields a new set identity.
+
+The active schemas are `nkd.dev/validation-vector/v3`, `nkd.dev/inventory/v4`, and
+`nkd.dev/release-set/v4`. Their `buildDigest` fields bind the generated `nkd.build` identity. Removed
+`recipeDigest`, deployment-role fields, and older majors are rejected, never renamed inside authenticated bytes. Frozen digest
+family tags remain unchanged for these existing trust-object families (ADR-01).
 
 ### 3. Digest-authentication chain (SEC-02)
 
@@ -97,16 +102,18 @@ evidence and is never included in, or hashed back into, the reference vector it 
 compatibility, and vulnerability results are likewise release-gate receipts under ADR-13/16, not mutable fields
 added to an already published vector. Every claim therefore has exactly one owner and no vector self-compares.
 
-Every trust object — Resolved Recipe, pipeline bundle, ValidationVector, ReleaseSet, Inventory,
+Every trust object — resolved build graph, pipeline bundle, ValidationVector, ReleaseSet, Inventory,
 publisher-evidence index, and ReproductionObservation — is independently digest-addressable via the ADR-01 codec,
 satisfying SEC-01.
 
 ### 5. Generate membership from frozen intent
 
-Normal callers author outputs through a Definition (ADR-17). Preparation freezes component, role, platform,
-resolved Recipe identity, and required output slots before execution. Observed bytes fill those slots only after
+Normal callers author outputs through a Definition (ADR-17). Preparation freezes component, platform,
+resolved build identity, exact named output use, and required output slots before execution. Observed bytes fill those slots only after
 the owning executor verifies their exact membership. Missing, unexpected, conflicting, or multiply realized
 members fail completeness; build failure cannot shrink the required set.
+Equal Build Digests do not merge independently required uses: producer, restore, terminal observation and
+evidence joins must satisfy each named output binding separately. A digest-only map cannot supply completeness.
 
 The qualified Inventory's exact artifact digests are unavailable before execution. Generate that compatibility
 record only after authenticated binding of the frozen requirements, then derive its ReleaseSet. A static plan
@@ -117,15 +124,17 @@ independent of the later operator observations compared against them.
 
 A future versioned ValidationVector coverage profile enumerates scenario classes, the exhaustiveness rule over
 the promoted/provisioned set, and how conformance/qualification `vectorDigests` map to coverage. A pinned
-`suitePolicyDigest` governs which coverage a passing verdict may assert. Cluster requirements may demand, for
+`suitePolicyDigest` governs which coverage a passing verdict may assert. An external consumer may demand, for
 example, GPU-runtime health and CNI conformance. Raw test results remain opaque; NKD checks the declared coverage
 and suite policy. Coverage is schema, not additional authority. No coverage-profile implementation is claimed.
-Later e2e/cluster observations remain outside the published vector and bind the distinct ADR-19 result.
+Deployment qualification and cluster topology remain outside the active artifact model (ADR-19); no
+cluster-result field is retained in the ValidationVector. External observations remain outside the published
+vector and require a separately specified subject and policy before any future acceptance.
 
 ## Consequences
 
 **Positive**
-- One signed object per recipe+profile, one publisher aggregate per vector — no manifest/vector drift.
+- One signed object per build+profile, one publisher aggregate per vector — no manifest/vector drift.
 - The Inventory is the single source of required-set and compatibility data.
 - The SEC-02 chain makes a side-loaded or swapped digest inert.
 - FR-22 and FR-23 are satisfied without folding a later verifier observation into its own reference.

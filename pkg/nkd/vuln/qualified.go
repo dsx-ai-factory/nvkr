@@ -20,7 +20,7 @@ type QualifiedScanRequest struct {
 	Scanner        string
 	ScannerDigest  string
 	DatabaseDigest string
-	RecipeDigest   string
+	BuildDigest    string
 	ArtifactDigest string
 	SBOMDigest     string
 	CanonicalSBOM  []byte
@@ -68,7 +68,7 @@ func QualifyScan(ctx context.Context, request QualifiedScanRequest, scanner Rele
 	}
 	for _, identity := range []struct{ name, digest string }{
 		{"scanner", request.ScannerDigest}, {"database", request.DatabaseDigest},
-		{"recipe", request.RecipeDigest}, {"artifact", request.ArtifactDigest}, {"SBOM", request.SBOMDigest},
+		{"build", request.BuildDigest}, {"artifact", request.ArtifactDigest}, {"SBOM", request.SBOMDigest},
 	} {
 		if !canonical.IsDigest(identity.digest) {
 			return QualifiedReport{}, e.New(e.CodeUnpinnedInput,
@@ -128,7 +128,7 @@ func QualifyScan(ctx context.Context, request QualifiedScanRequest, scanner Rele
 		SchemaVersion: QualifiedReportSchemaVersion,
 		Scanner:       request.Scanner, ScannerDigest: request.ScannerDigest,
 		DBVersion: request.DatabaseDigest, DatabaseDigest: request.DatabaseDigest,
-		RecipeDigest: request.RecipeDigest, Artifact: request.ArtifactDigest,
+		BuildDigest: request.BuildDigest, Artifact: request.ArtifactDigest,
 		SBOMDigest: request.SBOMDigest, ResultDigest: resultDigest, Findings: findings,
 	}
 	return QualifiedReport{report: report, valid: true}, nil

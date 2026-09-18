@@ -11,14 +11,13 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
@@ -102,7 +101,7 @@ func TestResolveSelectorRequiresCanonicalExactDigest(t *testing.T) {
 	}
 }
 
-func qualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
+func qualifiedReport(t *testing.T, buildDigest, artifactDigest string,
 	localSBOM sbom.LocalEvidenceReceipt,
 ) vuln.QualifiedReport {
 	t.Helper()
@@ -110,7 +109,7 @@ func qualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if binding.RecipeDigest != recipeDigest || binding.ArtifactDigest != artifactDigest {
+	if binding.BuildDigest != buildDigest || binding.ArtifactDigest != artifactDigest {
 		t.Fatalf("local SBOM fixture does not bind vulnerability subject")
 	}
 	sbomBytes, err := localSBOM.ExactBytes()
@@ -119,7 +118,7 @@ func qualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
 	}
 	request := vuln.QualifiedScanRequest{
 		Scanner: vuln.ScannerGrype, ScannerDigest: digest('7'), DatabaseDigest: digest('8'),
-		RecipeDigest: recipeDigest, ArtifactDigest: artifactDigest,
+		BuildDigest: buildDigest, ArtifactDigest: artifactDigest,
 		SBOMDigest: binding.EvidenceDigest, CanonicalSBOM: sbomBytes,
 	}
 	report, err := vuln.QualifyScan(context.Background(), request, qualifiedScanner{observation: vuln.ScanObservation{
@@ -353,9 +352,9 @@ func inventory() *Inventory {
 		SchemaVersion: InventorySchemaVersion,
 		Version:       "1.0",
 		Components: []InventoryComponent{
-			{Name: "kubelet", Role: "worker", VersionConstraint: "1.32.x", RequiredArtifacts: []string{digest('a')},
+			{Name: "kubelet", VersionConstraint: "1.32.x", RequiredArtifacts: []string{digest('a')},
 				ArtifactKinds: []ArtifactKindBinding{{ArtifactDigest: digest('a'), Kind: ArtifactHostPackage}}},
-			{Name: "apiserver", Role: "control-plane", VersionConstraint: ">=1.32 <1.33", RequiredArtifacts: []string{digest('b')},
+			{Name: "apiserver", VersionConstraint: ">=1.32 <1.33", RequiredArtifacts: []string{digest('b')},
 				ArtifactKinds: []ArtifactKindBinding{{ArtifactDigest: digest('b'), Kind: ArtifactHostPackage}}},
 		},
 		Compatibility: Compatibility{Kubernetes: "1.32.x", NKE: ">=2.4 <3.0", Platform: "bare-metal|eks"},
@@ -374,13 +373,13 @@ func releaseSet(t *testing.T, inv *Inventory) *ReleaseSet {
 		InventoryRef:  invDigest,
 		Members: []Member{
 			{
-				Component: "kubelet", Role: "worker", Arch: "amd64", Version: "1.32.7",
-				RecipeDigest: digest('c'), VectorDigest: digest('d'), ResolvedInputDigest: digest('3'),
+				Component: "kubelet", Arch: "amd64", Version: "1.32.7",
+				BuildDigest: digest('c'), VectorDigest: digest('d'), ResolvedInputDigest: digest('3'),
 				ArtifactDigests: []string{digest('a')},
 			},
 			{
-				Component: "apiserver", Role: "control-plane", Arch: "amd64", Version: "1.32.7",
-				RecipeDigest: digest('f'), VectorDigest: digest('1'), ResolvedInputDigest: digest('5'),
+				Component: "apiserver", Arch: "amd64", Version: "1.32.7",
+				BuildDigest: digest('f'), VectorDigest: digest('1'), ResolvedInputDigest: digest('5'),
 				ArtifactDigests: []string{digest('b')},
 			},
 		},
@@ -391,7 +390,7 @@ func TestReleaseDocumentsRejectNonCanonicalAndEmptyIdentityFields(t *testing.T) 
 	for name, mutate := range map[string]func(*Inventory){
 		"version whitespace": func(value *Inventory) { value.Version = " 1.0" },
 		"member whitespace":  func(value *Inventory) { value.Components[0].Name = "kubelet " },
-		"role whitespace":    func(value *Inventory) { value.Components[0].Role = " worker" },
+
 		"no artifacts": func(value *Inventory) {
 			value.Components[0].RequiredArtifacts = nil
 			value.Components[0].ArtifactKinds = nil
@@ -428,8 +427,8 @@ func target() CompatibilityTarget {
 	return CompatibilityTarget{Kubernetes: "1.32.7", NKE: "2.5.1", Platform: "bare-metal"}
 }
 
-func releaseFixtureArtifactBytes(component, role string) []byte {
-	return []byte("release-fixture-artifact/" + component + "/" + role)
+func releaseFixtureArtifactBytes(component string) []byte {
+	return []byte("release-fixture-artifact/" + component)
 }
 
 func rawFixtureDigest(payload []byte) string {
@@ -451,29 +450,28 @@ func writeReleasePipelineResult(t *testing.T, dir, nodeID string, result pipelin
 	}
 }
 
-func qualifiedPublisherFixture(t *testing.T, component, role, version string, artifactBytes []byte) (
-	*recipe.Resolved, *pipeline.Report, *attest.PublisherEvidence,
+func qualifiedPublisherFixture(t *testing.T, component, version string, artifactBytes []byte) (
+	*buildgraph.Resolved, *pipeline.Report, *attest.PublisherEvidence,
 ) {
 	t.Helper()
 	if version == "" {
 		version = "1.0.0"
 	}
 	artifactDigest := rawFixtureDigest(artifactBytes)
-	resolved := &recipe.Resolved{
-		RecipeID: "release-" + component,
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: component, Component: catalog.Component{
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: component, Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			Tag: version, SourceDate: 1, OutputType: "host-package",
 			Prebuilt: &catalog.Prebuilt{URL: "https://artifacts.example.test/" + component,
 				Digests:  map[string]string{"amd64": artifactDigest},
 				Evidence: &catalog.ExternalEvidence{None: true}},
 		}}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +497,7 @@ func qualifiedPublisherFixture(t *testing.T, component, role, version string, ar
 		EngineClass:   ir.EnginePrebuiltAcquire, Path: pull.ArtifactPath,
 		SHA256: artifactDigest, Size: int64(len(artifactBytes)),
 	})
-	report, err := (pipeline.Local{}).VerifyResults(graph, recipeDigest,
+	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest,
 		pipeline.ResultDirectory(options.SourceRoot), options)
 	if err != nil {
 		t.Fatal(err)
@@ -576,11 +574,11 @@ func authorizationRequest(t *testing.T, inv *Inventory, set *ReleaseSet) Authori
 	var localProvenance []provenance.LocalEvidenceReceipt
 	for memberIndex := range set.Members {
 		member := &set.Members[memberIndex]
-		artifactBytes := releaseFixtureArtifactBytes(member.Component, member.Role)
+		artifactBytes := releaseFixtureArtifactBytes(member.Component)
 		artifactDigest := rawFixtureDigest(artifactBytes)
 		for componentIndex := range inv.Components {
 			component := &inv.Components[componentIndex]
-			if component.Name != member.Component || (component.Role != "" && component.Role != member.Role) {
+			if component.Name != member.Component {
 				continue
 			}
 			kind := ArtifactHostPackage
@@ -594,12 +592,12 @@ func authorizationRequest(t *testing.T, inv *Inventory, set *ReleaseSet) Authori
 			}
 		}
 		resolved, report, publisherEvidence := qualifiedPublisherFixture(t,
-			member.Component, member.Role, member.Version, artifactBytes)
-		graph, err := recipe.Compile(resolved)
+			member.Component, member.Version, artifactBytes)
+		graph, err := buildgraph.Compile(resolved)
 		if err != nil {
 			t.Fatal(err)
 		}
-		recipeDigest, err := graph.Digest()
+		buildDigest, err := graph.Digest()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -608,7 +606,7 @@ func authorizationRequest(t *testing.T, inv *Inventory, set *ReleaseSet) Authori
 		if err != nil {
 			t.Fatal(err)
 		}
-		member.RecipeDigest = recipeDigest
+		member.BuildDigest = buildDigest
 		member.VectorDigest = vectorDigest
 		member.ProfileDigest = ""
 		member.ArtifactDigests = []string{artifactDigest}
@@ -646,8 +644,8 @@ func authorizationRequest(t *testing.T, inv *Inventory, set *ReleaseSet) Authori
 	for _, member := range set.Members {
 		result := ReproductionResult{
 			SchemaVersion: ReproductionSchemaVersion, ReleaseSetDigest: releaseDigest,
-			Component: member.Component, Role: member.Role, Arch: member.Arch,
-			RecipeDigest: member.RecipeDigest, VectorDigest: member.VectorDigest,
+			Component: member.Component, Arch: member.Arch,
+			BuildDigest: member.BuildDigest, VectorDigest: member.VectorDigest,
 			ProfileDigest: member.ProfileDigest, ProfileIndependent: member.ProfileDigest == "",
 			ResolvedInputDigest: member.ResolvedInputDigest,
 			ArtifactDigests:     append([]string(nil), member.ArtifactDigests...), Verdict: Reproduced,
@@ -666,21 +664,21 @@ func authorizationRequest(t *testing.T, inv *Inventory, set *ReleaseSet) Authori
 				if bindingErr != nil {
 					t.Fatal(bindingErr)
 				}
-				if binding.Component == member.Component && binding.RecipeDigest == member.RecipeDigest &&
+				if binding.Component == member.Component && binding.BuildDigest == member.BuildDigest &&
 					binding.ArtifactDigest == artifactDigest {
 					localSBOM = candidate
 					break
 				}
 			}
 			req.VulnerabilityReports = append(req.VulnerabilityReports,
-				qualifiedReport(t, member.RecipeDigest, artifactDigest, localSBOM))
+				qualifiedReport(t, member.BuildDigest, artifactDigest, localSBOM))
 		}
 	}
-	recipes, vectors, artifacts := releaseIdentitySets(set.Members)
+	builds, vectors, artifacts := releaseIdentitySets(set.Members)
 	compatibility, err := VerifyCompatibility(context.Background(), CompatibilityResult{
 		SchemaVersion: CompatibilitySchemaVersion, ReleaseSetDigest: releaseDigest, InventoryDigest: invDigest,
 		CompatibilityPolicyDigest: req.PromotionPolicy.policy.CompatibilityPolicyDigest, Target: req.Target,
-		RecipeDigests: recipes, VectorDigests: vectors, ArtifactDigests: artifacts,
+		BuildDigests: builds, VectorDigests: vectors, ArtifactDigests: artifacts,
 		Verdict: CompatibilityAccepted, EffectiveEpoch: 1, ExpiresEpoch: 20,
 	}, []byte("compatibility-signature"), releaseReceipt, inv, authenticator)
 	if err != nil {
@@ -782,7 +780,7 @@ func TestCompletenessNamesMissingMemberAndArtifactWithoutTrustingRawEvidence(t *
 	if code(err) != nkderr.CodeReleaseIncomplete {
 		t.Fatalf("incomplete release must fail closed: %v", err)
 	}
-	for _, want := range []string{"apiserver@control-plane", "artifact " + digest('a')} {
+	for _, want := range []string{"apiserver", "artifact " + digest('a')} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("completeness error must name %q: %v", want, err)
 		}
@@ -847,7 +845,7 @@ func TestIncrementalCandidateDiffRequiresExactMemberDeclaration(t *testing.T) {
 		name   string
 		mutate func(*Member)
 	}{
-		{name: "role", mutate: func(member *Member) { member.Role = "gpu-worker" }},
+		{name: "architecture", mutate: func(member *Member) { member.Arch = "arm64" }},
 		{name: "artifact", mutate: func(member *Member) { member.ArtifactDigests = []string{digest('9')} }},
 	}
 	for _, test := range mutations {

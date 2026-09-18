@@ -1,78 +1,11 @@
 package factory
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
-
-func TestClusterCompilerBindsExactRecipeAndSelectedRole(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		change func(*Plan, *CompileSpec)
-		code   e.Code
-	}{
-		{name: "inferred role subset"},
-		{name: "explicit role subset", change: func(p *Plan, d *CompileSpec) {
-			d.Clusters[0].RoleBindings[0].Subset = append([]string(nil), p.Recipes[0].Components...)
-		}},
-		{name: "wrong recipe digest", change: func(p *Plan, _ *CompileSpec) { p.Recipes[0].RecipeDigest = "sha256:" + strings.Repeat("a", 64) }, code: e.CodeUnverifiedRef},
-		{name: "no selected role", change: func(_ *Plan, d *CompileSpec) { d.Clusters[0].RoleBindings[0].Role = "gpu-worker" }, code: e.CodeInvalidCatalog},
-		{name: "mixed resolution frames", change: func(p *Plan, d *CompileSpec) {
-			r := p.Recipes[0]
-			r.Name = "other"
-			r.Criteria.Arch = "arm64"
-			p.Recipes = append(p.Recipes, r)
-			d.Clusters[0].RecipeTargets = append(d.Clusters[0].RecipeTargets, "other")
-		}, code: e.CodeInvalidCatalog},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			plan := githubTestPlan(t)
-			definition := CompileSpec{Clusters: []ClusterSpec{{Name: "tenant", Type: cluster.TypeTenant, RecipeTargets: []string{"worker"}, RoleBindings: []cluster.RoleBinding{{Role: "worker", NodeLevelCategories: []string{"kubernetes"}}}}}}
-			if tc.change != nil {
-				tc.change(plan, &definition)
-			}
-			nodes, artifacts := map[string]Node{}, map[string]Artifact{}
-			err := addClusterCompositions(definition, plan, nodes, artifacts)
-			if tc.code != "" {
-				assertFactoryErrorCode(t, err, tc.code)
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(plan.Compositions) != 1 {
-				t.Fatalf("compositions = %+v", plan.Compositions)
-			}
-			composition := plan.Compositions[0]
-			if !reflect.DeepEqual(composition.Composition.RoleBindings[0].Subset, plan.Recipes[0].Components) || composition.Composition.Recipes[0].RecipeDigest != plan.Recipes[0].RecipeDigest {
-				t.Fatalf("composition lost recipe/SKU bindings: %+v", composition)
-			}
-			t.Chdir(t.TempDir())
-			if err := executeComposition(t.Context(), plan, nodes["composition/tenant"], artifacts); err != nil {
-				t.Fatal(err)
-			}
-			raw, err := os.ReadFile(filepath.FromSlash(artifacts["composition/tenant"].Path))
-			if err != nil {
-				t.Fatal(err)
-			}
-			var emitted cluster.ClusterComposition
-			if err := json.Unmarshal(raw, &emitted); err != nil {
-				t.Fatal(err)
-			}
-			digest, err := emitted.Digest()
-			if err != nil || digest != composition.Digest {
-				t.Fatalf("emitted composition identity = %s, %v", digest, err)
-			}
-		})
-	}
-}
 
 func TestPackageOrderingUsesDependenciesAndRejectsCycles(t *testing.T) {
 	for _, tc := range []struct {
@@ -122,7 +55,7 @@ func TestCompilerPackageAndRouteAdmissionRejectsWrongRepresentations(t *testing.
 			if tc.count == 2 {
 				inputs = append(inputs, "other")
 			}
-			artifacts := map[string]Artifact{"input": {Kind: tc.inputKind, RecipeTarget: "worker"}, "other": {Kind: tc.inputKind, RecipeTarget: "worker"}}
+			artifacts := map[string]Artifact{"input": {Kind: tc.inputKind, BuildTarget: "worker"}, "other": {Kind: tc.inputKind, BuildTarget: "worker"}}
 			assertFactoryErrorCode(t, validatePackageInputs(PackageSpec{Name: "package", Kind: tc.kind}, inputs, artifacts), e.CodeInvalidCatalog)
 		})
 	}
@@ -159,7 +92,7 @@ func TestCompilerSelectorsKeepAICRExplicitAndDeduplicate(t *testing.T) {
 	}
 }
 
-func TestCompilerHelmBindingRequiresExactImageAndRecipeSource(t *testing.T) {
+func TestCompilerHelmBindingRequiresExactImageAndBuildSource(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change func(*PackageSpec, map[string]Artifact)
@@ -173,7 +106,7 @@ func TestCompilerHelmBindingRequiresExactImageAndRecipeSource(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := PackageSpec{Name: "chart", Kind: PackageHelm, HelmImage: &HelmImageBinding{Image: "package/image", Chart: "controller"}}
-			artifacts := map[string]Artifact{"package/image": {Kind: PackageImage}, "artifact/source": {Kind: "tarball", RecipeTarget: "source"}}
+			artifacts := map[string]Artifact{"package/image": {Kind: PackageImage}, "artifact/source": {Kind: "tarball", BuildTarget: "source"}}
 			if tc.change != nil {
 				tc.change(&spec, artifacts)
 			}

@@ -1,20 +1,20 @@
 // Package ir defines nkdctl's engine-neutral pipeline IR: the fully-pinned build
 // DAG that is the single source of truth for emission, build, and verification
 // (SRD §4.5, §5.1). The full IR may carry compiler-selected Environment metadata,
-// but contains no runtime-observed host, clock, or random values. Recipe identity
+// but contains no runtime-observed host, clock, or random values. Build identity
 // is derived from the deterministic content view defined in marshal.go.
 package ir
 
 import (
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 // SchemaVersion identifies the IR shape; it participates in the digest so a schema
 // change is a pin change.
-const SchemaVersion = "nkd.dev/ir/v1"
+const SchemaVersion = "nkd.dev/ir/v3"
 
 // Node kinds.
 const (
@@ -31,8 +31,8 @@ const (
 )
 
 // Builder types (ADR-10) refine the from-source lane. The builder type is a
-// build-semantic input carried in the IR, so it is part of recipeDigest: switching
-// a component's builder is a NEW recipe, never a variant (ADR-10 §4).
+// build-semantic input carried in the IR, so it is part of buildDigest: switching
+// a component's builder is a NEW build identity, never a variant (ADR-10 §4).
 const (
 	BuilderOCIHermetic = "oci-hermetic"      // hermetic compile in a pinned toolchain container (the default)
 	BuilderNix         = "nix"               // produced from a locked flake in a pinned nix container
@@ -41,8 +41,8 @@ const (
 
 // Engine classes (ADR-07 §1) are the OBSERVED build substrate a component was
 // actually built under — recorded in the detached build record and verified equal to
-// the builder the recipe declared. Because it is an observation, it never enters the
-// recipe identity.
+// the builder the producer declared. Because it is an observation, it never enters the
+// build identity.
 const (
 	EngineOCIHermetic     = "oci-hermetic"
 	EngineNix             = "nix"
@@ -57,7 +57,7 @@ type EnvVar struct {
 
 // PatchRef is one content-addressed patch applied to the source before build.
 // Order is significant (patches apply in sequence), so it is never sorted; it is
-// part of the digest so an altered patch set changes recipeDigest (NKD-FR-RC-022).
+// part of the digest so an altered patch set changes buildDigest (NKD-FR-RC-022).
 type PatchRef struct {
 	Name    string `json:"name"`
 	SHA256  string `json:"sha256"`
@@ -65,35 +65,36 @@ type PatchRef struct {
 }
 
 // AICRActivation is the output-affecting accelerated-runtime selection bound into
-// recipe identity. These are the exact inputs passed to `aicr recipe`, plus the
+// build identity. These are the exact inputs passed to `aicr recipe`, plus the
 // digest of the canonical AICR recipe they must reproduce and the digest of the
 // exact generator executable. Human profile identity and repository location are
 // deliberately absent: they are labels/transport, not content identity.
 type AICRActivation struct {
-	Service         string `json:"service"`
-	Accelerator     string `json:"accelerator"`
-	OS              string `json:"os"`
-	Intent          string `json:"intent"`
-	Platform        string `json:"platform,omitempty"`
-	RecipeDigest    string `json:"recipeDigest"`
-	GeneratorDigest string `json:"generatorDigest"`
+	Service         string            `json:"service"`
+	Accelerator     string            `json:"accelerator"`
+	OS              string            `json:"os"`
+	Intent          string            `json:"intent"`
+	Platform        string            `json:"platform,omitempty"`
+	ProfileDigest   string            `json:"profileDigest"`
+	GeneratorDigest string            `json:"generatorDigest"`
+	Bundle          aicr.BundleInputs `json:"bundle"`
 }
 
-// Validate prevents a caller-composed IR from gaining a recipe identity while
+// Validate prevents a caller-composed IR from gaining a build identity while
 // omitting either AICR authority pin or carrying unsupported generator inputs.
 func (a AICRActivation) Validate() error {
-	if !canonical.IsDigest(a.RecipeDigest) {
+	if !canonical.IsDigest(a.ProfileDigest) {
 		return e.New(e.CodeUnpinnedSource,
-			"AICR activation recipe digest %q is not a lowercase sha256:<64-hex> pin", a.RecipeDigest)
+			"AICR activation recipe digest %q is not a lowercase sha256:<64-hex> pin", a.ProfileDigest)
 	}
 	if !canonical.IsDigest(a.GeneratorDigest) {
 		return e.New(e.CodeUnpinnedSource,
 			"AICR activation generator digest %q is not a lowercase sha256:<64-hex> pin", a.GeneratorDigest)
 	}
-	if err := criteria.ValidateAICRValues(a.Service, a.Accelerator, a.OS, a.Intent, a.Platform); err != nil {
+	if err := aicr.ValidateValues(a.Service, a.Accelerator, a.OS, a.Intent, a.Platform); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "AICR activation")
 	}
-	return nil
+	return a.Bundle.Validate()
 }
 
 // Node is one vertex of the build DAG. Field presence depends on Kind; unused
@@ -105,10 +106,10 @@ type Node struct {
 	// Requirements is the deterministic runner request for this step. Build nodes are
 	// the currently admitted kind; other kinds fail closed until their compiler
 	// projection exists. It travels with executable bytes but is excluded from
-	// recipeDigest because it does not describe the content produced by the recipe.
+	// buildDigest because it does not describe the content produced by the graph.
 	Requirements *execution.Requirements `json:"requirements,omitempty"`
 	// ExecutionBinding is the exact Environment execution class selected by the
-	// factory compiler. It is executable Plan metadata and is excluded from Recipe
+	// factory compiler. It is executable Plan metadata and is excluded from Build
 	// identity. An unbound graph remains valid before Environment compilation.
 	ExecutionBinding *execution.Binding `json:"executionBinding,omitempty"`
 
@@ -123,7 +124,7 @@ type Node struct {
 	// pull (the prebuilt-acquire lane — NKD-FR-BLD-050): download a pinned artifact
 	// instead of building it. The reproducibility pin moves from "same inputs rebuild
 	// the same bytes" to "these exact content-addressed bytes": Digest is the expected
-	// sha256 of the acquired artifact and is part of recipeDigest (a repin is a recipe
+	// sha256 of the acquired artifact and is part of buildDigest (a repin is a build identity
 	// change, exactly as a source-commit bump is). Fail-closed: acquisition verifies the
 	// bytes against Digest and refuses a mismatch — no from-source guarantee is claimed.
 	Artifact string `json:"artifact,omitempty"` // https URL (binary) or OCI image name (pulled by @Digest); {{.Arch}} already resolved
@@ -132,12 +133,12 @@ type Node struct {
 	// build
 	Component string `json:"component,omitempty"`
 	// BuilderType selects the from-source build substrate (oci-hermetic | nix,
-	// ADR-10). It is a build-semantic input, so it participates in recipeDigest; the
+	// ADR-10). It is a build-semantic input, so it participates in buildDigest; the
 	// runner dispatches on it and records the observed engineClass for verify.
 	BuilderType string `json:"builderType,omitempty"`
 	// FlakeRef / FlakeOutput / FlakeLockDigest pin a nix build's locked flake, output
 	// attribute, and transitive-closure lock digest (ADR-10 §2); empty for an
-	// oci-hermetic build. FlakeRef is transport (not in recipeDigest); FlakeLockDigest
+	// oci-hermetic build. FlakeRef is transport (not in buildDigest); FlakeLockDigest
 	// and FlakeOutput are the nix content identity. The closure is pre-realized in the
 	// fetch step and the build runs offline against it.
 	FlakeRef        string `json:"flakeRef,omitempty"`
@@ -147,8 +148,8 @@ type Node struct {
 	// Platform is the target run platform (linux/<arch>). It forces the container to
 	// run the toolchain image's NATIVE arch variant (of a multi-arch toolchain) — or,
 	// on a foreign host, under emulation — so GOARCH compilation is native, never a
-	// cross-compile (model B). Derived from criteria.Arch, so it is part of the
-	// per-arch recipeDigest (NKD-NFR-093).
+	// cross-compile (model B). Derived from the selected target platform, so it is part of the
+	// per-arch buildDigest (NKD-NFR-093).
 	Platform   string     `json:"platform,omitempty"`
 	Network    string     `json:"network,omitempty"`
 	Env        []EnvVar   `json:"env,omitempty"`     // sorted by Name
@@ -176,12 +177,11 @@ type Node struct {
 
 // Graph is the whole resolved pipeline IR.
 type Graph struct {
-	SchemaVersion string            `json:"schemaVersion"`
-	RecipeID      string            `json:"recipeId"`
-	Criteria      criteria.Criteria `json:"criteria"`
-	// AICR is present only for an activated accelerated-runtime recipe. It remains in
+	SchemaVersion string `json:"schemaVersion"`
+	Platform      string `json:"platform"`
+	// AICR is present only for an explicitly selected AICR profile. It remains in
 	// LogicalGraph because changing any generator input or its pinned canonical output
-	// changes what is rendered and must therefore change recipeDigest.
+	// changes what is rendered and must therefore change buildDigest.
 	AICR  *AICRActivation `json:"aicr,omitempty"`
 	Nodes []Node          `json:"nodes"` // sorted by ID
 }

@@ -249,13 +249,13 @@ func releaseFromVectorsCmd() *cli.Command {
 	}
 }
 
-// releaseAdvisoryCmd maps an advisory to the recipe digests it affects over a
+// releaseAdvisoryCmd maps an advisory to the build digests it affects over a
 // CALLER-SUPPLIED resolvable set (ADR-13 §4) — NKD keeps no fleet index, so any digest
 // it cannot independently recompute fails closed.
 func releaseAdvisoryCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "advisory",
-		Usage: "disabled legacy advisory path (a recomputing recipe-index adapter is required)",
+		Usage: "disabled legacy advisory path (a recomputing build-index adapter is required)",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "id", Hidden: true},
 			&cli.StringSliceFlag{Name: "affected", Hidden: true},
@@ -265,7 +265,7 @@ func releaseAdvisoryCmd() *cli.Command {
 		},
 		Action: func(*cli.Context) error {
 			return e.New(e.CodeUnsupported,
-				"legacy advisory is disabled: --resolvable caller booleans do not prove recipe identity; configure an adapter that recomputes every affected recipe digest")
+				"legacy advisory is disabled: --resolvable caller booleans do not prove build identity; configure an adapter that recomputes every affected build digest")
 		},
 	}
 }

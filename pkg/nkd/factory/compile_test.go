@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 )
 
 func TestUnsetRunsOnDefaultsToGenericRunner(t *testing.T) {
@@ -20,17 +19,15 @@ func TestUnsetRunsOnDefaultsToGenericRunner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// No runsOn anywhere (definition or recipe target): ADR-18 §8 runs on a generic
+	// No runsOn anywhere (definition or build target): ADR-18 §8 runs on a generic
 	// runner, so compilation must DEFAULT the label rather than fail, and every emitted node
 	// must carry the generic runner — no bespoke self-hosted label is ever required.
 	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
 		Metadata: Metadata{Name: "ai-factory"}, Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
 		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
 		UtilityPlatform:  "linux/amd64",
-		Recipes: []RecipeTarget{{Name: "node-worker", Criteria: criteria.Criteria{
-			Category: "kubernetes", Role: "worker", K8sVersion: "1.34.0", OS: "ubuntu", Arch: "amd64",
-		}}},
-		Packages: []PackageSpec{{Name: "node-tools", Kind: PackageBinaryBundle, Inputs: []string{"node-worker/*"}}},
+		Builds:           []BuildTarget{{Name: "node-worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
+		Packages:         []PackageSpec{{Name: "node-tools", Kind: PackageBinaryBundle, Inputs: []string{"node-worker/*"}}},
 	}
 	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
 		Metadata: Metadata{Name: "env"},
@@ -52,8 +49,8 @@ func TestUnsetRunsOnDefaultsToGenericRunner(t *testing.T) {
 			t.Fatalf("unconstrained node %q received execution binding %#v", node.ID, node.ExecutionBinding)
 		}
 	}
-	for _, recipe := range plan.Recipes {
-		for _, node := range recipe.Graph.Nodes {
+	for _, build := range plan.Builds {
+		for _, node := range build.Graph.Nodes {
 			if node.ExecutionBinding != nil {
 				t.Fatalf("unconstrained IR node %q received execution binding %#v", node.ID, node.ExecutionBinding)
 			}
@@ -74,9 +71,7 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 		Metadata: Metadata{Name: "ai-factory"}, RunsOn: "ubuntu-24.04", Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
 		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
 		UtilityPlatform:  "linux/amd64",
-		Recipes: []RecipeTarget{{Name: "node-worker", RunsOn: "ubuntu-24.04", Criteria: criteria.Criteria{
-			Category: "kubernetes", Role: "worker", K8sVersion: "1.34.0", OS: "ubuntu", Arch: "amd64",
-		}}},
+		Builds:           []BuildTarget{{Name: "node-worker", RunsOn: "ubuntu-24.04", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
 		Packages: []PackageSpec{
 			{Name: "node-tools", Kind: PackageBinaryBundle, Inputs: []string{"node-worker/*"}},
 			{Name: "node-apt", Kind: PackageAPT, Inputs: []string{"node-worker/containerd"}, Distribution: "stable", Component: "main"},
@@ -119,10 +114,10 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 		t.Fatal(err)
 	}
 	withOverride := definition
-	withOverride.Recipes = append([]RecipeTarget(nil), definition.Recipes...)
-	withOverride.Recipes[0].Catalog = &CatalogStack{Base: "another-catalog"}
+	withOverride.Builds = append([]BuildTarget(nil), definition.Builds...)
+	withOverride.Builds[0].Catalog = &CatalogStack{Base: "another-catalog"}
 	if _, err := Compile(context.Background(), withOverride, delivery, stack, "test"); err == nil {
-		t.Fatal("direct compiler silently ignored a recipe-specific catalog override")
+		t.Fatal("direct compiler silently ignored a build-specific catalog override")
 	}
 	delivery.Targets["apt"] = Target{Kind: TargetAPT, Ref: "https://apt.example.invalid/nkd", Anonymous: true}
 	delivery.Routes = []Route{{Name: "node-apt", Input: "package/node-apt", Target: "apt"}}
@@ -134,7 +129,7 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 func TestPackageSpecsUseArtifactTopologyNotAuthoredOrLexicalOrder(t *testing.T) {
 	ordered, err := orderPackageSpecs([]PackageSpec{
 		{Name: "aggregate", Inputs: []string{"package/z-bundle"}},
-		{Name: "z-bundle", Inputs: []string{"recipe/component"}},
+		{Name: "z-bundle", Inputs: []string{"build/component"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -172,10 +167,10 @@ func TestArtifactGraphRejectsMissingInputAndCycle(t *testing.T) {
 		t.Fatal("artifact dataflow cycle was accepted")
 	}
 	unsafe := ArtifactGraph{SchemaVersion: ArtifactGraphSchema,
-		Nodes: []Node{{ID: "composition/a", Kind: NodeComposition, Network: "none", RunsOn: "linux",
+		Nodes: []Node{{ID: "package/a", Kind: NodePackage, Network: "none", RunsOn: "linux",
 			Outputs: []string{"artifact/a"}}},
-		Artifacts: []Artifact{{ID: "artifact/a", Name: "a", Kind: "composition", Path: "../escape",
-			Producer: "composition/a"}},
+		Artifacts: []Artifact{{ID: "artifact/a", Name: "a", Kind: "binary-bundle", Path: "../escape",
+			Producer: "package/a"}},
 	}
 	if err := unsafe.Validate(); err == nil {
 		t.Fatal("unsafe artifact transport path was accepted")

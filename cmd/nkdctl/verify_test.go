@@ -13,15 +13,14 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 	"github.com/urfave/cli/v2"
 )
@@ -36,7 +35,7 @@ const (
 	testCertificateDigest = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 )
 
-var testRecipeDigest = func() string {
+var testBuildDigest = func() string {
 	digest, err := prebuiltFixtureGraph().Digest()
 	if err != nil {
 		panic(err)
@@ -87,8 +86,7 @@ func manifestBytes(t *testing.T, manifest *attest.Manifest) []byte {
 func prebuiltVector(artifactDigest string) *attest.Manifest {
 	return &attest.Manifest{
 		SchemaVersion: attest.SchemaVersion,
-		RecipeID:      "test-recipe",
-		RecipeDigest:  testRecipeDigest,
+		BuildDigest:   testBuildDigest,
 		Evidence: &attest.EvidenceRef{
 			SBOMDigest: verifyTestDigest('8'), ProvenanceDigest: verifyTestDigest('9'),
 		},
@@ -99,17 +97,16 @@ func prebuiltVector(artifactDigest string) *attest.Manifest {
 	}
 }
 
-func acceptTestEvidence(context.Context, trust.DocumentReceipt, *recipe.Resolved, *pipeline.Report) error {
+func acceptTestEvidence(context.Context, trust.DocumentReceipt, *buildgraph.Resolved, *pipeline.Report) error {
 	return nil
 }
 
 func prebuiltFixtureGraph() *ir.Graph {
 	return &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, RecipeID: "test-recipe",
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
 		Nodes: []ir.Node{
 			{ID: "pull-artifact", Kind: ir.KindPull, Component: "artifact", OutputType: "raw",
-				Artifact: "file:///artifact", Digest: testArtifactDigest, Platform: "linux/amd64",
+				Artifact: "https://example.invalid/artifact", Digest: testArtifactDigest, Platform: "linux/amd64",
 				Network: ir.NetworkDefault, ArtifactPath: "artifact", Version: "1.0.0"},
 			{ID: "verify", Kind: ir.KindVerify, Needs: []string{"pull-artifact"}},
 		},
@@ -143,7 +140,7 @@ func prebuiltReport(t *testing.T, artifactDigest string) *pipeline.Report {
 	if err := os.WriteFile(filepath.Join(resultsDir, "pull-artifact.json"), raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	report, err := (pipeline.Local{}).VerifyResults(graph, testRecipeDigest, resultsDir, pipeline.RunOptions{
+	report, err := (pipeline.Local{}).VerifyResults(graph, testBuildDigest, resultsDir, pipeline.RunOptions{
 		Ctx: context.Background(), SourceRoot: sourceRoot,
 	})
 	if err != nil {
@@ -152,12 +149,12 @@ func prebuiltReport(t *testing.T, artifactDigest string) *pipeline.Report {
 	return report
 }
 
-func prebuiltResolved() *recipe.Resolved {
-	return &recipe.Resolved{
-		RecipeID: "test-recipe", Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{
+func prebuiltResolved() *buildgraph.Resolved {
+	return &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			Tag: "v1.0.0", OutputType: "raw", Prebuilt: &catalog.Prebuilt{
-				URL: "file:///artifact", Digests: map[string]string{"amd64": testArtifactDigest},
+				URL: "https://example.invalid/artifact", Digests: map[string]string{"amd64": testArtifactDigest},
 				Evidence: &catalog.ExternalEvidence{None: true},
 			},
 		}}},
@@ -194,7 +191,7 @@ func authenticateVectorReceipt(t *testing.T, raw []byte) trust.DocumentReceipt {
 func TestVerifyEvidenceUsesAuthenticatedVectorAndTerminalPublisherAuthority(t *testing.T) {
 	ctx := context.Background()
 	resolved := prebuiltResolved()
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,8 +312,8 @@ func TestVerifyCLIUsesAuthenticatedVectorSnapshotAfterPathMutation(t *testing.T)
 			}
 			return cliEvidence(vectorSigner, vectorIssuer), nil
 		}),
-		Resolve: func(*cli.Context) (*recipe.Resolved, string, error) { return prebuiltResolved(), "", nil },
-		Build: func(c *cli.Context, _ *recipe.Resolved, _ *profile.BuilderProfile, _ profile.HostPreflightReceipt) (*pipeline.Report, error) {
+		Resolve: func(*cli.Context) (*buildgraph.Resolved, string, error) { return prebuiltResolved(), "", nil },
+		Build: func(c *cli.Context, _ *buildgraph.Resolved, _ *profile.BuilderProfile, _ profile.HostPreflightReceipt) (*pipeline.Report, error) {
 			if c.Context.Value(requestContextKey{}) != "request-context" {
 				t.Fatal("CLI did not propagate request context to build seam")
 			}
@@ -344,11 +341,11 @@ func TestVerifyCLIRejectsEvidenceFreeSignedVectorBeforeBuild(t *testing.T) {
 		Verifier: cliVerifierFunc(func(context.Context, trust.DocumentVerificationRequest) (trust.VerificationEvidence, error) {
 			return cliEvidence(vectorSigner, vectorIssuer), nil
 		}),
-		Resolve: func(*cli.Context) (*recipe.Resolved, string, error) {
+		Resolve: func(*cli.Context) (*buildgraph.Resolved, string, error) {
 			t.Fatal("evidence-free vector reached resolution")
 			return nil, "", nil
 		},
-		Build: func(*cli.Context, *recipe.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error) {
+		Build: func(*cli.Context, *buildgraph.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error) {
 			buildCalled = true
 			return nil, nil
 		},
@@ -388,8 +385,8 @@ func TestVerifyCLIMandatoryAuthenticationAndOfflineMaterial(t *testing.T) {
 			verifierCalls++
 			return cliEvidence(vectorSigner, vectorIssuer), nil
 		}),
-		Resolve: func(*cli.Context) (*recipe.Resolved, string, error) { return prebuiltResolved(), "", nil },
-		Build: func(*cli.Context, *recipe.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error) {
+		Resolve: func(*cli.Context) (*buildgraph.Resolved, string, error) { return prebuiltResolved(), "", nil },
+		Build: func(*cli.Context, *buildgraph.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error) {
 			t.Fatal("authentication failure reached build")
 			return nil, nil
 		},
@@ -451,8 +448,8 @@ func TestVerifyCLIRejectsFabricatedSignerAndNonCanonicalVector(t *testing.T) {
 			Verifier: cliVerifierFunc(func(context.Context, trust.DocumentVerificationRequest) (trust.VerificationEvidence, error) {
 				return evidence, nil
 			}),
-			Resolve: func(*cli.Context) (*recipe.Resolved, string, error) { return prebuiltResolved(), "", nil },
-			Build: func(*cli.Context, *recipe.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error) {
+			Resolve: func(*cli.Context) (*buildgraph.Resolved, string, error) { return prebuiltResolved(), "", nil },
+			Build: func(*cli.Context, *buildgraph.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error) {
 				t.Fatal("rejected document reached build")
 				return nil, nil
 			},
@@ -500,9 +497,9 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 		t.Fatal(err)
 	}
 	profilePath := writeCLIFile(t, "profile.json", profileRaw)
-	resolvedFixture := &recipe.Resolved{
-		RecipeID: "test-recipe", Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{
+	resolvedFixture := &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			FromSource: true, BuilderType: "oci-hermetic", Tag: "v1.0.0", SourceDate: 1,
 			ToolchainImage: "toolchain@sha256:" + strings.Repeat("6", 64),
 			Repo:           "https://source.example/repo", Commit: strings.Repeat("1", 40),
@@ -510,11 +507,11 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 			WriteDir: "out", ArtifactPath: "out/artifact", OutputType: "raw",
 		}}},
 	}
-	graph, err := recipe.Compile(resolvedFixture)
+	graph, err := buildgraph.Compile(resolvedFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,8 +526,7 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 	}
 	vector := &attest.Manifest{
 		SchemaVersion:  attest.SchemaVersion,
-		RecipeID:       "test-recipe",
-		RecipeDigest:   recipeDigest,
+		BuildDigest:    buildDigest,
 		ProfileDigest:  profileDigest,
 		BuilderProfile: &attest.BuilderProfileRef{Digest: profileDigest},
 		Components: []attest.ComponentDigest{{
@@ -561,8 +557,8 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 				return trust.VerificationEvidence{}, nil
 			}
 		}),
-		Resolve: func(*cli.Context) (*recipe.Resolved, string, error) { return resolvedFixture, recipeDigest, nil },
-		Build: func(c *cli.Context, resolved *recipe.Resolved, gotProfile *profile.BuilderProfile, host profile.HostPreflightReceipt) (*pipeline.Report, error) {
+		Resolve: func(*cli.Context) (*buildgraph.Resolved, string, error) { return resolvedFixture, buildDigest, nil },
+		Build: func(c *cli.Context, resolved *buildgraph.Resolved, gotProfile *profile.BuilderProfile, host profile.HostPreflightReceipt) (*pipeline.Report, error) {
 			if gotProfile == nil || gotProfile.Identity != originalProfile.Identity {
 				t.Fatalf("build did not receive authenticated profile object: %#v", gotProfile)
 			}
@@ -606,7 +602,7 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 			if err := os.WriteFile(filepath.Join(resultsDir, buildNode.ID+".json"), raw, 0o600); err != nil {
 				return nil, err
 			}
-			return pipeline.Local{}.VerifyResults(graph, recipeDigest, resultsDir, pipeline.RunOptions{
+			return pipeline.Local{}.VerifyResults(graph, buildDigest, resultsDir, pipeline.RunOptions{
 				Ctx: c.Context, SourceRoot: sourceRoot, Runtime: os.Args[0],
 				Qualification: &pipeline.QualifiedExecution{
 					Profile: *gotProfile, HostReceipt: host,
@@ -636,21 +632,20 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 
 func TestVerifyCLITerminalResultsUseReceiptsWithoutSourceBuild(t *testing.T) {
 	work := filepath.Join(t.TempDir(), "work")
-	res := &recipe.Resolved{
-		RecipeID: "terminal-recipe",
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{
+	res := &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			FromSource: true, BuilderType: ir.BuilderOCIHermetic, Tag: "v1.0.0", SourceDate: 1,
-			Repo: "file:///definitely-not-a-source-repository", Commit: strings.Repeat("1", 40),
+			Repo: "https://must-not-be-contacted.invalid/source", Commit: strings.Repeat("1", 40),
 			TreeHash: strings.Repeat("2", 40), ToolchainImage: "toolchain@sha256:" + strings.Repeat("3", 64),
 			OutputType: "raw", BuildCommand: []string{"false"}, WriteDir: "out", ArtifactPath: "out/artifact",
 		}}},
 	}
-	graph, err := recipe.Compile(res)
+	graph, err := buildgraph.Compile(res)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -718,7 +713,7 @@ func TestVerifyCLITerminalResultsUseReceiptsWithoutSourceBuild(t *testing.T) {
 		toolchainIdentity = digest
 	}
 	vector := &attest.Manifest{
-		SchemaVersion: attest.SchemaVersion, RecipeID: res.RecipeID, RecipeDigest: recipeDigest,
+		SchemaVersion: attest.SchemaVersion, BuildDigest: buildDigest,
 		ProfileDigest: profileDigest, BuilderProfile: &attest.BuilderProfileRef{Digest: profileDigest},
 		Components: []attest.ComponentDigest{{
 			Name: buildNode.Component, OutputType: buildNode.OutputType, Toolchain: toolchainIdentity,
@@ -748,8 +743,8 @@ func TestVerifyCLITerminalResultsUseReceiptsWithoutSourceBuild(t *testing.T) {
 				return trust.VerificationEvidence{}, nil
 			}
 		}),
-		Resolve: func(*cli.Context) (*recipe.Resolved, string, error) { return res, recipeDigest, nil },
-		Build: func(c *cli.Context, _ *recipe.Resolved, gotProfile *profile.BuilderProfile, host profile.HostPreflightReceipt) (*pipeline.Report, error) {
+		Resolve: func(*cli.Context) (*buildgraph.Resolved, string, error) { return res, buildDigest, nil },
+		Build: func(c *cli.Context, _ *buildgraph.Resolved, gotProfile *profile.BuilderProfile, host profile.HostPreflightReceipt) (*pipeline.Report, error) {
 			observation := profile.ExecutionObservation{
 				RunnerDigest: "sha256:" + strings.Repeat("4", 64), RunnerOrigin: profile.RunnerPreexisting,
 				RuntimeIdentity: "sha256:" + strings.Repeat("5", 64),
@@ -773,7 +768,7 @@ func TestVerifyCLITerminalResultsUseReceiptsWithoutSourceBuild(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(resultsDir, buildNode.ID+".json"), raw, 0o600); err != nil {
 				return nil, err
 			}
-			return pipeline.Local{}.VerifyResults(graph, recipeDigest, resultsDir, pipeline.RunOptions{
+			return pipeline.Local{}.VerifyResults(graph, buildDigest, resultsDir, pipeline.RunOptions{
 				Ctx: c.Context, SourceRoot: sourceRoot, Runtime: os.Args[0],
 				Qualification: &pipeline.QualifiedExecution{
 					Profile: *gotProfile, HostReceipt: host,

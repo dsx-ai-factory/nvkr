@@ -10,7 +10,6 @@ import (
 
 	client "github.com/NVIDIA/nke-recipes/client/v1"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
@@ -20,14 +19,11 @@ import (
 func TestDiagnosticSBOMConsumesSelectedBakeOffRecordOnlyWithExplicitFlag(t *testing.T) {
 	ctx := context.Background()
 	data := filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")
-	resolution, err := client.New(client.WithData(data)).ResolveRecipe(ctx, client.ResolveRequest{Criteria: criteria.Criteria{
-		Category: "kubernetes", Role: "worker", K8sVersion: "1.32.0",
-		OS: "ubuntu", Arch: "amd64",
-	}})
+	resolution, err := client.New(client.WithData(data)).ResolveBuild(ctx, client.ResolveRequest{Components: []string{"crictl", "kubectl"}, Platform: "linux/amd64"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolved, recipeDigest := resolution.Resolved, resolution.RecipeDigest
+	resolved, buildDigest := resolution.Resolved, resolution.BuildDigest
 	var outputType, toolchain string
 	for _, component := range resolved.Components {
 		if component.Name == "crictl" {
@@ -48,7 +44,7 @@ func TestDiagnosticSBOMConsumesSelectedBakeOffRecordOnlyWithExplicitFlag(t *test
 		t.Fatal(err)
 	}
 	manifest := &attest.Manifest{
-		SchemaVersion: attest.SchemaVersion, RecipeID: resolved.RecipeID, RecipeDigest: recipeDigest,
+		SchemaVersion: attest.SchemaVersion, BuildDigest: buildDigest,
 		ProfileDigest: profileDigest,
 		BuilderProfile: &attest.BuilderProfileRef{
 			ID: selectedProfile.Identity, Digest: profileDigest,
@@ -72,8 +68,7 @@ func TestDiagnosticSBOMConsumesSelectedBakeOffRecordOnlyWithExplicitFlag(t *test
 
 	app := &cli.App{Commands: []*cli.Command{cmdSBOM()}}
 	strictOut := filepath.Join(t.TempDir(), "strict.json")
-	strictArgs := []string{"nkdctl", "sbom", "--category", "kubernetes", "--role", "worker",
-		"--k8s", "1.32.0", "--arch", "amd64", "--data", data, "--expected-digests", record, "--out", strictOut}
+	strictArgs := []string{"nkdctl", "sbom", "--component", "crictl,kubectl", "--platform", "linux/amd64", "--data", data, "--expected-digests", record, "--out", strictOut}
 	if err := app.RunContext(ctx, strictArgs); err == nil {
 		t.Fatal("diagnostic observation was accepted without --diagnostic")
 	}
@@ -137,8 +132,8 @@ func TestDiagnosticSBOMConsumesSelectedBakeOffRecordOnlyWithExplicitFlag(t *test
 	if err := json.Unmarshal(indexBytes, &index); err != nil {
 		t.Fatal(err)
 	}
-	if index.RecipeDigest != recipeDigest || len(index.Entries) != 1 {
-		t.Fatalf("index lost recipe/scope: %+v", index)
+	if index.BuildDigest != buildDigest || len(index.Entries) != 1 {
+		t.Fatalf("index lost build/scope: %+v", index)
 	}
 	artifactDigest, err := artifactBOM.Digest()
 	if err != nil {

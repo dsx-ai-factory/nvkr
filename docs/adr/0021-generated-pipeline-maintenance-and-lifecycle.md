@@ -7,7 +7,7 @@
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-21 in the consolidated NKD ADR set (added to close the day-2 pipeline-maintenance gap).
-- **Relates to:** ADR-18 (what is emitted / the runner), ADR-11 (merge algebra reused for extensions), ADR-07
+- **Relates to:** ADR-18 (what is emitted / the runner), ADR-11 (catalog producer overlays), ADR-07
   (runner/profile digest, re-sign), ADR-22 (the pin/lock contract a bump edits), ADR-01 (canonical codec +
   digest provenance), ADR-17 (CLI verbs), ADR-20 (publish phase).
 - **Satisfies:** FR-05 (CI portability), FR-21 (standard, replaceable interfaces); supports FR-20 (coded
@@ -26,15 +26,19 @@ This ADR fixes maintenance.
 
 ### 1. The emitted pipeline is a generated artifact, not an owned scaffold
 
-`run generate` is the normal owner of committed workflows, plans, graphs, compositions and manifests. Every
+`run generate` is the normal owner of committed workflows, plans, graphs and manifests. Every
 owned file regenerates byte-for-byte from exact Definition, Environment, catalog pins, generator version and
 engine. Drift checks repeat the recorded Definition and Environment inputs without substituting a different
-catalog, path or engine. The former factory catalog and its indexed-selection workflow are removed.
+catalog, path or engine. Definition v4 outputs select exact producers and a concrete platform directly;
+generated plans and graph paths are keyed by output name. The former recipe selection and catalog criteria
+workflow are removed. Cluster-composition files and nodes are also removed; regeneration retires former
+owned members through the same prior-manifest checks described below. Changed graph/plan and lifecycle records use their new schema majors; old records
+cannot be relabeled into current identities.
 
-Execution identity and transaction identity are separate. The execution-bundle identity binds engine, Recipe/
+Execution identity and transaction identity are separate. The execution-bundle identity binds engine, build/
 plan identities, canonical nodes, transport plan and rendered provider body, excluding its own provenance header.
-The commit manifest lists each owned file's safe relative path, media type, mode and exact whole-file digest,
-plus execution identity. It is written last and never lists itself. No self-referential identity is permitted.
+The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
+plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
 
 Owned payloads are generated provider/configuration files and canonical graph/plan records. Catalogs, profiles,
 vectors, roots and credentials remain external inputs whose exact references/policies are recorded, not copied
@@ -96,12 +100,14 @@ The generator-is-canonical rule (§1) needs a sanctioned seam for "add a Slack n
 There are **two**, and an operator may use either or both:
 
 - **Declared extension overlay.** The `bundle` config declares named hook points (`pre-build`, `post-verify`,
-  `pre-publish`) whose contents the operator supplies; `bundle` **merges them deterministically using ADR-11's
-  merge algebra**, so extensions are part of `bundleDigest` and stay drift-checkable. In-pipeline steps that must
+  `pre-publish`) whose contents the operator supplies; `bundle` must compose them under a separately specified deterministic hook contract, so extensions are part of `bundleDigest` and stay drift-checkable. In-pipeline steps that must
   be gated or audited belong here.
 - **Emit-callable form.** `bundle --emit-callable` emits the pipeline as a reusable unit (reusable workflow /
   `include:` / composed Pipeline) so an operator's **outer, operator-owned** workflow can invoke the pristine
   generated pipeline and wrap it with org logic, leaving the generated file untouched.
+
+These deferred pipeline hooks do not restore removed recipe layers or mixins. Catalog overlay v3 remains
+a separate whole-producer replacement operation.
 
 Editing the generated file directly remains out of contract; the drift gate rejects it. These are proposed
 alternatives, unavailable at the current CLI boundary until their admission and transport contracts exist.
@@ -109,7 +115,7 @@ alternatives, unavailable at the current CLI boundary until their admission and 
 ### 5. Runner/bootstrap self-upgrade is a profile change, not a catalog change
 
 Helper/runtime upgrades belong to Environment and, for qualified execution, the signed builder profile.
-Component toolchains and output-affecting inputs belong to Recipe/catalog identity. Neither owner can override
+Component toolchains and output-affecting inputs belong to producer/catalog identity. Neither owner can override
 the other's pins. From-source helper bootstrap measures the actual helper and bootstrap toolchain; a preexisting
 helper must not claim a bootstrap that did not participate (ADR-07/18).
 
@@ -117,41 +123,37 @@ For the qualified source-bootstrap path, `profile repin --runner|--bootstrap-too
 and re-signs; regeneration accompanies the change and actual execution must reproduce the expected helper and
 pass stage two. A pinned helper image is an alternative transport, not automatic qualified admission. Its
 qualified path remains unavailable until the exact executable/runtime observation contract is implemented.
-The legacy `--toolchain` spelling cannot alter component Recipe pins.
+The legacy `--toolchain` spelling cannot alter component producer pins.
 
-### 6. Concurrency: Git serializes branches; local writers use atomic compare-and-swap
+### 6. Serialized local writes and exact retirement of generated members
 
-A bump is a pure function of immutable inputs producing a staged lock/bundle change (ADR-22), but Git serializes
-only actors operating in **separate branches or worktrees**. Two processes writing the same checkout can both
-read the old lock, and one update is lost before Git observes anything.
+Catalog lock writes use original-byte compare-and-swap, a persistent kernel lock inode, same-filesystem
+staging, fsync and atomic replacement (ADR-22). Generated Run writes acquire their per-bundle kernel lock,
+stage complete files and fsync them, publish payloads, retire obsolete members, and replace the manifest last.
+The current generated Run writer serializes same-checkout writers; it does not promise an optimistic CAS
+conflict for two separately compiled bundles.
 
-Every mutating command therefore:
+Retirement reads the previous generated-run/v1 manifest as a bounded ownership description. It validates
+its schema, engine, workflow path, sorted member paths, digests and modes. A member may be retired only
+inside the generator-owned directory and only when it is a regular file whose current bytes and mode still
+match that manifest. Missing obsolete members are tolerated for retry after an interrupted retirement.
+Symlinks, changed obsolete members and unlisted directory members fail closed before payload publication.
+A missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by
+retired members are removed nonrecursively; unknown files are never swept by a recursive cleanup.
 
-1. records the original digest/version of each input and destination;
-2. writes and fsyncs complete replacements in same-filesystem temporary paths;
-3. acquires a short-lived **per-target commit lock** through a persistent owner-only regular lock inode and a
-   kernel advisory lock, then rechecks all original digests while holding it and returns a distinct coded
-   `write-conflict` if any changed; and
-4. atomically renames outputs, writing the bundle manifest/transaction marker last, fsyncs the directory, and
-   only then releases the kernel lock.
+Payload replacement and retirement are not atomic across the directory. The writer rechecks retired bytes
+before removal, writes the new manifest last, and fsyncs generated directories. A process crash may leave
+mixed payloads or incomplete retirement that fails the byte-exact check; regeneration is the recovery path
+when the prior ownership record remains available. The writer does not claim a crash-wide transaction or
+protection from an arbitrary same-user editor outside its kernel lock. If an older generator already replaced
+the ownership manifest while leaving old files behind, recover the authentic prior manifest from version
+control before regeneration; the current writer does not guess which unlisted files it may delete.
 
-The lock is scoped to one lock or bundle root and is held only for the local commit, never during network
-resolution or builds. Acquisition uses non-blocking kernel attempts plus context-aware retry, never an
-uninterruptible wait. The owner-only inode is opened without following symlinks and is intentionally never
-removed: process death releases kernel ownership automatically, and the unlocked inode and any stale PID metadata
-remain safely reusable. File contents are diagnostic only and never establish ownership. Platforms without
-equivalent kernel-lock semantics must fail closed. This closes the compare-then-rename race without an `O_EXCL`
-sentinel whose crash recovery would require unsafe stale-owner guessing or operator deletion.
-
-The lockfile is a single-file atomic compare-and-swap. A multi-file bundle is a crash-consistent transaction: all
-files are staged first, all destinations pass CAS, payloads are replaced, and the manifest is replaced last. A
-crash can leave a detectable incomplete generation, but cannot leave a new valid manifest authenticating old or
-partial payloads. Recovery is deterministic regeneration. Commands never truncate a previously valid target
-before verification succeeds.
-
-NKD requires no daemon and no global distributed lock. Scheduled automation uses a dedicated branch or worktree;
-Git PR merge serializes separate actors, while the local commit lock plus CAS prevents same-checkout lost
-updates. This distinction is part of the interface, not an implementation detail.
+The persistent owner-only lock inode is opened without following symlinks and is never removed. Process death
+releases kernel ownership automatically. Acquisition uses nonblocking attempts with context-aware retries;
+unsupported lock platforms fail closed. Staging honors cancellation; after publication begins the small
+commit finishes without voluntary cancellation. No daemon or distributed lock is required. Separate branches
+and worktrees retain Git's ordinary review and merge-conflict behavior.
 
 ### 7. Single-owner rule for "the CI files"
 
@@ -178,14 +180,14 @@ disallowed; that ambiguity is what makes forgotten-regen drift possible.
 
 ## Alternatives considered
 
-- **One-time scaffold the operator then owns.** Rejected — silent drift breaks "the pipeline builds this
-  recipe"; the byte-identity claim evaporates.
+- **One-time scaffold the operator then owns.** Rejected — silent drift breaks "the pipeline builds these
+  selected producers"; the byte-identity claim evaporates.
 - **Route the runner/bootstrap bump through `catalog bump`.** Rejected — it puts environment identity in the
   definition and skips the required profile re-sign (§5).
 - **Overlay OR emit-callable, pick one.** Rejected — in-pipeline gated steps need the drift-checkable overlay
   and org-owned wrapping needs the callable form; they serve different needs.
 - **Rely on Git for concurrent writers in one checkout.** Rejected — Git sees only the last filesystem state and
-  cannot detect a pre-commit lost update. Local optimistic CAS is required; a daemon or global lock is still
+  cannot detect a pre-commit lost update. Catalog lock CAS and bundle serialization are required; a daemon or global lock is still
   unnecessary (§6).
 - **Digest recheck without a commit lock.** Rejected — two writers can both pass the check before either rename.
   The narrowly scoped kernel lock makes check-and-commit atomic without introducing a service.
@@ -210,6 +212,10 @@ disallowed; that ambiguity is what makes forgotten-regen drift possible.
 - **ADR-18:** the emitted pipeline whose lifecycle this governs.
 
 ## Acceptance evidence
+
+Current generated Run contract evidence in `pkg/nkd/factory/bundle_io_test.go` covers idempotent generation,
+byte-exact drift checks, unchanged obsolete-member retirement, empty-directory cleanup, and preservation of
+modified or unlisted files. These tests do not establish a complete crash/kill-point matrix.
 
 Current contract evidence in `pkg/nkd/pipeline/emitters_test.go` and `cmd/nkdctl/bundle_test.go` covers
 deterministic bundle identity, graph/body substitution detection, extension rendering, fail-before-output source

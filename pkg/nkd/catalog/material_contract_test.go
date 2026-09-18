@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
@@ -35,10 +34,6 @@ func vmMaterialComponent(materials map[string]string) Component {
 func materialCatalog(t *testing.T) *Catalog {
 	t.Helper()
 	catalog := &Catalog{
-		Recipes: []Recipe{{
-			ID: "node-image", Criteria: criteria.Criteria{Category: "os", OS: "ubuntu", Arch: "amd64"},
-			Components: []string{"agent", "image", "runtime"},
-		}},
 		Components: map[string]Component{
 			"agent":   goodComponent(),
 			"image":   vmMaterialComponent(map[string]string{"agent-package": "agent", "runtime-package": "runtime"}),
@@ -132,7 +127,7 @@ func TestVMMaterialBindingValidation(t *testing.T) {
 		{
 			name: "excluded component",
 			mutate: func(catalog *Catalog) {
-				catalog.Components["runtime"] = Component{ExclusionReason: "not distributed"}
+				catalog.Components["runtime"] = Component{Platforms: []string{"linux/amd64"}, ExclusionReason: "not distributed"}
 			},
 			wantText: "references excluded component",
 		},
@@ -151,13 +146,6 @@ func TestVMMaterialBindingValidation(t *testing.T) {
 				catalog.Components["runtime"] = vmMaterialComponent(map[string]string{"image": "image"})
 			},
 			wantText: "material dependency cycle",
-		},
-		{
-			name: "recipe omits material",
-			mutate: func(catalog *Catalog) {
-				catalog.Recipes[0].Components = []string{"image", "runtime"}
-			},
-			wantText: "incomplete material set",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -238,6 +226,13 @@ func TestValidateMaterialSetRejectsInvalidOrDuplicateResolvedComponents(t *testi
 		{name: "empty name", components: []NamedComponent{{Name: "", Component: goodComponent()}}, wantText: "invalid component name"},
 		{name: "surrounding whitespace", components: []NamedComponent{{Name: " agent", Component: goodComponent()}}, wantText: "invalid component name"},
 		{name: "duplicate", components: []NamedComponent{component, component}, wantText: "repeats component"},
+		{
+			name: "selected producer set omits material",
+			components: []NamedComponent{{
+				Name: "image", Component: vmMaterialComponent(map[string]string{"agent-package": "agent"}),
+			}},
+			wantText: "references unknown component",
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			err := ValidateMaterialSet(test.components)

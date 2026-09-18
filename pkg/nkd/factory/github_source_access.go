@@ -18,11 +18,11 @@ func githubSourceEnvironment(plan *Plan, node Node) map[string]string {
 	if node.Kind != NodeFetch || !irProjectedNode(node) {
 		return nil
 	}
-	for _, recipe := range plan.Recipes {
-		if recipe.Name != node.RecipeTarget {
+	for _, build := range plan.Builds {
+		if build.Name != node.BuildTarget {
 			continue
 		}
-		for _, source := range recipe.Graph.Nodes {
+		for _, source := range build.Graph.Nodes {
 			if source.ID != node.IRNode || source.Kind != ir.KindFetch {
 				continue
 			}

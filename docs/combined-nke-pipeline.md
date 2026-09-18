@@ -12,9 +12,11 @@ hosted Run from the current checkout.
 
 ## Implementation
 
-`definitions/nke-v1/definition.yaml` selects two catalog Recipes: `nke-cli` produces `nkectl`, and
-`nke-control-plane` produces `cwe` plus `nke-helm`. Environment inputs select Docker, one publication namespace
-and signing. The seven public objects and Definition → Run → Release lifecycle are unchanged.
+`definitions/nke-v1/definition.yaml` selects `nkectl`, `cwe`, and `nke-helm` directly on their named outputs.
+Each output has a compiler-derived build graph; the Helm package explicitly depends on the image output. Environment inputs select Docker, one publication namespace
+and signing. The six public objects and Definition → Run → Release lifecycle are unchanged. Definition v4 contains no
+cluster views, deployment roles or categories. The generated Run still freezes all required outputs and binds
+each exact named output, build identity, observed bytes and evidence into the publication content subject.
 
 The CLI and source-chart archive build offline with the pinned Go toolchain. CWE wraps the upstream
 `controller/Dockerfile` using rootless BuildKit v0.33.0, pinned to

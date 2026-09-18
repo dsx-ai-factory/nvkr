@@ -10,36 +10,29 @@ import (
 )
 
 func TestDirectPackerProducerLoadsStrictlyAndAffectsCatalogIdentity(t *testing.T) {
-	registry := `apiVersion: nkd.dev/catalog/v1
+	registry := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   image-source:
     repo: https://github.com/example/node-image
     toolchainImage: ` + goodImage + `
-recipes:
-  - id: node-amd64
-    criteria:
-      category: os
-      os: ubuntu
-      arch: amd64
-    components:
-      - agent-package
-      - node-image
-      - runtime-package
 components:
   agent-package:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: image-source
     outputType: host-package
     buildCommand: [make, agent-package]
     artifactPath: out/agent.deb
   runtime-package:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: image-source
     outputType: host-package
     buildCommand: [make, runtime-package]
     artifactPath: out/runtime.deb
   node-image:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: image-source
     builderType: vm-image
@@ -176,7 +169,7 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 	valid.ArtifactPath = "output/node-{{.Arch}}.qcow2"
 	validate := func(component Component) error {
 		cat := base(component)
-		cat.Recipes[0].Criteria.Category = "os"
+		cat.Components["x"] = component
 		return cat.Validate()
 	}
 	if err := validate(valid); err != nil {
@@ -464,7 +457,7 @@ func TestVMImageCommandProducerRemainsValid(t *testing.T) {
 	component.BuildCommand = []string{"make", "image"}
 	component.Packer = nil
 	cat := base(component)
-	cat.Recipes[0].Criteria.Category = "os"
+	cat.Components["x"] = component
 	if err := cat.Validate(); err != nil {
 		t.Fatalf("existing command/Make vm-image producer rejected: %v", err)
 	}

@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -34,7 +33,7 @@ func TestBuildQualifiedFromReportDerivesPublisherAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if binding.Component != "agent" || binding.RecipeDigest != report.RecipeDigest ||
+	if binding.Component != "agent" || binding.BuildDigest != report.BuildDigest ||
 		binding.ArtifactDigest != report.Artifacts[0].SHA256 {
 		t.Fatalf("receipt lost qualified subject binding: %+v", binding)
 	}
@@ -94,8 +93,8 @@ func TestCallerDeclaredProvenanceCannotMintPublisherAuthority(t *testing.T) {
 	}
 
 	assembled := &pipeline.Report{
-		RecipeID: report.RecipeID, RecipeDigest: report.RecipeDigest,
-		Artifacts: append([]pipeline.ArtifactResult(nil), report.Artifacts...),
+		BuildDigest: report.BuildDigest,
+		Artifacts:   append([]pipeline.ArtifactResult(nil), report.Artifacts...),
 	}
 	if _, err := BuildQualifiedFromReport(context.Background(), assembled, graph); errorCode(err) != nkderr.CodePreflightFailed {
 		t.Fatalf("caller-assembled report minted provenance authority: %v", err)
@@ -135,7 +134,7 @@ func TestQualifiedDependencyProjectionIsMirrorInvariant(t *testing.T) {
 	toolchainDigest := provenanceDigest('5')
 	artifact := provenanceDigest('b')
 	profile := provenanceDigest('a')
-	recipe := provenanceDigest('9')
+	buildDigest := provenanceDigest('9')
 	fetch := ir.Node{
 		Commit: strings.Repeat("6", 40), TreeHash: strings.Repeat("7", 40),
 		VendorSpecDigest: provenanceDigest('8'),
@@ -149,7 +148,7 @@ func TestQualifiedDependencyProjectionIsMirrorInvariant(t *testing.T) {
 			Component: component, BuilderType: ir.BuilderOCIHermetic,
 			Toolchain: toolchain,
 		}
-		return BuildIndex(recipe, profile, []Artifact{{
+		return BuildIndex(buildDigest, profile, []Artifact{{
 			Component: component, SHA256: artifact, InputDigest: input,
 			BuilderType: ir.BuilderOCIHermetic,
 			Deps:        qualifiedBuildDependencies(result, build, fetch),
@@ -184,8 +183,7 @@ func qualifiedPrebuiltReport(t *testing.T, payload []byte) (*pipeline.Report, *i
 	digest := "sha256:" + hex.EncodeToString(sum[:])
 	graph := &ir.Graph{
 		SchemaVersion: ir.SchemaVersion,
-		RecipeID:      "provenance-fixture",
-		Criteria:      criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+		Platform:      "linux/amd64",
 		Nodes: []ir.Node{
 			{
 				ID: "pull-agent", Kind: ir.KindPull, Component: "agent",
@@ -197,7 +195,7 @@ func qualifiedPrebuiltReport(t *testing.T, payload []byte) (*pipeline.Report, *i
 		},
 	}
 	graph.Normalize()
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +226,7 @@ func qualifiedPrebuiltReport(t *testing.T, payload []byte) (*pipeline.Report, *i
 	if err := os.WriteFile(filepath.Join(resultDirectory, "pull-agent.json"), resultPayload, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	report, err := (pipeline.Local{}).VerifyResults(graph, recipeDigest, resultDirectory,
+	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest, resultDirectory,
 		pipeline.RunOptions{Ctx: context.Background(), SourceRoot: sourceRoot})
 	if err != nil {
 		t.Fatal(err)

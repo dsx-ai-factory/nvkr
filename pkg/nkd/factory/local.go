@@ -63,12 +63,12 @@ type LocalRunResult struct {
 }
 
 type localRunDeps struct {
-	runRecipe     func(context.Context, RecipePlan, LocalRunOptions) (*pipeline.Report, error)
+	runBuild      func(context.Context, BuildPlan, LocalRunOptions) (*pipeline.Report, error)
 	prepareRunner func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error)
 	executeNode   func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error
 }
 
-// RunLocal executes the artifact graph on this host. Recipe subgraphs are delegated
+// RunLocal executes the artifact graph on this host. Build subgraphs are delegated
 // to pipeline.Local (the existing build oracle); factory-only nodes are executed in
 // their exact pinned utility container, except network acquisition/publication which
 // use their existing host adapters. This keeps the orchestration interface small and
@@ -122,10 +122,10 @@ func withLocalDefaults(options LocalRunOptions) LocalRunOptions {
 
 func productionLocalRunDeps() localRunDeps {
 	return localRunDeps{
-		runRecipe: func(ctx context.Context, recipe RecipePlan, options LocalRunOptions) (*pipeline.Report, error) {
-			return (pipeline.Local{}).Run(recipe.Graph, recipe.RecipeDigest, pipeline.RunOptions{
-				Ctx: ctx, SourceRoot: filepath.Join(options.Workspace, recipe.Name, "src"),
-				Only: recipe.Components, Jobs: options.Jobs, Runtime: options.Runtime,
+		runBuild: func(ctx context.Context, build BuildPlan, options LocalRunOptions) (*pipeline.Report, error) {
+			return (pipeline.Local{}).Run(build.Graph, build.BuildDigest, pipeline.RunOptions{
+				Ctx: ctx, SourceRoot: filepath.Join(options.Workspace, build.Name, "src"),
+				Only: build.Components, Jobs: options.Jobs, Runtime: options.Runtime,
 				Stdout: options.Stdout, Stderr: options.Stderr,
 			})
 		},
@@ -157,7 +157,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}
 		return result, nil
 	}
-	if deps.runRecipe == nil || deps.prepareRunner == nil || deps.executeNode == nil {
+	if deps.runBuild == nil || deps.prepareRunner == nil || deps.executeNode == nil {
 		return nil, e.New(e.CodeInternal, "factory local executor is incomplete")
 	}
 	if err := ensureLocalWorkspace(ctx, options.Workspace, planDigest); err != nil {
@@ -170,28 +170,28 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	}
 
 	status := make(map[string]string, len(ordered))
-	for _, recipe := range plan.Recipes {
-		if len(recipe.Components) == 0 {
+	for _, build := range plan.Builds {
+		if len(build.Components) == 0 {
 			continue
 		}
-		fmt.Fprintf(options.Stdout, "\n=== factory recipe %s (%d components) ===\n", recipe.Name, len(recipe.Components))
-		report, runErr := deps.runRecipe(ctx, recipe, options)
+		fmt.Fprintf(options.Stdout, "\n=== factory build %s (%d components) ===\n", build.Name, len(build.Components))
+		report, runErr := deps.runBuild(ctx, build, options)
 		if runErr != nil {
 			if report != nil {
 				_ = report.Close()
 			}
-			return nil, e.Wrap(e.CodeBuildFailed, runErr, "factory recipe target %s", recipe.Name)
+			return nil, e.Wrap(e.CodeBuildFailed, runErr, "factory build target %s", build.Name)
 		}
 		if report == nil {
-			return nil, e.New(e.CodeInternal, "factory recipe target %s returned no report", recipe.Name)
+			return nil, e.New(e.CodeInternal, "factory build target %s returned no report", build.Name)
 		}
-		if err := persistRecipeResults(ctx, plan, recipe, report, options.Workspace); err != nil {
+		if err := persistBuildResults(ctx, plan, build, report, options.Workspace); err != nil {
 			_ = report.Close()
 			return nil, err
 		}
 		_ = report.Close()
 		for _, node := range ordered {
-			if node.RecipeTarget == recipe.Name && node.IRNode != "" {
+			if node.BuildTarget == build.Name && node.IRNode != "" {
 				status[node.ID] = "ok"
 				result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "ok"})
 			}
@@ -413,17 +413,23 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 	return ExecuteNode(ctx, relocated, node.ID, options.Stdout, options.Stderr)
 }
 
-func persistRecipeResults(ctx context.Context, plan *Plan, recipe RecipePlan, report *pipeline.Report, workspace string) error {
+func persistBuildResults(ctx context.Context, plan *Plan, build BuildPlan, report *pipeline.Report, workspace string) error {
+	if report == nil || report.BuildDigest != build.BuildDigest {
+		return e.New(e.CodeUnverifiedRef, "output %q producer report has the wrong build identity", build.Name)
+	}
 	artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
 	seen := make(map[string]bool, len(report.Artifacts))
 	for _, result := range report.Artifacts {
-		artifactID := "artifact/" + recipe.Name + "/" + result.Component
+		if seen[result.Component] {
+			return e.New(e.CodeVerifyFailed, "output %q repeats producer result %q", build.Name, result.Component)
+		}
+		artifactID := "artifact/" + build.Name + "/" + result.Component
 		planned, ok := artifacts[artifactID]
 		if !ok {
-			return e.New(e.CodePipelineDrift, "recipe %s returned unplanned component %s", recipe.Name, result.Component)
+			return e.New(e.CodePipelineDrift, "build %s returned unplanned component %s", build.Name, result.Component)
 		}
 		actualPath := result.AbsPath
 		if result.TransportPath != "" {
@@ -436,10 +442,10 @@ func persistRecipeResults(ctx context.Context, plan *Plan, recipe RecipePlan, re
 		actualAbs, _ := filepath.Abs(actualPath)
 		expectedAbs, _ := filepath.Abs(expectedPath)
 		if actualAbs != expectedAbs {
-			return e.New(e.CodePipelineDrift, "recipe %s component %s materialized at %s, want %s",
-				recipe.Name, result.Component, actualPath, expectedPath)
+			return e.New(e.CodePipelineDrift, "build %s component %s materialized at %s, want %s",
+				build.Name, result.Component, actualPath, expectedPath)
 		}
-		resultArtifact := artifacts["result/"+recipe.Name+"/"+result.Component]
+		resultArtifact := artifacts["result/"+build.Name+"/"+result.Component]
 		resultPath, err := relocatedFactoryPath(resultArtifact.Path, workspace)
 		if err != nil {
 			return err
@@ -453,9 +459,9 @@ func persistRecipeResults(ctx context.Context, plan *Plan, recipe RecipePlan, re
 		}
 		seen[result.Component] = true
 	}
-	for _, component := range recipe.Components {
+	for _, component := range build.Components {
 		if !seen[component] {
-			return e.New(e.CodeVerifyFailed, "recipe %s did not return selected component %s", recipe.Name, component)
+			return e.New(e.CodeVerifyFailed, "build %s did not return selected component %s", build.Name, component)
 		}
 	}
 	return nil

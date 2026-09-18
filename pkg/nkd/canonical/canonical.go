@@ -6,8 +6,8 @@
 // every RFC-8785 number. The byte form it produces IS the identity — an auditor can
 // recompute the same bytes independently in any language, without nkdctl.
 //
-// ADR-01 is explicit that there is NO grandfathered exception: the recipe
-// identity (recipeDigest) uses this codec, exactly like the trust objects. It
+// ADR-01 is explicit that there is NO grandfathered exception: the build
+// identity (buildDigest) uses this codec, exactly like the trust objects. It
 // deliberately replaces the earlier deterministic-YAML digest. Human-authored
 // inputs (the catalog) stay in their friendly format; only the HASHED forms are
 // canonical JSON.
@@ -39,7 +39,10 @@ import (
 // objects share a tag, so the anti-collision guarantee is by construction, not by
 // luck.
 const (
-	KindRecipe                  = "nkd.recipe"                   // the compiled IR / recipeDigest (ADR-02)
+	// KindLegacyRecipe permanently reserves the retired family. Digest rejects it;
+	// active builds use KindBuild.
+	KindLegacyRecipe            = "nkd.recipe"
+	KindBuild                   = "nkd.build"                    // the compiled IR / buildDigest (ADR-02)
 	KindBuilderProfile          = "nkd.builder-profile"          // the signed builder profile (ADR-07)
 	KindValidationVector        = "nkd.validation-vector"        // the expected-digests manifest (ADR-05)
 	KindEvidence                = "nkd.evidence"                 // the evidence bundle (ADR-05 §4)
@@ -67,10 +70,10 @@ const (
 	KindPublicationRoot         = "nkd.publication-root"         // OCI bootstrap object for one delivery closure
 	KindBinaryBundle            = "nkd.binary-bundle"            // exact installable loose-binary projection
 	KindAPTRepository           = "nkd.apt-repository"           // exact Debian repository projection
-	KindClusterDefinition       = "nkd.cluster-definition"       // the ClusterDefinition (ADR-19)
-	KindClusterComposition      = "nkd.cluster-composition"      // pre-release exact recipe composition (ADR-19)
+	KindClusterDefinition       = "nkd.cluster-definition"       // retired cluster-definition family, reserved
+	KindClusterComposition      = "nkd.cluster-composition"      // retired cluster-composition family, reserved
 	KindDiskManifest            = "nkd.disk-manifest"            // the unified canonical-disk manifest (ADR-14 §1)
-	KindStagingManifest         = "nkd.staging-manifest"         // the node-SKU staging manifest (ADR-14 §4)
+	KindStagingManifest         = "nkd.staging-manifest"         // retired staging-manifest family, reserved
 	KindSourceClosure           = "nkd.source-closure"           // fetched/vendor-resolved source bytes
 	KindVendorSpec              = "nkd.vendor-spec"              // dependency materialization argv + image content identity
 	KindSourceInput             = "nkd.source-input"             // commit/tree/vendor content identity used by IR lowering
@@ -87,8 +90,8 @@ const (
 	KindEnvironment             = "nkd.environment"              // independently selected execution/delivery settings (ADR-20 §6)
 	KindVerificationPolicy      = "nkd.verification-policy"      // consumer-selected release acceptance policy (ADR-04 §5)
 	KindReleaseContent          = "nkd.release-content/v1"       // internal exact artifact content subject (ADR-17 §6)
-	KindClusterRealization      = "nkd.cluster-realization/v1"   // composition-to-content member binding (ADR-19 §4)
-	KindLifecycleBinding        = "nkd.lifecycle-binding/v1"     // signed output and cluster publication binding (ADR-20 §7)
+	KindClusterRealization      = "nkd.cluster-realization/v1"   // retired cluster-realization family, reserved
+	KindLifecycleBinding        = "nkd.lifecycle-binding/v1"     // signed output publication binding (ADR-20 §7)
 	// Internal capability bindings are registered too. They are not wire schemas,
 	// but their domain tags are just as security-sensitive as object identities:
 	// a typo must fail instead of silently minting a different receipt family.
@@ -105,12 +108,13 @@ const (
 )
 
 // KindBuildMaterialManifest identifies deterministic execution-local component
-// inputs. It is separate from ADR-14's final node-SKU staging manifest.
+// inputs. It is separate from the retired final-artifact staging manifest family.
 const KindBuildMaterialManifest = "nkd.build-material-manifest/v1"
 
-// registeredKinds is the private authority registry used by Digest.
+// registeredKinds permanently records allocated families, including retired ones.
+// Digest admits only active families; historical descriptions may retain their kind.
 var registeredKinds = [...]string{
-	KindRecipe, KindBuilderProfile, KindValidationVector, KindEvidence, KindPublisherEvidence, KindReproductionObservation, KindPromotionPolicy,
+	KindLegacyRecipe, KindBuild, KindBuilderProfile, KindValidationVector, KindEvidence, KindPublisherEvidence, KindReproductionObservation, KindPromotionPolicy,
 	KindReproductionResult, KindCompatibilityResult, KindConformanceResult, KindEvidenceWaiver, KindProvenance, KindProvenanceStatement,
 	KindSBOM, KindSBOMIndex, KindVulnReport, KindBundle, KindInventory,
 	KindReleaseSet, KindClearance, KindStatus, KindStatusCheckpoint, KindTrustedTime, KindPublication, KindPublicationManifest, KindPublicationRoot, KindBinaryBundle, KindAPTRepository, KindClusterDefinition, KindClusterComposition,
@@ -355,6 +359,11 @@ func requireEOF(dec *json.Decoder) error {
 // Digest returns the domain-separated content digest of v as "sha256:"+hex:
 // sha256(kind ∥ 0x00 ∥ canonical-bytes) (ADR-01 §3).
 func Digest(kind string, v any) (string, error) {
+	switch kind {
+	case KindLegacyRecipe, KindClusterDefinition, KindClusterComposition, KindClusterRealization, KindStagingManifest:
+		return "", e.New(e.CodeUnsupported,
+			"canonical: digest domain %q is retired and cannot mint identities", kind)
+	}
 	if !registeredKind(kind) {
 		return "", e.New(e.CodeInternal,
 			"canonical: unregistered digest domain %q", kind)
@@ -381,7 +390,7 @@ func registeredKind(kind string) bool {
 
 // IsDigest reports whether s is a canonical content digest: the exact
 // sha256:<64 lowercase hex> shape every identity string in NKD uses. It is the single
-// owner of that predicate — sign, release, cluster, ir, catalog, attest and the rest
+// owner of that predicate — sign, release, ir, catalog, attest and the rest
 // call here instead of each re-compiling `^sha256:[0-9a-f]{64}$`, so the shape cannot
 // drift between the seams that must agree on it (ADR-01). It is allocation-free and
 // does not authenticate the referent; it only validates the string's form.
@@ -400,7 +409,7 @@ func IsDigest(s string) bool {
 
 // TypedDigest is a digest paired with the domain-separation Kind it was computed under.
 // Digest returns a bare string with the kind tag hashed in and unrecoverable, so nothing
-// stops a KindRecipe digest being used where a KindReleaseSet is expected — cross-kind
+// stops a KindBuild digest being used where a KindReleaseSet is expected — cross-kind
 // confusion is a runtime, not a compile, concern. A TypedDigest carries the kind
 // alongside the value so boundary code can demand a specific family (Expect) and
 // re-derive-and-compare identity (Verify) instead of trusting a shape-checked string.

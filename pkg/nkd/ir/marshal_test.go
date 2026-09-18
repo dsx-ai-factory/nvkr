@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
-func TestRecipeIdentityFieldRulesCoverEveryGraphField(t *testing.T) {
-	assertRecipeIdentityFieldRules(t, reflect.TypeOf(Node{}), reflect.TypeOf(LogicalNode{}), nodeRecipeIdentityRules)
-	assertRecipeIdentityFieldRules(t, reflect.TypeOf(criteria.Criteria{}), reflect.TypeOf(LogicalCriteria{}), criteriaRecipeIdentityRules)
-	assertRecipeIdentityFieldRules(t, reflect.TypeOf(Graph{}), reflect.TypeOf(LogicalGraph{}), graphRecipeIdentityRules)
+func TestBuildIdentityFieldRulesCoverEveryGraphField(t *testing.T) {
+	assertBuildIdentityFieldRules(t, reflect.TypeOf(Node{}), reflect.TypeOf(LogicalNode{}), nodeBuildIdentityRules)
+	assertBuildIdentityFieldRules(t, reflect.TypeOf(Graph{}), reflect.TypeOf(LogicalGraph{}), graphBuildIdentityRules)
 
 	activation := reflect.TypeOf(AICRActivation{})
 	logicalActivation := reflect.TypeOf(LogicalAICRActivation{})
@@ -30,41 +30,41 @@ func TestRecipeIdentityFieldRulesCoverEveryGraphField(t *testing.T) {
 	}
 }
 
-func assertRecipeIdentityFieldRules(t *testing.T, full, logical reflect.Type,
-	rules map[string]recipeIdentityFieldRule,
+func assertBuildIdentityFieldRules(t *testing.T, full, logical reflect.Type,
+	rules map[string]buildIdentityFieldRule,
 ) {
 	t.Helper()
 	if len(rules) != full.NumField() {
-		t.Fatalf("%s Recipe-identity rules have %d entries for %d fields",
+		t.Fatalf("%s Build-identity rules have %d entries for %d fields",
 			full.Name(), len(rules), full.NumField())
 	}
 	for i := 0; i < full.NumField(); i++ {
 		field := full.Field(i)
 		rule, ok := rules[field.Name]
 		if !ok {
-			t.Fatalf("new %s field %s has no explicit Recipe-identity rule", full.Name(), field.Name)
+			t.Fatalf("new %s field %s has no explicit Build-identity rule", full.Name(), field.Name)
 		}
 		logicalField, represented := logical.FieldByName(field.Name)
 		switch rule {
-		case includeLogicalValueInRecipeIdentity, includeContentReferenceInRecipeIdentity:
+		case includeLogicalValueInBuildIdentity, includeContentReferenceInBuildIdentity:
 			if !represented {
 				t.Fatalf("T1 %s field %s is classified for identity but absent from %s", full.Name(), field.Name, logical.Name())
 			}
 			if logicalField.Tag.Get("json") != field.Tag.Get("json") {
 				t.Fatalf("T1 %s field %s changed canonical key in %s", full.Name(), field.Name, logical.Name())
 			}
-		case excludeTransportFromRecipeIdentity, excludeCompositionFromRecipeIdentity,
-			excludeExecutionMetadataFromRecipeIdentity:
+		case excludeTransportFromBuildIdentity,
+			excludeExecutionMetadataFromBuildIdentity:
 			if represented {
 				t.Fatalf("non-T1 %s field %s leaked into %s", full.Name(), field.Name, logical.Name())
 			}
 		default:
-			t.Fatalf("%s field %s has unknown Recipe-identity rule %d", full.Name(), field.Name, rule)
+			t.Fatalf("%s field %s has unknown Build-identity rule %d", full.Name(), field.Name, rule)
 		}
 	}
 	for name := range rules {
 		if _, ok := full.FieldByName(name); !ok {
-			t.Fatalf("Recipe-identity rules retain removed %s field %s", full.Name(), name)
+			t.Fatalf("Build-identity rules retain removed %s field %s", full.Name(), name)
 		}
 	}
 }
@@ -72,7 +72,7 @@ func assertRecipeIdentityFieldRules(t *testing.T, full, logical reflect.Type,
 // TestDigestHostInvariance is the ADR-02 §4 empirical purity guard for process
 // environment values related to the host and clock. The IR carries no runtime-
 // observed host, clock, or random field, so perturbing hostname, user, home,
-// timezone, and a source-date environment value must not move Recipe identity.
+// timezone, and a source-date environment value must not move Build identity.
 // Separate tests cover pinned-input sensitivity and execution-metadata projection.
 func TestDigestHostInvariance(t *testing.T) {
 	before, err := sample().Digest()
@@ -94,39 +94,43 @@ func TestDigestHostInvariance(t *testing.T) {
 		t.Fatal(err)
 	}
 	if before != after {
-		t.Fatalf("recipe identity moved under host/clock env mutation: %s -> %s", before, after)
+		t.Fatalf("build identity moved under host/clock env mutation: %s -> %s", before, after)
 	}
 }
 
 func TestAICRActivationCannotGainIdentityWithoutBothPins(t *testing.T) {
 	valid := &AICRActivation{
 		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-		RecipeDigest:    "sha256:" + strings.Repeat("a", 64),
+		Bundle:          aicr.BundleInputs{Deployer: "helm"},
+		ProfileDigest:   "sha256:" + strings.Repeat("a", 64),
 		GeneratorDigest: "sha256:" + strings.Repeat("b", 64),
 	}
-	graph := sample()
-	graph.Criteria.Category = "accelerated-runtime"
+	graph := Graph{SchemaVersion: SchemaVersion, Platform: "linux/amd64", Nodes: []Node{{ID: "verify", Kind: KindVerify}}}
 	graph.AICR = valid
 	if _, err := graph.Digest(); err != nil {
 		t.Fatalf("valid AICR activation was rejected: %v", err)
 	}
-	for name, mutate := range map[string]func(*AICRActivation){
-		"recipe":    func(a *AICRActivation) { a.RecipeDigest = "" },
-		"generator": func(a *AICRActivation) { a.GeneratorDigest = "SHA256:" + strings.Repeat("b", 64) },
-		"axis":      func(a *AICRActivation) { a.Accelerator = "future-gpu" },
+	for _, test := range []struct {
+		name   string
+		mutate func(*AICRActivation)
+		code   e.Code
+	}{
+		{"profile", func(a *AICRActivation) { a.ProfileDigest = "" }, e.CodeUnpinnedSource},
+		{"generator", func(a *AICRActivation) { a.GeneratorDigest = "SHA256:" + strings.Repeat("b", 64) }, e.CodeUnpinnedSource},
+		{"input", func(a *AICRActivation) { a.Accelerator = "future-gpu" }, e.CodeInvalidCatalog},
+		{"missing effective bundle", func(a *AICRActivation) { a.Bundle = aicr.BundleInputs{} }, e.CodeInvalidCatalog},
+		{"unordered bundle", func(a *AICRActivation) { a.Bundle.WorkloadSelectors = []string{"z=1", "a=1"} }, e.CodeInvalidCatalog},
+		{"duplicate bundle selector", func(a *AICRActivation) { a.Bundle.WorkloadSelectors = []string{"a=1", "a=1"} }, e.CodeInvalidCatalog},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			changed := *valid
-			mutate(&changed)
-			invalid := sample()
-			invalid.Criteria.Category = "accelerated-runtime"
+			test.mutate(&changed)
+			invalid := graph
 			invalid.AICR = &changed
-			if _, err := invalid.Digest(); err == nil {
-				t.Fatal("invalid caller-composed AICR activation gained a recipe identity")
-			}
-			if _, err := invalid.CanonicalJSON(); err == nil {
-				t.Fatal("invalid caller-composed AICR activation entered executable IR")
-			}
+			_, err := invalid.Digest()
+			assertIRCode(t, err, test.code)
+			_, err = invalid.CanonicalJSON()
+			assertIRCode(t, err, test.code)
 		})
 	}
 }
@@ -139,8 +143,7 @@ func sample() Graph {
 	source := "kubernetes-" + commit[:12]
 	return Graph{
 		SchemaVersion: SchemaVersion,
-		RecipeID:      "k8s-core-worker",
-		Criteria:      criteria.Criteria{Category: "kubernetes", Role: "worker", K8sVersion: "1.32.0", OS: "ubuntu", Arch: "amd64"},
+		Platform:      "linux/amd64",
 		Nodes: []Node{
 			{ID: "build-kubelet", Kind: KindBuild, Needs: []string{"fetch-kubernetes-abc"},
 				Component: "kubelet", BuilderType: BuilderOCIHermetic, Toolchain: toolchain,
@@ -208,7 +211,7 @@ func TestDigestStableAndSensitive(t *testing.T) {
 	}
 }
 
-func TestExecutionRequirementsChangeFullGraphButNotRecipeIdentity(t *testing.T) {
+func TestExecutionRequirementsChangeFullGraphButNotBuildIdentity(t *testing.T) {
 	base := sample()
 	baseDigest, err := base.Digest()
 	if err != nil {
@@ -241,7 +244,7 @@ func TestExecutionRequirementsChangeFullGraphButNotRecipeIdentity(t *testing.T) 
 		t.Fatal(err)
 	}
 	if requestedDigest != baseDigest {
-		t.Fatalf("execution request changed recipe identity: %s != %s", requestedDigest, baseDigest)
+		t.Fatalf("execution request changed build identity: %s != %s", requestedDigest, baseDigest)
 	}
 	if string(requestedBytes) == string(baseBytes) {
 		t.Fatal("execution request was omitted from the full executable graph")
@@ -269,7 +272,7 @@ func TestExecutionRequirementsChangeFullGraphButNotRecipeIdentity(t *testing.T) 
 		t.Fatal(err)
 	}
 	if boundDigest != requestedDigest {
-		t.Fatalf("execution binding changed recipe identity: %s != %s", boundDigest, requestedDigest)
+		t.Fatalf("execution binding changed build identity: %s != %s", boundDigest, requestedDigest)
 	}
 	if string(boundBytes) == string(requestedBytes) {
 		t.Fatal("execution binding was omitted from the full executable graph")

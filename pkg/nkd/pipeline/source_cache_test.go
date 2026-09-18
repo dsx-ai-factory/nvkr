@@ -59,7 +59,7 @@ func TestLocalRunMaterializesSharedSourceOnce(t *testing.T) {
 		ID: "build-c", Kind: ir.KindBuild, Component: "c", Toolchain: toolchain,
 		WriteDir: "alternate", ArtifactPath: "alternate/c",
 	}, fetch)
-	graph := testSourceGraph("shared-source", fetch, buildA, buildB, buildC)
+	graph := testSourceGraph(fetch, buildA, buildB, buildC)
 
 	runtimePath := filepath.Join(work, "fake-runtime")
 	if err := os.WriteFile(runtimePath, []byte(`#!/usr/bin/env bash

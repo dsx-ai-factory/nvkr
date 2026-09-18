@@ -12,8 +12,8 @@ script now executes the combined CLI/image/Helm Definition; see the [walkthrough
 | Milestone | Outcome | Exit criterion |
 |---|---|---|
 | M1 — Vertical slice | One pinned NKE CLI build through a generated GitHub workflow | A green default-branch Run builds from the pinned source entrypoint, publishes to OCI, keyless-signs and attaches production provenance; independent cosign verification succeeds |
-| M2 — Breadth | The complete in-scope artifact set, including the NKE OS image and cluster views | One Run delivers the required artifacts and exact tenant/site-controller membership, with signatures, source-lane provenance and consumer verification; recorded fallbacks remain visible |
-| M3 — Qualification | Automated recipe and evidence checks under a separate qualification identity | Schema, pin consistency, signature/provenance and tooling smoke checks pass; signed evidence records verdicts and approved waivers; tampering or missing evidence fails closed |
+| M2 — Breadth | The complete in-scope artifact set, including the NKE OS image | One Run delivers the required artifacts and exact output membership, with signatures, source-lane provenance and consumer verification; recorded fallbacks remain visible |
+| M3 — Qualification | Automated build and evidence checks under a separate qualification identity | Schema, pin consistency, signature/provenance and tooling smoke checks pass; signed evidence records verdicts and approved waivers; tampering or missing evidence fails closed |
 | M4 — Automated releases | Reviewed pin updates produce immutable, qualified v1 Release manifests | Scheduled detection opens a reviewable update; merging produces a signed manifest and immutable tag; manual dispatch re-verifies an existing manifest without rebuilding; overlapping and interrupted release runs never move an immutable tag; a signed revocation withdraws a release from the channel |
 
 M3 qualification does not establish cluster conformance or byte-identical reproduction. M4's Release manifest
@@ -22,10 +22,10 @@ verification is narrower than M3/M4 acceptance.
 
 ## Artifact scope
 
-V1 targets one amd64 variant per class: one OS image, one tenant cluster view, one site-controller cluster view,
-and one AICR package. Source lanes are `hermetic-build`, `wrapped-build`, or `acquired`; production provenance
-records the actual lane. Every separately delivered Artifact is signed and attested in OCI. A cluster view is
-authored once in the Definition and realized against exact delivered artifacts.
+V1 targets one amd64 variant per delivered artifact, including one OS image and one AICR package. Source lanes are `hermetic-build`, `wrapped-build`, or `acquired`; production provenance
+records the actual lane. Every separately delivered Artifact is signed and attested in OCI. The Release binds exact named outputs without a deployment topology.
+Each named output selects its producers and concrete target directly. Shared build content does not collapse
+separate required outputs or let one output's evidence satisfy another.
 
 | Artifact or capability | Production source | Delivery / milestone |
 |---|---|---|
@@ -39,15 +39,14 @@ authored once in the Definition and realized against exact delivered artifacts.
 | CNI | NKE OS build | Inside OS image / M2 |
 | Helm | Digest-pinned acquisition | Operator tooling package / M2 |
 | AICR CLI | Digest-pinned acquisition | Operator tooling package / M2 |
-| Spire-agent | Placement decision: embedded or acquired | OS image or both cluster views / M2 |
+| Spire-agent | Placement decision: embedded or acquired | Inside OS image or OCI artifact / M2 |
 | Third-party container images | Digest-pinned acquisition when outside OS image | OCI images / M2 |
 | AICR deployment and charts | Pinned renderer and chart inputs | OCI package / M2 |
 | NKE Helm charts | Pinned chart sources | OCI packages / M2 |
 | Operator tooling | Acquired kubectl, Helm and AICR CLI | OCI package / M2 |
-| Tenant cluster view | Exact OS image, packages and cluster images | Release membership / M2–M3 |
-| Site-controller cluster view | Exact OS image, packages and cluster images | Release membership / M2–M3 |
 
-The NKE OS build team owns image-content verification. Embedded components retain matrix rows for
+The NKE OS build team owns embedded-software correctness and runtime validation. NKD's deferred disk delivery
+requires an inventory reconciling traced materials with read-only inspection of the exact disk. Embedded components retain matrix rows for
 traceability, but do not imply separate NKD builds or delivery. A deferred member stays explicit in authored
 requirements and planned qualification waivers; it must never disappear because a build failed.
 
@@ -66,6 +65,6 @@ environment, the recorded M2 fallback is digest-pinned acquisition of a prebuilt
 source claim and must be visible in provenance and the acceptance record.
 
 Outside v1: non-OCI delivery, upstream from-source replacement builds, acquired upstream-signature verification,
-vulnerability scanning, cluster E2E qualification, air gap, builder-profile reproduction and byte-identity
+vulnerability scanning, deployment topology, cluster E2E qualification, air gap, builder-profile reproduction and byte-identity
 guarantees. The existing GitLab generator remains a build/package-only development lane; GitHub is the v1
 publication and signing provider. Per-built-artifact SBOM composition is included in the current graph.

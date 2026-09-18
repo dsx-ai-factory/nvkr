@@ -31,7 +31,7 @@ const (
 	TierPipelineAttested EvidenceTier = "pipeline-attested"
 
 	// TierTerminalObservation is the artifact kind of a terminal observation: a
-	// deterministic digest listing of what a recipe target actually materialized.
+	// deterministic digest listing of what a build target actually materialized.
 	// It gates packaging without claiming a qualified terminal receipt.
 	TierTerminalObservation EvidenceTier = "unqualified-terminal-observation"
 

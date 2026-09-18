@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	InventorySchemaVersion   = "nkd.dev/inventory/v2"
-	ReleaseSetSchemaVersion  = "nkd.dev/release-set/v2"
+	InventorySchemaVersion   = "nkd.dev/inventory/v4"
+	ReleaseSetSchemaVersion  = "nkd.dev/release-set/v4"
 	ConformanceSchemaVersion = "nkd.dev/conformance-result/v2"
 )
 
@@ -41,7 +41,6 @@ const (
 // and any external evidence refs for a prebuilt/acquired one.
 type InventoryComponent struct {
 	Name                     string                   `json:"name"`
-	Role                     string                   `json:"role,omitempty"` // control-plane | worker | gpu-worker | "" (any)
 	VersionConstraint        string                   `json:"versionConstraint,omitempty"`
 	RequiredArtifacts        []string                 `json:"requiredArtifacts,omitempty"`
 	ArtifactKinds            []ArtifactKindBinding    `json:"artifactKinds,omitempty"`
@@ -103,10 +102,7 @@ func (in *Inventory) sorted() *Inventory {
 		})
 	}
 	sort.Slice(c.Components, func(i, j int) bool {
-		if c.Components[i].Name != c.Components[j].Name {
-			return c.Components[i].Name < c.Components[j].Name
-		}
-		return c.Components[i].Role < c.Components[j].Role
+		return c.Components[i].Name < c.Components[j].Name
 	})
 	return &c
 }
@@ -140,27 +136,26 @@ func (in *Inventory) Validate() error {
 	seen := map[string]bool{}
 	for _, component := range in.Components {
 		if strings.TrimSpace(component.Name) == "" || strings.TrimSpace(component.Name) != component.Name ||
-			(component.Role != "" && strings.TrimSpace(component.Role) != component.Role) ||
 			(component.VersionConstraint != "" && strings.TrimSpace(component.VersionConstraint) != component.VersionConstraint) {
 			return e.New(e.CodeInvalidCatalog,
-				"inventory member name, role, and version constraint must be canonical")
+				"inventory member name and version constraint must be canonical")
 		}
-		k := key(component.Name, component.Role)
+		k := component.Name
 		if seen[k] {
-			return e.New(e.CodeInvalidCatalog, "inventory contains duplicate required member %s", label(component.Name, component.Role))
+			return e.New(e.CodeInvalidCatalog, "inventory contains duplicate required member %s", component.Name)
 		}
 		seen[k] = true
 		if len(component.RequiredArtifacts) == 0 {
 			return e.New(e.CodeReleaseIncomplete,
-				"inventory member %s declares no required artifacts", label(component.Name, component.Role))
+				"inventory member %s declares no required artifacts", component.Name)
 		}
 		artifacts := map[string]bool{}
 		for _, digest := range component.RequiredArtifacts {
 			if !isDigest(digest) {
-				return e.New(e.CodeInvalidCatalog, "inventory member %s has non-digest required artifact %q", label(component.Name, component.Role), digest)
+				return e.New(e.CodeInvalidCatalog, "inventory member %s has non-digest required artifact %q", component.Name, digest)
 			}
 			if artifacts[digest] {
-				return e.New(e.CodeInvalidCatalog, "inventory member %s repeats required artifact %s", label(component.Name, component.Role), digest)
+				return e.New(e.CodeInvalidCatalog, "inventory member %s repeats required artifact %s", component.Name, digest)
 			}
 			artifacts[digest] = true
 		}
@@ -169,17 +164,17 @@ func (in *Inventory) Validate() error {
 			if !isDigest(binding.ArtifactDigest) || !artifacts[binding.ArtifactDigest] {
 				return e.New(e.CodeInvalidCatalog,
 					"inventory member %s classifies non-required artifact %q",
-					label(component.Name, component.Role), binding.ArtifactDigest)
+					component.Name, binding.ArtifactDigest)
 			}
 			if !binding.Kind.valid() {
 				return e.New(e.CodeInvalidCatalog,
 					"inventory member %s assigns an unknown kind to artifact %s",
-					label(component.Name, component.Role), binding.ArtifactDigest)
+					component.Name, binding.ArtifactDigest)
 			}
 			if classified[binding.ArtifactDigest] {
 				return e.New(e.CodeInvalidCatalog,
 					"inventory member %s classifies artifact %s more than once",
-					label(component.Name, component.Role), binding.ArtifactDigest)
+					component.Name, binding.ArtifactDigest)
 			}
 			classified[binding.ArtifactDigest] = true
 		}
@@ -187,7 +182,7 @@ func (in *Inventory) Validate() error {
 			if !classified[digest] {
 				return e.New(e.CodeInvalidCatalog,
 					"inventory member %s does not classify required artifact %s",
-					label(component.Name, component.Role), digest)
+					component.Name, digest)
 			}
 		}
 		for _, external := range []struct {
@@ -201,12 +196,12 @@ func (in *Inventory) Validate() error {
 			if (external.ref == "") != (external.digest == "") {
 				return e.New(e.CodeUnverifiedRef,
 					"inventory member %s must bind %s reference and digest together",
-					label(component.Name, component.Role), external.field)
+					component.Name, external.field)
 			}
 			if external.ref != "" && (!isCanonicalEvidenceRef(external.ref) || !isDigest(external.digest)) {
 				return e.New(e.CodeUnverifiedRef,
 					"inventory member %s has noncanonical %s reference or digest",
-					label(component.Name, component.Role), external.field)
+					component.Name, external.field)
 			}
 		}
 		gapTypes := map[string]bool{}
@@ -214,7 +209,7 @@ func (in *Inventory) Validate() error {
 			if !artifacts[gap.ArtifactDigest] {
 				return e.New(e.CodeInvalidCatalog,
 					"inventory member %s evidence gap targets non-required artifact %q",
-					label(component.Name, component.Role), gap.ArtifactDigest)
+					component.Name, gap.ArtifactDigest)
 			}
 			missing, err := normalizeEvidenceTypes(gap.MissingTypes)
 			if err != nil {
@@ -222,21 +217,21 @@ func (in *Inventory) Validate() error {
 			}
 			if !gap.Reason.valid() {
 				return e.New(e.CodeInvalidCatalog,
-					"inventory member %s has unknown evidence gap reason", label(component.Name, component.Role))
+					"inventory member %s has unknown evidence gap reason", component.Name)
 			}
 			for _, evidenceType := range missing {
 				key := gap.ArtifactDigest + "\x00" + evidenceType.String()
 				if gapTypes[key] {
 					return e.New(e.CodeInvalidCatalog,
 						"inventory member %s repeats %s gap for artifact %s",
-						label(component.Name, component.Role), evidenceType.String(), gap.ArtifactDigest)
+						component.Name, evidenceType.String(), gap.ArtifactDigest)
 				}
 				gapTypes[key] = true
 				if (evidenceType == EvidenceSBOM && component.ExternalSBOMRef != "") ||
 					(evidenceType == EvidenceProvenance && component.ExternalProvenanceRef != "") {
 					return e.New(e.CodeInvalidCatalog,
 						"inventory member %s declares both external %s evidence and a missing-evidence gap for artifact %s",
-						label(component.Name, component.Role), evidenceType.String(), gap.ArtifactDigest)
+						component.Name, evidenceType.String(), gap.ArtifactDigest)
 				}
 			}
 		}
@@ -247,10 +242,9 @@ func (in *Inventory) Validate() error {
 // Member is one verified member of a ReleaseSet, referenced by immutable digest.
 type Member struct {
 	Component           string `json:"component"`
-	Role                string `json:"role,omitempty"`
 	Arch                string `json:"arch"`
 	Version             string `json:"version,omitempty"`
-	RecipeDigest        string `json:"recipeDigest"`
+	BuildDigest         string `json:"buildDigest"`
 	VectorDigest        string `json:"vectorDigest"`
 	ResolvedInputDigest string `json:"resolvedInputDigest"`
 	// ProfileDigest binds waiver and reproduction policy to the exact build
@@ -308,9 +302,6 @@ func (rs *ReleaseSet) sorted() *ReleaseSet {
 		if c.Members[i].Component != c.Members[j].Component {
 			return c.Members[i].Component < c.Members[j].Component
 		}
-		if c.Members[i].Role != c.Members[j].Role {
-			return c.Members[i].Role < c.Members[j].Role
-		}
 		return c.Members[i].Arch < c.Members[j].Arch
 	})
 	return &c
@@ -341,7 +332,7 @@ func (rs *ReleaseSet) Validate() error {
 		}
 		k := memberKey(member)
 		if seen[k] {
-			return e.New(e.CodeInvalidCatalog, "release set contains duplicate member %s/%s/%s", member.Component, orNone(member.Role), member.Arch)
+			return e.New(e.CodeInvalidCatalog, "release set contains duplicate member %s/%s", member.Component, member.Arch)
 		}
 		seen[k] = true
 	}
@@ -387,7 +378,7 @@ func (cr ConformanceResult) Validate() error {
 }
 
 // CompletenessGate fails closed (release-incomplete) unless every Inventory-required
-// (component, role) is present as a member, naming EVERY missing one (ADR-16 §1). A
+// component is present as a member, naming EVERY missing one (ADR-16 §1). A
 // partial set is not promotable.
 func (rs *ReleaseSet) CompletenessGate(in *Inventory) error {
 	if err := in.Validate(); err != nil {
@@ -407,14 +398,14 @@ func (rs *ReleaseSet) CompletenessGate(in *Inventory) error {
 	for _, req := range in.Components {
 		var matches []Member
 		for _, member := range rs.Members {
-			if member.Component == req.Name && (req.Role == "" || member.Role == req.Role) {
+			if member.Component == req.Name {
 				matches = append(matches, member)
 			}
 		}
 		if len(matches) == 0 {
-			missing = append(missing, label(req.Name, req.Role))
+			missing = append(missing, req.Name)
 			for _, digest := range req.RequiredArtifacts {
-				missing = append(missing, label(req.Name, req.Role)+" artifact "+digest)
+				missing = append(missing, req.Name+" artifact "+digest)
 			}
 			continue
 		}
@@ -426,7 +417,7 @@ func (rs *ReleaseSet) CompletenessGate(in *Inventory) error {
 		}
 		for _, digest := range req.RequiredArtifacts {
 			if !haveArtifacts[digest] {
-				missing = append(missing, label(req.Name, req.Role)+" artifact "+digest)
+				missing = append(missing, req.Name+" artifact "+digest)
 			}
 		}
 	}
@@ -441,17 +432,16 @@ func (rs *ReleaseSet) CompletenessGate(in *Inventory) error {
 func validateMember(member Member) error {
 	if strings.TrimSpace(member.Component) == "" || strings.TrimSpace(member.Component) != member.Component ||
 		strings.TrimSpace(member.Arch) == "" || strings.TrimSpace(member.Arch) != member.Arch ||
-		(member.Role != "" && strings.TrimSpace(member.Role) != member.Role) ||
 		(member.Version != "" && strings.TrimSpace(member.Version) != member.Version) {
 		return e.New(e.CodeInvalidCatalog,
-			"release member component, role, arch, and version must be canonical")
+			"release member component, arch, and version must be canonical")
 	}
 	if member.Arch != "amd64" && member.Arch != "arm64" {
 		return e.New(e.CodeInvalidCatalog,
 			"release member %s has unsupported architecture %q", member.Component, member.Arch)
 	}
-	if !isDigest(member.RecipeDigest) || !isDigest(member.VectorDigest) {
-		return e.New(e.CodeUnverifiedRef, "member %s/%s must bind immutable recipe and vector digests", member.Component, member.Arch)
+	if !isDigest(member.BuildDigest) || !isDigest(member.VectorDigest) {
+		return e.New(e.CodeUnverifiedRef, "member %s/%s must bind immutable build and vector digests", member.Component, member.Arch)
 	}
 	if !isDigest(member.ResolvedInputDigest) {
 		return e.New(e.CodeUnverifiedRef, "member %s/%s must bind an immutable resolved-input digest", member.Component, member.Arch)
@@ -477,7 +467,7 @@ func validateMember(member Member) error {
 }
 
 func memberKey(member Member) string {
-	return member.Component + "\x00" + member.Role + "\x00" + member.Arch
+	return member.Component + "\x00" + member.Arch
 }
 
 func isDigest(value string) bool {
@@ -497,13 +487,6 @@ func isCanonicalEvidenceRef(value string) bool {
 		!strings.ContainsAny(value, "\x00\r\n\t")
 }
 
-func key(name, role string) string { return name + "\x00" + role }
-func label(name, role string) string {
-	if role == "" {
-		return name
-	}
-	return name + "@" + role
-}
 func orNone(s string) string {
 	if s == "" {
 		return "<none>"

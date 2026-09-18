@@ -119,5 +119,6 @@ clean: ## Remove build output, coverage, and the local engine workspace.
 	go clean
 	rm -rf bin coverage.out .nkd/work
 
-run-resolve: build ## Resolve the default control-plane recipe and print the pinned IR.
-	$(BIN) recipe --role control-plane --k8s 1.32.0 --os ubuntu --arch amd64
+.PHONY: run-resolve
+run-resolve: build ## Resolve the pinned kubectl producer and print its build graph.
+	$(BIN) resolve --data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64

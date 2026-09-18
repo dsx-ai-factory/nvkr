@@ -15,15 +15,14 @@ import (
 
 	client "github.com/NVIDIA/nke-recipes/client/v1"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
@@ -45,20 +44,20 @@ func digestBytes(payload []byte) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-func TestResolveRecipeEqualsAuthoritativeModules(t *testing.T) {
+func TestResolveBuildEqualsAuthoritativeModules(t *testing.T) {
 	ctx := context.Background()
-	query := criteria.Criteria{Role: "control-plane"}
+	selection := buildgraph.Selection{Components: sdkFixtureComponents(), Platform: "linux/amd64"}
 	data := filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")
 
 	wantCatalog, err := catalog.LoadContext(ctx, catalog.Dir(data))
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantResolved, err := recipe.Resolve(wantCatalog, query, nil)
+	wantResolved, err := buildgraph.Resolve(wantCatalog, selection)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantGraph, err := recipe.Compile(wantResolved)
+	wantGraph, err := buildgraph.Compile(wantResolved)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,21 +67,21 @@ func TestResolveRecipeEqualsAuthoritativeModules(t *testing.T) {
 	}
 
 	sdk := client.New(client.WithData(data))
-	got, err := sdk.ResolveRecipe(ctx, client.ResolveRequest{Criteria: query})
+	got, err := sdk.ResolveBuild(ctx, client.ResolveRequest{Components: selection.Components, Platform: selection.Platform})
 	if err != nil {
-		t.Fatalf("facade ResolveRecipe failed: %v", err)
+		t.Fatalf("facade ResolveBuild failed: %v", err)
 	}
 	if !reflect.DeepEqual(got.Resolved, wantResolved) {
-		t.Fatalf("facade resolved value differs from recipe.Resolve\n got: %#v\nwant: %#v", got.Resolved, wantResolved)
+		t.Fatalf("facade resolved value differs from buildgraph.Resolve\n got: %#v\nwant: %#v", got.Resolved, wantResolved)
 	}
-	if !reflect.DeepEqual(got.Graph, wantGraph) || got.RecipeDigest != wantDigest {
-		t.Fatalf("facade graph/digest differs from recipe.Compile: got %s, want %s", got.RecipeDigest, wantDigest)
+	if !reflect.DeepEqual(got.Graph, wantGraph) || got.BuildDigest != wantDigest {
+		t.Fatalf("facade graph/digest differs from buildgraph.Compile: got %s, want %s", got.BuildDigest, wantDigest)
 	}
 
 }
 
-func TestResolveRecipeRequiresExplicitCatalog(t *testing.T) {
-	_, err := client.New().ResolveRecipe(context.Background(), client.ResolveRequest{})
+func TestResolveBuildRequiresExplicitCatalog(t *testing.T) {
+	_, err := client.New().ResolveBuild(context.Background(), client.ResolveRequest{})
 	if errorCode(err) != nkderr.CodeUsage || !strings.Contains(err.Error(), "requires catalog I/O") {
 		t.Fatalf("missing catalog returned %v", err)
 	}
@@ -109,13 +108,13 @@ func (authority forbiddenReleaseAuthority) Authorize(context.Context,
 	return nil, errors.New("release authority must not run")
 }
 
-func TestResolveRecipeCancellationPreventsCatalogIO(t *testing.T) {
+func TestResolveBuildCancellationPreventsCatalogIO(t *testing.T) {
 	catalogIO := &countingCatalogIO{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := client.New(client.WithCatalogIO(catalogIO)).ResolveRecipe(ctx, client.ResolveRequest{
-		Criteria: criteria.Criteria{Role: "worker"},
+	_, err := client.New(client.WithCatalogIO(catalogIO)).ResolveBuild(ctx, client.ResolveRequest{
+		Components: []string{"kubectl"}, Platform: "linux/amd64",
 	})
 	if errorCode(err) != nkderr.CodeTimeout {
 		t.Fatalf("cancellation must use the stable timeout code, got %v", err)
@@ -128,8 +127,8 @@ func TestResolveRecipeCancellationPreventsCatalogIO(t *testing.T) {
 func TestRequestedAtomicOutputIsAdmittedBeforeAuthorityIO(t *testing.T) {
 	t.Run("resolve", func(t *testing.T) {
 		catalogIO := &countingCatalogIO{}
-		_, err := client.New(client.WithCatalogIO(catalogIO)).ResolveRecipe(context.Background(), client.ResolveRequest{
-			Criteria: criteria.Criteria{Role: "worker"}, OutputName: "graph.json",
+		_, err := client.New(client.WithCatalogIO(catalogIO)).ResolveBuild(context.Background(), client.ResolveRequest{
+			Components: []string{"kubectl"}, Platform: "linux/amd64", OutputName: "graph.json",
 		})
 		if errorCode(err) != nkderr.CodeUsage {
 			t.Fatalf("error = %v, want %s", err, nkderr.CodeUsage)
@@ -184,8 +183,7 @@ func (runner *cancelRunner) Run(_ *ir.Graph, _ string, options pipeline.RunOptio
 
 func TestRunPropagatesCancellationToRunner(t *testing.T) {
 	graph := &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, RecipeID: "cancel-test",
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
 		Nodes: []ir.Node{
 			{ID: "pull-test", Kind: ir.KindPull, Component: "test", Artifact: "https://example.test/test",
 				Digest: "sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Network: ir.NetworkDefault,
@@ -202,7 +200,7 @@ func TestRunPropagatesCancellationToRunner(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	result := make(chan error, 1)
 	go func() {
-		_, runErr := c.Run(ctx, client.RunRequest{Graph: graph, RecipeDigest: digest})
+		_, runErr := c.Run(ctx, client.RunRequest{Graph: graph, BuildDigest: digest})
 		result <- runErr
 	}()
 
@@ -236,8 +234,7 @@ func reportFixture(t *testing.T) *pipeline.Report {
 	t.Helper()
 	work := filepath.Join(t.TempDir(), "work")
 	options := pipeline.RunOptions{Ctx: context.Background(), SourceRoot: filepath.Join(work, "src")}
-	graph := &ir.Graph{SchemaVersion: ir.SchemaVersion, RecipeID: "recipe",
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"}}
+	graph := &ir.Graph{SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64"}
 	verify := ir.Node{ID: "verify", Kind: ir.KindVerify}
 	for _, fixture := range []struct {
 		name string
@@ -374,12 +371,12 @@ type fixedRunner struct{ calls int }
 func (runner *fixedRunner) Name() string { return "fixed" }
 func (runner *fixedRunner) Run(graph *ir.Graph, digest string, _ pipeline.RunOptions) (*pipeline.Report, error) {
 	runner.calls++
-	return &pipeline.Report{RecipeID: graph.RecipeID, RecipeDigest: digest}, nil
+	return &pipeline.Report{BuildDigest: digest}, nil
 }
 
 func TestRunRejectsUnsafeCallerGraphBeforeInjectedRunner(t *testing.T) {
-	resolution, err := client.New(client.WithData(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered"))).ResolveRecipe(context.Background(), client.ResolveRequest{
-		Criteria: criteria.Criteria{Category: "kubernetes", K8sVersion: "1.32.0", OS: "ubuntu", Arch: "amd64"},
+	resolution, err := client.New(client.WithData(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered"))).ResolveBuild(context.Background(), client.ResolveRequest{
+		Components: sdkFixtureComponents(), Platform: "linux/amd64",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -404,7 +401,7 @@ func TestRunRejectsUnsafeCallerGraphBeforeInjectedRunner(t *testing.T) {
 			}
 			runner := &fixedRunner{}
 			_, err := client.New(client.WithRunner(runner)).Run(context.Background(), client.RunRequest{
-				Graph: &graph, RecipeDigest: resolution.RecipeDigest,
+				Graph: &graph, BuildDigest: resolution.BuildDigest,
 			})
 			if err == nil || runner.calls != 0 {
 				t.Fatalf("unsafe graph reached injected runner: calls=%d err=%v", runner.calls, err)
@@ -618,8 +615,8 @@ func (observer *fixedHostObserver) Observe(ctx context.Context) (map[string]stri
 
 func TestVerifyAuthenticatedEnforcesProfileReceiptAndPreflight(t *testing.T) {
 	ctx := context.Background()
-	query := criteria.Criteria{Role: "control-plane"}
-	resolution, err := client.New(client.WithData(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered"))).ResolveRecipe(ctx, client.ResolveRequest{Criteria: query})
+	selection := buildgraph.Selection{Components: sdkFixtureComponents(), Platform: "linux/amd64"}
+	resolution, err := client.New(client.WithData(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered"))).ResolveBuild(ctx, client.ResolveRequest{Components: selection.Components, Platform: selection.Platform})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -627,7 +624,7 @@ func TestVerifyAuthenticatedEnforcesProfileReceiptAndPreflight(t *testing.T) {
 		SchemaVersion: profile.SchemaVersion,
 		Identity:      "operator-profile", Version: "1",
 		HostControlClass: profile.OperatorControlled,
-		Provides:         recipe.RequiredBuilders(resolution.Resolved),
+		Provides:         buildgraph.RequiredBuilders(resolution.Resolved),
 		Fields: []profile.Field{
 			{Name: "host.test", Value: "matching", HardFail: true, MeasurementStage: profile.MeasurementHost},
 			{Name: profile.FieldRunnerDigest, Value: testDigest('1'), HardFail: true, MeasurementStage: profile.MeasurementExecution},
@@ -681,7 +678,7 @@ func TestVerifyAuthenticatedEnforcesProfileReceiptAndPreflight(t *testing.T) {
 	}
 	expectedObserver := &fixedExecutionObserver{observation: executionObserver.observation}
 	expectedRunner := &artifactRunner{artifacts: artifacts}
-	expectedReport, err := expectedRunner.Run(resolution.Graph, resolution.RecipeDigest, pipeline.RunOptions{
+	expectedReport, err := expectedRunner.Run(resolution.Graph, resolution.BuildDigest, pipeline.RunOptions{
 		Ctx: ctx, SourceRoot: filepath.Join(t.TempDir(), "expected", "src"), Runtime: os.Args[0],
 		Qualification: &pipeline.QualifiedExecution{
 			Profile: builderProfile, HostReceipt: expectedHostReceipt, Observer: expectedObserver,
@@ -708,7 +705,7 @@ func TestVerifyAuthenticatedEnforcesProfileReceiptAndPreflight(t *testing.T) {
 	if _, err := creationClient.CreateValidationVector(ctx, client.ValidationVectorRequest{
 		Report: expectedReport,
 	}); errorCode(err) != nkderr.CodeUsage {
-		t.Fatalf("publisher-evidence authority ran without the resolved recipe/graph: %v", err)
+		t.Fatalf("publisher-evidence authority ran without the resolved producer/graph: %v", err)
 	}
 	created, err := creationClient.CreateValidationVector(ctx, client.ValidationVectorRequest{
 		Report: expectedReport, Resolved: resolution.Resolved, Graph: resolution.Graph,
@@ -774,7 +771,7 @@ func TestVerifyAuthenticatedEnforcesProfileReceiptAndPreflight(t *testing.T) {
 	request := client.VerifyAuthenticatedRequest{
 		Expected: client.ValidationVectorInput{SourcePath: vectorPath},
 		Profile:  client.BuilderProfileInput{SourcePath: profilePath},
-		Resolve:  client.ResolveRequest{Criteria: query},
+		Resolve:  client.ResolveRequest{Components: selection.Components, Platform: selection.Platform},
 	}
 	withoutEvidenceCalls := 0
 	withoutEvidence := client.New(client.WithValidationVectorAuthority(
@@ -1077,7 +1074,7 @@ func releaseSetReceipt(t *testing.T, set *release.ReleaseSet) release.ReleaseSet
 	return receipt
 }
 
-func releaseQualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
+func releaseQualifiedReport(t *testing.T, buildDigest, artifactDigest string,
 	localSBOM sbom.LocalEvidenceReceipt,
 ) vuln.QualifiedReport {
 	t.Helper()
@@ -1085,7 +1082,7 @@ func releaseQualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if binding.RecipeDigest != recipeDigest || binding.ArtifactDigest != artifactDigest {
+	if binding.BuildDigest != buildDigest || binding.ArtifactDigest != artifactDigest {
 		t.Fatalf("local SBOM fixture does not bind vulnerability subject")
 	}
 	canonicalSBOM, err := localSBOM.ExactBytes()
@@ -1094,7 +1091,7 @@ func releaseQualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
 	}
 	request := vuln.QualifiedScanRequest{
 		Scanner: vuln.ScannerGrype, ScannerDigest: testDigest('9'), DatabaseDigest: testDigest('a'),
-		RecipeDigest: recipeDigest, ArtifactDigest: artifactDigest,
+		BuildDigest: buildDigest, ArtifactDigest: artifactDigest,
 		SBOMDigest: binding.EvidenceDigest, CanonicalSBOM: canonicalSBOM,
 	}
 	report, err := vuln.QualifyScan(context.Background(), request, releaseQualifiedScanner{observation: vuln.ScanObservation{
@@ -1108,7 +1105,7 @@ func releaseQualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
 }
 
 func releasePublisherAuthorityFixture(t *testing.T, component string, artifactBytes []byte) (
-	recipeDigest, vectorDigest, artifactDigest string,
+	buildDigest, vectorDigest, artifactDigest string,
 	vector attest.PublishedVectorReceipt,
 	sbomReceipts []sbom.LocalEvidenceReceipt,
 	provenanceReceipts []provenance.LocalEvidenceReceipt,
@@ -1116,11 +1113,11 @@ func releasePublisherAuthorityFixture(t *testing.T, component string, artifactBy
 ) {
 	t.Helper()
 	artifactDigest = digestBytes(artifactBytes)
-	resolved := &recipe.Resolved{
-		RecipeID: "client-release-" + component,
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
 		Components: []catalog.NamedComponent{{Name: component, Component: catalog.Component{
-			Tag: "v1.0.0", OutputType: "raw",
+			Platforms: []string{"linux/amd64"},
+			Tag:       "v1.0.0", OutputType: "raw",
 			Prebuilt: &catalog.Prebuilt{
 				URL:      "https://artifacts.example.test/" + component,
 				Digests:  map[string]string{"amd64": artifactDigest},
@@ -1128,11 +1125,11 @@ func releasePublisherAuthorityFixture(t *testing.T, component string, artifactBy
 			},
 		}}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err = graph.Digest()
+	buildDigest, err = graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1170,7 +1167,7 @@ func releasePublisherAuthorityFixture(t *testing.T, component string, artifactBy
 	if err := os.WriteFile(filepath.Join(resultsDir, pull.ID+".json"), payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	report, err := (pipeline.Local{}).VerifyResults(graph, recipeDigest, resultsDir, options)
+	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest, resultsDir, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1227,13 +1224,13 @@ func releasePublisherAuthorityFixture(t *testing.T, component string, artifactBy
 	if err != nil {
 		t.Fatal(err)
 	}
-	return recipeDigest, vectorDigest, artifactDigest, vector, sbomReceipts, provenanceReceipts,
+	return buildDigest, vectorDigest, artifactDigest, vector, sbomReceipts, provenanceReceipts,
 		publisherEvidence
 }
 
 func releaseRequestFixture(t *testing.T) release.AuthorizationRequest {
 	t.Helper()
-	recipeDigest, vectorDigest, artifactDigest, vectorReceipt, sbomReceipts, provenanceReceipts, _ :=
+	buildDigest, vectorDigest, artifactDigest, vectorReceipt, sbomReceipts, provenanceReceipts, _ :=
 		releasePublisherAuthorityFixture(t, "component", []byte("client-release-component"))
 	inventory := &release.Inventory{
 		SchemaVersion: release.InventorySchemaVersion,
@@ -1249,7 +1246,7 @@ func releaseRequestFixture(t *testing.T) release.AuthorizationRequest {
 	}
 	member := release.Member{
 		Component: "component", Arch: "amd64",
-		RecipeDigest: recipeDigest, VectorDigest: vectorDigest, ResolvedInputDigest: testDigest('c'),
+		BuildDigest: buildDigest, VectorDigest: vectorDigest, ResolvedInputDigest: testDigest('c'),
 		ArtifactDigests: []string{artifactDigest},
 	}
 	set := &release.ReleaseSet{
@@ -1268,8 +1265,8 @@ func releaseRequestFixture(t *testing.T) release.AuthorizationRequest {
 	receiptAuthenticator := releaseReceiptAuthenticator{}
 	reproductionReceipt, err := release.VerifyReproduction(context.Background(), release.ReproductionResult{
 		SchemaVersion: release.ReproductionSchemaVersion, ReleaseSetDigest: releaseDigest,
-		Component: member.Component, Role: member.Role, Arch: member.Arch,
-		RecipeDigest: member.RecipeDigest, VectorDigest: member.VectorDigest,
+		Component: member.Component, Arch: member.Arch,
+		BuildDigest: member.BuildDigest, VectorDigest: member.VectorDigest,
 		ProfileIndependent: true, ResolvedInputDigest: member.ResolvedInputDigest,
 		ArtifactDigests: member.ArtifactDigests, Verdict: release.Reproduced,
 		EffectiveEpoch: 1, ExpiresEpoch: 20,
@@ -1280,7 +1277,7 @@ func releaseRequestFixture(t *testing.T) release.AuthorizationRequest {
 	compatibilityReceipt, err := release.VerifyCompatibility(context.Background(), release.CompatibilityResult{
 		SchemaVersion: release.CompatibilitySchemaVersion, ReleaseSetDigest: releaseDigest,
 		InventoryDigest: inventoryDigest, CompatibilityPolicyDigest: testDigest('6'),
-		RecipeDigests: []string{member.RecipeDigest}, VectorDigests: []string{member.VectorDigest},
+		BuildDigests: []string{member.BuildDigest}, VectorDigests: []string{member.VectorDigest},
 		ArtifactDigests: member.ArtifactDigests, Verdict: release.CompatibilityAccepted,
 		EffectiveEpoch: 1, ExpiresEpoch: 20,
 	}, []byte("compatibility signature"), releaseReceipt, inventory, receiptAuthenticator)
@@ -1303,7 +1300,7 @@ func releaseRequestFixture(t *testing.T) release.AuthorizationRequest {
 		LocalProvenanceEvidence: provenanceReceipts,
 		Reproduction:            []release.ReproductionReceipt{reproductionReceipt}, Compatibility: compatibilityReceipt,
 		Conformance: []release.ConformanceReceipt{conformanceReceipt},
-		VulnerabilityReports: []vuln.QualifiedReport{releaseQualifiedReport(t, member.RecipeDigest,
+		VulnerabilityReports: []vuln.QualifiedReport{releaseQualifiedReport(t, member.BuildDigest,
 			artifactDigest, sbomReceipts[0])},
 		Status:          releaseStatusBinding(t, publicationIdentity),
 		PromotionPolicy: releasePromotionPolicyReceipt(t, testDigest('6'), testDigest('7')),
@@ -1360,4 +1357,8 @@ func TestPublishFailsBeforeArtifactIOWithoutPublicationRootProtocol(t *testing.T
 
 func testDigest(character byte) string {
 	return "sha256:" + strings.Repeat(string(character), 64)
+}
+
+func sdkFixtureComponents() []string {
+	return []string{"cni-plugins", "containerd", "coredns", "crictl", "etcd", "helm", "kube-apiserver", "kube-controller-manager", "kube-proxy", "kube-scheduler", "kubeadm", "kubectl", "kubelet", "pause", "runc"}
 }

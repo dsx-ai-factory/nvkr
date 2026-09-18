@@ -78,8 +78,8 @@ body:
       options:
         - Catalog — pins (pins.lock.yaml)
         - Catalog — registry (sources / constraints / build commands)
-        - Recipes — overlays / mixins
-        - CLI (nkectl)
+        - Definitions — output selection / catalog substitutions
+        - CLI (nkdctl)
         - Generator / pipeline emission
         - Signing / provenance / evidence
         - Docs / examples

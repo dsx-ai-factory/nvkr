@@ -21,14 +21,14 @@ func inspectFactoryImage(ctx context.Context, plan *Plan, artifact Artifact) (de
 			continue
 		}
 		count++
-		for _, recipe := range plan.Recipes {
-			if recipe.Name == input.RecipeTarget {
-				platform = "linux/" + recipe.Criteria.Arch
+		for _, build := range plan.Builds {
+			if build.Name == input.BuildTarget {
+				platform = build.Platform
 			}
 		}
 	}
 	if count != 1 || platform == "" {
-		return delivery.ImageInspection{}, e.New(e.CodeVerifyFailed, "image output %q has no unique recipe platform", artifact.Name)
+		return delivery.ImageInspection{}, e.New(e.CodeVerifyFailed, "image output %q has no unique build platform", artifact.Name)
 	}
 	return delivery.InspectContainerImage(ctx, artifact.Path, platform)
 }

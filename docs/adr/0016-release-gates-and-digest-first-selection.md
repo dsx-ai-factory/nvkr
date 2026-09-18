@@ -8,7 +8,7 @@
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-16 in the consolidated NKD ADR set.
 - **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-06 (status / selection), ADR-04 (verify / signing),
-  ADR-19 (ClusterDefinition / consumer).
+  ADR-19 (deployment-scope boundary).
 - **Satisfies:** FR-18 (atomic promotion), FR-24 (incremental validation), SEC-08 (independent gates), SEC-13
   (registry integrity), SEC-17 (downstream verification). Advances UC-05/08/10/14/15/16.
 
@@ -37,7 +37,7 @@ requirements and, per evidence type, to a closed allow-list of waivable gap reas
 exact compatibility and conformance policy digests and carries an effective/expiry interval. A raw policy digest
 or a decoded policy value is not a capability. An `evidence:none` declaration is absence, not satisfaction: it
 passes only where the authenticated policy does not require that evidence type, or explicitly permits that exact
-gap reason and ADR-13's authenticated waiver receipt binds the artifact, recipe, profile, status checkpoint, and
+gap reason and ADR-13's authenticated waiver receipt binds the artifact, build, profile, status checkpoint, and
 promotion-policy digest.
 
 ### 2. Authenticated typed inputs + two independent gates (SEC-08)
@@ -51,7 +51,7 @@ Promotion accepts typed, authenticated receipts rather than caller-supplied bool
 - one **`PromotionPolicyReceipt`**, narrowed from an authenticated canonical document under the dedicated
   promotion-policy role and rechecked for exact bytes, digest, effective time, artifact-kind coverage, evidence,
   waiver, compatibility, and conformance policy bindings;
-- a **`ReproductionReceipt` per release member**, binding the exact recipe, ValidationVector, builder-profile,
+- a **`ReproductionReceipt` per release member**, binding the exact build, ValidationVector, builder-profile,
   resolved-input-manifest, and sorted artifact digests to a reproduction verdict;
 - the **`EvidenceReceipt` set** from ADR-13, binding every policy-required evidence type to the exact artifact
   and evidence bytes, or to an exact policy-authorized waiver;
@@ -85,6 +85,12 @@ artifact, evidence document, or policy is rejected.
   `PublicationManifest`. Downstream consumers authenticate and rehydrate this exact object rather than
   reconstructing success from flags or trusting a same-process capability.
 
+The active exact-member schemas are `nkd.dev/reproduction-result/v3` and
+`nkd.dev/evidence-waiver/v3`; the clearance is `nkd.dev/release-authorization/v9`.
+Member and evidence identities retain component, build, artifact, platform and policy bindings while removing
+deployment roles. Earlier schemas and removed fields fail closed. Signer and receipt trust roles remain
+mandatory authentication boundaries and are unaffected by removal of deployment metadata.
+
 The `PublicationManifest` is exhaustive. For each OCI subject it lists the cleared artifact and every required
 referrer, with both its NKD semantic identity (domain-separated canonical digest) and its raw OCI blob digest and
 media type. Publication rejects a missing, extra, type-confused, or substituted attachment; transport
@@ -102,7 +108,7 @@ verification: consumers always select by immutable digest and reject a lifecycle
 minimum or high-water mark.
 
 For a ReleaseSet, the status target is
-`publicationIdentity = Digest("publication", exact canonical ReleaseSet bytes)`, not the raw `releaseSetDigest`.
+`publicationIdentity = Digest("nkd.publication", exact canonical ReleaseSet bytes)`, not the raw `releaseSetDigest`.
 Both identities are bound by the authenticated ReleaseSet receipt and cannot be caller-selected.
 
 ### 4. Incremental validation, rollback, and clearance — produce, don't operate
@@ -112,7 +118,8 @@ Both identities are bound by the authenticated ReleaseSet receipt and cannot be 
   authenticated prior clearance plus the exact prior typed receipts, all rebound to the current release member
   and still acceptable under the current promotion, evidence, compatibility, and conformance policies. Status and
   trusted-time checks are always fresh. Until that authenticated cache protocol exists, NKD re-runs `Authorize`;
-  `IncrementalPlan` is diagnostic only and cannot mint or reuse evidence.
+  `IncrementalPlan` is diagnostic only and cannot mint or reuse evidence. Equal Build Digests across named
+  outputs likewise grant no execution/evidence reuse: every frozen output use must independently complete.
 - **Rollback (UC-15).** `rollback --to <releaseSetDigest>` makes a **previously verified set re-selectable and
   re-verifiable by immutable digest** and re-runs the clearance path at the as-of epoch from a fresh opaque
   `CheckpointReceipt`. The checkpoint must target the exact candidate and must already have passed current
@@ -138,11 +145,11 @@ dry-run stays static-unqualified. Pipeline-attested never satisfies qualified re
 Inventory, ReleaseSet, clearance, or stage-two receipt. The hosted design targets SLSA Build L2; that is an
 acceptance target, not a certification established by local tests.
 
-V1 full-release acceptance is a **deferred** recipe/evidence qualification gate and versioned release manifest.
+V1 full-release acceptance is a **deferred** build/evidence qualification gate and versioned release manifest.
 Qualification checks schema, pins (including embedded-component consistency), signatures, production attestations,
 and a tooling smoke test in a network-disabled container. Every subject receives one pass/fail/waived verdict;
 a waiver binds component, reason and approver. Failing evidence is never attested. This gate is neither runtime
-conformance nor ADR-19 cluster qualification.
+conformance nor deployment qualification.
 
 The separate qualification workflow signs `nkd.qualification-evidence/v1`; the build workflow cannot sign in
 that role. A versioned `nkd.release-manifest/v1` lists every selected artifact from one default-branch Run with
@@ -163,8 +170,8 @@ supervises it. NKD authenticates an already-produced independently signed observ
 suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
 `resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
 unpinned identities, caller-provided pass booleans, wrong roles, expired evidence or mismatched subjects fail
-closed with coded errors and no partial output. Release-set conformance remains exhaustive; post-clearance
-cluster qualification has the separate ADR-19 subject and cannot authorize promotion.
+closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
+are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
 
 ## Consequences
 
@@ -198,8 +205,7 @@ cluster qualification has the separate ADR-19 subject and cannot authorize promo
 - **ADR-05:** the ReleaseSet and Inventory the gates read, and the ValidationVector evidence the conformance
   result populates.
 - **ADR-06:** status referrers consulted during selection.
-- **ADR-19:** generated cluster realization binds exact intent to accepted Release contents; the legacy
-  ClusterDefinition wire references a cleared ReleaseSet by digest.
+- **ADR-19:** deployment topology and cluster qualification are outside the current artifact model.
 - **ADR-13:** owns typed evidence and waiver receipts; promotion consumes but does not reinterpret them.
 
 ## Acceptance evidence

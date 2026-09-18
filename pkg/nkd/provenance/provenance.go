@@ -30,9 +30,9 @@ var (
 
 // BuildType URIs identify the NKD build lane a statement describes.
 const (
-	BuildTypeOCIHermetic = "https://nkd.dev/buildtypes/oci-hermetic/v1"
-	BuildTypeNix         = "https://nkd.dev/buildtypes/nix/v1"
-	BuildTypePrebuilt    = "https://nkd.dev/buildtypes/prebuilt-acquire/v1"
+	BuildTypeOCIHermetic = "https://nkd.dev/buildtypes/oci-hermetic/v2"
+	BuildTypeNix         = "https://nkd.dev/buildtypes/nix/v2"
+	BuildTypePrebuilt    = "https://nkd.dev/buildtypes/prebuilt-acquire/v2"
 
 	statementType = "https://in-toto.io/Statement/v1"
 	predicateType = "https://slsa.dev/provenance/v1"
@@ -98,7 +98,7 @@ type Artifact struct {
 }
 
 // ForArtifact builds the deterministic SLSA statement for one built artifact.
-func ForArtifact(recipeDigest, profileDigest string, a Artifact) Statement {
+func ForArtifact(buildDigest, profileDigest string, a Artifact) Statement {
 	deps := append([]Dependency(nil), a.Deps...)
 	sort.Slice(deps, func(i, j int) bool { return deps[i].URI < deps[j].URI })
 	builderID := orNone(profileDigest)
@@ -113,15 +113,15 @@ func ForArtifact(recipeDigest, profileDigest string, a Artifact) Statement {
 			BuildDefinition: BuildDefinition{
 				BuildType: buildTypeFor(a.BuilderType),
 				ExternalParameters: map[string]string{
-					"recipeDigest": recipeDigest,
-					"component":    a.Component,
-					"inputDigest":  a.InputDigest,
+					"buildDigest": buildDigest,
+					"component":   a.Component,
+					"inputDigest": a.InputDigest,
 				},
 				ResolvedDependencies: deps,
 			},
 			RunDetails: RunDetails{
 				Builder:  Builder{ID: builderID},
-				Metadata: map[string]string{"invocationId": recipeDigest + "/" + a.Component},
+				Metadata: map[string]string{"invocationId": buildDigest + "/" + a.Component},
 			},
 		},
 	}
@@ -131,21 +131,21 @@ func ForArtifact(recipeDigest, profileDigest string, a Artifact) Statement {
 // expected-evidence digest in the ValidationVector (ADR-05 §1).
 type Index struct {
 	SchemaVersion string      `json:"schemaVersion"`
-	RecipeDigest  string      `json:"recipeDigest"`
+	BuildDigest   string      `json:"buildDigest"`
 	Statements    []Statement `json:"statements"`
 }
 
-const IndexSchemaVersion = "nkd.dev/provenance-index/v1"
+const IndexSchemaVersion = "nkd.dev/provenance-index/v2"
 
 // BuildIndex emits one statement per artifact and returns the deterministic index
 // (statements sorted by subject name).
-func BuildIndex(recipeDigest, profileDigest string, artifacts []Artifact) *Index {
+func BuildIndex(buildDigest, profileDigest string, artifacts []Artifact) *Index {
 	stmts := make([]Statement, 0, len(artifacts))
 	for _, a := range artifacts {
-		stmts = append(stmts, ForArtifact(recipeDigest, profileDigest, a))
+		stmts = append(stmts, ForArtifact(buildDigest, profileDigest, a))
 	}
 	sort.Slice(stmts, func(i, j int) bool { return stmts[i].Subject[0].Name < stmts[j].Subject[0].Name })
-	return &Index{SchemaVersion: IndexSchemaVersion, RecipeDigest: recipeDigest, Statements: stmts}
+	return &Index{SchemaVersion: IndexSchemaVersion, BuildDigest: buildDigest, Statements: stmts}
 }
 
 // Digest is the aggregate provenance evidence digest (ADR-01 domain-separated).
@@ -167,9 +167,9 @@ func (ix *Index) Validate() error {
 		return e.New(e.CodeInvalidCatalog,
 			"provenance schemaVersion %q is unsupported (want %q)", ix.SchemaVersion, IndexSchemaVersion)
 	}
-	if !canonical.IsDigest(ix.RecipeDigest) {
+	if !canonical.IsDigest(ix.BuildDigest) {
 		return e.New(e.CodeUnverifiedRef,
-			"provenance recipeDigest %q is not an exact lowercase sha256 identity", ix.RecipeDigest)
+			"provenance buildDigest %q is not an exact lowercase sha256 identity", ix.BuildDigest)
 	}
 	if len(ix.Statements) == 0 {
 		return e.New(e.CodeProvenanceMissing, "provenance index contains no artifact statements")
@@ -210,10 +210,10 @@ func (ix *Index) Validate() error {
 				"reproduction provenance subject %q must not carry build-time internal parameters", subject.Name)
 		}
 		parameters := definition.ExternalParameters
-		if len(parameters) != 3 || parameters["recipeDigest"] != ix.RecipeDigest ||
+		if len(parameters) != 3 || parameters["buildDigest"] != ix.BuildDigest ||
 			parameters["component"] != subject.Name {
 			return e.New(e.CodeUnverifiedRef,
-				"provenance subject %q does not bind the exact recipe/component parameters", subject.Name)
+				"provenance subject %q does not bind the exact build/component parameters", subject.Name)
 		}
 		inputDigest := parameters["inputDigest"]
 		builderID := statement.Predicate.RunDetails.Builder.ID
@@ -227,7 +227,7 @@ func (ix *Index) Validate() error {
 				"prebuilt provenance subject %q must be profile-independent and have no source-input digest", subject.Name)
 		}
 		metadata := statement.Predicate.RunDetails.Metadata
-		if len(metadata) != 1 || metadata["invocationId"] != ix.RecipeDigest+"/"+subject.Name {
+		if len(metadata) != 1 || metadata["invocationId"] != ix.BuildDigest+"/"+subject.Name {
 			return e.New(e.CodeUnverifiedRef,
 				"provenance subject %q has an invalid invocation binding", subject.Name)
 		}
@@ -274,7 +274,7 @@ func validDependencyIdentity(dependency Dependency) bool {
 // may be independently signed.
 type BuildObservations struct {
 	SchemaVersion string                `json:"schemaVersion"`
-	RecipeDigest  string                `json:"recipeDigest"`
+	BuildDigest   string                `json:"buildDigest"`
 	Observations  []ArtifactObservation `json:"observations"`
 	Host          map[string]string     `json:"host,omitempty"`
 }
@@ -287,7 +287,7 @@ type ArtifactObservation struct {
 	FinishedOn  string `json:"finishedOn,omitempty"`
 }
 
-const ObservationsSchemaVersion = "nkd.dev/build-observations/v1"
+const ObservationsSchemaVersion = "nkd.dev/build-observations/v2"
 
 func buildTypeFor(builderType string) string {
 	switch builderType {

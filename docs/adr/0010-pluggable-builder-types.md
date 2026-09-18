@@ -9,7 +9,9 @@
 - **Index:** ADR-10 in the consolidated NKD ADR set.
 - **Relates to:** ADR-07 (reproduction identity & builder profile), ADR-08 (bake-off gate).
 
-- **Scope:** The numbered builder contract is for qualified execution; the final Decision section defines v1 source lanes. Nix and wrapped execution remain capability-gated.
+- **Scope:** The numbered builder contract is for qualified execution; the later Decision sections define v1
+  source lanes and disk authoring. Nix, VM execution and fused large-output wrapped jobs remain capability-gated;
+  the admitted BuildKit wrapped lane has the narrower contract below.
 
 ## Context
 
@@ -37,20 +39,21 @@ constraint, and Nix can enter the reproducibility boundary only after its execut
    The `prebuilt` lane is restricted to byte-preserving fetch plus digest verification. Repackaging,
    normalization, conversion, patching, or any other byte transformation is a build node with a builder type,
    pinned transformation inputs, and profile-bound output (ADR-07); it cannot be hidden inside `prebuilt`
-   acquisition. Exclusion is unchanged.
+   acquisition. Exclusions remain catalog declarations but cannot be selected as artifact producers; an ordinary
+   output requires a nonempty producer set.
 
 2. **What "nix" means.** A `nix` component's artifact is produced from a **locked flake** (`flakeRef` + a fully
    pinned lock over all transitive inputs + an output attribute). "Nix as an *environment* provider" is **not** a
    separate builder; it is a flake-pinned toolchain source feeding an otherwise `oci-hermetic` build. The
    builder-type set stays small and closed.
 
-3. **Granularity: per-component.** Each component declares its builder type. A recipe may mix `nix`-built and
+3. **Granularity: per-component.** Each component declares its builder type. A build may mix `nix`-built and
    `oci-hermetic`-built components, which is safe because verification is builder-agnostic (§5).
 
 4. **Identity.** The builder type and its pins — the container-image digest and flake lock for `nix`, the
    toolchain digest for `oci-hermetic` — are **build-semantic inputs**, part of the IR and therefore of
-   `recipeDigest`. Switching a component's builder produces a **new `recipeDigest`, i.e. a new recipe** — never a
-   "variant" (variants cover same-recipe *representation* drift only). Once `vm-image` lowering is admitted,
+   `buildDigest`. Switching a selected component's builder changes its generated graph's **Build Digest**;
+   no authored build object or variant classifier is involved. Once `vm-image` lowering is admitted,
    its selected producer form, exact source-owned entrypoint, declared variable and material bindings, pinned
    toolchain closure, and output contract are likewise build-semantic inputs.
 
@@ -97,7 +100,7 @@ The lane must agree in provenance, Release membership, evidence records, and mil
 indeterminate lanes are definition errors. The `buildkit-rootless` builder implements the wrapped-build lane
 for OCI-export archives on Docker, locally and in generated lifecycle Runs. Other wrapped adapters and Nix
 qualified execution remain deferred. A component may select its own digest-pinned toolchain image while
-retaining the same pinned source as other components; this changes its Recipe identity, not its source pin.
+retaining the same pinned source as other components; this changes its build identity, not its source pin.
 
 ### Disk-image authoring contract
 
@@ -173,11 +176,12 @@ before lowering is admitted. A local 2026-09-18 framing probe used the official 
 the same success line on stdout, and empty stderr. This probes validation framing only, not NKE execution or disk
 production.
 
-`materials` is a one-to-one map from a source-owned binding name to another component in the same resolved
-Recipe. The target may be a from-source build or a digest-pinned acquisition. Unknown, excluded, self-referential,
-duplicate-target, cyclic, or omitted targets fail catalog or Recipe resolution. The declaration does not create a
-second component graph or implicitly add components to a Recipe; it adds typed edges between the Recipe's existing
-component outputs. Source-owned HCL defaults do not authorize NKD to infer or fetch undeclared build materials.
+`materials` is a one-to-one map from a source-owned binding name to another explicitly selected component in
+the same output's build graph. The target may be a from-source build or a digest-pinned acquisition. Unknown,
+excluded, self-referential, duplicate-target, cyclic, or omitted targets fail catalog validation or build-graph
+resolution. The declaration does not create a second component graph or implicitly select producers; it adds
+typed edges between the existing selected component outputs. Source-owned HCL defaults do not authorize NKD to
+infer or fetch undeclared build materials.
 
 Before either driver may lower, required component outputs must be built or acquired, verified, and assembled
 into a deterministic build-material manifest. Each entry binds its source-owned binding name, observed component
@@ -199,8 +203,8 @@ Admitted lowering must bind only declared inputs and variables, provide a privat
 selected driver through the shared runner, collect the declared artifact, and recompute its exact bytes. A driver
 may not replace a staged material with an undeclared network fetch. The catalog entry owns the pinned source and
 toolchain, selected driver, exact entrypoint or Packer project and build name, artifact path, material edges, and
-public Packer-variable values. These fields affect resolved Catalog identity now and become Recipe inputs only
-after disk lowering is admitted; the schema-only contract mints no Recipe identity for a disk.
+public Packer-variable values. These fields affect resolved Catalog identity now and become logical graph inputs
+only after disk lowering is admitted; the schema-only contract mints no build identity for a disk.
 
 The executable name grants no evidence lane. A Make-driven image may qualify when its exact command, staged
 materials, toolchain closure, enforced isolation, output collection, disk inspection, and reproduction evidence
@@ -215,7 +219,7 @@ complete profile: positive CPU, memory and ephemeral storage, at least one eligi
 explicit KVM policy, and a positive executor timeout. That request is reusable by every builder type, changes
 catalog and Plan identity, and never proves that the selected runner satisfies it. The request can constrain minimum CPU,
 memory and ephemeral storage, an OR-set of eligible runner-host platforms, typed host capabilities, and the
-executor wall-time budget. Runner-host platform is distinct from Recipe criteria and the IR target/toolchain
+executor wall-time budget. Runner-host platform is distinct from output target platform and the IR target/toolchain
 platform. For `vm-image`, per-architecture toolchain pins name execution-host platforms rather than the guest
 architecture. Every allowed host route needs an exact toolchain pin or the scalar fallback. `kvm` is the first
 typed capability: `required` must be exposed and requires an allowed host platform matching the resolved guest
@@ -229,8 +233,7 @@ an artifact and transport concern rather than a runner-capacity field.
 
 For the [NKE Makefile at commit `6df693a`](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185),
 the following source-owned targets illustrate the `command` driver. Plain and FDE are separate selectable
-components, not a public boolean or variant. The existing typed architecture token is resolved from Recipe
-criteria:
+components, not a public boolean or variant. The existing typed architecture token is resolved from the output target platform:
 
 ```text
 make -C os-image/packer os-image-non-fde ARCH={{.Arch}}
@@ -241,10 +244,10 @@ make -C os-image/packer os-image-fde ARCH={{.Arch}}
 
 The current NKE release matrix realizes plain amd64, FDE amd64, and plain arm64. It does not validate or publish
 FDE arm64. Definition output selection records that supported matrix without duplicating components per
-architecture. A maintained NKE recipe may instead select the `packer` driver after NKE exposes an authenticated
+architecture. A maintained NKE component may instead select the `packer` driver after NKE exposes an authenticated
 staged-material input and private-output contract in its source-owned HCL. That catalog choice changes catalog
-snapshot identity now and, once disk lowering is admitted, changes Recipe identity. It does not remove or
-invalidate the standalone Make entrypoint. These bindings are authoring data only; command and Packer Recipe
+snapshot identity now and, once disk lowering is admitted, changes build identity. It does not remove or
+invalidate the standalone Make entrypoint. These bindings are authoring data only; command and Packer graph
 lowering, VM execution, and disk collection remain capability-gated. An override that changes NKE's derived
 output filename must also change the catalog artifact path; NKD never guesses it.
 
@@ -269,7 +272,9 @@ network, or credentials during build before output. An external reusable workflo
 `embeds` declares components inside the external artifact that NKD neither builds nor separately delivers.
 Names, versions and known source pins feed production dependencies, the aggregate SBOM dependency graph, and a
 qualification cross-check against the upstream version manifest **at the pinned commit**. Missing or disagreeing
-members fail that check. NKD does not inspect the image to prove its contents; that remains the upstream build
+members fail that check. This declaration does not prove the image's observed contents. ADR-13 separately
+requires traced materials and read-only final-disk inspection before disk delivery is admitted; those inventory
+adapters remain deferred. Embedded-software correctness and runtime validation remain the upstream build
 owner's duty. Where ADR-22's curated set exists, derive `embeds` from it and re-derive at validation. Both
 `embeds` and the curated-set machinery remain deferred.
 
@@ -286,12 +291,12 @@ owner's duty. Where ADR-22's curated set exists, derive `embeds` from it and re-
 **Negative / costs**
 - Nix build isolation under least-privilege needs a spike and may require a documented, profile-tracked privilege
   concession.
-- A recipe using `nix` requires an operator builder profile that *provides* Nix at the pinned version — a higher
+- A build using `nix` requires an operator builder profile that *provides* Nix at the pinned version — a higher
   bar for those operators.
 - The builder profile and reproduction tuple gain builder-type-aware fields (ADR-07).
 
 **Neutral**
-- `recipeDigest` changes for any component moved to `nix` — by design; a builder switch is a new recipe.
+- `buildDigest` changes for any component moved to `nix` — by design; a builder switch is a new build.
 
 ## Alternatives considered
 
@@ -325,7 +330,7 @@ path, the local-vs-emitted byte-identity contract is preserved.
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nkd/recipe/nix_test.go`, `pkg/nkd/recipe/prebuilt_test.go`, and
+Current module evidence in `pkg/nkd/buildgraph/nix_test.go`, `pkg/nkd/buildgraph/prebuilt_test.go`, and
 `pkg/nkd/pipeline/pull_test.go` is partial. Acceptance requires an offline least-privilege execution of one real
 Nix component and a test proving that byte-preserving acquisition has no profile while a deterministic
-repackaging step changes the recipe graph and binds its output to the measured builder profile.
+repackaging step changes the build graph and binds its output to the measured builder profile.

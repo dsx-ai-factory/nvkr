@@ -42,12 +42,12 @@ demo_need_command cmp
 demo_need_command dd
 WORK=$(demo_absolute_path "$WORK")
 demo_prepare_work "$WORK" "tamper-detection" "$(demo_absolute_path .nkd/demo-tamper-detection)"
-QUERY=(--data testdata/catalogs/kubernetes-layered --category kubernetes --role worker --k8s 1.32.0 --arch amd64)
-RECIPE_DIGEST=$("$NKD" resolve "${QUERY[@]}" -o digest)
+QUERY=(--data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64)
+BUILD_DIGEST=$("$NKD" resolve "${QUERY[@]}" -o digest)
 
 write_observation() {
   local path=$1 digest=$2
-  printf '%s' "{\"components\":[{\"engineClass\":\"prebuilt-acquire\",\"name\":\"demo-artifact\",\"outputType\":\"host-package\",\"sha256\":\"$digest\"}],\"recipeDigest\":\"$RECIPE_DIGEST\",\"recipeId\":\"tamper-demo\",\"schemaVersion\":\"nkd.dev/validation-vector/v1\"}" > "$path"
+  printf '%s' "{\"buildDigest\":\"$BUILD_DIGEST\",\"components\":[{\"engineClass\":\"prebuilt-acquire\",\"name\":\"demo-artifact\",\"outputType\":\"host-package\",\"sha256\":\"$digest\"}],\"schemaVersion\":\"nkd.dev/validation-vector/v3\"}" > "$path"
 }
 
 demo_section "1/4  Detect changed artifact bytes through exact observation comparison"

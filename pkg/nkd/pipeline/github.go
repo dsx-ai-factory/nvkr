@@ -59,8 +59,11 @@ func withoutBootstrapWhen(needs []string, active bool) []string {
 
 func (GitHub) Name() string { return "github-actions" }
 
-func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([]byte, error) {
+func (e GitHub) Render(ctx context.Context, g *ir.Graph, buildDigest string) ([]byte, error) {
 	if err := requireEmitterContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := validateGraphIdentity(g, buildDigest); err != nil {
 		return nil, err
 	}
 	if err := ValidateEmitterDataPath(e.Data); err != nil {
@@ -96,7 +99,7 @@ func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 	if e.HelperImage != "" {
 		fmt.Fprintf(bw, "# pinned-helper-image delivery: jobs run in container %s (nkd-exec on PATH); no bootstrap job.\n", e.HelperImage)
 	}
-	fmt.Fprintf(bw, "name: nkd-build-%s\n", g.RecipeID)
+	fmt.Fprintf(bw, "name: nkd-build-%s\n", strings.TrimPrefix(buildDigest, "sha256:")[:16])
 	fmt.Fprintf(bw, "on: [workflow_dispatch]\n")
 	fmt.Fprintf(bw, "jobs:\n")
 
@@ -166,7 +169,7 @@ func (e GitHub) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 			}
 		}
 	}
-	return GeneratedPipelineBytes(ctx, e.Name(), recipeDigest, g.RecipeID, g, body.Bytes())
+	return GeneratedPipelineBytes(ctx, e.Name(), buildDigest, g, body.Bytes())
 }
 
 func (actions GitHubActionRefs) emitGitHubDownload(w io.Writer, name string) {

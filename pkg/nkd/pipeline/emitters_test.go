@@ -2,11 +2,12 @@ package pipeline
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -20,8 +21,7 @@ func sampleGraph() *ir.Graph {
 		panic(err)
 	}
 	return &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, RecipeID: "k8s-core-worker",
-		Criteria: criteria.Criteria{Category: "kubernetes", Role: "worker", K8sVersion: "1.32.0", OS: "ubuntu", Arch: "amd64"},
+		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
 		Nodes: []ir.Node{
 			{ID: "build-kubectl", Kind: ir.KindBuild, Component: "kubectl", Needs: []string{"fetch-k"},
 				BuilderType: ir.BuilderOCIHermetic, Toolchain: toolchain,
@@ -44,8 +44,7 @@ func sampleGraph() *ir.Graph {
 
 func prebuiltEmitterGraph() *ir.Graph {
 	return &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, RecipeID: "prebuilt",
-		Criteria: criteria.Criteria{Role: "worker", K8sVersion: "1.32.0", OS: "ubuntu", Arch: "amd64"},
+		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
 		Nodes: []ir.Node{
 			{ID: "pull-kubectl", Kind: ir.KindPull, Component: "kubectl", OutputType: "host-package",
 				Network: ir.NetworkDefault, Platform: "linux/amd64", Artifact: "https://dl/amd64/kubectl",
@@ -191,9 +190,8 @@ func TestEmittersEmitUnconditionalVerify(t *testing.T) {
 	}
 }
 
-// The emitted terminal verify MUST carry the full resolved criteria (and, for a
-// non-embedded catalog, --data).
-func TestEmittersVerifyCarriesFullCriteria(t *testing.T) {
+// Terminal verification carries the exact selected producers, target, and catalog.
+func TestEmittersVerifyCarriesExactProducerSelection(t *testing.T) {
 	g := prebuiltEmitterGraph()
 	digest := graphDigest(t, g)
 	for _, em := range testEmitters("opcat") {
@@ -203,12 +201,55 @@ func TestEmittersVerifyCarriesFullCriteria(t *testing.T) {
 		}
 		out := string(b)
 		for _, want := range []string{
-			"--role", "worker", "--os", "ubuntu", "--arch", "amd64", "--k8s", "1.32.0", "--data", "opcat",
+			"--component kubectl --component pause", "--platform linux/amd64", "--data", "opcat",
 			"--cosign", "trust/cosign", "--cosign-digest", "sha256:" + strings.Repeat("c", 64),
 		} {
 			if !strings.Contains(out, want) {
 				t.Errorf("%s: verify command missing %q", em.Name(), want)
 			}
+		}
+		for _, removed := range []string{" --role ", " --os ", " --arch ", " --k8s ", " --category ", "# recipe:"} {
+			if strings.Contains(out, removed) {
+				t.Fatalf("%s retains removed selection %q", em.Name(), removed)
+			}
+		}
+	}
+}
+
+func TestVerificationSelectionSortsExactMixedProducers(t *testing.T) {
+	graph := sampleGraph()
+	graph.Nodes = append(graph.Nodes, ir.Node{
+		ID: "pull-agent", Kind: ir.KindPull, Component: "agent", OutputType: "raw",
+		Network: ir.NetworkDefault, Platform: graph.Platform, Artifact: "https://dl/agent",
+		Digest: "sha256:" + strings.Repeat("a", 64), ArtifactPath: "agent", Version: "1.0.0",
+	})
+	graph.Nodes[2].Needs = append(graph.Nodes[2].Needs, "pull-agent")
+	graph.Normalize()
+	args, err := verifyArgs(graph, "catalog", testVerificationConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"verify", "--platform", "linux/amd64", "--component", "agent", "--component", "kubectl", "--data", "catalog"}
+	if len(args) < len(want) || !reflect.DeepEqual(args[:len(want)], want) {
+		t.Fatalf("verification selection = %v, want prefix %v", args, want)
+	}
+}
+
+func TestEmittersRejectUnsupportedAICRBeforeBytes(t *testing.T) {
+	bundle, err := aicr.NormalizeBundleInputs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph := &ir.Graph{SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64", AICR: &ir.AICRActivation{
+		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
+		ProfileDigest: "sha256:" + strings.Repeat("a", 64), GeneratorDigest: "sha256:" + strings.Repeat("b", 64),
+		Bundle: bundle,
+	}, Nodes: []ir.Node{{ID: "verify", Kind: ir.KindVerify}}}
+	digest := graphDigest(t, graph)
+	for _, emitter := range testEmitters("catalog") {
+		out, err := emitter.Render(context.Background(), graph, digest)
+		if executionErrorCode(err) != nkderr.CodeEngineCapability || len(out) != 0 {
+			t.Fatalf("%s emitted an AICR pipeline without a render adapter: %q, %v", emitter.Name(), out, err)
 		}
 	}
 }
@@ -302,13 +343,12 @@ func TestBundleIdentityBindsExactPipelineBodyAndNodes(t *testing.T) {
 		t.Fatalf("bundle identity must change when the executable body changes: %v", err)
 	}
 	substitute := prebuiltEmitterGraph()
-	substitute.RecipeID = "substituted"
 	substitutedNodes, err := NodesJSON(substitute)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, _, err := BundleDigest("test", digest, substitutedNodes, body); executionErrorCode(err) != nkderr.CodePipelineDrift {
-		t.Fatalf("nodes from a different recipe must not accept the caller-supplied recipe digest, got %v", err)
+		t.Fatalf("nodes from a different build must not accept the caller-supplied build digest, got %v", err)
 	}
 
 	emitGraph := prebuiltEmitterGraph()

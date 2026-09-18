@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -25,7 +24,7 @@ func CompileFiles(ctx context.Context, definitionPath, environmentPath, generato
 	return Compile(ctx, definitionPath, definition, environmentPath, environment, generatorVersion)
 }
 
-// Compile lowers the v2 public model into the existing internal compiler model.
+// Compile lowers the v4 public model into the existing internal compiler model.
 // The lowering owns package and route derivation; callers never assemble a plan.
 func Compile(ctx context.Context, definitionPath string, definition Definition,
 	environmentPath string, environment Environment, generatorVersion string,
@@ -64,30 +63,16 @@ func Compile(ctx context.Context, definitionPath string, definition Definition,
 	plan.DefinitionDigest = definitionDigest
 	plan.EnvironmentDigest = environmentDigest
 	for _, output := range definition.Outputs {
-		var recipeDigest string
-		for _, recipe := range plan.Recipes {
-			if recipe.Name == output.Recipe {
-				recipeDigest = recipe.RecipeDigest
+		var buildDigest string
+		for _, build := range plan.Builds {
+			if build.Name == output.Name {
+				buildDigest = build.BuildDigest
 				break
 			}
 		}
 		plan.LifecycleOutputs = append(plan.LifecycleOutputs, factory.LifecycleOutputPlan{Name: output.Name, Kind: output.Format,
-			ArtifactID: "package/" + output.Name, RecipeDigest: recipeDigest,
+			ArtifactID: "package/" + output.Name, BuildDigest: buildDigest,
 			Components: append([]string(nil), output.Components...)})
-	}
-	for _, view := range definition.Clusters {
-		var compositionDigest string
-		for _, composition := range plan.Compositions {
-			if composition.Name == view.Name {
-				compositionDigest = composition.Digest
-				break
-			}
-		}
-		bound := factory.LifecycleClusterPlan{Name: view.Name, CompositionDigest: compositionDigest}
-		for _, member := range view.Members {
-			bound.Members = append(bound.Members, factory.LifecycleClusterMember{Output: member.Output, Role: member.Role})
-		}
-		plan.LifecycleClusters = append(plan.LifecycleClusters, bound)
 	}
 	plan.DefinitionPath = filepath.ToSlash(filepath.Clean(definitionPath))
 	plan.EnvironmentPath = filepath.ToSlash(filepath.Clean(environmentPath))
@@ -117,69 +102,23 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 	if environment.Signing != nil && environment.Signing.Mode == "cosign" {
 		tools = append(tools, definition.CosignTool)
 	}
-	for _, selection := range definition.Recipes {
-		if selection.AICRGenerator != "" {
-			tools = append(tools, selection.AICRGenerator)
+	for _, output := range definition.Outputs {
+		compiled := factory.BuildTarget{Name: output.Name, Components: append([]string(nil), output.Components...), Platform: output.Platform}
+		if output.AICR != nil {
+			compiled.AICRProfile = output.AICR.Profile
+			compiled.AICRGenerator = output.AICR.Generator
+			if output.AICR.Bundle != nil {
+				bundle := output.AICR.Bundle.Clone()
+				compiled.Bundle = &bundle
+			}
+			tools = append(tools, output.AICR.Generator)
 		}
+		if output.Catalog != nil {
+			compiled.Catalog = &factory.CatalogStack{Base: output.Catalog.Base, Overlays: append([]string(nil), output.Catalog.Overlays...)}
+		}
+		compileSpec.Builds = append(compileSpec.Builds, compiled)
 	}
 	compileSpec.SelectedTools = uniqueSorted(tools)
-	outputComponents := make(map[string][]string, len(definition.Recipes))
-	for _, output := range definition.Outputs {
-		outputComponents[output.Recipe] = append(outputComponents[output.Recipe], output.Components...)
-	}
-	for _, recipe := range definition.Recipes {
-		target := factory.RecipeTarget{Name: recipe.Name, Criteria: recipe.Criteria,
-			Reserved: cloneMap(recipe.Parameters), AICRGenerator: recipe.AICRGenerator,
-			LifecycleComponents: uniqueSorted(outputComponents[recipe.Name])}
-		if recipe.Catalog != nil {
-			target.Catalog = &factory.CatalogStack{Base: recipe.Catalog.Base, Overlays: append([]string(nil), recipe.Catalog.Overlays...)}
-		}
-		compileSpec.Recipes = append(compileSpec.Recipes, target)
-	}
-	for _, view := range definition.Clusters {
-		recipeTargets := map[string]bool{}
-		clusterCategories := map[string]bool{}
-		roleBindings := map[string]*cluster.RoleBinding{}
-		for _, member := range view.Members {
-			var output DefinitionOutput
-			for _, candidate := range definition.Outputs {
-				if candidate.Name == member.Output {
-					output = candidate
-					break
-				}
-			}
-			var selection RecipeSelection
-			for _, candidate := range definition.Recipes {
-				if candidate.Name == output.Recipe {
-					selection = candidate
-					break
-				}
-			}
-			recipeTargets[output.Recipe] = true
-			if member.Role == "" {
-				clusterCategories[selection.Criteria.Category] = true
-				continue
-			}
-			binding := roleBindings[member.Role]
-			if binding == nil {
-				binding = &cluster.RoleBinding{Role: member.Role}
-				roleBindings[member.Role] = binding
-			}
-			binding.NodeLevelCategories = append(binding.NodeLevelCategories, selection.Criteria.Category)
-			binding.Subset = append(binding.Subset, output.Components...)
-		}
-		roles := make([]cluster.RoleBinding, 0, len(roleBindings))
-		for _, binding := range roleBindings {
-			binding.NodeLevelCategories = uniqueSorted(binding.NodeLevelCategories)
-			binding.Subset = uniqueSorted(binding.Subset)
-			roles = append(roles, *binding)
-		}
-		sort.Slice(roles, func(i, j int) bool { return roles[i].Role < roles[j].Role })
-		compileSpec.Clusters = append(compileSpec.Clusters, factory.ClusterSpec{Name: view.Name, Type: view.Type, CNI: view.CNI,
-			RecipeTargets: sortedMapKeys(recipeTargets), RoleBindings: roles,
-			ClusterCategories: sortedMapKeys(clusterCategories), AICRBundle: view.AICRBundle,
-			ValidationRequirements: append([]string(nil), view.ValidationRequirements...)})
-	}
 
 	delivery := factory.ExecutionSettings{
 		SBOMTool:   definition.SBOMTool,
@@ -208,17 +147,14 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		authoredNames[output.Name] = true
 	}
 	packageNames := make(map[string]bool, len(outputs)*2)
-	closureInputs := make([]string, 0, len(outputs)+len(definition.Clusters))
+	closureInputs := make([]string, 0, len(outputs))
 	for _, output := range outputs {
 		closureInputs = append(closureInputs, "package/"+output.Name)
-	}
-	for _, view := range definition.Clusters {
-		closureInputs = append(closureInputs, "composition/"+view.Name)
 	}
 	for _, output := range outputs {
 		selectors := make([]string, 0, len(output.Components))
 		for _, component := range output.Components {
-			selectors = append(selectors, output.Recipe+"/"+component)
+			selectors = append(selectors, output.Name+"/"+component)
 		}
 		packageKind := factory.PackageBinaryBundle
 		switch output.Format {
@@ -229,7 +165,7 @@ func lower(definition Definition, environment Environment) (factory.CompileSpec,
 		case OutputHelm:
 			packageKind = factory.PackageHelm
 			if len(output.Components) == 0 {
-				selectors = []string{output.Recipe + "/aicr-bundle"}
+				selectors = []string{output.Name + "/aicr-bundle"}
 			}
 		}
 		bundleName := output.Name

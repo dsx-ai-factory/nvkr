@@ -73,7 +73,7 @@ func TestHostedObservationReopensExactInputs(t *testing.T) {
 	}{
 		{name: "exact observation"},
 		{name: "wrong schema", change: func(o *factoryObservation, _ *Plan, _ string) { o.SchemaVersion = "wrong" }, code: e.CodeProvenanceMissing},
-		{name: "wrong recipe", change: func(o *factoryObservation, _ *Plan, _ string) { o.RecipeDigest = pipeline.FileDigest([]byte("other")) }, code: e.CodeProvenanceMissing},
+		{name: "wrong build", change: func(o *factoryObservation, _ *Plan, _ string) { o.BuildDigest = pipeline.FileDigest([]byte("other")) }, code: e.CodeProvenanceMissing},
 		{name: "wrong tier", change: func(o *factoryObservation, _ *Plan, _ string) { o.Qualification = TierPipelineAttested }, code: e.CodeProvenanceMissing},
 		{name: "missing input", change: func(o *factoryObservation, _ *Plan, _ string) { o.Inputs = nil }, code: e.CodeProvenanceMissing},
 		{name: "unbound input", change: func(o *factoryObservation, _ *Plan, _ string) { o.Inputs[0].ArtifactID = "other" }, code: e.CodeProvenanceMissing},
@@ -83,8 +83,8 @@ func TestHostedObservationReopensExactInputs(t *testing.T) {
 				panic(err)
 			}
 		}, code: e.CodeVerifyFailed},
-		{name: "missing recipe observation", change: func(_ *factoryObservation, p *Plan, _ string) {
-			p.Recipes = append(p.Recipes, RecipePlan{Name: "missing", RecipeDigest: pipeline.FileDigest([]byte("missing"))})
+		{name: "missing build observation", change: func(_ *factoryObservation, p *Plan, _ string) {
+			p.Builds = append(p.Builds, BuildPlan{Name: "missing", BuildDigest: p.Builds[0].BuildDigest})
 		}, code: e.CodeProvenanceMissing},
 		{name: "path escape", change: func(_ *factoryObservation, p *Plan, _ string) { p.Graph.Artifacts[0].Path = "outside" }, code: e.CodePipelineDrift},
 	} {
@@ -98,12 +98,12 @@ func TestHostedObservationReopensExactInputs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			recipeDigest := pipeline.FileDigest([]byte("recipe"))
-			plan := &Plan{Recipes: []RecipePlan{{Name: "one", RecipeDigest: recipeDigest}}, Graph: ArtifactGraph{
-				Nodes:     []Node{{ID: "observe", RecipeTarget: "one", Inputs: []string{"input"}}},
+			buildDigest := pipeline.FileDigest([]byte("build"))
+			plan := &Plan{Builds: []BuildPlan{{Name: "one", BuildDigest: buildDigest}}, Graph: ArtifactGraph{
+				Nodes:     []Node{{ID: "observe", BuildTarget: "one", Inputs: []string{"input"}}},
 				Artifacts: []Artifact{{ID: "input", Kind: "executable", Path: ".nkd/factory/input"}, {ID: "observation", Kind: string(TierTerminalObservation), Producer: "observe", Path: ".nkd/factory/observation.json"}},
 			}}
-			observation := factoryObservation{SchemaVersion: "nkd.dev/factory-observation/v1", Qualification: TierStaticUnqualified, RecipeDigest: recipeDigest, Inputs: []factoryObservedInput{{ArtifactID: "input", Kind: "executable", Digest: digest}}}
+			observation := factoryObservation{SchemaVersion: "nkd.dev/factory-observation/v2", Qualification: TierStaticUnqualified, BuildDigest: buildDigest, BuildTarget: "one", Inputs: []factoryObservedInput{{ArtifactID: "input", Kind: "executable", Digest: digest}}}
 			if tc.change != nil {
 				tc.change(&observation, plan, path)
 			}
@@ -187,7 +187,7 @@ func TestProductionBuildTypeUsesStrongestNetworkRequirement(t *testing.T) {
 		{name: "mixed", nodes: []ir.Node{{Kind: ir.KindBuild, Network: ir.NetworkNone}, {Kind: ir.KindBuild, BuilderType: ir.BuilderBuildKit, Network: ir.NetworkDefault}}, want: provenance.BuildTypeWrappedBuild},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan := &Plan{Recipes: []RecipePlan{{Graph: &ir.Graph{Nodes: tc.nodes}}}}
+			plan := &Plan{Builds: []BuildPlan{{Graph: &ir.Graph{Nodes: tc.nodes}}}}
 			if got := productionBuildType(plan); got != tc.want {
 				t.Fatalf("build type=%s, want %s", got, tc.want)
 			}

@@ -36,7 +36,7 @@ func requireEmitterContext(ctx context.Context) error {
 // validation or I/O.
 type Runner interface {
 	Name() string
-	Run(g *ir.Graph, recipeDigest string, opts RunOptions) (*Report, error)
+	Run(g *ir.Graph, buildDigest string, opts RunOptions) (*Report, error)
 }
 
 // RunOptions parameterize a local run.
@@ -106,7 +106,7 @@ type ArtifactResult struct {
 	InputDigest string `json:"inputDigest,omitempty"`
 	// BuilderType is the DECLARED from-source substrate (from the IR node). EngineClass
 	// is the OBSERVED substrate the runner actually used. Verify fails closed if they
-	// diverge — a recipe that declares nix but whose artifact came off a native lane is
+	// diverge — a producer that declares nix but whose artifact came off a native lane is
 	// a different build, not a sanctioned variant (ADR-07 §1).
 	BuilderType string `json:"builderType,omitempty"`
 	EngineClass string `json:"engineClass,omitempty"`
@@ -145,8 +145,7 @@ type NodeResult struct {
 
 // Report is the result of a local run.
 type Report struct {
-	RecipeID      string           `json:"recipeId"`
-	RecipeDigest  string           `json:"recipeDigest"`
+	BuildDigest   string           `json:"buildDigest"`
 	Nodes         []NodeResult     `json:"nodes"`
 	Artifacts     []ArtifactResult `json:"artifacts"`
 	qualification reportQualification

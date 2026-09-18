@@ -7,17 +7,28 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-func TestCatalogRejectsAmbiguousRecipeMembership(t *testing.T) {
+func TestCatalogRejectsInvalidProducerDeclarations(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		edit func(*Catalog)
 	}{
+		{"missing platforms", func(c *Catalog) { v := c.Components["x"]; v.Platforms = nil; c.Components["x"] = v }},
+		{"unknown platform", func(c *Catalog) {
+			v := c.Components["x"]
+			v.Platforms = []string{"linux/riscv64"}
+			c.Components["x"] = v
+		}},
+		{"duplicate platform", func(c *Catalog) {
+			v := c.Components["x"]
+			v.Platforms = []string{"linux/amd64", "linux/amd64"}
+			c.Components["x"] = v
+		}},
+		{"unsorted platforms", func(c *Catalog) {
+			v := c.Components["x"]
+			v.Platforms = []string{"linux/arm64", "linux/amd64"}
+			c.Components["x"] = v
+		}},
 		{"blank component name", func(c *Catalog) { c.Components[" "] = goodComponent() }},
-		{"padded recipe name", func(c *Catalog) { c.Recipes[0].ID = " r " }},
-		{"duplicate recipe", func(c *Catalog) { c.Recipes = append(c.Recipes, c.Recipes[0]) }},
-		{"blank component reference", func(c *Catalog) { c.Recipes[0].Components = []string{" "} }},
-		{"duplicate component reference", func(c *Catalog) { c.Recipes[0].Components = []string{"x", "x"} }},
-		{"unknown component reference", func(c *Catalog) { c.Recipes[0].Components = []string{"missing"} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cat := base(goodComponent())

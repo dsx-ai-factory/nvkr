@@ -28,7 +28,7 @@ func TestCurrentPipelineAdaptersRejectExecutionRequirements(t *testing.T) {
 			TimeoutSeconds: 7200,
 		},
 	}, fetch)
-	graph := testSourceGraph("requirements", fetch, build)
+	graph := testSourceGraph(fetch, build)
 	digest := mustGraphDigest(t, graph)
 
 	tests := []struct {
@@ -48,7 +48,7 @@ func TestCurrentPipelineAdaptersRejectExecutionRequirements(t *testing.T) {
 			return err
 		}},
 		{name: "generated pipeline", run: func() error {
-			_, err := GeneratedPipelineBytes(context.Background(), "test", digest, graph.RecipeID, graph, []byte("body\n"))
+			_, err := GeneratedPipelineBytes(context.Background(), "test", digest, graph, []byte("body\n"))
 			return err
 		}},
 	}
@@ -66,7 +66,7 @@ func TestGeneratedPipelineValidatesGraphBeforeCapabilityAdmission(t *testing.T) 
 	fetch := testFetchNode("fetch-source", "https://example.test/source", testSourceCommit, testSourceTree,
 		"source", toolchain, "")
 	build := completeTestBuild(ir.Node{ID: "build-artifact", Kind: ir.KindBuild, Component: "artifact"}, fetch)
-	graph := testSourceGraph("invalid-requirements", fetch, build)
+	graph := testSourceGraph(fetch, build)
 	foundFetch := false
 	for i := range graph.Nodes {
 		if graph.Nodes[i].Kind == ir.KindFetch {
@@ -91,7 +91,7 @@ func TestGeneratedPipelineValidatesGraphBeforeCapabilityAdmission(t *testing.T) 
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := GeneratedPipelineBytes(context.Background(), "test", "sha256:"+strings.Repeat("a", 64),
-				"invalid-requirements", test.graph, []byte("body\n"))
+				test.graph, []byte("body\n"))
 			if code(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), test.wantText) {
 				t.Fatalf("invalid graph returned %v, want %s containing %q",
 					err, nkderr.CodeInvalidCatalog, test.wantText)

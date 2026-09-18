@@ -20,8 +20,7 @@ func rawEvidenceDigest(payload []byte) string {
 type evidenceProof struct {
 	ReceiptType    EvidenceType `json:"receiptType"`
 	Component      string       `json:"component,omitempty"`
-	Role           string       `json:"role,omitempty"`
-	RecipeDigest   string       `json:"recipeDigest,omitempty"`
+	BuildDigest    string       `json:"buildDigest,omitempty"`
 	ArtifactDigest string       `json:"artifactDigest"`
 	EvidenceDigest string       `json:"evidenceDigest"`
 	BlobDigest     string       `json:"blobDigest"`
@@ -36,8 +35,7 @@ type evidenceProof struct {
 type waiverProof struct {
 	ReceiptDigest          string         `json:"receiptDigest"`
 	Component              string         `json:"component"`
-	Role                   string         `json:"role,omitempty"`
-	RecipeDigest           string         `json:"recipeDigest"`
+	BuildDigest            string         `json:"buildDigest"`
 	ArtifactDigest         string         `json:"artifactDigest"`
 	ProfileScope           string         `json:"profileScope"`
 	ProfileDigest          string         `json:"profileDigest,omitempty"`
@@ -61,8 +59,7 @@ type qualifiedEvidenceResult struct {
 
 type evidenceSubject struct {
 	component      string
-	role           string
-	recipeDigest   string
+	buildDigest    string
 	artifactDigest string
 	artifactKind   ArtifactKind
 	profileDigest  string
@@ -175,16 +172,16 @@ func evaluateQualifiedEvidence(ctx context.Context, request AuthorizationRequest
 			return qualifiedEvidenceResult{}, err
 		}
 		if report.SchemaVersion != vuln.QualifiedReportSchemaVersion ||
-			!isDigest(report.RecipeDigest) || !isDigest(report.Artifact) || !isDigest(report.SBOMDigest) ||
+			!isDigest(report.BuildDigest) || !isDigest(report.Artifact) || !isDigest(report.SBOMDigest) ||
 			!isDigest(report.ScannerDigest) || !isDigest(report.DatabaseDigest) || !isDigest(report.ResultDigest) {
 			return qualifiedEvidenceResult{}, e.New(e.CodeUnverifiedRef,
 				"qualified vulnerability report lost an exact identity binding")
 		}
-		key := report.RecipeDigest + "\x00" + report.Artifact
+		key := report.BuildDigest + "\x00" + report.Artifact
 		if seenReports[key] {
 			return qualifiedEvidenceResult{}, e.New(e.CodeGateUnmet,
-				"authorization repeats qualified vulnerability report for recipe %s artifact %s",
-				report.RecipeDigest, report.Artifact)
+				"authorization repeats qualified vulnerability report for build %s artifact %s",
+				report.BuildDigest, report.Artifact)
 		}
 		matchingSubjects := subjectsByReportKey[key]
 		var subject evidenceSubject
@@ -195,10 +192,10 @@ func evaluateQualifiedEvidence(ctx context.Context, request AuthorizationRequest
 				break
 			}
 		}
-		if subject.recipeDigest == "" {
+		if subject.buildDigest == "" {
 			return qualifiedEvidenceResult{}, e.New(e.CodeGateUnmet,
-				"qualified vulnerability report for recipe %s artifact %s is not an unwaived release requirement",
-				report.RecipeDigest, report.Artifact)
+				"qualified vulnerability report for build %s artifact %s is not an unwaived release requirement",
+				report.BuildDigest, report.Artifact)
 		}
 		reportDigest, err := qualified.Digest()
 		if err != nil {
@@ -213,20 +210,19 @@ func evaluateQualifiedEvidence(ctx context.Context, request AuthorizationRequest
 			digests[digest] = true
 		}
 		proofs = append(proofs, evidenceProof{
-			ReceiptType: EvidenceVulnerability, Component: subject.component, Role: subject.role,
-			RecipeDigest: report.RecipeDigest, ArtifactDigest: report.Artifact,
+			ReceiptType: EvidenceVulnerability, Component: subject.component, BuildDigest: report.BuildDigest, ArtifactDigest: report.Artifact,
 			EvidenceDigest: reportDigest, BlobDigest: rawEvidenceDigest(payload), EvidenceSchema: report.SchemaVersion,
 			SBOMDigest: report.SBOMDigest, ResultDigest: report.ResultDigest,
 			ScannerDigest: report.ScannerDigest, DatabaseDigest: report.DatabaseDigest,
 		})
 	}
 	for _, subject := range subjects {
-		key := subject.recipeDigest + "\x00" + subject.artifactDigest
+		key := subject.buildDigest + "\x00" + subject.artifactDigest
 		if rules.requires(subject.artifactKind, EvidenceVulnerability) &&
 			!waivedTypes[subjectTypeKey(subject, EvidenceVulnerability)] && !seenReports[key] {
 			return qualifiedEvidenceResult{}, e.New(e.CodeGateUnmet,
-				"member %s/%s recipe %s artifact %s lacks a qualified vulnerability report",
-				subject.component, orNone(subject.role), subject.recipeDigest, subject.artifactDigest)
+				"member %s build %s artifact %s lacks a qualified vulnerability report",
+				subject.component, subject.buildDigest, subject.artifactDigest)
 		}
 	}
 
@@ -261,8 +257,8 @@ func collectLocalEvidence(ctx context.Context, request AuthorizationRequest, sub
 	rules promotionRuleSet, waivedTypes, satisfied, digests map[string]bool, proofs *[]evidenceProof,
 ) error {
 	type localBinding struct {
-		component, recipeDigest, artifactDigest, evidenceDigest, blobDigest, schema string
-		evidenceType                                                                EvidenceType
+		component, buildDigest, artifactDigest, evidenceDigest, blobDigest, schema string
+		evidenceType                                                               EvidenceType
 	}
 	bindings := make([]localBinding, 0, len(request.LocalSBOMEvidence)+len(request.LocalProvenanceEvidence))
 	for _, receipt := range request.LocalSBOMEvidence {
@@ -274,7 +270,7 @@ func collectLocalEvidence(ctx context.Context, request AuthorizationRequest, sub
 			return err
 		}
 		bindings = append(bindings, localBinding{component: binding.Component,
-			recipeDigest: binding.RecipeDigest, artifactDigest: binding.ArtifactDigest,
+			buildDigest: binding.BuildDigest, artifactDigest: binding.ArtifactDigest,
 			evidenceDigest: binding.EvidenceDigest, blobDigest: binding.BlobDigest,
 			schema: binding.EvidenceSchema, evidenceType: EvidenceSBOM})
 	}
@@ -287,7 +283,7 @@ func collectLocalEvidence(ctx context.Context, request AuthorizationRequest, sub
 			return err
 		}
 		bindings = append(bindings, localBinding{component: binding.Component,
-			recipeDigest: binding.RecipeDigest, artifactDigest: binding.ArtifactDigest,
+			buildDigest: binding.BuildDigest, artifactDigest: binding.ArtifactDigest,
 			evidenceDigest: binding.EvidenceDigest, blobDigest: binding.BlobDigest,
 			schema: binding.EvidenceSchema, evidenceType: EvidenceProvenance})
 	}
@@ -295,23 +291,23 @@ func collectLocalEvidence(ctx context.Context, request AuthorizationRequest, sub
 	for _, binding := range bindings {
 		var matches []evidenceSubject
 		for _, subject := range subjects {
-			if subject.component == binding.component && subject.recipeDigest == binding.recipeDigest &&
+			if subject.component == binding.component && subject.buildDigest == binding.buildDigest &&
 				subject.artifactDigest == binding.artifactDigest {
 				matches = append(matches, subject)
 			}
 		}
 		if len(matches) != 1 {
 			return e.New(e.CodeGateUnmet,
-				"local %s evidence for %s recipe %s artifact %s matches %d exact release subjects",
-				binding.evidenceType.String(), binding.component, binding.recipeDigest,
+				"local %s evidence for %s build %s artifact %s matches %d exact release subjects",
+				binding.evidenceType.String(), binding.component, binding.buildDigest,
 				binding.artifactDigest, len(matches))
 		}
 		subject := matches[0]
 		key := subjectTypeKey(subject, binding.evidenceType)
 		if seenLocal[key] {
 			return e.New(e.CodeGateUnmet,
-				"authorization repeats qualified %s evidence for %s/%s artifact %s",
-				binding.evidenceType.String(), subject.component, orNone(subject.role), subject.artifactDigest)
+				"authorization repeats qualified %s evidence for %s artifact %s",
+				binding.evidenceType.String(), subject.component, subject.artifactDigest)
 		}
 		seenLocal[key] = true
 		if rules.requires(subject.artifactKind, binding.evidenceType) &&
@@ -320,7 +316,7 @@ func collectLocalEvidence(ctx context.Context, request AuthorizationRequest, sub
 		}
 		digests[binding.evidenceDigest] = true
 		*proofs = append(*proofs, evidenceProof{ReceiptType: binding.evidenceType,
-			Component: subject.component, Role: subject.role, RecipeDigest: subject.recipeDigest,
+			Component: subject.component, BuildDigest: subject.buildDigest,
 			ArtifactDigest: subject.artifactDigest, EvidenceDigest: binding.evidenceDigest,
 			BlobDigest: binding.blobDigest, EvidenceSchema: binding.schema})
 	}
@@ -332,17 +328,17 @@ func releaseEvidenceSubjects(members []Member, inventory *Inventory, rules promo
 	subjects := make([]evidenceSubject, 0)
 	for _, member := range members {
 		for _, artifact := range member.ArtifactDigests {
-			kind, err := inventoryArtifactKind(inventory, member.Component, member.Role, artifact)
+			kind, err := inventoryArtifactKind(inventory, member.Component, artifact)
 			if err != nil {
 				return nil, err
 			}
 			if _, covered := rules[kind]; !covered {
 				return nil, e.New(e.CodeGateUnmet,
-					"promotion policy has no rule for artifact kind %s (%s/%s artifact %s)",
-					kind.String(), member.Component, orNone(member.Role), artifact)
+					"promotion policy has no rule for artifact kind %s (%s artifact %s)",
+					kind.String(), member.Component, artifact)
 			}
-			subject := evidenceSubject{component: member.Component, role: member.Role,
-				recipeDigest: member.RecipeDigest, artifactDigest: artifact, artifactKind: kind,
+			subject := evidenceSubject{component: member.Component,
+				buildDigest: member.BuildDigest, artifactDigest: artifact, artifactKind: kind,
 				profileDigest: member.ProfileDigest}
 			key := waiverSubjectKey(subject)
 			if !seen[key] {
@@ -355,11 +351,11 @@ func releaseEvidenceSubjects(members []Member, inventory *Inventory, rules promo
 	return subjects, nil
 }
 
-func inventoryArtifactKind(inventory *Inventory, componentName, role, artifact string) (ArtifactKind, error) {
+func inventoryArtifactKind(inventory *Inventory, componentName, artifact string) (ArtifactKind, error) {
 	var matched bool
 	var kind ArtifactKind
 	for _, component := range inventory.Components {
-		if component.Name != componentName || (component.Role != "" && component.Role != role) {
+		if component.Name != componentName {
 			continue
 		}
 		for _, binding := range component.ArtifactKinds {
@@ -368,16 +364,16 @@ func inventoryArtifactKind(inventory *Inventory, componentName, role, artifact s
 			}
 			if matched {
 				return 0, e.New(e.CodeInvalidCatalog,
-					"inventory classifies %s/%s artifact %s through more than one component rule",
-					componentName, orNone(role), artifact)
+					"inventory classifies %s artifact %s through more than one component rule",
+					componentName, artifact)
 			}
 			matched, kind = true, binding.Kind
 		}
 	}
 	if !matched {
 		return 0, e.New(e.CodeReleaseIncomplete,
-			"release artifact %s for %s/%s has no exact Inventory artifact-kind binding",
-			artifact, componentName, orNone(role))
+			"release artifact %s for %s has no exact Inventory artifact-kind binding",
+			artifact, componentName)
 	}
 	return kind, nil
 }
@@ -388,7 +384,7 @@ func inventoryExternalRequirements(inventory *Inventory, subjects []evidenceSubj
 	requirements := map[string]externalRequirement{}
 	for _, component := range inventory.Components {
 		for _, subject := range subjects {
-			if subject.component != component.Name || (component.Role != "" && subject.role != component.Role) {
+			if subject.component != component.Name {
 				continue
 			}
 			for _, item := range []struct {
@@ -408,8 +404,8 @@ func inventoryExternalRequirements(inventory *Inventory, subjects []evidenceSubj
 						continue
 					}
 					return nil, e.New(e.CodeGateUnmet,
-						"promotion policy requires %s evidence for %s/%s artifact %s, but no qualified receipt or authorized gap exists",
-						item.evidenceType.String(), subject.component, orNone(subject.role), subject.artifactDigest)
+						"promotion policy requires %s evidence for %s artifact %s, but no qualified receipt or authorized gap exists",
+						item.evidenceType.String(), subject.component, subject.artifactDigest)
 				}
 				key := externalKey(component.Name, subject.artifactDigest, item.evidenceType)
 				if _, duplicate := requirements[key]; duplicate {
@@ -438,8 +434,7 @@ func inventoryWaiverRequirements(inventory *Inventory, subjects []evidenceSubjec
 			}
 			matched := false
 			for _, subject := range subjects {
-				if subject.component != component.Name || subject.artifactDigest != gap.ArtifactDigest ||
-					(component.Role != "" && subject.role != component.Role) {
+				if subject.component != component.Name || subject.artifactDigest != gap.ArtifactDigest {
 					continue
 				}
 				matched = true
@@ -465,7 +460,7 @@ func inventoryWaiverRequirements(inventory *Inventory, subjects []evidenceSubjec
 			if !matched {
 				return nil, nil, e.New(e.CodeReleaseIncomplete,
 					"inventory evidence gap for %s artifact %s has no exact release member",
-					label(component.Name, component.Role), gap.ArtifactDigest)
+					component.Name, gap.ArtifactDigest)
 			}
 		}
 	}
@@ -535,7 +530,7 @@ func verifyWaiverRequirements(ctx context.Context, request AuthorizationRequest,
 		subject, exists := subjectByWaiverIdentity[documentSubjectKey(receipt.document)]
 		if !exists || !documentMatchesProfile(receipt.document, subject) {
 			return nil, e.New(e.CodeGateUnmet,
-				"evidence waiver does not bind an exact release recipe, artifact, role, and profile")
+				"evidence waiver does not bind an exact release build, artifact, and profile")
 		}
 		reason, ok := parseGapReason(receipt.document.Reason)
 		if !ok {
@@ -554,8 +549,7 @@ func verifyWaiverRequirements(ctx context.Context, request AuthorizationRequest,
 		seen[key] = true
 		digests[digest] = true
 		proofs = append(proofs, waiverProof{
-			ReceiptDigest: digest, Component: receipt.document.Component, Role: receipt.document.Role,
-			RecipeDigest: receipt.document.RecipeDigest, ArtifactDigest: receipt.document.ArtifactDigest,
+			ReceiptDigest: digest, Component: receipt.document.Component, BuildDigest: receipt.document.BuildDigest, ArtifactDigest: receipt.document.ArtifactDigest,
 			ProfileScope: receipt.document.ProfileScope, ProfileDigest: receipt.document.ProfileDigest,
 			StatusCheckpointDigest: receipt.document.StatusCheckpointDigest,
 			MissingTypes:           append([]EvidenceType(nil), receipt.document.MissingTypes...),
@@ -567,8 +561,8 @@ func verifyWaiverRequirements(ctx context.Context, request AuthorizationRequest,
 	for key, requirement := range requirementByKey {
 		if !seen[key] {
 			return nil, e.New(e.CodeGateUnmet,
-				"artifact %s recipe %s lacks an authenticated waiver for exact %s gap (%s)",
-				requirement.subject.artifactDigest, requirement.subject.recipeDigest,
+				"artifact %s build %s lacks an authenticated waiver for exact %s gap (%s)",
+				requirement.subject.artifactDigest, requirement.subject.buildDigest,
 				evidenceTypesKey(requirement.types), requirement.reason.String())
 		}
 	}
@@ -577,8 +571,8 @@ func verifyWaiverRequirements(ctx context.Context, request AuthorizationRequest,
 
 func sortEvidenceProofs(proofs []evidenceProof) {
 	sort.Slice(proofs, func(i, j int) bool {
-		left := proofs[i].ReceiptType.String() + "\x00" + proofs[i].Component + "\x00" + proofs[i].RecipeDigest + "\x00" + proofs[i].ArtifactDigest
-		right := proofs[j].ReceiptType.String() + "\x00" + proofs[j].Component + "\x00" + proofs[j].RecipeDigest + "\x00" + proofs[j].ArtifactDigest
+		left := proofs[i].ReceiptType.String() + "\x00" + proofs[i].Component + "\x00" + proofs[i].BuildDigest + "\x00" + proofs[i].ArtifactDigest
+		right := proofs[j].ReceiptType.String() + "\x00" + proofs[j].Component + "\x00" + proofs[j].BuildDigest + "\x00" + proofs[j].ArtifactDigest
 		return left < right
 	})
 }
@@ -595,15 +589,15 @@ func externalEvidenceType(value string) (EvidenceType, bool) {
 }
 
 func subjectKey(subject evidenceSubject) string {
-	return subject.recipeDigest + "\x00" + subject.artifactDigest
+	return subject.buildDigest + "\x00" + subject.artifactDigest
 }
 
 func waiverSubjectKey(subject evidenceSubject) string {
-	return subject.component + "\x00" + subject.role + "\x00" + subject.recipeDigest + "\x00" + subject.artifactDigest
+	return subject.component + "\x00" + subject.buildDigest + "\x00" + subject.artifactDigest
 }
 
 func documentSubjectKey(document evidenceWaiverDocument) string {
-	return document.Component + "\x00" + document.Role + "\x00" + document.RecipeDigest + "\x00" + document.ArtifactDigest
+	return document.Component + "\x00" + document.BuildDigest + "\x00" + document.ArtifactDigest
 }
 
 func subjectTypeKey(subject evidenceSubject, evidenceType EvidenceType) string {
@@ -619,7 +613,7 @@ func waiverRequirementKey(requirement waiverRequirement) string {
 }
 
 func waiverProofKey(proof waiverProof) string {
-	return proof.Component + "\x00" + proof.Role + "\x00" + proof.RecipeDigest + "\x00" +
+	return proof.Component + "\x00" + proof.BuildDigest + "\x00" +
 		proof.ArtifactDigest + "\x00" + evidenceTypesKey(proof.MissingTypes)
 }
 

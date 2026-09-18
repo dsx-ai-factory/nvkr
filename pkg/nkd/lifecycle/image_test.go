@@ -50,7 +50,7 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 				seenReceipts[artifact.Path] = true
 			}
 			if len(seenReceipts) < 3 {
-				t.Fatal("combined fixture must exercise independent fetches within one recipe")
+				t.Fatal("combined fixture must exercise independent fetches within one build")
 			}
 			bundle, err := factory.Render(ctx, plan, factory.EngineGitHub)
 			if err != nil {
@@ -100,7 +100,7 @@ func TestConsumerImageBinding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			artifact := Artifact{Name: "cwe", Kind: OutputOCI, Digest: image.ManifestDigest, RecipeDigest: "sha256:" + repeat("a", 64), Components: []string{"cwe"}}
+			artifact := Artifact{Name: "cwe", Kind: OutputOCI, Digest: image.ManifestDigest, BuildDigest: "sha256:" + repeat("a", 64), Components: []string{"cwe"}}
 			content, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: []Artifact{artifact}})
 			if err != nil {
 				t.Fatal(err)
@@ -119,7 +119,7 @@ func TestConsumerImageBinding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			artifacts, subject, _, err := artifactsFromBinding(ctx, layout, inspection)
+			artifacts, subject, err := artifactsFromBinding(ctx, layout, inspection)
 			if err != nil {
 				t.Fatal(err)
 			}

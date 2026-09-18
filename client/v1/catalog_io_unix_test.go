@@ -10,7 +10,6 @@ import (
 
 	client "github.com/NVIDIA/nke-recipes/client/v1"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -53,8 +52,8 @@ func TestWithDataRejectsOversizedAndSymlinkAuthorityFiles(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
 			test.setup(t, root)
-			_, err := client.New(client.WithData(root)).ResolveRecipe(context.Background(), client.ResolveRequest{
-				Criteria: criteria.Criteria{Role: "worker"},
+			_, err := client.New(client.WithData(root)).ResolveBuild(context.Background(), client.ResolveRequest{
+				Components: []string{"kubectl"}, Platform: "linux/amd64",
 			})
 			if errorCode(err) != nkderr.CodeInvalidCatalog {
 				t.Fatalf("WithData %s authority returned %v", test.name, err)
@@ -66,8 +65,8 @@ func TestWithDataRejectsOversizedAndSymlinkAuthorityFiles(t *testing.T) {
 func TestWithDataPreCanceledContextDoesNotResolveDirectory(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := client.New(client.WithData(filepath.Join(t.TempDir(), "missing"))).ResolveRecipe(ctx, client.ResolveRequest{
-		Criteria: criteria.Criteria{Role: "worker"},
+	_, err := client.New(client.WithData(filepath.Join(t.TempDir(), "missing"))).ResolveBuild(ctx, client.ResolveRequest{
+		Components: []string{"kubectl"}, Platform: "linux/amd64",
 	})
 	if errorCode(err) != nkderr.CodeTimeout {
 		t.Fatalf("pre-canceled WithData returned %v", err)

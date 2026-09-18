@@ -74,7 +74,7 @@ func TestProvenanceValidationFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	tests := map[string]func(*Index){
-		"malformed recipe digest": func(index *Index) { index.RecipeDigest = "sha256:recipe" },
+		"malformed build digest": func(index *Index) { index.BuildDigest = "sha256:build" },
 		"duplicate subject": func(index *Index) {
 			index.Statements = append(index.Statements, index.Statements[len(index.Statements)-1])
 		},

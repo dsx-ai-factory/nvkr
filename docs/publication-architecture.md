@@ -58,7 +58,7 @@ flowchart TB
 
 The release index remains one release signature target. An index has no config, so one metadata manifest
 carries its canonical config. That config alone owns output names, sibling repository locators, exact
-manifest identities, recipe/cluster relationships and evidence membership. No deliverable or SBOM payload
+manifest identities, build bindings, and evidence membership. No deliverable or SBOM payload
 is copied into the release repository, and no separate lifecycle-binding object is published.
 
 The CLI retains its file/platform config for extraction. CWE retains its native manifest, config and layers.

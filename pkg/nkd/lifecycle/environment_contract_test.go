@@ -225,35 +225,35 @@ executionClasses:
 	if err != nil {
 		t.Fatal(err)
 	}
-	var recipeNode *ir.Node
-	for index := range plan.Recipes[0].Graph.Nodes {
-		if plan.Recipes[0].Graph.Nodes[index].Component == "kubelet" {
-			recipeNode = &plan.Recipes[0].Graph.Nodes[index]
+	var buildNode *ir.Node
+	for index := range plan.Builds[0].Graph.Nodes {
+		if plan.Builds[0].Graph.Nodes[index].Component == "kubelet" {
+			buildNode = &plan.Builds[0].Graph.Nodes[index]
 			break
 		}
 	}
-	if recipeNode == nil || recipeNode.ExecutionBinding == nil ||
-		recipeNode.ExecutionBinding.Class.Name != "beta-kvm" {
-		t.Fatalf("public Environment did not select preferred class: %#v", recipeNode)
+	if buildNode == nil || buildNode.ExecutionBinding == nil ||
+		buildNode.ExecutionBinding.Class.Name != "beta-kvm" {
+		t.Fatalf("public Environment did not select preferred class: %#v", buildNode)
 	}
 	var planNode *factory.Node
 	for index := range plan.Graph.Nodes {
-		if plan.Graph.Nodes[index].IRNode == recipeNode.ID {
+		if plan.Graph.Nodes[index].IRNode == buildNode.ID {
 			planNode = &plan.Graph.Nodes[index]
 			break
 		}
 	}
 	if planNode == nil || planNode.RunsOn != "linux-amd64-kvm" ||
-		!execution.EqualBinding(planNode.ExecutionBinding, recipeNode.ExecutionBinding) {
+		!execution.EqualBinding(planNode.ExecutionBinding, buildNode.ExecutionBinding) {
 		t.Fatalf("Plan did not preserve deterministic binding: %#v", planNode)
 	}
 
-	alternative, err := execution.Match(recipeNode.Requirements,
+	alternative, err := execution.Match(buildNode.Requirements,
 		[]execution.Class{delivery.ExecutionClasses[0]}, execution.MatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeNode.ExecutionBinding = alternative
+	buildNode.ExecutionBinding = alternative
 	planNode.ExecutionBinding = execution.CloneBinding(alternative)
 	planNode.RunsOn = alternative.Class.RunsOn
 	assertCode(t, plan.Validate(), e.CodePipelineDrift)

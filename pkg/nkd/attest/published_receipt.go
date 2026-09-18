@@ -25,13 +25,13 @@ type PublishedVectorReceipt struct {
 }
 
 // PublishedVectorBinding is the defensive release-facing projection of an
-// authenticated vector. It binds the exact signed recipe/profile/artifact set and
+// authenticated vector. It binds the exact signed build/profile/artifact set and
 // publisher evidence aggregates; possessing this data value alone is not authority.
 type PublishedVectorBinding struct {
 	IdentityDigest          string
 	BlobDigest              string
 	Signer                  string
-	RecipeDigest            string
+	BuildDigest             string
 	ProfileDigest           string
 	SBOMIndexDigest         string
 	ProvenanceIndexDigest   string
@@ -137,7 +137,7 @@ func (receipt PublishedVectorReceipt) ReleaseBinding() (PublishedVectorBinding, 
 	}
 	return PublishedVectorBinding{
 		IdentityDigest: identity, BlobDigest: blob, Signer: signer,
-		RecipeDigest: manifest.RecipeDigest, ProfileDigest: manifest.ProfileDigest,
+		BuildDigest: manifest.BuildDigest, ProfileDigest: manifest.ProfileDigest,
 		SBOMIndexDigest:         manifest.Evidence.SBOMDigest,
 		ProvenanceIndexDigest:   manifest.Evidence.ProvenanceDigest,
 		PublisherEvidenceDigest: manifest.EvidenceDigest,

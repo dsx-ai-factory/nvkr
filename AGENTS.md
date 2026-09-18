@@ -20,14 +20,15 @@ yet implemented.
 
 NKD (`nkdctl`) turns a declarative component catalog into immutable, verifiable build and release identities,
 and generates the CI pipelines that build, sign, and publish those artifacts. The v1 customer is NKE: NKD wraps
-NKE's builds (CLI, OS image) and publishes signed OCI artifacts with attested provenance.
+NKE's CLI, image and chart builds and publishes signed OCI artifacts with attested provenance. OS-image
+integration remains capability-gated.
 
-**Public lifecycle:** Definition → Run → Release. The seven public objects are Definition, Recipe, Environment,
-Run, Artifact, Release, and Verification Policy (ADR-17). A cluster is a named view inside a Definition and its
-exact realization inside a Release. Plans, inventories, vectors, clearance, and publication roots are generated
+**Public lifecycle:** Definition → Run → Release. The six public objects are Definition, Environment,
+Run, Artifact, Release, and Verification Policy (ADR-17). Definitions declare outputs; downstream consumers
+own deployment topology and node placement. Plans, inventories, vectors, clearance, and publication roots are generated
 or authenticated internal records, inspectable without becoming independently authored lifecycle inputs.
 
-**Internal workflow:** Resolve pinned recipes → freeze required outputs → compile → execute and observe →
+**Internal workflow:** Resolve output-selected pinned producers → freeze required outputs → compile → execute and observe →
 check completeness and evidence → publish → authenticate the selected closure under consumer policy.
 
 Two evidence lanes share this workflow. `qualified` requires exact-byte reproduction and authenticated
@@ -61,8 +62,9 @@ retains its original scope; superseded requirements and plans are available only
   coded error and no partial output.
 - Thread `context.Context` through blocking work, bound external I/O, and own every goroutine or child-process
   lifecycle through stop and join.
-- Validate the complete graph at every executable boundary. Preserve the separation between logical recipe
+- Validate the complete graph at every executable boundary. Preserve the separation between logical build
   identity, transport identity, runtime observation, terminal artifact verification, and release authorization.
+  Bind completeness and evidence to each exact named output; equal Build Digests do not authorize sibling reuse.
 - Use the canonical codec and an existing typed digest family for structured identity. Raw SHA-256 is only exact
   blob integrity, never a substitute for a typed identity or authenticated receipt.
 - Treat durable authority as a cross-process state machine: kernel-released locking, byte-CAS/no-replace
@@ -112,8 +114,9 @@ NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
 
 Read `docs/adr/reconciliation.md` for current support before claiming a capability. Read ADR-17 for public
 lifecycle/SDK ownership, ADR-18 for hosted execution/isolation, ADR-04/09/16 for evidence lanes, ADR-19 for
-cluster realization, ADR-20 for publication, and ADR-21/22 for generated files and pins. `pkg/nkd/lifecycle`
-owns the public workflow; `factory` owns compiler/executor mechanics; existing authority modules own invariants.
+artifact membership and downstream ownership, ADR-20 for publication, and ADR-21/22 for generated files and pins. `pkg/nkd/lifecycle`
+owns the public workflow; `buildgraph` derives graphs from direct producer selections; `factory` owns
+Run compilation/execution. ADR-11/12 own direct selection, target and AICR rendering contracts.
 
 ## Required Patterns
 
@@ -124,7 +127,7 @@ the error must be wrapped with a code before it crosses a package boundary that 
 ```go
 import "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 
-return errors.New(errors.CodeInvalidCatalog, "recipe %q: criteria arch %q is not supported", name, arch)
+return errors.New(errors.CodeInvalidCatalog, "component %q does not support platform %q", name, platform)
 return errors.Wrap(errors.CodeFetchFailed, err, "checkout %s", pin.Commit)
 ```
 
@@ -140,7 +143,7 @@ family. Never `yaml.Marshal` or `json.Marshal` a map for anything that feeds a d
 
 **Deterministic output.** Sort every emitted collection. Generated bundles must regenerate byte-for-byte
 (`run generate --check` with the same Definition and Environment). Timestamps and randomness are injectable
-and excluded from logical Recipe identity; attempt metadata may affect its own Run or provenance identity.
+and excluded from logical build identity; attempt metadata may affect its own Run or provenance identity.
 
 **Table-driven tests** for any function with more than one case. Contract tests assert the coded error, not just
 `err != nil`.

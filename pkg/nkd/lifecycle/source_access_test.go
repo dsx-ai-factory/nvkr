@@ -14,7 +14,7 @@ func TestEnvironmentSourceAccessValidationAndLowering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	baseRecipeDigest, err := definition.Digest()
+	baseBuildDigest, err := definition.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,12 +32,12 @@ func TestEnvironmentSourceAccessValidationAndLowering(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(compileSpec, baseCompileSpec) {
-		t.Fatal("source access changed the Recipe-affecting compile spec")
+		t.Fatal("source access changed the Build-affecting compile spec")
 	}
 	if got := settings.SourceAccess[source]; got.Mirror != "https://github.com/example/nke-mirror" || got.CredentialRef != "github:NKE_SOURCE_TOKEN" {
 		t.Fatalf("lowered source access = %+v", got)
 	}
-	if digest, err := definition.Digest(); err != nil || digest != baseRecipeDigest {
+	if digest, err := definition.Digest(); err != nil || digest != baseBuildDigest {
 		t.Fatalf("source access changed Definition identity: %q, %v", digest, err)
 	}
 }

@@ -54,10 +54,11 @@ func ReadSourcesContext(ctx context.Context, p DataProvider) (map[string]Source,
 // carries the {{.Arch}} token; an image ref does not), and Tag records the version the
 // resolved digests will correspond to.
 type PrebuiltTarget struct {
-	Name  string
-	Tag   string
-	URL   string
-	Image string
+	Platforms []string
+	Name      string
+	Tag       string
+	URL       string
+	Image     string
 }
 
 // ReadPrebuiltTargets returns the prebuilt components of a registry with their
@@ -101,7 +102,7 @@ func readPrebuiltTargets(p DataProvider) ([]PrebuiltTarget, error) {
 		if err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "prebuilt component %q", name)
 		}
-		out = append(out, PrebuiltTarget{Name: name, Tag: pin.Tag, URL: url, Image: img})
+		out = append(out, PrebuiltTarget{Name: name, Tag: pin.Tag, URL: url, Image: img, Platforms: append([]string(nil), raw.Platforms...)})
 	}
 	return out, nil
 }
@@ -130,6 +131,9 @@ func LoadLockContext(ctx context.Context, dir string) (*PinLock, error) {
 	}
 	bound, err := BindContext(ctx, Dir(abs))
 	if err != nil {
+		return nil, err
+	}
+	if err := rejectLegacyComposition(bound); err != nil {
 		return nil, err
 	}
 	registryRaw, registryExists, err := readOptionalProviderFile(bound, RegistryFile)
@@ -217,6 +221,14 @@ func WriteLockContext(ctx context.Context, dir string, lock *PinLock) error {
 		return e.New(e.CodeInvalidCatalog, "serialized %s exceeds the %d-byte bound", LockFile, MaxCatalogFileBytes)
 	}
 	if err := requireCatalogContext(ctx, "catalog lock write"); err != nil {
+		return err
+	}
+
+	bound, err := BindContext(ctx, Dir(abs))
+	if err != nil {
+		return err
+	}
+	if err := rejectLegacyComposition(bound); err != nil {
 		return err
 	}
 

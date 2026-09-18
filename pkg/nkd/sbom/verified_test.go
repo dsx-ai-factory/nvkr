@@ -11,14 +11,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 )
 
 func evidenceDigest(body []byte) string {
@@ -37,25 +36,25 @@ func externalProvenanceEvidence(component, artifactDigest string) []byte {
 		`"}}],"predicateType":"https://slsa.dev/provenance/v1","predicate":{"buildDefinition":{"buildType":"https://example.test/prebuilt/v1","externalParameters":{}},"runDetails":{"builder":{"id":"https://example.test/upstream-builder"}}}}`)
 }
 
-func prebuiltResolved(t testing.TB, evidence *catalog.ExternalEvidence) (*recipe.Resolved, string, string) {
+func prebuiltResolved(t testing.TB, evidence *catalog.ExternalEvidence) (*buildgraph.Resolved, string, string) {
 	t.Helper()
 	artifactDigest := evidenceDigest([]byte("prebuilt-artifact"))
-	resolved := &recipe.Resolved{
-		RecipeID: "prebuilt-recipe", Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: "prebuilt", Component: catalog.Component{
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: "prebuilt", Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			Tag: "v1.0.0", SourceDate: 1, OutputType: "host-package",
 			Prebuilt: &catalog.Prebuilt{URL: "https://upstream.example/prebuilt", Digests: map[string]string{"amd64": artifactDigest}, Evidence: evidence},
 		}}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return resolved, recipeDigest, artifactDigest
+	return resolved, buildDigest, artifactDigest
 }
 
 func sbomCode(err error) nkderr.Code {
@@ -73,7 +72,7 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 		SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(sbomBytes),
 		ProvenanceRef: "https://upstream.example/provenance", ProvenanceDigest: evidenceDigest(provenanceBytes),
 	}
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, evidence)
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	if artifactDigest != expectedArtifactDigest {
 		t.Fatalf("test fixture artifact digest drifted: got %s want %s", artifactDigest, expectedArtifactDigest)
 	}
@@ -89,7 +88,7 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 			return nil, errors.New("unknown ref")
 		}
 	})
-	set, err := BuildVerified(context.Background(), resolved, recipeDigest,
+	set, err := BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, reader)
 	if err != nil {
 		t.Fatal(err)
@@ -118,7 +117,7 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 		t.Fatalf("verified bindings missing from SBOM: %+v", properties)
 	}
 
-	declared := fromRecipe(resolved, recipeDigest, map[string]string{"prebuilt": artifactDigest}, false)
+	declared := fromBuild(resolved, buildDigest, map[string]string{"prebuilt": artifactDigest}, false)
 	declaredProperties := map[string]string{}
 	for _, property := range declared.Components[0].Properties {
 		declaredProperties[property.Name] = property.Value
@@ -132,35 +131,35 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 func TestBuildVerifiedRejectsTamperedAbsentAndUnpinnedMaterial(t *testing.T) {
 	body := []byte(`{"bomFormat":"CycloneDX"}`)
 	evidence := &catalog.ExternalEvidence{SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(body)}
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, evidence)
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	artifacts := map[string]string{"prebuilt": artifactDigest}
 
 	tampered := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return []byte("tampered"), nil })
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest, artifacts, tampered); sbomCode(err) != nkderr.CodeUnverifiedRef {
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest, artifacts, tampered); sbomCode(err) != nkderr.CodeUnverifiedRef {
 		t.Fatalf("tampered external evidence must fail closed, got %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest, artifacts, nil); sbomCode(err) != nkderr.CodeUnavailable {
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest, artifacts, nil); sbomCode(err) != nkderr.CodeUnavailable {
 		t.Fatalf("missing reader must fail closed, got %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest, nil, tampered); sbomCode(err) != nkderr.CodeProvenanceMissing {
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest, nil, tampered); sbomCode(err) != nkderr.CodeProvenanceMissing {
 		t.Fatalf("missing artifact digest must fail closed, got %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest,
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": "sha256:" + strings.Repeat("f", 64)}, tampered); sbomCode(err) != nkderr.CodeUnverifiedRef {
-		t.Fatalf("caller subject differing from the recipe-pinned prebuilt artifact must fail closed, got %v", err)
+		t.Fatalf("caller subject differing from the build-pinned prebuilt artifact must fail closed, got %v", err)
 	}
 	unpinned := *evidence
 	unpinned.SBOMDigest = "latest"
-	resolved, recipeDigest, artifactDigest = prebuiltResolved(t, &unpinned)
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest,
-		map[string]string{"prebuilt": artifactDigest}, tampered); sbomCode(err) != nkderr.CodeUnpinnedInput {
+	resolved.Components[0].Prebuilt.Evidence = &unpinned
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
+		map[string]string{"prebuilt": artifactDigest}, tampered); sbomCode(err) != nkderr.CodeUnpinnedSource {
 		t.Fatalf("unpinned external evidence must fail closed, got %v", err)
 	}
 }
 
 func TestEvidenceNoneIsWaiverSignalNeverReceipt(t *testing.T) {
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{None: true})
-	set, err := BuildVerified(context.Background(), resolved, recipeDigest,
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{None: true})
+	set, err := BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -188,14 +187,14 @@ func TestEvidenceNoneIsWaiverSignalNeverReceipt(t *testing.T) {
 
 func TestBuildVerifiedHonorsContext(t *testing.T) {
 	body := []byte(`{"bomFormat":"CycloneDX"}`)
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{
 		SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(body),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return body, nil })
-	if _, err := BuildVerified(ctx, resolved, recipeDigest,
+	if _, err := BuildVerified(ctx, resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nkderr.CodeTimeout {
 		t.Fatalf("canceled acquisition must return timeout, got %v", err)
 	}
@@ -206,18 +205,18 @@ func TestBuildVerifiedRequiresExactArtifactSetAndCanonicalReferences(t *testing.
 	evidence := &catalog.ExternalEvidence{
 		SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(body),
 	}
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, evidence)
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	readerCalls := 0
 	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) {
 		readerCalls++
 		return body, nil
 	})
 
-	if _, err := BuildVerified(nil, resolved, recipeDigest, //nolint:staticcheck // verifies the nil-context fail-closed contract
+	if _, err := BuildVerified(nil, resolved, buildDigest, //nolint:staticcheck // verifies the nil-context fail-closed contract
 		map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nkderr.CodeUsage {
 		t.Fatalf("nil context must fail as usage, got %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest,
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest, "unselected": artifactDigest}, reader); sbomCode(err) != nkderr.CodeUnverifiedRef {
 		t.Fatalf("an extra artifact identity must fail closed, got %v", err)
 	}
@@ -227,8 +226,8 @@ func TestBuildVerifiedRequiresExactArtifactSetAndCanonicalReferences(t *testing.
 
 	badRef := *evidence
 	badRef.SBOMRef += " "
-	resolved, recipeDigest, artifactDigest = prebuiltResolved(t, &badRef)
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest,
+	resolved, buildDigest, artifactDigest = prebuiltResolved(t, &badRef)
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nkderr.CodeUnverifiedRef {
 		t.Fatalf("non-canonical evidence reference must fail closed, got %v", err)
 	}
@@ -245,7 +244,7 @@ func TestBuildDiagnosticSelectedScopesCallerObservationWithoutMintingAuthority(t
 	}
 	hashes := map[string]string{"beta": report.Artifacts[0].SHA256}
 
-	set, err := BuildDiagnosticSelected(context.Background(), resolved, report.RecipeDigest, hashes, nil)
+	set, err := BuildDiagnosticSelected(context.Background(), resolved, report.BuildDigest, hashes, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,15 +253,15 @@ func TestBuildDiagnosticSelectedScopesCallerObservationWithoutMintingAuthority(t
 		t.Fatal(err)
 	}
 	if len(aggregate.Components) != 1 || aggregate.Components[0].Name != "beta" {
-		t.Fatalf("diagnostic SBOM leaked the unobserved recipe members: %+v", aggregate.Components)
+		t.Fatalf("diagnostic SBOM leaked the unobserved build members: %+v", aggregate.Components)
 	}
 	if _, err := set.LocalReceipts(); sbomCode(err) != nkderr.CodePreflightFailed {
 		t.Fatalf("diagnostic subset minted publisher authority: %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, report.RecipeDigest, hashes, nil); sbomCode(err) != nkderr.CodeProvenanceMissing {
+	if _, err := BuildVerified(context.Background(), resolved, report.BuildDigest, hashes, nil); sbomCode(err) != nkderr.CodeProvenanceMissing {
 		t.Fatalf("exhaustive BuildVerified silently accepted a subset: %v", err)
 	}
-	if _, err := BuildDiagnosticSelected(context.Background(), resolved, report.RecipeDigest,
+	if _, err := BuildDiagnosticSelected(context.Background(), resolved, report.BuildDigest,
 		map[string]string{"unknown": report.Artifacts[0].SHA256}, nil); sbomCode(err) != nkderr.CodeUnverifiedRef {
 		t.Fatalf("unknown diagnostic artifact was accepted: %v", err)
 	}
@@ -274,7 +273,7 @@ func TestBuildVerifiedSnapshotsCallerInputsBeforeExternalIO(t *testing.T) {
 	evidence := &catalog.ExternalEvidence{
 		SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(body),
 	}
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, evidence)
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	hashes := map[string]string{"prebuilt": artifactDigest}
 	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) {
 		hashes["prebuilt"] = "sha256:" + strings.Repeat("f", 64)
@@ -283,7 +282,7 @@ func TestBuildVerifiedSnapshotsCallerInputsBeforeExternalIO(t *testing.T) {
 		return body, nil
 	})
 
-	set, err := BuildVerified(context.Background(), resolved, recipeDigest, hashes, reader)
+	set, err := BuildVerified(context.Background(), resolved, buildDigest, hashes, reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,9 +305,9 @@ func TestBuildVerifiedRejectsUntypedOrWrongSubjectExternalBytes(t *testing.T) {
 			evidence := &catalog.ExternalEvidence{
 				SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(body),
 			}
-			resolved, recipeDigest, artifactDigest := prebuiltResolved(t, evidence)
+			resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 			reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return body, nil })
-			if _, err := BuildVerified(context.Background(), resolved, recipeDigest,
+			if _, err := BuildVerified(context.Background(), resolved, buildDigest,
 				map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nkderr.CodeUnverifiedRef {
 				t.Fatalf("external bytes without a matching typed subject produced authority: %v", err)
 			}
@@ -329,18 +328,18 @@ func TestExternalCycloneDXCannotReplayOneSubjectAcrossConflictingArtifactHashes(
 			}
 			resolved, _, _ := prebuiltResolved(t, evidence)
 			resolved.Components[0].Prebuilt.Digests["amd64"] = artifactDigest
-			graph, err := recipe.Compile(resolved)
+			graph, err := buildgraph.Compile(resolved)
 			if err != nil {
 				t.Fatal(err)
 			}
-			recipeDigest, err := graph.Digest()
+			buildDigest, err := graph.Digest()
 			if err != nil {
 				t.Fatal(err)
 			}
 			reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) {
 				return append([]byte(nil), body...), nil
 			})
-			if _, err := BuildVerified(context.Background(), resolved, recipeDigest,
+			if _, err := BuildVerified(context.Background(), resolved, buildDigest,
 				map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nkderr.CodeUnverifiedRef {
 				t.Fatalf("conflicting SHA-256 rows minted external evidence for %s: %v", artifactDigest, err)
 			}
@@ -349,9 +348,9 @@ func TestExternalCycloneDXCannotReplayOneSubjectAcrossConflictingArtifactHashes(
 }
 
 func TestBuildVerifiedRejectsDuplicateResolvedComponents(t *testing.T) {
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{None: true})
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{None: true})
 	resolved.Components = append(resolved.Components, resolved.Components[0])
-	if _, err := BuildVerified(context.Background(), resolved, recipeDigest,
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, nil); sbomCode(err) != nkderr.CodeInvalidCatalog {
 		t.Fatalf("duplicate resolved component must fail closed, got %v", err)
 	}
@@ -385,7 +384,7 @@ func TestBuildVerifiedFromReportIssuesExactFullAndSubsetPublisherReceipts(t *tes
 				if err != nil {
 					t.Fatal(err)
 				}
-				if binding.Component != test.want[index] || binding.RecipeDigest != report.RecipeDigest {
+				if binding.Component != test.want[index] || binding.BuildDigest != report.BuildDigest {
 					t.Fatalf("receipt[%d] lost full-recipe/subset binding: %+v", index, binding)
 				}
 			}
@@ -394,7 +393,7 @@ func TestBuildVerifiedFromReportIssuesExactFullAndSubsetPublisherReceipts(t *tes
 				t.Fatal(err)
 			}
 			if len(boms) != len(test.want) || len(index.Entries) != len(test.want) ||
-				index.RecipeDigest != report.RecipeDigest {
+				index.BuildDigest != report.BuildDigest {
 				t.Fatalf("SBOM index scope drifted: boms=%v index=%+v", boms, index)
 			}
 			aggregate, err := set.Aggregate()
@@ -420,9 +419,9 @@ func TestBuildVerifiedFromReportSBOMIndexIsMirrorInvariant(t *testing.T) {
 	mirrorResolved, mirrorReport := qualifiedSourceSBOMReport(t,
 		"https://source.airgap.example/mirror/agent.git",
 		"registry.airgap.example/mirror/toolchain@"+toolchainDigest)
-	if onlineReport.RecipeDigest != mirrorReport.RecipeDigest {
-		t.Fatalf("transport relocation changed recipe identity: %s != %s",
-			onlineReport.RecipeDigest, mirrorReport.RecipeDigest)
+	if onlineReport.BuildDigest != mirrorReport.BuildDigest {
+		t.Fatalf("transport relocation changed build identity: %s != %s",
+			onlineReport.BuildDigest, mirrorReport.BuildDigest)
 	}
 
 	online, err := BuildVerifiedFromReport(context.Background(), onlineResolved, onlineReport, nil)
@@ -487,7 +486,7 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 		SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(sbomBytes),
 		ProvenanceRef: "https://upstream.example/provenance", ProvenanceDigest: evidenceDigest(provenanceBytes),
 	}
-	resolved, recipeDigest, artifactDigest := prebuiltResolved(t, evidence)
+	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	reader := EvidenceReaderFunc(func(_ context.Context, ref string) ([]byte, error) {
 		switch ref {
 		case evidence.SBOMRef:
@@ -498,7 +497,7 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 			return nil, errors.New("unknown reference")
 		}
 	})
-	set, err := BuildVerified(context.Background(), resolved, recipeDigest,
+	set, err := BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, reader)
 	if err != nil {
 		t.Fatal(err)
@@ -515,8 +514,8 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 func TestBuildVerifiedFromReportRejectsFabricationAndCallbackMutation(t *testing.T) {
 	resolved, report := qualifiedSBOMReport(t, []string{"alpha"}, nil)
 	assembled := &pipeline.Report{
-		RecipeID: report.RecipeID, RecipeDigest: report.RecipeDigest,
-		Artifacts: append([]pipeline.ArtifactResult(nil), report.Artifacts...),
+		BuildDigest: report.BuildDigest,
+		Artifacts:   append([]pipeline.ArtifactResult(nil), report.Artifacts...),
 	}
 	if _, err := BuildVerifiedFromReport(context.Background(), resolved, assembled, nil); sbomCode(err) != nkderr.CodePreflightFailed {
 		t.Fatalf("caller-assembled report minted publisher SBOM authority: %v", err)
@@ -531,7 +530,7 @@ func TestBuildVerifiedFromReportRejectsFabricationAndCallbackMutation(t *testing
 	wrongResolved, _ := snapshotResolved(resolved)
 	wrongResolved.Components[0].Prebuilt.Digests["amd64"] = "sha256:" + strings.Repeat("9", 64)
 	if _, err := BuildVerifiedFromReport(context.Background(), wrongResolved, report, nil); sbomCode(err) != nkderr.CodeUnverifiedRef {
-		t.Fatalf("caller recipe projection substitution did not fail closed: %v", err)
+		t.Fatalf("caller build projection substitution did not fail closed: %v", err)
 	}
 
 	artifactDigest := report.Artifacts[0].SHA256
@@ -610,11 +609,10 @@ func (fixtureOCITransport) Verify(context.Context, string, string) error { retur
 
 func qualifiedSBOMReport(t *testing.T, only []string,
 	evidence map[string]*catalog.ExternalEvidence,
-) (*recipe.Resolved, *pipeline.Report) {
+) (*buildgraph.Resolved, *pipeline.Report) {
 	t.Helper()
-	resolved := &recipe.Resolved{
-		RecipeID: "publisher-sbom-fixture",
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
 	}
 	for _, name := range []string{"alpha", "beta"} {
 		declaredEvidence := &catalog.ExternalEvidence{None: true}
@@ -623,7 +621,7 @@ func qualifiedSBOMReport(t *testing.T, only []string,
 		}
 		resolved.Components = append(resolved.Components, catalog.NamedComponent{
 			Name: name,
-			Component: catalog.Component{
+			Component: catalog.Component{Platforms: []string{"linux/amd64"},
 				Tag: "v1.0.0", OutputType: "oci-image",
 				Prebuilt: &catalog.Prebuilt{
 					Image:    "registry.example.test/" + name,
@@ -633,16 +631,16 @@ func qualifiedSBOMReport(t *testing.T, only []string,
 			},
 		})
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
 	work := filepath.Join(t.TempDir(), "work")
-	report, err := (pipeline.Local{}).Run(graph, recipeDigest, pipeline.RunOptions{
+	report, err := (pipeline.Local{}).Run(graph, buildDigest, pipeline.RunOptions{
 		Ctx: context.Background(), SourceRoot: filepath.Join(work, "src"),
 		Only: only, OCI: fixtureOCITransport{},
 	})
@@ -652,14 +650,13 @@ func qualifiedSBOMReport(t *testing.T, only []string,
 	return resolved, report
 }
 
-func qualifiedSourceSBOMReport(t *testing.T, repo, toolchain string) (*recipe.Resolved, *pipeline.Report) {
+func qualifiedSourceSBOMReport(t *testing.T, repo, toolchain string) (*buildgraph.Resolved, *pipeline.Report) {
 	t.Helper()
-	resolved := &recipe.Resolved{
-		RecipeID: "publisher-source-sbom-fixture",
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
 		Components: []catalog.NamedComponent{{
 			Name: "agent",
-			Component: catalog.Component{
+			Component: catalog.Component{Platforms: []string{"linux/amd64"},
 				FromSource: true, Repo: repo, Tag: "v1.0.0",
 				Commit: strings.Repeat("d", 40), TreeHash: strings.Repeat("e", 40),
 				ToolchainImage: toolchain, OutputType: "raw",
@@ -668,11 +665,11 @@ func qualifiedSourceSBOMReport(t *testing.T, repo, toolchain string) (*recipe.Re
 			},
 		}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -752,7 +749,7 @@ func qualifiedSourceSBOMReport(t *testing.T, repo, toolchain string) (*recipe.Re
 	if err := os.WriteFile(filepath.Join(resultsDir, build.ID+".json"), resultBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	report, err := (pipeline.Local{}).VerifyResults(graph, recipeDigest, resultsDir, options)
+	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest, resultsDir, options)
 	if err != nil {
 		t.Fatal(err)
 	}

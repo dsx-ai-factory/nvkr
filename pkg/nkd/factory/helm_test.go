@@ -11,7 +11,6 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -45,7 +44,7 @@ func TestSourceHelmArchiveBoundary(t *testing.T) {
 			if err := file.Close(); err != nil {
 				t.Fatal(err)
 			}
-			root, _, cleanup, err := helmPackageTree(context.Background(), &Plan{}, Artifact{ID: "charts", Kind: "tarball", RecipeTarget: "recipe", Path: archive})
+			root, _, cleanup, err := helmPackageTree(context.Background(), &Plan{}, Artifact{ID: "charts", Kind: "tarball", BuildTarget: "charts", Path: archive})
 			defer cleanup()
 			if root != "" || e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
 				t.Fatalf("unsafe archive accepted: %q %v", root, err)
@@ -70,7 +69,7 @@ func TestSourceHelmGNUTarDirectory(t *testing.T) {
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
-	root, relative, cleanup, err := helmPackageTree(context.Background(), &Plan{}, Artifact{ID: "charts", Kind: "tarball", RecipeTarget: "recipe", Path: archive})
+	root, relative, cleanup, err := helmPackageTree(context.Background(), &Plan{}, Artifact{ID: "charts", Kind: "tarball", BuildTarget: "charts", Path: archive})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,13 +131,13 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	}
 	writeRecord()
 	artifacts := map[string]Artifact{
-		"source":         {ID: "source", Name: "charts", Kind: "tarball", Component: "charts", RecipeTarget: "recipe", Path: archive},
-		"result":         {ID: "result", Name: "charts-result", Kind: "producer-result", Component: "charts", RecipeTarget: "recipe", Path: recordPath},
+		"source":         {ID: "source", Name: "charts", Kind: "tarball", Component: "charts", BuildTarget: "charts", Path: archive},
+		"result":         {ID: "result", Name: "charts-result", Kind: "producer-result", Component: "charts", BuildTarget: "charts", Path: recordPath},
 		"package/charts": {ID: "package/charts", Name: "charts", Kind: PackageHelm, Producer: "package/charts", MediaType: packageMediaType(PackageHelm), Path: filepath.Join(root, "packaged")},
 	}
 	node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, Inputs: []string{"source"}, Outputs: []string{"package/charts"}}
-	recipeDigest := "sha256:" + strings.Repeat("a", 64)
-	plan := &Plan{Recipes: []RecipePlan{{Name: "recipe", RecipeDigest: recipeDigest, Criteria: criteria.Criteria{Arch: "amd64"}}}}
+	buildDigest := "sha256:" + strings.Repeat("a", 64)
+	plan := &Plan{Builds: []BuildPlan{{Name: "charts", BuildDigest: buildDigest, Platform: "linux/amd64"}}}
 	if binding {
 		binary := filepath.Join(root, "worker")
 		if err := os.WriteFile(binary, []byte("fixture worker"), 0o755); err != nil {
@@ -149,7 +148,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 			t.Fatal(err)
 		}
 		artifacts["package/image"] = Artifact{ID: "package/image", Name: "image", Kind: PackageImage, Producer: "package/image", Path: imagePath}
-		artifacts["rawimage"] = Artifact{ID: "rawimage", Kind: "oci-image", RecipeTarget: "recipe", Component: "image"}
+		artifacts["rawimage"] = Artifact{ID: "rawimage", Kind: "oci-image", BuildTarget: "charts", Component: "image"}
 		plan.Graph.Nodes = append(plan.Graph.Nodes, Node{ID: "package/image", Kind: NodePackage, PackageKind: PackageImage, Inputs: []string{"rawimage"}, Outputs: []string{"package/image"}})
 		node.HelmImage = &HelmImageBinding{Image: "package/image", Chart: "controller"}
 		node.Inputs = append(node.Inputs, "package/image")
@@ -173,7 +172,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	} else if strings.Contains(log.String(), "Bound Helm") {
 		t.Fatalf("claimed an image binding without an image: %s", &log)
 	}
-	expected := LifecycleOutputPlan{Name: "charts", Kind: "helm-oci", ArtifactID: "package/charts", RecipeDigest: recipeDigest, Components: []string{"charts"}}
+	expected := LifecycleOutputPlan{Name: "charts", Kind: "helm-oci", ArtifactID: "package/charts", BuildDigest: buildDigest, Components: []string{"charts"}}
 	observed, err := ObserveLifecyclePayload(ctx, plan, expected, artifacts)
 	if err != nil {
 		t.Fatal(err)

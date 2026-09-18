@@ -33,8 +33,7 @@ func diagnosticBakeOffContext(t *testing.T, args ...string) *cli.Context {
 
 func diagnosticBakeOffReport(digest string) *pipeline.Report {
 	return &pipeline.Report{
-		RecipeID:     "kubernetes-test",
-		RecipeDigest: "sha256:" + strings.Repeat("1", 64),
+		BuildDigest: "sha256:" + strings.Repeat("1", 64),
 		Artifacts: []pipeline.ArtifactResult{{
 			Component: "crictl", OutputType: "host-package",
 			SHA256:      "sha256:" + strings.Repeat(digest, 64),
@@ -49,7 +48,7 @@ func diagnosticBakeOffReport(digest string) *pipeline.Report {
 func TestDiagnosticBuildEmitCannotCrossQualifiedParseBoundary(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "observed.json")
 	ctx := diagnosticBakeOffContext(t,
-		"--arch", "amd64", "--source-root", filepath.Join(t.TempDir(), "record", "src"),
+		"--platform", "linux/amd64", "--source-root", filepath.Join(t.TempDir(), "record", "src"),
 		"--emit", output)
 	calls := 0
 	err := emitDiagnosticBuild(ctx, func(_ *cli.Context, sourceRoot string) (*pipeline.Report, error) {
@@ -80,7 +79,7 @@ func TestDiagnosticBuildEmitCannotCrossQualifiedParseBoundary(t *testing.T) {
 func TestDiagnosticBakeOffUsesTwoSiblingWorkRootsAndDetectsMismatch(t *testing.T) {
 	base := t.TempDir()
 	ctx := diagnosticBakeOffContext(t,
-		"--arch", "amd64", "--source-root", filepath.Join(base, "bakeoff", "src"))
+		"--platform", "linux/amd64", "--source-root", filepath.Join(base, "bakeoff", "src"))
 	var roots []string
 	err := runBakeOffWithBuild(ctx, func(_ *cli.Context, sourceRoot string) (*pipeline.Report, error) {
 		roots = append(roots, sourceRoot)
@@ -108,7 +107,7 @@ func TestDiagnosticBakeOffUsesTwoSiblingWorkRootsAndDetectsMismatch(t *testing.T
 }
 
 func TestDiagnosticBakeOffComparisonRequiresExactComponentScope(t *testing.T) {
-	ctx := diagnosticBakeOffContext(t, "--arch", "amd64")
+	ctx := diagnosticBakeOffContext(t, "--platform", "linux/amd64")
 	one, err := diagnosticManifestFromReport(ctx, diagnosticBakeOffReport("a"))
 	if err != nil {
 		t.Fatal(err)

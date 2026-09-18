@@ -1,7 +1,7 @@
 // Package architecture hosts the ADR-02 §3 STATIC purity guard: an automated check that
 // the identity-producing code paths contain no nondeterministic source — wall-clock
 // reads, randomness, UUID generation, hostname, or host-environment reads — because a
-// leak there would make recipeDigest host-dependent and collapse the trust model. It
+// leak there would make buildDigest host-dependent and collapse the trust model. It
 // is the static half; the empirical invariance test lives in pkg/nkd/ir
 // (TestDigestHostInvariance). A deliberate exception is allowlisted only with an
 // inline `//nkd:allow-nondeterminism` note on the offending line, forcing a
@@ -16,8 +16,8 @@ import (
 )
 
 // identityPaths are the packages whose output flows into a digest-addressed identity
-// (recipeDigest / builder-profile / trust objects). They MUST be pure.
-var identityPaths = []string{"ir", "recipe", "canonical", "compose", "criteria"}
+// (buildDigest / builder-profile / trust objects). They MUST be pure.
+var identityPaths = []string{"ir", "buildgraph", "canonical", "target"}
 
 // forbidden are substrings that indicate a nondeterministic source. Kept as source
 // substrings (not full AST) so the guard is cheap and dependency-free.
@@ -53,19 +53,35 @@ func TestIdentityPathsArePure(t *testing.T) {
 			if err != nil {
 				t.Fatalf("reading %s: %v", path, err)
 			}
-			for i, line := range strings.Split(string(b), "\n") {
-				if strings.Contains(line, allowMarker) {
-					continue // explicitly justified exception
-				}
-				// Ignore import lines that merely name a std pkg in a comment; the
-				// substrings above are specific enough (e.g. "math/rand") that a real
-				// import or call is what trips them.
-				for _, bad := range forbidden {
-					if strings.Contains(line, bad) {
-						t.Errorf("%s:%d: nondeterministic call %q in an identity path (add %s with a justification if truly deterministic)\n\t%s",
-							path, i+1, bad, allowMarker, strings.TrimSpace(line))
-					}
-				}
+			assertPureSource(t, path, b)
+		}
+	}
+}
+
+// Rendering-input normalization is pure even though the AICR execution adapter
+// in the same package intentionally performs subprocess and filesystem work.
+func TestAICRBundleInputNormalizationIsPure(t *testing.T) {
+	path := filepath.Join("..", "..", "pkg", "nkd", "aicr", "bundle_inputs.go")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertPureSource(t, path, b)
+}
+
+func assertPureSource(t *testing.T, path string, b []byte) {
+	t.Helper()
+	for i, line := range strings.Split(string(b), "\n") {
+		if strings.Contains(line, allowMarker) {
+			continue // explicitly justified exception
+		}
+		// Ignore import lines that merely name a std pkg in a comment; the
+		// substrings above are specific enough (e.g. "math/rand") that a real
+		// import or call is what trips them.
+		for _, bad := range forbidden {
+			if strings.Contains(line, bad) {
+				t.Errorf("%s:%d: nondeterministic call %q in an identity path (add %s with a justification if truly deterministic)\n\t%s",
+					path, i+1, bad, allowMarker, strings.TrimSpace(line))
 			}
 		}
 	}

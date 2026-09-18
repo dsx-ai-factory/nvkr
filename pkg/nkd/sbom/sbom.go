@@ -1,7 +1,7 @@
-// Package sbom emits a deterministic CycloneDX SBOM for a resolved recipe: a single
+// Package sbom emits a deterministic CycloneDX SBOM for a resolved build: a single
 // document covering every component's source provenance (repo, pinned commit, tree
 // hash, toolchain digest, version) and, when a build has run, the produced artifact
-// digests (SRD §6.7). It contains no timestamps or random values, so the same recipe
+// digests (SRD §6.7). It contains no timestamps or random values, so the same build
 // always yields byte-identical bytes.
 package sbom
 
@@ -10,11 +10,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
 const (
@@ -71,18 +72,18 @@ type Property struct {
 	Value string `json:"value"`
 }
 
-func fromRecipe(res *recipe.Resolved, recipeDigest string, artifactHashes map[string]string,
+func fromBuild(res *buildgraph.Resolved, buildDigest string, artifactHashes map[string]string,
 	transportIndependent bool,
 ) *BOM {
 	bom := &BOM{
 		BOMFormat:    bomFormat,
 		SpecVersion:  specVersion,
-		SerialNumber: deriveURN(recipeDigest),
+		SerialNumber: deriveURN(buildDigest),
 		Version:      1,
 		Metadata: Metadata{
-			Component: Component{Type: "application", Name: "nkd-" + res.RecipeID, Version: res.Criteria.K8sVersion},
+			Component: Component{Type: "application", Name: "nkd-build", Version: buildDigest},
 			Tools:     []ToolRef{{Vendor: "NVIDIA", Name: "nkdctl"}},
-			Props:     []Property{{Name: "nkd:recipeDigest", Value: recipeDigest}},
+			Props:     []Property{{Name: "nkd:buildDigest", Value: buildDigest}},
 		},
 	}
 
@@ -90,7 +91,7 @@ func fromRecipe(res *recipe.Resolved, recipeDigest string, artifactHashes map[st
 	sort.Slice(comps, func(i, j int) bool { return comps[i].Name < comps[j].Name })
 	for _, nc := range comps {
 		bom.Components = append(bom.Components,
-			componentForEvidence(nc, artifactHashes[nc.Name], res.Criteria.Arch,
+			componentForEvidence(nc, artifactHashes[nc.Name], target.Arch(res.Platform),
 				externalEvidenceDeclarationProps(nc.Prebuilt), transportIndependent))
 	}
 	return bom
@@ -98,22 +99,22 @@ func fromRecipe(res *recipe.Resolved, recipeDigest string, artifactHashes map[st
 
 // FromComponent builds a per-artifact SBOM bound to one component's artifact digest
 // (ADR-13 §1 / FR-15): a CycloneDX document whose subject is that single artifact.
-// Its serial number is derived from recipeDigest + the component name, so it is unique
+// Its serial number is derived from buildDigest + the component name, so it is unique
 // per artifact yet reproducible (no random UUID, no timestamp).
-func FromComponent(nc catalog.NamedComponent, recipeDigest, artifactHash string) *BOM {
-	return fromComponentForArch(nc, recipeDigest, artifactHash, "")
+func FromComponent(nc catalog.NamedComponent, buildDigest, artifactHash string) *BOM {
+	return fromComponentForArch(nc, buildDigest, artifactHash, "")
 }
 
-func fromComponentForArch(nc catalog.NamedComponent, recipeDigest, artifactHash, arch string) *BOM {
+func fromComponentForArch(nc catalog.NamedComponent, buildDigest, artifactHash, arch string) *BOM {
 	metadataProps := []Property{
-		{Name: "nkd:recipeDigest", Value: recipeDigest},
+		{Name: "nkd:buildDigest", Value: buildDigest},
 		{Name: "nkd:artifact", Value: nc.Name},
 	}
 	sort.Slice(metadataProps, func(i, j int) bool { return metadataProps[i].Name < metadataProps[j].Name })
 	return &BOM{
 		BOMFormat:    bomFormat,
 		SpecVersion:  specVersion,
-		SerialNumber: deriveURN(recipeDigest + "/" + nc.Name),
+		SerialNumber: deriveURN(buildDigest + "/" + nc.Name),
 		Version:      1,
 		Metadata: Metadata{
 			Component: componentForArch(nc, artifactHash, arch),
@@ -138,26 +139,26 @@ type IndexEntry struct {
 // an aggregate evidence digest.
 type Index struct {
 	SchemaVersion string       `json:"schemaVersion"`
-	RecipeDigest  string       `json:"recipeDigest"`
+	BuildDigest   string       `json:"buildDigest"`
 	Entries       []IndexEntry `json:"entries"`
 }
 
-const IndexSchemaVersion = "nkd.dev/sbom-index/v1"
+const IndexSchemaVersion = "nkd.dev/sbom-index/v2"
 
 // PerArtifact builds one SBOM per from-source/prebuilt component (bound to its
 // artifact digest) plus the aggregate index linking them, all deterministic.
 // These documents describe observed composition. Publisher-qualified flows use
 // BuildVerifiedFromReport and its PerArtifact method to obtain evidence receipts.
-func PerArtifact(res *recipe.Resolved, recipeDigest string, artifactHashes map[string]string) (map[string]*BOM, *Index, error) {
+func PerArtifact(res *buildgraph.Resolved, buildDigest string, artifactHashes map[string]string) (map[string]*BOM, *Index, error) {
 	comps := append([]catalog.NamedComponent(nil), res.Components...)
 	sort.Slice(comps, func(i, j int) bool { return comps[i].Name < comps[j].Name })
 	boms := make(map[string]*BOM, len(comps))
-	idx := &Index{SchemaVersion: IndexSchemaVersion, RecipeDigest: recipeDigest}
+	idx := &Index{SchemaVersion: IndexSchemaVersion, BuildDigest: buildDigest}
 	for _, nc := range comps {
 		if !nc.FromSource && nc.Prebuilt == nil {
 			continue // an exclusion has no artifact SBOM
 		}
-		b := fromComponentForArch(nc, recipeDigest, artifactHashes[nc.Name], res.Criteria.Arch)
+		b := fromComponentForArch(nc, buildDigest, artifactHashes[nc.Name], target.Arch(res.Platform))
 		d, err := b.Digest()
 		if err != nil {
 			return nil, nil, err
@@ -177,8 +178,8 @@ func (ix *Index) Validate() error {
 	if ix.SchemaVersion != IndexSchemaVersion {
 		return e.New(e.CodeInvalidCatalog, "SBOM index schemaVersion %q is unsupported", ix.SchemaVersion)
 	}
-	if !canonical.IsDigest(ix.RecipeDigest) {
-		return e.New(e.CodeUnverifiedRef, "SBOM index recipeDigest %q is not an exact lowercase sha256 identity", ix.RecipeDigest)
+	if !canonical.IsDigest(ix.BuildDigest) {
+		return e.New(e.CodeUnverifiedRef, "SBOM index buildDigest %q is not an exact lowercase sha256 identity", ix.BuildDigest)
 	}
 	if len(ix.Entries) == 0 {
 		return e.New(e.CodeProvenanceMissing, "SBOM index has no artifact entries")
@@ -218,7 +219,7 @@ func componentForWithExternalEvidence(nc catalog.NamedComponent, artifactHash, a
 }
 
 // componentForPublisherEvidence removes source/toolchain transport locators from
-// locally generated publisher evidence. Recipe identity deliberately ignores those
+// locally generated publisher evidence. Build identity deliberately ignores those
 // locators, so retaining them would let an online-to-mirror relocation perturb an
 // SBOM and the publisher-evidence aggregate for identical content.
 func componentForPublisherEvidence(nc catalog.NamedComponent, artifactHash, arch string,
@@ -354,11 +355,11 @@ func (b *BOM) Validate() error {
 	if err := validateProperties("metadata.properties", b.Metadata.Props); err != nil {
 		return err
 	}
-	recipeDigest, artifact, err := metadataBindings(b.Metadata.Props)
+	buildDigest, artifact, err := metadataBindings(b.Metadata.Props)
 	if err != nil {
 		return err
 	}
-	serialSeed := recipeDigest
+	serialSeed := buildDigest
 	if artifact != "" {
 		serialSeed += "/" + artifact
 	}
@@ -368,7 +369,7 @@ func (b *BOM) Validate() error {
 			if !validEvidenceStage(prop.Value) || artifact == "" || len(b.Metadata.Component.Hashes) != 1 {
 				return e.New(e.CodeVerifyFailed, "SBOM has an invalid stage binding")
 			}
-			expectedSerial, err = stageSerialNumber(recipeDigest, artifact, prop.Value, "sha256:"+b.Metadata.Component.Hashes[0].Content)
+			expectedSerial, err = stageSerialNumber(buildDigest, artifact, prop.Value, "sha256:"+b.Metadata.Component.Hashes[0].Content)
 			if err != nil {
 				return err
 			}
@@ -378,7 +379,7 @@ func (b *BOM) Validate() error {
 		}
 	}
 	if b.SerialNumber != expectedSerial {
-		return e.New(e.CodeUnverifiedRef, "SBOM serialNumber is not bound to its exact recipe/artifact identity")
+		return e.New(e.CodeUnverifiedRef, "SBOM serialNumber is not bound to its exact build/artifact identity")
 	}
 	previous := ""
 	for i, component := range b.Components {
@@ -406,7 +407,7 @@ func (b *BOM) Validate() error {
 		}
 		return nil
 	}
-	// An aggregate SBOM must inventory the recipe's components.
+	// An aggregate SBOM must inventory the build's components.
 	if len(b.Components) == 0 {
 		return e.New(e.CodeProvenanceMissing, "SBOM has no components")
 	}
@@ -414,23 +415,23 @@ func (b *BOM) Validate() error {
 }
 
 func metadataBindings(properties []Property) (string, string, error) {
-	recipeDigest := ""
+	buildDigest := ""
 	artifact := ""
 	for _, property := range properties {
 		switch property.Name {
-		case "nkd:recipeDigest":
-			recipeDigest = property.Value
+		case "nkd:buildDigest":
+			buildDigest = property.Value
 		case "nkd:artifact":
 			artifact = property.Value
 		}
 	}
-	if !canonical.IsDigest(recipeDigest) {
-		return "", "", e.New(e.CodeUnverifiedRef, "SBOM metadata has no exact recipe digest")
+	if !canonical.IsDigest(buildDigest) {
+		return "", "", e.New(e.CodeUnverifiedRef, "SBOM metadata has no exact build digest")
 	}
 	if artifact != "" && !canonicalText(artifact) {
 		return "", "", e.New(e.CodeInvalidCatalog, "SBOM metadata has a non-canonical artifact binding")
 	}
-	return recipeDigest, artifact, nil
+	return buildDigest, artifact, nil
 }
 
 func validateSBOMComponent(field string, component Component) error {
@@ -515,10 +516,10 @@ func purl(repo, commit string) string {
 	return fmt.Sprintf("pkg:generic/%s@%s?download_url=%s", strings.TrimSuffix(name, ".git"), commit, repo)
 }
 
-// deriveURN turns the recipeDigest into a stable urn:uuid so the serial number is
-// unique per recipe yet reproducible (no random UUID).
-func deriveURN(recipeDigest string) string {
-	h := strings.TrimPrefix(recipeDigest, "sha256:")
+// deriveURN turns the buildDigest into a stable urn:uuid so the serial number is
+// unique per build yet reproducible (no random UUID).
+func deriveURN(buildDigest string) string {
+	h := strings.TrimPrefix(buildDigest, "sha256:")
 	for len(h) < 32 {
 		h += "0"
 	}

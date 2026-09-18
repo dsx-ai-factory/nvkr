@@ -1,6 +1,6 @@
 # Repository cleanup and module disposition
 
-Reviewed 2026-09-09 against Definition → Run → Release, ADR-17/18, and the NKE scope: local and GitHub;
+Disposition updated 2026-09-17 against Definition → Run → Release, ADR-17/18, and the NKE scope: local and GitHub;
 the NKE OS-image build owns all worker components. This review traces production imports and command
 registrations against current product value. Backward compatibility is not a retention requirement; dormant
 workflows and their contracts are removed when they do not serve the current product. The reconciliation remains the capability/evidence authority.
@@ -12,7 +12,7 @@ workflows and their contracts are removed when they do not serve the current pro
 | Maintained NKE CLI and AICR inputs | `definitions/nke-v1/` and `definitions/aicr/`, each with its own catalog |
 | Root `recipes/` and implicit catalog | Removed from production; useful data is explicit test fixtures. Product Definitions select their own catalog |
 | Worker, multi-output, layered and operator examples | Moved to `testdata/examples/`; no longer advertised as product build instructions |
-| AICR dependency on the worker catalog | Removed; its catalog contains only the pinned AICR profile and an empty source lock |
+| AICR dependency on the worker catalog | Removed; its catalog owns the exact AICR profile and pinned generator/evidence tools |
 | Checked-in GitLab pipeline and bundle | Removed, including the root entrypoint, demo, and Environment files; Go adapter contracts retained |
 | Bootstrap instructions and HTML/DOCX requirement exports | Removed as superseded duplicates; Git history and dated evidence retain traceability |
 | Historical plans, design drafts and SRD | Removed after review against current ADRs and milestone requirements; history retains the originals |
@@ -20,7 +20,7 @@ workflows and their contracts are removed when they do not serve the current pro
 | Worker-specific Go/CGO/rootfs contexts and image lock | Removed together with the old toolchain builder and disabled image/package commands |
 | Unwired `pipeline/portable.go` prototype | Removed with its renderer-only test; the real helper-launch contract test is retained |
 | Unregistered optional-signature verifier marker | Removed its dead command constructor, refusal helper and self-referential test; registered authenticated verification stays intact |
-| Standalone cluster authoring CLI | Removed; authors declare cluster views inside a Definition |
+| Cluster views, classifications and provisioning interface | Removed; Definitions declare artifact outputs and downstream consumers own deployment |
 | Old factory catalog/loaders and authoring CLI | Removed; lifecycle lowers into internal `CompileSpec` and `ExecutionSettings` |
 | Factory GitHub bundle aliases/wrappers | Removed; both providers use `GeneratedBundle` and the shared writer/checker |
 | Exported graph-format helpers | Internalized behind `RenderGraph` |
@@ -30,15 +30,15 @@ workflows and their contracts are removed when they do not serve the current pro
 | Orphaned mirror, advisory and factory-catalog digest families | Removed from the canonical registry |
 | `pkg/nkd/purity` | Moved to `internal/architecture`; it is a repository test, not a domain module |
 
-Recipe and Definition are not interchangeable: a Recipe supplies reusable build semantics; a Definition
-selects Recipes and names required outputs and cluster views. Factory is an internal compiler/executor.
+Catalog components supply reusable producer semantics. A Definition selects producers and platforms directly
+on named outputs, including explicit AICR rendering settings. Factory is an internal compiler/executor.
 Test fixtures remain only where they exercise current resolution, packaging or authority behavior. They are not
 migration guarantees. The old factory catalog, file loaders, authoring commands and frozen migration fixtures
 are removed. Internal factory types are compile specifications and execution settings, not public authored objects.
 
 ## Every domain package
 
-Three former domain packages are removed: `airgap`, `query`, and `variant`. The retained packages support the
+Former domain packages `airgap`, `query`, `variant`, `recipe`, `compose`, `criteria`, `cluster`, and `placement` are removed. The retained packages support the
 current lifecycle or its evidence and release gates; tests alone are not justification for keeping an unused API.
 
 | Package | Actual role and disposition |
@@ -47,14 +47,16 @@ current lifecycle or its evidence and release gates; tests alone are not justifi
 | `factory` | Keep: lifecycle calls its graph compiler, packaging, generation and executor; remove redundant wrappers, not the executor |
 | `pipeline` | Keep: shared acquisition/execution, sandbox, observations, terminal receipts and node transport; also contains separate qualified emitters |
 | `catalog` | Keep: pinned catalog loading, stacking, validation and maintenance used by lifecycle/resolution |
-| `compose` | Keep: catalog overlay inheritance and mixins; distinct from cluster realization |
-| `recipe` | Keep: selection and logical Recipe resolution over catalog content |
-| `criteria` | Keep: shared selection-axis validation and matching |
-| `ir` | Keep: canonical single-Recipe graph and typed logical/execution identities |
+| `compose` | Removed: Recipe inheritance and mixins have no direct-output consumer |
+| `recipe`, `criteria` | Removed: direct output membership and concrete target admission replace authored groups and matching |
+| `buildgraph` | Derive exact pinned graphs from each output’s selected producers |
+| `target` | Validate concrete target platforms and architecture routes |
+| `placement` | Removed: deployment classifications have no build/release responsibility |
+| `ir` | Keep: canonical output build graph and typed logical/execution identities |
 | `canonical` | Keep: canonical codec and frozen typed digest families |
 | `errors` | Keep: stable boundary codes and exit mapping |
 | `aicr` | Keep: real pinned profile/generator integration used by the maintained AICR Run |
-| `cluster` | Keep: exact named-view realization used by lifecycle, factory and delivery; no independent public cluster authoring workflow |
+| `cluster` | Removed: exact output and evidence membership remain in lifecycle/factory/delivery |
 | `assemble` | Keep: byte packaging called by factory/pipeline; disk measurement contracts do not implement an OS-image builder |
 | `delivery` | Keep: artifact layouts, APT/Helm/binary closure and OCI publication/consumption used by lifecycle |
 | `sign` | Keep: signer/tool authentication and publication verification used by factory and lifecycle |
@@ -77,12 +79,16 @@ scanner product or a claim that scanning is exercised. `transport` remains becau
 authorized artifact sets. Neither package is retained to preserve obsolete callers.
 
 `factory` and `pipeline` overlap in provider adapters but not in authority: the former compiles multi-output
-lifecycle Runs; the latter owns single-Recipe execution and qualified receipts. Likewise, `delivery` creates
+lifecycle Runs; the latter owns output build execution and qualified receipts. Likewise, `delivery` creates
 and verifies artifact representations while `transport` requires qualified release authorization before
 publishing through injected backends. Merging those packages merely to reduce directory count would obscure
 those boundaries. ADR-17/18 and the SADD describe the distinction.
 
-## Validation
+## Historical validation — 2026-09-09
+
+The following results apply to the cleanup and inputs exercised on that date. They do not validate the current
+Recipe-removal migration, its new wire schemas, or the current generated bundle. That migration's completion
+gate and maintained-input local build remain tracked separately in reconciliation.
 
 The final cleanup passed the full local gate (format, vet, lint, ShellCheck and race tests), uncached repository
 unit tests, and native Linux ARM64 race tests for signing and pipeline execution. Linux ran with a read-only

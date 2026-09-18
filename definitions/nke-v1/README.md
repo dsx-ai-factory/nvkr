@@ -2,17 +2,17 @@
 
 This Definition builds `nkectl`, the complete upstream CWE runtime image, and the quickstart Helm bundle from
 independently pinned CLI and controller module tags in NKE. It observes all three named outputs and generates one shared OCI release publication and signing
-jobs. Recipes remain catalog-owned. Runtime, destination, and signing choices live in independently selected
+jobs. Producer instructions remain catalog-owned; outputs select them directly. Runtime, destination, and signing choices live in independently selected
 Environments. The [combined hosted run and independent consumers](../../docs/evidence/2026-09-10-combined-run.md)
 passed for all three outputs, including real signing and complete Run finalization. That recorded run predates
 the controller tag/version correction described below; it does not validate a hosted run of these updated inputs.
 
 | File | Purpose |
 |---|---|
-| `definition.yaml` | Public Definition: Recipes, CLI/image/Helm outputs, and the Helm-to-image binding. |
+| `definition.yaml` | Public Definition: direct producers, CLI/image/Helm outputs, and the Helm-to-image binding. |
 | `environment-local.yaml` | Local registry and dry-run signing settings. |
 | `environment-github.yaml` | Hosted GitHub destination and signing settings. |
-| `catalog/registry.yaml` | Catalog-owned NKE Recipe and source declaration. |
+| `catalog/registry.yaml` | Catalog-owned NKE components, platforms, and source declarations. |
 | `catalog/pins.lock.yaml` | Machine-managed exact source pins. |
 
 ## Inspect and run
@@ -158,3 +158,7 @@ nkdctl catalog bump --dir definitions/nke-v1/catalog checkout download-artifact 
 
 Regenerate the Run workflow after applying an update. No generator rebuild is needed. The adapter rejects
 missing pins, unexpected action repositories and unsupported major versions before producing a workflow.
+
+The current input contract is Definition v4 with catalog v3 and generated IR v3. Definition outputs describe
+produced artifacts and package dependencies. Deployment topology, node roles and cluster validation belong to
+the downstream deployment system; the release content subject still binds every exact named output.

@@ -27,7 +27,7 @@ func TestReleaseConstructionRejectsIncompleteOrSubstitutedEvidence(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := testReleaseRequest(t, []Artifact{{Name: "cli", Kind: OutputExecutable, Digest: descriptor.Digest, RecipeDigest: "sha256:" + repeat("a", 64), Components: []string{"cli"}}}, []delivery.ObjectInput{{Name: "cli", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"cli": pipeline.FileDigest(payload)})
+	request := testReleaseRequest(t, []Artifact{{Name: "cli", Kind: OutputExecutable, Digest: descriptor.Digest, BuildDigest: "sha256:" + repeat("a", 64), Components: []string{"cli"}}}, []delivery.ObjectInput{{Name: "cli", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"cli": pipeline.FileDigest(payload)})
 	encoded, err := json.Marshal(request)
 	if err != nil {
 		t.Fatal(err)

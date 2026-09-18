@@ -4,14 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func diskDefinition(t *testing.T) Definition {
 	t.Helper()
 	definition := testDefinition(t)
-	definition.Recipes[0].Criteria = criteria.Criteria{Category: "os", Role: "any", OS: "ubuntu", Arch: "amd64"}
 	definition.Outputs[0].Format = OutputDiskImage
 	definition.Outputs[0].Components = []string{"nke-node-non-fde"}
 	return definition
@@ -43,7 +41,7 @@ func TestDiskImageOutputSchemaAndIdentity(t *testing.T) {
 	}{
 		{"no component", func(d *Definition) { d.Outputs[0].Components = nil }},
 		{"two components", func(d *Definition) { d.Outputs[0].Components = []string{"a", "b"} }},
-		{"non-os recipe", func(d *Definition) { d.Recipes[0].Criteria.Category = "kubernetes" }},
+		{"unsupported platform", func(d *Definition) { d.Outputs[0].Platform = "windows/amd64" }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

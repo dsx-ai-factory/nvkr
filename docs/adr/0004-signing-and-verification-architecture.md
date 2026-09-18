@@ -146,8 +146,9 @@ successful signing or verification record. Registry credentials use a private re
 never argv. Dry-run executes no signer and contacts no registry for signing; it records intended argv and
 `dryRun: true`, retaining `static-unqualified` evidence.
 
-Build identity is a fixed committed workflow path and default-branch ref under an explicit issuer. The separate
-recipe/evidence qualification workflow has its own identity; build provenance and qualification evidence cannot
+The build signer's identity is a fixed committed workflow path and default-branch ref under an explicit issuer.
+It authenticates who produced the artifact; Build Digest separately identifies the selected logical graph. The separate
+build/evidence qualification workflow has its own identity; build provenance and qualification evidence cannot
 substitute for one another. Consumer instructions publish both identities and use stock
 `cosign verify-attestation` with the explicit signature or SLSA predicate type. Downloaded bundles are also
 independently verifiable with `verify-blob-attestation` and an independently selected digest. An NKD reader is
@@ -157,7 +158,7 @@ A Verification Policy explicitly selects lane and acceptance scope:
 
 | Lane / scope | Required acceptance |
 |---|---|
-| `pipeline-attested` / `artifact-publication` | Exact selected closure, accepted build identity and issuer, signature, and subject-bound production provenance |
+| `pipeline-attested` / `artifact-publication` | Exact selected closure, accepted build signer identity and issuer, signature, and subject-bound production provenance |
 | `pipeline-attested` / `release` | Artifact-publication checks plus ADR-16 qualification identity, verdicts, membership, and ADR-06 revocation checks |
 | `qualified` / `release` | Qualified authority, evidence, freshness, status, and publication contracts in ADR-05/06/16/20 |
 

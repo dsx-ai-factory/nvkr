@@ -5,7 +5,7 @@ package vuln
 import "github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 
 const (
-	QualifiedReportSchemaVersion = "nkd.dev/vuln-report/v2"
+	QualifiedReportSchemaVersion = "nkd.dev/vuln-report/v3"
 	ScannerGrype                 = "grype"
 	ScannerTrivy                 = "trivy"
 )
@@ -20,7 +20,7 @@ type Finding struct {
 }
 
 // Report is the deterministic vuln report: it names the scanned artifact, the pinned
-// DB/policy version, and the recipe identity — scan-time OMITTED. Findings are sorted
+// DB/policy version, and the build identity — scan-time OMITTED. Findings are sorted
 // so two runs over the same SBOM + pinned DB are byte-identical.
 type Report struct {
 	SchemaVersion  string    `json:"schemaVersion"`
@@ -28,7 +28,7 @@ type Report struct {
 	ScannerDigest  string    `json:"scannerDigest,omitempty"`
 	DBVersion      string    `json:"dbVersion"`
 	DatabaseDigest string    `json:"databaseDigest,omitempty"`
-	RecipeDigest   string    `json:"recipeDigest"`
+	BuildDigest    string    `json:"buildDigest"`
 	Artifact       string    `json:"artifact"`
 	SBOMDigest     string    `json:"sbomDigest,omitempty"`
 	ResultDigest   string    `json:"resultDigest,omitempty"`

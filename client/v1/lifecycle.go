@@ -10,7 +10,6 @@ import (
 // The lifecycle aliases are the SDK's public product vocabulary. Compiler
 // plans, graphs, inventories, and authority receipts remain behind methods.
 type Definition = lifecycle.Definition
-type Recipe = lifecycle.Recipe
 type Environment = lifecycle.Environment
 type Run = lifecycle.Run
 type Artifact = lifecycle.Artifact

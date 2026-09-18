@@ -15,11 +15,11 @@ func githubNodeLabel(plan *Plan, node Node) string {
 	case NodeFetch:
 		return "Fetch pinned source for " + githubSourceConsumers(plan, node)
 	case NodeBuild:
-		for _, recipe := range plan.Recipes {
-			if recipe.Name == node.RecipeTarget && recipe.Graph != nil {
-				for _, build := range recipe.Graph.Nodes {
+		for _, build := range plan.Builds {
+			if build.Name == node.BuildTarget && build.Graph != nil {
+				for _, build := range build.Graph.Nodes {
 					if build.ID == node.IRNode {
-						return "Build " + build.Component + " (" + node.RecipeTarget + ")"
+						return "Build " + build.Component + " (" + node.BuildTarget + ")"
 					}
 				}
 			}
@@ -28,9 +28,9 @@ func githubNodeLabel(plan *Plan, node Node) string {
 	case NodeAcquire:
 		return "Acquire pinned " + strings.TrimPrefix(name, "tool/")
 	case NodeVerify:
-		return "Verify built artifacts: " + node.RecipeTarget
+		return "Verify built artifacts: " + node.BuildTarget
 	case NodeSBOM:
-		return "Generate SBOMs: " + node.RecipeTarget
+		return "Generate SBOMs: " + node.BuildTarget
 	case NodePackage:
 		switch node.PackageKind {
 		case PackageImage:
@@ -56,10 +56,8 @@ func githubNodeLabel(plan *Plan, node Node) string {
 		return "Sign and attest release and deliverables: " + name
 	case NodeVerifyPublication:
 		return "Verify release and deliverable signatures: " + name
-	case NodeComposition:
-		return "Assemble cluster: " + name
 	case NodeAICR:
-		return "Generate deployment bundle: " + node.RecipeTarget
+		return "Generate deployment bundle: " + node.BuildTarget
 	default:
 		return node.Kind + ": " + name
 	}
@@ -67,11 +65,11 @@ func githubNodeLabel(plan *Plan, node Node) string {
 
 func githubSourceConsumers(plan *Plan, node Node) string {
 	var components []string
-	for _, recipe := range plan.Recipes {
-		if recipe.Name != node.RecipeTarget || recipe.Graph == nil {
+	for _, build := range plan.Builds {
+		if build.Name != node.BuildTarget || build.Graph == nil {
 			continue
 		}
-		for _, candidate := range recipe.Graph.Nodes {
+		for _, candidate := range build.Graph.Nodes {
 			if candidate.Kind != ir.KindBuild {
 				continue
 			}
@@ -83,22 +81,22 @@ func githubSourceConsumers(plan *Plan, node Node) string {
 		}
 	}
 	if len(components) == 0 {
-		return node.RecipeTarget
+		return node.BuildTarget
 	}
-	return strings.Join(uniqueSorted(components), ", ") + " (" + node.RecipeTarget + ")"
+	return strings.Join(uniqueSorted(components), ", ") + " (" + node.BuildTarget + ")"
 }
 
 func githubStageLabel(plan *Plan, nodes []Node) string {
 	if len(nodes) == 1 {
 		return githubNodeLabel(plan, nodes[0])
 	}
-	var packages, recipes []string
+	var packages, builds []string
 	bindsImage := false
 	for _, node := range nodes {
 		if node.Kind == NodePackage {
 			packages = append(packages, strings.TrimPrefix(node.ID, "package/"))
-		} else if node.RecipeTarget != "" {
-			recipes = append(recipes, node.RecipeTarget)
+		} else if node.BuildTarget != "" {
+			builds = append(builds, node.BuildTarget)
 		}
 		bindsImage = bindsImage || node.HelmImage != nil
 	}
@@ -109,7 +107,7 @@ func githubStageLabel(plan *Plan, nodes []Node) string {
 		}
 		return label
 	}
-	return "Verify artifacts and generate SBOMs: " + strings.Join(uniqueSorted(recipes), ", ")
+	return "Verify artifacts and generate SBOMs: " + strings.Join(uniqueSorted(builds), ", ")
 }
 
 func githubArtifactLabel(plan *Plan, artifact Artifact) string {
@@ -125,11 +123,11 @@ func githubArtifactLabel(plan *Plan, artifact Artifact) string {
 			}
 		}
 	case string(TierTerminalObservation):
-		return "artifact checks for " + artifact.RecipeTarget
+		return "artifact checks for " + artifact.BuildTarget
 	case "producer-result":
 		return "build result for " + artifact.Component
 	case "sbom-set":
-		return "SBOMs for " + artifact.RecipeTarget
+		return "SBOMs for " + artifact.BuildTarget
 	}
 	kind := map[string]string{
 		"host-package": "binary", "oci-image": "image export", "tarball": "source archive",

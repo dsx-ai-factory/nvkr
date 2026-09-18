@@ -28,8 +28,8 @@ const (
 )
 
 // PublicationIdentity is the immutable identity of a signed publication object (a
-// ValidationVector or ReleaseSet), DISTINCT from recipeDigest (which covers only the
-// compiled graph). Two profiles/manifests over one recipe would otherwise collide, so
+// ValidationVector or ReleaseSet), DISTINCT from buildDigest (which covers only the
+// compiled graph). Two profiles/manifests over one build would otherwise collide, so
 // publication identity is its own domain (ADR-06 §1).
 func PublicationIdentity(signed any) (string, error) {
 	return canonical.Digest(canonical.KindPublication, signed)

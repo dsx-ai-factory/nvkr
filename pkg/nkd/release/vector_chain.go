@@ -16,7 +16,7 @@ type validationVectorProof struct {
 	IdentityDigest          string                          `json:"identityDigest"`
 	BlobDigest              string                          `json:"blobDigest"`
 	Signer                  string                          `json:"signer"`
-	RecipeDigest            string                          `json:"recipeDigest"`
+	BuildDigest             string                          `json:"buildDigest"`
 	ProfileDigest           string                          `json:"profileDigest,omitempty"`
 	SBOMIndexDigest         string                          `json:"sbomIndexDigest"`
 	ProvenanceIndexDigest   string                          `json:"provenanceIndexDigest"`
@@ -43,7 +43,7 @@ func verifyAuthenticatedVectorChain(ctx context.Context, request AuthorizationRe
 		if err != nil {
 			return nil, err
 		}
-		key := vectorEvidenceKey(binding.Component, binding.RecipeDigest, binding.ArtifactDigest)
+		key := vectorEvidenceKey(binding.Component, binding.BuildDigest, binding.ArtifactDigest)
 		if _, duplicate := sboms[key]; duplicate {
 			return nil, e.New(e.CodeGateUnmet,
 				"release repeats local SBOM evidence for %s/%s", binding.Component, binding.ArtifactDigest)
@@ -56,7 +56,7 @@ func verifyAuthenticatedVectorChain(ctx context.Context, request AuthorizationRe
 		if err != nil {
 			return nil, err
 		}
-		key := vectorEvidenceKey(binding.Component, binding.RecipeDigest, binding.ArtifactDigest)
+		key := vectorEvidenceKey(binding.Component, binding.BuildDigest, binding.ArtifactDigest)
 		if _, duplicate := provenances[key]; duplicate {
 			return nil, e.New(e.CodeGateUnmet,
 				"release repeats local provenance evidence for %s/%s", binding.Component, binding.ArtifactDigest)
@@ -85,20 +85,20 @@ func verifyAuthenticatedVectorChain(ctx context.Context, request AuthorizationRe
 		vector, ok := vectors[member.VectorDigest]
 		if !ok {
 			return nil, e.New(e.CodeGateUnmet,
-				"release member %s/%s lacks authenticated validation vector %s",
-				member.Component, orNone(member.Role), member.VectorDigest)
+				"release member %s lacks authenticated validation vector %s",
+				member.Component, member.VectorDigest)
 		}
-		if vector.RecipeDigest != member.RecipeDigest || vector.ProfileDigest != member.ProfileDigest {
+		if vector.BuildDigest != member.BuildDigest || vector.ProfileDigest != member.ProfileDigest {
 			return nil, e.New(e.CodeGateUnmet,
-				"validation vector %s does not bind member %s/%s exact recipe/profile",
-				member.VectorDigest, member.Component, orNone(member.Role))
+				"validation vector %s does not bind member %s exact build/profile",
+				member.VectorDigest, member.Component)
 		}
 		componentArtifacts := make([]string, 0, len(vector.Components))
 		var sbomReceipts []sbom.LocalEvidenceReceipt
 		var provenanceReceipts []provenance.LocalEvidenceReceipt
 		for _, component := range vector.Components {
 			componentArtifacts = append(componentArtifacts, component.SHA256)
-			key := vectorEvidenceKey(component.Name, vector.RecipeDigest, component.SHA256)
+			key := vectorEvidenceKey(component.Name, vector.BuildDigest, component.SHA256)
 			sbomReceipt, sbomOK := sboms[key]
 			provenanceReceipt, provenanceOK := provenances[key]
 			if !sbomOK || !provenanceOK {
@@ -113,8 +113,8 @@ func verifyAuthenticatedVectorChain(ctx context.Context, request AuthorizationRe
 		sort.Strings(componentArtifacts)
 		if !equalStrings(componentArtifacts, sortedStrings(member.ArtifactDigests)) {
 			return nil, e.New(e.CodeGateUnmet,
-				"validation vector %s artifact set does not exactly equal member %s/%s",
-				member.VectorDigest, member.Component, orNone(member.Role))
+				"validation vector %s artifact set does not exactly equal member %s",
+				member.VectorDigest, member.Component)
 		}
 		publisherEvidence, err := attest.QualifyPublisherEvidenceReceipts(ctx, sbomReceipts, provenanceReceipts)
 		if err != nil {
@@ -124,7 +124,7 @@ func verifyAuthenticatedVectorChain(ctx context.Context, request AuthorizationRe
 		if err != nil {
 			return nil, err
 		}
-		if publisherBinding.RecipeDigest != vector.RecipeDigest ||
+		if publisherBinding.BuildDigest != vector.BuildDigest ||
 			publisherBinding.SBOMIndexDigest != vector.SBOMIndexDigest ||
 			publisherBinding.ProvenanceIndexDigest != vector.ProvenanceIndexDigest ||
 			publisherBinding.EvidenceDigest != vector.PublisherEvidenceDigest {
@@ -134,7 +134,7 @@ func verifyAuthenticatedVectorChain(ctx context.Context, request AuthorizationRe
 		}
 		proof := validationVectorProof{
 			IdentityDigest: vector.IdentityDigest, BlobDigest: vector.BlobDigest, Signer: vector.Signer,
-			RecipeDigest: vector.RecipeDigest, ProfileDigest: vector.ProfileDigest,
+			BuildDigest: vector.BuildDigest, ProfileDigest: vector.ProfileDigest,
 			SBOMIndexDigest: vector.SBOMIndexDigest, ProvenanceIndexDigest: vector.ProvenanceIndexDigest,
 			PublisherEvidenceDigest: vector.PublisherEvidenceDigest,
 			Components:              append([]attest.ComponentDigest(nil), vector.Components...),
@@ -163,13 +163,13 @@ func verifyAuthenticatedVectorChain(ctx context.Context, request AuthorizationRe
 	return proofs, nil
 }
 
-func vectorEvidenceKey(component, recipeDigest, artifactDigest string) string {
-	return component + "\x00" + recipeDigest + "\x00" + artifactDigest
+func vectorEvidenceKey(component, buildDigest, artifactDigest string) string {
+	return component + "\x00" + buildDigest + "\x00" + artifactDigest
 }
 
 func equalValidationVectorProof(left, right validationVectorProof) bool {
 	return left.IdentityDigest == right.IdentityDigest && left.BlobDigest == right.BlobDigest &&
-		left.Signer == right.Signer && left.RecipeDigest == right.RecipeDigest &&
+		left.Signer == right.Signer && left.BuildDigest == right.BuildDigest &&
 		left.ProfileDigest == right.ProfileDigest &&
 		left.PublisherEvidenceDigest == right.PublisherEvidenceDigest
 }

@@ -11,11 +11,10 @@ import (
 
 func TestResolveNodesOutputPreservesIdentityFrame(t *testing.T) {
 	queryArgs := []string{
-		"--category", "kubernetes", "--role", "worker",
-		"--k8s", "1.32.0", "--arch", "amd64",
+		"--component", "kubectl", "--platform", "linux/amd64",
 		"--data", filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered"),
 	}
-	app := &cli.App{Commands: []*cli.Command{cmdRecipe()}}
+	app := &cli.App{Commands: []*cli.Command{cmdResolve()}}
 	nodes, err := runCLIWithCapturedStdout(t, app,
 		append([]string{"nkdctl", "resolve"}, append(queryArgs, "-o", "nodes")...)...)
 	if err != nil {
@@ -28,16 +27,13 @@ func TestResolveNodesOutputPreservesIdentityFrame(t *testing.T) {
 	if _, ok := decoded["nodes"].([]any); !ok {
 		t.Fatalf("nodes output omitted the full execution graph: %s", nodes)
 	}
-	criteria, _ := decoded["criteria"].(map[string]any)
-	// nodes.json is the execution document for a role-invariant recipeDigest, so it must
-	// NOT carry the composition role axis: two role-SKUs of one category share a
-	// recipeDigest and must therefore share byte-identical nodes.json (recipe.Compile
-	// clears role/clusterType from the identity frame).
-	if _, present := criteria["role"]; present {
-		t.Fatalf("nodes output must not carry the composition role axis: %#v", criteria)
+	if decoded["platform"] != "linux/amd64" {
+		t.Fatalf("nodes output lost target platform: %s", nodes)
 	}
-	if criteria["category"] != "kubernetes" {
-		t.Fatalf("nodes output dropped the recipe identity frame: %#v", criteria)
+	for _, legacy := range []string{"criteria", "recipeID", "recipeId"} {
+		if _, present := decoded[legacy]; present {
+			t.Fatalf("nodes output contains removed %s", legacy)
+		}
 	}
 
 }

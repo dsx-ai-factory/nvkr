@@ -1,4 +1,4 @@
-# ADR-19 — Cluster views, realization & provisioning boundary
+# ADR-19 — Artifact membership and downstream deployment ownership
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
 - **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
@@ -6,91 +6,74 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-19 in the consolidated NKD ADR set (added to close the composition→cluster realization gap).
-- **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-12 (categories, role/clusterType composition), ADR-16
+- **Index:** ADR-19 in the consolidated NKD ADR set (artifact membership and downstream ownership).
+- **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-12 (targets and AICR rendering), ADR-16
   (release gates), ADR-14 (delivery), ADR-18 (build pipeline).
 
 ## Context
 
-Authors need to describe how reusable recipes form a tenant or operator cluster, inspect it before artifacts
-exist, and identify the exact delivered realization. Those are states of one cluster view. A second authored
-topology document duplicates intent without supplying release authority. NKD defines and verifies inputs;
-downstream engines own provisioning and fleet operation.
+NKD produces and verifies artifacts. The maintained NKE and AICR Definitions require exact output membership,
+pinned producers, packaging and evidence, but do not require a deployment topology. The former cluster-view
+model added node roles, categories, declared Kubernetes/OS context, and generated composition records without
+an implemented provisioning consumer or runtime-compatibility proof. Its AICR settings did affect rendered bytes
+and must remain explicit producer inputs.
 
 ## Decision
 
-### 1. One authored cluster view
+### 1. Definition owns required outputs
 
-A Definition contains optional named cluster views. Each view names its cluster type, concrete Kubernetes/OS/
-architecture frame, CNI, selected named outputs, node-role subsets, cluster-level categories and validation
-requirements. Node roles and cluster type belong to this view, not Recipe selection. Resolution produces an
-immutable composition binding exact Recipe Digests and selected components.
+A Definition selects named outputs, their exact producers, concrete target platforms, artifact formats and
+byte-changing packaging relationships. There is no authored cluster view, tenant/operator type, node role,
+role affinity, deployment category, cluster context, CNI declaration or cluster validation-requirement list.
+Different deliverable sets can use separate Definitions. No replacement grouping object is introduced.
 
-AICR views also bind exact activation plus deployer, storage class, accelerated-node selectors/tolerations and
-workload selectors. Output-affecting activation/generator inputs enter Recipe identity (ADR-12); deployment
-choices enter composition identity. Labels or matching names cannot replace these bindings. Before execution a
-composition makes no artifact, qualification or clearance claim and requires no invented ReleaseSet digest.
+Each output remains an independent required use even if another output has the same Build Digest. Preparation
+freezes the exact required set; execution and hosted finalization join producer results, terminal observations,
+artifacts and evidence by output name and build identity. Missing, extra, duplicated or substituted outputs fail
+closed. Removing the topology model does not remove these generic completeness checks.
 
-### 2. Generate the exact artifact realization
+### 2. Release owns exact artifact membership
 
-Release construction binds the exact composition to its release-content subject and exact selected artifacts.
-Validate recipe/component/role/platform membership, AICR inputs and required outputs. A composition can have
-multiple realizations; attaching a release digest to copied topology is insufficient. Neither a nullable release
-reference nor a caller-set readiness flag is an authority transition.
+Named artifacts retain their observed payload digests. Canonical release content binds the complete named
+artifact set. The enclosing publication root carries the exact output, component/build and evidence bindings,
+including sibling repository/digest references. Its transport identity is distinct from content identity and
+cannot appear as one of its own content members. Consumers authenticate and recompute the exact membership
+before accepting or exposing materialized outputs. Names inside publication records cannot select arbitrary destination paths.
 
-Identity order is noncircular: named Artifacts retain their observed payload digest; canonical release content
-binds payload membership; cluster realization binds that content and exact composition; the enclosing OCI root
-carries one authoritative metadata config with sibling repository/digest references and those relationships. A separate
-lifecycle-binding wrapper is not published; output descriptors and evidence membership belong to the release index. Evidence targets the content subject without including itself in that
-subject. Route verification checks the enclosing published digest separately. Consumers recompute composition
-and content identities and exact member joins before materialization. Storage paths are verifier-owned; names
-inside a publication cannot select arbitrary filesystem locations.
+No cluster composition or realization is emitted or published. Definition v4, Run/Release v3 and publication
+root v3 reject earlier topology-bearing fields rather than dropping them during decoding. Retired cluster
+identity families remain reserved and cannot mint new identities. Historical signed bytes retain their original
+meaning; this migration grants no compatibility alias or authority to a decoded legacy description.
 
-The standalone cluster authoring CLI is removed. Product authors declare cluster views inside a Definition.
-Internal composition and qualified publication records are descriptions until the owning consumer authenticates
-them against exact content and authority; their presence does not create another public authoring workflow.
+### 3. Rendering inputs belong to their output
 
-### 3. Provisioning belongs to downstream engines
+An AICR output carries optional typed bundle settings: deployer, storage class, accelerated-node selectors and
+tolerations, and workload selectors. The AICR owner normalizes the effective defaults and validates all values
+before work. The generated graph binds the effective settings into Build identity with the profile and generator
+pins. Execution reads those graph settings directly. Two outputs using the same profile can select different
+rendering settings and obtain different build identities; no cluster lookup mediates their execution.
 
-NKD owns cluster intent and exact artifact relationships. A downstream adapter creates an engine-specific
-Projection; the engine owns instance counts, instance types, site/provider bindings, concrete test selectors,
-deployment timing, node installation, Helm deployment and reconciliation. NKE, Cluster API or another engine
-may consume the same accepted view. NKD neither initiates provisioning nor operates qualification suites.
+### 4. Downstream systems own deployment
 
-An operator/management cluster is another named view with `clusterType: operator`; the same boundary applies to
-it and tenant clusters. Determinism means the same intent resolves the same pinned identities and requirements,
-not a byte-identical running cluster. Authorization to mutate infrastructure belongs to the downstream system.
+NKE or another downstream owner decides topology, node placement, deployment timing, installation, Helm
+application and reconciliation using accepted artifact references. NKD has no provisioning-adapter interface or
+cluster qualification result. A future integration requires a concrete consumer and its own scoped contract;
+this decision reserves no unused runtime interface or qualification record.
 
-### 4. Post-clearance cluster qualification — deferred
-
-An external harness independently provisions/tests and signs an observation using the passive ADR-16 protocol.
-A future `QualificationResult` binds exact cluster realization (and, for the legacy wire, both
-`clusterDefinitionDigest` and `releaseSetDigest`), Inventory, sorted vector digests, suite/policy, verdict,
-exact opaque results digest, harness/environment digests, and operator-supplied effective/expiry epochs.
-Its new `nkd.qualification-result` family and qualification role require implementation; no such result or
-production handoff exists today.
-
-The role is distinct from build, publish, conformance and clearance. This downstream composition claim is
-**not a release gate and cannot authorize promotion**. Release conformance stays exhaustive over its ReleaseSet.
-Coverage must satisfy the view's validation requirements under ADR-05's governed coverage profile. Dormant
-e2e/cluster-validation evidence slots may bind this later result only, never the published reproduction vector.
-ADR-20 registration may reference it only with exact composition-and-release subject equality. The v1
-recipe/evidence gate is a different claim and does not satisfy this contract.
+Signer and authenticated-receipt roles remain mandatory security controls. Existing qualified release-policy
+compatibility and conformance receipts retain their exact subject, signer, policy and expiry checks. They do
+not gain deployment or runtime claims from removing cluster descriptions.
 
 ## Consequences
 
-Authors maintain topology once; consumers inspect the same named view before and after production. The cost is
-an exact compiler/verifier-owned binding, rather than aliases between different wire schemas. Qualification and
-registration remain optional downstream contracts, and neither expands the seven-object public model.
+Authors describe the artifacts they need once. The compiler and consumer maintain exact release membership
+without a parallel deployment taxonomy. NKD no longer authenticates a tenant/operator grouping or asserts node
+placement intent; downstream consumers that need such descriptions own them explicitly.
 
 ## Acceptance evidence
 
-Composition and lifecycle contract tests cover exact membership, role reuse, concrete frame, AICR inputs,
-substitution, and complete amd64/arm64 GPU executable/APT/Helm publication closure. Consumer tests verify the
-same payload identities across Run and Release and reject forged bindings. These use controlled producers and
-do not prove a real provisioning engine or qualification harness ran.
-
-External acceptance requires independent downstream adapters consuming the same authenticated view, refusing
-uncleared/wrong-member inputs before provisioning, and an independently signed harness round trip. Negative
-qualification cases include unsigned/boolean observations, wrong subject or signer role, inadequate coverage,
-expired epochs, and attempted use of cluster qualification to authorize release promotion.
+Contract checks must reject removed topology fields before output or subprocess work; preserve required-output
+and consumer-substitution negatives; and bind each AICR output's effective rendering settings to its build
+identity and invocation. Repository validation and fresh local execution are tracked in reconciliation and the
+[implementation plan](../output-only-simplification-plan.md). Earlier cluster fixture tests are not retained as
+an unused product interface. No external provisioning or runtime qualification is claimed.

@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -44,7 +43,7 @@ func TestWriteExecutionBundlePublishesExactBytesAndCommitManifest(t *testing.T) 
 			t.Fatalf("bundle member %s = %q, want %q: %v", path, got, want, err)
 		}
 	}
-	if err := pipeline.VerifyManifest(fixture.manifest, "github", "r", fixture.recipeDigest, out, fixture.emitted, fixture.nodes, fixture.transportPlan); err != nil {
+	if err := pipeline.VerifyManifest(fixture.manifest, "github", fixture.buildDigest, out, fixture.emitted, fixture.nodes, fixture.transportPlan); err != nil {
 		t.Fatal(err)
 	}
 	var decoded pipeline.BundleManifest
@@ -409,7 +408,7 @@ func TestBundleCheckRejectsOversizedCommittedMemberWithoutReadingIt(t *testing.T
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
-	err = bundleCheck(context.Background(), out, "github", "r", fixture.recipeDigest,
+	err = bundleCheck(context.Background(), out, "github", fixture.buildDigest,
 		fixture.emitted, fixture.nodes, fixture.transportPlan, false)
 	if cliErrorCode(err) != nkderr.CodePipelineDrift {
 		t.Fatalf("oversized committed bundle code = %q, want %q: %v",
@@ -421,7 +420,7 @@ func TestBundleCheckCanceledBeforeFilesystemIO(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "must-not-be-read")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	err := bundleCheck(ctx, path, "github", "r", "sha256:"+strings.Repeat("a", 64),
+	err := bundleCheck(ctx, path, "github", "sha256:"+strings.Repeat("a", 64),
 		[]byte("pipeline"), []byte("nodes"), []byte("transport"), false)
 	if cliErrorCode(err) != nkderr.CodeTimeout {
 		t.Fatalf("canceled bundle check code = %q, want %q: %v",
@@ -471,7 +470,7 @@ type executionBundleFixture struct {
 	nodes         []byte
 	transportPlan []byte
 	manifest      []byte
-	recipeDigest  string
+	buildDigest   string
 }
 
 func newExecutionBundleFixture(t *testing.T, out string) executionBundleFixture {
@@ -485,25 +484,24 @@ func newExecutionBundleFixture(t *testing.T, out string) executionBundleFixture 
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	emitted := []byte("# recipeDigest: " + recipeDigest + "\n# nodesDigest: " + pipeline.FileDigest(nodes) + "\n# transportPlanDigest: " + pipeline.FileDigest(transportPlan) + "\n# bundleDigest: sha256:bundle\njobs: {}\n")
-	manifest, err := pipeline.ManifestJSON("github", "r", recipeDigest, out, emitted, nodes, transportPlan)
+	emitted := []byte("# buildDigest: " + buildDigest + "\n# nodesDigest: " + pipeline.FileDigest(nodes) + "\n# transportPlanDigest: " + pipeline.FileDigest(transportPlan) + "\n# bundleDigest: sha256:bundle\njobs: {}\n")
+	manifest, err := pipeline.ManifestJSON("github", buildDigest, out, emitted, nodes, transportPlan)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return executionBundleFixture{
 		emitted: emitted, nodes: nodes, transportPlan: transportPlan,
-		manifest: manifest, recipeDigest: recipeDigest,
+		manifest: manifest, buildDigest: buildDigest,
 	}
 }
 
 func bundleFixtureGraph() *ir.Graph {
 	return &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, RecipeID: "r",
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
 		Nodes: []ir.Node{
 			{ID: "pull-artifact", Kind: ir.KindPull, Component: "artifact", OutputType: "raw",
 				Artifact: "https://example.test/artifact", Digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

@@ -29,7 +29,7 @@ func TestInspectReleaseLayoutReturnsExactSortedObjects(t *testing.T) {
 		found := false
 		for _, object := range inspection.Root.Objects {
 			if object.Name == artifact.Name {
-				found = object.Output != nil && artifact.Kind == object.Output.Format && artifact.Digest == object.DescriptorDigest && artifact.RecipeDigest == object.Output.RecipeDigest
+				found = object.Output != nil && artifact.Kind == object.Output.Format && artifact.Digest == object.DescriptorDigest && artifact.BuildDigest == object.Output.BuildDigest
 			}
 		}
 		if !found {
@@ -92,7 +92,7 @@ func TestInspectionRejectsInvalidObjectIdentity(t *testing.T) {
 		{Name: "tools", Kind: "binary-bundle", BlobDigest: "invalid"},
 	} {
 		inspection := delivery.Inspection{Root: delivery.PublicationRoot{Objects: []delivery.PublishedObject{object}}}
-		got, _, _, err := artifactsFromBinding(t.Context(), t.TempDir(), inspection)
+		got, _, err := artifactsFromBinding(t.Context(), t.TempDir(), inspection)
 		assertCode(t, err, e.CodeVerifyFailed)
 		if got != nil {
 			t.Fatalf("invalid object returned artifacts: %+v", got)

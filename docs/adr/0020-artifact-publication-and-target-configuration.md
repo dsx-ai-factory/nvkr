@@ -23,11 +23,11 @@ This ADR fixes the target-configuration surface and the emitted publish phase.
 
 ## Decision
 
-### 1. Targets are operator/transport configuration — never part of the recipe identity
+### 1. Targets are operator/transport configuration — never part of the build identity
 
-Two operators who build the same recipe and publish the same verified artifacts to *different* registries produce
-**identical artifact digests**; only the location differs. Target registries and repositories are therefore
-**environment configuration**, declared **outside the catalog and recipe** and **excluded from `recipeDigest`**,
+Publishing the same verified artifact bytes to *different* registries preserves their **artifact digests**;
+only the location differs. This makes no claim that two executions reproduce identical bytes. Target registries
+and repositories are **environment configuration**, declared **outside producer instructions** and **excluded from `buildDigest`**,
 because they are transport rather than a build input. This preserves define-once / publish-many and
 cross-environment byte-identity.
 
@@ -36,8 +36,9 @@ cross-environment byte-identity.
 Environment (`nkd.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
 credential references and signing identity/issuer policy. `publication.repositoryPrefix` is an explicitly
 qualified, untagged repository prefix; credentials, anonymous access and plain HTTP are transport settings.
-When publication is configured, the release index, metadata and SBOMs publish under
-`<repositoryPrefix>/releases`. Each deliverable publishes once in `<repositoryPrefix>/<output-name>`. The signed
+When publication is configured, the release index and metadata publish under
+`<repositoryPrefix>/releases`. Each deliverable and its SBOM attestation bundles publish in
+`<repositoryPrefix>/<output-name>`. The signed
 release metadata binds canonical sibling repository names and manifest digests; no complete closure is copied
 into the product repositories.
 Omitting publication produces a build-only Run. Destinations and a separate output-to-destination map are
@@ -49,16 +50,16 @@ Explicit low-level tagged publication remains a discovery operation; automatic v
 promotion policy are not implemented by this lifecycle configuration.
 
 Definition owns selected components, byte-changing packaging intent, and catalog tool selectors (`sbomTool`,
-`cosignTool`, and recipe `aicrGenerator`). Catalog source declarations own release URL templates, executable
+`cosignTool`, and output `aicr.generator`). Catalog source declarations own release URL templates, executable
 members, formats, platform and version constraints. The generated source lock owns the resolved tool URL,
 archive digest and executable digest (ADR-22). Environment contains no executable pins. A dry-run signing
-Environment does not acquire the selected cosign executable. Output-affecting tools remain bound to Recipe
-identity; evidence tools affect catalog/plan/evidence identity without changing source-build Recipe identity.
+Environment does not acquire the selected cosign executable. Output-affecting tools remain bound to Build
+identity; evidence tools affect catalog/plan/evidence identity without changing the logical source-build graph.
 
 
 Environment may also map a canonical source URL to an HTTPS fetch mirror and a GitHub secret reference
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
-commit/tree, or Recipe identity. The current adapter binds the credential only to the matching GitHub fetch
+commit/tree, or build identity. The current adapter binds the credential only to the matching GitHub fetch
 execution step using transient, repository-scoped Git configuration. Secret values never enter a remote URL,
 serialized plan or transported source tree. Local and GitLab execution reject this configuration until those
 adapters support equivalent credential isolation.
@@ -69,7 +70,7 @@ store targets remain separately capability-gated adapters. Credential values nev
 Transport settings stay replaceable by environment owners.
 
 The disk target is a future OCI evidence and control root over an exact QCOW2 payload. An optional S3 object and
-CDN URL are projections of those same payload bytes, not alternate Recipe identities. The signed root must bind
+CDN URL are projections of those same payload bytes, not alternate Build identities. The signed root must bind
 the payload digest, exact object route, and authenticated upload/read-back result before a consumer may accept
 the projection. Object-store credentials remain Environment references and cannot enter the disk, evidence, or
 route metadata. The first disk authoring contract adds no object-store schema, OCI disk wrapper, signing route,
@@ -106,11 +107,17 @@ inputs.
 
 That non-circular root/discovery/signature protocol is mandatory for a qualified publication claim. The delivery
 module implements its transport representation as an OCI image index with artifact type
-`application/vnd.nkd.publication-root.v1`: every child is an exact OCI manifest or nested index, and the canonical
+`application/vnd.nkd.publication-root.v3`: every child is an exact OCI manifest or nested index, and the canonical
 root config binds each child's name, kind, artifact type, OCI descriptor digest, exact payload or root blob
 digest, semantic digest, size, and optional platform. The registry tag is only a discovery hint; the publisher
 returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
+
+The config uses `nkd.dev/publication-root/v3` and `application/vnd.nkd.publication-root.config.v3+json`.
+Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
+removed. Readers reject earlier metadata and removed fields. Qualified attachments use the owning schema
+versions: validation vector v3, ReleaseSet/Inventory v4 and clearance v9.
+Their MIME versions track these schemas while their canonical digest-family allocations remain frozen.
 
 Loose executables use `application/vnd.nkd.binary-bundle.v1`. The Binary Bundle's canonical config binds OS,
 architecture, purpose, optional ReleaseSet and Inventory identities, and every file's name, absolute install
@@ -148,7 +155,7 @@ nested publication root is removed. The native image is pullable from its own ou
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
-output names, sibling repository locators, descriptor identities, Recipe/component mappings, content subject, cluster realizations and
+output names, sibling repository locators, descriptor identities, output-to-Build-Digest/component mappings, content subject and
 required evidence membership. There is no separately published lifecycle-binding object. Output identity is
 the deliverable manifest digest (APT retains its typed repository identity); input layout-index hashes are not
 Artifact identities. The qualified representation in §4 remains a separate protocol, not a compatibility path
@@ -161,8 +168,9 @@ subject remains the exact inventoried binary, native image manifest, or source/f
 belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,
 canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; CWE inventories
 the native manifest and records the scanned OCI-export input; Helm has distinct source-archive and final-bound-
-package inventories. Identical evidence shared by output projections has one document with sorted output
-memberships. Per-recipe indexes stay internal. Missing, substituted, duplicate or unbound evidence fails
+package inventories. Identical evidence may have one published document with sorted output memberships only
+after each output's exact producer/evidence handoff is validated. Equal Build Digests cannot satisfy missing
+output uses. Per-build indexes stay internal. Missing, substituted, duplicate or unbound evidence fails
 construction and consumption. A protected pre-publication stage creates and verifies the bundles before
 assembling the final release metadata; production publication and authenticated consumption reject raw
 preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
@@ -202,28 +210,15 @@ An optional signed `ReleaseRegistration` index may let an operator map a segment
 published release. It carries references, not artifacts or validation authority, and remains post-v1 with no
 implementation. Registration is internal discovery machinery, not another normal authored product object.
 
-Use a strict versioned, sorted, duplicate-free index with a new `nkd.release-registration` family and a distinct
-registration signer role. Segment keys preserve the layers: recipe selection `{category, os, arch, k8sVersion}`;
-composition `{role, clusterType, cni}`; and digest-pinned AICR activation. Accelerated runtime is a category plus
-AICR profile/inputs, not a flat GPU artifact axis. A role subset has no independent Recipe identity.
+A future design must use a strict versioned index, a separately allocated digest family, and explicit signer
+policy. Each entry must reference exact named outputs, target platforms, authenticated publication contents and
+clearance. Names, tags, paths and repository locations cannot establish identity; a byte-identical mirror
+preserves the referenced identity. Deployment roles, categories, cluster context and qualification are outside
+the current artifact model and must not be added to build or release identity merely to support discovery.
 
-Each entry binds Recipe Digest, signed ValidationVector digest, pinned publication root and clearance digest;
-a cluster entry also binds the exact cluster identity. Optional qualification must match **both** its exact
-cluster and release subject; a bare recipe entry cannot carry cluster qualification. Names, mutable osProfile
-strings, tags and paths cannot establish identity. The repository locator of a root is transport; only the
-root digest participates in logical registration identity, so a byte-identical mirror preserves it. Human
-labels are nonidentity annotations.
-
-NKD mints/signs over already authenticated cleared contents. A capability-gated adapter only transports that
-record to an operator-owned endpoint and returns an authenticated acceptance receipt; it cannot mint a passing
-boolean, mutate NKD authority, or register an uncleared composition. Vendor/provider/count vocabulary stays in
-the downstream Projection. Admission fails before output until an authenticated endpoint adapter exists.
-
-The record uses canonical byte-CAS/no-replace persistence and OCI referrer discovery on publication identity,
-or an authenticated air-gap copy. There is no hosted NKD feed or new registered/available release state.
-Qualified status checkpoints still govern supersession, deprecation and withdrawal. Production acceptance needs
-register → segment resolve → downstream consumption plus wrong-signature, mismatched qualification, mutable
-reference, withdrawn target, mirror-location invariance and forged-adapter-receipt negatives.
+No endpoint adapter, registration schema, or registration authority is implemented. Any later implementation
+requires its own admission, exact-byte persistence, authenticated endpoint response and operational evidence;
+it cannot derive availability or qualification from a plan or caller-provided success flag.
 
 ## Consequences
 
@@ -236,7 +231,7 @@ reference, withdrawn target, mirror-location invariance and forged-adapter-recei
   digests.
 
 **Negative / costs**
-- The target config is an environment surface that must stay out of the recipe identity — a boundary reviewers
+- The target config is an environment surface that must stay out of the build identity — a boundary reviewers
   must hold.
 - Credential handling depends on the CI engine's secret mechanism, which is per-engine plumbing.
 
@@ -246,7 +241,7 @@ reference, withdrawn target, mirror-location invariance and forged-adapter-recei
 
 ## Alternatives considered
 
-- **Declare targets in the catalog or recipe.** Rejected — perturbs `recipeDigest` and couples a recipe to one
+- **Declare publication destinations in producer instructions.** Rejected — perturbs `buildDigest` and couples a build to one
   environment; targets are transport, not definition.
 - **NKD hosts a registry or release-stream service.** Rejected — deployment owners supply storage and discovery. The v1 NVIDIA workflow publishes bytes; qualified publication remains operator-owned.
 - **Qualified publication before authorization.** Rejected — only verified, cleared contents may be published
@@ -271,7 +266,7 @@ unavailable. Source Helm archive selection and exact producer observation also h
 This adapter does not mint qualified execution or release authority.
 
 Current contract evidence in `pkg/nkd/transport/*_test.go`, `pkg/nkd/release/*_test.go`, and
-`pkg/nkd/delivery/*_test.go` covers target exclusion from recipe identity, authorization-bound subjects,
+`pkg/nkd/delivery/*_test.go` covers target exclusion from build identity, authorization-bound subjects,
 exhaustive referrer matching, semantic-versus-blob digest separation, no implicit I/O, deterministic binary and
 APT layouts, recursive OCI closure verification, extraction, and rejection of missing, extra, or substituted
 bytes. The dated local NKE record in reconciliation establishes development registry interoperability for

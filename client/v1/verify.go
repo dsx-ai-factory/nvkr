@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 )
 
@@ -301,11 +301,11 @@ func (c *Client) VerifyAuthenticated(ctx context.Context, request VerifyAuthenti
 	}
 
 	// Authentication and host preflight deliberately precede catalog/input reads.
-	resolution, err := c.ResolveRecipe(ctx, request.Resolve)
+	resolution, err := c.ResolveBuild(ctx, request.Resolve)
 	if err != nil {
 		return nil, err
 	}
-	requiredBuilders := recipe.RequiredBuilders(resolution.Resolved)
+	requiredBuilders := buildgraph.RequiredBuilders(resolution.Resolved)
 	fromSource := len(requiredBuilders) > 0
 	if fromSource && authenticatedProfile == nil {
 		return nil, e.New(e.CodeUntrustedProfile,
@@ -313,7 +313,7 @@ func (c *Client) VerifyAuthenticated(ctx context.Context, request VerifyAuthenti
 	}
 	if !fromSource && authenticatedProfile != nil {
 		return nil, e.New(e.CodeVerifyFailed,
-			"profile-bound validation vector resolved to an all-prebuilt recipe")
+			"profile-bound validation vector resolved to an all-prebuilt output")
 	}
 	if authenticatedProfile != nil {
 		if err := authenticatedProfile.Profile.RequireBuilders(requiredBuilders); err != nil {
@@ -328,7 +328,7 @@ func (c *Client) VerifyAuthenticated(ctx context.Context, request VerifyAuthenti
 		}
 	}
 	report, err := c.Run(ctx, RunRequest{
-		Graph: resolution.Graph, RecipeDigest: resolution.RecipeDigest, Options: runOptions,
+		Graph: resolution.Graph, BuildDigest: resolution.BuildDigest, Options: runOptions,
 	})
 	if err != nil {
 		return nil, err

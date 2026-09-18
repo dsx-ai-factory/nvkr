@@ -10,7 +10,6 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -49,17 +48,17 @@ func TestImagePackageObservesProducerAndPreservesPublishedImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	artifacts := map[string]Artifact{
-		"artifact/recipe/cwe": {ID: "artifact/recipe/cwe", Name: "cwe", Kind: "oci-image", Component: "cwe", RecipeTarget: "recipe", Path: archive},
-		"result/recipe/cwe":   {ID: "result/recipe/cwe", Name: "cwe-result", Kind: "producer-result", Component: "cwe", RecipeTarget: "recipe", Path: recordPath},
-		"package/cwe":         {ID: "package/cwe", Name: "cwe", Kind: PackageImage, Producer: "package/cwe", MediaType: packageMediaType(PackageImage), Path: filepath.Join(root, "packaged")},
-		"package/root":        {ID: "package/root", Name: "root", Kind: PackageOCI, Producer: "package/root", Path: filepath.Join(root, "publication")},
+		"artifact/build/cwe": {ID: "artifact/build/cwe", Name: "cwe", Kind: "oci-image", Component: "cwe", BuildTarget: "cwe", Path: archive},
+		"result/build/cwe":   {ID: "result/build/cwe", Name: "cwe-result", Kind: "producer-result", Component: "cwe", BuildTarget: "cwe", Path: recordPath},
+		"package/cwe":        {ID: "package/cwe", Name: "cwe", Kind: PackageImage, Producer: "package/cwe", MediaType: packageMediaType(PackageImage), Path: filepath.Join(root, "packaged")},
+		"package/root":       {ID: "package/root", Name: "root", Kind: PackageOCI, Producer: "package/root", Path: filepath.Join(root, "publication")},
 	}
 	imageNode := Node{ID: "package/cwe", Kind: NodePackage, PackageKind: PackageImage,
-		Inputs: []string{"artifact/recipe/cwe"}, Outputs: []string{"package/cwe"}}
+		Inputs: []string{"artifact/build/cwe"}, Outputs: []string{"package/cwe"}}
 	rootNode := Node{ID: "package/root", Kind: NodePackage, PackageKind: PackageOCI,
 		Inputs: []string{"package/cwe"}, Outputs: []string{"package/root"}}
-	recipeDigest := "sha256:" + strings.Repeat("a", 64)
-	plan := &Plan{Recipes: []RecipePlan{{Name: "recipe", RecipeDigest: recipeDigest, Criteria: criteria.Criteria{Arch: "amd64"}}},
+	buildDigest := "sha256:" + strings.Repeat("a", 64)
+	plan := &Plan{Builds: []BuildPlan{{Name: "cwe", BuildDigest: buildDigest, Platform: "linux/amd64"}},
 		Graph: ArtifactGraph{Nodes: []Node{imageNode, rootNode}}}
 	for _, a := range artifacts {
 		plan.Graph.Artifacts = append(plan.Graph.Artifacts, a)
@@ -67,7 +66,7 @@ func TestImagePackageObservesProducerAndPreservesPublishedImage(t *testing.T) {
 	if err := executePackage(ctx, plan, imageNode, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	expected := LifecycleOutputPlan{Name: "cwe", Kind: "oci", ArtifactID: "package/cwe", RecipeDigest: recipeDigest, Components: []string{"cwe"}}
+	expected := LifecycleOutputPlan{Name: "cwe", Kind: "oci", ArtifactID: "package/cwe", BuildDigest: buildDigest, Components: []string{"cwe"}}
 	observed, err := ObserveLifecyclePayload(ctx, plan, expected, artifacts)
 	if err != nil {
 		t.Fatal(err)

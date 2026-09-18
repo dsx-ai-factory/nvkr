@@ -42,18 +42,18 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 	run := &Run{SchemaVersion: RunSchemaVersion, Attempt: attempt, DefinitionDigest: definitionDigest,
 		EnvironmentDigest: environmentDigest, PlanDigest: planDigest,
 		Lane: LaneUnqualified, Status: RunPending}
-	recipes := make(map[string]factory.RecipePlan, len(plan.Recipes))
-	for _, recipePlan := range plan.Recipes {
-		recipes[recipePlan.Name] = recipePlan
+	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
+	for _, buildPlan := range plan.Builds {
+		builds[buildPlan.Name] = buildPlan
 	}
 	artifacts := make(map[string]factory.Artifact, len(plan.Graph.Artifacts))
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
 	for _, output := range definition.Outputs {
-		recipePlan, ok := recipes[output.Recipe]
+		buildPlan, ok := builds[output.Name]
 		if !ok {
-			return nil, e.New(e.CodeUnverifiedRef, "run plan omits output %q recipe %q", output.Name, output.Recipe)
+			return nil, e.New(e.CodeUnverifiedRef, "run plan omits output %q build %q", output.Name, output.Name)
 		}
 		artifactID := "package/" + output.Name
 		memberArtifactID := artifactID
@@ -64,15 +64,15 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 		}
 		componentResults := make([]string, 0, len(output.Components))
 		for _, component := range output.Components {
-			resultID := "result/" + output.Recipe + "/" + component
+			resultID := "result/" + output.Name + "/" + component
 			result, exists := artifacts[resultID]
-			if !exists || result.Component != component || result.RecipeTarget != output.Recipe {
+			if !exists || result.Component != component || result.BuildTarget != output.Name {
 				return nil, e.New(e.CodeUnverifiedRef, "run plan omits exact producer result %q for output %q", resultID, output.Name)
 			}
 			componentResults = append(componentResults, resultID)
 		}
 		run.Expected = append(run.Expected, requiredOutput{Name: output.Name, Kind: output.Format, ArtifactID: artifactID, MemberArtifactID: memberArtifactID,
-			RecipeDigest: recipePlan.RecipeDigest, Components: append([]string(nil), output.Components...), ComponentResults: componentResults})
+			BuildDigest: buildPlan.BuildDigest, Components: append([]string(nil), output.Components...), ComponentResults: componentResults})
 	}
 	sort.Slice(run.Expected, func(i, j int) bool { return run.Expected[i].Name < run.Expected[j].Name })
 	return run, nil
@@ -106,8 +106,8 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 		if seen[artifact.Name] {
 			return nil, e.New(e.CodeReleaseIncomplete, "run observed artifact %q more than once", artifact.Name)
 		}
-		if artifact.Kind != slot.Kind || artifact.RecipeDigest != slot.RecipeDigest || artifact.Role != slot.Role || !equalStrings(artifact.Components, slot.Components) {
-			return nil, e.New(e.CodeVerifyFailed, "run artifact %q does not satisfy its frozen kind/recipe/component slot", artifact.Name)
+		if artifact.Kind != slot.Kind || artifact.BuildDigest != slot.BuildDigest || !equalStrings(artifact.Components, slot.Components) {
+			return nil, e.New(e.CodeVerifyFailed, "run artifact %q does not satisfy its frozen kind/build/component slot", artifact.Name)
 		}
 		seen[artifact.Name] = true
 		copyRun.Observed = append(copyRun.Observed, artifact)
@@ -146,7 +146,7 @@ func validateRun(run *Run) error {
 	}
 	previous := ""
 	for _, slot := range run.Expected {
-		if !namePattern.MatchString(slot.Name) || slot.Name <= previous || slot.ArtifactID == "" || slot.MemberArtifactID == "" || !canonical.IsDigest(slot.RecipeDigest) ||
+		if !namePattern.MatchString(slot.Name) || slot.Name <= previous || slot.ArtifactID == "" || slot.MemberArtifactID == "" || !canonical.IsDigest(slot.BuildDigest) ||
 			(slot.Kind != OutputHelm && len(slot.Components) == 0) || len(slot.ComponentResults) != len(slot.Components) {
 			return e.New(e.CodeVerifyFailed, "run required outputs must be canonical, sorted, unique, and complete")
 		}
@@ -171,7 +171,7 @@ func failedRun(run *Run, cause error) *Run {
 
 func (artifact Artifact) validate() error {
 	if !namePattern.MatchString(artifact.Name) || artifact.Kind == "" || !canonical.IsDigest(artifact.Digest) ||
-		(artifact.RecipeDigest != "" && !canonical.IsDigest(artifact.RecipeDigest)) || sortedUnique("artifact components", artifact.Components) != nil {
+		(artifact.BuildDigest != "" && !canonical.IsDigest(artifact.BuildDigest)) || sortedUnique("artifact components", artifact.Components) != nil {
 		return e.New(e.CodeVerifyFailed, "artifact %q must identify exact immutable bytes", artifact.Name)
 	}
 	return nil

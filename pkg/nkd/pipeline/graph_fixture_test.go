@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -85,10 +84,9 @@ func completeTestBuild(node ir.Node, fetch ir.Node) ir.Node {
 	return node
 }
 
-func testSourceGraph(recipeID string, fetch ir.Node, builds ...ir.Node) *ir.Graph {
+func testSourceGraph(fetch ir.Node, builds ...ir.Node) *ir.Graph {
 	graph := &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, RecipeID: recipeID,
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
+		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
 	}
 	verify := ir.Node{ID: "verify", Kind: ir.KindVerify}
 	for _, build := range builds {

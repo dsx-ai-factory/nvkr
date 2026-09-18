@@ -14,7 +14,7 @@ var goodArtifactDigest = "sha256:" + strings.Repeat("a", 64)
 // goodPrebuilt is a valid resolved prebuilt (no-compile) component: a binary URL with
 // the per-arch token intact and a pinned amd64 digest.
 func goodPrebuilt() Component {
-	return Component{
+	return Component{Platforms: []string{"linux/amd64"},
 		OutputType: "host-package",
 		Prebuilt: &Prebuilt{
 			URL:      "https://dl.k8s.io/release/v1.32.0/bin/linux/{{.Arch}}/kubectl",
@@ -29,7 +29,7 @@ func TestPrebuiltValidates(t *testing.T) {
 		t.Fatalf("valid prebuilt component must validate: %v", err)
 	}
 	// An image delivery (oci-image) is equally valid.
-	img := Component{OutputType: "oci-image", Prebuilt: &Prebuilt{
+	img := Component{Platforms: []string{"linux/amd64"}, OutputType: "oci-image", Prebuilt: &Prebuilt{
 		Image: "registry.k8s.io/pause:3.10", Digests: map[string]string{"amd64": goodArtifactDigest},
 		Evidence: &ExternalEvidence{None: true},
 	}}
@@ -137,35 +137,14 @@ func TestPrebuiltArchTokenAccepted(t *testing.T) {
 // applyComponentOverrides deep-merges valid overrides onto a component but fails closed
 // on an override key that is not a Component field (a typo), so a layered overlay cannot
 // silently drop an operator's intended override.
-func TestApplyComponentOverridesStrict(t *testing.T) {
-	c := goodComponent()
-	// valid scalar override (outputType) applies.
-	out, err := applyComponentOverrides(c, map[string]any{"outputType": "raw"})
-	if err != nil || out.OutputType != "raw" {
-		t.Fatalf("valid override must apply: out=%q err=%v", out.OutputType, err)
-	}
-	// valid nested-map override deep-merges into versionStamp.
-	c.VersionStamp = map[string]string{"KUBE_GIT_VERSION": "v1.32.0"}
-	out, err = applyComponentOverrides(c, map[string]any{"versionStamp": map[string]any{"CC": "gcc"}})
-	if err != nil || out.VersionStamp["CC"] != "gcc" || out.VersionStamp["KUBE_GIT_VERSION"] != "v1.32.0" {
-		t.Fatalf("nested override must deep-merge: %v err=%v", out.VersionStamp, err)
-	}
-	// a typo'd override key (not a Component field) fails closed.
-	if _, err := applyComponentOverrides(c, map[string]any{"outputTyp": "raw"}); err == nil {
-		t.Fatal("typo'd override key must fail closed (strict decode)")
-	}
-}
 
-// The full Load path: a prebuilt component takes its version pin from the referenced
-// source (so {{.Tag}} renders, {{.Arch}} is left for compile), and the lock's artifacts
-// section supplies the per-arch digests.
 func TestLoadPrebuiltRendersRefAndMergesLock(t *testing.T) {
-	reg := `apiVersion: nkd.dev/catalog/v1
+	reg := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources: {s: {repo: https://github.com/o/r}}
-recipes: [{id: r, versionFrom: s, criteria: {category: kubernetes}, components: [c]}]
 components:
   c:
+    platforms: [linux/amd64, linux/arm64]
     source: s
     outputType: host-package
     prebuilt:
@@ -206,12 +185,12 @@ artifacts:
 func TestLoadPrebuiltRejectsAuthoredDigestCollision(t *testing.T) {
 	authored := "sha256:" + strings.Repeat("b", 64)
 	locked := "sha256:" + strings.Repeat("c", 64)
-	reg := `apiVersion: nkd.dev/catalog/v1
+	reg := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources: {s: {repo: https://github.com/o/r}}
-recipes: [{id: r, versionFrom: s, criteria: {category: kubernetes}, components: [c]}]
 components:
   c:
+    platforms: [linux/amd64, linux/arm64]
     source: s
     outputType: raw
     prebuilt:
@@ -234,12 +213,12 @@ artifacts:
 
 // An unknown template token in a prebuilt ref fails closed at load (missingkey=error).
 func TestLoadPrebuiltUnknownTokenFailsClosed(t *testing.T) {
-	reg := `apiVersion: nkd.dev/catalog/v1
+	reg := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources: {s: {repo: https://github.com/o/r}}
-recipes: [{id: r, versionFrom: s, criteria: {category: kubernetes}, components: [c]}]
 components:
   c:
+    platforms: [linux/amd64, linux/arm64]
     source: s
     outputType: raw
     prebuilt:

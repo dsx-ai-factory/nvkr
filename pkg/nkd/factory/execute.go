@@ -20,7 +20,6 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -60,7 +59,7 @@ func LoadPlanContext(ctx context.Context, path string) (*Plan, error) {
 }
 
 // ExecuteNode executes a non-IR artifact-graph node. Fetch/build/pull nodes keep
-// using exec-node over the exact recipe graph; this function owns factory tooling,
+// using exec-node over the exact build graph; this function owns factory tooling,
 // unqualified terminal observation, packaging, and delivery representation.
 func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr io.Writer) error {
 	if ctx == nil {
@@ -105,8 +104,6 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 		return executePackage(ctx, plan, node, artifacts, stdout)
 	case NodePublish:
 		return executePublish(ctx, plan, node, artifacts, stdout)
-	case NodeComposition:
-		return executeComposition(ctx, plan, node, artifacts)
 	case NodeAttestEvidence:
 		return executeAttestEvidence(ctx, plan, node, artifacts, productionOCISigner, stdout)
 	case NodeSign:
@@ -243,53 +240,26 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 	return nil
 }
 
-func executeComposition(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) error {
-	name := strings.TrimPrefix(node.ID, "composition/")
-	for _, composition := range plan.Compositions {
-		if composition.Name != name {
-			continue
-		}
-		raw, err := composition.Composition.Marshal()
-		if err != nil {
-			return err
-		}
-		return writeFactoryFile(ctx, artifacts[node.Outputs[0]].Path, append(raw, '\n'), 0o644)
-	}
-	return e.New(e.CodePipelineDrift, "composition node %q has no exact plan object", node.ID)
-}
-
 func executeAICR(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout, stderr io.Writer) error {
-	var recipePlan *RecipePlan
-	for index := range plan.Recipes {
-		if plan.Recipes[index].Name == node.RecipeTarget {
-			recipePlan = &plan.Recipes[index]
+	var buildPlan *BuildPlan
+	for index := range plan.Builds {
+		if plan.Builds[index].Name == node.BuildTarget {
+			buildPlan = &plan.Builds[index]
 			break
 		}
 	}
-	if recipePlan == nil || recipePlan.Graph.AICR == nil || len(node.Inputs) != 1 {
-		return e.New(e.CodePipelineDrift, "AICR node %q lacks recipe activation or generator input", node.ID)
+	if buildPlan == nil || buildPlan.Graph == nil || buildPlan.Graph.AICR == nil || len(node.Inputs) != 1 || len(node.Outputs) != 1 {
+		return e.New(e.CodePipelineDrift, "AICR node %q lacks build activation or generator input", node.ID)
 	}
-	activation := recipePlan.Graph.AICR
-	profile := aicr.Profile{Identity: recipePlan.AICRProfileIdentity,
-		Digest: activation.RecipeDigest, GeneratorDigest: activation.GeneratorDigest,
+	activation := buildPlan.Graph.AICR
+	if err := activation.Validate(); err != nil {
+		return err
+	}
+	profile := aicr.Profile{Identity: buildPlan.AICRProfileIdentity,
+		Digest: activation.ProfileDigest, GeneratorDigest: activation.GeneratorDigest,
 		Service: activation.Service, Accelerator: activation.Accelerator, OS: activation.OS,
 		Intent: activation.Intent, Platform: activation.Platform}
-	options := aicr.Options{OutputDir: artifacts[node.Outputs[0]].Path}
-	if bundle := aicrBundleForRecipe(plan, recipePlan.RecipeDigest); bundle != nil {
-		options.Deployer = bundle.Deployer
-		if bundle.StorageClass != "" {
-			options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--storage-class", bundle.StorageClass)
-		}
-		for _, value := range bundle.AcceleratedNodeSelectors {
-			options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--accelerated-node-selector", value)
-		}
-		for _, value := range bundle.AcceleratedNodeTolerations {
-			options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--accelerated-node-toleration", value)
-		}
-		for _, value := range bundle.WorkloadSelectors {
-			options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--workload-selector", value)
-		}
-	}
+	options := aicrBundleOptions(activation.Bundle, artifacts[node.Outputs[0]].Path)
 	bundler := aicr.CLIBundler{Binary: artifacts[node.Inputs[0]].Path}
 	qualified, err := bundler.BundleQualified(ctx, profile, options, stdout, stderr)
 	if err != nil {
@@ -299,21 +269,28 @@ func executeAICR(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	return err
 }
 
-func aicrBundleForRecipe(plan *Plan, digest string) *cluster.AICRBundleInputs {
-	for index := range plan.Compositions {
-		for _, binding := range plan.Compositions[index].Composition.Recipes {
-			if binding.RecipeDigest == digest && binding.AICRBundle != nil {
-				return binding.AICRBundle
-			}
-		}
+func aicrBundleOptions(bundle aicr.BundleInputs, outputPath string) aicr.Options {
+	options := aicr.Options{OutputDir: outputPath, Deployer: bundle.Deployer}
+	if bundle.StorageClass != "" {
+		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--storage-class", bundle.StorageClass)
 	}
-	return nil
+	for _, value := range bundle.AcceleratedNodeSelectors {
+		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--accelerated-node-selector", value)
+	}
+	for _, value := range bundle.AcceleratedNodeTolerations {
+		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--accelerated-node-toleration", value)
+	}
+	for _, value := range bundle.WorkloadSelectors {
+		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--workload-selector", value)
+	}
+	return options
 }
 
 type factoryObservation struct {
 	SchemaVersion string                 `json:"schemaVersion"`
 	Qualification EvidenceTier           `json:"qualification"`
-	RecipeDigest  string                 `json:"recipeDigest"`
+	BuildDigest   string                 `json:"buildDigest"`
+	BuildTarget   string                 `json:"buildTarget"`
 	Inputs        []factoryObservedInput `json:"inputs"`
 }
 
@@ -324,10 +301,10 @@ type factoryObservedInput struct {
 }
 
 func executeObservation(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) error {
-	observation := factoryObservation{SchemaVersion: "nkd.dev/factory-observation/v1", Qualification: TierStaticUnqualified}
-	for _, recipePlan := range plan.Recipes {
-		if recipePlan.Name == node.RecipeTarget {
-			observation.RecipeDigest = recipePlan.RecipeDigest
+	observation := factoryObservation{SchemaVersion: "nkd.dev/factory-observation/v2", Qualification: TierStaticUnqualified, BuildTarget: node.BuildTarget}
+	for _, buildPlan := range plan.Builds {
+		if buildPlan.Name == node.BuildTarget {
+			observation.BuildDigest = buildPlan.BuildDigest
 		}
 	}
 	for _, input := range node.Inputs {
@@ -338,8 +315,8 @@ func executeObservation(ctx context.Context, plan *Plan, node Node, artifacts ma
 		}
 		observation.Inputs = append(observation.Inputs, factoryObservedInput{ArtifactID: input, Kind: artifact.Kind, Digest: digest})
 	}
-	if observation.RecipeDigest == "" {
-		return e.New(e.CodePipelineDrift, "terminal node %q has no recipe digest", node.ID)
+	if observation.BuildDigest == "" {
+		return e.New(e.CodePipelineDrift, "terminal node %q has no build digest", node.ID)
 	}
 	raw, err := canonical.Marshal(observation)
 	if err != nil {
@@ -367,7 +344,7 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		}
 		artifact, ok := artifacts[id]
 		if !ok || artifact.ID != planned.ID || artifact.Kind != planned.Kind || artifact.Name != planned.Name ||
-			artifact.RecipeTarget != planned.RecipeTarget || artifact.Component != planned.Component {
+			artifact.BuildTarget != planned.BuildTarget || artifact.Component != planned.Component {
 			return e.New(e.CodeReleaseIncomplete, "package node %q has no exact declared input %q", node.ID, id)
 		}
 		inputs = append(inputs, artifact)
@@ -519,7 +496,7 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			}
 		}()
 		for _, input := range inputs {
-			if input.RecipeTarget != "" {
+			if input.BuildTarget != "" {
 				continue
 			}
 			object := delivery.ObjectInput{Name: input.Name, Kind: input.Kind, Path: input.Path,
@@ -578,10 +555,7 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 				object.Path, object.LayerMediaType = archive, "application/vnd.nkd.apt-repository.v1.tar"
 				object.SemanticDigest, object.BlobDigest = repository.Digest, digest
 			default:
-				object.SemanticDigest, _ = compositionDigestForPath(plan, input.Path)
-				if object.SemanticDigest == "" {
-					object.SemanticDigest, _ = digestFactoryPath(ctx, input.Path)
-				}
+				object.SemanticDigest, _ = digestFactoryPath(ctx, input.Path)
 			}
 			objects = append(objects, object)
 		}
@@ -591,24 +565,24 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			if err != nil {
 				return err
 			}
-			metadata = &delivery.ReleaseMetadata{DefinitionDigest: binding.DefinitionDigest, EnvironmentDigest: binding.EnvironmentDigest, ContentSubject: binding.ContentSubject, Clusters: binding.Clusters}
+			metadata = &delivery.ReleaseMetadata{DefinitionDigest: binding.DefinitionDigest, EnvironmentDigest: binding.EnvironmentDigest, ContentSubject: binding.ContentSubject}
 			for i := range objects {
 				for _, output := range binding.Outputs {
 					if objects[i].Name == output.Name {
-						objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind, RecipeDigest: output.RecipeDigest, Components: output.Components, TransportPath: output.TransportPath}
+						objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind, BuildDigest: output.BuildDigest, Components: output.Components, TransportPath: output.TransportPath}
 						for _, component := range output.Components {
 							for _, inputID := range node.Inputs {
 								input := artifacts[inputID]
-								if input.Kind != "producer-result" || input.Component != component {
+								if input.Kind != "producer-result" || input.Component != component || input.BuildTarget != output.Name {
 									continue
 								}
-								matchingRecipe := false
-								for _, recipe := range plan.Recipes {
-									if recipe.Name == input.RecipeTarget && recipe.RecipeDigest == output.RecipeDigest {
-										matchingRecipe = true
+								matchingBuild := false
+								for _, build := range plan.Builds {
+									if build.Name == input.BuildTarget && build.BuildDigest == output.BuildDigest {
+										matchingBuild = true
 									}
 								}
-								if !matchingRecipe {
+								if !matchingBuild {
 									continue
 								}
 								result, err := readProducerResult(ctx, input.Path)
@@ -675,11 +649,11 @@ func removeFactoryCarrier(path string) error {
 }
 
 func packageInputMetadata(plan *Plan, artifact Artifact) (string, int64, string, error) {
-	for _, recipePlan := range plan.Recipes {
-		if recipePlan.Name != artifact.RecipeTarget || recipePlan.Graph == nil {
+	for _, buildPlan := range plan.Builds {
+		if buildPlan.Name != artifact.BuildTarget || buildPlan.Graph == nil {
 			continue
 		}
-		for _, node := range recipePlan.Graph.Nodes {
+		for _, node := range buildPlan.Graph.Nodes {
 			if node.Component != artifact.Component || (node.Kind != ir.KindBuild && node.Kind != ir.KindPull) {
 				continue
 			}
@@ -702,7 +676,7 @@ func packageInputMetadata(plan *Plan, artifact Artifact) (string, int64, string,
 			return version, epoch, arch, nil
 		}
 	}
-	return "", 0, "", e.New(e.CodePipelineDrift, "artifact %s has no producing recipe node", artifact.ID)
+	return "", 0, "", e.New(e.CodePipelineDrift, "artifact %s has no producing build node", artifact.ID)
 }
 
 func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
@@ -743,22 +717,13 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 
 func packageArch(plan *Plan, inputs []Artifact) string {
 	for _, input := range inputs {
-		for _, recipePlan := range plan.Recipes {
-			if recipePlan.Name == input.RecipeTarget {
-				return recipePlan.Criteria.Arch
+		for _, buildPlan := range plan.Builds {
+			if buildPlan.Name == input.BuildTarget {
+				return strings.TrimPrefix(buildPlan.Platform, "linux/")
 			}
 		}
 	}
 	return "amd64"
-}
-
-func compositionDigestForPath(plan *Plan, path string) (string, bool) {
-	for _, composition := range plan.Compositions {
-		if filepath.ToSlash(filepath.Join(".nkd", "factory", "compositions", composition.Name+".json")) == path {
-			return composition.Digest, true
-		}
-	}
-	return "", false
 }
 
 type factoryTreeRow struct {

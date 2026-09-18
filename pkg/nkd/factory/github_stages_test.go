@@ -277,6 +277,39 @@ func stepDownloadsArtifact(plan *Plan, steps []githubStep, name string) bool {
 func githubLifecycleTestPlan(t *testing.T) *Plan {
 	t.Helper()
 	plan := githubTestPlan(t)
+	// Lifecycle targets derive from output names. The low-level fixture uses a
+	// differently named target, so migrate every generated reference consistently.
+	rename := func(value string) string {
+		value = strings.ReplaceAll(value, "worker/", "tools/")
+		if strings.HasSuffix(value, "/worker") {
+			value = strings.TrimSuffix(value, "/worker") + "/tools"
+		}
+		return value
+	}
+	plan.Builds[0].Name = "tools"
+	for i := range plan.Graph.Nodes {
+		node := &plan.Graph.Nodes[i]
+		node.ID = rename(node.ID)
+		if node.BuildTarget == "worker" {
+			node.BuildTarget = "tools"
+		}
+		for j := range node.Inputs {
+			node.Inputs[j] = rename(node.Inputs[j])
+		}
+		for j := range node.Outputs {
+			node.Outputs[j] = rename(node.Outputs[j])
+		}
+	}
+	for i := range plan.Graph.Artifacts {
+		artifact := &plan.Graph.Artifacts[i]
+		artifact.ID = rename(artifact.ID)
+		artifact.Producer = rename(artifact.Producer)
+		artifact.Path = rename(artifact.Path)
+		if artifact.BuildTarget == "worker" {
+			artifact.BuildTarget = "tools"
+		}
+	}
+
 	plan.DefinitionDigest = "sha256:" + strings.Repeat("a", 64)
 	plan.EnvironmentDigest = "sha256:" + strings.Repeat("b", 64)
 	artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
@@ -290,24 +323,24 @@ func githubLifecycleTestPlan(t *testing.T) *Plan {
 	output := artifacts["package/tools"]
 	producer := nodes[output.Producer]
 	var components []string
-	recipeTarget := ""
+	buildTarget := ""
 	for _, inputID := range producer.Inputs {
 		input := artifacts[inputID]
-		if input.RecipeTarget == "" || input.Component == "" || input.Kind == "producer-result" {
+		if input.BuildTarget == "" || input.Component == "" || input.Kind == "producer-result" {
 			continue
 		}
 		components = append(components, input.Component)
-		recipeTarget = input.RecipeTarget
+		buildTarget = input.BuildTarget
 	}
-	recipeDigest := ""
-	for _, recipe := range plan.Recipes {
-		if recipe.Name == recipeTarget {
-			recipeDigest = recipe.RecipeDigest
+	buildDigest := ""
+	for _, build := range plan.Builds {
+		if build.Name == buildTarget {
+			buildDigest = build.BuildDigest
 		}
 	}
 	plan.LifecycleOutputs = []LifecycleOutputPlan{{
 		Name: output.Name, Kind: "executable", ArtifactID: output.ID,
-		RecipeDigest: recipeDigest, Components: uniqueSorted(components),
+		BuildDigest: buildDigest, Components: uniqueSorted(components),
 	}}
 	if err := plan.Validate(); err != nil {
 		t.Fatalf("lifecycle GitHub fixture is invalid: %v", err)

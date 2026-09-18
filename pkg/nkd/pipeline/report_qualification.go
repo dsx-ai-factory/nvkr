@@ -25,8 +25,7 @@ type reportQualification struct {
 }
 
 type qualifiedReportView struct {
-	RecipeID         string           `json:"recipeId"`
-	RecipeDigest     string           `json:"recipeDigest"`
+	BuildDigest      string           `json:"buildDigest"`
 	ProfileDigest    string           `json:"profileDigest,omitempty"`
 	ExecutionBinding string           `json:"executionBinding,omitempty"`
 	Artifacts        []ArtifactResult `json:"artifacts"`
@@ -200,7 +199,7 @@ func reportQualificationBinding(report *Report, profileDigest, executionBinding 
 	}
 	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Component < artifacts[j].Component })
 	view := qualifiedReportView{
-		RecipeID: report.RecipeID, RecipeDigest: report.RecipeDigest,
+		BuildDigest:   report.BuildDigest,
 		ProfileDigest: profileDigest, ExecutionBinding: executionBinding,
 		Artifacts: artifacts,
 	}

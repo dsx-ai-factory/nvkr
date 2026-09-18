@@ -8,10 +8,10 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 	"github.com/urfave/cli/v2"
 )
@@ -22,19 +22,19 @@ import (
 // already-decoded profile, never a profile pathname.
 type qualifiedVerifyDependencies struct {
 	Verifier    trust.DocumentVerifier
-	Resolve     func(*cli.Context) (*recipe.Resolved, string, error)
-	Build       func(*cli.Context, *recipe.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error)
+	Resolve     func(*cli.Context) (*buildgraph.Resolved, string, error)
+	Build       func(*cli.Context, *buildgraph.Resolved, *profile.BuilderProfile, profile.HostPreflightReceipt) (*pipeline.Report, error)
 	ObserveHost func() map[string]string
 	// VerifyEvidence is package-private test injection; production always binds the
 	// concrete SBOM/provenance recomputation below. It receives the authenticated
 	// vector receipt and opaque terminal report rather than decoded values or caller
 	// digests, so a test seam cannot accidentally become production authority.
-	VerifyEvidence func(context.Context, trust.DocumentReceipt, *recipe.Resolved, *pipeline.Report) error
+	VerifyEvidence func(context.Context, trust.DocumentReceipt, *buildgraph.Resolved, *pipeline.Report) error
 }
 
 func defaultQualifiedVerifyDependencies() qualifiedVerifyDependencies {
 	return qualifiedVerifyDependencies{
-		Resolve:        resolveRecipe,
+		Resolve:        resolveBuild,
 		Build:          runMeasureOnlyVerification,
 		ObserveHost:    profile.ObserveHost,
 		VerifyEvidence: verifyEvidenceDigests,
@@ -45,7 +45,7 @@ func defaultQualifiedVerifyDependencies() qualifiedVerifyDependencies {
 // It consumes terminal result files and never invokes a build engine. From-source
 // result qualification additionally needs a provider-issued execution receipt, for
 // which the stock CLI has no adapter, so that lane fails closed in runQualifiedBuild.
-func runMeasureOnlyVerification(c *cli.Context, res *recipe.Resolved, authenticatedProfile *profile.BuilderProfile, hostReceipt profile.HostPreflightReceipt) (*pipeline.Report, error) {
+func runMeasureOnlyVerification(c *cli.Context, res *buildgraph.Resolved, authenticatedProfile *profile.BuilderProfile, hostReceipt profile.HostPreflightReceipt) (*pipeline.Report, error) {
 	if strings.TrimSpace(c.String("results-dir")) == "" {
 		return nil, e.New(e.CodeEngineCapability,
 			"the stock verifier is measure-only and never rebuilds; supply --results-dir with qualified producer results, or use a separately deployed producer/verifier integration")
@@ -74,7 +74,7 @@ func cmdVerifyWithDependencies(deps qualifiedVerifyDependencies) *cli.Command {
 	return &cli.Command{
 		Name:  "verify",
 		Usage: "authenticate a signed validation vector and verify qualified producer results without rebuilding",
-		Flags: append(append(append(queryFlags(), qualifiedVerifyBuildFlags()...),
+		Flags: append(append(append(selectionFlags(), qualifiedVerifyBuildFlags()...),
 			&cli.StringFlag{Name: "expected-digests", Aliases: []string{"e"}, Required: true,
 				Usage: "canonical JSON validation vector; the exact file bytes are authenticated and decoded once"},
 			&cli.StringFlag{Name: "profile", Usage: "signed canonical JSON builder profile; required when the vector is profile-bound"},
@@ -257,17 +257,17 @@ func runQualifiedVerify(c *cli.Context, deps qualifiedVerifyDependencies) error 
 	if err != nil {
 		return err
 	}
-	fromSource := recipeHasSource(res)
+	fromSource := buildHasSource(res)
 	if fromSource && authenticatedProfile == nil {
 		return e.New(e.CodeUntrustedProfile,
 			"from-source qualified verification requires a vector-bound, separately authenticated builder profile")
 	}
 	if !fromSource && authenticatedProfile != nil {
 		return e.New(e.CodeVerifyFailed,
-			"profile-bound validation vector resolved to an all-prebuilt recipe")
+			"profile-bound validation vector resolved to an all-prebuilt build")
 	}
 	if authenticatedProfile != nil {
-		if err := authenticatedProfile.RequireBuilders(recipe.RequiredBuilders(res)); err != nil {
+		if err := authenticatedProfile.RequireBuilders(buildgraph.RequiredBuilders(res)); err != nil {
 			return err
 		}
 	}
@@ -302,7 +302,7 @@ func runQualifiedVerify(c *cli.Context, deps qualifiedVerifyDependencies) error 
 			return err
 		}
 		fmt.Printf("QUALIFIED VERIFIED (Reproduced)  %s\n%d selected component digest(s) reproduced from authenticated vector bytes under profile %s; omitted expected members received no verdict.\n",
-			want.RecipeDigest, len(got.Components), orNone(want.ProfileDigest))
+			want.BuildDigest, len(got.Components), orNone(want.ProfileDigest))
 		return nil
 	}
 	_ = writeQualifiedEvidence(c, want.BuildEvidence(got, attest.VerdictRejected, profileDivs))
@@ -377,11 +377,11 @@ func vectorProfileDigest(vector *attest.Manifest) (string, error) {
 	return vector.BuilderProfile.Digest, nil
 }
 
-func runQualifiedBuild(c *cli.Context, res *recipe.Resolved, authenticatedProfile *profile.BuilderProfile, hostReceipt profile.HostPreflightReceipt) (*pipeline.Report, error) {
-	if recipeHasSource(res) && authenticatedProfile == nil {
+func runQualifiedBuild(c *cli.Context, res *buildgraph.Resolved, authenticatedProfile *profile.BuilderProfile, hostReceipt profile.HostPreflightReceipt) (*pipeline.Report, error) {
+	if buildHasSource(res) && authenticatedProfile == nil {
 		return nil, e.New(e.CodeUntrustedProfile, "qualified from-source build has no authenticated builder profile")
 	}
-	graph, err := recipe.Compile(res)
+	graph, err := buildgraph.Compile(res)
 	if err != nil {
 		return nil, err
 	}
@@ -389,10 +389,7 @@ func runQualifiedBuild(c *cli.Context, res *recipe.Resolved, authenticatedProfil
 	if err != nil {
 		return nil, err
 	}
-	only, err := skuComponents(c, res)
-	if err != nil {
-		return nil, err
-	}
+	only := selectedComponents(c)
 	opts := pipeline.RunOptions{
 		Ctx:        c.Context,
 		SourceRoot: c.String("source-root"), Only: only, Jobs: c.Int("jobs"),
@@ -406,7 +403,7 @@ func runQualifiedBuild(c *cli.Context, res *recipe.Resolved, authenticatedProfil
 		}
 	}
 	if resultsDir := strings.TrimSpace(c.String("results-dir")); resultsDir != "" {
-		if recipeHasSource(res) {
+		if buildHasSource(res) {
 			return nil, e.New(e.CodeEngineCapability,
 				"from-source --results-dir requires a provider execution-attestation adapter that issued the stage-two receipt before producer artifact work; the stock CLI cannot substitute a terminal-host observation")
 		}

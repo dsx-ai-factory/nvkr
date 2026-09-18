@@ -1,8 +1,11 @@
 package canonical
 
 import (
+	"errors"
 	"math"
 	"testing"
+
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // TestMarshalGolden pins the canonical byte form: sorted keys, no whitespace,
@@ -45,15 +48,15 @@ func TestMarshalStableAcrossKeyOrder(t *testing.T) {
 // different digests, and that Digest is stable.
 func TestDigestDomainSeparation(t *testing.T) {
 	v := map[string]any{"k": "v"}
-	d1, err := Digest(KindRecipe, v)
+	d1, err := Digest(KindBuild, v)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d2, _ := Digest(KindBuilderProfile, v)
 	if d1 == d2 {
-		t.Errorf("domain separation failed: recipe and profile digests equal (%s)", d1)
+		t.Errorf("domain separation failed: build and profile digests equal (%s)", d1)
 	}
-	again, _ := Digest(KindRecipe, v)
+	again, _ := Digest(KindBuild, v)
 	if d1 != again {
 		t.Errorf("Digest not stable: %s vs %s", d1, again)
 	}
@@ -65,6 +68,45 @@ func TestDigestDomainSeparation(t *testing.T) {
 func TestDigestRejectsUnregisteredDomain(t *testing.T) {
 	if _, err := Digest("nkd.recipe-typo", map[string]string{"value": "same"}); err == nil {
 		t.Fatal("an unregistered digest domain must fail instead of minting a new identity family")
+	}
+}
+
+func TestRetiredDomainsRemainReservedButCannotMint(t *testing.T) {
+	for _, allocation := range []struct{ kind, want string }{
+		{KindLegacyRecipe, "nkd.recipe"},
+		{KindClusterDefinition, "nkd.cluster-definition"},
+		{KindClusterComposition, "nkd.cluster-composition"},
+		{KindClusterRealization, "nkd.cluster-realization/v1"},
+		{KindStagingManifest, "nkd.staging-manifest"},
+	} {
+		t.Run(allocation.want, func(t *testing.T) {
+			kind := allocation.kind
+			if kind != allocation.want || !registeredKind(kind) {
+				t.Fatal("retired domain allocation must remain reserved")
+			}
+			value := map[string]string{"value": "new-object"}
+			for _, test := range []struct {
+				name string
+				mint func() (string, error)
+			}{
+				{"digest", func() (string, error) { return Digest(kind, value) }},
+				{"typed digest", func() (string, error) {
+					digest, err := DigestTyped(kind, value)
+					if digest.Kind != "" {
+						t.Fatal("rejected typed identity retained a kind")
+					}
+					return digest.Value, err
+				}},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					digest, err := test.mint()
+					var coded *e.Error
+					if digest != "" || !errors.As(err, &coded) || coded.Code != e.CodeUnsupported {
+						t.Fatalf("retired identity = %q, %v; want no digest and %s", digest, err, e.CodeUnsupported)
+					}
+				})
+			}
+		})
 	}
 }
 
@@ -228,7 +270,7 @@ func TestMarshalRejectsInvalidUTF8BeforeIdentityCollapses(t *testing.T) {
 	if _, err := Marshal(map[string]string{invalid: "value"}); err == nil {
 		t.Fatal("invalid UTF-8 object name was silently normalized")
 	}
-	if _, err := Digest(KindRecipe, map[string]string{"value": invalid}); err == nil {
+	if _, err := Digest(KindBuild, map[string]string{"value": invalid}); err == nil {
 		t.Fatal("invalid UTF-8 value minted a digest")
 	}
 

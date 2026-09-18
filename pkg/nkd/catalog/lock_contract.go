@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	"sigs.k8s.io/yaml"
 )
 
@@ -113,7 +113,7 @@ func validatePinLockShape(lock *PinLock) error {
 		}
 		sort.Strings(arches)
 		for _, arch := range arches {
-			if !criteria.ValidArch(arch) {
+			if !target.ValidArch(arch) {
 				return e.New(e.CodeInvalidCatalog, "lock artifact %q has undeclared v1 architecture %q", name, arch)
 			}
 			if !canonical.IsDigest(pin.Digests[arch]) {
@@ -186,7 +186,7 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 			continue
 		}
 		requiredArches := requiredArtifactArches(reg, name)
-		for _, arch := range criteria.Arches() {
+		for _, arch := range target.Arches() {
 			_, required := requiredArches[arch]
 			_, present := ap.Digests[arch]
 			if requireArtifacts && required && !present {
@@ -195,7 +195,7 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 			}
 			if present && !required {
 				return e.New(e.CodeInvalidCatalog,
-					"lock artifact %q has digest for undeclared recipe arch %q", name, arch)
+					"lock artifact %q has digest for undeclared component arch %q", name, arch)
 			}
 		}
 		// If acquisition is version-rendered from the source pin, its artifact pin must
@@ -221,43 +221,13 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 	return nil
 }
 
-// requiredArtifactArches derives the exact v1 architecture set from flat recipes.
-// A wildcard recipe, or a component reachable only through external composition
-// layers, conservatively means both native v1 architectures.
+// requiredArtifactArches derives lock completeness from explicit producer targets.
 func requiredArtifactArches(reg *registryDoc, component string) map[string]bool {
-	required := map[string]bool{}
-	found := false
-	for _, recipe := range reg.Recipes {
-		uses := false
-		for _, name := range recipe.Components {
-			if name == component {
-				uses = true
-				break
-			}
-		}
-		if !uses {
-			continue
-		}
-		found = true
-		if recipe.Criteria.Arch == "" || recipe.Criteria.Arch == "any" {
-			return allSupportedArches()
-		}
-		required[recipe.Criteria.Arch] = true
-	}
-	if !found {
-		return allSupportedArches()
+	required := make(map[string]bool)
+	for _, platform := range reg.Components[component].Platforms {
+		required[target.Arch(platform)] = true
 	}
 	return required
-}
-
-// allSupportedArches is the v1 architecture set, sourced from the criteria domain owner
-// so adding an arch is a one-line change in that package, not coordinated edits here.
-func allSupportedArches() map[string]bool {
-	out := make(map[string]bool, len(criteria.Arches()))
-	for _, arch := range criteria.Arches() {
-		out[arch] = true
-	}
-	return out
 }
 
 func usesSourceVersionTemplate(p *Prebuilt) bool {

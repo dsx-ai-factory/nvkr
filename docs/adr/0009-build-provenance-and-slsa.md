@@ -39,6 +39,12 @@ Emit one **in-toto v1 statement** carrying an `https://slsa.dev/provenance/v1` p
 Serialize through the canonical codec (ADR-01). The statement's digest is a **stable expected evidence digest** in
 the ValidationVector (ADR-05), so verify recomputes and compares it.
 
+The NKD reproduction build-type URIs use `/v2` (`oci-hermetic`, `nix`, `prebuilt-acquire`) and bind
+`externalParameters.buildDigest`. The surrounding standard in-toto Statement/v1 and SLSA provenance/v1 formats
+remain unchanged. The owning provenance index and build-observations records use
+`nkd.dev/provenance-index/v2` and `nkd.dev/build-observations/v2`; legacy Recipe fields and build-type versions
+cannot be relabeled as this graph identity.
+
 ### 2. Two attestations: reproducible provenance vs signed observations
 
 "Signed" and "part of the reproducibility identity" are **independent** properties. NKD emits **two** attestations,
@@ -61,8 +67,8 @@ consistent with builder-agnostic verify.
 
 ### 4. `prebuilt` provenance
 
-A no-compile component emits **no from-source build claim**. NKD may emit a profile-free `prebuilt-acquire/v1`
-statement binding the exact acquired bytes, recipe, and resolved transport inputs; that statement proves
+A no-compile component emits **no from-source build claim**. NKD may emit a profile-free `prebuilt-acquire/v2`
+statement binding the exact acquired bytes, build, and resolved transport inputs; that statement proves
 acquisition, not upstream construction. The artifact also records a **verified reference** to the upstream's
 external provenance where one exists, else an explicit `evidence: none` — never silently absent. The
 external-reference schema lives in ADR-13.
@@ -74,7 +80,7 @@ reproducible identity and cannot replace §1's reproduction predicate.
 
 | Field | Production contract |
 |---|---|
-| `buildType` | Versioned NKD URI identifying `hermetic-build`, `wrapped-build`, or `acquired`; any wrapped/network-enabled build makes the complete plan `wrapped-build`, regardless of recipe order |
+| `buildType` | Versioned NKD URI identifying `hermetic-build`, `wrapped-build`, or `acquired`; any wrapped/network-enabled build makes the complete plan `wrapped-build`, regardless of build order |
 | `builder.id` | Committed workflow path and ref; a local Run uses a distinct local builder URI |
 | Invocation metadata | Exact Run identity with start and finish times |
 | `externalParameters` | Definition, Environment, catalog/selection and prepared plan identities |
@@ -124,7 +130,7 @@ build or signature-verification claim. Without declared digest-pinned upstream e
 ## Acceptance evidence
 
 Current contract evidence in `pkg/nkd/provenance/provenance_test.go` covers the supported in-toto Statement/v1 +
-SLSA provenance/v1 profile, exact single-artifact subjects, recipe/input/builder binding, pinned dependencies,
+SLSA provenance/v1 profile, exact single-artifact subjects, build/input/builder binding, pinned dependencies,
 stable ordering, and rejection of mutable or type-confused inputs. It does not prove producer signing or
 cross-process observation provenance.
 

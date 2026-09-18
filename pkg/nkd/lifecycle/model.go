@@ -9,22 +9,21 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
 const (
-	DefinitionAPIVersion  = "nkd.dev/definition/v2"
+	DefinitionAPIVersion  = "nkd.dev/definition/v4"
 	DefinitionKind        = "Definition"
 	EnvironmentAPIVersion = "nkd.dev/environment/v1"
 	EnvironmentKind       = "Environment"
-	RunSchemaVersion      = "nkd.dev/run/v1"
-	ReleaseSchemaVersion  = "nkd.dev/release/v1"
+	RunSchemaVersion      = "nkd.dev/run/v3"
+	ReleaseSchemaVersion  = "nkd.dev/release/v3"
 )
 
 const (
@@ -48,32 +47,16 @@ type Metadata struct {
 	Description string `json:"description,omitempty"`
 }
 
-// Definition declares reusable recipes and named outputs once. Its compiler
+// Definition declares named outputs and their exact producer selections. Its compiler
 // derives package envelopes, routes, plans, and execution graphs.
 type Definition struct {
-	APIVersion string              `json:"apiVersion"`
-	Kind       string              `json:"kind"`
-	Metadata   Metadata            `json:"metadata"`
-	Catalog    Catalog             `json:"catalog"`
-	SBOMTool   string              `json:"sbomTool,omitempty"`
-	CosignTool string              `json:"cosignTool,omitempty"`
-	Recipes    []RecipeSelection   `json:"recipes"`
-	Outputs    []DefinitionOutput  `json:"outputs"`
-	Clusters   []DefinitionCluster `json:"clusters,omitempty"`
-}
-
-// Recipe is the reusable catalog-owned component recipe. Definition refers to
-// one through RecipeSelection; selection is not a second kind of Recipe.
-type Recipe = catalog.Recipe
-
-// RecipeSelection names one use of a reusable Recipe under an explicit frame.
-// Resolution and its exact logical identity are compiler products.
-type RecipeSelection struct {
-	Name          string            `json:"name"`
-	Catalog       *Catalog          `json:"catalog,omitempty"`
-	Criteria      criteria.Criteria `json:"criteria"`
-	Parameters    map[string]string `json:"parameters,omitempty"`
-	AICRGenerator string            `json:"aicrGenerator,omitempty"`
+	APIVersion string             `json:"apiVersion"`
+	Kind       string             `json:"kind"`
+	Metadata   Metadata           `json:"metadata"`
+	Catalog    Catalog            `json:"catalog"`
+	SBOMTool   string             `json:"sbomTool,omitempty"`
+	CosignTool string             `json:"cosignTool,omitempty"`
+	Outputs    []DefinitionOutput `json:"outputs"`
 }
 
 type Catalog struct {
@@ -82,14 +65,23 @@ type Catalog struct {
 }
 
 // DefinitionOutput is a named artifact slot frozen before a run. Components
-// selects exact outputs of one recipe; format selects the standard envelope.
+// selects exact outputs of one build; format selects the standard envelope.
 type DefinitionOutput struct {
 	Name       string      `json:"name"`
-	Recipe     string      `json:"recipe"`
+	Platform   string      `json:"platform"`
+	Catalog    *Catalog    `json:"catalog,omitempty"`
+	AICR       *AICROutput `json:"aicr,omitempty"`
 	Components []string    `json:"components,omitempty"`
 	Format     string      `json:"format"`
 	APT        *APTOutput  `json:"apt,omitempty"`
 	Helm       *HelmOutput `json:"helm,omitempty"`
+}
+
+// AICROutput explicitly selects an imported profile and its pinned generator.
+type AICROutput struct {
+	Bundle    *aicr.BundleInputs `json:"bundle,omitempty"`
+	Profile   string             `json:"profile"`
+	Generator string             `json:"generator"`
 }
 
 // HelmOutput binds a rendered controller chart to another output's native image.
@@ -102,24 +94,6 @@ type HelmOutput struct {
 type APTOutput struct {
 	Distribution string `json:"distribution"`
 	Component    string `json:"component"`
-}
-
-// DefinitionCluster is the sole authored cluster view. Exact recipe and later
-// release-artifact bindings are compiler products.
-type DefinitionCluster struct {
-	Name                   string                    `json:"name"`
-	Type                   string                    `json:"type"`
-	CNI                    string                    `json:"cni,omitempty"`
-	Members                []ClusterMember           `json:"members"`
-	AICRBundle             *cluster.AICRBundleInputs `json:"aicrBundle,omitempty"`
-	ValidationRequirements []string                  `json:"validationRequirements,omitempty"`
-}
-
-// ClusterMember selects one named output. Role is required for node-level
-// recipe categories and omitted for cluster-level categories.
-type ClusterMember struct {
-	Output string `json:"output"`
-	Role   string `json:"role,omitempty"`
 }
 
 // Environment contains settings independently selected for one run. Publish
@@ -141,7 +115,7 @@ type Environment struct {
 
 // SourceAccess configures transport-only authentication and mirroring for one
 // canonical catalog source URL. It cannot alter source commits, tree hashes, or
-// Recipe identity.
+// Build identity.
 type SourceAccess struct {
 	Mirror        string `json:"mirror"`
 	CredentialRef string `json:"credentialRef"`
@@ -175,30 +149,28 @@ type Signing struct {
 // Artifact is an immutable public output or evidence reference. It always names
 // exact observed bytes; required output slots use a separate internal record.
 type Artifact struct {
-	Name         string   `json:"name"`
-	Kind         string   `json:"kind"`
-	Digest       string   `json:"digest"`
-	Reference    string   `json:"reference,omitempty"`
-	RecipeDigest string   `json:"recipeDigest"`
-	Components   []string `json:"components,omitempty"`
-	Role         string   `json:"role,omitempty"`
+	Name        string   `json:"name"`
+	Kind        string   `json:"kind"`
+	Digest      string   `json:"digest"`
+	Reference   string   `json:"reference,omitempty"`
+	BuildDigest string   `json:"buildDigest"`
+	Components  []string `json:"components,omitempty"`
 }
 
 // Run joins frozen expectations to observations without deriving requirements
 // from success. Plans and node reports are inspectable internal records.
 type Run struct {
-	SchemaVersion     string               `json:"schemaVersion"`
-	Attempt           string               `json:"attempt"`
-	DefinitionDigest  string               `json:"definitionDigest"`
-	EnvironmentDigest string               `json:"environmentDigest"`
-	PlanDigest        string               `json:"planDigest"`
-	Lane              string               `json:"lane"`
-	Status            string               `json:"status"`
-	Expected          []requiredOutput     `json:"expected"`
-	Observed          []Artifact           `json:"observed,omitempty"`
-	Failure           *runFailure          `json:"failure,omitempty"`
-	ContentSubject    string               `json:"contentSubject,omitempty"`
-	Clusters          []clusterRealization `json:"clusters,omitempty"`
+	SchemaVersion     string           `json:"schemaVersion"`
+	Attempt           string           `json:"attempt"`
+	DefinitionDigest  string           `json:"definitionDigest"`
+	EnvironmentDigest string           `json:"environmentDigest"`
+	PlanDigest        string           `json:"planDigest"`
+	Lane              string           `json:"lane"`
+	Status            string           `json:"status"`
+	Expected          []requiredOutput `json:"expected"`
+	Observed          []Artifact       `json:"observed,omitempty"`
+	Failure           *runFailure      `json:"failure,omitempty"`
+	ContentSubject    string           `json:"contentSubject,omitempty"`
 }
 
 type requiredOutput struct {
@@ -206,8 +178,7 @@ type requiredOutput struct {
 	Kind             string   `json:"kind"`
 	ArtifactID       string   `json:"artifactId"`
 	MemberArtifactID string   `json:"memberArtifactId"`
-	RecipeDigest     string   `json:"recipeDigest"`
-	Role             string   `json:"role,omitempty"`
+	BuildDigest      string   `json:"buildDigest"`
 	Components       []string `json:"components"`
 	ComponentResults []string `json:"componentResults"`
 }
@@ -221,14 +192,13 @@ type runFailure struct {
 // closure verification. Wire manifests and qualified receipts retain their own
 // schemas and identities behind this view.
 type Release struct {
-	SchemaVersion  string               `json:"schemaVersion"`
-	Subject        string               `json:"subject"`
-	Lane           string               `json:"lane"`
-	Scope          string               `json:"scope"`
-	Artifacts      []Artifact           `json:"artifacts"`
-	ContentSubject string               `json:"contentSubject"`
-	Clusters       []clusterRealization `json:"clusters,omitempty"`
-	PolicyDigest   string               `json:"policyDigest"`
+	SchemaVersion  string     `json:"schemaVersion"`
+	Subject        string     `json:"subject"`
+	Lane           string     `json:"lane"`
+	Scope          string     `json:"scope"`
+	Artifacts      []Artifact `json:"artifacts"`
+	ContentSubject string     `json:"contentSubject"`
+	PolicyDigest   string     `json:"policyDigest"`
 }
 
 // VerificationPolicy identifies the exact lane and trust requirements a
@@ -244,52 +214,41 @@ func (definition Definition) Validate() error {
 	if definition.APIVersion != DefinitionAPIVersion || definition.Kind != DefinitionKind {
 		return e.New(e.CodeInvalidCatalog, "definition has unsupported apiVersion/kind %q/%q", definition.APIVersion, definition.Kind)
 	}
-	if !namePattern.MatchString(definition.Metadata.Name) || definition.Catalog.Base == "" || len(definition.Recipes) == 0 || len(definition.Outputs) == 0 {
-		return e.New(e.CodeInvalidCatalog, "definition requires a canonical name, catalog, recipes, and outputs")
+	if !namePattern.MatchString(definition.Metadata.Name) || definition.Catalog.Base == "" || len(definition.Outputs) == 0 {
+		return e.New(e.CodeInvalidCatalog, "definition requires a canonical name, catalog and outputs")
 	}
 	for _, tool := range []string{definition.SBOMTool, definition.CosignTool} {
 		if tool != "" && !namePattern.MatchString(tool) {
 			return e.New(e.CodeInvalidCatalog, "invalid catalog tool selector %q", tool)
 		}
 	}
-	recipes := make(map[string]bool, len(definition.Recipes))
-	selections := make(map[string]RecipeSelection, len(definition.Recipes))
 	previous := ""
-	for _, recipe := range definition.Recipes {
-		if !namePattern.MatchString(recipe.Name) || recipe.Name <= previous || recipes[recipe.Name] {
-			return e.New(e.CodeInvalidCatalog, "definition recipe name %q is invalid or repeated", recipe.Name)
+	outputs := make(map[string]bool, len(definition.Outputs))
+	for _, output := range definition.Outputs {
+		if !namePattern.MatchString(output.Name) || output.Name <= previous || outputs[output.Name] {
+			return e.New(e.CodeInvalidCatalog, "definition output %q is invalid, repeated, empty, or has an invalid platform", output.Name)
 		}
-		if err := recipe.Criteria.ValidateActive(); err != nil {
+		if err := target.ValidatePlatform(output.Platform); err != nil {
 			return err
 		}
-		if recipe.Criteria.Role != "" && recipe.Criteria.Role != "any" {
-			return e.New(e.CodeInvalidCatalog, "recipe selection %q must leave role to its cluster member", recipe.Name)
+		if output.Catalog != nil && output.Catalog.Base == "" {
+			return e.New(e.CodeInvalidCatalog, "output %q has an empty catalog override", output.Name)
 		}
-		if recipe.Criteria.ClusterType != "" && recipe.Criteria.ClusterType != "any" {
-			return e.New(e.CodeInvalidCatalog, "recipe selection %q must leave cluster type to its cluster view", recipe.Name)
+		if output.AICR != nil && (output.Format != OutputHelm || len(output.Components) != 0 || !namePattern.MatchString(output.AICR.Profile) || !namePattern.MatchString(output.AICR.Generator)) {
+			return e.New(e.CodeInvalidCatalog, "output %q has invalid AICR producer settings", output.Name)
 		}
-		recipes[recipe.Name] = true
-		selections[recipe.Name] = recipe
-		previous = recipe.Name
-		if recipe.AICRGenerator != "" {
-			if !namePattern.MatchString(recipe.AICRGenerator) {
-				return e.New(e.CodeInvalidCatalog, "recipe selection %q references unknown output tool %q", recipe.Name, recipe.AICRGenerator)
+		if output.AICR != nil {
+			if _, err := aicr.NormalizeBundleInputs(output.AICR.Bundle); err != nil {
+				return err
 			}
-		}
-	}
-	outputs := make(map[string]bool, len(definition.Outputs))
-	previous = ""
-	for _, output := range definition.Outputs {
-		if !namePattern.MatchString(output.Name) || output.Name <= previous || outputs[output.Name] || !recipes[output.Recipe] {
-			return e.New(e.CodeInvalidCatalog, "definition output %q is invalid, repeated, empty, or references an unknown recipe", output.Name)
 		}
 		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has unsupported format %q", output.Name, output.Format)
 		}
 		if output.Format == OutputHelm {
-			generated := selections[output.Recipe].AICRGenerator != ""
+			generated := output.AICR != nil
 			if (generated && len(output.Components) != 0) || (!generated && len(output.Components) != 1) {
-				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires either an AICR recipe without components or one source archive component", output.Name)
+				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires either an AICR build without components or one source archive component", output.Name)
 			}
 		} else if len(output.Components) == 0 {
 			return e.New(e.CodeInvalidCatalog, "definition output %q requires components", output.Name)
@@ -297,8 +256,8 @@ func (definition Definition) Validate() error {
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
 		}
-		if output.Format == OutputDiskImage && (len(output.Components) != 1 || selections[output.Recipe].Criteria.Category != "os") {
-			return e.New(e.CodeInvalidCatalog, "definition disk-image output %q requires exactly one component from an os recipe", output.Name)
+		if output.Format == OutputDiskImage && (len(output.Components) != 1) {
+			return e.New(e.CodeInvalidCatalog, "definition disk-image output %q requires exactly one component", output.Name)
 		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {
@@ -327,49 +286,7 @@ func (definition Definition) Validate() error {
 		outputs[output.Name] = true
 		previous = output.Name
 	}
-	clusters := map[string]bool{}
-	previous = ""
-	for _, view := range definition.Clusters {
-		if !namePattern.MatchString(view.Name) || view.Name <= previous || clusters[view.Name] || len(view.Members) == 0 {
-			return e.New(e.CodeInvalidCatalog, "definition cluster %q is invalid, repeated, or has no members", view.Name)
-		}
-		if view.Type != cluster.TypeTenant && view.Type != cluster.TypeOperator {
-			return e.New(e.CodeUnsupported, "definition cluster %q has unsupported type %q", view.Name, view.Type)
-		}
-		frame := criteria.Criteria{}
-		previousMember := ""
-		for index, member := range view.Members {
-			if !outputs[member.Output] || member.Output <= previousMember {
-				return e.New(e.CodeInvalidCatalog, "definition cluster %q members must select sorted unique outputs", view.Name)
-			}
-			var selectedOutput DefinitionOutput
-			for _, output := range definition.Outputs {
-				if output.Name == member.Output {
-					selectedOutput = output
-					break
-				}
-			}
-			candidate := selections[selectedOutput.Recipe].Criteria
-			if criteria.IsNodeCategory(candidate.Category) {
-				if !criteria.ValidRole(member.Role) {
-					return e.New(e.CodeInvalidCatalog, "definition cluster %q output %q must select a supported node role", view.Name, member.Output)
-				}
-			} else if !criteria.IsClusterCategory(candidate.Category) || member.Role != "" {
-				return e.New(e.CodeInvalidCatalog, "definition cluster %q output %q has invalid category/role membership", view.Name, member.Output)
-			}
-			if index == 0 {
-				frame = candidate
-			} else if candidate.K8sVersion != frame.K8sVersion || candidate.OS != frame.OS || candidate.Arch != frame.Arch {
-				return e.New(e.CodeInvalidCatalog, "definition cluster %q recipe selections do not share one concrete frame", view.Name)
-			}
-			previousMember = member.Output
-		}
-		if err := sortedUnique("cluster validation requirements", view.ValidationRequirements); err != nil {
-			return err
-		}
-		clusters[view.Name] = true
-		previous = view.Name
-	}
+
 	return nil
 }
 

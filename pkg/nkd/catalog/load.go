@@ -1,10 +1,8 @@
 package catalog
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -14,14 +12,14 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	ociname "github.com/google/go-containerregistry/pkg/name"
 	"sigs.k8s.io/yaml"
 )
@@ -41,7 +39,7 @@ var (
 	// becomes a host-package (.deb) or is kept raw; an Image is itself the oci-image.
 	prebuiltOutputSet = map[string]bool{"host-package": true, "oci-image": true, "raw": true}
 	// reproEnvKeys are the reproducibility/hermeticity variables the compiler owns
-	// and pins from criteria/component metadata. A catalog's versionStamp may add
+	// and pins from target/component metadata. A catalog's versionStamp may add
 	// extra pinned env (KUBE_GIT_*, CC), but must not resolve to a value that
 	// overrides these — that would silently break hermeticity, so it fails closed.
 	reproEnvKeys = map[string]bool{
@@ -51,27 +49,27 @@ var (
 )
 
 const (
-	catalogAPIVersion = "nkd.dev/catalog/v1"
+	catalogAPIVersion = "nkd.dev/catalog/v3"
 	catalogKind       = "SourceBuildRegistry"
 )
 
 // registryDoc is the hand-authored registry as parsed from disk, before sources
 // and lock pins are merged in.
 type registryDoc struct {
-	APIVersion string                  `json:"apiVersion"`
-	Kind       string                  `json:"kind"`
-	Metadata   Metadata                `json:"metadata"`
-	Sources    map[string]Source       `json:"sources"`
-	Recipes    []Recipe                `json:"recipes"`
-	Components map[string]rawComponent `json:"components"`
+	APIVersion   string                  `json:"apiVersion"`
+	Kind         string                  `json:"kind"`
+	Metadata     Metadata                `json:"metadata"`
+	Sources      map[string]Source       `json:"sources"`
+	AICRProfiles map[string]aicr.Profile `json:"aicrProfiles,omitempty"`
+	Components   map[string]rawComponent `json:"components"`
 }
 
 // rawComponent is a component as authored: it references a source by name and
 // carries version-stamp templates, not resolved pins.
 type rawComponent struct {
+	Platforms       []string           `json:"platforms"`
 	FromSource      bool               `json:"fromSource"`
 	Source          string             `json:"source,omitempty"`
-	Roles           []string           `json:"roles,omitempty"`          // node-role affinity (ADR-12 §3); composition, not identity
 	BuilderType     string             `json:"builderType,omitempty"`    // oci-hermetic (default) | nix | buildkit-rootless | vm-image (ADR-10)
 	ToolchainImage  string             `json:"toolchainImage,omitempty"` // component-specific exact builder image
 	Flake           *FlakePin          `json:"flake,omitempty"`          // required iff builderType==nix
@@ -99,7 +97,7 @@ type patchDeclaration struct {
 }
 
 // LoadContext performs a deep cancelable catalog load. Every registry, lock, patch,
-// overlay, and mixin read is routed through one context-bound provider with aggregate
+// and directory read is routed through one context-bound provider with aggregate
 // byte and directory-entry ceilings.
 func LoadContext(ctx context.Context, p DataProvider) (*Catalog, error) {
 	bound, err := BindContext(ctx, p)
@@ -124,13 +122,14 @@ func load(p DataProvider) (*Catalog, error) {
 	}
 
 	cat := &Catalog{
-		APIVersion: reg.APIVersion,
-		Kind:       reg.Kind,
-		Metadata:   reg.Metadata,
-		Sources:    reg.Sources,
-		Components: map[string]Component{},
-		Tools:      map[string]ToolPin{},
-		Actions:    map[string]ActionPin{},
+		APIVersion:   reg.APIVersion,
+		Kind:         reg.Kind,
+		Metadata:     reg.Metadata,
+		Sources:      reg.Sources,
+		AICRProfiles: reg.AICRProfiles,
+		Components:   map[string]Component{},
+		Tools:        map[string]ToolPin{},
+		Actions:      map[string]ActionPin{},
 	}
 
 	for name, pin := range lock.Pins {
@@ -144,20 +143,6 @@ func load(p DataProvider) (*Catalog, error) {
 		if pin.Tool != nil {
 			cat.Tools[name] = *pin.Tool
 		}
-	}
-
-	// Recipes: fill the k8sVersion axis from a source pin when versionFrom is set,
-	// so a bump does not require editing the recipe.
-	for _, r := range reg.Recipes {
-		if r.VersionFrom != "" {
-			pin, ok := lock.Pins[r.VersionFrom]
-			if !ok {
-				return nil, e.New(e.CodeUnpinnedSource,
-					"recipe %q versionFrom source %q has no pin in the lock", r.ID, r.VersionFrom)
-			}
-			r.Criteria.K8sVersion = NormalizeVersion(pin.Tag)
-		}
-		cat.Recipes = append(cat.Recipes, r)
 	}
 
 	// Components: resolve source + pin into the concrete Component.
@@ -177,139 +162,31 @@ func load(p DataProvider) (*Catalog, error) {
 		cat.Components[name] = c
 	}
 
-	// Optional composition layers (base/overlays/mixins). When present the catalog
-	// resolves by composing layers; the flat recipes: block may be empty.
-	layers, err := compose.LoadStore(p)
-	if err != nil {
-		return nil, err
-	}
-	cat.Layers = layers
-
 	if err := cat.Validate(); err != nil {
-		return nil, err
-	}
-	if err := validateLayerRefs(cat); err != nil {
 		return nil, err
 	}
 	return cat, nil
 }
 
-// validateLayerRefs fails closed if any layer (base, overlay, or mixin) references a
-// component name absent from the registry — the same "recipe references unknown
-// component" guarantee the flat path enforces, extended to the composition graph.
-func validateLayerRefs(cat *Catalog) error {
-	if cat.Layers == nil {
-		return nil
-	}
-	check := func(where string, refs []compose.ComponentRef) error {
-		for _, r := range refs {
-			if _, ok := cat.Components[r.Name]; !ok {
-				return e.New(e.CodeInvalidCatalog, "%s references unknown component %q", where, r.Name)
-			}
+// rejectLegacyComposition rejects stale recipe layer inputs rather than silently
+// dropping them after migration. Provider enumeration retains bounded no-follow I/O.
+func rejectLegacyComposition(p DataProvider) error {
+	for _, directory := range []string{"overlays", "mixins"} {
+		entries, err := p.ReadDir(directory)
+		if err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "checking removed recipe directory %s", directory)
 		}
-		return nil
-	}
-	if cat.Layers.Base != nil {
-		if err := check("base", cat.Layers.Base.Spec.ComponentRefs); err != nil {
-			return err
-		}
-	}
-	names := make([]string, 0, len(cat.Layers.Overlays))
-	for n := range cat.Layers.Overlays {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		if err := check("overlay "+n, cat.Layers.Overlays[n].Spec.ComponentRefs); err != nil {
-			return err
-		}
-	}
-	mnames := make([]string, 0, len(cat.Layers.Mixins))
-	for n := range cat.Layers.Mixins {
-		mnames = append(mnames, n)
-	}
-	sort.Strings(mnames)
-	for _, n := range mnames {
-		if err := check("mixin "+n, cat.Layers.Mixins[n].Spec.ComponentRefs); err != nil {
-			return err
+		if len(entries) != 0 {
+			return e.New(e.CodeInvalidCatalog, "legacy recipe %s directory is unsupported; select explicit component producers", directory)
 		}
 	}
 	return nil
 }
 
-// ComposeComponents maps a composed effective set to concrete NamedComponents: each ref
-// resolves to its registry component (fail closed on unknown), with any overrides
-// deep-merged onto the component's fields and the result re-validated.
-func (cat *Catalog) ComposeComponents(refs []compose.ComponentRef) ([]NamedComponent, error) {
-	out := make([]NamedComponent, 0, len(refs))
-	for _, ref := range refs {
-		c, ok := cat.Components[ref.Name]
-		if !ok {
-			return nil, e.New(e.CodeInvalidCatalog, "composed recipe references unknown component %q", ref.Name)
-		}
-		if len(ref.Overrides) > 0 {
-			merged, err := applyComponentOverrides(c, ref.Overrides)
-			if err != nil {
-				return nil, e.Wrap(e.CodeInvalidCatalog, err, "applying overrides to component %q", ref.Name)
-			}
-			if err := validateComponent(ref.Name, merged); err != nil {
-				return nil, err
-			}
-			c = merged
-		}
-		out = append(out, NamedComponent{Name: ref.Name, Component: c})
-	}
-	return out, nil
-}
-
-// applyComponentOverrides deep-merges an overlay's overrides onto a typed Component via
-// a JSON round-trip (the Component's json tags), mirroring AICR's deep-merge-onto-
-// component-config — a set scalar/slice replaces, a nested map merges.
-func applyComponentOverrides(c Component, overrides map[string]any) (Component, error) {
-	raw, err := json.Marshal(c)
-	if err != nil {
-		return c, err
-	}
-	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return c, err
-	}
-	mergeJSONMap(m, overrides)
-	raw, err = json.Marshal(m)
-	if err != nil {
-		return c, err
-	}
-	// Strict decode so an override key that is not a Component field (a typo, e.g.
-	// `outputTyp`, or wrong nesting) fails closed rather than being silently dropped —
-	// the same discipline the registry/lock/layer decoders use. The merged map's keys are
-	// the Component's own fields (always valid) plus any override-introduced keys, so only
-	// a bogus override key trips DisallowUnknownFields. (Map-valued fields like
-	// versionStamp still accept arbitrary keys, which is correct.)
-	var out Component
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&out); err != nil {
-		return c, err
-	}
-	return out, nil
-}
-
-// mergeJSONMap deep-merges src into dst: nested maps merge, everything else replaces
-// (same semantics as compose.deepMergeMap; kept local so catalog does not depend on an
-// unexported compose helper).
-func mergeJSONMap(dst, src map[string]any) {
-	for k, sv := range src {
-		if svMap, ok := sv.(map[string]any); ok {
-			if dvMap, ok := dst[k].(map[string]any); ok {
-				mergeJSONMap(dvMap, svMap)
-				continue
-			}
-		}
-		dst[k] = sv
-	}
-}
-
 func readRegistry(p DataProvider) (*registryDoc, error) {
+	if err := rejectLegacyComposition(p); err != nil {
+		return nil, err
+	}
 	raw, err := p.ReadFile(RegistryFile)
 	if err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "reading %s from %s", RegistryFile, p.Name())
@@ -320,8 +197,7 @@ func readRegistry(p DataProvider) (*registryDoc, error) {
 func decodeRegistry(raw []byte, where string) (*registryDoc, error) {
 	var reg registryDoc
 	// Strict decode: an unknown or misplaced field is a coded error, never silently
-	// dropped. This is what makes a reserved axis written inline in a recipe's
-	// criteria: block, or a typo'd axis, fail closed (NKD-FR-RC-012).
+	// dropped. Removed authoring fields and misspelled producer fields fail closed.
 	if err := yaml.UnmarshalStrict(raw, &reg); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", where)
 	}
@@ -341,6 +217,24 @@ func decodeRegistry(raw []byte, where string) (*registryDoc, error) {
 // well as full Load. Those paths must never act on a repo or toolchain declaration
 // which only a later component resolution would reject.
 func validateRegistryDeclarations(reg *registryDoc) error {
+	if err := validateAICRProfiles(reg.AICRProfiles); err != nil {
+		return err
+	}
+	componentNames := make([]string, 0, len(reg.Components))
+	for name := range reg.Components {
+		componentNames = append(componentNames, name)
+	}
+	sort.Strings(componentNames)
+	for _, name := range componentNames {
+		c := reg.Components[name]
+		if strings.TrimSpace(name) == "" || name != strings.TrimSpace(name) {
+			return e.New(e.CodeInvalidCatalog, "component name %q is empty or non-canonical", name)
+		}
+		if err := validateComponentTargets(name, c.Platforms); err != nil {
+			return err
+		}
+	}
+
 	for _, sourceName := range sortedSourceNames(reg.Sources) {
 		if strings.TrimSpace(sourceName) == "" || sourceName != strings.TrimSpace(sourceName) {
 			return e.New(e.CodeInvalidCatalog, "catalog source name %q is empty or has surrounding whitespace", sourceName)
@@ -385,7 +279,7 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 		sort.Strings(archs)
 		for _, arch := range archs {
 			ref := src.ToolchainImagesByArch[arch]
-			if !criteria.ValidArch(arch) {
+			if !target.ValidArch(arch) {
 				return e.New(e.CodeInvalidCatalog,
 					"catalog source %q has a toolchain for unsupported v1 arch %q", sourceName, arch)
 			}
@@ -414,8 +308,8 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		return Component{}, e.New(e.CodeInvalidCatalog, "component %q: toolchain override requires a from-source build", name)
 	}
 	c := Component{
+		Platforms:       append([]string(nil), raw.Platforms...),
 		FromSource:      raw.FromSource,
-		Roles:           raw.Roles,
 		BuilderType:     raw.BuilderType,
 		Flake:           raw.Flake,
 		CGO:             raw.CGO,
@@ -689,7 +583,7 @@ func splitVersion(tag string) (maj, min, pat string) {
 }
 
 // Validate enforces the resolved-catalog invariants. It is deterministic:
-// components and recipes are checked in sorted order so the first error is stable.
+// components and profiles are checked in sorted order so the first error is stable.
 func (cat *Catalog) Validate() error {
 	if cat == nil {
 		return e.New(e.CodeInvalidCatalog, "catalog is nil")
@@ -699,31 +593,11 @@ func (cat *Catalog) Validate() error {
 			return err
 		}
 	}
-	// A catalog needs at least one way to resolve: flat recipes OR composition layers.
-	if len(cat.Recipes) == 0 && cat.Layers == nil {
-		return e.New(e.CodeInvalidCatalog, "catalog has no recipes and no composition layers")
+	if len(cat.Components) == 0 && len(cat.AICRProfiles) == 0 {
+		return e.New(e.CodeInvalidCatalog, "catalog has no component producers or AICR profiles")
 	}
-	if cat.Layers != nil && len(cat.Layers.Categories()) == 0 {
-		return e.New(e.CodeInvalidCatalog,
-			"layered catalog has no concrete category recipe patterns; an abstract base or orthogonal overlay cannot resolve by itself")
-	}
-	if cat.Layers != nil {
-		if err := cat.Layers.Validate(); err != nil {
-			return err
-		}
-		layerNames := make([]string, 0, len(cat.Layers.Overlays))
-		for name := range cat.Layers.Overlays {
-			layerNames = append(layerNames, name)
-		}
-		sort.Strings(layerNames)
-		for _, name := range layerNames {
-			profile := cat.Layers.Overlays[name].Spec.AICRProfile
-			if profile != nil && profile.Repo != "" {
-				if err := checkSourceRepoScheme("overlay "+name+" aicrProfile", profile.Repo); err != nil {
-					return err
-				}
-			}
-		}
+	if err := validateAICRProfiles(cat.AICRProfiles); err != nil {
+		return err
 	}
 
 	names := make([]string, 0, len(cat.Components))
@@ -738,108 +612,54 @@ func (cat *Catalog) Validate() error {
 		if err := validateComponent(name, cat.Components[name]); err != nil {
 			return err
 		}
+		for _, platform := range cat.Components[name].Platforms {
+			if err := ValidateVMImageHostRoute(name, cat.Components[name], target.Arch(platform)); err != nil {
+				return err
+			}
+		}
 	}
-	if err := validateMaterialGraph(cat.Components); err != nil {
-		return err
-	}
+	return validateMaterialGraph(cat.Components)
+}
 
-	seen := map[string]bool{}
-	for _, r := range cat.Recipes {
-		if strings.TrimSpace(r.ID) == "" || r.ID != strings.TrimSpace(r.ID) {
-			return e.New(e.CodeInvalidCatalog, "recipe id %q is empty or has surrounding whitespace", r.ID)
+func validateAICRProfiles(profiles map[string]aicr.Profile) error {
+	names := make([]string, 0, len(profiles))
+	for name := range profiles {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if strings.TrimSpace(name) == "" || name != strings.TrimSpace(name) {
+			return e.New(e.CodeInvalidCatalog, "AICR profile name %q is empty or non-canonical", name)
 		}
-		if seen[r.ID] {
-			return e.New(e.CodeInvalidCatalog, "duplicate recipe id %q", r.ID)
-		}
-		seen[r.ID] = true
-		if err := criteria.CheckReserved(r.Reserved); err != nil {
+		profile := profiles[name]
+		if err := profile.Validate(); err != nil {
 			return err
 		}
-		// Composition is an inert v1 hook: recognized but not yet active. A populated
-		// base/overlays/mixins fails closed rather than being silently flattened
-		// (NKD-FR-RC-014/015, NKD-CON-017).
-		if f := r.compositionFields(); len(f) > 0 {
-			return e.New(e.CodeUnsupported,
-				"recipe %q uses composition %v, which is a reserved v1 hook: recipes must be flat", r.ID, f)
-		}
-		if err := r.Criteria.ValidateRecipePattern(); err != nil {
-			return err
-		}
-		// A declared AICR profile must be identity-named and digest-pinned (never a
-		// tag), mirroring the toolchain fail-closed discipline (NKD v1 §8.1).
-		if r.AICRProfile != nil {
-			a := r.AICRProfile
-			if r.Criteria.Category != "accelerated-runtime" {
-				return e.New(e.CodeInvalidCatalog,
-					"recipe %q: aicrProfile is valid only for category accelerated-runtime", r.ID)
+		if profile.Repo != "" {
+			if err := checkSourceRepoScheme(name+" AICR profile", profile.Repo); err != nil {
+				return err
 			}
-			if strings.TrimSpace(a.Identity) == "" || a.Identity != strings.TrimSpace(a.Identity) {
-				return e.New(e.CodeInvalidCatalog,
-					"recipe %q: aicrProfile identity %q is empty or has surrounding whitespace", r.ID, a.Identity)
-			}
-			if !canonical.IsDigest(a.Digest) {
-				return e.New(e.CodeUnpinnedSource,
-					"recipe %q: aicrProfile digest %q is not a bare sha256:<64-hex> pin", r.ID, a.Digest)
-			}
-			if !canonical.IsDigest(a.GeneratorDigest) {
-				return e.New(e.CodeUnpinnedSource,
-					"recipe %q: aicrProfile generatorDigest %q is not a bare sha256:<64-hex> pin", r.ID, a.GeneratorDigest)
-			}
-			if err := criteria.ValidateAICRValues(a.Service, a.Accelerator, a.OS, a.Intent, a.Platform); err != nil {
-				return e.Wrap(e.CodeInvalidCatalog, err, "recipe %q aicrProfile", r.ID)
-			}
-			if !criteria.IsWildcard(r.Criteria.OS) && r.Criteria.OS != a.OS {
-				return e.New(e.CodeInvalidCatalog,
-					"recipe %q criteria os %q conflicts with aicrProfile os %q", r.ID, r.Criteria.OS, a.OS)
-			}
-			if a.Repo != "" {
-				if err := checkSourceRepoScheme(r.ID+" aicrProfile", a.Repo); err != nil {
-					return err
-				}
-			}
-		}
-		if len(r.Components) == 0 && r.AICRProfile == nil {
-			return e.New(e.CodeInvalidCatalog, "recipe %q references no components and declares no AICR activation", r.ID)
-		}
-		componentRefs := make(map[string]struct{}, len(r.Components))
-		for _, cn := range r.Components {
-			if strings.TrimSpace(cn) == "" || cn != strings.TrimSpace(cn) {
-				return e.New(e.CodeInvalidCatalog,
-					"recipe %q component reference %q is empty or has surrounding whitespace", r.ID, cn)
-			}
-			if _, duplicate := componentRefs[cn]; duplicate {
-				return e.New(e.CodeInvalidCatalog,
-					"recipe %q references component %q more than once", r.ID, cn)
-			}
-			componentRefs[cn] = struct{}{}
-			component, ok := cat.Components[cn]
-			if !ok {
-				return e.New(e.CodeInvalidCatalog, "recipe %q references unknown component %q", r.ID, cn)
-			}
-			if !criteria.IsWildcard(r.Criteria.Arch) {
-				if err := ValidateVMImageHostRoute(cn, component, r.Criteria.Arch); err != nil {
-					return e.Wrap(e.CodeInvalidCatalog, err,
-						"recipe %q cannot realize component %q", r.ID, cn)
-				}
-			}
-		}
-		selected := make([]NamedComponent, 0, len(componentRefs))
-		for componentName := range componentRefs {
-			selected = append(selected, NamedComponent{Name: componentName, Component: cat.Components[componentName]})
-		}
-		// Keep the public resolved-set validator self-contained at this boundary.
-		// Global component and graph validation above makes some checks redundant,
-		// but a completeness-only shortcut here would let the two seams drift.
-		if err := ValidateMaterialSet(selected); err != nil {
-			return e.Wrap(e.CodeInvalidCatalog, err,
-				"recipe %q has an incomplete material set", r.ID)
 		}
 	}
 	return nil
 }
 
-// validNodeRoles is the ADR-12 §3 role-affinity domain.
-var validNodeRoles = map[string]bool{"control-plane": true, "worker": true, "gpu-worker": true}
+func validateComponentTargets(name string, platforms []string) error {
+	if len(platforms) == 0 {
+		return e.New(e.CodeInvalidCatalog, "component %q requires explicit supported platforms", name)
+	}
+	previous := ""
+	for _, platform := range platforms {
+		if err := target.ValidatePlatform(platform); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "component %q", name)
+		}
+		if platform <= previous {
+			return e.New(e.CodeInvalidCatalog, "component %q platforms must be sorted and unique", name)
+		}
+		previous = platform
+	}
+	return nil
+}
 
 func validateVMImageBuildRequirements(name string, requirements *execution.Requirements) error {
 	if requirements == nil {
@@ -974,7 +794,7 @@ func sortedStringKeys(values map[string]string) []string {
 	return keys
 }
 
-// ValidateMaterialSet verifies one resolved Recipe's complete component set. It
+// ValidateMaterialSet verifies one output's complete selected component set. It
 // validates declarations rather than authenticating artifact bytes; execution must
 // bind each edge to a verified producer observation before staging.
 func ValidateMaterialSet(components []NamedComponent) error {
@@ -1048,14 +868,14 @@ func validateMaterialGraph(components map[string]Component) error {
 	return nil
 }
 
-// ValidateVMImageHostRoute closes the guest/host relationship only after Recipe
-// criteria supplies a concrete guest architecture. KVM acceleration cannot cross
+// ValidateVMImageHostRoute closes the guest/host relationship for a concrete
+// component target architecture. KVM acceleration cannot cross
 // architectures; preferred and forbidden policies retain their declared TCG route.
 func ValidateVMImageHostRoute(name string, component Component, guestArch string) error {
 	if component.BuilderType != BuilderVMImage {
 		// TODO(execution-class admission): Before any adapter admits non-nil
 		// execution requirements, define in ADR-18 whether an ordinary builder's
-		// Recipe architecture constrains its runner host, then enforce required-KVM
+		// target architecture constrains its runner host, then enforce required-KVM
 		// host matching here or in the authenticated Environment matcher. Today only
 		// vm-image defines that architecture as a guest/host relationship, and every
 		// current adapter rejects non-nil requirements before work or output.
@@ -1087,19 +907,10 @@ func ValidateVMImageHostRoute(name string, component Component, guestArch string
 }
 
 func validateComponent(name string, c Component) error {
-	// Role affinity (composition metadata) must name known node roles.
-	seenRoles := make(map[string]struct{}, len(c.Roles))
-	for _, r := range c.Roles {
-		if !validNodeRoles[r] {
-			return e.New(e.CodeInvalidCatalog,
-				"component %q: role affinity %q is not a known node role (control-plane|worker|gpu-worker)", name, r)
-		}
-		if _, duplicate := seenRoles[r]; duplicate {
-			return e.New(e.CodeInvalidCatalog,
-				"component %q: role affinity %q appears more than once", name, r)
-		}
-		seenRoles[r] = struct{}{}
+	if err := validateComponentTargets(name, c.Platforms); err != nil {
+		return err
 	}
+
 	if c.BuildRequirements != nil {
 		if !c.FromSource {
 			return e.New(e.CodeInvalidCatalog,
@@ -1227,7 +1038,7 @@ func validateComponent(name string, c Component) error {
 		}
 		sort.Strings(archs)
 		for _, a := range archs {
-			if !criteria.ValidArch(a) {
+			if !target.ValidArch(a) {
 				return e.New(e.CodeInvalidCatalog,
 					"component %q: toolchain map has unsupported v1 arch %q", name, a)
 			}
@@ -1252,7 +1063,7 @@ func validateComponent(name string, c Component) error {
 				"component %q: toolchain %q is not pinned by @sha256: digest", name, c.ToolchainImage)
 		}
 	}
-	// VM-image toolchains execute on the runner host, while Recipe criteria names
+	// VM-image toolchains execute on the runner host, while target selection names
 	// the guest/output architecture. Every eligible host platform needs an exact
 	// toolchain pin unless the scalar fallback covers all routes.
 	if c.BuilderType == BuilderVMImage && c.ToolchainImage == "" {

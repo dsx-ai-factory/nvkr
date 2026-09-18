@@ -7,12 +7,12 @@
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-22 in the consolidated NKD ADR set (added to give the pin/lock model a decided home).
-- **Relates to:** ADR-02 (what enters `recipeDigest`), ADR-10 (toolchain / builder pins), ADR-11 (the catalog
-  the lock feeds resolution), ADR-12 (the criteria/composition shape a curated set takes), ADR-13 (the aggregate
+- **Relates to:** ADR-02 (what enters `buildDigest`), ADR-10 (toolchain / builder pins), ADR-11 (the catalog
+  the lock feeds resolution), ADR-12 (the output/composition shape a curated set takes), ADR-13 (the aggregate
   SBOM dependency graph a curated set induces), ADR-15 (mirrorable pinned inputs), ADR-16 (digest-first
   selection), ADR-07 (the profile boundary the lock must NOT cross), ADR-21 (bump → regen), ADR-10 (a wrapped
   build's `embeds` are derived from a curated set), ADR-01 (canonical codec).
-- **Satisfies:** FR-01/FR-02 (digest-pinned, fail-closed inputs). Supports the `recipeDigest` determinism of
+- **Satisfies:** FR-01/FR-02 (digest-pinned, fail-closed inputs). Supports the `buildDigest` determinism of
   ADR-02.
 
 ## Context
@@ -21,7 +21,7 @@ NKD aggregates a dozen-plus upstream components that each move independently as 
 If every pin lived in a file compiled into the `nkdctl` binary, keeping current would mean cutting a tool
 release constantly and the repository would churn forever. Multiple ADRs already *assume* a lockfile exists
 (ADR-02 "source-date derived from a lock", ADR-10 flake locks, ADR-15 locked closures), but the pin/lock
-contract itself — the declare-vs-resolve split, what feeds `recipeDigest`, what a bump is, and where the
+contract itself — the declare-vs-resolve split, what feeds `buildDigest`, what a bump is, and where the
 lock stops and the builder profile begins — was never decided in an ADR. This ADR fixes it. It is upstream of
 both `resolve` and `catalog bump`.
 
@@ -39,6 +39,13 @@ both `resolve` and `catalog bump`.
 Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact versioned schema, reject unknown
 versions/kinds/fields, and never interpret a future lock as the current version. A missing lock is an input error,
 not an implicit empty lock.
+
+Registry v3 contains producer components with explicit supported `platforms` and an optional `aicrProfiles`
+map. It contains no recipes, criteria, recipe layers, mixins, `versionFrom`, placement categories or node roles.
+Catalog overlay v3 can replace complete component producers under ADR-11; it is independent of the removed
+recipe merge system. Catalog snapshots use v3 and strict decoding rejects removed classification fields even
+when the caller supplies the current version. Lock v1 remains unchanged because its resolved source and
+artifact shape is unchanged.
 
 Multiple components may share one source and therefore **bump atomically** (e.g. the Kubernetes-core binaries
 move together on a single lock entry).
@@ -60,37 +67,37 @@ is attempted on the URL. In the other direction a **component has exactly one so
 hermetic build. A component needing bytes from two repositories is two components, or one source that vendors
 the other.
 
-### 2. The lock feeds `recipeDigest`; a bump is a recipe change
+### 2. The lock feeds logical build identity for selected producers
 
-Resolution moves to **load time**: `registry.yaml` + `pins.lock.yaml` → a fully-pinned catalog → recipe/IR →
-`recipeDigest`. `recipeDigest` depends on the **fully-resolved pins**, so provenance is unchanged and a **pin
-bump is a recipe change** — exactly like a source-commit bump, and repinning a prebuilt artifact is likewise a
-recipe change (ADR-16 selects by digest regardless).
+Load-time resolution combines `registry.yaml` and `pins.lock.yaml` into a fully pinned catalog. Each Definition
+output selects exact producer IDs and a concrete platform from that catalog. Compilation generates its
+executable closure and canonical BuildDigest. A selected source pin, prebuilt artifact or producer toolchain
+change moves that logical build identity when it changes the selected graph. An unrelated catalog edit may
+change catalog and Plan identity without changing another output's BuildDigest. Output names, packaging,
+and transport do not enter this logical identity. Effective AICR rendering settings do enter it.
 
-**Templated version stamps** keep the hand-authored file from churning: values like `KUBE_GIT_VERSION` /
-`KUBE_GIT_COMMIT` are **templates rendered from the pin** at load time (`{{.Tag}}`, `{{.Commit}}`, …), and the
-recipe's `k8sVersion` axis is filled from a source via `versionFrom:`. `recipeDigest` is computed from the
-**rendered** values, so it changes **exactly** when a pin changes — no more, no less. Any template token other
-than the sanctioned set fails closed at load.
+Templated version stamps such as `KUBE_GIT_VERSION` and `KUBE_GIT_COMMIT` are rendered from source pins at
+load time (`{{.Tag}}`, `{{.Commit}}`, …). Unknown template tokens fail closed. There is no cluster context,
+criteria axis or `versionFrom` projection into build identity.
 
 ### 3. Fail closed on any unpinned or under-resolved input
 
 An **unpinned source ref**, or a **toolchain pinned by tag instead of digest**, **fails resolution** — it never
 builds (a core SRD invariant). The lock must be **complete** — every declared source resolved, every required
-`artifacts:` digest present for the target arch — or resolution fails closed with a distinct coded error. The
+`artifacts:` digest present for every architecture declared by each prebuilt producer's `platforms` — or resolution fails closed with a distinct coded error. The
 validator accepts either digest form for a toolchain (manifest-list `golang@sha256:…` or a per-arch image ID)
 and every per-arch entry, but fails closed on a tag. Completeness is an exact key-set contract: orphan source
-pins, artifacts for undeclared components/architectures, and duplicate semantic entries are rejected unless the
-schema explicitly declares them as retained compatibility data. Stale data cannot silently survive a bump.
+pins, artifacts for undeclared components/architectures, and duplicate semantic entries are rejected.
+Completeness is checked from actual producer platform declarations even when no Definition selects that producer. Stale data cannot silently survive a bump.
 
-A **derived member** (§7) whose lock pin disagrees with the version its umbrella declares **at the umbrella's
+In the deferred pin-set contract, a **derived member** (§7) whose lock pin disagrees with the version its umbrella declares **at the umbrella's
 pinned tree** is likewise an **under-resolved input**: resolution fails closed with a distinct coded error rather
 than preferring either value. Re-derivation, not the recorded `derivedFrom` string, is what makes the curated set
 a checked property.
 
 Authority-bearing catalog reads are context-aware and resource-bounded. The on-disk provider holds a real root
 and opens every component descriptor-relative with `O_NOFOLLOW`; it accepts regular files only, limits one file
-to 4 MiB and one deep load to 32 MiB, and limits recursive overlay/mixin discovery to 1,024 entries and 16
+to 4 MiB and one deep load to 32 MiB, and limits recursive catalog-overlay discovery to 1,024 entries and 16
 directory levels. Cancellation is checked before any path I/O and between bounded chunks. Legacy providers that
 lack the deep context interface remain usable only through the synchronous diagnostic compatibility API;
 `client/v1` rejects them before a read.
@@ -105,7 +112,7 @@ lack the deep context interface remain usable only through the synchronous diagn
   churn.
 - `catalog bump --check` — **dry-run**: print the lockfile diff, write nothing (the ADR-21 doctrine's
   `--check` twin, and the "show me what a bump would change" command).
-- **Derived pins (§7).** `pin`/`bump` **refuse** an independent bump of a member marked `pinnedBy` with a coded
+- **Deferred derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
   error naming its umbrella; bumping the umbrella is **one operation** that re-derives and rewrites the umbrella
   entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
   prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
@@ -127,7 +134,7 @@ newer binary**.
 | Changes | Touches | Cadence | Ships as |
 |---|---|---|---|
 | A component version / CVE patch | `pins.lock.yaml` | often | catalog release (data) |
-| A build recipe / new component | `registry.yaml` | occasional | catalog release (data) |
+| A producer build definition / new component | `registry.yaml` | occasional | catalog release (data) |
 | Resolver / IR / engine logic | Go code | rare | `nkdctl` release (tool) |
 
 `derivedFrom` (§7) is **pin provenance carried in the lock as data**: it records which umbrella pin produced a
@@ -136,18 +143,21 @@ receipt, and not an authority on its own — the authority is the re-derivation 
 
 ### 6. Catalog data pins DEFINITION inputs only — never the builder profile
 
-Catalog data pins **definition** inputs, all of which enter `recipeDigest`: resolved sources and prebuilt
+Catalog data pins **definition** inputs; the selected executable subset enters `buildDigest`: resolved sources and prebuilt
 artifacts live in `pins.lock.yaml`; the directly digest-pinned **component build toolchain** lives in
 `registry.yaml`. The signed builder profile does **not** override either. It owns environment identity instead:
 the `nkd-runner`, its bootstrap toolchain, host-environment facts, and builder capabilities (ADR-07), all excluded
-from `recipeDigest` by construction.
+from `buildDigest` by construction.
 
-This boundary is load-bearing: changing a component toolchain is a reviewed catalog/recipe change and moves
-`recipeDigest`; changing the runner/bootstrap uses `profile repin --runner|--bootstrap-toolchain` and does not.
-Putting runner/bootstrap identity in the lock would corrupt recipe identity; putting a source/component-toolchain
+This boundary is load-bearing: changing a component toolchain is a reviewed catalog producer change and moves
+`buildDigest`; changing the runner/bootstrap uses `profile repin --runner|--bootstrap-toolchain` and does not.
+Putting runner/bootstrap identity in the lock would corrupt logical build identity; putting a source/component-toolchain
 pin in the profile would make the definition overridable by its environment.
 
-### 7. Derived pin sets: one source may curate other sources' pins
+### 7. Deferred derived pin sets: one source may curate other sources' pins
+
+This section is a proposed future capability. Registry v2 does not accept `pinSet`, `pinnedBy` or
+`derivedFrom`, and no current pin/bump or composition behavior claims the derivation contract below.
 
 Upstreams increasingly ship a **curated set**: one repository states which versions of several other components
 belong together (a Helm umbrella chart's lock file, a platform manifest, a release matrix). Re-typing those
@@ -204,7 +214,7 @@ stays one level deep at each declaration and no implicit transitive closure is w
 
 The curation is visible downstream as well as in the lock. A composition consuming a curated set binds the
 **umbrella's commit** (`curatedBy`), so the resolved graph records *which* curated set it came from and a set
-change moves `recipeDigest` through the ordinary §2 path. The aggregate SBOM's dependency graph points from the
+change moves `buildDigest` through the ordinary §2 path. The aggregate SBOM's dependency graph points from the
 umbrella to its members rather than presenting them as unrelated peers. Both are stated here as consequences of
 the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
 
@@ -212,7 +222,7 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
 
 **Positive**
 - Staying current is a **data** operation (a catalog release), not a tool release — the repo does not churn.
-- `recipeDigest` changes exactly when a pin changes; provenance is preserved with resolution at load time.
+- A selected producer pin changes its logical build identity; unrelated catalog inputs remain outside that closure.
 - Shared-source components bump atomically; the hand-authored file stays quiet via templated stamps.
 - The definition/environment boundary is explicit, so catalog edits and `profile repin` cannot overlap or
   override one another.
@@ -232,9 +242,9 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
 
 **Neutral**
 - The reviewable lock file is strict, deterministically emitted YAML input; its raw bytes are not a semantic
-  trust-object identity. After strict parsing, its normalized resolved values enter ADR-01's canonical recipe
+  trust-object identity. After strict parsing, its normalized resolved values enter ADR-01's canonical build
   graph. ADR-15 may hash the exact lock file as a transported blob, which must not be confused with
-  `recipeDigest` or a canonical `LockSnapshot` object.
+  `buildDigest` or a canonical `LockSnapshot` object.
 
 ## Alternatives considered
 
@@ -247,7 +257,7 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
 - **Pin the runner/environment in the lock.** Rejected — it is not a definition input; it belongs in the
   signed builder profile (§6, ADR-07).
 - **One source pinned at several tags (a multi-tag source).** Rejected — it would make "the source's commit"
-  ambiguous inside one hermetic build and in `recipeDigest`. Declare two sources against the same repository
+  ambiguous inside one hermetic build and in `buildDigest`. Declare two sources against the same repository
   instead (§1); the checkout node de-duplicates by commit anyway.
 - **A repository-level pin shared by every source naming that repository.** Rejected — it forces unrelated
   modules of a monorepo to move together and re-introduces the churn `tagPrefix` exists to avoid.
@@ -259,15 +269,15 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
 
 ## Follow-ups
 
-- **ADR-02:** the fully-resolved pins are the `recipeDigest` inputs; source-date comes from the lock.
+- **ADR-02:** the fully-resolved pins are the `buildDigest` inputs; source-date comes from the lock.
 - **ADR-10:** toolchain and prebuilt-artifact digests the lock carries.
 - **ADR-15:** the lock and its pinned inputs are mirrorable for air-gap.
 - **ADR-21:** `catalog bump` → regen; the `--check` dry-run; the definition/environment boundary vs.
   `profile repin`.
 - **ADR-11:** a composition that consumes a curated set binds the umbrella's commit as `curatedBy`; the merge
   algebra and conflict rules for a curated member are ADR-11's to state normatively.
-- **ADR-12 §3:** a curated set is a composition, not a recipe-selection axis — the SKU takes the **umbrella's
-  shape**, and members are composition members bound by digest.
+- **ADR-12 §3:** a future curated set can inform explicit output membership; it must not introduce a selector
+  axis, deployment topology or reusable recipe group.
 - **ADR-13:** the aggregate SBOM's dependency graph points from the umbrella to its members; the CycloneDX
   representation of that edge is ADR-13's to fix.
 - **ADR-10:** the `embeds` of a wrapped build are **derived from the same pin set** when the upstream publishes

@@ -9,13 +9,11 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 )
 
-func TestLifecycleOutputsLimitExecutionWithoutChangingRecipeIdentity(t *testing.T) {
+func TestLifecycleOutputsCompileOnlySelectedProducers(t *testing.T) {
 	repoRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -27,10 +25,10 @@ func TestLifecycleOutputsLimitExecutionWithoutChangingRecipeIdentity(t *testing.
 		t.Fatal(err)
 	}
 	want := []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}
-	var gpu factory.RecipePlan
-	for _, recipePlan := range plan.Recipes {
-		if recipePlan.Name == "gpu-node" {
-			gpu = recipePlan
+	var gpu factory.BuildPlan
+	for _, buildPlan := range plan.Builds {
+		if buildPlan.Name == "worker-binaries" {
+			gpu = buildPlan
 			break
 		}
 	}
@@ -41,26 +39,26 @@ func TestLifecycleOutputsLimitExecutionWithoutChangingRecipeIdentity(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if graphDigest != gpu.RecipeDigest {
-		t.Fatalf("full graph digest = %s, RecipeDigest = %s", graphDigest, gpu.RecipeDigest)
+	if graphDigest != gpu.BuildDigest {
+		t.Fatalf("full graph digest = %s, BuildDigest = %s", graphDigest, gpu.BuildDigest)
 	}
-	fullRecipeHasHelm := false
+	fullBuildHasHelm := false
 	for _, node := range gpu.Graph.Nodes {
 		if node.Component == "helm" {
-			fullRecipeHasHelm = true
+			fullBuildHasHelm = true
 		}
 	}
-	if !fullRecipeHasHelm {
-		t.Fatal("full canonical Recipe identity lost unused Helm member")
+	if fullBuildHasHelm {
+		t.Fatal("unselected Helm producer contaminated build identity")
 	}
 	nodes := make(map[string]factory.Node, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
 		nodes[node.ID] = node
 	}
-	if _, exists := nodes["gpu-node/build-helm"]; exists {
+	if _, exists := nodes["worker-binaries/build-helm"]; exists {
 		t.Fatal("unused Helm producer remained in lifecycle execution graph")
 	}
-	containerd, exists := nodes["gpu-node/build-containerd"]
+	containerd, exists := nodes["worker-binaries/build-containerd"]
 	if !exists || len(containerd.Inputs) == 0 {
 		t.Fatal("selected containerd producer lost its source dependency")
 	}
@@ -75,6 +73,35 @@ func TestLifecycleOutputsLimitExecutionWithoutChangingRecipeIdentity(t *testing.
 		if producer == "" || nodes[producer].Kind != factory.NodeFetch {
 			t.Fatalf("containerd input %q is not produced by a retained pinned fetch", input)
 		}
+	}
+}
+
+func TestAICRProfileNameCannotBeSubstitutedOutsideCatalog(t *testing.T) {
+	repo, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	for _, test := range []struct {
+		name string
+		edit func(*factory.Plan)
+	}{
+		{name: "build profile", edit: func(plan *factory.Plan) {
+			for i := range plan.Builds {
+				if plan.Builds[i].Graph.AICR != nil {
+					plan.Builds[i].AICRProfileIdentity = "substituted"
+				}
+			}
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, err := CompileFiles(t.Context(), "testdata/examples/ai-factory/definition-arm64.yaml", "testdata/examples/ai-factory/environment-local.yaml", "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.edit(plan)
+			assertCode(t, plan.Validate(), nkderr.CodeUnverifiedRef)
+		})
 	}
 }
 
@@ -156,8 +183,8 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstPlan.Recipes[0].RecipeDigest != secondPlan.Recipes[0].RecipeDigest {
-		t.Fatal("environment destination changed logical Recipe identity")
+	if firstPlan.Builds[0].BuildDigest != secondPlan.Builds[0].BuildDigest {
+		t.Fatal("environment destination changed logical Build identity")
 	}
 	signedDefinition, signedDelivery, err := lower(definition, signingEnvironment)
 	if err != nil {
@@ -167,8 +194,8 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstPlan.Recipes[0].RecipeDigest != signedPlan.Recipes[0].RecipeDigest {
-		t.Fatal("Environment-owned signing tool changed logical Recipe identity")
+	if firstPlan.Builds[0].BuildDigest != signedPlan.Builds[0].BuildDigest {
+		t.Fatal("Environment-owned signing tool changed logical Build identity")
 	}
 	firstPlanDigest, err := firstPlan.Digest()
 	if err != nil {
@@ -226,34 +253,13 @@ func TestLowerDerivesExecutableEnvelopeAndRoute(t *testing.T) {
 	}
 }
 
-func TestClusterViewsReuseOneResolvedRecipeAcrossRoles(t *testing.T) {
-	definition := testDefinition(t)
-	definition.Clusters = []DefinitionCluster{
-		{Name: "operator", Type: cluster.TypeOperator, Members: []ClusterMember{{Output: "cli", Role: "control-plane"}}},
-		{Name: "tenant", Type: cluster.TypeTenant, Members: []ClusterMember{{Output: "cli", Role: "worker"}}},
-	}
-	legacy, _, err := lower(definition, testEnvironment())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(legacy.Recipes) != 1 || legacy.Recipes[0].Criteria.Role != "any" || len(legacy.Clusters) != 2 {
-		t.Fatalf("legacy lowering duplicated or role-specialized Recipe: %+v", legacy)
-	}
-	if legacy.Clusters[0].RoleBindings[0].Role != "control-plane" || legacy.Clusters[1].RoleBindings[0].Role != "worker" {
-		t.Fatalf("cluster-local roles = %+v", legacy.Clusters)
-	}
-}
-
 func TestDefinitionRejectsUnknownAndDuplicateSelections(t *testing.T) {
 	tests := []struct {
 		name string
 		edit func(*Definition)
 	}{
-		{name: "unknown output recipe", edit: func(d *Definition) { d.Outputs[0].Recipe = "missing" }},
+		{name: "unknown output build", edit: func(d *Definition) { d.Outputs[0].Platform = "missing" }},
 		{name: "duplicate output", edit: func(d *Definition) { d.Outputs = append(d.Outputs, d.Outputs[0]) }},
-		{name: "unknown cluster output", edit: func(d *Definition) { d.Clusters[0].Members = []ClusterMember{{Output: "missing", Role: "worker"}} }},
-		{name: "recipe owns cluster role", edit: func(d *Definition) { d.Recipes[0].Criteria.Role = "worker" }},
-		{name: "recipe owns cluster type", edit: func(d *Definition) { d.Recipes[0].Criteria.ClusterType = cluster.TypeOperator }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -285,10 +291,7 @@ func testDefinition(t *testing.T) Definition {
 	catalogPath := filepath.Join(filepath.Dir(source), "..", "..", "..", "testdata", "catalogs", "kubernetes-layered")
 	return Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind,
 		Metadata: Metadata{Name: "product"}, Catalog: Catalog{Base: catalogPath},
-		Recipes: []RecipeSelection{{Name: "cli-recipe", Criteria: criteria.Criteria{Category: "kubernetes", Role: "any", K8sVersion: "1.36.0", OS: "ubuntu", Arch: "amd64"}}},
-		Outputs: []DefinitionOutput{{Name: "cli", Recipe: "cli-recipe", Components: []string{"kubectl"}, Format: OutputExecutable}},
-		Clusters: []DefinitionCluster{{Name: "tenant", Type: cluster.TypeTenant,
-			Members: []ClusterMember{{Output: "cli", Role: "worker"}}}}}
+		Outputs: []DefinitionOutput{{Name: "cli", Platform: "linux/amd64", Components: []string{"kubectl"}, Format: OutputExecutable}}}
 }
 
 func testEnvironment() Environment {
@@ -303,4 +306,30 @@ func repeat(value string, count int) string {
 		result += value
 	}
 	return result
+}
+
+func TestOutputsWithIdenticalProducersKeepSeparateExecutionUses(t *testing.T) {
+	definition := testDefinition(t)
+	duplicate := definition.Outputs[0]
+	duplicate.Name = "cli-copy"
+	definition.Outputs = append(definition.Outputs, duplicate)
+	environment := testEnvironment()
+	environment.Publication = nil
+	plan, err := Compile(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Builds) != 2 || plan.Builds[0].BuildDigest != plan.Builds[1].BuildDigest {
+		t.Fatal("identical producers should have one content identity across distinct output uses")
+	}
+	run, err := PrepareRun(definition, environment, plan, "same-content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(run.Expected) != 2 || run.Expected[0].ComponentResults[0] == run.Expected[1].ComponentResults[0] {
+		t.Fatal("equal content collapsed required execution evidence")
+	}
+	if plan.Builds[0].Name == plan.Builds[1].Name {
+		t.Fatal("output names collapsed")
+	}
 }

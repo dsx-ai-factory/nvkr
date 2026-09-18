@@ -18,12 +18,12 @@ import (
 	"sort"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/transport"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
@@ -69,7 +69,7 @@ type PublisherEvidenceAuthority interface {
 // PublisherEvidenceRequest gives the authority both the full declaration/graph and
 // the exact terminally qualified (possibly selected-subset) report.
 type PublisherEvidenceRequest struct {
-	Resolved *recipe.Resolved
+	Resolved *buildgraph.Resolved
 	Graph    *ir.Graph
 	Report   *pipeline.Report
 }
@@ -88,7 +88,7 @@ type ReleaseAuthority interface {
 
 // Client is a small orchestration facade over the authoritative domain modules.
 // Construct it with New and supply catalog data with WithData, WithProvider, or
-// WithCatalogIO for recipe operations. Filesystem output and publication are opt-in seams.
+// WithCatalogIO for producer resolution. Filesystem output and publication are opt-in seams.
 type Client struct {
 	catalogIO CatalogIO
 	runner    pipeline.Runner

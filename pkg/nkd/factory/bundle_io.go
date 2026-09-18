@@ -73,8 +73,9 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	return manifest, append(raw, '\n'), nil
 }
 
-// WriteGeneratedBundle transactionally commits generated payloads and writes the root
-// manifest last. Re-running with identical input is idempotent.
+// WriteGeneratedBundle stages generated payloads, retires unchanged prior members,
+// and writes the root manifest last. Interrupted writes are detected by the check
+// gate; this is not an atomic replacement of the entire directory.
 func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "generated Run write requires a context")
@@ -96,6 +97,10 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	defer release()
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
+	}
+	retired, err := retiredGeneratedMembers(ctx, root, bundle)
+	if err != nil {
+		return err
 	}
 
 	type staged struct{ destination, temporary string }
@@ -151,9 +156,17 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled before commit")
 	}
+	if err := checkRetiredGeneratedMembers(ctx, root, retired); err != nil {
+		return err
+	}
 	// The manifest is staged last and committed last. Once payload publication starts,
 	// complete the small commit even if voluntary cancellation arrives.
 	for index := range stagedFiles {
+		if index == len(stagedFiles)-1 {
+			if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundle, retired); err != nil {
+				return err
+			}
+		}
 		entry := &stagedFiles[index]
 		if err := os.Rename(entry.temporary, entry.destination); err != nil {
 			return e.Wrap(e.CodeInternal, err, "publishing generated member %s", entry.destination)

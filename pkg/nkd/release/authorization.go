@@ -15,7 +15,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 )
 
-const AuthorizationSchemaVersion = "nkd.dev/release-authorization/v7"
+const AuthorizationSchemaVersion = "nkd.dev/release-authorization/v9"
 
 // ReleaseSetReceipt is an unforgeable-in-data capability: its critical fields are
 // private and it can be created only by VerifyAuthenticatedReleaseSet.
@@ -201,10 +201,9 @@ type AuthorizationRequest struct {
 
 type memberProof struct {
 	Component           string   `json:"component"`
-	Role                string   `json:"role,omitempty"`
 	Arch                string   `json:"arch"`
 	Version             string   `json:"version,omitempty"`
-	RecipeDigest        string   `json:"recipeDigest"`
+	BuildDigest         string   `json:"buildDigest"`
 	VectorDigest        string   `json:"vectorDigest"`
 	ProfileDigest       string   `json:"profileDigest,omitempty"`
 	ProfileIndependent  bool     `json:"profileIndependent,omitempty"`
@@ -235,7 +234,7 @@ type compatibilityProof struct {
 	ReceiptDigest             string              `json:"receiptDigest"`
 	CompatibilityPolicyDigest string              `json:"compatibilityPolicyDigest"`
 	Target                    CompatibilityTarget `json:"target"`
-	RecipeDigests             []string            `json:"recipeDigests"`
+	BuildDigests              []string            `json:"buildDigests"`
 	VectorDigests             []string            `json:"vectorDigests"`
 	ArtifactDigests           []string            `json:"artifactDigests"`
 	Verdict                   string              `json:"verdict"`
@@ -378,11 +377,11 @@ func Authorize(ctx context.Context, req AuthorizationRequest) (*Authorization, e
 				"reproduction receipt for %s/%s has non-passing verdict %q",
 				receipt.result.Component, receipt.result.Arch, receipt.result.Verdict)
 		}
-		key := receipt.result.Component + "\x00" + receipt.result.Role + "\x00" + receipt.result.Arch
+		key := receipt.result.Component + "\x00" + receipt.result.Arch
 		if _, duplicate := reproduction[key]; duplicate {
 			return nil, e.New(e.CodeGateUnmet,
-				"authorization repeats reproduction receipt for %s/%s/%s",
-				receipt.result.Component, orNone(receipt.result.Role), receipt.result.Arch)
+				"authorization repeats reproduction receipt for %s/%s",
+				receipt.result.Component, receipt.result.Arch)
 		}
 		reproduction[key] = receipt
 	}
@@ -404,12 +403,12 @@ func Authorize(ctx context.Context, req AuthorizationRequest) (*Authorization, e
 		req.AsOfEpoch, "compatibility"); err != nil {
 		return nil, err
 	}
-	recipes, vectors, expectedArtifacts := releaseIdentitySets(req.Release.set.Members)
+	builds, vectors, expectedArtifacts := releaseIdentitySets(req.Release.set.Members)
 	if compatibility.result.ReleaseSetDigest != req.Release.digest ||
 		compatibility.result.InventoryDigest != invDigest ||
 		compatibility.result.CompatibilityPolicyDigest != promotionPolicy.CompatibilityPolicyDigest ||
 		compatibility.result.Target != req.Target || compatibility.result.Verdict != CompatibilityAccepted ||
-		!equalStrings(compatibility.result.RecipeDigests, recipes) ||
+		!equalStrings(compatibility.result.BuildDigests, builds) ||
 		!equalStrings(compatibility.result.VectorDigests, vectors) ||
 		!equalStrings(compatibility.result.ArtifactDigests, expectedArtifacts) {
 		return nil, e.New(e.CodeGateUnmet,
@@ -467,7 +466,7 @@ func Authorize(ctx context.Context, req AuthorizationRequest) (*Authorization, e
 			ReceiptDigest:             compatibility.digest,
 			CompatibilityPolicyDigest: compatibility.result.CompatibilityPolicyDigest,
 			Target:                    compatibility.result.Target,
-			RecipeDigests:             append([]string(nil), compatibility.result.RecipeDigests...),
+			BuildDigests:              append([]string(nil), compatibility.result.BuildDigests...),
 			VectorDigests:             append([]string(nil), compatibility.result.VectorDigests...),
 			ArtifactDigests:           append([]string(nil), compatibility.result.ArtifactDigests...),
 			Verdict:                   compatibility.result.Verdict, VerifiedSigner: compatibility.verifiedSigner,
@@ -487,12 +486,12 @@ func Authorize(ctx context.Context, req AuthorizationRequest) (*Authorization, e
 		receipt, ok := reproduction[memberKey(member)]
 		if !ok || !reproductionMatchesMember(receipt.result, member) {
 			return nil, e.New(e.CodeGateUnmet,
-				"member %s/%s/%s lacks a reproduction receipt bound to its exact recipe, vector, profile, resolved inputs, artifacts, and verdict",
-				member.Component, orNone(member.Role), member.Arch)
+				"member %s/%s lacks a reproduction receipt bound to its exact build, vector, profile, resolved inputs, artifacts, and verdict",
+				member.Component, member.Arch)
 		}
 		proof := memberProof{
-			Component: member.Component, Role: member.Role, Arch: member.Arch, Version: member.Version,
-			RecipeDigest: member.RecipeDigest, VectorDigest: member.VectorDigest,
+			Component: member.Component, Arch: member.Arch, Version: member.Version,
+			BuildDigest: member.BuildDigest, VectorDigest: member.VectorDigest,
 			ProfileDigest: member.ProfileDigest, ProfileIndependent: member.ProfileDigest == "",
 			ResolvedInputDigest: member.ResolvedInputDigest,
 			ArtifactDigests:     append([]string(nil), member.ArtifactDigests...),

@@ -11,7 +11,7 @@ import (
 func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 	plan := buildOnlyPlan(t, "")
 	source := ""
-	for _, node := range plan.Recipes[0].Graph.Nodes {
+	for _, node := range plan.Builds[0].Graph.Nodes {
 		if node.Kind == ir.KindFetch && node.Repo != "" {
 			source = node.Repo
 			break

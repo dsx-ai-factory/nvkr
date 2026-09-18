@@ -185,7 +185,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	for _, artifact := range plan.Graph.Artifacts {
 		planned[artifact.ID] = artifact
 	}
-	aicrPath := planned["artifact/h100-runtime/aicr-bundle"].Path
+	aicrPath := planned["artifact/gpu-runtime/aicr-bundle"].Path
 	if err := os.MkdirAll(aicrPath, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -224,10 +224,10 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeAPT, recipeHelm := "sha256:"+repeat("5", 64), "sha256:"+repeat("6", 64)
+	buildAPT, buildHelm := "sha256:"+repeat("5", 64), "sha256:"+repeat("6", 64)
 	artifacts := []Artifact{
-		{Name: "gpu-runtime", Kind: OutputHelm, Digest: helm.Digest, RecipeDigest: recipeHelm},
-		{Name: "worker-apt", Kind: OutputAPT, Digest: apt.Digest, RecipeDigest: recipeAPT, Components: []string{"agent"}},
+		{Name: "gpu-runtime", Kind: OutputHelm, Digest: helm.Digest, BuildDigest: buildHelm},
+		{Name: "worker-apt", Kind: OutputAPT, Digest: apt.Digest, BuildDigest: buildAPT, Components: []string{"agent"}},
 	}
 	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: artifacts})
 	if err != nil {
@@ -326,7 +326,7 @@ func testPreparedPublicationLayout(t *testing.T) (string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	artifact := Artifact{Name: "tools", Kind: OutputExecutable, Digest: descriptor.Digest, RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
+	artifact := Artifact{Name: "tools", Kind: OutputExecutable, Digest: descriptor.Digest, BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
 	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{Name: "tools", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"kubectl": pipeline.FileDigest([]byte("kubectl"))})
 	layout := filepath.Join(root, "publication")
 	publication, err := delivery.BuildPublicationRoot(context.Background(), layout, request)
@@ -364,12 +364,12 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 		request.Objects = append(request.Objects, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(digest, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: digest, Bytes: raw, Evidence: &delivery.EvidenceBinding{Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspected}})
 	}
 	for i, artifact := range artifacts {
-		output := &delivery.OutputBinding{Repository: artifact.Name, Format: artifact.Kind, RecipeDigest: artifact.RecipeDigest, Components: artifact.Components}
+		output := &delivery.OutputBinding{Repository: artifact.Name, Format: artifact.Kind, BuildDigest: artifact.BuildDigest, Components: artifact.Components}
 		request.Objects[i].Output = output
 		for _, component := range artifact.Components {
 			subject := subjects[component]
 			output.BuildSubjects = append(output.BuildSubjects, delivery.BuildSubject{Component: component, Digest: subject})
-			bom, err := sbom.NewSubject(artifact.RecipeDigest, component, subject)
+			bom, err := sbom.NewSubject(artifact.BuildDigest, component, subject)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -396,7 +396,7 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 			if err != nil {
 				t.Fatal(err)
 			}
-			bom, err := sbom.NewSubject(artifact.RecipeDigest, artifact.Name, subject)
+			bom, err := sbom.NewSubject(artifact.BuildDigest, artifact.Name, subject)
 			if err != nil {
 				t.Fatal(err)
 			}

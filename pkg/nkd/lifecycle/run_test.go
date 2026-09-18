@@ -9,7 +9,7 @@ import (
 func TestBindObservedPreservesFrozenRequiredOutputs(t *testing.T) {
 	run := testRun()
 	artifact := Artifact{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64),
-		RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
+		BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
 	bound, err := bindObserved(run, []Artifact{artifact})
 	if err != nil {
 		t.Fatal(err)
@@ -32,12 +32,12 @@ func TestBindObservedFailsClosedOnIncompleteOrSubstitutedOutput(t *testing.T) {
 		status    string
 	}{
 		{name: "missing", status: RunFailed},
-		{name: "unexpected", artifacts: []Artifact{{Name: "other", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}}, want: nkderr.CodeReleaseIncomplete},
-		{name: "wrong recipe", artifacts: []Artifact{{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), RecipeDigest: "sha256:" + repeat("6", 64), Components: []string{"kubectl"}}}, want: nkderr.CodeVerifyFailed},
-		{name: "wrong components", artifacts: []Artifact{{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"other"}}}, want: nkderr.CodeVerifyFailed},
+		{name: "unexpected", artifacts: []Artifact{{Name: "other", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}}, want: nkderr.CodeReleaseIncomplete},
+		{name: "wrong build", artifacts: []Artifact{{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), BuildDigest: "sha256:" + repeat("6", 64), Components: []string{"kubectl"}}}, want: nkderr.CodeVerifyFailed},
+		{name: "wrong components", artifacts: []Artifact{{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"other"}}}, want: nkderr.CodeVerifyFailed},
 		{name: "duplicate", artifacts: []Artifact{
-			{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}},
-			{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}},
+			{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}},
+			{Name: "cli", Kind: OutputExecutable, Digest: "sha256:" + repeat("4", 64), BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}},
 		}, want: nkderr.CodeReleaseIncomplete},
 	}
 	for _, test := range tests {
@@ -64,5 +64,5 @@ func testRun() *Run {
 	return &Run{SchemaVersion: RunSchemaVersion, Attempt: "attempt-1", DefinitionDigest: "sha256:" + repeat("1", 64),
 		EnvironmentDigest: "sha256:" + repeat("2", 64), PlanDigest: "sha256:" + repeat("3", 64),
 		Lane: LaneUnqualified, Status: RunPending,
-		Expected: []requiredOutput{{Name: "cli", Kind: OutputExecutable, ArtifactID: "package/cli", MemberArtifactID: "package/cli-bundle", RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}, ComponentResults: []string{"result/cli-recipe/kubectl"}}}}
+		Expected: []requiredOutput{{Name: "cli", Kind: OutputExecutable, ArtifactID: "package/cli", MemberArtifactID: "package/cli-bundle", BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}, ComponentResults: []string{"result/cli/kubectl"}}}}
 }

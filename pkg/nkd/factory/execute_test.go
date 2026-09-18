@@ -20,7 +20,7 @@ func TestPublicationRootEnclosesAPTRepositoryAsOCIArtifact(t *testing.T) {
 	if err := os.WriteFile("inputs/tool", []byte("tool-bytes\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	plan := &Plan{Recipes: []RecipePlan{
+	plan := &Plan{Builds: []BuildPlan{
 		{
 			Name: "node",
 			Graph: &ir.Graph{Nodes: []ir.Node{
@@ -32,7 +32,7 @@ func TestPublicationRootEnclosesAPTRepositoryAsOCIArtifact(t *testing.T) {
 		},
 	}}
 	artifacts := map[string]Artifact{
-		"artifact/node/tool": {ID: "artifact/node/tool", Name: "tool", Kind: "host-package", Path: "inputs/tool", RecipeTarget: "node", Component: "tool"},
+		"artifact/node/tool": {ID: "artifact/node/tool", Name: "tool", Kind: "host-package", Path: "inputs/tool", BuildTarget: "node", Component: "tool"},
 		"package/worker-apt": {ID: "package/worker-apt", Name: "worker-apt", Kind: PackageAPT, MediaType: packageMediaType(PackageAPT), Path: "outputs/apt"},
 		"package/root":       {ID: "package/root", Name: "root", Kind: PackageOCI, MediaType: packageMediaType(PackageOCI), Path: "outputs/root"},
 	}
@@ -67,7 +67,7 @@ func TestHelmPackageIsStableAcrossWorkspaceRelocationAndReclaimsCarrier(t *testi
 	if err := os.MkdirAll(canonicalInput, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(canonicalInput, "recipe.yaml"), []byte("apiVersion: aicr.nvidia.com/v1\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(canonicalInput, "build.yaml"), []byte("apiVersion: aicr.nvidia.com/v1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	node := Node{ID: "package/gpu", Kind: NodePackage, PackageKind: PackageHelm,

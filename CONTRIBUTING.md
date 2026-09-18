@@ -35,13 +35,14 @@ These are load-bearing. The proposed decisions in [`docs/adr/`](docs/adr/) are t
 baseline pending ratification, and [`docs/adr/reconciliation.md`](docs/adr/reconciliation.md) records the
 current implementation boundary:
 
-- **Fail closed.** An unpinned source ref, a tag-pinned toolchain, an unsupported criteria value, or a
-  reserved axis must error with a coded, distinct exit status — never a silent default.
-- **Deterministic IR.** `recipeDigest` is the domain-separated digest of the canonical IR. No host paths,
+- **Fail closed.** An unpinned source ref, a tag-pinned toolchain, an unknown component or unsupported target platform must error with a coded, distinct exit status — never a silent default.
+- **Deterministic IR.** `buildDigest` identifies the validated graph's logical projection under `nkd.build`.
+  Transport and execution metadata remain in the full graph and Plan. No host paths,
   clocks, UUIDs, random values, invalid UTF-8 normalization, or Go map-iteration order may feed a semantic
   identity, manifest, or signature.
-- **Keep lanes explicit.** From-source builds run in pinned-by-digest toolchain containers with
-  `--network=none`. Byte-preserving prebuilt acquisition is a separate, content-addressed lane and
+- **Keep lanes explicit.** Hermetic source builds run in pinned-by-digest toolchain containers with
+  `--network=none`; admitted wrapped builds record their declared network and privilege. Byte-preserving
+  prebuilt acquisition is a separate, content-addressed lane and
   in the qualified lane must carry typed external SBOM/provenance evidence or an exact authenticated waiver; v1 acquisition records its pin without authenticating upstream signatures. Acquisition must never
   be relabeled as a source build.
 - **One IR → many adapters.** A new CI engine is one adapter; a new component is one catalog YAML entry,
@@ -54,8 +55,8 @@ current implementation boundary:
 
 ## Contributing a catalog / component
 
-Adding a component is normally a **declarative** change in the selected Definition’s catalog under `definitions/` and, where applicable,
-its Recipe overlay or mixin, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
+Adding a component is a **declarative** change in the selected Definition’s catalog under `definitions/`.
+Select it directly in an output with a concrete platform, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
 waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nkdctl definition validate --definition <path>`. A source bake-off is useful contract evidence, but
 release qualification also requires the authenticated producer, terminal, evidence, policy, and status chain

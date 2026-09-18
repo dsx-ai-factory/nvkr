@@ -36,14 +36,14 @@ func qualifiedResultGraph(t *testing.T, node ir.Node) (*ir.Graph, string) {
 	t.Helper()
 	fetch := testFetchNode(node.Needs[0], "https://example.test/source", node.SourceCommit,
 		node.SourceTreeHash, node.SourceDest, node.Toolchain, node.VendorSpecDigest)
-	graph := testSourceGraph("r", fetch, node)
+	graph := testSourceGraph(fetch, node)
 	return graph, mustGraphDigest(t, graph)
 }
 
 func TestVerifyResultsRehydratesAndRehashesExactProducerSet(t *testing.T) {
 	work := filepath.Join(t.TempDir(), "work")
 	node, opts, receipt := qualifiedResultOptions(t, filepath.Join(work, "src"))
-	g, recipeDigest := qualifiedResultGraph(t, node)
+	g, buildDigest := qualifiedResultGraph(t, node)
 	artifact := artifactHostPath(opts, node)
 	if err := os.MkdirAll(filepath.Dir(artifact), 0o755); err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestVerifyResultsRehydratesAndRehashesExactProducerSet(t *testing.T) {
 	}
 	results := ResultDirectory(opts.SourceRoot)
 	writeResultForTest(t, results, node.ID, result)
-	rep, err := (Local{}).VerifyResults(g, recipeDigest, results, opts)
+	rep, err := (Local{}).VerifyResults(g, buildDigest, results, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestVerifyResultsRehydratesAndRehashesExactProducerSet(t *testing.T) {
 	if err := os.WriteFile(artifact, []byte("tampered"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Local{}).VerifyResults(g, recipeDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := (Local{}).VerifyResults(g, buildDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("post-job artifact tamper must fail closed, got %v", err)
 	}
 }
@@ -88,8 +88,8 @@ func TestVerifyResultsBindsOnlyTheSelectedProducerSet(t *testing.T) {
 		WriteDir: "out-other", ArtifactPath: "out-other/a-other",
 		Command: []string{"must-not-run"},
 	}, fetch)
-	graph := testSourceGraph("selected-results", fetch, selected, other)
-	recipeDigest := mustGraphDigest(t, graph)
+	graph := testSourceGraph(fetch, selected, other)
+	buildDigest := mustGraphDigest(t, graph)
 	observation := profile.ExecutionObservation{
 		RunnerDigest: "sha256:" + repeatHex("a"), RunnerOrigin: profile.RunnerPreexisting,
 		RuntimeIdentity: "sha256:" + repeatHex("b"),
@@ -124,7 +124,7 @@ func TestVerifyResultsBindsOnlyTheSelectedProducerSet(t *testing.T) {
 		ExecutionBinding: receipt.ExecutionBinding(),
 	})
 
-	report, err := (Local{}).VerifyResults(graph, recipeDigest, ResultDirectory(opts.SourceRoot), opts)
+	report, err := (Local{}).VerifyResults(graph, buildDigest, ResultDirectory(opts.SourceRoot), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,12 +139,12 @@ func TestVerifyResultsBindsOnlyTheSelectedProducerSet(t *testing.T) {
 func TestVerifyResultsRejectsMissingExtraAndForgedFields(t *testing.T) {
 	work := filepath.Join(t.TempDir(), "work")
 	node, opts, receipt := qualifiedResultOptions(t, filepath.Join(work, "src"))
-	g, recipeDigest := qualifiedResultGraph(t, node)
+	g, buildDigest := qualifiedResultGraph(t, node)
 	results := ResultDirectory(opts.SourceRoot)
 	if err := os.MkdirAll(results, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Local{}).VerifyResults(g, recipeDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := (Local{}).VerifyResults(g, buildDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("missing producer result must fail closed, got %v", err)
 	}
 
@@ -159,23 +159,23 @@ func TestVerifyResultsRejectsMissingExtraAndForgedFields(t *testing.T) {
 	unqualified.Component = node.Component
 	unqualified.Qualification = ArtifactUnqualified
 	writeResultForTest(t, results, node.ID, unqualified)
-	if _, err := (Local{}).VerifyResults(g, recipeDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := (Local{}).VerifyResults(g, buildDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("explicitly unqualified exec-node result must fail terminal verification, got %v", err)
 	}
 	writeResultForTest(t, results, node.ID, forged)
-	if _, err := (Local{}).VerifyResults(g, recipeDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := (Local{}).VerifyResults(g, buildDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("forged result identity must fail closed, got %v", err)
 	}
 	forged.Component = node.Component
 	forged.SHA256 = repeatHex("c") // a bare hex string is not a content-addressed identity
 	writeResultForTest(t, results, node.ID, forged)
-	if _, err := (Local{}).VerifyResults(g, recipeDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := (Local{}).VerifyResults(g, buildDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("unqualified result digest must fail closed, got %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(results, "extra.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Local{}).VerifyResults(g, recipeDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := (Local{}).VerifyResults(g, buildDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("extra result must fail exact-set verification, got %v", err)
 	}
 	resultPath := filepath.Join(results, sanitizeName(node.ID)+".json")
@@ -185,7 +185,7 @@ func TestVerifyResultsRejectsMissingExtraAndForgedFields(t *testing.T) {
 	if err := os.WriteFile(resultPath, []byte(`{"component":"c","component":"c"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Local{}).VerifyResults(g, recipeDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := (Local{}).VerifyResults(g, buildDigest, results, opts); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("duplicate result members must fail exact decoding, got %v", err)
 	}
 }

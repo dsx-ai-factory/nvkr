@@ -39,15 +39,15 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			if err := canonical.UnmarshalExact(bytes.TrimSuffix(object.Bytes, []byte{'\n'}), &bom); err != nil {
 				return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding held SBOM")
 			}
-			recipe := ""
+			build := ""
 			for _, p := range bom.Metadata.Props {
-				if p.Name == "nkd:recipeDigest" {
-					recipe = p.Value
+				if p.Name == "nkd:buildDigest" {
+					build = p.Value
 				}
 			}
-			key := recipe + "/" + bom.Metadata.Component.Name
+			key := artifact.BuildTarget + "/" + build + "/" + bom.Metadata.Component.Name
 			if previous := boms[key]; previous != nil {
-				return nil, e.New(e.CodeVerifyFailed, "ambiguous recipe inventory %q", key)
+				return nil, e.New(e.CodeVerifyFailed, "ambiguous build inventory %q", key)
 			}
 			boms[key] = &bom
 		}
@@ -80,7 +80,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			return nil, e.New(e.CodeProvenanceMissing, "release omits output %q", output.Name)
 		}
 		for _, component := range output.Components {
-			bom := boms[output.RecipeDigest+"/"+component]
+			bom := boms[output.Name+"/"+output.BuildDigest+"/"+component]
 			if bom == nil {
 				return nil, e.New(e.CodeProvenanceMissing, "release omits inventory for %q/%q", output.Name, component)
 			}
@@ -124,7 +124,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			if err != nil {
 				return err
 			}
-			bom, err := sbom.NewSubject(output.RecipeDigest, output.Name, subject)
+			bom, err := sbom.NewSubject(output.BuildDigest, output.Name, subject)
 			if err != nil {
 				return err
 			}

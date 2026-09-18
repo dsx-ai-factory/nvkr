@@ -35,15 +35,15 @@ const (
 
 	// Band 10–19 — resolve / input / preflight / crypto. The signature/trust gate
 	// (signature-invalid) runs BEFORE the digest comparison (ADR-04).
-	CodeNoMatch            Code = "NKD-E-NO-MATCH"             // no recipe matched the query
-	CodeAmbiguous          Code = "NKD-E-AMBIGUOUS"            // more than one equally-specific recipe matched (ties fail closed)
+	CodeNoMatch            Code = "NKD-E-NO-MATCH"             // reserved historical selector code: no match
+	CodeAmbiguous          Code = "NKD-E-AMBIGUOUS"            // reserved historical selector code: ambiguous match
 	CodeReservedAxis       Code = "NKD-E-RESERVED-AXIS"        // a reserved (v1-inactive) axis carried a value
 	CodeUnsupported        Code = "NKD-E-UNSUPPORTED"          // active axis value outside its v1 domain
 	CodeUnpinnedSource     Code = "NKD-E-UNPINNED-SOURCE"      // component lacks a full commit SHA / tree hash
 	CodeTagToolchain       Code = "NKD-E-TOOLCHAIN-TAG"        // toolchain image referenced by tag, not digest
 	CodeInvalidCatalog     Code = "NKD-E-INVALID-CATALOG"      // catalog failed schema/consistency validation
 	CodePreflightFailed    Code = "NKD-E-PREFLIGHT-FAILED"     // host diverges from the selected builder profile on a fail-closed field
-	CodeBuilderNotProvided Code = "NKD-E-BUILDER-NOT-PROVIDED" // builder profile does not provide a builder the recipe requires
+	CodeBuilderNotProvided Code = "NKD-E-BUILDER-NOT-PROVIDED" // builder profile does not provide a builder the selected build requires
 	CodeSignatureInvalid   Code = "NKD-E-SIGNATURE-INVALID"    // a signature failed to verify (crypto gate, before digest compare)
 
 	// Band 20–29 — build / verify / trust-policy / disk.

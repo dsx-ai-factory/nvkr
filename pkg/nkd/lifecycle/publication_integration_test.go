@@ -13,7 +13,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
-func TestPublicationEmbedsAuthenticatedOutputsAndClusterRealization(t *testing.T) {
+func TestPublicationEmbedsAuthenticatedOutputsAndContent(t *testing.T) {
 	plan, err := Compile(context.Background(), "definition.yaml", testDefinition(t), "environment.yaml", testEnvironment(), "test")
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +32,7 @@ func TestPublicationEmbedsAuthenticatedOutputsAndClusterRealization(t *testing.T
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	component := artifacts["artifact/cli-recipe/kubectl"]
+	component := artifacts["artifact/cli/kubectl"]
 	if err := os.MkdirAll(filepath.Dir(component.Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestPublicationEmbedsAuthenticatedOutputsAndClusterRealization(t *testing.T
 	if err := os.WriteFile(component.Path, payload, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	resultArtifact := artifacts["result/cli-recipe/kubectl"]
+	resultArtifact := artifacts["result/cli/kubectl"]
 	if err := os.MkdirAll(filepath.Dir(resultArtifact.Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -59,10 +59,7 @@ func TestPublicationEmbedsAuthenticatedOutputsAndClusterRealization(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := factory.ExecuteNode(context.Background(), plan, "composition/tenant", nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := factory.ExecuteNode(context.Background(), plan, "cli-recipe/sbom", nil, nil); err != nil {
+	if err := factory.ExecuteNode(context.Background(), plan, "cli/sbom", nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := factory.ExecuteNode(context.Background(), plan, "package/release", nil, nil); err != nil {
@@ -73,7 +70,7 @@ func TestPublicationEmbedsAuthenticatedOutputsAndClusterRealization(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	gotArtifacts, subject, clusters, err := artifactsFromBinding(context.Background(), root, inspection)
+	gotArtifacts, subject, err := artifactsFromBinding(context.Background(), root, inspection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,8 +79,8 @@ func TestPublicationEmbedsAuthenticatedOutputsAndClusterRealization(t *testing.T
 		t.Fatal(err)
 	}
 	if len(gotArtifacts) != 1 || gotArtifacts[0].Name != "cli" || gotArtifacts[0].Digest != descriptor.Digest ||
-		len(clusters) != 1 || clusters[0].Members[0].Role != "worker" || clusters[0].Members[0].ArtifactDigest != descriptor.Digest || subject == "" {
-		t.Fatalf("artifacts=%+v subject=%s clusters=%+v", gotArtifacts, subject, clusters)
+		subject == "" {
+		t.Fatalf("artifacts=%+v subject=%s", gotArtifacts, subject)
 	}
 
 	for _, tc := range []struct {
@@ -135,7 +132,7 @@ func TestPublicationEmbedsAuthenticatedOutputsAndClusterRealization(t *testing.T
 			changed := inspection
 			changed.Root.Objects = append([]delivery.PublishedObject(nil), inspection.Root.Objects...)
 			tc.mutate(&changed)
-			_, _, _, err := artifactsFromBinding(t.Context(), root, changed)
+			_, _, err := artifactsFromBinding(t.Context(), root, changed)
 			assertCode(t, err, nkderr.CodeVerifyFailed)
 		})
 	}

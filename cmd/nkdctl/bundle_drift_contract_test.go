@@ -20,9 +20,9 @@ func TestExecutionBundleDriftClassification(t *testing.T) {
 			}
 			switch kind {
 			case "stale-pins":
-				raw := strings.ReplaceAll(string(fixture.emitted), fixture.recipeDigest, "sha256:"+strings.Repeat("f", 64))
+				raw := strings.ReplaceAll(string(fixture.emitted), fixture.buildDigest, "sha256:"+strings.Repeat("f", 64))
 				if raw == string(fixture.emitted) {
-					t.Fatal("fixture lacks recipe header")
+					t.Fatal("fixture lacks build header")
 				}
 				if err := os.WriteFile(out, []byte(raw), 0o644); err != nil {
 					t.Fatal(err)
@@ -40,7 +40,7 @@ func TestExecutionBundleDriftClassification(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			err := bundleCheck(t.Context(), out, "github", "r", fixture.recipeDigest, fixture.emitted, fixture.nodes, fixture.transportPlan, true)
+			err := bundleCheck(t.Context(), out, "github", fixture.buildDigest, fixture.emitted, fixture.nodes, fixture.transportPlan, true)
 			if kind == "exact" {
 				if err != nil {
 					t.Fatal(err)

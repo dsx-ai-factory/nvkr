@@ -30,7 +30,7 @@ func TestBakeOffCLIComparesFilesWithoutClaimingQualification(t *testing.T) {
 				if i == 1 && tc.second == "b" {
 					digest = "b"
 				}
-				manifest, err := diagnosticManifestFromReport(diagnosticBakeOffContext(t, "--arch", "amd64"), diagnosticBakeOffReport(digest))
+				manifest, err := diagnosticManifestFromReport(diagnosticBakeOffContext(t, "--platform", "linux/amd64"), diagnosticBakeOffReport(digest))
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -6,9 +6,9 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-18 in the consolidated NKD ADR set (added to close the recipe→realized-pipeline gap).
+- **Index:** ADR-18 in the consolidated NKD ADR set (added to close the Definition→realized-pipeline gap).
 - **Relates to:** ADR-02 (IR), ADR-10 (builder types), ADR-07 (builder profile / runner-digest pin), ADR-04
-  (verify), ADR-19 (cluster orchestration).
+  (verify), ADR-19 (deployment ownership boundary).
 - **Satisfies:** FR-05 (CI portability), FR-06 (hermetic build), SEC-06 (terminal verify), SEC-11 (build
   isolation).
 
@@ -27,7 +27,14 @@ kept in sync.
 
 Each CI adapter (GitHub, GitLab, Tekton, Argo) and the local runner **lower the same IR**. Adapters map **job/step
 topology and artifact transport only**, never build semantics. Adding an engine is one thin adapter; adding a
-component is one catalog entry and no code.
+component is one catalog entry and no code. Definition v4 names each output, its exact catalog producers,
+and its concrete platform. Compilation derives one internal build target per output; no authored reusable
+producer group, recipe selection, criteria matcher, mixin or recipe layer participates. The BuildDigest
+identifies the selected executable producer closure and excludes the output name, packaging and transport.
+Two named outputs with equal BuildDigest retain independent executions, results and evidence obligations.
+Existing Helm image-output dependencies remain explicit packaging edges. AICR renderer settings belong to the
+individual output and the generated IR v3 activation. The effective deployer and selectors participate in its
+BuildDigest. Run-plan, compile-spec and artifact-graph v3 contain no cluster-composition nodes or records.
 
 #### Required engine capability and transport contract
 
@@ -95,20 +102,20 @@ Missing prerequisites fail capability admission. No bespoke/self-hosted runner l
 Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.
 Prebuilt helper-image qualification stays disabled until that admission contract exists. Runtime/helper changes
-belong to Environment/profile configuration; component toolchains remain Recipe inputs.
+belong to Environment/profile configuration; component toolchains remain producer inputs.
 
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
 - The exact runner bytes that execute from-source nodes are always measured and verified against the
   builder-profile runner pin.
-- A self-hosting execution builds the runner **from pinned source** — its own recipe, because the tool is not a
+- A self-hosting execution builds the runner **from pinned source** — its own pinned producer definition, because the tool is not a
   trusted pre-built binary — under a pinned bootstrap toolchain, producing a digest-pinned runner. Its stage-two
   observation records `bootstrapped`, measures that actual bootstrap toolchain, and verifies both identities.
 - An execution that uses a preexisting runner records `preexisting`, hashes those exact bytes, and MUST NOT claim
   or require a bootstrap toolchain that did not participate. This prevents a profile declaration from becoming
   fabricated evidence.
 - The runner is **output-affecting** (it executes the build), so its digest is a **fail-closed builder-identity attribute in the builder
-  profile** (ADR-07), not part of `recipeDigest`: a runner bump is an environment change, not a definition
+  profile** (ADR-07), not part of `buildDigest`: a runner bump is an environment change, not a definition
   change.
 
 The profile-free prebuilt artifact lane still executes a runner to acquire bytes, enforce the transport
@@ -133,7 +140,7 @@ Isolation and the fixed environment/mount contract are identical across all engi
 - `oci-hermetic` and proposed `nix` build nodes use helper-launched pinned toolchains; unsupported execution adapters fail admission.
 - `buildkit-rootless` is the networked wrapped OCI-export mode for generated lifecycle Runs (ADR-10).
   The shared Docker launcher owns its fixed non-root isolation settings and child-process cleanup. Factory
-  build projections must match the embedded recipe IR's network, container and platform exactly. The qualified
+  build projections must match the embedded output build IR's network, container and platform exactly. The qualified
   pipeline emitter rejects this mode; it cannot silently render it as a network-denied build.
 - `prebuilt` nodes lower to acquire-and-digest-verify.
 - `exclusion` emits no node.
@@ -148,7 +155,7 @@ existing T1 IR field and is not duplicated in execution requirements.
 
 The currently admitted authoring path is deliberately narrower: a from-source catalog producer authors
 `buildRequirements`, and compilation copies it unchanged into the corresponding build node in the full IR and
-Plan. It changes catalog and Plan identity but is structurally excluded from Recipe identity. Other node kinds
+Plan. It changes catalog and Plan identity but is structurally excluded from logical build identity. Other node kinds
 reject the field until their compiler projection and admission semantics exist. The request is optional for
 ordinary from-source builders. A `vm-image` producer requires positive values for all three resources, at least
 one eligible host platform, an explicit KVM policy, and a positive timeout. Host-platform and capability sets are
@@ -169,7 +176,7 @@ Plan, routes that node through the selected class, and does not infer an ordinar
 architecture. Plan admission recomputes the deterministic selection from the exact Environment inventory and
 rejects a substituted class, route, request, or binding. The class inventory affects Environment,
 execution-settings, and Plan identities; the selected binding affects full-IR bytes and Plan identity. Neither
-enters Recipe identity.
+enters logical build identity.
 
 Execution-class declarations are planning input, not runtime proof. Every current local or hosted adapter still
 rejects a selected build with nonempty execution requirements before execution or emitted output. A future runtime
@@ -218,9 +225,9 @@ receipt authentication and no-replace restoration remain mandatory.
 
 Every emitted pipeline is **job-per-component** and ends in an **unconditional terminal verify** (GitHub
 `if: always()`, GitLab `when: always`, Tekton `finally:`, Argo finished-state `depends`), so verify runs even if a
-build fails, on every engine (SEC-06). An unchanged recipe identity can identify a prior-verification reuse
-candidate, but the candidate diff is not evidence authority: actual skipping also requires an authenticated
-prior clearance whose exact member, policy, status, and time bindings remain current.
+build fails, on every engine (SEC-06). Equal logical build identities do not collapse named output executions
+or their evidence slots. The current Definition path performs no general reuse of prior builds or verification;
+any future reuse needs an authenticated prior result bound to the exact output, members, policy, status and time.
 
 The terminal signature verifier is itself an authenticated execution input. An emitted qualified pipeline must
 name a committed workspace-relative `cosign` executable and carry its exact lowercase `sha256` byte digest. The
@@ -234,14 +241,15 @@ missing, zero, changed-selection, or forged bindings.
 
 ### 8. Pipeline-attested generation and credential admission
 
-Two emitters share the node-execution primitive. The single-recipe authoritative emitter retains §1's qualified
-provider-attestation gate and stays frozen where adapters are incomplete. The multi-recipe factory emitter may
-render from-source production for GitHub at the pipeline-attested tier without a qualified provider receipt.
+Two emitters share the node-execution primitive. The single-graph authoritative emitter retains §1's qualified
+provider-attestation gate and stays frozen where adapters are incomplete. The output-oriented factory emitter
+may render from-source production for GitHub at the pipeline-attested tier without a qualified provider receipt.
 Self-reported isolation is recorded, never promoted to qualification. Wrapped production uses ADR-10's deferred
 fused-job contract. Invoking an upstream reusable workflow needs a separate execution and evidence contract;
 v1 invokes pinned source entrypoints instead.
 
-GitLab is build/package-only. GitLab, Tekton and Argo reject signing plans with `CodeEngineCapability` before
+The retained GitLab adapter is build/package-only; maintained lifecycle targets are local and GitHub.
+GitLab, Tekton and Argo reject signing plans with `CodeEngineCapability` before
 output; omitting unsupported signing jobs silently is forbidden. Tekton/Argo factory adapters remain unavailable.
 
 | Event | Admitted work and credentials |
@@ -274,7 +282,7 @@ container and platform into one bounded job. Every logical node retains its exac
 container isolation; fetch, build, publication and signing remain separate jobs. Internal dependencies use the
 same workspace bytes and consumer checks. Each logical output retains its carrier for finalization. A failed
 shared job makes its outputs unsuccessful for finalization, even if an earlier step uploaded a carrier.
-This provider scheduling choice does not change the logical graph or Recipe identity.
+This provider scheduling choice does not change the logical graph or logical build identity.
 
 GitHub job and step labels describe the operation and selected component or output. Grouped jobs disclose Helm
 image binding when present; stable execution step IDs and exact commands retain the graph binding independently
@@ -337,12 +345,12 @@ the finalizer itself from starting; inspect provider status when no Run record e
 
 - **ADR-03:** owns the stable coded `engine-capability` failure used by this contract.
 - **ADR-07:** the runner digest is a fail-closed builder-identity attribute in the builder profile.
-- **ADR-19:** how a full release or cluster fans these per-category pipelines out and aggregates them.
+- **ADR-19:** downstream deployment owns topology and placement; generated Run pipelines build and publish named outputs.
 
 ## Acceptance evidence
 
 Current module evidence in `pkg/nkd/pipeline/emitters_test.go`, `pkg/nkd/pipeline/execnode_test.go`, and
-`pkg/nkd/pipeline/results_test.go` proves engine-neutral lowering, node serialization, exact bundle/recipe
+`pkg/nkd/pipeline/results_test.go` proves engine-neutral lowering, node serialization, exact bundle/build
 binding, explicit unqualified exec-node results, terminal receipt enforcement, and that all four default adapters
 reject a from-source graph before emitting bytes when provider execution attestation is absent. Prebuilt-only
 GitLab emission tests retain unconditional-verify, exact pinned-verifier arguments, transport-shape coverage,

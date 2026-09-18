@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
@@ -60,10 +59,8 @@ func buildOnlyPlan(t *testing.T, deliveryRunsOn string) *Plan {
 		Metadata: Metadata{Name: "buildonly"}, Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
 		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
 		UtilityPlatform:  "linux/amd64",
-		Recipes: []RecipeTarget{{Name: "worker", Criteria: criteria.Criteria{
-			Category: "kubernetes", Role: "worker", K8sVersion: "1.34.0", OS: "ubuntu", Arch: "amd64",
-		}}},
-		Packages: []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
+		Builds:           []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
+		Packages:         []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
 	}
 	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
 		Metadata: Metadata{Name: "build-only"}, RunsOn: deliveryRunsOn}
@@ -107,7 +104,7 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 }
 
 // TestCommittedCanonicalMembersHaveNoTrailingNewline guards every canonical bundle member
-// (plan, graphs, compositions) that is read back at runtime with canonical.UnmarshalExact,
+// (plan and graphs) that is read back at runtime with canonical.UnmarshalExact,
 // which rejects a trailing newline. Only the workflow (.yml) may end with one.
 func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
@@ -126,14 +123,14 @@ func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 }
 
 // TestToolAcquireNodeIsNotIRProjected guards the routing bug: a tool-download acquire node has
-// no RecipeTarget/IRNode, so it must run via the glue `factory execute-node` path, not the IR
+// no BuildTarget/IRNode, so it must run via the glue `factory execute-node` path, not the IR
 // exec-node branch (which would reference a nonexistent graphs/.json).
 func TestToolAcquireNodeIsNotIRProjected(t *testing.T) {
 	if irProjectedNode(Node{ID: "tool/aicr", Kind: NodeAcquire}) {
-		t.Fatal("a tool acquire node (no RecipeTarget/IRNode) must not be IR-projected")
+		t.Fatal("a tool acquire node (no BuildTarget/IRNode) must not be IR-projected")
 	}
-	if !irProjectedNode(Node{ID: "gpu/pull-x", Kind: NodeAcquire, RecipeTarget: "gpu", IRNode: "pull-x"}) {
-		t.Fatal("a recipe-projected acquire node must be IR-projected")
+	if !irProjectedNode(Node{ID: "gpu/pull-x", Kind: NodeAcquire, BuildTarget: "gpu", IRNode: "pull-x"}) {
+		t.Fatal("a build-projected acquire node must be IR-projected")
 	}
 	if irProjectedNode(Node{ID: "package/tools", Kind: NodePackage}) {
 		t.Fatal("a package (glue) node must not be IR-projected")

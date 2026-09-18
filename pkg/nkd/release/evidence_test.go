@@ -10,11 +10,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 )
@@ -65,7 +64,7 @@ func evidenceNoneAuthorization(t *testing.T) (AuthorizationRequest, EvidenceWaiv
 		}
 	}
 	waiver, err := VerifyEvidenceWaiver(context.Background(), EvidenceWaiverRequest{
-		Component: "kubelet", Role: "worker", RecipeDigest: set.Members[0].RecipeDigest,
+		Component: "kubelet", BuildDigest: set.Members[0].BuildDigest,
 		ArtifactDigest: set.Members[0].ArtifactDigests[0], Profile: profileBinding, Status: statusBinding,
 		MissingTypes: []EvidenceType{EvidenceSBOM, EvidenceProvenance}, Reason: EvidenceNone,
 		PromotionPolicyDigest: promotionPolicyDigest, ApproverIdentity: "waiver-approver",
@@ -122,7 +121,7 @@ func TestAuthorizeRequiresQualifiedReportsAndIgnoresRawEvidenceDigest(t *testing
 	}
 	wrongReport, err := vuln.QualifyScan(context.Background(), vuln.QualifiedScanRequest{
 		Scanner: vuln.ScannerGrype, ScannerDigest: digest('7'), DatabaseDigest: digest('8'),
-		RecipeDigest: member.RecipeDigest, ArtifactDigest: member.ArtifactDigests[0],
+		BuildDigest: member.BuildDigest, ArtifactDigest: member.ArtifactDigests[0],
 		SBOMDigest: otherSBOMDigest, CanonicalSBOM: otherSBOMBytes,
 	}, qualifiedScanner{observation: vuln.ScanObservation{
 		ScannerDigest: digest('7'), DatabaseDigest: digest('8'), Result: []byte(`{"matches":[]}`),
@@ -216,7 +215,7 @@ func TestEvidenceNoneRequiresExactAuthenticatedWaiver(t *testing.T) {
 		}
 	}
 	expiredWaiver, err := VerifyEvidenceWaiver(context.Background(), EvidenceWaiverRequest{
-		Component: member.Component, Role: member.Role, RecipeDigest: member.RecipeDigest,
+		Component: member.Component, BuildDigest: member.BuildDigest,
 		ArtifactDigest: member.ArtifactDigests[0], Profile: mustProfile(t, member.ProfileDigest), Status: req.Status,
 		MissingTypes: []EvidenceType{EvidenceSBOM, EvidenceProvenance}, Reason: EvidenceNone,
 		PromotionPolicyDigest: mustPromotionPolicyDigest(t, req.PromotionPolicy), ApproverIdentity: "waiver-approver",
@@ -246,20 +245,20 @@ func TestWaiverReplayAcrossRecipeProfileOrGapFails(t *testing.T) {
 		name    string
 		request EvidenceWaiverRequest
 	}{
-		{name: "recipe", request: EvidenceWaiverRequest{
-			Component: member.Component, Role: member.Role, RecipeDigest: digest('9'),
+		{name: "build", request: EvidenceWaiverRequest{
+			Component: member.Component, BuildDigest: digest('9'),
 			ArtifactDigest: member.ArtifactDigests[0], Profile: mustProfile(t, member.ProfileDigest), Status: statusBinding,
 			MissingTypes: []EvidenceType{EvidenceSBOM, EvidenceProvenance}, Reason: EvidenceNone,
 			PromotionPolicyDigest: mustPromotionPolicyDigest(t, req.PromotionPolicy), ApproverIdentity: "waiver-approver", IssuedEpoch: 10, ExpiresEpoch: 20,
 		}},
 		{name: "profile", request: EvidenceWaiverRequest{
-			Component: member.Component, Role: member.Role, RecipeDigest: member.RecipeDigest,
+			Component: member.Component, BuildDigest: member.BuildDigest,
 			ArtifactDigest: member.ArtifactDigests[0], Profile: mustProfile(t, digest('9')), Status: statusBinding,
 			MissingTypes: []EvidenceType{EvidenceSBOM, EvidenceProvenance}, Reason: EvidenceNone,
 			PromotionPolicyDigest: mustPromotionPolicyDigest(t, req.PromotionPolicy), ApproverIdentity: "waiver-approver", IssuedEpoch: 10, ExpiresEpoch: 20,
 		}},
 		{name: "gap", request: EvidenceWaiverRequest{
-			Component: member.Component, Role: member.Role, RecipeDigest: member.RecipeDigest,
+			Component: member.Component, BuildDigest: member.BuildDigest,
 			ArtifactDigest: member.ArtifactDigests[0], Profile: mustProfile(t, member.ProfileDigest), Status: statusBinding,
 			MissingTypes: []EvidenceType{EvidenceSBOM}, Reason: EvidenceNone,
 			PromotionPolicyDigest: mustPromotionPolicyDigest(t, req.PromotionPolicy), ApproverIdentity: "waiver-approver", IssuedEpoch: 10, ExpiresEpoch: 20,
@@ -302,7 +301,7 @@ func TestWaiverAuthenticationMutationAndCancellationFailClosed(t *testing.T) {
 		t.Fatalf("canceled waiver authentication must return timeout: %v", err)
 	}
 	request := EvidenceWaiverRequest{
-		Component: "c", RecipeDigest: digest('a'), ArtifactDigest: digest('b'),
+		Component: "c", BuildDigest: digest('a'), ArtifactDigest: digest('b'),
 		Profile: BindProfileIndependent(), Status: verifiedStatus(t, digest('f'), "waiver-test-authority", 1),
 		MissingTypes: []EvidenceType{EvidenceSBOM}, Reason: EvidenceNone,
 		PromotionPolicyDigest: digest('d'), ApproverIdentity: "expected", IssuedEpoch: 1, ExpiresEpoch: 2,
@@ -317,7 +316,7 @@ func TestWaiverAuthenticationMutationAndCancellationFailClosed(t *testing.T) {
 }
 
 func TestExternalDeclarationsRequireByteVerifiedReceipts(t *testing.T) {
-	artifactDigest := rawTestDigest(releaseFixtureArtifactBytes("prebuilt", "worker"))
+	artifactDigest := rawTestDigest(releaseFixtureArtifactBytes("prebuilt"))
 	sbomBytes := []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","metadata":{"component":{"name":"prebuilt","hashes":[{"alg":"SHA-256","content":"` + strings.TrimPrefix(artifactDigest, "sha256:") + `"}]}}}`)
 	provenanceBytes := []byte(`{"_type":"https://in-toto.io/Statement/v1","subject":[{"name":"prebuilt","digest":{"sha256":"` + strings.TrimPrefix(artifactDigest, "sha256:") + `"}}],"predicateType":"https://slsa.dev/provenance/v1","predicate":{"buildDefinition":{"buildType":"https://example.test/prebuilt/v1","externalParameters":{}},"runDetails":{"builder":{"id":"https://example.test/upstream-builder"}}}}`)
 	sbomDigest := rawTestDigest(sbomBytes)
@@ -327,9 +326,9 @@ func TestExternalDeclarationsRequireByteVerifiedReceipts(t *testing.T) {
 	// digest before an opaque receipt can cross into release authorization.
 	sbomRef := "https://evidence.example.test/prebuilt/sbom.json"
 	provenanceRef := "https://evidence.example.test/prebuilt/provenance.json"
-	resolved := &recipe.Resolved{
-		RecipeID: "prebuilt", Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: "prebuilt", Component: catalog.Component{
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: "prebuilt", Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			Tag: "v1", SourceDate: 1, OutputType: "host-package", Prebuilt: &catalog.Prebuilt{
 				URL: "https://upstream.example/prebuilt", Digests: map[string]string{"amd64": artifactDigest},
 				Evidence: &catalog.ExternalEvidence{SBOMRef: sbomRef, SBOMDigest: sbomDigest,
@@ -337,11 +336,11 @@ func TestExternalDeclarationsRequireByteVerifiedReceipts(t *testing.T) {
 			},
 		}}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,7 +354,7 @@ func TestExternalDeclarationsRequireByteVerifiedReceipts(t *testing.T) {
 			return nil, errors.New("unexpected ref")
 		}
 	})
-	verifiedSet, err := sbom.BuildVerified(context.Background(), resolved, recipeDigest,
+	verifiedSet, err := sbom.BuildVerified(context.Background(), resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, reader)
 	if err != nil {
 		t.Fatal(err)
@@ -369,15 +368,15 @@ func TestExternalDeclarationsRequireByteVerifiedReceipts(t *testing.T) {
 	badPrebuilt.Evidence = &badEvidence
 	badComponent.Prebuilt = &badPrebuilt
 	badResolved.Components[0] = badComponent
-	badGraph, err := recipe.Compile(&badResolved)
+	badGraph, err := buildgraph.Compile(&badResolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	badRecipeDigest, err := badGraph.Digest()
+	badBuildDigest, err := badGraph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sbom.BuildVerified(context.Background(), &badResolved, badRecipeDigest,
+	if _, err := sbom.BuildVerified(context.Background(), &badResolved, badBuildDigest,
 		map[string]string{"prebuilt": artifactDigest}, reader); code(err) != nkderr.CodeUnverifiedRef {
 		t.Fatalf("external HTTPS bytes that mismatch their exact declared digest must not produce a receipt: %v", err)
 	}
@@ -386,7 +385,7 @@ func TestExternalDeclarationsRequireByteVerifiedReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	inv := &Inventory{SchemaVersion: InventorySchemaVersion, Version: "1", Components: []InventoryComponent{{
-		Name: "prebuilt", Role: "worker", RequiredArtifacts: []string{artifactDigest},
+		Name: "prebuilt", RequiredArtifacts: []string{artifactDigest},
 		ArtifactKinds:            []ArtifactKindBinding{{ArtifactDigest: artifactDigest, Kind: ArtifactOCIImage}},
 		ExternalSBOMRef:          sbomRef,
 		ExternalSBOMDigest:       sbomDigest,
@@ -398,7 +397,7 @@ func TestExternalDeclarationsRequireByteVerifiedReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	set := &ReleaseSet{SchemaVersion: ReleaseSetSchemaVersion, Version: "1", InventoryRef: invDigest, Members: []Member{{
-		Component: "prebuilt", Role: "worker", Arch: "amd64", RecipeDigest: recipeDigest,
+		Component: "prebuilt", Arch: "amd64", BuildDigest: buildDigest,
 		VectorDigest: digest('1'), ResolvedInputDigest: digest('3'), ArtifactDigests: []string{artifactDigest},
 	}}}
 	req := authorizationRequest(t, inv, set)

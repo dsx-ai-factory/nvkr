@@ -10,12 +10,13 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
 // EvidenceReader is the only external-evidence acquisition seam. Implementations
@@ -59,11 +60,11 @@ func (r ExternalEvidenceReceipt) EvidenceSchema() string { return r.evidenceSche
 //
 // The receipt cannot be populated through JSON.  It is issued only by
 // VerifiedSet.LocalReceipts after BuildVerifiedFromReport has bound every generated
-// SBOM to the exact qualified producer recipe and artifact set.
+// SBOM to the exact qualified producer build and artifact set.
 type LocalEvidenceReceipt struct {
 	valid            bool
 	component        string
-	recipeDigest     string
+	buildDigest      string
 	artifactDigest   string
 	evidenceDigest   string
 	blobDigest       string
@@ -76,7 +77,7 @@ type LocalEvidenceReceipt struct {
 // revalidates the receipt's private exact-byte binding first.
 type LocalEvidenceBinding struct {
 	Component      string
-	RecipeDigest   string
+	BuildDigest    string
 	ArtifactDigest string
 	EvidenceDigest string
 	BlobDigest     string
@@ -84,7 +85,7 @@ type LocalEvidenceBinding struct {
 }
 
 func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
-	if !receipt.valid || !canonicalText(receipt.component) || !canonical.IsDigest(receipt.recipeDigest) ||
+	if !receipt.valid || !canonicalText(receipt.component) || !canonical.IsDigest(receipt.buildDigest) ||
 		!canonical.IsDigest(receipt.artifactDigest) || !canonical.IsDigest(receipt.evidenceDigest) ||
 		!canonical.IsDigest(receipt.blobDigest) || receipt.evidenceSchema != "cyclonedx-json/1.5" ||
 		receipt.canonicalPayload == "" {
@@ -99,7 +100,7 @@ func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
 	if err != nil {
 		return LocalEvidenceBinding{}, err
 	}
-	documentRecipe, documentArtifact, err := metadataBindings(document.Metadata.Props)
+	documentBuild, documentArtifact, err := metadataBindings(document.Metadata.Props)
 	if err != nil {
 		return LocalEvidenceBinding{}, err
 	}
@@ -108,14 +109,14 @@ func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
 			"local SBOM receipt no longer matches its canonical payload")
 	}
 	subject := document.Metadata.Component
-	if documentRecipe != receipt.recipeDigest || documentArtifact != receipt.component ||
+	if documentBuild != receipt.buildDigest || documentArtifact != receipt.component ||
 		len(document.Components) != 0 || subject.Name != receipt.component ||
 		len(subject.Hashes) != 1 || subject.Hashes[0].Alg != "SHA-256" ||
 		"sha256:"+subject.Hashes[0].Content != receipt.artifactDigest {
 		return LocalEvidenceBinding{}, e.New(e.CodeUnverifiedRef,
 			"local SBOM receipt no longer binds its exact artifact subject")
 	}
-	return LocalEvidenceBinding{Component: receipt.component, RecipeDigest: receipt.recipeDigest,
+	return LocalEvidenceBinding{Component: receipt.component, BuildDigest: receipt.buildDigest,
 		ArtifactDigest: receipt.artifactDigest, EvidenceDigest: receipt.evidenceDigest,
 		BlobDigest: receipt.blobDigest, EvidenceSchema: receipt.evidenceSchema}, nil
 }
@@ -157,7 +158,7 @@ type VerifiedSet struct {
 // locally generated SBOMs are diagnostic only: caller hash strings do not prove a
 // producer observed those artifact bytes, so this path cannot issue LocalReceipts
 // or qualify publisher evidence. Use BuildVerifiedFromReport for publisher output.
-func BuildVerified(ctx context.Context, res *recipe.Resolved, recipeDigest string,
+func BuildVerified(ctx context.Context, res *buildgraph.Resolved, buildDigest string,
 	artifactHashes map[string]string, reader EvidenceReader,
 ) (*VerifiedSet, error) {
 	if err := validateSBOMContext(ctx); err != nil {
@@ -167,33 +168,33 @@ func BuildVerified(ctx context.Context, res *recipe.Resolved, recipeDigest strin
 	if err != nil {
 		return nil, err
 	}
-	if !canonical.IsDigest(recipeDigest) {
-		return nil, e.New(e.CodeUnverifiedRef, "verified SBOM has unpinned recipe digest %q", recipeDigest)
+	if !canonical.IsDigest(buildDigest) {
+		return nil, e.New(e.CodeUnverifiedRef, "verified SBOM has unpinned build digest %q", buildDigest)
 	}
 	hashes := cloneHashes(artifactHashes)
 	components, err := declarationArtifactSelection(snapshot, hashes)
 	if err != nil {
 		return nil, err
 	}
-	graph, err := requireResolvedRecipeIdentity(snapshot, recipeDigest)
+	graph, err := requireResolvedBuildIdentity(snapshot, buildDigest)
 	if err != nil {
 		return nil, err
 	}
 	if err := bindDeclaredPrebuiltSubjects(graph, hashes); err != nil {
 		return nil, err
 	}
-	return buildVerifiedSet(ctx, snapshot, recipeDigest, components, hashes, reader, false)
+	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, false)
 }
 
-// BuildDiagnosticSelected verifies the full resolved recipe identity, then emits a
+// BuildDiagnosticSelected verifies the full resolved build identity, then emits a
 // deterministic diagnostic SBOM for exactly the caller-observed artifact subset.
 // It exists for development tools such as the local bake-off: a one-component
-// observation must not need fabricated hashes for every other recipe component.
+// observation must not need fabricated hashes for every other build component.
 //
 // Like BuildVerified, this caller-hash path can independently verify external
 // evidence bytes, but it cannot issue LocalEvidenceReceipts or publisher authority.
 // Qualified publisher output must use BuildVerifiedFromReport instead.
-func BuildDiagnosticSelected(ctx context.Context, res *recipe.Resolved, recipeDigest string,
+func BuildDiagnosticSelected(ctx context.Context, res *buildgraph.Resolved, buildDigest string,
 	artifactHashes map[string]string, reader EvidenceReader,
 ) (*VerifiedSet, error) {
 	if err := validateSBOMContext(ctx); err != nil {
@@ -203,12 +204,12 @@ func BuildDiagnosticSelected(ctx context.Context, res *recipe.Resolved, recipeDi
 	if err != nil {
 		return nil, err
 	}
-	if !canonical.IsDigest(recipeDigest) {
+	if !canonical.IsDigest(buildDigest) {
 		return nil, e.New(e.CodeUnverifiedRef,
-			"diagnostic SBOM has unpinned recipe digest %q", recipeDigest)
+			"diagnostic SBOM has unpinned build digest %q", buildDigest)
 	}
 	hashes := cloneHashes(artifactHashes)
-	graph, err := requireResolvedRecipeIdentity(snapshot, recipeDigest)
+	graph, err := requireResolvedBuildIdentity(snapshot, buildDigest)
 	if err != nil {
 		return nil, err
 	}
@@ -216,15 +217,15 @@ func BuildDiagnosticSelected(ctx context.Context, res *recipe.Resolved, recipeDi
 	if err != nil {
 		return nil, err
 	}
-	return buildVerifiedSet(ctx, snapshot, recipeDigest, components, hashes, reader, false)
+	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, false)
 }
 
 // BuildVerifiedFromReport is the sole local producer-to-SBOM authority seam. It
-// preserves the full resolved recipe identity while emitting only the exact
+// preserves the full resolved build identity while emitting only the exact
 // artifact subset authorized by the opaque qualified pipeline report. Artifact
 // names and hashes are derived from that report, never accepted as caller input.
 // External evidence remains independently verified by reading its exact bytes.
-func BuildVerifiedFromReport(ctx context.Context, res *recipe.Resolved, report *pipeline.Report,
+func BuildVerifiedFromReport(ctx context.Context, res *buildgraph.Resolved, report *pipeline.Report,
 	reader EvidenceReader,
 ) (*VerifiedSet, error) {
 	if err := validateSBOMContext(ctx); err != nil {
@@ -241,20 +242,15 @@ func BuildVerifiedFromReport(ctx context.Context, res *recipe.Resolved, report *
 	if err != nil {
 		return nil, err
 	}
-	graph, err := requireResolvedRecipeIdentity(snapshot, report.RecipeDigest)
+	graph, err := requireResolvedBuildIdentity(snapshot, report.BuildDigest)
 	if err != nil {
 		return nil, err
-	}
-	if snapshot.RecipeID != report.RecipeID || graph.RecipeID != report.RecipeID {
-		return nil, e.New(e.CodeVerifyFailed,
-			"resolved SBOM recipe %q does not match qualified report recipe %q",
-			snapshot.RecipeID, report.RecipeID)
 	}
 	components, hashes, err := qualifiedReportArtifactSelection(snapshot, graph, report)
 	if err != nil {
 		return nil, err
 	}
-	set, err := buildVerifiedSet(ctx, snapshot, report.RecipeDigest, components, hashes, reader, true)
+	set, err := buildVerifiedSet(ctx, snapshot, report.BuildDigest, components, hashes, reader, true)
 	if err != nil {
 		return nil, err
 	}
@@ -276,10 +272,10 @@ func validateSBOMContext(ctx context.Context) error {
 	return nil
 }
 
-func requireResolvedSnapshot(res *recipe.Resolved) (*recipe.Resolved, error) {
+func requireResolvedSnapshot(res *buildgraph.Resolved) (*buildgraph.Resolved, error) {
 	if res == nil {
 		return nil, e.New(e.CodeProvenanceMissing,
-			"verified SBOM construction requires a resolved recipe")
+			"verified SBOM construction requires a resolved build")
 	}
 	return snapshotResolved(res)
 }
@@ -292,7 +288,7 @@ func cloneHashes(artifactHashes map[string]string) map[string]string {
 	return hashes
 }
 
-func validatedResolvedComponents(snapshot *recipe.Resolved) ([]catalog.NamedComponent, error) {
+func validatedResolvedComponents(snapshot *buildgraph.Resolved) ([]catalog.NamedComponent, error) {
 	components := append([]catalog.NamedComponent(nil), snapshot.Components...)
 	sort.Slice(components, func(i, j int) bool { return components[i].Name < components[j].Name })
 	previousName := ""
@@ -303,7 +299,7 @@ func validatedResolvedComponents(snapshot *recipe.Resolved) ([]catalog.NamedComp
 		}
 		if index > 0 && component.Name == previousName {
 			return nil, e.New(e.CodeInvalidCatalog,
-				"verified SBOM resolved recipe repeats component %q", component.Name)
+				"verified SBOM resolved build repeats component %q", component.Name)
 		}
 		previousName = component.Name
 		if component.FromSource && len(component.Commit) < 12 {
@@ -314,7 +310,7 @@ func validatedResolvedComponents(snapshot *recipe.Resolved) ([]catalog.NamedComp
 	return components, nil
 }
 
-func declarationArtifactSelection(snapshot *recipe.Resolved, hashes map[string]string) ([]catalog.NamedComponent, error) {
+func declarationArtifactSelection(snapshot *buildgraph.Resolved, hashes map[string]string) ([]catalog.NamedComponent, error) {
 	components, err := validatedResolvedComponents(snapshot)
 	if err != nil {
 		return nil, err
@@ -330,7 +326,7 @@ func declarationArtifactSelection(snapshot *recipe.Resolved, hashes map[string]s
 	}
 	if len(selected) == 0 {
 		return nil, e.New(e.CodeProvenanceMissing,
-			"verified SBOM resolved recipe has no produced or acquired artifacts")
+			"verified SBOM resolved build has no produced or acquired artifacts")
 	}
 	for name := range expected {
 		if !canonical.IsDigest(hashes[name]) {
@@ -354,7 +350,7 @@ func declarationArtifactSelection(snapshot *recipe.Resolved, hashes map[string]s
 	return components, nil
 }
 
-func diagnosticArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph,
+func diagnosticArtifactSelection(snapshot *buildgraph.Resolved, graph *ir.Graph,
 	hashes map[string]string,
 ) ([]catalog.NamedComponent, error) {
 	components, err := validatedResolvedComponents(snapshot)
@@ -381,7 +377,7 @@ func diagnosticArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph,
 		producer, produced := producerByComponent[name]
 		if !resolved || !produced || (!component.FromSource && component.Prebuilt == nil) {
 			return nil, e.New(e.CodeUnverifiedRef,
-				"diagnostic SBOM artifact %q is not a resolved recipe producer", name)
+				"diagnostic SBOM artifact %q is not a resolved build producer", name)
 		}
 		if !canonical.IsDigest(digest) {
 			return nil, e.New(e.CodeUnverifiedRef,
@@ -389,7 +385,7 @@ func diagnosticArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph,
 		}
 		if producer.Kind == ir.KindPull && digest != producer.Digest {
 			return nil, e.New(e.CodeUnverifiedRef,
-				"diagnostic prebuilt SBOM subject %q is %s, want recipe-pinned %s",
+				"diagnostic prebuilt SBOM subject %q is %s, want build-pinned %s",
 				name, digest, producer.Digest)
 		}
 		selected = append(selected, component)
@@ -398,8 +394,8 @@ func diagnosticArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph,
 	return selected, nil
 }
 
-func requireResolvedRecipeIdentity(snapshot *recipe.Resolved, recipeDigest string) (*ir.Graph, error) {
-	graph, err := recipe.Compile(snapshot)
+func requireResolvedBuildIdentity(snapshot *buildgraph.Resolved, buildDigest string) (*ir.Graph, error) {
+	graph, err := buildgraph.Compile(snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -407,9 +403,9 @@ func requireResolvedRecipeIdentity(snapshot *recipe.Resolved, recipeDigest strin
 	if err != nil {
 		return nil, err
 	}
-	if computed != recipeDigest {
+	if computed != buildDigest {
 		return nil, e.New(e.CodeUnverifiedRef,
-			"verified SBOM recipe digest %s does not match resolved recipe %s", recipeDigest, computed)
+			"verified SBOM build digest %s does not match resolved build %s", buildDigest, computed)
 	}
 	return graph, nil
 }
@@ -421,14 +417,14 @@ func bindDeclaredPrebuiltSubjects(graph *ir.Graph, hashes map[string]string) err
 		}
 		if hashes[node.Component] != node.Digest {
 			return e.New(e.CodeUnverifiedRef,
-				"declared prebuilt SBOM subject %q is %s, want recipe-pinned %s",
+				"declared prebuilt SBOM subject %q is %s, want build-pinned %s",
 				node.Component, hashes[node.Component], node.Digest)
 		}
 	}
 	return nil
 }
 
-func qualifiedReportArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph,
+func qualifiedReportArtifactSelection(snapshot *buildgraph.Resolved, graph *ir.Graph,
 	report *pipeline.Report,
 ) ([]catalog.NamedComponent, map[string]string, error) {
 	resolvedComponents, err := validatedResolvedComponents(snapshot)
@@ -459,7 +455,7 @@ func qualifiedReportArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph
 		if !knownComponent || !produced || artifact.OutputType != node.OutputType ||
 			!canonical.IsDigest(artifact.SHA256) {
 			return nil, nil, e.New(e.CodeVerifyFailed,
-				"qualified report artifact %q is not an exact resolved recipe producer", artifact.Component)
+				"qualified report artifact %q is not an exact resolved build producer", artifact.Component)
 		}
 		switch node.Kind {
 		case ir.KindBuild:
@@ -470,7 +466,7 @@ func qualifiedReportArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph
 				artifact.Toolchain != node.Toolchain || !canonical.IsDigest(artifact.InputDigest) ||
 				artifact.ProfileDigest != profileDigest || artifact.ExecutionBinding != executionBinding {
 				return nil, nil, e.New(e.CodeVerifyFailed,
-					"qualified build artifact %q lost its exact recipe/execution binding", artifact.Component)
+					"qualified build artifact %q lost its exact build/execution binding", artifact.Component)
 			}
 		case ir.KindPull:
 			if component.FromSource || component.Prebuilt == nil ||
@@ -494,7 +490,7 @@ func qualifiedReportArtifactSelection(snapshot *recipe.Resolved, graph *ir.Graph
 	return selected, hashes, nil
 }
 
-func buildVerifiedSet(ctx context.Context, snapshot *recipe.Resolved, recipeDigest string,
+func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildDigest string,
 	components []catalog.NamedComponent, hashes map[string]string, reader EvidenceReader,
 	publisherQualified bool,
 ) (*VerifiedSet, error) {
@@ -520,40 +516,40 @@ func buildVerifiedSet(ctx context.Context, snapshot *recipe.Resolved, recipeDige
 
 	scoped := *snapshot
 	scoped.Components = append([]catalog.NamedComponent(nil), components...)
-	aggregate := fromRecipe(&scoped, recipeDigest, hashes, publisherQualified)
+	aggregate := fromBuild(&scoped, buildDigest, hashes, publisherQualified)
 	for i := range aggregate.Components {
 		for _, component := range components {
 			if aggregate.Components[i].Name == component.Name && component.Prebuilt != nil {
 				if publisherQualified {
 					aggregate.Components[i] = componentForPublisherEvidence(component,
-						hashes[component.Name], snapshot.Criteria.Arch, verifiedProps[component.Name])
+						hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
 				} else {
 					aggregate.Components[i] = componentForWithExternalEvidence(component,
-						hashes[component.Name], snapshot.Criteria.Arch, verifiedProps[component.Name])
+						hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
 				}
 				break
 			}
 		}
 	}
 	perArtifact := make(map[string]*BOM)
-	index := &Index{SchemaVersion: IndexSchemaVersion, RecipeDigest: recipeDigest}
+	index := &Index{SchemaVersion: IndexSchemaVersion, BuildDigest: buildDigest}
 	for _, component := range components {
 		if !component.FromSource && component.Prebuilt == nil {
 			continue
 		}
-		bom := fromComponentForArch(component, recipeDigest, hashes[component.Name], snapshot.Criteria.Arch)
+		bom := fromComponentForArch(component, buildDigest, hashes[component.Name], target.Arch(snapshot.Platform))
 		if publisherQualified {
 			publisherComponent := componentForPublisherEvidence(component,
-				hashes[component.Name], snapshot.Criteria.Arch,
+				hashes[component.Name], target.Arch(snapshot.Platform),
 				externalEvidenceDeclarationProps(component.Prebuilt))
 			bom.Metadata.Component = publisherComponent
 		}
 		if component.Prebuilt != nil {
 			verifiedComponent := componentForWithExternalEvidence(component,
-				hashes[component.Name], snapshot.Criteria.Arch, verifiedProps[component.Name])
+				hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
 			if publisherQualified {
 				verifiedComponent = componentForPublisherEvidence(component,
-					hashes[component.Name], snapshot.Criteria.Arch, verifiedProps[component.Name])
+					hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
 			}
 			bom.Metadata.Component = verifiedComponent
 		}
@@ -865,7 +861,7 @@ func (set *VerifiedSet) LocalReceipts() ([]LocalEvidenceReceipt, error) {
 			return nil, err
 		}
 		receipts = append(receipts, LocalEvidenceReceipt{
-			valid: true, component: component, recipeDigest: set.index.RecipeDigest,
+			valid: true, component: component, buildDigest: set.index.BuildDigest,
 			artifactDigest: entry.ArtifactSHA, evidenceDigest: identity,
 			blobDigest: rawDigest(payload), evidenceSchema: "cyclonedx-json/1.5",
 			canonicalPayload: string(payload),
@@ -919,14 +915,14 @@ func rawDigest(bytes []byte) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-func snapshotResolved(resolved *recipe.Resolved) (*recipe.Resolved, error) {
+func snapshotResolved(resolved *buildgraph.Resolved) (*buildgraph.Resolved, error) {
 	raw, err := json.Marshal(resolved)
 	if err != nil {
-		return nil, e.Wrap(e.CodeInternal, err, "snapshotting resolved recipe for verified SBOM")
+		return nil, e.Wrap(e.CodeInternal, err, "snapshotting resolved build for verified SBOM")
 	}
-	var snapshot recipe.Resolved
+	var snapshot buildgraph.Resolved
 	if err := json.Unmarshal(raw, &snapshot); err != nil {
-		return nil, e.Wrap(e.CodeInternal, err, "restoring resolved recipe snapshot for verified SBOM")
+		return nil, e.Wrap(e.CodeInternal, err, "restoring resolved build snapshot for verified SBOM")
 	}
 	return &snapshot, nil
 }

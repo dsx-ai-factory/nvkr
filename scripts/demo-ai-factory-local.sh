@@ -23,7 +23,7 @@ usage() {
 Usage: scripts/demo-ai-factory-local.sh [options]
 
 Execute one immutable local Run:
-  pinned AICR Recipe -> exact render observation -> Helm OCI output
+  pinned AICR profile -> exact render observation -> Helm OCI output
     -> complete lifecycle publication envelope
 
 Options:
@@ -31,7 +31,7 @@ Options:
   --environment PATH   Environment YAML (default: loopback registry on port 5001)
   --attempts-root DIR  immutable Run storage root under .nkd
   --attempt NAME       new attempt name (default: timestamp plus process ID)
-  --jobs N             parallel recipe slots (default: 1)
+  --jobs N             parallel output builds (default: 1)
   --publish             start or reuse the owned localhost:5001 registry and publish
   --plan                validate and print the Run plan; perform no execution
   -h, --help            show this help
@@ -116,7 +116,7 @@ demo_section "4/4  Show Run and output locations"
 cat <<EOF_RESULT
 LOCAL AICR RUN COMPLETE — UNQUALIFIED-LOCAL-EXECUTION
   Run record:           $WORK/lifecycle.json
-  AICR render tree:     $WORK/h100-runtime/aicr-bundle
+  AICR render tree:     $WORK/gpu-runtime/aicr-bundle
   Helm OCI payload:     $WORK/packages/gpu-runtime
   publication envelope: $ROOT
   inspection:           $WORK/publication-inspection.json

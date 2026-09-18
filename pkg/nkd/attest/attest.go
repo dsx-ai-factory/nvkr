@@ -1,5 +1,5 @@
 // Package attest binds qualified validation vectors and publisher evidence to exact
-// recipe, execution, and artifact identities. Diagnostic projections remain
+// build, execution, and artifact identities. Diagnostic projections remain
 // unauthenticated until the owning receipt checks succeed.
 package attest
 
@@ -16,13 +16,13 @@ import (
 )
 
 // SchemaVersion identifies the manifest / ValidationVector shape.
-const SchemaVersion = "nkd.dev/validation-vector/v1"
+const SchemaVersion = "nkd.dev/validation-vector/v3"
 
 var (
 	canonicalIdentity = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 )
 
-// ValidationVector is the ADR-05 name for the one signed object binding a recipe +
+// ValidationVector is the ADR-05 name for the one signed object binding a build +
 // builder profile to expected artifacts and evidence. NKD publishes ONE such object,
 // not a separate "manifest" and "vector" — Manifest is its Go type; this alias makes
 // the ADR-05 vocabulary usable directly.
@@ -38,24 +38,21 @@ type BuilderProfileRef struct {
 }
 
 // EvidenceRef is the ADR-05 publisher evidence block. Publishable vectors bind only
-// deterministic SBOM and provenance aggregates. The remaining fields are retained
-// solely so legacy diagnostic records decode; operator reproduction, conformance,
-// and vulnerability observations belong to later independently authenticated
-// release receipts and ValidatePublished rejects them.
+// deterministic SBOM and provenance aggregates. Vulnerability observations belong
+// to later independently authenticated release receipts; ValidatePublished rejects
+// the diagnostic vulnerability field. Deployment qualification has no vector slot.
 type EvidenceRef struct {
-	SBOMDigest              string `json:"sbomDigest,omitempty"`
-	ProvenanceDigest        string `json:"provenanceDigest,omitempty"`
-	E2ETestDigest           string `json:"e2eTestDigest,omitempty"`
-	ClusterValidationDigest string `json:"clusterValidationDigest,omitempty"`
+	SBOMDigest       string `json:"sbomDigest,omitempty"`
+	ProvenanceDigest string `json:"provenanceDigest,omitempty"`
 	// VulnReportDigest is the deterministic vuln-report digest (ADR-13 §3), bound to
-	// the same recipe + pinned scanner DB — scan-time omitted so it is reproducible.
+	// the same build + pinned scanner DB — scan-time omitted so it is reproducible.
 	VulnReportDigest string `json:"vulnReportDigest,omitempty"`
 }
 
 // ComponentDigest is one built artifact's expected content digest, bound to the
 // digest-pinned toolchain image that produced it (provenance, NKD-FR-REP-009). The
-// toolchain is also part of the IR and thus recipeDigest, so a toolchain change is
-// already caught by the recipeDigest check; recording it per-component makes the
+// toolchain is also part of the IR and thus buildDigest, so a toolchain change is
+// already caught by the buildDigest check; recording it per-component makes the
 // manifest self-describing for mirroring/audit.
 type ComponentDigest struct {
 	Name       string `json:"name"`
@@ -77,7 +74,7 @@ type ComponentDigest struct {
 
 // Manifest is the expected-digests document — reconciled toward NKD v1's validation
 // vector (§8.4). It contains no host/clock/random values, so a publisher and an
-// operator building the same recipe under the same profile emit byte-equal manifests.
+// operator building the same build under the same profile emit byte-equal manifests.
 //
 // Byte-reproducibility is bounded to a builder profile (NKD v1 §10.1): ProfileDigest
 // binds this manifest to the profile it was produced under; a verify under a
@@ -86,8 +83,7 @@ type ComponentDigest struct {
 // reference (§8.1).
 type Manifest struct {
 	SchemaVersion string `json:"schemaVersion"`
-	RecipeID      string `json:"recipeId"`
-	RecipeDigest  string `json:"recipeDigest"`
+	BuildDigest   string `json:"buildDigest"`
 	// ProfileDigest is the authoritative from-source profile binding compared by
 	// verify. BuilderProfile carries the same digest plus the id/hostControl the
 	// ADR-05 schema calls for; both are empty for an all-prebuilt vector (ADR-07 §6).
@@ -167,8 +163,7 @@ func (m *Manifest) ValidatePublished() error {
 				"published validation vector requires exact %s", field.name)
 		}
 	}
-	if m.Evidence.E2ETestDigest != "" || m.Evidence.ClusterValidationDigest != "" ||
-		m.Evidence.VulnReportDigest != "" {
+	if m.Evidence.VulnReportDigest != "" {
 		return e.New(e.CodeProvenanceMissing,
 			"published validation vector cannot embed later operator reproduction, conformance, or vulnerability observations")
 	}
@@ -258,8 +253,7 @@ func FromReport(rep *pipeline.Report) *Manifest {
 	}
 	m := &Manifest{
 		SchemaVersion: SchemaVersion,
-		RecipeID:      rep.RecipeID,
-		RecipeDigest:  rep.RecipeDigest,
+		BuildDigest:   rep.BuildDigest,
 	}
 	for _, a := range rep.Artifacts {
 		m.Components = append(m.Components, ComponentDigest{
@@ -315,10 +309,7 @@ func (m *Manifest) Validate() error {
 	if m.SchemaVersion != SchemaVersion {
 		return e.New(e.CodeVerifyFailed, "validation vector schemaVersion %q is unsupported; want %q", m.SchemaVersion, SchemaVersion)
 	}
-	if !canonicalIdentity.MatchString(m.RecipeID) {
-		return e.New(e.CodeVerifyFailed, "validation vector recipeId %q is not a canonical nonempty identifier", m.RecipeID)
-	}
-	if err := requireExactDigest("recipeDigest", m.RecipeDigest, true); err != nil {
+	if err := requireExactDigest("buildDigest", m.BuildDigest, true); err != nil {
 		return err
 	}
 	if err := validateProfileBinding(m); err != nil {
@@ -403,8 +394,6 @@ func validateEvidence(m *Manifest) error {
 	}{
 		{"evidence.sbomDigest", m.Evidence.SBOMDigest},
 		{"evidence.provenanceDigest", m.Evidence.ProvenanceDigest},
-		{"evidence.e2eTestDigest", m.Evidence.E2ETestDigest},
-		{"evidence.clusterValidationDigest", m.Evidence.ClusterValidationDigest},
 		{"evidence.vulnReportDigest", m.Evidence.VulnReportDigest},
 	} {
 		if err := requireExactDigest(field.name, field.value, false); err != nil {
@@ -511,14 +500,13 @@ func (m *Manifest) authorityBinding(profileDigest, executionBinding string) (str
 	}
 	type authorityView struct {
 		SchemaVersion    string            `json:"schemaVersion"`
-		RecipeID         string            `json:"recipeId"`
-		RecipeDigest     string            `json:"recipeDigest"`
+		BuildDigest      string            `json:"buildDigest"`
 		ProfileDigest    string            `json:"profileDigest,omitempty"`
 		ExecutionBinding string            `json:"executionBinding,omitempty"`
 		Components       []ComponentDigest `json:"components"`
 	}
 	return canonical.Digest(canonical.KindQualifiedObservation, authorityView{
-		SchemaVersion: m.SchemaVersion, RecipeID: m.RecipeID, RecipeDigest: m.RecipeDigest,
+		SchemaVersion: m.SchemaVersion, BuildDigest: m.BuildDigest,
 		ProfileDigest: profileDigest, ExecutionBinding: executionBinding,
 		Components: m.Components,
 	})
@@ -597,7 +585,7 @@ func (m *Manifest) Marshal() ([]byte, error) {
 // MarshalQualified returns canonical publication bytes only while the vector's
 // report-derived core still matches its live opaque pipeline qualification. Callers
 // may attach publisher-qualified evidence or receipt-bound AICR before this
-// finalization; recipe/profile/component mutations still fail.
+// finalization; build/profile/component mutations still fail.
 // Conformance remains a separately authenticated release-gate receipt and cannot be
 // embedded as caller-authored metadata in these bytes.
 // Use these bytes for any signed or publisher-qualified output derived from a build.
@@ -705,7 +693,7 @@ type Divergence struct {
 }
 
 // Check collects every divergence between the expected manifest and a freshly-built
-// one without failing. Recipe and profile mismatches are fatal. Component
+// one without failing. Build and profile mismatches are fatal. Component
 // digest mismatches are collected into Divergences; built components absent from the
 // expected manifest are collected into Missing.
 func (want *Manifest) Check(got *Manifest) (divs []Divergence, missing []string, err error) {
@@ -738,13 +726,9 @@ func comparisonInputs(want, got *Manifest) (map[string]ComponentDigest, []Compon
 	if err := got.Validate(); err != nil {
 		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "built validation-vector observation is invalid")
 	}
-	if want.RecipeID != got.RecipeID {
+	if want.BuildDigest != got.BuildDigest {
 		return nil, nil, e.New(e.CodeVerifyFailed,
-			"recipeId mismatch: expected %s, built %s", want.RecipeID, got.RecipeID)
-	}
-	if want.RecipeDigest != got.RecipeDigest {
-		return nil, nil, e.New(e.CodeVerifyFailed,
-			"recipeDigest mismatch: expected %s, built %s", want.RecipeDigest, got.RecipeDigest)
+			"buildDigest mismatch: expected %s, built %s", want.BuildDigest, got.BuildDigest)
 	}
 	if want.ProfileDigest != got.ProfileDigest {
 		return nil, nil, e.New(e.CodeVerifyFailed,
@@ -790,5 +774,5 @@ func (m *Manifest) Summary() string {
 	if m.ProfileDigest != "" {
 		prof = fmt.Sprintf(", profile %s", m.ProfileDigest)
 	}
-	return fmt.Sprintf("%s @ %s (%d component digests%s)", m.RecipeID, m.RecipeDigest, len(m.Components), prof)
+	return fmt.Sprintf("%s (%d component digests%s)", m.BuildDigest, len(m.Components), prof)
 }

@@ -23,7 +23,7 @@ CONSUME=${CONSUME:-.nkd/m1-local-consume}
 DEFINITIONS=${DEFINITIONS:-definitions/nke-v1}
 ROUTE=${ROUTE:-release}
 BUNDLE=${BUNDLE:-nkectl}
-RECIPE_TARGET=${RECIPE_TARGET:-nke-cli}
+BUILD_TARGET=${BUILD_TARGET:-nkectl}
 JOBS=${JOBS:-1}
 REGISTRY_CONTAINER=${REGISTRY_CONTAINER:-nkd-m1-registry}
 REGISTRY_IMAGE=${REGISTRY_IMAGE:-registry:3}
@@ -188,7 +188,7 @@ demo_section "5/8  Inspect the CLI SBOM and its observed subject"
 # step 4 and wrote a deterministic CycloneDX SBOM per built component plus an aggregate
 # index, each bound to the component's runner-observed artifact digest. This is
 # unqualified composition evidence — it asserts what went in, never a signature.
-sbom_dir="$WORKSPACE/$RECIPE_TARGET/sbom"
+sbom_dir="$WORKSPACE/$BUILD_TARGET/sbom"
 sbom_index="$sbom_dir/index.json"
 [ -f "$sbom_index" ] || demo_die "Run did not emit an SBOM index: $sbom_index"
 # Fail closed rather than narrate: an index that binds no exact subject digest would make

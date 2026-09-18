@@ -19,16 +19,14 @@ import (
 func acquisitionCatalogFixture(t *testing.T, url, digest string) string {
 	t.Helper()
 	root := t.TempDir()
-	registry := fmt.Sprintf(`apiVersion: nkd.dev/catalog/v1
+	registry := fmt.Sprintf(`apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   source: {repo: https://example.invalid/source}
-recipes:
-  - {id: tools, criteria: {category: kubernetes}, components: [tool]}
 components:
   tool:
+    platforms: [linux/amd64, linux/arm64]
     source: source
-    roles: [worker]
     outputType: raw
     prebuilt:
       url: %s
@@ -69,13 +67,12 @@ func TestLocalAcquisitionCommandsUsePinnedPrebuiltBytes(t *testing.T) {
 		{"fetch dry run", []string{"fetch", "--dry-run"}, "dry-run", ""},
 		{"build", []string{"build"}, digest, ""},
 		{"build dry run", []string{"build", "--dry-run"}, "dry-run", ""},
-		{"build role", []string{"build", "--role", "worker"}, digest, ""},
 		{"build explicit", []string{"build", "--only", "tool"}, digest, ""},
 		{"unknown fetch component", []string{"fetch", "--only", "absent"}, "", e.CodeUnsupported},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			args := append([]string{"nkdctl"}, tc.args...)
-			args = append(args, "--data", catalog, "--category", "kubernetes", "--k8s", "1.32.0", "--os", "ubuntu", "--arch", "amd64", "--source-root", filepath.Join(t.TempDir(), "src"))
+			args = append(args, "--data", catalog, "--component", "tool", "--platform", "linux/amd64", "--source-root", filepath.Join(t.TempDir(), "src"))
 			out, err := runCLIWithCapturedStdout(t, newApp(), args...)
 			if tc.code != "" {
 				assertLifecycleCommandCode(t, err, tc.code)
@@ -91,11 +88,11 @@ func TestLocalAcquisitionCommandsUsePinnedPrebuiltBytes(t *testing.T) {
 	}
 }
 
-func TestResolveOutputFormsShareRecipeIdentity(t *testing.T) {
+func TestResolveOutputFormsShareBuildIdentity(t *testing.T) {
 	data := filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")
 	invoke := func(format string) []byte {
 		t.Helper()
-		out, err := runCLIWithCapturedStdout(t, newApp(), "nkdctl", "resolve", "--data", data, "--category", "kubernetes", "--k8s", "1.32.0", "--os", "ubuntu", "--arch", "amd64", "-o", format)
+		out, err := runCLIWithCapturedStdout(t, newApp(), "nkdctl", "resolve", "--data", data, "--component", "containerd", "--platform", "linux/amd64", "-o", format)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,7 +119,7 @@ func TestResolveOutputFormsShareRecipeIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	if strings.TrimSpace(string(invoke("canonical"))) != string(expected) {
-		t.Fatal("canonical output differs from recipe identity view")
+		t.Fatal("canonical output differs from build identity view")
 	}
 	for _, format := range []string{"ir", "components"} {
 		out := string(invoke(format))

@@ -4,36 +4,27 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"sigs.k8s.io/yaml"
 )
 
-// LogicalCriteria is the recipe-identity projection of resolved criteria. Role and
-// clusterType are composition/delivery axes and therefore cannot be represented by
-// this type. Adding a field to criteria.Criteria requires an explicit classification
-// in the identity coverage tests before it can affect, or be excluded from, identity.
-type LogicalCriteria struct {
-	Category   string `json:"category,omitempty"`
-	K8sVersion string `json:"k8sVersion,omitempty"`
-	OS         string `json:"os,omitempty"`
-	Arch       string `json:"arch,omitempty"`
-}
-
 // LogicalAICRActivation contains only output-affecting AICR inputs and pins. Human
 // labels and transport locations do not exist in this representation.
 type LogicalAICRActivation struct {
-	Service         string `json:"service"`
-	Accelerator     string `json:"accelerator"`
-	OS              string `json:"os"`
-	Intent          string `json:"intent"`
-	Platform        string `json:"platform,omitempty"`
-	RecipeDigest    string `json:"recipeDigest"`
-	GeneratorDigest string `json:"generatorDigest"`
+	Service         string            `json:"service"`
+	Accelerator     string            `json:"accelerator"`
+	OS              string            `json:"os"`
+	Intent          string            `json:"intent"`
+	Platform        string            `json:"platform,omitempty"`
+	ProfileDigest   string            `json:"profileDigest"`
+	GeneratorDigest string            `json:"generatorDigest"`
+	Bundle          aicr.BundleInputs `json:"bundle"`
 }
 
-// LogicalNode is the explicit T1 recipe-identity DTO. It intentionally cannot carry
+// LogicalNode is the explicit T1 build-identity DTO. It intentionally cannot carry
 // source/artifact/flake transport locators. OCI references are reduced to their
 // immutable manifest digest while constructing this value; the registry/name prefix
 // is not representable here.
@@ -70,82 +61,70 @@ type LogicalNode struct {
 	Version          string     `json:"version,omitempty"`
 }
 
-// LogicalGraph is the only shape accepted by recipe identity computation. The
+// LogicalGraph is the only shape accepted by build identity computation. The
 // transport-bearing Graph is fully validated first and then projected into this
 // structurally transport-free DTO.
 type LogicalGraph struct {
 	SchemaVersion string                 `json:"schemaVersion"`
-	RecipeID      string                 `json:"recipeId"`
-	Criteria      LogicalCriteria        `json:"criteria"`
+	Platform      string                 `json:"platform"`
 	AICR          *LogicalAICRActivation `json:"aicr,omitempty"`
 	Nodes         []LogicalNode          `json:"nodes"`
 }
 
-type recipeIdentityFieldRule uint8
+type buildIdentityFieldRule uint8
 
 const (
-	includeLogicalValueInRecipeIdentity recipeIdentityFieldRule = iota + 1
-	includeContentReferenceInRecipeIdentity
-	excludeTransportFromRecipeIdentity
-	excludeCompositionFromRecipeIdentity
-	excludeExecutionMetadataFromRecipeIdentity
+	includeLogicalValueInBuildIdentity buildIdentityFieldRule = iota + 1
+	includeContentReferenceInBuildIdentity
+	excludeTransportFromBuildIdentity
+	excludeExecutionMetadataFromBuildIdentity
 )
 
 // These exhaustive rules are checked reflectively in marshal_test.go.
-// They make adding a field to a full graph type a deliberate Recipe-identity boundary
+// They make adding a field to a full graph type a deliberate Build-identity boundary
 // decision instead of silently inheriting a serializer's behavior.
-var nodeRecipeIdentityRules = map[string]recipeIdentityFieldRule{
-	"ID":               includeLogicalValueInRecipeIdentity,
-	"Kind":             includeLogicalValueInRecipeIdentity,
-	"Needs":            includeLogicalValueInRecipeIdentity,
-	"Requirements":     excludeExecutionMetadataFromRecipeIdentity,
-	"ExecutionBinding": excludeExecutionMetadataFromRecipeIdentity,
-	"Repo":             excludeTransportFromRecipeIdentity,
-	"Commit":           includeLogicalValueInRecipeIdentity,
-	"TreeHash":         includeLogicalValueInRecipeIdentity,
-	"Dest":             includeLogicalValueInRecipeIdentity,
-	"VendorCmd":        includeLogicalValueInRecipeIdentity,
-	"VendorImage":      includeContentReferenceInRecipeIdentity,
-	"Artifact":         excludeTransportFromRecipeIdentity,
-	"Digest":           includeLogicalValueInRecipeIdentity,
-	"Component":        includeLogicalValueInRecipeIdentity,
-	"BuilderType":      includeLogicalValueInRecipeIdentity,
-	"FlakeRef":         excludeTransportFromRecipeIdentity,
-	"FlakeOutput":      includeLogicalValueInRecipeIdentity,
-	"FlakeLockDigest":  includeLogicalValueInRecipeIdentity,
-	"Toolchain":        includeContentReferenceInRecipeIdentity,
-	"Platform":         includeLogicalValueInRecipeIdentity,
-	"Network":          includeLogicalValueInRecipeIdentity,
-	"Env":              includeLogicalValueInRecipeIdentity,
-	"Patches":          includeLogicalValueInRecipeIdentity,
-	"Command":          includeLogicalValueInRecipeIdentity,
-	"Workdir":          includeLogicalValueInRecipeIdentity,
-	"SourceDest":       includeLogicalValueInRecipeIdentity,
-	"SourceCommit":     includeLogicalValueInRecipeIdentity,
-	"SourceTreeHash":   includeLogicalValueInRecipeIdentity,
-	"VendorSpecDigest": includeLogicalValueInRecipeIdentity,
-	"SourceReadOnly":   includeLogicalValueInRecipeIdentity,
-	"WriteDir":         includeLogicalValueInRecipeIdentity,
-	"OutputType":       includeLogicalValueInRecipeIdentity,
-	"ArtifactPath":     includeLogicalValueInRecipeIdentity,
-	"Version":          includeLogicalValueInRecipeIdentity,
+var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
+	"ID":               includeLogicalValueInBuildIdentity,
+	"Kind":             includeLogicalValueInBuildIdentity,
+	"Needs":            includeLogicalValueInBuildIdentity,
+	"Requirements":     excludeExecutionMetadataFromBuildIdentity,
+	"ExecutionBinding": excludeExecutionMetadataFromBuildIdentity,
+	"Repo":             excludeTransportFromBuildIdentity,
+	"Commit":           includeLogicalValueInBuildIdentity,
+	"TreeHash":         includeLogicalValueInBuildIdentity,
+	"Dest":             includeLogicalValueInBuildIdentity,
+	"VendorCmd":        includeLogicalValueInBuildIdentity,
+	"VendorImage":      includeContentReferenceInBuildIdentity,
+	"Artifact":         excludeTransportFromBuildIdentity,
+	"Digest":           includeLogicalValueInBuildIdentity,
+	"Component":        includeLogicalValueInBuildIdentity,
+	"BuilderType":      includeLogicalValueInBuildIdentity,
+	"FlakeRef":         excludeTransportFromBuildIdentity,
+	"FlakeOutput":      includeLogicalValueInBuildIdentity,
+	"FlakeLockDigest":  includeLogicalValueInBuildIdentity,
+	"Toolchain":        includeContentReferenceInBuildIdentity,
+	"Platform":         includeLogicalValueInBuildIdentity,
+	"Network":          includeLogicalValueInBuildIdentity,
+	"Env":              includeLogicalValueInBuildIdentity,
+	"Patches":          includeLogicalValueInBuildIdentity,
+	"Command":          includeLogicalValueInBuildIdentity,
+	"Workdir":          includeLogicalValueInBuildIdentity,
+	"SourceDest":       includeLogicalValueInBuildIdentity,
+	"SourceCommit":     includeLogicalValueInBuildIdentity,
+	"SourceTreeHash":   includeLogicalValueInBuildIdentity,
+	"VendorSpecDigest": includeLogicalValueInBuildIdentity,
+	"SourceReadOnly":   includeLogicalValueInBuildIdentity,
+	"WriteDir":         includeLogicalValueInBuildIdentity,
+	"OutputType":       includeLogicalValueInBuildIdentity,
+	"ArtifactPath":     includeLogicalValueInBuildIdentity,
+	"Version":          includeLogicalValueInBuildIdentity,
 }
 
-var criteriaRecipeIdentityRules = map[string]recipeIdentityFieldRule{
-	"Category":    includeLogicalValueInRecipeIdentity,
-	"Role":        excludeCompositionFromRecipeIdentity,
-	"K8sVersion":  includeLogicalValueInRecipeIdentity,
-	"OS":          includeLogicalValueInRecipeIdentity,
-	"Arch":        includeLogicalValueInRecipeIdentity,
-	"ClusterType": excludeCompositionFromRecipeIdentity,
-}
-
-var graphRecipeIdentityRules = map[string]recipeIdentityFieldRule{
-	"SchemaVersion": includeLogicalValueInRecipeIdentity,
-	"RecipeID":      includeLogicalValueInRecipeIdentity,
-	"Criteria":      includeLogicalValueInRecipeIdentity,
-	"AICR":          includeLogicalValueInRecipeIdentity,
-	"Nodes":         includeLogicalValueInRecipeIdentity,
+var graphBuildIdentityRules = map[string]buildIdentityFieldRule{
+	"SchemaVersion": includeLogicalValueInBuildIdentity,
+	"Platform":      includeLogicalValueInBuildIdentity,
+	"AICR":          includeLogicalValueInBuildIdentity,
+	"Nodes":         includeLogicalValueInBuildIdentity,
 }
 
 // Normalize enforces a canonical ordering on the graph: nodes by ID, and within
@@ -165,6 +144,11 @@ func (g *Graph) Normalize() {
 // Graph.Validate rejects that input before serialization or identity computation.
 func (g Graph) normalizedCopy() Graph {
 	c := g
+	if g.AICR != nil {
+		activation := *g.AICR
+		activation.Bundle = g.AICR.Bundle.Clone()
+		c.AICR = &activation
+	}
 	c.Nodes = append([]Node(nil), g.Nodes...)
 	for i := range c.Nodes {
 		c.Nodes[i].Needs = append([]string(nil), g.Nodes[i].Needs...)
@@ -190,31 +174,28 @@ func (g Graph) MarshalDeterministic() ([]byte, error) {
 	// sorted map keys) then to YAML (sorted keys) — deterministic on both hops.
 	b, err := yaml.Marshal(c)
 	if err != nil {
-		return nil, e.Wrap(e.CodeInternal, err, "serializing IR for recipe %q", g.RecipeID)
+		return nil, e.Wrap(e.CodeInternal, err, "serializing build IR")
 	}
 	return b, nil
 }
 
 // logicalGraph projects a previously validated execution graph into a distinct DTO
 // that cannot represent transport. This structural split prevents a newly added URL,
-// registry, credential, or mirror field from leaking into recipe identity merely
+// registry, credential, or mirror field from leaking into build identity merely
 // because a sanitizer forgot to clear it.
 func (g Graph) logicalGraph() LogicalGraph {
 	c := g.normalizedCopy()
 	logical := LogicalGraph{
 		SchemaVersion: c.SchemaVersion,
-		RecipeID:      c.RecipeID,
-		Criteria: LogicalCriteria{
-			Category: c.Criteria.Category, K8sVersion: c.Criteria.K8sVersion,
-			OS: c.Criteria.OS, Arch: c.Criteria.Arch,
-		},
-		Nodes: make([]LogicalNode, 0, len(c.Nodes)),
+		Platform:      c.Platform,
+		Nodes:         make([]LogicalNode, 0, len(c.Nodes)),
 	}
 	if c.AICR != nil {
 		logical.AICR = &LogicalAICRActivation{
 			Service: c.AICR.Service, Accelerator: c.AICR.Accelerator, OS: c.AICR.OS,
 			Intent: c.AICR.Intent, Platform: c.AICR.Platform,
-			RecipeDigest: c.AICR.RecipeDigest, GeneratorDigest: c.AICR.GeneratorDigest,
+			ProfileDigest: c.AICR.ProfileDigest, GeneratorDigest: c.AICR.GeneratorDigest,
+			Bundle: c.AICR.Bundle.Clone(),
 		}
 	}
 	for _, node := range c.Nodes {
@@ -268,14 +249,14 @@ func (g Graph) CanonicalJSON() ([]byte, error) {
 	return canonical.Marshal(g.normalizedCopy())
 }
 
-// Digest computes recipeDigest via the one canonical codec (ADR-01): a
+// Digest computes buildDigest via the one canonical codec (ADR-01): a
 // domain-separated sha256 over the RFC-8785 canonical-JSON form of the graph's content
 // identity (digestView), "sha256:"+hex (NKD-FR-RC-018). There is no grandfathered YAML
-// exception — the recipe identity uses the same codec as every other digest-addressed
+// exception — the build identity uses the same codec as every other digest-addressed
 // object, so an auditor can recompute it in any language.
 func (g Graph) Digest() (string, error) {
 	if err := (&g).Validate(); err != nil {
 		return "", err
 	}
-	return canonical.Digest(canonical.KindRecipe, g.logicalGraph())
+	return canonical.Digest(canonical.KindBuild, g.logicalGraph())
 }

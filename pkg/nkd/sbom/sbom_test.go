@@ -6,23 +6,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 )
 
-func resolveCP(t *testing.T) (*recipe.Resolved, string) {
+func resolveCP(t *testing.T) (*buildgraph.Resolved, string) {
 	t.Helper()
 	cat, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := recipe.Resolve(cat, criteria.Criteria{Category: "kubernetes", K8sVersion: "1.32.0", OS: "ubuntu", Arch: "amd64"}, nil)
+	res, err := buildgraph.Resolve(cat, buildgraph.Selection{Components: []string{"cni-plugins", "kube-apiserver", "kubectl", "kubelet"}, Platform: "linux/amd64"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	graph, err := recipe.Compile(res)
+	graph, err := buildgraph.Compile(res)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,11 +34,11 @@ func resolveCP(t *testing.T) (*recipe.Resolved, string) {
 
 func TestSBOMDeterministic(t *testing.T) {
 	res, digest := resolveCP(t)
-	a, err := fromRecipe(res, digest, nil, false).Marshal()
+	a, err := fromBuild(res, digest, nil, false).Marshal()
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, _ := fromRecipe(res, digest, nil, false).Marshal()
+	b, _ := fromBuild(res, digest, nil, false).Marshal()
 	if !bytes.Equal(a, b) {
 		t.Fatal("SBOM marshaling is not deterministic")
 	}
@@ -47,7 +46,7 @@ func TestSBOMDeterministic(t *testing.T) {
 
 func TestSBOMFoldsArtifactHashes(t *testing.T) {
 	res, digest := resolveCP(t)
-	b := fromRecipe(res, digest, map[string]string{"kubectl": "sha256:abc"}, false)
+	b := fromBuild(res, digest, map[string]string{"kubectl": "sha256:abc"}, false)
 	var found bool
 	for _, c := range b.Components {
 		if c.Name == "kubectl" {
@@ -104,14 +103,14 @@ func TestPerArtifactAndIndex(t *testing.T) {
 }
 
 func TestSBOMAndIndexRejectSemanticAmbiguityBeforeDigest(t *testing.T) {
-	res, recipeDigest := resolveCP(t)
+	res, buildDigest := resolveCP(t)
 	hashes := make(map[string]string)
 	for _, component := range res.Components {
 		if component.FromSource || component.Prebuilt != nil {
 			hashes[component.Name] = "sha256:" + strings.Repeat("a", 64)
 		}
 	}
-	boms, index, err := PerArtifact(res, recipeDigest, hashes)
+	boms, index, err := PerArtifact(res, buildDigest, hashes)
 	if err != nil {
 		t.Fatal(err)
 	}

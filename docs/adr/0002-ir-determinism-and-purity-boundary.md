@@ -12,9 +12,9 @@
 
 ## Context
 
-The **Recipe Digest** is the digest of the logical T1 projection of a fully resolved, compiled build graph.
-The full executable graph may also carry deterministic T2 execution metadata that Plan identity binds but Recipe
-identity excludes. NKD's define-once / publish-many model and its zero-binary trust both depend on Recipe identity
+The **Build Digest** is the digest of the logical T1 projection of a fully resolved, compiled build graph.
+The full executable graph may also carry deterministic T2 execution metadata that Plan identity binds but Build
+identity excludes. NKD's define-once / publish-many model and its zero-binary trust both depend on Build identity
 being a **pure function of resolved content inputs only**. If a host, clock, random, builder observation, or
 generated-identifier value leaks into it, the identity becomes host-dependent and the trust model collapses. The
 SRD states this directly: output-affecting clock, randomness, host, and automatically generated identifier values
@@ -30,15 +30,18 @@ the identity. This ADR draws the boundary explicitly and makes it enforceable.
 
 Every field lives in exactly one tier:
 
-- **T1 — inside the Recipe Digest** (the hashed, compiled graph): resolved logical sources (stable catalog
+- **T1 — inside the Build Digest** (the hashed, compiled graph): resolved logical sources (stable catalog
   source key + commit + tree/content digest + source-date), per-component builder pins (`oci-hermetic` toolchain
   digest; `nix` container-image digest + flake lock), prebuilt content digests, the **builder type**, the pinned
-  normalization / build-flag environment allowlist, and platform/architecture. A network URL, registry host,
+  normalization / build-flag environment allowlist, concrete target platform, and exact AICR activation and
+  profile/generator pins and effective bundle-rendering settings where present. A network URL, registry host,
   mirror path, credential reference, or other transport locator is never a T1 field.
-- **T2 — deterministic metadata, *not* in the Recipe Digest**: the Recipe Digest itself, the expected
+- **T2 — deterministic metadata, *not* in the Build Digest**: the Build Digest itself, the expected
   per-artifact digests, the **builder-profile identity**, deterministic execution requirements and their
   Plan bindings, the conformance claim, the ValidationVector reference, and the accelerated-runtime reference.
-  Authority-bearing T2 records are signed **detached** — never embedded in the bytes the identity covers.
+  Output names, supported-platform admission lists and packaging
+  are also excluded from build identity. They remain bound in the owning catalog/Definition/Plan
+  records. Deployment classification and topology are not admitted NKD inputs. Authority-bearing T2 records are signed **detached**, never embedded in the bytes the identity covers.
 - **T3 — detached, non-identity record** (may carry host/clock/builder facts; **may be independently signed**):
   the signed build-observations attestation (observed host, actual build times, **observed engine class**), and
   lifecycle times (variant expiry, status effective-time). Operator-supplied lifecycle times are **inputs**,
@@ -47,9 +50,9 @@ Every field lives in exactly one tier:
 
 ### 2. Identity is over the resolved logical graph; pin-derived time is an input, host time is not
 
-- The Recipe Digest is the digest of the **resolved/compiled logical T1 projection** — *after* composition and
-  pin resolution, not of the authored recipe or every field in the executable document. Two authored recipes
-  that resolve to the same pinned logical graph share one identity.
+- The Build Digest is the digest of the **resolved/compiled logical T1 projection** of one Definition output
+  under `nkd.build`, after exact producer and pin selection. There is no authored Recipe or intermediate group.
+  Two named outputs with the same selected producers, target and pinned logical graph share one Build Digest.
 - A value **derived from a pin**, such as the source-date taken from the pinned commit's committer date, is a
   **deterministic input** and belongs in T1.
 - The **host wall clock, hostname, home directory, host timezone, and kernel** are observations. They are
@@ -59,24 +62,34 @@ Every field lives in exactly one tier:
 
 Every resolved input has two different representations:
 
-- **`LogicalInput`** — the stable input key and immutable content/revision facts used by T1 and the
+- **Logical input** — the stable input key and immutable content/revision facts used by T1 and the
   resolved-input manifest; and
-- **`TransportBinding`** — one or more fetch locations, credential references, and mirror locations keyed by
-  that logical input. Transport bindings are execution configuration, not recipe semantics.
+- **Transport binding** — one or more fetch locations, credential references, and mirror locations keyed by
+  that logical input. Transport bindings are execution configuration, not build semantics.
 
-Online and air-gap execution may replace a `TransportBinding` but MUST NOT change its `LogicalInput`. Before an
-input crosses into an offline build node, the resolver verifies that bytes fetched through the binding reproduce
-the logical tree/content identity. A binding that resolves to different bytes fails closed. The complete binding
-map is itself canonical, digest-addressed, and authenticated as part of the mirror/execution manifest (ADR-15),
-so excluding locators from `recipeDigest` does not make relocation unaudited.
+Changing source mirrors or registry transport MUST preserve the selected logical input. Before an input
+crosses into an offline build node, execution verifies that bytes fetched through the binding reproduce its
+pinned source tree/content identity. A binding that resolves to different bytes fails closed. The full executable
+graph and Plan retain transport settings and their exact byte identities. Excluding locators from `buildDigest`
+does not authorize unchecked relocation. A general air-gap lifecycle remains outside the current scope.
 
-This separation is structural: the type passed to Recipe Digest computation contains `LogicalInput` values only.
-A sanitizer that deletes URL fields immediately before hashing is not sufficient, because a newly added locator
-could otherwise leak into identity unnoticed.
+The separation is structural: `ir.LogicalGraph` and `ir.LogicalNode` cannot represent source URLs, artifact
+locators, flake references, execution requirements or execution bindings. The complete `ir.Graph` is validated
+before projection. Clearing strings just before hashing is insufficient, because a new field could otherwise
+leak into identity unnoticed.
+
+Generated targets have no display ID inside the graph. Output names bind uses in the Definition and Plan;
+they do not change the logical graph. Equal digests never merge independently required uses: execution,
+restore and terminal evidence must match the exact output/target as well as its Build Digest.
+
+AICR renderer settings affect produced bytes and therefore belong in T1. Authored omission and an explicit
+Helm default compile to the same complete activation. Lists are copied and sorted before compilation;
+executable graph validation rejects missing effective defaults, duplicate entries and noncanonical order.
+The graph does not infer these settings from an external cluster declaration.
 
 A producer's execution requirements are carried in the full executable graph and compiled Plan, while the
-logical Recipe projection cannot represent them. Changing resources, eligible host platforms, typed capability
-policy, or executor timeout changes catalog and Plan identities without changing what the Recipe builds. The
+logical build projection cannot represent them. Changing resources, eligible host platforms, typed capability
+policy, or executor timeout changes catalog and Plan identities without changing what the selected producers build. The
 request is not capability proof: compilation deterministically binds an Environment execution class into Plan
 identity, while authenticated runtime observations remain a separate execution-admission record (ADR-18).
 
@@ -88,14 +101,14 @@ An automated two-part guard enforces the boundary; documentation alone does not:
   host-environment-into-identity) in the identity-producing code paths. Any use is allowlisted only with an
   explicit justifying note.
 - **Empirical invariance and sensitivity tests**: `TestDigestHostInvariance` mutates host- and clock-related
-  process environment values and asserts that the Recipe Digest is byte-stable. Separate tests assert that
-  mutating a **pinned content input** changes Recipe identity, while mutating an authored execution request changes
-  catalog and Plan identities and full executable graph bytes without changing Recipe identity.
+  process environment values and asserts that the Build Digest is byte-stable. Separate tests assert that
+  mutating a **pinned content input** changes Build identity, while mutating an authored execution request changes
+  catalog and Plan identities and full executable graph bytes without changing Build identity.
 
 ## Consequences
 
 **Positive**
-- The Recipe Digest is provably host-independent; the same definition yields the same identity everywhere.
+- The Build Digest is provably host-independent; the same definition yields the same identity everywhere.
 - Host/builder provenance is preserved in T3 without polluting the identity or the signed metadata.
 - The guard turns an easily-violated invariant into a CI-enforced one.
 
@@ -109,8 +122,8 @@ An automated two-part guard enforces the boundary; documentation alone does not:
 
 ## Alternatives considered
 
-- **Two tiers (covered vs detached), folding the builder-profile identity into the Recipe Digest.** Rejected —
-  makes the Recipe Digest host/profile-dependent and defeats define-once / publish-many.
+- **Two tiers (covered vs detached), folding the builder-profile identity into the Build Digest.** Rejected —
+  makes the Build Digest host/profile-dependent and defeats define-once / publish-many.
 - **Put builder/host provenance inside the signed metadata (T2).** Rejected — perturbs the signed bytes on every
   host and breaks cross-builder equality of the manifest.
 - **Rely on code review to keep the identity pure.** Rejected — the leak is invisible until a digest silently
@@ -118,11 +131,12 @@ An automated two-part guard enforces the boundary; documentation alone does not:
 
 ## Follow-ups
 
-- **ADR-07:** `profileDigest` is T2; the observed engine class is T3; builder pins are T1.
+- **ADR-07:** the builder-profile digest is T2; the observed engine class is T3; builder pins are T1.
+  The AICR activation's separately owned `profileDigest` identifies a pinned content input and belongs to T1.
 - **ADR-09:** the build record is the T3 home for host/clock/builder observations.
 - **ADR-01:** the identity digest uses the canonical codec and domain tag defined there.
-- **ADR-15:** defines the exhaustive authenticated `TransportBinding`/mirror manifest and proves relocation
-  preserves every `LogicalInput` and the Recipe Digest.
+- **ADR-15:** general air-gap lifecycle remains out of scope; any future adapter must preserve logical
+  content identity while authenticating every relocated transport binding.
 
 ## Acceptance evidence
 
@@ -130,17 +144,20 @@ Current package-level evidence includes:
 
 - the explicit `ir.LogicalGraph` / `ir.LogicalNode` identity DTOs, which cannot represent source, artifact, or
   flake transport locators;
-- `pkg/nkd/ir/marshal_test.go::TestRecipeIdentityFieldRulesCoverEveryGraphField`, whose reflection coverage
-  makes every full-graph field declare whether Recipe identity includes its logical value or content reference,
-  or excludes it as transport, composition, or execution metadata;
+- `pkg/nkd/ir/marshal_test.go::TestBuildIdentityFieldRulesCoverEveryGraphField`, whose reflection coverage
+  makes every full-graph field declare whether Build identity includes its logical value or content reference,
+  or excludes it as transport or execution metadata;
 - `pkg/nkd/ir/validate_test.go::TestGraphDigestRemainsTransportIndependentAfterFullValidation`, which proves
-  independently relocated full execution graphs project to identical logical bytes and `recipeDigest`; and
+  independently relocated full execution graphs project to identical logical bytes and `buildDigest`; and
 - `pkg/nkd/ir/marshal_test.go::TestDigestHostInvariance` plus the static guard in
   `internal/architecture/purity_test.go` for host purity.
 
-Remaining end-to-end acceptance evidence requires:
+The focused IR migration tests also cover concrete targets, exact producer membership, AICR inputs, strict
+legacy-field rejection and the distinct `nkd.build` family. Repository checks are recorded in reconciliation;
+the [2026-09-17 local NKE build](../evidence/2026-09-17-direct-output-local-build.md) exercised the direct-output
+model with dry-run signing. Remaining external acceptance requires:
 
 1. negative tests showing one-byte/tree/revision substitution through an authenticated mirror fails before build;
    and
-2. an online→air-gap activation round trip that proves the logical-input manifest and `recipeDigest` are
-   unchanged while every transport locator changes.
+2. any future air-gap adapter to record an activation round trip proving `buildDigest` remains unchanged
+   while every transport locator changes. No current air-gap implementation is claimed.

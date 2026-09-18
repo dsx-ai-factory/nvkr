@@ -7,7 +7,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-func TestPlanRejectsSubstitutedInputsAndRecipeBindings(t *testing.T) {
+func TestPlanRejectsSubstitutedInputsAndBuildBindings(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		edit    func(*Plan)
@@ -23,22 +23,17 @@ func TestPlanRejectsSubstitutedInputsAndRecipeBindings(t *testing.T) {
 		{"partial lifecycle identity", func(p *Plan) { p.DefinitionDigest = "sha256:" + strings.Repeat("a", 64); p.EnvironmentDigest = "" }, e.CodeUnverifiedRef, "together"},
 		{"bad catalog identity", func(p *Plan) { p.CatalogDigest = "latest" }, e.CodeUnpinnedSource, "catalog/execution-settings"},
 		{"substituted environment", func(p *Plan) { p.ExecutionSettings.RunsOn = "ubuntu-22.04" }, e.CodeUnverifiedRef, "executionSettingsDigest"},
-		{"empty recipes", func(p *Plan) { p.Recipes = nil }, e.CodeInvalidCatalog, "no recipes"},
-		{"duplicate recipe", func(p *Plan) { p.Recipes = append(p.Recipes, p.Recipes[0]) }, e.CodeInvalidCatalog, "repeated"},
-		{"missing recipe graph", func(p *Plan) { p.Recipes[0].Graph = nil }, e.CodeInvalidCatalog, "invalid"},
-		{"missing recipe catalog", func(p *Plan) { p.Recipes[0].CatalogDigest = "" }, e.CodeUnpinnedSource, "catalog digest"},
-		{"substituted recipe identity", func(p *Plan) { p.Recipes[0].RecipeDigest = "sha256:" + strings.Repeat("a", 64) }, e.CodeUnverifiedRef, "graph identity"},
-		{"substituted recipe ID", func(p *Plan) { p.Recipes[0].RecipeID = "other" }, e.CodeUnverifiedRef, "graph identity"},
-		{"empty selection", func(p *Plan) { p.Recipes[0].Components = nil }, e.CodeInvalidCatalog, "selects no components"},
-		{"unordered selection", func(p *Plan) { p.Recipes[0].Components = []string{"z", "a"} }, e.CodeInvalidCatalog, "not canonical"},
+		{"empty builds", func(p *Plan) { p.Builds = nil }, e.CodeInvalidCatalog, "no builds"},
+		{"duplicate build", func(p *Plan) { p.Builds = append(p.Builds, p.Builds[0]) }, e.CodeInvalidCatalog, "repeated"},
+		{"missing build graph", func(p *Plan) { p.Builds[0].Graph = nil }, e.CodeInvalidCatalog, "invalid"},
+		{"missing build catalog", func(p *Plan) { p.Builds[0].CatalogDigest = "" }, e.CodeUnpinnedSource, "catalog digest"},
+		{"substituted build identity", func(p *Plan) { p.Builds[0].BuildDigest = "sha256:" + strings.Repeat("a", 64) }, e.CodeUnverifiedRef, "graph identity"},
+		{"substituted build ID", func(p *Plan) { p.Builds[0].Platform = "linux/arm64" }, e.CodeUnverifiedRef, "graph identity"},
+		{"empty selection", func(p *Plan) { p.Builds[0].Components = nil }, e.CodeInvalidCatalog, "selects no components"},
+		{"unordered selection", func(p *Plan) { p.Builds[0].Components = []string{"z", "a"} }, e.CodeInvalidCatalog, "not canonical"},
 		{"duplicate selection", func(p *Plan) {
-			components := p.Recipes[0].Components
-			p.Recipes[0].Components = append([]string{components[0]}, components...)
-		}, e.CodeInvalidCatalog, "not canonical"},
-		{"unordered full membership", func(p *Plan) { p.Recipes[0].AllComponents = []string{"z", "a"} }, e.CodeInvalidCatalog, "not canonical"},
-		{"duplicate full membership", func(p *Plan) {
-			components := p.Recipes[0].AllComponents
-			p.Recipes[0].AllComponents = append([]string{components[0]}, components...)
+			components := p.Builds[0].Components
+			p.Builds[0].Components = append([]string{components[0]}, components...)
 		}, e.CodeInvalidCatalog, "not canonical"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

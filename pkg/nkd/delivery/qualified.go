@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
@@ -12,11 +11,10 @@ import (
 )
 
 const (
-	MediaClearanceDocument   = "application/vnd.nkd.clearance.v7+json"
+	MediaClearanceDocument   = "application/vnd.nkd.clearance.v9+json"
 	MediaPublicationManifest = "application/vnd.nkd.publication-manifest.v1+json"
-	MediaReleaseSet          = "application/vnd.nkd.release-set.v2+json"
-	MediaInventory           = "application/vnd.nkd.inventory.v2+json"
-	MediaClusterDefinition   = "application/vnd.nkd.cluster-definition.v1+json"
+	MediaReleaseSet          = "application/vnd.nkd.release-set.v4+json"
+	MediaInventory           = "application/vnd.nkd.inventory.v4+json"
 	MediaCosignSignature     = "application/vnd.dev.cosign.simplesigning.v1+json"
 	MediaPEMCertificate      = "application/x-pem-file"
 	MediaSigstoreBundle      = "application/vnd.dev.sigstore.bundle.v0.3+json"
@@ -28,16 +26,15 @@ const (
 // Derived binary bundles are permitted only when every entry is itself a cleared
 // artifact. No caller boolean or serialized root can construct this authority.
 type QualifiedPublicationRequest struct {
-	Authorization         *release.Authorization
-	Clearance             trust.DocumentReceipt
-	ReleaseSetPath        string
-	InventoryPath         string
-	ClusterDefinitionPath string
-	SignaturePath         string
-	CertificatePath       string
-	BundlePath            string
-	TrustedRootPath       string
-	Objects               []ObjectInput
+	Authorization   *release.Authorization
+	Clearance       trust.DocumentReceipt
+	ReleaseSetPath  string
+	InventoryPath   string
+	SignaturePath   string
+	CertificatePath string
+	BundlePath      string
+	TrustedRootPath string
+	Objects         []ObjectInput
 }
 
 // QualifiedRoot is an opaque same-process capability proving that a qualified OCI
@@ -141,26 +138,10 @@ func BuildQualifiedPublicationRoot(ctx context.Context, out string, request Qual
 		return nil, err
 	}
 	objects = append(objects, proofObjects...)
-	clusterDigest := ""
-	if request.ClusterDefinitionPath != "" {
-		clusterRaw, err := readHeldBytes(ctx, request.ClusterDefinitionPath, "ClusterDefinition", 16<<20)
-		if err != nil {
-			return nil, err
-		}
-		var definition cluster.ClusterDefinition
-		if err := canonical.UnmarshalExact(clusterRaw, &definition); err != nil {
-			return nil, err
-		}
-		clusterDigest, err = definition.Digest()
-		if err != nil || definition.ReleaseSetRef != releaseDigest {
-			return nil, e.New(e.CodeUnverifiedRef, "ClusterDefinition does not reference the authorized ReleaseSet")
-		}
-		objects = append(objects, bytesObject("cluster-definition", "cluster-definition", MediaClusterDefinition, clusterDigest, digestBytes(clusterRaw), clusterRaw))
-	}
 	rootModel := PublicationRoot{SchemaVersion: PublicationRootSchema, Qualification: QualificationQualified,
 		PublicationIdentity: publicationIdentity, PublicationManifest: publicationManifestDigest,
 		ReleaseSetDigest: releaseDigest, InventoryDigest: inventoryDigest,
-		ClusterDefinitionDigest: clusterDigest, ClearanceDigest: wantAuthorization}
+		ClearanceDigest: wantAuthorization}
 	result, err := buildPublicationRoot(ctx, out, rootModel, objects)
 	if err != nil {
 		return nil, err
@@ -252,7 +233,7 @@ func validateAuthorizedObjects(ctx context.Context, authorization *release.Autho
 func qualifiedReservedName(name string) bool {
 	switch name {
 	case "clearance", "clearance-signature", "clearance-certificate", "clearance-bundle",
-		"trusted-root", "publication-manifest", "release-set", "inventory", "cluster-definition":
+		"trusted-root", "publication-manifest", "release-set", "inventory":
 		return true
 	default:
 		return false

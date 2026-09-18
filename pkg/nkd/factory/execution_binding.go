@@ -14,11 +14,11 @@ func matchOptionsForBuildNode(_ ir.Node) execution.MatchOptions {
 	return execution.MatchOptions{}
 }
 
-// bindRecipeExecution deterministically selects an Environment execution class
+// bindBuildExecution deterministically selects an Environment execution class
 // for every selected build that declares requirements. Ordinary builders do not
 // infer a host platform from their target/toolchain platform; VM-specific hard
 // constraints belong to the later VM lowering boundary.
-func bindRecipeExecution(graph *ir.Graph, selected map[string]bool, classes []execution.Class) error {
+func bindBuildExecution(graph *ir.Graph, selected map[string]bool, classes []execution.Class) error {
 	for index := range graph.Nodes {
 		node := &graph.Nodes[index]
 		if node.Kind != ir.KindBuild || !selected[node.Component] {

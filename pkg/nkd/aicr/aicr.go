@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
@@ -50,9 +49,7 @@ type Profile struct {
 	Platform        string `json:"platform,omitempty"`
 }
 
-// Selection is the complete set of AICR-governed recipe-selection axes. It is
-// deliberately separate from criteria.Criteria: these axes are active only for a
-// recipe layer that declares an exact Profile.
+// Selection is the complete concrete input tuple for an upstream AICR profile.
 type Selection struct {
 	Service     string
 	Accelerator string
@@ -64,7 +61,7 @@ type Selection struct {
 // Validate rejects incomplete selections rather than treating missing AICR axes as
 // wildcards.
 func (s Selection) Validate() error {
-	return criteria.ValidateAICRValues(s.Service, s.Accelerator, s.OS, s.Intent, s.Platform)
+	return ValidateValues(s.Service, s.Accelerator, s.OS, s.Intent, s.Platform)
 }
 
 // Matches reports exact selection equality. The optional platform matches only when
@@ -209,7 +206,7 @@ func (p Profile) Validate() error {
 		return e.New(e.CodeUnpinnedSource,
 			"aicr profile generator digest %q is not a lowercase sha256:<64-hex> pin", p.GeneratorDigest)
 	}
-	if err := criteria.ValidateAICRValues(p.Service, p.Accelerator, p.OS, p.Intent, p.Platform); err != nil {
+	if err := ValidateValues(p.Service, p.Accelerator, p.OS, p.Intent, p.Platform); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "aicr profile %q", p.Identity)
 	}
 	return nil

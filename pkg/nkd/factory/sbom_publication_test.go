@@ -26,7 +26,7 @@ func publicationSBOMFixture(t *testing.T) (*Plan, map[string]Artifact, Node) {
 		}
 		raw := []byte("built " + a.Component)
 		for _, payload := range artifacts {
-			if strings.HasPrefix(payload.ID, "artifact/") && payload.Component == a.Component && payload.RecipeTarget == a.RecipeTarget {
+			if strings.HasPrefix(payload.ID, "artifact/") && payload.Component == a.Component && payload.BuildTarget == a.BuildTarget {
 				if err := writeFactoryFile(t.Context(), payload.Path, raw, 0o755); err != nil {
 					t.Fatal(err)
 				}
@@ -95,7 +95,7 @@ func TestPublicationContainsExactSBOMBytes(t *testing.T) {
 		}
 		count++
 	}
-	expected := len(plan.Recipes[0].ResolvedComponents) + 1
+	expected := len(plan.Builds[0].ResolvedComponents) + 1
 	if count != expected {
 		t.Fatalf("got %d evidence objects, want %d", count, expected)
 	}
@@ -134,7 +134,7 @@ func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {
 	}{
 		{name: "missing document", remove: true, code: e.CodeProvenanceMissing},
 		{name: "wrong subject", change: func(i *sbom.Index) { i.Entries[0].ArtifactSHA = "sha256:" + strings.Repeat("a", 64) }, code: e.CodeVerifyFailed},
-		{name: "wrong recipe", change: func(i *sbom.Index) { i.RecipeDigest = "sha256:" + strings.Repeat("b", 64) }, code: e.CodeVerifyFailed},
+		{name: "wrong build", change: func(i *sbom.Index) { i.BuildDigest = "sha256:" + strings.Repeat("b", 64) }, code: e.CodeVerifyFailed},
 		{name: "wrong evidence digest", change: func(i *sbom.Index) { i.Entries[0].SBOMDigest = "sha256:" + strings.Repeat("c", 64) }, code: e.CodeVerifyFailed},
 		{name: "omitted entry", change: func(i *sbom.Index) { i.Entries = i.Entries[1:] }, code: e.CodeProvenanceMissing},
 	} {

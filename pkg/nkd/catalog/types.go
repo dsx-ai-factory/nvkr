@@ -1,4 +1,4 @@
-// Package catalog models the declarative SourceBuildRegistry, its recipes, and the
+// Package catalog models the declarative SourceBuildRegistry, its components, and the
 // DataProvider seam through which all catalog reads flow (SRD §4.6/§4.7). The
 // catalog is split like go.mod/go.sum: a hand-authored registry that declares
 // sources + components, and a machine-managed lockfile that pins each source, so
@@ -8,13 +8,11 @@ package catalog
 
 import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 // From-source builder types (ADR-10). Executable builders mirror ir.Builder*;
-// schema-only builders fail at the recipe compiler capability boundary.
+// schema-only builders fail at the build-graph compiler capability boundary.
 const (
 	BuilderOCIHermetic = "oci-hermetic"
 	BuilderNix         = "nix"
@@ -137,7 +135,7 @@ type Patch struct {
 
 // FlakePin pins a nix builder's locked flake (ADR-10 §2): a flake reference, a fully
 // pinned lock digest over all transitive inputs, an output attribute, and the pinned
-// nix container image. All are build-semantic inputs (part of recipeDigest); the
+// nix container image. All are build-semantic inputs (part of buildDigest); the
 // lock closure is pre-realized in the fetch step so the build runs offline (§7).
 type FlakePin struct {
 	Ref        string `json:"ref"`             // flake reference, e.g. github:owner/repo?rev=<sha>
@@ -185,15 +183,12 @@ type ExternalEvidence struct {
 // (NKD-FR-RC-026). It is the concrete shape every downstream stage consumes; the
 // loader produces it from the raw registry entry + its source + the lock.
 type Component struct {
-	FromSource bool `json:"fromSource"`
+	// Platforms is the sorted, nonempty allowlist of supported output targets.
+	Platforms  []string `json:"platforms"`
+	FromSource bool     `json:"fromSource"`
 
-	// Roles is the ADR-12 §3 affinity metadata: which node roles this component belongs
-	// to (control-plane|worker|gpu-worker). It drives COMPOSITION/delivery (the node-SKU
-	// role filter), NOT recipe selection, and does not affect recipeDigest. Empty means
-	// role-agnostic (present in every SKU).
-	Roles []string `json:"roles,omitempty"`
 	// BuilderType selects the from-source build substrate (ADR-10). It is a
-	// build-semantic input and flows into recipeDigest.
+	// build-semantic input and flows into buildDigest.
 	BuilderType string `json:"builderType,omitempty"`
 	// BuildRequirements declares the generic runner contract for this component's
 	// build step. It is operational metadata, not builder-specific behavior or proof
@@ -210,7 +205,7 @@ type Component struct {
 	Patches        []Patch `json:"patches,omitempty"`
 	ToolchainImage string  `json:"toolchainImage,omitempty"` // must be @sha256: digest
 	// ToolchainImages is the resolved per-execution-arch toolchain set. Ordinary
-	// compilation selects the Recipe arch. Future VM admission selects one eligible
+	// compilation selects the target arch. Future VM admission selects one eligible
 	// host platform independently from the guest/output arch.
 	ToolchainImages map[string]string `json:"toolchainImages,omitempty"`
 	CGO             bool              `json:"cgo,omitempty"`
@@ -221,9 +216,9 @@ type Component struct {
 	Packer       *PackerConfig `json:"packer,omitempty"`
 	BuildCommand []string      `json:"buildCommand,omitempty"`
 	// Materials binds source-owned input names to other component outputs in the
-	// same resolved Recipe. Each component may be bound exactly once. Future VM
-	// lowering turns these declarations into build-graph edges and stages only the
-	// verified outputs named here.
+	// same output's selected producer set. Each component may be bound exactly once.
+	// Future VM lowering turns these declarations into build-graph edges and stages
+	// only the verified outputs named here.
 	Materials map[string]string `json:"materials,omitempty"`
 	// For direct Packer, ArtifactPath is relative to the private output directory.
 	// Other builders retain their existing workspace-relative interpretation.
@@ -242,66 +237,21 @@ type Component struct {
 	ExclusionReason string `json:"exclusionReason,omitempty"`
 }
 
-// AICRProfile is a digest-pinned reference to an AICR (github.com/NVIDIA/aicr)
-// accelerated-runtime profile — the validated set of GPU/driver/operator/kernel
-// component pairings for an accelerator. Reconciled toward NKD v1 goal 10 / §8.1
-// ("the AICR profile identity and digest"): a recipe that declares one activates the
-// AICR-governed criteria axes (accelerator/service/intent/platform), pins the exact
-// generator bytes, and carries the profile identity+digests through the graph. nkdctl does not
-// build AICR's runtime from source; it references the pinned profile as the
-// foundational declarative layer for the accelerated-runtime slice.
+// AICRProfile pins the exact upstream profile and generator inputs for an
+// explicitly selected AICR output. It is independent of ordinary components.
 type AICRProfile = aicr.Profile
 
-// Recipe binds a criteria pattern to a set of component names (NKD-FR-RC-001).
-// VersionFrom names a source whose resolved tag fills the k8sVersion axis, so a
-// version bump does not require editing the recipe.
-//
-// Base/Overlays/Mixins are the composition hook (NKD-FR-RC-014/015, NKD-CON-017):
-// v1 recipes ship flat, but the fields are RETAINED here (recognized, not stripped)
-// so the shape is forward-compatible with layered composition. In v1 any populated
-// value fails closed in Validate rather than being silently ignored — the hook is
-// inert, not silently active.
-type Recipe struct {
-	ID          string            `json:"id"`
-	Criteria    criteria.Criteria `json:"criteria"`
-	VersionFrom string            `json:"versionFrom,omitempty"`
-	AICRProfile *AICRProfile      `json:"aicrProfile,omitempty"` // activates the AICR-governed axes for this recipe
-	Reserved    map[string]string `json:"reserved,omitempty"`    // must be empty in v1
-	Base        string            `json:"base,omitempty"`        // composition hook — must be empty in v1
-	Overlays    []string          `json:"overlays,omitempty"`    // composition hook — must be empty in v1
-	Mixins      []string          `json:"mixins,omitempty"`      // composition hook — must be empty in v1
-	Components  []string          `json:"components"`
-}
-
-// compositionFields reports the populated composition hook fields, if any, in a
-// stable order. Empty means the recipe is flat (the v1 requirement).
-func (r Recipe) compositionFields() []string {
-	var f []string
-	if r.Base != "" {
-		f = append(f, "base")
-	}
-	if len(r.Overlays) > 0 {
-		f = append(f, "overlays")
-	}
-	if len(r.Mixins) > 0 {
-		f = append(f, "mixins")
-	}
-	return f
-}
-
-// Catalog is the loaded, fully-resolved catalog (registry + lock merged). Layers is the
-// optional composition store (base/overlays/mixins, AICR-style): when present the
-// catalog resolves recipes by composing layers instead of matching a flat recipe.
+// Catalog is the loaded, fully resolved registry and lock. Producer selection is
+// explicit in each Definition output; the catalog contains no authored groups.
 type Catalog struct {
-	Actions    map[string]ActionPin
-	Tools      map[string]ToolPin
-	APIVersion string
-	Kind       string
-	Metadata   Metadata
-	Sources    map[string]Source
-	Recipes    []Recipe
-	Components map[string]Component
-	Layers     *compose.Store
+	Actions      map[string]ActionPin
+	Tools        map[string]ToolPin
+	APIVersion   string
+	Kind         string
+	Metadata     Metadata
+	Sources      map[string]Source
+	Components   map[string]Component
+	AICRProfiles map[string]aicr.Profile
 }
 
 // NamedComponent pairs a component with its registry key, for ordered iteration

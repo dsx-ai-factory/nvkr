@@ -51,7 +51,6 @@ func TestPublicationDescriptionCannotSmuggleAuthorityOrAmbiguousObjects(t *testi
 		{"diagnostic clearance", func(r *PublicationRoot) { r.ClearanceDigest = digest }, e.CodeGateUnmet},
 		{"diagnostic publication authority", func(r *PublicationRoot) { r.PublicationIdentity = digest }, e.CodeGateUnmet},
 		{"incomplete qualified description", func(r *PublicationRoot) { r.Qualification = QualificationQualified }, e.CodeGateUnmet},
-		{"invalid cluster digest", func(r *PublicationRoot) { r.ClusterDefinitionDigest = "tag" }, e.CodeUnverifiedRef},
 		{"incomplete release binding", func(r *PublicationRoot) { r.ReleaseSetDigest = digest }, e.CodeUnverifiedRef},
 		{"empty objects", func(r *PublicationRoot) { r.Objects = nil }, e.CodeReleaseIncomplete},
 		{"duplicate descriptor", func(r *PublicationRoot) { o := r.Objects[0]; o.Name = "z"; r.Objects = append(r.Objects, o) }, e.CodeVerifyFailed},

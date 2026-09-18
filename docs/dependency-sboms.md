@@ -26,8 +26,8 @@ inspection. This does not enable vulnerability scanning or qualified reproductio
 
 One release index references each required CycloneDX attestation bundle once in its owning artifact repository.
 The document appears only inside that signed statement; raw SBOM files remain private job handoffs. Its metadata records exact subject,
-covered stage, raw document digest, typed document identity and output membership. Build-time per-recipe
-indexes remain internal handoffs. Packaging verifies their recipe/producer/scanner bindings, transforms the
+covered stage, raw document digest, typed document identity and output membership. Build-time per-build
+indexes remain internal handoffs. Packaging verifies their output/build/producer/scanner bindings, transforms the
 documents to explicit stage subjects, and adds the final Helm packaging inventory. Before publication a
 separate stage creates and verifies subject-bound Sigstore bundles, then derives the final release index. The native CWE
 SBOM targets the delivered image manifest and records the scanned export digest. Signing the release index

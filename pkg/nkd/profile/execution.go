@@ -325,7 +325,7 @@ func VerifyExecution(
 
 func deriveExpectedExecution(p BuilderProfile, buildNodes []ir.Node, origin RunnerOrigin) (expectedExecution, error) {
 	if len(buildNodes) == 0 {
-		return expectedExecution{}, e.New(e.CodePreflightFailed, "execution preflight requires at least one selected build node; all-prebuilt recipes are profile-free")
+		return expectedExecution{}, e.New(e.CodePreflightFailed, "execution preflight requires at least one selected build node; all-prebuilt graphs are profile-free")
 	}
 	runner, err := requiredProfileDigest(p, FieldRunnerDigest)
 	if err != nil {

@@ -12,20 +12,16 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-const (
-	clusterBindingSchema = "nkd.dev/cluster-realization/v1"
-)
-
 type lifecycleContent struct {
 	Artifacts []lifecycleContentArtifact `json:"artifacts"`
 }
 
 type lifecycleContentArtifact struct {
-	Name         string   `json:"name"`
-	Kind         string   `json:"kind"`
-	Digest       string   `json:"digest"`
-	RecipeDigest string   `json:"recipeDigest"`
-	Components   []string `json:"components,omitempty"`
+	Name        string   `json:"name"`
+	Kind        string   `json:"kind"`
+	Digest      string   `json:"digest"`
+	BuildDigest string   `json:"buildDigest"`
+	Components  []string `json:"components,omitempty"`
 }
 
 // LifecyclePayloadObservation is an independently reopened and reproduced
@@ -49,24 +45,27 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		return LifecyclePayloadObservation{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no package producer", expected.Name)
 	}
 	components := append([]string(nil), expected.Components...)
-	recipeName := ""
-	for _, recipe := range plan.Recipes {
-		if recipe.RecipeDigest == expected.RecipeDigest {
-			if recipeName != "" {
-				return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q has an ambiguous recipe identity", expected.Name)
+	buildName := ""
+	for _, build := range plan.Builds {
+		if build.Name == expected.Name && build.BuildDigest == expected.BuildDigest {
+			if buildName != "" {
+				return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q has an ambiguous build identity", expected.Name)
 			}
-			recipeName = recipe.Name
+			buildName = build.Name
 		}
 	}
-	if recipeName == "" {
-		return LifecyclePayloadObservation{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no exact recipe", expected.Name)
+	if buildName == "" {
+		return LifecyclePayloadObservation{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no exact build", expected.Name)
 	}
 	verifyRawResults := func() error {
 		seen := map[string]bool{}
 		for _, inputID := range node.Inputs {
 			input := artifacts[inputID]
-			if input.RecipeTarget == "" || input.Component == "" || input.Kind == "producer-result" {
+			if input.BuildTarget == "" || input.Component == "" || input.Kind == "producer-result" {
 				continue
+			}
+			if input.BuildTarget != buildName {
+				return e.New(e.CodeVerifyFailed, "lifecycle output %q carries foreign producer %q", expected.Name, input.BuildTarget)
 			}
 			if seen[input.Component] {
 				return e.New(e.CodeVerifyFailed, "lifecycle output %q has ambiguous producer bytes for %q", expected.Name, input.Component)
@@ -79,7 +78,7 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 			}
 			matches := 0
 			for _, candidate := range artifacts {
-				if candidate.Kind != "producer-result" || candidate.RecipeTarget != input.RecipeTarget || candidate.Component != input.Component {
+				if candidate.Kind != "producer-result" || candidate.BuildTarget != input.BuildTarget || candidate.Component != input.Component {
 					continue
 				}
 				result, readErr := readProducerResult(ctx, candidate.Path)
@@ -132,7 +131,7 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 			components = append(components, entry.Name)
 			matches := 0
 			for _, candidate := range artifacts {
-				if candidate.Kind != "producer-result" || candidate.RecipeTarget != recipeName || candidate.Component != entry.Name {
+				if candidate.Kind != "producer-result" || candidate.BuildTarget != buildName || candidate.Component != entry.Name {
 					continue
 				}
 				resultRecord, readErr := readProducerResult(ctx, candidate.Path)
@@ -211,71 +210,30 @@ func lifecyclePublicationBinding(ctx context.Context, plan *Plan, node Node, art
 		}
 		components := observation.Components
 		payloadDigest := observation.Digest
-		if !equalFactoryStrings(components, expected.Components) || payloadDigest == "" || expected.RecipeDigest == "" {
+		if !equalFactoryStrings(components, expected.Components) || payloadDigest == "" || expected.BuildDigest == "" {
 			return LifecycleBinding{}, e.New(e.CodeVerifyFailed, "lifecycle output %q payload differs from its exact plan binding", expected.Name)
 		}
 		bound := LifecycleBoundOutput{Name: expected.Name, Kind: expected.Kind,
-			Digest: payloadDigest, RecipeDigest: expected.RecipeDigest, Components: append([]string(nil), components...)}
+			Digest: payloadDigest, BuildDigest: expected.BuildDigest, Components: append([]string(nil), components...)}
 		if artifact.Kind == PackageAPT {
 			bound.TransportPath = artifact.Path
 		}
 		binding.Outputs = append(binding.Outputs, bound)
 	}
 	sort.Slice(binding.Outputs, func(i, j int) bool { return binding.Outputs[i].Name < binding.Outputs[j].Name })
-	if err := ValidateLifecycleRealizations(plan.Compositions, plan.LifecycleOutputs, plan.LifecycleClusters, binding.Outputs); err != nil {
+	if err := ValidateLifecycleOutputs(plan.LifecycleOutputs, binding.Outputs); err != nil {
 		return LifecycleBinding{}, err
 	}
 	content := lifecycleContent{}
 	for _, output := range binding.Outputs {
 		content.Artifacts = append(content.Artifacts, lifecycleContentArtifact{Name: output.Name,
-			Kind: output.Kind, Digest: output.Digest, RecipeDigest: output.RecipeDigest, Components: append([]string(nil), output.Components...)})
+			Kind: output.Kind, Digest: output.Digest, BuildDigest: output.BuildDigest, Components: append([]string(nil), output.Components...)})
 	}
 	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, content)
 	if err != nil {
 		return LifecycleBinding{}, err
 	}
 	binding.ContentSubject = contentSubject
-	outputs := make(map[string]LifecycleBoundOutput, len(binding.Outputs))
-	for _, output := range binding.Outputs {
-		outputs[output.Name] = output
-	}
-	for _, planned := range plan.LifecycleClusters {
-		var composition *CompositionPlan
-		for index := range plan.Compositions {
-			if plan.Compositions[index].Name == planned.Name {
-				composition = &plan.Compositions[index]
-				break
-			}
-		}
-		if composition == nil || composition.Digest != planned.CompositionDigest {
-			return LifecycleBinding{}, e.New(e.CodeVerifyFailed, "cluster %q differs from its exact composition plan", planned.Name)
-		}
-		digest, err := composition.Composition.Digest()
-		if err != nil || digest != planned.CompositionDigest {
-			return LifecycleBinding{}, e.New(e.CodeVerifyFailed, "cluster %q composition bytes differ from its identity", planned.Name)
-		}
-		cluster := LifecycleBoundCluster{SchemaVersion: clusterBindingSchema, Name: planned.Name,
-			CompositionDigest: planned.CompositionDigest, ContentSubject: contentSubject}
-		for _, member := range planned.Members {
-			output, ok := outputs[member.Output]
-			if !ok {
-				return LifecycleBinding{}, e.New(e.CodeReleaseIncomplete, "cluster %q references missing output %q", planned.Name, member.Output)
-			}
-			cluster.Members = append(cluster.Members, LifecycleBoundClusterMember{Output: output.Name, ArtifactDigest: output.Digest,
-				RecipeDigest: output.RecipeDigest, Components: append([]string(nil), output.Components...), Role: member.Role})
-		}
-		sort.Slice(cluster.Members, func(i, j int) bool {
-			if cluster.Members[i].Output != cluster.Members[j].Output {
-				return cluster.Members[i].Output < cluster.Members[j].Output
-			}
-			return cluster.Members[i].Role < cluster.Members[j].Role
-		})
-		if _, err := canonical.Digest(canonical.KindClusterRealization, cluster); err != nil {
-			return LifecycleBinding{}, err
-		}
-		binding.Clusters = append(binding.Clusters, cluster)
-	}
-	sort.Slice(binding.Clusters, func(i, j int) bool { return binding.Clusters[i].Name < binding.Clusters[j].Name })
 	return binding, nil
 }
 
@@ -329,15 +287,13 @@ func planNode(plan *Plan, id string) Node {
 	return Node{}
 }
 
-// ValidateLifecycleRealizations owns the exact join from resolved recipes and
-// compiled cluster compositions to observed public output payloads.
-func ValidateLifecycleRealizations(compositions []CompositionPlan, expected []LifecycleOutputPlan,
-	clusters []LifecycleClusterPlan, observed []LifecycleBoundOutput,
-) error {
+// ValidateLifecycleOutputs owns the exact join from compiled output requirements
+// to observed public payloads, including each output name and build identity.
+func ValidateLifecycleOutputs(expected []LifecycleOutputPlan, observed []LifecycleBoundOutput) error {
 	outputs := make(map[string]LifecycleBoundOutput, len(observed))
 	for _, output := range observed {
 		if _, exists := outputs[output.Name]; exists || lifecyclePackageKind(output.Kind) == "" || !canonical.IsDigest(output.Digest) ||
-			!canonical.IsDigest(output.RecipeDigest) || (output.Kind != "helm-oci" && len(output.Components) == 0) {
+			!canonical.IsDigest(output.BuildDigest) || (output.Kind != "helm-oci" && len(output.Components) == 0) {
 			return e.New(e.CodeVerifyFailed, "lifecycle outputs are not unique exact payload bindings")
 		}
 		outputs[output.Name] = output
@@ -347,75 +303,11 @@ func ValidateLifecycleRealizations(compositions []CompositionPlan, expected []Li
 	}
 	for _, want := range expected {
 		got, ok := outputs[want.Name]
-		if !ok || got.RecipeDigest != want.RecipeDigest || !equalFactoryStrings(got.Components, want.Components) {
-			return e.New(e.CodeVerifyFailed, "lifecycle output %q changes its recipe or component binding", want.Name)
-		}
-	}
-	compositionByName := make(map[string]CompositionPlan, len(compositions))
-	for _, composition := range compositions {
-		compositionByName[composition.Name] = composition
-	}
-	for _, planned := range clusters {
-		composition, ok := compositionByName[planned.Name]
-		if !ok || composition.Digest != planned.CompositionDigest {
-			return e.New(e.CodeVerifyFailed, "cluster %q differs from its exact composition plan", planned.Name)
-		}
-		digest, err := composition.Composition.Digest()
-		if err != nil || digest != planned.CompositionDigest {
-			return e.New(e.CodeVerifyFailed, "cluster %q composition bytes differ from its identity", planned.Name)
-		}
-		for _, member := range planned.Members {
-			output, ok := outputs[member.Output]
-			if !ok {
-				return e.New(e.CodeReleaseIncomplete, "cluster %q references missing output %q", planned.Name, member.Output)
-			}
-			var category string
-			for _, recipe := range composition.Composition.Recipes {
-				if recipe.RecipeDigest == output.RecipeDigest && containsFactoryStrings(recipe.Components, output.Components) {
-					category = recipe.Category
-					break
-				}
-			}
-			if category == "" {
-				return e.New(e.CodeVerifyFailed, "cluster %q output %q is not bound to an exact composition recipe", planned.Name, member.Output)
-			}
-			if member.Role == "" {
-				if !containsFactoryString(composition.Composition.ClusterCategories, category) {
-					return e.New(e.CodeVerifyFailed, "cluster %q output %q is not bound at cluster level", planned.Name, member.Output)
-				}
-				continue
-			}
-			matched := false
-			for _, role := range composition.Composition.RoleBindings {
-				if role.Role == member.Role && containsFactoryString(role.NodeLevelCategories, category) && containsFactoryStrings(role.Subset, output.Components) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				return e.New(e.CodeVerifyFailed, "cluster %q output %q is not bound to role %q", planned.Name, member.Output, member.Role)
-			}
+		if !ok || got.Kind != want.Kind || got.BuildDigest != want.BuildDigest || !equalFactoryStrings(got.Components, want.Components) {
+			return e.New(e.CodeVerifyFailed, "lifecycle output %q changes its build or component binding", want.Name)
 		}
 	}
 	return nil
-}
-
-func containsFactoryString(values []string, wanted string) bool {
-	for _, value := range values {
-		if value == wanted {
-			return true
-		}
-	}
-	return false
-}
-
-func containsFactoryStrings(values, wanted []string) bool {
-	for _, item := range wanted {
-		if !containsFactoryString(values, item) {
-			return false
-		}
-	}
-	return true
 }
 
 func equalFactoryStrings(left, right []string) bool {

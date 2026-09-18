@@ -25,7 +25,7 @@ import (
 
 // Production build types. They are distinct from the reproduction build types in
 // provenance.go because they describe how a factory node produced bytes, not how
-// a recipe's expected digests were derived.
+// a build's expected digests were derived.
 const (
 	// BuildTypeHermeticBuild is a build executed from pinned source inside a
 	// pinned toolchain container with no unpinned network input.

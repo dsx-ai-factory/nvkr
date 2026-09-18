@@ -50,12 +50,12 @@ func TestLocalRunnerIsRerunnableAndPreservesSourceCache(t *testing.T) {
 		prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
 			return map[string]string{"linux/amd64": "fake"}, nil
 		},
-		runRecipe: func(_ context.Context, recipe RecipePlan, options LocalRunOptions) (*pipeline.Report, error) {
-			report := &pipeline.Report{RecipeID: recipe.RecipeID, RecipeDigest: recipe.RecipeDigest}
-			for _, component := range recipe.Components {
+		runBuild: func(_ context.Context, build BuildPlan, options LocalRunOptions) (*pipeline.Report, error) {
+			report := &pipeline.Report{BuildDigest: build.BuildDigest}
+			for _, component := range build.Components {
 				var planned Artifact
 				for _, artifact := range plan.Graph.Artifacts {
-					if artifact.ID == "artifact/"+recipe.Name+"/"+component {
+					if artifact.ID == "artifact/"+build.Name+"/"+component {
 						planned = artifact
 						break
 					}

@@ -71,8 +71,11 @@ func (e GitLab) runtimeImage() string { return e.RuntimeImage }
 
 func (GitLab) Name() string { return "gitlab-ci" }
 
-func (e GitLab) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([]byte, error) {
+func (e GitLab) Render(ctx context.Context, g *ir.Graph, buildDigest string) ([]byte, error) {
 	if err := requireEmitterContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := validateGraphIdentity(g, buildDigest); err != nil {
 		return nil, err
 	}
 	if err := ValidateEmitterDataPath(e.Data); err != nil {
@@ -152,5 +155,5 @@ func (e GitLab) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 			}
 		}
 	}
-	return GeneratedPipelineBytes(ctx, e.Name(), recipeDigest, g.RecipeID, g, body.Bytes())
+	return GeneratedPipelineBytes(ctx, e.Name(), buildDigest, g, body.Bytes())
 }

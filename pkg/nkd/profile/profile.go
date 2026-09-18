@@ -28,7 +28,7 @@ import (
 const SchemaVersion = "nkd.dev/builder-profile/v1"
 
 // Host-control class (NKD v1 §8.2.2): who controls the pinned host image. At least
-// one operator-controlled profile MUST exist for every released recipe, so a release
+// one operator-controlled profile MUST exist for every released build, so a release
 // is never reachable only through infrastructure that both NVIDIA and the operator
 // lack control over (e.g. a hosted CI runner image the provider rotates without
 // notice). Preflight is fail-closed, so an unbounded provider rotation would
@@ -68,7 +68,7 @@ type BuilderProfile struct {
 	Version          string `json:"version"`          // profile revision
 	HostControlClass string `json:"hostControlClass"` // operator-controlled | provider-controlled
 	// Provides is the set of builders this profile supplies (ADR-07 §5). Matching is
-	// CAPABILITY-based: any profile that provides the recipe's required builders
+	// CAPABILITY-based: any profile that provides the selected build's required builders
 	// qualifies — the publisher pins no fixed profile identity, so an operator can
 	// always author a conforming profile. Empty defaults to ["oci-hermetic"].
 	Provides []string `json:"provides,omitempty"`
@@ -85,8 +85,8 @@ func (p BuilderProfile) ProvidedBuilders() []string {
 }
 
 // RequireBuilders fails closed (CodeBuilderNotProvided) if the profile does not
-// provide every builder the recipe requires (ADR-07 §5). This is a fail-closed
-// preflight condition — e.g. a recipe with a nix component needs a profile that
+// provide every builder the selected build requires (ADR-07 §5). This is a fail-closed
+// preflight condition — e.g. a build with a nix component needs a profile that
 // provides nix.
 func (p BuilderProfile) RequireBuilders(required []string) error {
 	have := map[string]bool{}
@@ -96,7 +96,7 @@ func (p BuilderProfile) RequireBuilders(required []string) error {
 	for _, r := range required {
 		if !have[r] {
 			return e.New(e.CodeBuilderNotProvided,
-				"builder profile %q does not provide builder %q required by the recipe (provides: %v)", p.Identity, r, p.ProvidedBuilders())
+				"builder profile %q does not provide builder %q required by the selected build (provides: %v)", p.Identity, r, p.ProvidedBuilders())
 		}
 	}
 	return nil
@@ -179,7 +179,7 @@ func (p BuilderProfile) MarshalDisplayYAML() ([]byte, error) {
 
 // Digest is the authoritative profile identity: a domain-separated sha256 over the
 // canonical JCS form (ADR-01), computed through the one canonical codec shared with
-// the recipe identity and every other digest-addressed object. All comparison,
+// the logical build identity and every other digest-addressed object. All comparison,
 // preflight, and telemetry key on this, never on the Identity label (NKD v1 §8.2.1).
 func (p BuilderProfile) Digest() (string, error) {
 	return canonical.Digest(canonical.KindBuilderProfile, p.canonical())

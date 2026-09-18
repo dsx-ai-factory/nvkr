@@ -9,7 +9,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-const BundleManifestSchema = "nkd.dev/execution-bundle-manifest/v1"
+const BundleManifestSchema = "nkd.dev/execution-bundle-manifest/v2"
 
 // BundleMember binds the exact bytes and intended mode of one execution file.
 type BundleMember struct {
@@ -27,26 +27,25 @@ type BundleMember struct {
 type BundleManifest struct {
 	SchemaVersion string         `json:"schemaVersion"`
 	Engine        string         `json:"engine"`
-	RecipeID      string         `json:"recipeId"`
-	RecipeDigest  string         `json:"recipeDigest"`
+	BuildDigest   string         `json:"buildDigest"`
 	BundleDigest  string         `json:"bundleDigest"`
 	Members       []BundleMember `json:"members"`
 }
 
 // ManifestJSON returns canonical bytes for the exact generated execution bundle.
-func ManifestJSON(engine, recipeID, recipeDigest, pipelineName string, emitted, nodes, transportPlan []byte) ([]byte, error) {
+func ManifestJSON(engine, buildDigest, pipelineName string, emitted, nodes, transportPlan []byte) ([]byte, error) {
 	bundleDigest := generatedHeaderValue(emitted, "bundleDigest")
 	if bundleDigest == "" || generatedHeaderValue(emitted, "nodesDigest") != FileDigest(nodes) ||
-		generatedHeaderValue(emitted, "transportPlanDigest") != FileDigest(transportPlan) || generatedHeaderValue(emitted, "recipeDigest") != recipeDigest {
-		return nil, e.New(e.CodePipelineDrift, "generated pipeline header does not bind the supplied recipe and nodes.json bytes")
+		generatedHeaderValue(emitted, "transportPlanDigest") != FileDigest(transportPlan) || generatedHeaderValue(emitted, "buildDigest") != buildDigest {
+		return nil, e.New(e.CodePipelineDrift, "generated pipeline header does not bind the supplied build and nodes.json bytes")
 	}
 	name := filepath.Base(pipelineName)
 	if name == "." || name == "" || name == NodesFile {
 		return nil, e.New(e.CodeUsage, "pipeline output name %q collides with the execution bundle", pipelineName)
 	}
 	manifest := BundleManifest{
-		SchemaVersion: BundleManifestSchema, Engine: engine, RecipeID: recipeID,
-		RecipeDigest: recipeDigest, BundleDigest: bundleDigest,
+		SchemaVersion: BundleManifestSchema, Engine: engine,
+		BuildDigest: buildDigest, BundleDigest: bundleDigest,
 		Members: []BundleMember{
 			{Name: name, MediaType: "application/yaml", SHA256: FileDigest(emitted), Mode: 0o644},
 			{Name: NodesFile, MediaType: "application/vnd.nkd.ir+json", SHA256: FileDigest(nodes), Mode: 0o644},
@@ -57,8 +56,8 @@ func ManifestJSON(engine, recipeID, recipeDigest, pipelineName string, emitted, 
 }
 
 // VerifyManifest requires exact canonical manifest bytes and exact member bytes.
-func VerifyManifest(manifestBytes []byte, engine, recipeID, recipeDigest, pipelineName string, emitted, nodes, transportPlan []byte) error {
-	want, err := ManifestJSON(engine, recipeID, recipeDigest, pipelineName, emitted, nodes, transportPlan)
+func VerifyManifest(manifestBytes []byte, engine, buildDigest, pipelineName string, emitted, nodes, transportPlan []byte) error {
+	want, err := ManifestJSON(engine, buildDigest, pipelineName, emitted, nodes, transportPlan)
 	if err != nil {
 		return err
 	}

@@ -8,7 +8,6 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -18,7 +17,7 @@ func TestCompileDocumentsResolvesCatalogRelativeToDefinition(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	var recipeDigest string
+	var buildDigest string
 	for _, tc := range []struct {
 		name                        string
 		absolute, override, missing bool
@@ -35,13 +34,13 @@ func TestCompileDocumentsResolvesCatalogRelativeToDefinition(t *testing.T) {
 			}
 			definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind, Metadata: Metadata{Name: "documents"}, Catalog: CatalogStack{Base: catalogPath},
 				UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161", UtilityPlatform: "linux/amd64",
-				Recipes:  []RecipeTarget{{Name: "worker", Criteria: criteria.Criteria{Category: "kubernetes", Role: "worker", K8sVersion: "1.34.0", OS: "ubuntu", Arch: "amd64"}}},
+				Builds:   []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
 				Packages: []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}}}
 			if tc.override {
-				definition.Recipes[0].Catalog = &CatalogStack{Base: catalogPath}
+				definition.Builds[0].Catalog = &CatalogStack{Base: catalogPath}
 			}
 			if tc.missing {
-				definition.Recipes[0].Catalog.Base = "missing"
+				definition.Builds[0].Catalog.Base = "missing"
 			}
 			environment := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind, Metadata: Metadata{Name: "local"}, RunsOn: "ubuntu-24.04"}
 			definitionPath := filepath.Join("definitions", "fixture.yaml")
@@ -59,14 +58,14 @@ func TestCompileDocumentsResolvesCatalogRelativeToDefinition(t *testing.T) {
 			if plan.DefinitionPath != filepath.ToSlash(definitionPath) || plan.EnvironmentPath != "environment.yaml" {
 				t.Fatalf("plan lost authored paths: %+v", plan)
 			}
-			if len(plan.Recipes) != 1 {
-				t.Fatalf("wrong recipe set: %+v", plan.Recipes)
+			if len(plan.Builds) != 1 {
+				t.Fatalf("wrong build set: %+v", plan.Builds)
 			}
-			if recipeDigest == "" {
-				recipeDigest = plan.Recipes[0].RecipeDigest
+			if buildDigest == "" {
+				buildDigest = plan.Builds[0].BuildDigest
 			}
-			if plan.Recipes[0].RecipeDigest != recipeDigest {
-				t.Fatal("catalog transport path changed recipe identity")
+			if plan.Builds[0].BuildDigest != buildDigest {
+				t.Fatal("catalog transport path changed build identity")
 			}
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)

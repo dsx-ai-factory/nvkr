@@ -10,16 +10,14 @@ import (
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
 var (
-	canonicalRecipeID = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
-	canonicalNodeID   = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
-	canonicalToken    = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?$`)
-	exactGitSHA       = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	flakeOutput       = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?$`)
+	canonicalNodeID = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
+	exactGitSHA     = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	flakeOutput     = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?$`)
 )
 
 var allowedBuildEnv = map[string]bool{
@@ -64,7 +62,7 @@ var knownOutputTypes = map[string]bool{
 // Validate is the single semantic authority for executable IR. It deliberately
 // validates the full transport-bearing graph before identity code removes transport
 // locators: an unsafe caller-composed graph can therefore neither execute nor gain a
-// recipeDigest merely because its reduced DigestView looks harmless.
+// buildDigest merely because its reduced DigestView looks harmless.
 func (g *Graph) Validate() error {
 	if g == nil {
 		return e.New(e.CodeInvalidCatalog, "IR graph is nil")
@@ -73,20 +71,12 @@ func (g *Graph) Validate() error {
 		return e.New(e.CodeUnsupported,
 			"IR graph schemaVersion %q is unsupported; want %q", g.SchemaVersion, SchemaVersion)
 	}
-	if !canonicalRecipeID.MatchString(g.RecipeID) {
-		return e.New(e.CodeInvalidCatalog,
-			"IR graph recipeId %q is not a canonical nonempty identifier", g.RecipeID)
-	}
-	if err := validateResolvedCriteria(g.Criteria); err != nil {
+	if err := target.ValidatePlatform(g.Platform); err != nil {
 		return err
 	}
 	if g.AICR != nil {
 		if err := g.AICR.Validate(); err != nil {
 			return err
-		}
-		if g.Criteria.Category != "accelerated-runtime" || g.Criteria.OS != g.AICR.OS {
-			return e.New(e.CodeInvalidCatalog,
-				"IR AICR activation does not match resolved category/os criteria")
 		}
 	}
 	if len(g.Nodes) == 0 {
@@ -115,10 +105,10 @@ func (g *Graph) Validate() error {
 		byID[node.ID] = node
 		switch node.Kind {
 		case KindBuild, KindPull:
-			if node.Platform != "linux/"+g.Criteria.Arch {
+			if node.Platform != g.Platform {
 				return e.New(e.CodeInvalidCatalog,
-					"node %q platform %q does not match resolved architecture %q",
-					node.ID, node.Platform, g.Criteria.Arch)
+					"node %q platform %q does not match build target %q",
+					node.ID, node.Platform, g.Platform)
 			}
 			if prior, duplicate := components[node.Component]; duplicate {
 				return e.New(e.CodeInvalidCatalog,
@@ -137,6 +127,12 @@ func (g *Graph) Validate() error {
 	}
 	if terminal == nil {
 		return e.New(e.CodeInvalidCatalog, "IR graph has no terminal verify node")
+	}
+	if g.AICR != nil && len(producerIDs) != 0 {
+		return e.New(e.CodeInvalidCatalog, "AICR build graph must not contain ordinary artifact producers")
+	}
+	if g.AICR == nil && len(producerIDs) == 0 {
+		return e.New(e.CodeInvalidCatalog, "build graph requires at least one artifact producer or an AICR profile")
 	}
 
 	for _, node := range g.Nodes {
@@ -186,7 +182,7 @@ func (g *Graph) Validate() error {
 }
 
 // Validate checks the kind-specific semantics that remain meaningful when a CI
-// adapter executes one node in isolation. Graph.Validate adds topology, criteria,
+// adapter executes one node in isolation. Graph.Validate adds topology, target platform,
 // and cross-node pin consistency; both interfaces share these same field checks.
 func (n Node) Validate() error {
 	if !canonicalNodeID.MatchString(n.ID) {
@@ -212,32 +208,6 @@ func (n Node) Validate() error {
 	default:
 		return e.New(e.CodeInvalidCatalog, "IR node %q has unknown kind %q", n.ID, n.Kind)
 	}
-}
-
-func validateResolvedCriteria(c criteria.Criteria) error {
-	if err := c.ValidateActive(); err != nil {
-		return err
-	}
-	for name, value := range map[string]string{
-		"category": c.Category, "role": c.Role, "k8sVersion": c.K8sVersion,
-		"os": c.OS, "arch": c.Arch, "clusterType": c.ClusterType,
-	} {
-		if value == criteria.Wildcard || value != strings.TrimSpace(value) || strings.ContainsRune(value, '\x00') {
-			return e.New(e.CodeInvalidCatalog,
-				"resolved IR criteria %s %q is not concrete and canonical", name, value)
-		}
-	}
-	if c.OS == "" || !canonicalToken.MatchString(c.OS) {
-		return e.New(e.CodeInvalidCatalog, "resolved IR criteria os %q is not canonical", c.OS)
-	}
-	if !criteria.ValidArch(c.Arch) {
-		return e.New(e.CodeInvalidCatalog, "resolved IR criteria arch %q is not concrete", c.Arch)
-	}
-	if c.K8sVersion != "" && !canonicalToken.MatchString(strings.TrimPrefix(c.K8sVersion, "v")) {
-		return e.New(e.CodeInvalidCatalog,
-			"resolved IR criteria k8sVersion %q is not canonical", c.K8sVersion)
-	}
-	return nil
 }
 
 func validateNeeds(n Node) error {
@@ -612,14 +582,10 @@ func exactOCIIdentity(reference string) bool {
 }
 
 func platformArch(platform string) (string, bool) {
-	switch platform {
-	case "linux/amd64":
-		return "amd64", true
-	case "linux/arm64":
-		return "arm64", true
-	default:
+	if err := target.ValidatePlatform(platform); err != nil {
 		return "", false
 	}
+	return target.Arch(platform), true
 }
 
 func safeRelativePath(value string) bool {

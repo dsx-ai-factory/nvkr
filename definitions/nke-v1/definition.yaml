@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/definition/v2
+apiVersion: nkd.dev/definition/v4
 catalog:
   base: ./catalog
 cosignTool: cosign
@@ -12,7 +12,7 @@ outputs:
   - cwe
   format: oci
   name: cwe
-  recipe: nke-control-plane
+  platform: linux/amd64
 - components:
   - nke-helm
   format: helm-oci
@@ -20,23 +20,10 @@ outputs:
     chart: 007-controller
     imageOutput: cwe
   name: nke-helm
-  recipe: nke-control-plane
+  platform: linux/amd64
 - components:
   - nkectl
   format: executable
   name: nkectl
-  recipe: nke-cli
-recipes:
-- criteria:
-    arch: amd64
-    category: operations
-    k8sVersion: 1.36.0
-    os: ubuntu
-  name: nke-cli
-- criteria:
-    arch: amd64
-    category: platform-services
-    k8sVersion: 1.36.0
-    os: ubuntu
-  name: nke-control-plane
+  platform: linux/amd64
 sbomTool: syft

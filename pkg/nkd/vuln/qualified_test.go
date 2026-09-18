@@ -48,7 +48,7 @@ func qualifiedFixture(t *testing.T) (QualifiedScanRequest, releaseScanner) {
 	}
 	request := QualifiedScanRequest{
 		Scanner: ScannerGrype, ScannerDigest: vulnExact("grype-binary"),
-		DatabaseDigest: vulnExact("grype-db"), RecipeDigest: vulnExact("recipe"),
+		DatabaseDigest: vulnExact("grype-db"), BuildDigest: vulnExact("build"),
 		ArtifactDigest: vulnExact("artifact"), SBOMDigest: sbomDigest, CanonicalSBOM: sbomBytes,
 	}
 	result := []byte(`{"matches":[{"vulnerability":{"id":"CVE-2","severity":"High","fix":{"versions":["2.0"]}},"artifact":{"name":"pkg-b","version":"1.0"}},{"vulnerability":{"id":"CVE-1","severity":"Low"},"artifact":{"name":"pkg-a","version":"1.1"}}]}`)

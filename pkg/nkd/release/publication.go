@@ -10,11 +10,11 @@ import (
 
 const (
 	PublicationManifestSchemaVersion = "nkd.dev/publication-manifest/v1"
-	ReferrerValidationVector         = "application/vnd.nkd.validation-vector.v1+json"
+	ReferrerValidationVector         = "application/vnd.nkd.validation-vector.v3+json"
 	ReferrerStatusCheckpoint         = "application/vnd.nkd.status-checkpoint.v1+json"
 	ReferrerSBOM                     = "application/vnd.cyclonedx+json"
 	ReferrerProvenance               = "application/vnd.in-toto+json"
-	ReferrerVulnerability            = "application/vnd.nkd.vulnerability-report.v2+json"
+	ReferrerVulnerability            = "application/vnd.nkd.vulnerability-report.v3+json"
 )
 
 // PublicationReferrer binds one exact OCI subject to both an NKD semantic identity
@@ -131,8 +131,8 @@ func buildPublicationManifest(request AuthorizationRequest, publicationIdentity 
 		vector, ok := vectors[member.VectorDigest]
 		if !ok {
 			return PublicationManifest{}, e.New(e.CodeGateUnmet,
-				"OCI member %s/%s lacks an authenticated validation-vector publication receipt %s",
-				member.Component, orNone(member.Role), member.VectorDigest)
+				"OCI member %s lacks an authenticated validation-vector publication receipt %s",
+				member.Component, member.VectorDigest)
 		}
 		componentArtifacts := map[string]bool{}
 		for _, component := range vector.components {

@@ -156,7 +156,7 @@ func TestRunSchedulerConcurrentDeterministic(t *testing.T) {
 		"k-source", toolchain, vendorSpec)
 	buildA := completeTestBuild(ir.Node{ID: "build-a", Kind: ir.KindBuild, Component: "a", Toolchain: toolchain}, fetch)
 	buildB := completeTestBuild(ir.Node{ID: "build-b", Kind: ir.KindBuild, Component: "b", Toolchain: toolchain}, fetch)
-	g := testSourceGraph("t", fetch, buildA, buildB)
+	g := testSourceGraph(fetch, buildA, buildB)
 	digest := mustGraphDigest(t, g)
 	run := func(jobs int) *Report {
 		rep, err := Local{}.Run(g, digest, RunOptions{Ctx: context.Background(), Jobs: jobs, DryRun: true})
@@ -199,7 +199,7 @@ func TestLocalRunAndLoweringRejectUnsafeCallerGraphBeforeWork(t *testing.T) {
 			graph := sampleGraph()
 			mutate(&graph.Nodes[0])
 			if _, err := graph.Digest(); err == nil {
-				t.Fatal("unsafe graph gained a recipe digest")
+				t.Fatal("unsafe graph gained a build digest")
 			}
 			var output bytes.Buffer
 			report, err := (Local{}).Run(graph, "sha256:"+repeatHex("f"), RunOptions{Ctx: context.Background(), DryRun: true, Stdout: &output})
@@ -223,7 +223,7 @@ func TestLocalRunCancellationStopsGitFetch(t *testing.T) {
 	fetch := testFetchNode("fetch-cancel", "https://example.test/source", testSourceCommit, testSourceTree,
 		"source", toolchain, "sha256:"+repeatHex("d"))
 	build := completeTestBuild(ir.Node{ID: "build-cancel", Kind: ir.KindBuild, Component: "cancel", Toolchain: toolchain}, fetch)
-	graph := testSourceGraph("cancel-fetch", fetch, build)
+	graph := testSourceGraph(fetch, build)
 	digest := mustGraphDigest(t, graph)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -248,7 +248,7 @@ func TestLocalDryRunKeepsLifecycleProgressQuiet(t *testing.T) {
 	fetch := testFetchNode("fetch-plan", "https://example.test/source", testSourceCommit, testSourceTree,
 		"source", toolchain, "sha256:"+repeatHex("d"))
 	build := completeTestBuild(ir.Node{ID: "build-plan", Kind: ir.KindBuild, Component: "plan", Toolchain: toolchain}, fetch)
-	graph := testSourceGraph("quiet-plan", fetch, build)
+	graph := testSourceGraph(fetch, build)
 	digest := mustGraphDigest(t, graph)
 	var output bytes.Buffer
 	if _, err := (Local{}).Run(graph, digest, RunOptions{

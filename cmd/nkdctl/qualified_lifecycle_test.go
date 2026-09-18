@@ -11,11 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/transport"
@@ -47,7 +46,7 @@ func TestStockQualifiedLifecycleCommandsRequireCosignPinBeforeInputIO(t *testing
 		},
 		{
 			name: "status", command: releaseStatusCmd(),
-			args: []string{"status", "--target", testRecipeDigest, "--authority", "status.example.test", "--documents", missing,
+			args: []string{"status", "--target", testBuildDigest, "--authority", "status.example.test", "--documents", missing,
 				"--high-water", missing, "--as-of", "1", "--status-issuer", "https://issuer.example.test"},
 		},
 	}
@@ -116,7 +115,7 @@ func TestQualifiedPackagingFailsBeforeCatalogOrArtifactIO(t *testing.T) {
 func TestSignedProfileRepinRequiresNewGenerationBeforeInputIO(t *testing.T) {
 	app := &cli.App{Commands: []*cli.Command{cmdProfile()}}
 	err := app.Run([]string{"nkdctl", "profile", "repin",
-		"--sign", "--profile", "must-not-be-read.json", "--runner", testRecipeDigest,
+		"--sign", "--profile", "must-not-be-read.json", "--runner", testBuildDigest,
 	})
 	if cliErrorCode(err) != nkderr.CodeUsage {
 		t.Fatalf("signed in-place profile repin did not fail before profile I/O: %v", err)
@@ -128,7 +127,7 @@ func TestStatusCheckpointSigningRequiresExecutablePinBeforePublication(t *testin
 	out := filepath.Join(dir, "checkpoint.json")
 	app := &cli.App{Commands: []*cli.Command{releaseCheckpointCmd()}}
 	err := app.Run([]string{"nkdctl", "checkpoint",
-		"--target", testRecipeDigest,
+		"--target", testBuildDigest,
 		"--authority", "status.example.test",
 		"--issued-epoch", "1",
 		"--valid-until-epoch", "2",
@@ -147,7 +146,7 @@ func TestStatusCheckpointSigningRequiresExecutablePinBeforePublication(t *testin
 }
 
 func TestQualifiedStatusAuthenticatesCheckpointAndPersistsHighWater(t *testing.T) {
-	target := testRecipeDigest
+	target := testBuildDigest
 	checkpoint := status.StatusCheckpoint{
 		SchemaVersion: status.CheckpointSchemaVersion, Target: target,
 		Authority: "status.example.test", Sequence: 0, DeclarationDigests: []string{},
@@ -246,7 +245,7 @@ func TestReleaseStructuralAuthoringLabelsOutputUnauthenticated(t *testing.T) {
 		SchemaVersion: release.InventorySchemaVersion,
 		Version:       "1",
 		Components: []release.InventoryComponent{{
-			Name: "kubelet", Role: "worker", RequiredArtifacts: []string{artifactDigest},
+			Name: "kubelet", RequiredArtifacts: []string{artifactDigest},
 			ArtifactKinds: []release.ArtifactKindBinding{{ArtifactDigest: artifactDigest, Kind: release.ArtifactHostPackage}},
 		}},
 	}
@@ -256,8 +255,8 @@ func TestReleaseStructuralAuthoringLabelsOutputUnauthenticated(t *testing.T) {
 	}
 	inventoryPath := writeCLIFile(t, "inventory.json", inventoryRaw)
 	member := release.Member{
-		Component: "kubelet", Role: "worker", Arch: "amd64", Version: "1",
-		RecipeDigest:        "sha256:" + strings.Repeat("b", 64),
+		Component: "kubelet", Arch: "amd64", Version: "1",
+		BuildDigest:         "sha256:" + strings.Repeat("b", 64),
 		VectorDigest:        "sha256:" + strings.Repeat("c", 64),
 		ResolvedInputDigest: "sha256:" + strings.Repeat("d", 64),
 		ArtifactDigests:     []string{artifactDigest},
@@ -328,14 +327,14 @@ func TestReleaseDiagnosticHelpStatesAuthorityBoundaries(t *testing.T) {
 
 func TestReleaseSelectCannotConfuseResolutionWithAuthorization(t *testing.T) {
 	app := &cli.App{Commands: []*cli.Command{cmdRelease()}}
-	err := app.Run([]string{"nkdctl", "release", "select", "release.example/stable@" + testRecipeDigest})
+	err := app.Run([]string{"nkdctl", "release", "select", "release.example/stable@" + testBuildDigest})
 	if cliErrorCode(err) != nkderr.CodeUnsupported {
 		t.Fatalf("unauthenticated selector produced a release decision: %v", err)
 	}
 }
 
 func TestQualifiedStatusPersistsWithdrawalCheckpointBeforeFailClosedDecision(t *testing.T) {
-	target := testRecipeDigest
+	target := testBuildDigest
 	declaration := status.StatusDeclaration{
 		SchemaVersion: status.SchemaVersion, Target: target, Action: status.ActionWithdrawn,
 		Reason: "compromised", EffectiveEpoch: 20,
@@ -407,7 +406,7 @@ func TestQualifiedStatusRejectsNonCanonicalTransportConfigBeforeVerification(t *
 	})
 	app := &cli.App{Commands: []*cli.Command{releaseStatusCmdWithVerifier(verifier)}}
 	err := app.Run([]string{"nkdctl", "status",
-		"--target", testRecipeDigest, "--authority", "status.example.test", "--documents", path,
+		"--target", testBuildDigest, "--authority", "status.example.test", "--documents", path,
 		"--high-water", "unused.json", "--as-of", "50", "--status-identity", statusTestIdentity,
 		"--status-issuer", statusTestIssuer,
 	})
@@ -455,7 +454,7 @@ func TestReleaseSetCommandNarrowsRoleQualifiedNormalizedDocument(t *testing.T) {
 		Version:       "1.0.0",
 		InventoryRef:  "sha256:1111111111111111111111111111111111111111111111111111111111111111",
 		Members: []release.Member{{
-			Component: "node", Arch: "amd64", RecipeDigest: testRecipeDigest,
+			Component: "node", Arch: "amd64", BuildDigest: testBuildDigest,
 			VectorDigest:        testInputDigest,
 			ResolvedInputDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
 			ArtifactDigests:     []string{testInputDigest, testArtifactDigest},
@@ -696,20 +695,20 @@ func TestAuthorityFabricatingLegacyCommandsAreExplicitlyDisabled(t *testing.T) {
 
 func TestVulnerabilityPathIssuesOnlyQualifiedReport(t *testing.T) {
 	artifactDigest := testArtifactDigest
-	resolved := &recipe.Resolved{
-		RecipeID: "qualified-vuln", Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			Tag: "v1.0.0", OutputType: "raw", Prebuilt: &catalog.Prebuilt{
-				URL: "file:///artifact", Digests: map[string]string{"amd64": artifactDigest},
+				URL: "https://example.invalid/artifact", Digests: map[string]string{"amd64": artifactDigest},
 				Evidence: &catalog.ExternalEvidence{None: true},
 			},
 		}}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -726,7 +725,7 @@ func TestVulnerabilityPathIssuesOnlyQualifiedReport(t *testing.T) {
 		},
 		Action: func(c *cli.Context) error {
 			var scanErr error
-			gotDigest, scanErr = runVulnScanWithScanner(c, resolved, recipeDigest,
+			gotDigest, scanErr = runVulnScanWithScanner(c, resolved, buildDigest,
 				map[string]string{"artifact": artifactDigest},
 				vulnerabilityScannerFunc(func(ctx context.Context, request vuln.QualifiedScanRequest) (vuln.ScanObservation, error) {
 					if ctx != c.Context {
@@ -767,24 +766,24 @@ func TestCommandSBOMReaderIssuesExternalReceiptOnlyAfterRehash(t *testing.T) {
 	sum := sha256.Sum256(evidence)
 	evidenceDigest := "sha256:" + hex.EncodeToString(sum[:])
 	evidencePath := writeCLIFile(t, "external-sbom.json", evidence)
-	resolved := &recipe.Resolved{
-		RecipeID: "external-evidence", Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{
+	resolved := &buildgraph.Resolved{
+		Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			Tag: "v1.0.0", OutputType: "raw", Prebuilt: &catalog.Prebuilt{
-				URL: "file:///artifact", Digests: map[string]string{"amd64": testArtifactDigest},
+				URL: "https://example.invalid/artifact", Digests: map[string]string{"amd64": testArtifactDigest},
 				Evidence: &catalog.ExternalEvidence{SBOMRef: "file://" + evidencePath, SBOMDigest: evidenceDigest},
 			},
 		}}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	set, err := buildVerifiedSBOM(context.Background(), resolved, recipeDigest,
+	set, err := buildVerifiedSBOM(context.Background(), resolved, buildDigest,
 		map[string]string{"artifact": testArtifactDigest})
 	if err != nil {
 		t.Fatal(err)
@@ -797,7 +796,7 @@ func TestCommandSBOMReaderIssuesExternalReceiptOnlyAfterRehash(t *testing.T) {
 		t.Fatalf("external evidence receipt lost exact bindings: %+v", receipts)
 	}
 	resolved.Components[0].Prebuilt.Evidence.SBOMDigest = testInputDigest
-	if _, err := buildVerifiedSBOM(context.Background(), resolved, recipeDigest,
+	if _, err := buildVerifiedSBOM(context.Background(), resolved, buildDigest,
 		map[string]string{"artifact": testArtifactDigest}); cliErrorCode(err) == "" {
 		t.Fatalf("expected digest mismatch to fail closed, got %v", err)
 	}

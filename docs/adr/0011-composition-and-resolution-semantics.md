@@ -1,4 +1,4 @@
-# ADR-11 — Composition & resolution semantics
+# ADR-11 — Direct producer selection & build graph derivation
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
 - **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
@@ -7,110 +7,111 @@
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-11 in the consolidated NKD ADR set.
-- **Relates to:** ADR-02 (identity over the resolved graph), ADR-12 (criteria model), ADR-07 (reproduction identity),
+- **Relates to:** ADR-02 (identity over the resolved graph), ADR-12 (target and AICR inputs), ADR-07 (reproduction identity),
   ADR-05 (inventory).
-- **Satisfies:** FR-01 (ties fail closed), FR-02 (layered composition), FR-21 (standard-interface enforcement).
+- **Scope:** both evidence lanes share direct selection and graph admission; neither selection nor compilation
+  grants execution, reproduction or release authority.
 
 ## Context
 
-A recipe may be authored as a `base` plus criteria-keyed `overlays` and orthogonal `mixins`. It must **flatten
-deterministically into one Resolved Recipe** whose Recipe Digest is its identity (ADR-02). The SRD requires
-normative merge and conflict-resolution rules and requires ties to fail closed. This ADR fixes the merge algebra,
-the fail-closed conflict rule, how drift is caught, how an operator's *kind* of extension is classified, and how
-standard interfaces are enforced at authoring time.
+A Definition already names its required outputs and their packaging relationships. Requiring a separately
+authored component group adds a second place to maintain membership without establishing compatibility.
+Reusable catalog producers supply the build instructions and pins. The compiler can derive each output's
+complete required build graph directly from those producers.
 
 ## Decision
 
-### 1. Normative merge algebra + fail-closed conflicts
+### 1. Exact producer selection
 
-- **Selection.** All criteria-matching overlays are composed (merge-many, not pick-one); overlays that are an
-  ancestor of another match are dropped (**maximal leaves**); application order is least-specific-first then name,
-  base seeded first, each overlay applied once.
-- **Chain.** For each leaf, resolve its `base ← overlay` chain **child-wins**.
-- **Merge.** Component refs merge by name; a set `enabled` value is child-wins; `overrides` deep-merge where
-  **scalars and slices replace wholesale (no concat/union)** and **maps merge key-wise**, child wins, values
-  deep-copied.
-- **`enabled: false`** disables a component: it stays in the inventory for provenance but is suppressed from the
-  effective set, and a more-specific child may re-enable it.
-- **Mixins** merge component refs by name, but **constraints do not compose**: a name collision across any
-  selected layer or mixin **fails closed** at the authoritative merge seam.
-- **Sibling ambiguity (new).** Two equally-specific, non-ancestor leaves that write **conflicting values on the
-  same `(component, path)`** **fail closed** (`ambiguous`), extending FR-01 into the layered path. The predicate
-  keys on *same component + same leaf path + differing values* only, so orthogonal overlays (for example
-  `category` vs `os`) still compose cleanly. (`role` is not an overlay-selection axis; see ADR-12.)
-- **Determinism.** Every output is sorted; override re-validation runs post-merge, so an override can never unpin
-  a source or downgrade a builder (fail closed).
+Each Definition output declares a concrete target platform and either a nonempty explicit component selection
+or one explicit AICR profile (ADR-12). The output uses the Definition's catalog stack unless it supplies its own.
+Catalog sources, tools, components and AICR profiles are reusable. There is no authored Recipe, reusable build
+group, criteria query, wildcard, specificity rule, inheritance chain, mixin, enable/disable merge, or reserved-axis
+activation. Removed fields and reserved legacy `overlays/` and `mixins/` directory layouts fail closed; they
+must not become ignored inputs.
 
-### 2. Golden-digest fixtures
+Admission checks the complete catalog, unique selected IDs, supported target declarations, exact source/artifact/
+tool pins, and the producer route before graph generation or external work. Unknown components and unsupported
+platforms are coded failures, never empty selections. Ordinary outputs cannot combine their component set with
+an AICR profile. Source-owned disk and VM metadata remain authored contracts whose lowering and execution are
+unavailable; they fail capability admission before source or output work.
 
-Golden fixtures **pin the composed Recipe Digest** for the test catalogs across their criteria
-combinations, plus the applied-layer provenance list. A bare test run never rewrites them and fails on unintended
-drift; a documented regen path handles intended changes. Any change to the merge algebra or the pins appears as a
-fixture diff paired with an explanatory note.
+`pkg/nkd/buildgraph` owns selection and compilation. Its resolved value describes validated inputs and owns
+copies of them; it does not grant authority. Direct compilation revalidates that description. CLI and SDK callers
+use this same owner rather than implementing another resolver.
 
-### 3. Operator-extension-surface classifier
+### 2. Generated closure and identity
 
-The resolved result is classified into exactly one of three surfaces, emitted in the deterministic selection
-record:
+The compiler selects exactly the requested producers and their pinned inputs. It lowers the existing supported
+fetch/build/acquire/terminal-verification relationships; it does not infer an arbitrary producer dependency
+language. Duplicate fetches of the same pinned source can be shared within one graph. Every selected producer
+must be covered by the terminal node, and the full graph is validated before identity or execution.
 
-- **published-tuple** — criteria select an existing published recipe; it resolves an existing identity and mints
-  no new one.
-- **declared-overlay** — operator overlays, mixins, and components compose to a **new** from-source-reproducible
-  Recipe Digest, still inside the publisher's trust chain.
-- **fork** — `--data` supplies a catalog whose identity differs from the referenced one, and is therefore
-  **outside** the publisher's chain.
+The generated graph uses `nkd.dev/ir/v3`; its transport-independent logical projection is identified under
+`nkd.build` (ADR-01/02). An unrelated catalog producer cannot change the selected graph's identity. Changing
+selected membership, target, pins, AICR rendering settings or output-affecting instructions must change it.
+Output labels, packaging and Environment settings remain outside build identity and inside their owning records.
+Deployment categories, node roles and cluster composition are removed rather than transported as unused metadata.
 
-### 4. Standard-interface scheme allowlist (FR-21)
+Each output remains independently accountable even if two output graphs have identical Build Digests. Initial
+execution may produce shared components twice. Cross-output reuse requires a separate authenticated reuse
+contract; a digest match alone cannot satisfy another output's required execution or evidence slot.
 
-Enforced **per field role**, not by a blanket regex:
+### 3. Component catalog overlays and trust
 
-- source repositories: `https`, `git`, `ssh`;
-- prebuilt download URLs: `https` only;
-- OCI image / toolchain refs: a well-formed OCI reference — both bare (`registry/path@sha256:…`) and an explicit
-  `oci://` prefix are accepted, with the digest-pinned/tag rules applied on top.
+A separately referenced component catalog overlay is retained (ADR-22). It replaces a complete producer against
+an exact predecessor catalog digest and is applied in explicit order. It does not reintroduce Recipe
+inheritance, component-field deep merging or wildcard membership selection. Effective catalog snapshots bind
+all admitted producer declarations and supported platforms. Catalog and overlay v3 strictly reject removed
+classification and role fields.
 
-A violation fails closed naming the field and the offending scheme.
+The former extension classifier based on authoring shape is removed. A catalog path, an overlay declaration,
+or a claim that a selection is published cannot establish trust. Consumer policy authenticates the exact
+published subjects, identities and evidence. A recomputed build digest is content identity, not publisher or
+release authority.
+
+### 4. Standard-interface field roles
+
+Scheme admission remains specific to each field:
+
+- source repositories admit `https`, `git` and `ssh`;
+- prebuilt download URLs admit `https`;
+- image/toolchain fields admit validated OCI references, including the supported explicit `oci://` form,
+  subject to their exact digest-pin requirements.
+
+Failures identify the offending field and use the stable coded-error boundary. Pin and transport validation
+are retained when authoring composition is removed.
 
 ## Consequences
 
-**Positive**
-- Layered composition is normative, deterministic, and fail-closed on genuine conflicts.
-- Golden fixtures turn merge-semantics drift into a visible, reviewable diff.
-- The classifier gives downstream a machine-readable kind-of-extension signal with explicit trust implications: a
-  fork leaves the chain.
-- Interface enforcement is standards-based but permissive to operator equivalents.
+Authors specify membership once, at the output that requires it. Pinned producer instructions remain reusable;
+there is no second authored lifecycle object to keep synchronized. The cost is an explicit migration of graph,
+plan, observation and evidence identities. A simple name substitution is insufficient: the old grouping and
+matching implementation must disappear.
 
-**Negative / costs**
-- The sibling-conflict predicate must be precise or it over-rejects legitimate orthogonal overlays.
-- Golden fixtures are brittle by design and need the documented regen discipline.
-
-**Neutral**
-- The flattened result's identity is the ADR-02 Recipe Digest; this ADR defines *how* the flattening happens, not
-  the identity mechanism.
+Multiple output uses sharing content still require distinct completeness checks. Exact required-output
+membership and evidence joins remain independent of deployment topology.
 
 ## Alternatives considered
 
-- **Pick one most-specific recipe (like the flat path) instead of merge-many.** Rejected — abandons the layered
-  composition model.
-- **Slice union/concat on override.** Rejected — breaks reproducibility intuition and churns every identity.
-- **A single global scheme regex.** Rejected — breaks bare OCI refs, which have no scheme.
-
-## Follow-ups
-
-- **ADR-12:** the criteria asymmetric-match rules that drive overlay selection.
-- **ADR-02:** the flattened result's digest is the Recipe Digest, subject to the purity boundary.
-- **ADR-22 §7:** a composition that consumes an upstream **curated pin set** binds the umbrella source's commit
-  as `curatedBy`, so the resolved graph records which curated set it came from; the merge and conflict rules for
-  a curated member are this ADR's to state normatively.
+- **Retain flat named Recipes.** Rejected for the current product: no demonstrated reuse justifies an authored
+  grouping between output selection and reusable producers.
+- **Keep a compatibility resolver or rename groups to builds.** Rejected because it preserves the removed
+  authoring model and creates two execution paths.
+- **Inline producer instructions in every Definition.** Rejected because catalog producers already provide
+  the useful reuse without selector complexity.
+- **Infer arbitrary producer dependencies.** Deferred until a concrete product requirement and explicit
+  graph/admission contract exist.
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/compose/*_test.go`, `pkg/nkd/recipe/*_test.go`, and
-`pkg/nkd/catalog/*_test.go` covers merge algebra, sibling and selected-chain conflicts, strict field-role scheme
-allowlists, layered selection ambiguity, deterministic resolution, transport relocation, and golden recipe
-identities. The golden corpus is an determinism gate and must change only with reviewed semantic
-or pin changes.
+The migration requires direct-selection contracts in `pkg/nkd/buildgraph`, strict catalog loading contracts,
+and identity/full-graph tests in `pkg/nkd/ir`. Preserve source pins, complete terminal coverage, builder/capability
+admission, source deduplication within a graph, deterministic ordering, transport purity and target sensitivity.
+Deleted matching/merge mechanisms need rejection coverage, not replacement golden inheritance fixtures.
 
-Acceptance remains ongoing rather than final: every schema/catalog evolution must update the relevant behavior fixtures,
-and public direct composition/compilation routes must reject inputs that did not pass the same validation as the
-authoritative catalog resolver.
+Focused IR vectors and producer-selection tests exercise these contracts. AICR bundle tests cover equivalent
+defaults, every rendering setting, owned input slices and malformed or caller-mutated descriptions. The earlier
+[2026-09-17 local NKE build](../evidence/2026-09-17-direct-output-local-build.md) separately exercised all three
+maintained outputs, loopback publication and recovered CLI execution with dry-run signing. The completion gate,
+generated-bundle checks and external evidence limits remain recorded in reconciliation.

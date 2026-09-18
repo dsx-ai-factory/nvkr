@@ -25,7 +25,7 @@ func TestDiskManifestCommandMeasuresExactCanonicalStream(t *testing.T) {
 			if err := os.WriteFile(path, payload, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			args := []string{"assemble", "--format", format, "--from-raw", path, "--role", "worker", "--block-size", strconv.Itoa(assemble.MinDiskBlockSizeBytes)}
+			args := []string{"assemble", "--format", format, "--from-raw", path, "--block-size", strconv.Itoa(assemble.MinDiskBlockSizeBytes)}
 			output, err := invokeLifecycleCLI(t, append(args, "--manifest-out", out)...)
 			if err != nil {
 				t.Fatal(err)
@@ -41,7 +41,7 @@ func TestDiskManifestCommandMeasuresExactCanonicalStream(t *testing.T) {
 			if err := manifest.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			if manifest.DiskKind != format || manifest.Role != "worker" || manifest.VirtualSizeBytes != int64(len(payload)) || manifest.LogicalDigest != pipeline.FileDigest(payload) {
+			if manifest.DiskKind != format || manifest.VirtualSizeBytes != int64(len(payload)) || manifest.LogicalDigest != pipeline.FileDigest(payload) {
 				t.Fatalf("manifest lost input binding: %+v", manifest)
 			}
 			if (manifest.BlockManifest != nil) != (format == "raw") {

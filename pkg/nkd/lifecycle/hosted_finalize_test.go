@@ -48,19 +48,13 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	}
 	// This fixture isolates missing CLI signing evidence; other product outputs
 	// would fail earlier on their deliberately absent payloads.
-	var cliRecipes []RecipeSelection
-	for _, recipe := range definition.Recipes {
-		if recipe.Name == "nke-cli" {
-			cliRecipes = append(cliRecipes, recipe)
-		}
-	}
 	var cliOutputs []DefinitionOutput
 	for _, output := range definition.Outputs {
 		if output.Name == "nkectl" {
 			cliOutputs = append(cliOutputs, output)
 		}
 	}
-	definition.Recipes, definition.Outputs = cliRecipes, cliOutputs
+	definition.Outputs = cliOutputs
 	definition.Catalog.Base = filepath.Join(repo, "definitions", "nke-v1", "catalog")
 	definitionPath = filepath.ToSlash(filepath.Join(caseRoot, "definition.json"))
 	writeCanonicalTestFile(t, definitionPath, definition)
@@ -79,7 +73,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	member, outer, result := artifacts["package/nkectl"], artifacts["package/release"], artifacts["result/nke-cli/nkectl"]
+	member, outer, result := artifacts["package/nkectl"], artifacts["package/release"], artifacts["result/nkectl/nkectl"]
 	payloadPath := filepath.Join(caseRoot, "nkectl")
 	payload := []byte("synthetic hosted output")
 	if err := os.MkdirAll(filepath.Dir(payloadPath), 0o700); err != nil {
@@ -97,7 +91,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := testReleaseRequest(t, []Artifact{{Name: member.Name, Kind: OutputExecutable, Digest: descriptor.Digest, RecipeDigest: "sha256:" + repeat("5", 64), Components: []string{"nkectl"}}}, []delivery.ObjectInput{{Name: member.Name, Kind: member.Kind, Path: local(member.Path), Layout: true, ArtifactType: member.MediaType, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"nkectl": pipeline.FileDigest(payload)})
+	request := testReleaseRequest(t, []Artifact{{Name: member.Name, Kind: OutputExecutable, Digest: descriptor.Digest, BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"nkectl"}}}, []delivery.ObjectInput{{Name: member.Name, Kind: member.Kind, Path: local(member.Path), Layout: true, ArtifactType: member.MediaType, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"nkectl": pipeline.FileDigest(payload)})
 	_, err = delivery.BuildPublicationRoot(ctx, local(outer.Path), request)
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +121,6 @@ func TestFinalizeGeneratedRequiresExactStaticHostedEvidenceClosure(t *testing.T)
 			ctx := context.Background()
 			t.Chdir(t.TempDir())
 			definition, environment := testDefinition(t), testEnvironment()
-			definition.Clusters = nil
 			environment.Publication, environment.Signing = nil, nil
 			writeCanonicalTestFile(t, "definition.json", definition)
 			writeCanonicalTestFile(t, "environment.json", environment)
@@ -191,7 +184,8 @@ func TestFinalizeGeneratedRequiresExactStaticHostedEvidenceClosure(t *testing.T)
 				var observation struct {
 					SchemaVersion string               `json:"schemaVersion"`
 					Qualification factory.EvidenceTier `json:"qualification"`
-					RecipeDigest  string               `json:"recipeDigest"`
+					BuildDigest   string               `json:"buildDigest"`
+					BuildTarget   string               `json:"buildTarget"`
 					Inputs        []struct {
 						ArtifactID string `json:"artifactId"`
 						Kind       string `json:"kind"`
@@ -237,7 +231,6 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 	ctx := context.Background()
 	t.Chdir(t.TempDir())
 	definition, environment := testDefinition(t), testEnvironment()
-	definition.Clusters = nil
 	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^builder$", Issuer: "issuer"}
 	addTestSigningTool(t, &definition)
 	writeCanonicalTestFile(t, "definition.json", definition)
@@ -267,7 +260,7 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 			if err := os.WriteFile(artifact.Path, payload, 0o755); err != nil {
 				t.Fatal(err)
 			}
-			result := artifacts["result/"+artifact.RecipeTarget+"/"+artifact.Component]
+			result := artifacts["result/"+artifact.BuildTarget+"/"+artifact.Component]
 			writeCanonicalTestFile(t, result.Path, pipeline.ArtifactResult{Component: artifact.Component,
 				OutputType: "binary", Path: artifact.Component, SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))})
 		}

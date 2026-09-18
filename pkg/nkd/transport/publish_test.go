@@ -13,14 +13,13 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
@@ -157,7 +156,7 @@ func writeArtifact(t *testing.T, dir, name string, bytes []byte) string {
 	return path
 }
 
-func qualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
+func qualifiedReport(t *testing.T, buildDigest, artifactDigest string,
 	localSBOM sbom.LocalEvidenceReceipt,
 ) vuln.QualifiedReport {
 	t.Helper()
@@ -165,7 +164,7 @@ func qualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if binding.RecipeDigest != recipeDigest || binding.ArtifactDigest != artifactDigest {
+	if binding.BuildDigest != buildDigest || binding.ArtifactDigest != artifactDigest {
 		t.Fatalf("local SBOM fixture does not bind vulnerability subject")
 	}
 	canonicalSBOM, err := localSBOM.ExactBytes()
@@ -174,7 +173,7 @@ func qualifiedReport(t *testing.T, recipeDigest, artifactDigest string,
 	}
 	request := vuln.QualifiedScanRequest{
 		Scanner: vuln.ScannerGrype, ScannerDigest: fixedDigest('d'), DatabaseDigest: fixedDigest('e'),
-		RecipeDigest: recipeDigest, ArtifactDigest: artifactDigest,
+		BuildDigest: buildDigest, ArtifactDigest: artifactDigest,
 		SBOMDigest: binding.EvidenceDigest, CanonicalSBOM: canonicalSBOM,
 	}
 	report, err := vuln.QualifyScan(context.Background(), request, qualifiedScanner{observation: vuln.ScanObservation{
@@ -296,7 +295,7 @@ func verifiedPromotionPolicy(t *testing.T, compatibilityPolicy, conformancePolic
 }
 
 type vectorEvidenceFixture struct {
-	recipeDigest string
+	buildDigest  string
 	vectorDigest string
 	receipt      attest.PublishedVectorReceipt
 	raw          []byte
@@ -307,20 +306,19 @@ type vectorEvidenceFixture struct {
 func qualifiedValidationVector(t *testing.T, component string, artifactBytes []byte) vectorEvidenceFixture {
 	t.Helper()
 	artifactDigest := digestBytes(artifactBytes)
-	resolved := &recipe.Resolved{RecipeID: "transport-" + component,
-		Criteria: criteria.Criteria{OS: "ubuntu", Arch: "amd64"},
-		Components: []catalog.NamedComponent{{Name: component, Component: catalog.Component{
+	resolved := &buildgraph.Resolved{Platform: "linux/amd64",
+		Components: []catalog.NamedComponent{{Name: component, Component: catalog.Component{Platforms: []string{"linux/amd64"},
 			Tag: "v1.0.0", SourceDate: 1, OutputType: "host-package",
 			Prebuilt: &catalog.Prebuilt{URL: "https://artifacts.example.test/" + component,
 				Digests:  map[string]string{"amd64": artifactDigest},
 				Evidence: &catalog.ExternalEvidence{None: true}},
 		}}},
 	}
-	graph, err := recipe.Compile(resolved)
+	graph, err := buildgraph.Compile(resolved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recipeDigest, err := graph.Digest()
+	buildDigest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +352,7 @@ func qualifiedValidationVector(t *testing.T, component string, artifactBytes []b
 	if err := os.WriteFile(filepath.Join(resultsDir, pull.ID+".json"), resultBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	report, err := (pipeline.Local{}).VerifyResults(graph, recipeDigest, resultsDir, options)
+	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest, resultsDir, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,7 +410,7 @@ func qualifiedValidationVector(t *testing.T, component string, artifactBytes []b
 	if err != nil {
 		t.Fatal(err)
 	}
-	return vectorEvidenceFixture{recipeDigest: recipeDigest, vectorDigest: identity,
+	return vectorEvidenceFixture{buildDigest: buildDigest, vectorDigest: identity,
 		receipt: receipt, raw: raw, sboms: sbomReceipts, provenances: provenanceReceipts}
 }
 
@@ -483,13 +481,13 @@ func authorizeArtifactsForKind(t *testing.T, digests []string,
 		component := "artifact-" + string(rune('a'+index))
 		fixture := qualifiedValidationVector(t, component, payload)
 		inv.Components = append(inv.Components, release.InventoryComponent{
-			Name: component, Role: "worker", VersionConstraint: "1.x",
+			Name: component, VersionConstraint: "1.x",
 			RequiredArtifacts: []string{digest},
 			ArtifactKinds:     []release.ArtifactKindBinding{{ArtifactDigest: digest, Kind: artifactKind}},
 		})
 		set.Members = append(set.Members, release.Member{
-			Component: component, Role: "worker", Arch: "amd64", Version: "1.0.0",
-			RecipeDigest: fixture.recipeDigest, VectorDigest: fixture.vectorDigest,
+			Component: component, Arch: "amd64", Version: "1.0.0",
+			BuildDigest: fixture.buildDigest, VectorDigest: fixture.vectorDigest,
 			ResolvedInputDigest: fixedDigest(byte('a' + index)), ArtifactDigests: []string{digest},
 		})
 		vectorReceipts = append(vectorReceipts, fixture.receipt)
@@ -530,12 +528,12 @@ func authorizeArtifactsForKind(t *testing.T, digests []string,
 	}
 	authenticator := receiptAuthenticator{}
 	var reproductions []release.ReproductionReceipt
-	var recipes, vectors []string
+	var builds, vectors []string
 	for _, member := range set.Members {
 		reproduction, err := release.VerifyReproduction(context.Background(), release.ReproductionResult{
 			SchemaVersion: release.ReproductionSchemaVersion, ReleaseSetDigest: releaseDigest,
-			Component: member.Component, Role: member.Role, Arch: member.Arch,
-			RecipeDigest: member.RecipeDigest, VectorDigest: member.VectorDigest,
+			Component: member.Component, Arch: member.Arch,
+			BuildDigest: member.BuildDigest, VectorDigest: member.VectorDigest,
 			ProfileIndependent: true, ResolvedInputDigest: member.ResolvedInputDigest,
 			ArtifactDigests: member.ArtifactDigests, Verdict: release.Reproduced,
 			EffectiveEpoch: 1, ExpiresEpoch: 20,
@@ -544,15 +542,15 @@ func authorizeArtifactsForKind(t *testing.T, digests []string,
 			t.Fatal(err)
 		}
 		reproductions = append(reproductions, reproduction)
-		recipes = append(recipes, member.RecipeDigest)
+		builds = append(builds, member.BuildDigest)
 		vectors = append(vectors, member.VectorDigest)
 	}
-	sort.Strings(recipes)
+	sort.Strings(builds)
 	sort.Strings(vectors)
 	compatibility, err := release.VerifyCompatibility(context.Background(), release.CompatibilityResult{
 		SchemaVersion: release.CompatibilitySchemaVersion, ReleaseSetDigest: releaseDigest,
 		InventoryDigest: invDigest, CompatibilityPolicyDigest: fixedDigest('1'),
-		RecipeDigests: recipes, VectorDigests: vectors,
+		BuildDigests: builds, VectorDigests: vectors,
 		ArtifactDigests: append([]string(nil), digests...), Verdict: release.CompatibilityAccepted,
 		EffectiveEpoch: 1, ExpiresEpoch: 20,
 	}, []byte("sig"), releaseReceipt, inv, authenticator)
@@ -578,13 +576,13 @@ func authorizeArtifactsForKind(t *testing.T, digests []string,
 			if bindingErr != nil {
 				t.Fatal(bindingErr)
 			}
-			if binding.Component == member.Component && binding.RecipeDigest == member.RecipeDigest &&
+			if binding.Component == member.Component && binding.BuildDigest == member.BuildDigest &&
 				binding.ArtifactDigest == artifactDigest {
 				localSBOM = candidate
 				break
 			}
 		}
-		report := qualifiedReport(t, member.RecipeDigest, artifactDigest, localSBOM)
+		report := qualifiedReport(t, member.BuildDigest, artifactDigest, localSBOM)
 		raw, err := report.Marshal()
 		if err != nil {
 			t.Fatal(err)

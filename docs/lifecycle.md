@@ -1,24 +1,30 @@
 # Definition, Run, and Release workflow
 
-The public model has seven objects: **Definition, Recipe, Environment, Run, Artifact, Release, and Verification
+The public model has six objects: **Definition, Environment, Run, Artifact, Release, and Verification
 Policy**. [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) defines their contract. The
 [implementation record](adr/reconciliation.md) records contract verification,
 separately from external operational acceptance.
 
 ## Declare outputs
 
-A Definition selects reusable recipes and declares named outputs. For example, the
-[NKE Definition](../definitions/nke-v1/definition.yaml) selects the NKE CLI recipe and requests one executable
-output. It does not separately author the binary package, enclosing publication root, and delivery route.
-The compiler derives those records from the output and selected Environment.
+A Definition declares named outputs. Each output selects exact catalog components and a concrete target
+platform, or one pinned AICR profile and generator. Catalog components own reusable build or acquisition
+instructions. The compiler derives a closed, pinned build graph for each output and derives its packaging,
+publication route, and evidence requirements from the output and selected Environment.
 
-A Recipe describes reusable build or acquisition behavior and its output contract. A recipe selection inside a
-Definition chooses that behavior with concrete inputs; it is not another top-level product object.
+The Build Digest identifies that generated graph's logical content. Output labels and
+execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
+separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-An optional cluster view belongs to the Definition. Its members reference named outputs and assign node roles
-where applicable. The view declares the cluster type and validation requirements; recipe selections do not
-repeat roles or cluster type. The generated realization must bind that exact composition to exact Release
-artifacts before it is usable by a downstream system. NKD does not provision or operate the cluster.
+The [NKE Definition](../definitions/nke-v1/definition.yaml) directly selects `nkectl`, `cwe`, and `nke-helm`
+for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
+criteria query, inheritance chain, or mixin sits between an output and its producers.
+
+AICR output rendering settings live under that output's `aicr.bundle`: deployer, storage class, node
+selectors, node tolerations and workload selectors. Omission means Helm with no overrides. The compiler
+records the complete effective settings in the build graph so every output-affecting setting changes its
+Build Digest. Deployment topology and placement are owned by the system that consumes the artifacts;
+Definitions and Releases contain no cluster views, deployment roles or categories.
 
 ## Select an Environment
 
@@ -32,10 +38,10 @@ still reject selected builds with requirements until they can authenticate and e
 
 Environments also own the publication namespace, credentials, and signing identity policy. Catalog sources and
 locks own tool versions and byte pins; Definition selects the scanner, signer, and generators by name.
-Output-affecting recipe tools remain part of build identity.
+Output-affecting build tools remain part of build identity.
 
 A destination or signing-setting change can change the prepared execution and generated workflow while
-preserving Recipe identity. A dry-run signing mode records intended operations and never supplies a signature.
+preserving build identity. A dry-run signing mode records intended operations and never supplies a signature.
 
 ## Inspect and generate
 
@@ -85,7 +91,7 @@ path under `.nkd`. Publication is a separately enabled operation. The
 implementation record distinguishes contract tests from external execution.
 
 A Run records one attempt against frozen inputs and expected output slots. Execution must match independently
-observed package contents to those slots, including selected recipe identities and exact component membership.
+observed package contents to those slots, including selected build identities and exact component membership.
 An omitted or conflicting output cannot make the Run complete. Once execution has prepared an attempt, its
 failure record retains the required outputs; that record cannot be deserialized into release authority.
 Hosted finalization also requires a running finalizer and its generated helper. A bootstrap failure, unavailable
@@ -120,7 +126,7 @@ scope. The CLI prints the verified description; the SDK retains a live, policy-b
 The stock verifier remains Linux-only, and unit tests do not establish live signing-service
 acceptance. Full v1 release scope (`--scope release`) and qualified acceptance remain capability-gated.
 
-The scoped consumer and exact cluster realization have passing positive and negative contracts. Full v1
+The scoped consumer and exact output/content bindings have positive and negative contracts. Full v1
 release acceptance still requires its deferred qualification, membership, and revocation adapters; the scoped
 result cannot substitute for them. The ADR-04 stock-cosign consumer contract remains independent of the
 convenience NKD reader.
@@ -162,7 +168,7 @@ func inspectRelease(ctx context.Context, c *client.Client, reference, identity, 
 }
 ```
 
-The returned Release is a description of the accepted contents and cluster views. Its serialized form does not
+The returned Release is a description of the accepted contents. Its serialized form does not
 recreate the live verified capability. Verification still requires the supported platform, pinned tool, and
 evidence described above; compiling this example does not exercise those external dependencies.
 
@@ -175,3 +181,6 @@ normal product authors do not construct and join them manually.
 
 Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
+The direct-output model uses Definition v4, catalog v3 and generated IR v3. Run and Release use v3. Older recipe layouts and cluster/placement fields
+are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;
+historical Runs retain the authoring and wire contracts exercised at the time.

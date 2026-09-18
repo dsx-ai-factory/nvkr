@@ -7,13 +7,13 @@
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-01 in the consolidated NKD ADR set.
-- **Relates to:** every digest-addressed object — the Recipe Digest (ADR-02), the trust objects (ADR-05),
+- **Relates to:** every digest-addressed object — the Build Digest (ADR-02), the trust objects (ADR-05),
   provenance and SBOM (ADR-09, ADR-13), publication and status (ADR-06). ADR-03 defines the error contract for
   serialization failures.
 
 ## Context
 
-Many NKD objects are identified and trusted by digest: the Recipe Digest, the ValidationVector, the ReleaseSet,
+Many NKD objects are identified and trusted by digest: the Build Digest, the ValidationVector, the ReleaseSet,
 the evidence bundle, provenance, SBOMs, and status declarations. For each, the byte form is the identity, frozen
 the moment it is published or signed. An auditor must be able to recompute that digest independently, in any
 language, without access to NKD's implementation.
@@ -26,7 +26,7 @@ kind of object from being mistaken for another.
 
 ### 1. One canonical codec for every structured semantic identity
 
-Every structured semantic identity — **including the Recipe Digest** — serializes through **one** canonical
+Every structured semantic identity — **including the Build Digest** — serializes through **one** canonical
 codec: the **RFC-8785 (JSON Canonicalization Scheme) structural/string profile with NKD's integer-only numeric
 profile**. That is UTF-8, object keys sorted by UTF-16 code units, ECMAScript string escaping, no insignificant
 whitespace, and object-owned slices pre-sorted before marshaling. **No host, clock, random, or
@@ -38,7 +38,7 @@ independent implementations therefore MUST NOT route an integer through IEEE-754
 needs a fractional quantity encodes a scaled integer or a canonical string, or introduces a future explicitly
 versioned numeric profile.
 
-There is **no grandfathered exception**: the Recipe Digest uses the same codec as everything else.
+There is **no grandfathered exception**: the Build Digest uses the same codec as everything else.
 Human-authored **inputs** (the catalog) stay in a human-friendly format; only the **hashed** forms are canonical
 JSON.
 
@@ -61,8 +61,8 @@ substitutes for that object's domain-separated identity or its authenticated rec
   not set it is byte-identical to the pre-field version. A schema can gain fields without perturbing
   already-signed bytes.
 - **Breaking** evolution — a type change, a field removal, or a changed meaning of an existing field — is a **new
-  major schema identity within the object's frozen family domain**. Old objects still verify under old rules,
-  with no silent reinterpretation.
+  major schema identity within the object's frozen family domain**. A supported legacy decoder applies its
+  original rules; otherwise old objects are rejected. No silent reinterpretation or signed-byte conversion is allowed.
 - A `schemaVersion` bump therefore **deliberately changes the digest**: a schema change is a new identity.
 - Golden-bytes tests pin each object's **valid minimal** and fully populated forms, so any accidental reordering
   or format drift is caught. Intentionally invalid zero values get fail-closed tests, not impossible golden
@@ -97,11 +97,38 @@ within the same family from being interpreted.
 
 ### 5. Public lifecycle schemas
 
-Definition uses `nkd.dev/definition/v2`; Environment, Run, Release, lifecycle binding, and cluster realization
-use their `nkd.dev/<name>/v1` schemas. Existing family tags and legacy wire meanings remain frozen. New semantic
-families distinguish Definition, Environment, Verification Policy, release content, cluster realization, and
-lifecycle binding; names do not justify reinterpreting an old digest. Run presentation and Release reference
-views do not acquire redundant identities without a canonical subject.
+The six public objects are Definition, Environment, Run, Artifact, Release, and Verification Policy. The
+compiler-derived logical build graph uses the new **`nkd.build`** family. **`nkd.recipe` remains a reserved
+historical allocation**; active graph compilation never mints new identities under it. Removing authored
+Recipes does not rename, convert, or reauthenticate historical signed bytes. Cluster-definition,
+cluster-composition, cluster-realization and staging-manifest families are likewise reserved and cannot mint
+new identities. Deployment topology and classification have no current authored or executable schema.
+
+The authored schemas use `apiVersion`; generated structured records use `schemaVersion`. The migration's
+changed shapes are:
+
+| Object | Schema |
+|---|---|
+| Definition | `nkd.dev/definition/v4` |
+| Component catalog and snapshot | `nkd.dev/catalog/v3`, `nkd.dev/catalog-snapshot/v3` |
+| Component catalog overlay | `nkd.dev/catalog-overlay/v3` |
+| Executable and logical build graph | `nkd.dev/ir/v3` |
+| Internal compile specification, Run plan, artifact graph | `nkd.dev/compile-spec/v3`, `nkd.dev/run-plan/v3`, `nkd.dev/artifact-graph/v3` |
+| Run and Release views | `nkd.dev/run/v3`, `nkd.dev/release/v3` |
+| Internal lifecycle binding | `nkd.dev/lifecycle-binding/v3` |
+| Low-level execution bundle and manifest | `nkd.dev/execution-bundle/v2`, `nkd.dev/execution-bundle-manifest/v2` |
+
+Definition v4 removes cluster views. Catalog v3 removes delivery categories and node-role affinities. IR v3
+binds effective AICR bundle-rendering settings, including the explicit Helm default, into Build Digest. Old
+major versions fail closed; the migration does not reinterpret or repair existing signed records.
+
+Environment stays `nkd.dev/environment/v1`; the generated Run's unchanged exact-file commit manifest stays
+`nkd.dev/generated-run/v1`. Unchanged wire shapes keep their existing major. Evidence,
+publication, and release owners version every field or meaning changed from Recipe identity to Build identity;
+they must not accept a former `recipeDigest` under a new `buildDigest` spelling. Existing family tags remain
+frozen even where their names contain a version; the schema inside the canonical bytes distinguishes changed
+major versions within a family. Run presentation and Release reference views do not acquire redundant identities
+without a canonical subject.
 
 The deferred v1 qualification-evidence and release-manifest documents (ADR-16) require strict schema dispatch
 and registered, domain-separated identities before implementation. Pretty-printed JSON hashes are insufficient.
@@ -115,7 +142,7 @@ and registered, domain-separated identities before implementation. Pretty-printe
 - Result/log stream separation keeps outputs pipeline-safe.
 
 **Negative / costs**
-- Because the Recipe Digest uses the canonical codec, its identity is defined solely by this ADR: any codec
+- Because the Build Digest uses the canonical codec, its identity is defined solely by this ADR: any codec
   change is a breaking change to every identity, so the codec is frozen once adopted.
 - The integer-only numeric profile is deliberately narrower than full RFC-8785 number handling. Schemas needing
   fractions cannot add them without a versioned profile decision.
@@ -128,14 +155,14 @@ and registered, domain-separated identities before implementation. Pretty-printe
 - **Freeze an existing pretty-printed JSON form as canonical.** Rejected — harder to recompute in other
   languages and locks in indentation.
 - **Use a YAML codec everywhere.** Rejected — YAML is a poor cross-language canonical form.
-- **Give the Recipe Digest a separate codec / grandfather it.** Rejected — two codecs to reason about, and the
+- **Give the Build Digest a separate codec / grandfather it.** Rejected — two codecs to reason about, and the
   "avoid changing a computed digest" motive is implementation baggage, not a real pre-launch constraint.
 - **CBOR / protobuf canonical encoding.** Rejected — non-human-readable and over-engineered for string-digest
   payloads.
 
 ## Follow-ups
 
-- **ADR-02:** the Recipe Digest is the digest of the compiled build graph under this codec, subject to the purity
+- **ADR-02:** the Build Digest is the digest of the compiled build graph under this codec, subject to the purity
   boundary.
 - **ADR-05 / ADR-09 / ADR-13:** the trust, provenance, and evidence objects each declare a `schemaVersion` and
   serialize through this codec; the evidence-serialization profile is this codec plus the set of declared schema
@@ -145,7 +172,8 @@ and registered, domain-separated identities before implementation. Pretty-printe
 
 Current module-level evidence is `pkg/nkd/canonical/canonical_test.go` (golden JCS bytes, integer boundaries,
 invalid UTF-8 rejection, immutable kind registration, and domain separation), `pkg/nkd/ir/marshal_test.go`
-(structurally transport-free, field-classified recipe identity), `pkg/nkd/pipeline/source_snapshot_test.go`
+(structurally transport-free, field-classified build identity), `pkg/nkd/ir/identity_contract_test.go`
+(independently calculated acquisition/source/AICR graph vectors, retired-family separation and old-field rejection), `pkg/nkd/pipeline/source_snapshot_test.go`
 (versioned canonical tree identity including empty directories, modes, content, and symlink targets). This is **contract evidence**, not
 corpus-wide or independent-language acceptance.
 

@@ -24,7 +24,7 @@ Related: <!-- #123 or N/A -->
 
 - [ ] Catalog data — pins (`pins.lock.yaml`)
 - [ ] Catalog data — registry: sources, constraints, build commands (`registry.yaml`)
-- [ ] Recipes — overlays / mixins
+- [ ] Definitions — output selection / catalog substitutions
 - [ ] CLI (`cmd/nkdctl`)
 - [ ] Generator / pipeline emission
 - [ ] Signing, provenance, or evidence

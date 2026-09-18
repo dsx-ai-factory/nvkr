@@ -17,7 +17,6 @@ func TestPublicationConstructionFailureCleansStaging(t *testing.T) {
 	}{
 		{"empty objects", func(r *PublicationRequest) { r.Objects = nil }, e.CodeUsage},
 		{"partial release binding", func(r *PublicationRequest) { r.InventoryDigest = digestBytes([]byte("inventory")) }, e.CodeUnverifiedRef},
-		{"bad cluster binding", func(r *PublicationRequest) { r.ClusterDefinitionDigest = "latest" }, e.CodeUnverifiedRef},
 		{"duplicate object", func(r *PublicationRequest) { r.Objects = append(r.Objects, r.Objects[0]) }, e.CodeInvalidCatalog},
 		{"missing semantic pin", func(r *PublicationRequest) { r.Objects[0].SemanticDigest = "" }, e.CodeUnverifiedRef},
 		{"wrong byte pin", func(r *PublicationRequest) { r.Objects[0].BlobDigest = digestBytes([]byte("different")) }, e.CodeVerifyFailed},

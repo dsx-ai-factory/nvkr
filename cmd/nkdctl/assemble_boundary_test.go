@@ -29,12 +29,6 @@ func TestAssembleUnavailableLanesFailBeforeIO(t *testing.T) {
 			args: []string{"--format", "qcow2", "--encrypt", "--from", "missing.raw",
 				"--from-raw", "also-missing.raw", "--manifest-out", "must-not-exist/manifest.json"},
 		},
-		{
-			name: "staging before catalog or vector",
-			args: []string{"--format", "raw", "--staging-out", "must-not-exist/staging.json",
-				"--expected-digests", "missing-vector.json"},
-		},
-
 		{name: "raw producer", args: []string{"--format", "raw"}},
 		{name: "iso producer", args: []string{"--format", "iso"}},
 		{name: "qcow2 producer", args: []string{"--format", "qcow2"}},

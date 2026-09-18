@@ -288,7 +288,7 @@ func TestReproductionValidatorRejectsTheProductionShape(t *testing.T) {
 	}
 	index := &Index{
 		SchemaVersion: IndexSchemaVersion,
-		RecipeDigest:  testDefinitionDigest,
+		BuildDigest:   testDefinitionDigest,
 		Statements: []Statement{{
 			Type:          statementType,
 			PredicateType: predicateType,
@@ -304,9 +304,9 @@ func TestReproductionValidatorRejectsTheProductionShape(t *testing.T) {
 	// the build-time internal parameters keep it out of the reproduction lane.
 	index.Statements[0].Predicate.BuildDefinition.BuildType = BuildTypeOCIHermetic
 	index.Statements[0].Predicate.BuildDefinition.ExternalParameters = map[string]string{
-		"recipeDigest": testDefinitionDigest,
-		"component":    "nkectl",
-		"inputDigest":  testPlanDigest,
+		"buildDigest": testDefinitionDigest,
+		"component":   "nkectl",
+		"inputDigest": testPlanDigest,
 	}
 	index.Statements[0].Predicate.RunDetails.Builder.ID = testProfileDigest
 	index.Statements[0].Predicate.RunDetails.Metadata = map[string]string{

@@ -1,9 +1,10 @@
 # NKE Recipes
 
 NKE Recipes uses `nkdctl` to turn a product **Definition** into a **Run** and an immutable **Release** of artifacts and evidence.
-Recipes supply reusable build instructions; an Environment supplies execution/publication settings; consumers
-apply a Verification Policy. A cluster is an optional named view in the Definition and its exact realization
-in the Release. Authors declare outputs once; NKD derives packages, routes and internal evidence relationships.
+Catalog components supply reusable producer instructions; an Environment supplies execution/publication settings; consumers
+apply a Verification Policy. Downstream systems own deployment topology and node placement. Authors declare outputs once; NKD derives packages, routes and internal evidence relationships.
+Each output directly selects catalog components and a concrete target, or an AICR profile and generator.
+The resulting build graph is generated and has no separate authoring lifecycle.
 
 ## Start here
 

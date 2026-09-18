@@ -17,7 +17,7 @@ import (
 func TestDiagnosticPublicationMetadataIdentityAndExtraction(t *testing.T) {
 	artifact := "sha256:" + strings.Repeat("a", 64)
 	inventory := release.Inventory{SchemaVersion: release.InventorySchemaVersion, Version: "1",
-		Components: []release.InventoryComponent{{Name: "node", Role: "worker", RequiredArtifacts: []string{artifact},
+		Components: []release.InventoryComponent{{Name: "node", RequiredArtifacts: []string{artifact},
 			ArtifactKinds: []release.ArtifactKindBinding{{ArtifactDigest: artifact, Kind: release.ArtifactHostPackage}}}}}
 	inventoryRaw, err := canonical.Marshal(inventory)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestDiagnosticPublicationMetadataIdentityAndExtraction(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			set := release.ReleaseSet{SchemaVersion: release.ReleaseSetSchemaVersion, Version: "1", InventoryRef: inventoryDigest,
-				Members: []release.Member{{Component: "node", Arch: "amd64", RecipeDigest: "sha256:" + strings.Repeat("b", 64),
+				Members: []release.Member{{Component: "node", Arch: "amd64", BuildDigest: "sha256:" + strings.Repeat("b", 64),
 					VectorDigest: "sha256:" + strings.Repeat("c", 64), ResolvedInputDigest: "sha256:" + strings.Repeat("d", 64), ArtifactDigests: []string{artifact}}}}
 			if tc.mismatch {
 				set.InventoryRef = artifact

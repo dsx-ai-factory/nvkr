@@ -93,7 +93,7 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 		}
 		return filepath.Join(workspace, filepath.FromSlash(strings.TrimPrefix(clean, prefix+"/"))), nil
 	}
-	observedRecipes := map[string]bool{}
+	observedBuilds := map[string]bool{}
 	evidenceSets := map[string][]delivery.ObjectInput{}
 	for _, artifact := range artifacts {
 		path, err := local(artifact.Path)
@@ -108,18 +108,18 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			}
 			var observation factoryObservation
 			if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &observation); err != nil ||
-				observation.SchemaVersion != "nkd.dev/factory-observation/v1" || !canonical.IsDigest(observation.RecipeDigest) || len(observation.Inputs) == 0 {
+				observation.SchemaVersion != "nkd.dev/factory-observation/v2" || !canonical.IsDigest(observation.BuildDigest) || len(observation.Inputs) == 0 {
 				return e.New(e.CodeProvenanceMissing, "hosted terminal observation is missing or malformed")
 			}
 			node := nodes[artifact.Producer]
-			var recipeDigest string
-			for _, recipe := range plan.Recipes {
-				if recipe.Name == node.RecipeTarget {
-					recipeDigest = recipe.RecipeDigest
+			var buildDigest string
+			for _, build := range plan.Builds {
+				if build.Name == node.BuildTarget {
+					buildDigest = build.BuildDigest
 					break
 				}
 			}
-			if observation.Qualification != TierStaticUnqualified || observation.RecipeDigest != recipeDigest || len(observation.Inputs) != len(node.Inputs) {
+			if observation.BuildTarget != node.BuildTarget || observation.Qualification != TierStaticUnqualified || observation.BuildDigest != buildDigest || len(observation.Inputs) != len(node.Inputs) {
 				return e.New(e.CodeProvenanceMissing, "hosted terminal observation does not cover its exact planned inputs")
 			}
 			for index, input := range observation.Inputs {
@@ -136,7 +136,7 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 					return e.New(e.CodeVerifyFailed, "hosted terminal observation input %q differs from restored bytes", input.ArtifactID)
 				}
 			}
-			observedRecipes[observation.RecipeDigest] = true
+			observedBuilds[node.BuildTarget] = true
 		case "sbom-set":
 			evidence, err := sbomPublicationObjects(ctx, plan, artifact, artifacts, local)
 			if err != nil {
@@ -145,9 +145,9 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			evidenceSets[artifact.ID] = evidence
 		}
 	}
-	for _, recipe := range plan.Recipes {
-		if !observedRecipes[recipe.RecipeDigest] {
-			return e.New(e.CodeProvenanceMissing, "hosted Run omits terminal observation for recipe %q", recipe.Name)
+	for _, build := range plan.Builds {
+		if !observedBuilds[build.Name] {
+			return e.New(e.CodeProvenanceMissing, "hosted Run omits terminal observation for build %q", build.Name)
 		}
 	}
 	for _, route := range plan.ExecutionSettings.Routes {

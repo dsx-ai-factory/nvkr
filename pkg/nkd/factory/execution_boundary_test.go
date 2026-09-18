@@ -62,7 +62,7 @@ func TestExecuteNodeObservesAndPackagesCompiledInputs(t *testing.T) {
 	if err := json.Unmarshal(raw, &observation); err != nil {
 		t.Fatal(err)
 	}
-	if observation.Qualification != TierStaticUnqualified || observation.RecipeDigest != plan.Recipes[0].RecipeDigest || len(observation.Inputs) != len(terminal.Inputs) {
+	if observation.Qualification != TierStaticUnqualified || observation.BuildDigest != plan.Builds[0].BuildDigest || len(observation.Inputs) != len(terminal.Inputs) {
 		t.Fatalf("observation = %+v", observation)
 	}
 	for i, input := range observation.Inputs {

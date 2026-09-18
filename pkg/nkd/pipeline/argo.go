@@ -23,8 +23,11 @@ type Argo struct {
 
 func (Argo) Name() string { return "argo" }
 
-func (e Argo) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([]byte, error) {
+func (e Argo) Render(ctx context.Context, g *ir.Graph, buildDigest string) ([]byte, error) {
 	if err := requireEmitterContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := validateGraphIdentity(g, buildDigest); err != nil {
 		return nil, err
 	}
 	if err := ValidateEmitterDataPath(e.Data); err != nil {
@@ -54,7 +57,7 @@ func (e Argo) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([]b
 	var body bytes.Buffer
 	bw := io.Writer(&body)
 	fmt.Fprintf(bw, "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\n")
-	fmt.Fprintf(bw, "metadata: {generateName: nkd-build-%s-}\nspec:\n  entrypoint: main\n  templates:\n", g.RecipeID)
+	fmt.Fprintf(bw, "metadata: {generateName: nkd-build-%s-}\nspec:\n  entrypoint: main\n  templates:\n", strings.TrimPrefix(buildDigest, "sha256:")[:16])
 
 	// DAG: each job is a task; verify depends on every producer's terminal state.
 	fmt.Fprintf(bw, "    - name: main\n      dag:\n        tasks:\n")
@@ -96,7 +99,7 @@ func (e Argo) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([]b
 			fmt.Fprintf(bw, "        image: %s\n        command: [sh, -c]\n        args: [%q]\n", img, strings.Join(ExecScript(j, e.RunnerDigest), " && "))
 		}
 	}
-	return GeneratedPipelineBytes(ctx, e.Name(), recipeDigest, g.RecipeID, g, body.Bytes())
+	return GeneratedPipelineBytes(ctx, e.Name(), buildDigest, g, body.Bytes())
 }
 
 func argoTransportContractImplemented() bool { return false }

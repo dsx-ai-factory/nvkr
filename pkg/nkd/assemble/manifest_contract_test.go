@@ -22,7 +22,6 @@ func TestDiskManifestRejectsInvalidSerializedDescriptions(t *testing.T) {
 	}{
 		{"schema", func(m *DiskManifest) { m.SchemaVersion = "unknown" }, e.CodeInvalidCatalog},
 		{"kind", func(m *DiskManifest) { m.DiskKind = "unknown" }, e.CodeUnsupported},
-		{"role", func(m *DiskManifest) { m.Role = "unknown" }, e.CodeUnsupported},
 		{"logical digest", func(m *DiskManifest) { m.LogicalDigest = "invalid" }, e.CodeUnverifiedRef},
 		{"size", func(m *DiskManifest) { m.VirtualSizeBytes = 0 }, e.CodeUnverifiedRef},
 		{"encrypted", func(m *DiskManifest) { m.PreEncryption = false }, e.CodeEncryptedArtifact},
@@ -38,7 +37,7 @@ func TestDiskManifestRejectsInvalidSerializedDescriptions(t *testing.T) {
 		}, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			manifest, err := NewDiskManifestContext(t.Context(), DiskKindRAW, "worker", path, MinDiskBlockSizeBytes)
+			manifest, err := NewDiskManifestContext(t.Context(), DiskKindRAW, path, MinDiskBlockSizeBytes)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -58,7 +57,7 @@ func TestISOManifestSerializationPreservesFlatStreamIdentity(t *testing.T) {
 	if err := os.WriteFile(path, []byte("diagnostic ISO stream"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	manifest, err := NewDiskManifestContext(t.Context(), DiskKindISO, "worker", path, 0)
+	manifest, err := NewDiskManifestContext(t.Context(), DiskKindISO, path, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

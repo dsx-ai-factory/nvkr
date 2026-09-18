@@ -10,7 +10,6 @@ import (
 
 	client "github.com/NVIDIA/nke-recipes/client/v1"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -28,8 +27,8 @@ func (*legacyCatalogProvider) Name() string { return "legacy" }
 
 func TestWithProviderRejectsLegacyIOBeforeRead(t *testing.T) {
 	provider := &legacyCatalogProvider{}
-	_, err := client.New(client.WithProvider(provider)).ResolveRecipe(context.Background(), client.ResolveRequest{
-		Criteria: criteria.Criteria{Role: "worker"},
+	_, err := client.New(client.WithProvider(provider)).ResolveBuild(context.Background(), client.ResolveRequest{
+		Components: []string{"kubectl"}, Platform: "linux/amd64",
 	})
 	if errorCode(err) != nkderr.CodeUsage {
 		t.Fatalf("legacy provider returned %v", err)
@@ -69,8 +68,8 @@ func TestWithProviderUsesOnlyDeepContextInterface(t *testing.T) {
 		t.Fatal("directory catalog is not context-aware")
 	}
 	provider := &contextOnlyProvider{base: base}
-	if _, err := client.New(client.WithProvider(provider)).ResolveRecipe(context.Background(), client.ResolveRequest{
-		Criteria: criteria.Criteria{Role: "worker"},
+	if _, err := client.New(client.WithProvider(provider)).ResolveBuild(context.Background(), client.ResolveRequest{
+		Components: []string{"kubectl"}, Platform: "linux/amd64",
 	}); err != nil {
 		t.Fatalf("context provider resolution failed: %v", err)
 	}
@@ -103,8 +102,8 @@ func (adversarialCatalogIO) Name() string { return "adversarial" }
 
 func TestWithCatalogIORejectsOversizedPayload(t *testing.T) {
 	base := catalog.Dir(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")).(catalog.ContextDataProvider)
-	_, err := client.New(client.WithCatalogIO(adversarialCatalogIO{base: base, oversized: true})).ResolveRecipe(
-		context.Background(), client.ResolveRequest{Criteria: criteria.Criteria{Role: "worker"}})
+	_, err := client.New(client.WithCatalogIO(adversarialCatalogIO{base: base, oversized: true})).ResolveBuild(
+		context.Background(), client.ResolveRequest{Components: []string{"kubectl"}, Platform: "linux/amd64"})
 	if errorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "byte bound") {
 		t.Fatalf("oversized CatalogIO payload returned %v", err)
 	}
@@ -112,9 +111,25 @@ func TestWithCatalogIORejectsOversizedPayload(t *testing.T) {
 
 func TestWithCatalogIORejectsUnsafeListing(t *testing.T) {
 	base := catalog.Dir(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")).(catalog.ContextDataProvider)
-	_, err := client.New(client.WithCatalogIO(adversarialCatalogIO{base: base, listing: []string{"../outside.yaml"}})).ResolveRecipe(
-		context.Background(), client.ResolveRequest{Criteria: criteria.Criteria{Role: "worker"}})
+	_, err := client.New(client.WithCatalogIO(adversarialCatalogIO{base: base, listing: []string{"../outside.yaml"}})).ResolveBuild(
+		context.Background(), client.ResolveRequest{Components: []string{"kubectl"}, Platform: "linux/amd64"})
 	if errorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "unsafe") {
 		t.Fatalf("unsafe CatalogIO listing returned %v", err)
+	}
+}
+
+func TestInvalidProducerSelectionPrecedesCatalogIO(t *testing.T) {
+	for _, request := range []client.ResolveRequest{
+		{Components: []string{"kubectl"}},
+		{Components: []string{"kubectl"}, Platform: "linux/riscv64"},
+		{Platform: "linux/amd64"},
+		{Components: []string{"kubectl", "kubectl"}, Platform: "linux/amd64"},
+		{Components: []string{"kubectl"}, Platform: "linux/amd64", AICRProfile: "profile"},
+	} {
+		catalogIO := &countingCatalogIO{}
+		resolution, err := client.New(client.WithCatalogIO(catalogIO)).ResolveBuild(context.Background(), request)
+		if resolution != nil || errorCode(err) != nkderr.CodeInvalidCatalog || catalogIO.calls != 0 {
+			t.Fatalf("invalid selection reached catalog I/O: resolution=%+v, err=%v, calls=%d", resolution, err, catalogIO.calls)
+		}
 	}
 }

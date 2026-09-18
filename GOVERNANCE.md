@@ -42,9 +42,9 @@ Path-level ownership is authoritative in
 [`.github/CODEOWNERS`](.github/CODEOWNERS). At a high level the project is
 organized into:
 
-- **Recipes, catalog, and evidence** — `definitions/**` (Definition, Environment,
+- **Definitions, catalog, and evidence** — `definitions/**` (Definition, Environment,
   `registry.yaml`, and the `pins.lock.yaml` trust roots under ADR-22).
-- **Core engine** — recipe resolution, bundling, collection, and validation
+- **Core engine** — producer resolution, build graph compilation, bundling, collection, and validation
   (`pkg/nkd/**`).
 - **CLI** — `cmd/nkdctl`.
 - **Toolchains** — pinned build inputs (`toolchains/**`).

@@ -11,7 +11,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
 )
 
-const EvidenceWaiverSchemaVersion = "nkd.dev/evidence-waiver/v1"
+const EvidenceWaiverSchemaVersion = "nkd.dev/evidence-waiver/v3"
 
 // EvidenceType is a closed set. Its JSON form is a human-readable string, but Go
 // callers cannot accidentally turn an arbitrary string into a passing requirement.
@@ -231,8 +231,7 @@ func (binding StatusBinding) validate() error {
 // there is no boolean or free-form string that can authorize absence.
 type EvidenceWaiverRequest struct {
 	Component             string
-	Role                  string
-	RecipeDigest          string
+	BuildDigest           string
 	ArtifactDigest        string
 	Profile               ProfileBinding
 	Status                StatusBinding
@@ -254,8 +253,7 @@ type EvidenceWaiverVerifier interface {
 type evidenceWaiverDocument struct {
 	SchemaVersion          string         `json:"schemaVersion"`
 	Component              string         `json:"component"`
-	Role                   string         `json:"role,omitempty"`
-	RecipeDigest           string         `json:"recipeDigest"`
+	BuildDigest            string         `json:"buildDigest"`
 	ArtifactDigest         string         `json:"artifactDigest"`
 	ProfileScope           string         `json:"profileScope"`
 	ProfileDigest          string         `json:"profileDigest,omitempty"`
@@ -325,10 +323,10 @@ func waiverDocument(request EvidenceWaiverRequest) (evidenceWaiverDocument, erro
 		return evidenceWaiverDocument{}, e.New(e.CodeInvalidCatalog,
 			"evidence waiver component is required")
 	}
-	if !isDigest(request.RecipeDigest) || !isDigest(request.ArtifactDigest) ||
+	if !isDigest(request.BuildDigest) || !isDigest(request.ArtifactDigest) ||
 		!isDigest(request.PromotionPolicyDigest) {
 		return evidenceWaiverDocument{}, e.New(e.CodeUnverifiedRef,
-			"evidence waiver must bind exact recipe, artifact, and promotion-policy digests")
+			"evidence waiver must bind exact build, artifact, and promotion-policy digests")
 	}
 	if !request.Profile.valid || (request.Profile.independent && request.Profile.digest != "") ||
 		(!request.Profile.independent && !isDigest(request.Profile.digest)) {
@@ -361,8 +359,7 @@ func waiverDocument(request EvidenceWaiverRequest) (evidenceWaiverDocument, erro
 	}
 	return evidenceWaiverDocument{
 		SchemaVersion: EvidenceWaiverSchemaVersion,
-		Component:     strings.TrimSpace(request.Component), Role: strings.TrimSpace(request.Role),
-		RecipeDigest: request.RecipeDigest, ArtifactDigest: request.ArtifactDigest,
+		Component:     strings.TrimSpace(request.Component), BuildDigest: request.BuildDigest, ArtifactDigest: request.ArtifactDigest,
 		ProfileScope: profileScope, ProfileDigest: request.Profile.digest,
 		StatusCheckpointDigest: request.Status.checkpointDigest,
 		MissingTypes:           missing, Reason: request.Reason.String(),

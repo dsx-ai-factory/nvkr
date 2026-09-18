@@ -19,13 +19,13 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		return nil
 	}
 	expected := map[string]EvidenceBinding{}
-	recipes := map[string]string{}
+	builds := map[string]string{}
 	for _, o := range publication.Objects {
 		output := o.Output
 		if output == nil {
 			continue
 		}
-		recipes[o.Name] = output.RecipeDigest
+		builds[o.Name] = output.BuildDigest
 		subjects := map[string]string{}
 		previous := ""
 		for _, subject := range output.BuildSubjects {
@@ -150,12 +150,12 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			props[p.Name] = p.Value
 		}
 		for _, outputName := range binding.Outputs {
-			if props["nkd:recipeDigest"] != recipes[outputName] {
-				return e.New(e.CodeVerifyFailed, "SBOM recipe is unbound")
+			if props["nkd:buildDigest"] != builds[outputName] {
+				return e.New(e.CodeVerifyFailed, "SBOM build is unbound")
 			}
 		}
 		if props["nkd:evidenceStage"] != binding.Stage || props["nkd:inspectionInputDigest"] != binding.InspectionInputDigest {
-			return e.New(e.CodeVerifyFailed, "SBOM recipe, stage or inspection input is unbound")
+			return e.New(e.CodeVerifyFailed, "SBOM build, stage or inspection input is unbound")
 		}
 		if binding.Stage == "packaging" && (len(bom.Components) == 0 || props["nkd:dependencyInspection"] != "helm-manifests/v1") {
 			return e.New(e.CodeProvenanceMissing, "final Helm package requires an inspected inventory")

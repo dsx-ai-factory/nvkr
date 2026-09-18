@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	OverlayAPIVersion = "nkd.dev/catalog-overlay/v1"
+	OverlayAPIVersion = "nkd.dev/catalog-overlay/v3"
 	OverlayKind       = "CatalogOverlay"
 	OverlayMaxBytes   = int64(4 << 20)
 )
@@ -39,7 +40,6 @@ type ComponentReplacement struct {
 	Version         string     `json:"version,omitempty"`
 	SourceDateEpoch int64      `json:"sourceDateEpoch,omitempty"`
 	OutputType      string     `json:"outputType,omitempty"`
-	Roles           []string   `json:"roles,omitempty"`
 	Prebuilt        *Prebuilt  `json:"prebuilt,omitempty"`
 	Component       *Component `json:"component,omitempty"`
 }
@@ -62,29 +62,28 @@ type Stack struct {
 }
 
 type catalogSnapshot struct {
-	Actions       map[string]ActionPin `json:"actions,omitempty"`
-	Tools         map[string]ToolPin   `json:"tools,omitempty"`
-	SchemaVersion string               `json:"schemaVersion"`
-	APIVersion    string               `json:"apiVersion"`
-	Kind          string               `json:"kind"`
-	Metadata      Metadata             `json:"metadata"`
-	Sources       map[string]Source    `json:"sources"`
-	Recipes       []Recipe             `json:"recipes,omitempty"`
-	Components    map[string]Component `json:"components"`
-	Layers        any                  `json:"layers,omitempty"`
+	Actions       map[string]ActionPin   `json:"actions,omitempty"`
+	Tools         map[string]ToolPin     `json:"tools,omitempty"`
+	SchemaVersion string                 `json:"schemaVersion"`
+	APIVersion    string                 `json:"apiVersion"`
+	Kind          string                 `json:"kind"`
+	Metadata      Metadata               `json:"metadata"`
+	Sources       map[string]Source      `json:"sources"`
+	AICRProfiles  map[string]AICRProfile `json:"aicrProfiles,omitempty"`
+	Components    map[string]Component   `json:"components"`
 }
 
-// SnapshotDigest identifies the complete resolved catalog state consumed by recipe
-// resolution. Transport locations are intentionally included: this is an operator
-// catalog-state pin, not recipeDigest's mirror-independent content identity.
+// SnapshotDigest identifies the complete resolved catalog state consumed by producer
+// selection. Transport locations are intentionally included: this is an operator
+// catalog-state pin, not buildDigest's mirror-independent content identity.
 func (cat *Catalog) SnapshotDigest() (string, error) {
 	if err := cat.Validate(); err != nil {
 		return "", err
 	}
 	return canonical.Digest(canonical.KindCatalogSnapshot, catalogSnapshot{
-		SchemaVersion: "nkd.dev/catalog-snapshot/v1", APIVersion: cat.APIVersion,
+		SchemaVersion: "nkd.dev/catalog-snapshot/v3", APIVersion: cat.APIVersion,
 		Kind: cat.Kind, Metadata: cat.Metadata, Sources: cat.Sources, Tools: cat.Tools, Actions: cat.Actions,
-		Recipes: cat.Recipes, Components: cat.Components, Layers: cat.Layers,
+		AICRProfiles: cat.AICRProfiles, Components: cat.Components,
 	})
 }
 
@@ -226,14 +225,13 @@ func materializeReplacement(name string, original Component, replacement Compone
 		if outputType == "" {
 			outputType = original.OutputType
 		}
-		roles := append([]string(nil), replacement.Roles...)
-		if len(roles) == 0 {
-			roles = append(roles, original.Roles...)
-		}
 		prebuilt := *replacement.Prebuilt
 		prebuilt.Digests = cloneStringMap(prebuilt.Digests)
-		out = Component{Roles: roles, OutputType: outputType, Tag: replacement.Version,
+		out = Component{Platforms: append([]string(nil), original.Platforms...), OutputType: outputType, Tag: replacement.Version,
 			SourceDate: replacement.SourceDateEpoch, Prebuilt: &prebuilt}
+	}
+	if !slices.Equal(out.Platforms, original.Platforms) {
+		return Component{}, fmt.Errorf("component %q replacement changes supported targets; use a new logical component for a different contract", name)
 	}
 	if out.OutputType != original.OutputType {
 		return Component{}, fmt.Errorf("component %q replacement changes outputType from %q to %q; use a new logical component name for a different contract", name, original.OutputType, out.OutputType)

@@ -1,36 +1,31 @@
-apiVersion: nkd.dev/definition/v2
+apiVersion: nkd.dev/definition/v4
 catalog:
   base: ../../catalogs/kubernetes-layered
   overlays:
   - supplier-kubectl.yaml
-clusters:
-- aicrBundle:
-    acceleratedNodeSelectors:
-    - nvidia.com/gpu.present=true
-    acceleratedNodeTolerations:
-    - nvidia.com/gpu=present:NoSchedule
-    deployer: helm
-    storageClass: gp3
-    workloadSelectors:
-    - nkd.dev/tenant=gpu
-  cni: cni-plugins
-  members:
-  - output: gpu-runtime
-  - output: worker-binaries
-    role: gpu-worker
-  name: gpu-tenant
-  type: tenant
-  validationRequirements:
-  - aicr-bundle-verified
-  - kubernetes-node-smoke
 kind: Definition
 metadata:
-  description: Native ARM64 GPU worker deliverables and their tenant cluster view.
+  description: Pinned GPU runtime and worker deliverables with explicit AICR rendering
+    settings.
   name: nke-gpu-tenant-arm64
 outputs:
-- format: helm-oci
+- aicr:
+    bundle:
+      acceleratedNodeSelectors:
+      - nvidia.com/gpu.present=true
+      acceleratedNodeTolerations:
+      - nvidia.com/gpu=present:NoSchedule
+      deployer: helm
+      storageClass: gp3
+      workloadSelectors:
+      - nkd.dev/tenant=gpu
+    generator: aicr
+    profile: h100-runtime
+  catalog:
+    base: ../layered-catalog
+  format: helm-oci
   name: gpu-runtime
-  recipe: h100-runtime
+  platform: linux/arm64
 - apt:
     component: main
     distribution: stable
@@ -43,7 +38,7 @@ outputs:
   - runc
   format: apt-repository
   name: worker-apt
-  recipe: gpu-node
+  platform: linux/arm64
 - components:
   - containerd
   - crictl
@@ -53,24 +48,4 @@ outputs:
   - runc
   format: executable
   name: worker-binaries
-  recipe: gpu-node
-recipes:
-- criteria:
-    arch: arm64
-    category: kubernetes
-    k8sVersion: 1.32.0
-    os: ubuntu
-  name: gpu-node
-- aicrGenerator: aicr
-  catalog:
-    base: ../layered-catalog
-  criteria:
-    arch: arm64
-    category: accelerated-runtime
-    k8sVersion: 1.32.0
-    os: ubuntu
-  name: h100-runtime
-  parameters:
-    accelerator: h100
-    intent: training
-    service: eks
+  platform: linux/arm64

@@ -30,7 +30,7 @@ func cmdDefinition() *cli.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("definition: %s\ndigest: %s\nrecipes: %d\noutputs: %d\nclusters: %d\n", definition.Metadata.Name, digest, len(definition.Recipes), len(definition.Outputs), len(definition.Clusters))
+			fmt.Printf("definition: %s\ndigest: %s\noutputs: %d\n", definition.Metadata.Name, digest, len(definition.Outputs))
 			return nil
 		}},
 		{Name: "inspect", Usage: "emit the validated Definition as canonical JSON", Flags: []cli.Flag{&cli.StringFlag{Name: "definition", Required: true}}, Action: func(c *cli.Context) error {
@@ -82,7 +82,7 @@ func cmdRun() *cli.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("definition: %s\ndefinitionDigest: %s\nenvironmentDigest: %s\nrun plan: %s\nrecipes: %d\nexpected outputs: %d\nlane: %s\n", plan.Name, plan.DefinitionDigest, plan.EnvironmentDigest, digest, len(plan.Recipes), len(definition.Outputs), plan.Qualification)
+			fmt.Printf("definition: %s\ndefinitionDigest: %s\nenvironmentDigest: %s\nrun plan: %s\nexpected outputs: %d\nlane: %s\n", plan.Name, plan.DefinitionDigest, plan.EnvironmentDigest, digest, len(definition.Outputs), plan.Qualification)
 			return nil
 		}},
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,

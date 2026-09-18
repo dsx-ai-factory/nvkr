@@ -332,7 +332,7 @@ type nodeOutcome struct {
 // seeding the expected-digests manifest, failing closed on the first build/verify
 // failure unless KeepGoing is set. The report is deterministic (nodes/artifacts
 // sorted) regardless of completion order.
-func (l Local) Run(g *ir.Graph, recipeDigest string, opts RunOptions) (*Report, error) {
+func (l Local) Run(g *ir.Graph, buildDigest string, opts RunOptions) (*Report, error) {
 	if err := requireRunContext(opts.Ctx, "local pipeline run"); err != nil {
 		return &Report{}, err
 	}
@@ -366,10 +366,10 @@ func (l Local) Run(g *ir.Graph, recipeDigest string, opts RunOptions) (*Report, 
 			opts.execution.cleanupRuntime()
 		}
 	}()
-	if err := validateGraphIdentity(g, recipeDigest); err != nil {
+	if err := validateGraphIdentity(g, buildDigest); err != nil {
 		return &Report{}, err
 	}
-	rep := &Report{RecipeID: g.RecipeID, RecipeDigest: recipeDigest}
+	rep := &Report{BuildDigest: buildDigest}
 
 	ordered, err := topoSort(g.Nodes) // fail fast on a cyclic graph
 	if err != nil {
@@ -1283,7 +1283,7 @@ func selectNodes(nodes []ir.Node, only []string) (map[string]bool, error) {
 	}
 	for c := range want {
 		if !found[c] {
-			return nil, e.New(e.CodeUnsupported, "--only names component %q not present in the resolved recipe", c)
+			return nil, e.New(e.CodeUnsupported, "--only names component %q not present in the build graph", c)
 		}
 	}
 	return included, nil

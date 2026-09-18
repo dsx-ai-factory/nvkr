@@ -150,7 +150,7 @@ func (record authorizationRecord) validate() error {
 	previousVector := ""
 	for _, vector := range record.ValidationVectors {
 		if !isDigest(vector.IdentityDigest) || !isDigest(vector.BlobDigest) ||
-			!isDigest(vector.RecipeDigest) || !isDigest(vector.SBOMIndexDigest) ||
+			!isDigest(vector.BuildDigest) || !isDigest(vector.SBOMIndexDigest) ||
 			!isDigest(vector.ProvenanceIndexDigest) || !isDigest(vector.PublisherEvidenceDigest) ||
 			strings.TrimSpace(vector.Signer) == "" ||
 			strings.TrimSpace(vector.Signer) != vector.Signer ||
@@ -163,7 +163,7 @@ func (record authorizationRecord) validate() error {
 				"release authorization validation vector has an invalid profile scope")
 		}
 		if err := vector.PublisherEvidence.Validate(); err != nil ||
-			vector.PublisherEvidence.RecipeDigest != vector.RecipeDigest ||
+			vector.PublisherEvidence.BuildDigest != vector.BuildDigest ||
 			vector.PublisherEvidence.SBOMIndexDigest != vector.SBOMIndexDigest ||
 			vector.PublisherEvidence.ProvenanceIndexDigest != vector.ProvenanceIndexDigest ||
 			vector.PublisherEvidence.EvidenceDigest != vector.PublisherEvidenceDigest ||
@@ -183,7 +183,7 @@ func (record authorizationRecord) validate() error {
 				return e.New(e.CodeGateUnmet,
 					"release authorization validation vector has an invalid component/evidence projection")
 			}
-			rowKey := vectorEvidenceKey(row.Component, vector.RecipeDigest, row.ArtifactDigest)
+			rowKey := vectorEvidenceKey(row.Component, vector.BuildDigest, row.ArtifactDigest)
 			if previousRow, duplicate := publisherRows[rowKey]; duplicate && previousRow != row {
 				return e.New(e.CodeGateUnmet,
 					"release authorization validation vectors disagree on publisher evidence for %s/%s",
@@ -197,21 +197,20 @@ func (record authorizationRecord) validate() error {
 	}
 	previousMember := ""
 	memberArtifacts := map[string]bool{}
-	memberRecipes := map[string]bool{}
+	memberBuilds := map[string]bool{}
 	memberVectorDigests := map[string]bool{}
 	memberSubjects := map[string]memberProof{}
 	externalSubjects := map[string]int{}
 	releaseMembers := make([]Member, 0, len(record.Members))
 	usedVectors := map[string]bool{}
 	for _, member := range record.Members {
-		key := member.Component + "\x00" + member.Role + "\x00" + member.Arch
+		key := member.Component + "\x00" + member.Arch
 		if strings.TrimSpace(member.Component) == "" || strings.TrimSpace(member.Arch) == "" ||
 			strings.TrimSpace(member.Component) != member.Component ||
 			strings.TrimSpace(member.Arch) != member.Arch ||
-			(member.Role != "" && strings.TrimSpace(member.Role) != member.Role) ||
 			(member.Version != "" && strings.TrimSpace(member.Version) != member.Version) ||
 			(member.Arch != "amd64" && member.Arch != "arm64") ||
-			(previousMember != "" && previousMember >= key) || !isDigest(member.RecipeDigest) ||
+			(previousMember != "" && previousMember >= key) || !isDigest(member.BuildDigest) ||
 			!isDigest(member.VectorDigest) || !isDigest(member.ResolvedInputDigest) ||
 			!isDigest(member.ReceiptDigest) || strings.TrimSpace(member.VerifiedBy) == "" ||
 			strings.TrimSpace(member.VerifiedBy) != member.VerifiedBy ||
@@ -228,8 +227,8 @@ func (record authorizationRecord) validate() error {
 		}
 		reproduction := ReproductionResult{
 			SchemaVersion: ReproductionSchemaVersion, ReleaseSetDigest: record.ReleaseSetDigest,
-			Component: member.Component, Role: member.Role, Arch: member.Arch,
-			RecipeDigest: member.RecipeDigest, VectorDigest: member.VectorDigest,
+			Component: member.Component, Arch: member.Arch,
+			BuildDigest: member.BuildDigest, VectorDigest: member.VectorDigest,
 			ProfileDigest: member.ProfileDigest, ProfileIndependent: member.ProfileIndependent,
 			ResolvedInputDigest: member.ResolvedInputDigest,
 			ArtifactDigests:     append([]string(nil), member.ArtifactDigests...), Verdict: member.Reproduction,
@@ -251,7 +250,7 @@ func (record authorizationRecord) validate() error {
 				"release authorization member proof does not rehydrate its exact reproduction receipt")
 		}
 		vector, ok := vectors[member.VectorDigest]
-		if !ok || vector.RecipeDigest != member.RecipeDigest || vector.ProfileDigest != member.ProfileDigest {
+		if !ok || vector.BuildDigest != member.BuildDigest || vector.ProfileDigest != member.ProfileDigest {
 			return e.New(e.CodeGateUnmet,
 				"release authorization member does not bind its exact authenticated validation vector")
 		}
@@ -265,17 +264,17 @@ func (record authorizationRecord) validate() error {
 				"release authorization member/vector artifact sets differ")
 		}
 		usedVectors[member.VectorDigest] = true
-		memberRecipes[member.RecipeDigest] = true
+		memberBuilds[member.BuildDigest] = true
 		memberVectorDigests[member.VectorDigest] = true
 		releaseMembers = append(releaseMembers, Member{
-			Component: member.Component, Role: member.Role, Arch: member.Arch, Version: member.Version,
-			RecipeDigest: member.RecipeDigest, VectorDigest: member.VectorDigest,
+			Component: member.Component, Arch: member.Arch, Version: member.Version,
+			BuildDigest: member.BuildDigest, VectorDigest: member.VectorDigest,
 			ResolvedInputDigest: member.ResolvedInputDigest, ProfileDigest: member.ProfileDigest,
 			ArtifactDigests: append([]string(nil), member.ArtifactDigests...),
 		})
 		for _, digest := range member.ArtifactDigests {
 			memberArtifacts[digest] = true
-			subjectKey := clearanceSubjectKey(member.Component, member.Role, member.RecipeDigest, digest)
+			subjectKey := clearanceSubjectKey(member.Component, member.BuildDigest, digest)
 			if _, duplicate := memberSubjects[subjectKey]; duplicate {
 				return e.New(e.CodeGateUnmet,
 					"release authorization repeats exact evidence subject %s/%s",
@@ -313,7 +312,7 @@ func (record authorizationRecord) validate() error {
 		ReleaseSetDigest: record.ReleaseSetDigest, InventoryDigest: record.InventoryDigest,
 		CompatibilityPolicyDigest: record.Compatibility.CompatibilityPolicyDigest,
 		Target:                    record.Compatibility.Target,
-		RecipeDigests:             append([]string(nil), record.Compatibility.RecipeDigests...),
+		BuildDigests:              append([]string(nil), record.Compatibility.BuildDigests...),
 		VectorDigests:             append([]string(nil), record.Compatibility.VectorDigests...),
 		ArtifactDigests:           append([]string(nil), record.Compatibility.ArtifactDigests...),
 		Verdict:                   record.Compatibility.Verdict,
@@ -326,7 +325,7 @@ func (record authorizationRecord) validate() error {
 		record.Compatibility.Verdict != CompatibilityAccepted ||
 		strings.TrimSpace(record.Compatibility.VerifiedSigner) == "" ||
 		strings.TrimSpace(record.Compatibility.VerifiedSigner) != record.Compatibility.VerifiedSigner ||
-		!equalStrings(record.Compatibility.RecipeDigests, sortedKeys(memberRecipes)) ||
+		!equalStrings(record.Compatibility.BuildDigests, sortedKeys(memberBuilds)) ||
 		!equalStrings(record.Compatibility.VectorDigests, sortedKeys(memberVectorDigests)) ||
 		!equalStrings(record.Compatibility.ArtifactDigests, record.ArtifactDigests) {
 		return e.New(e.CodeGateUnmet,
@@ -398,20 +397,19 @@ func (record authorizationRecord) validate() error {
 		}
 	}
 	for _, proof := range record.Evidence {
-		key := proof.ReceiptType.String() + "\x00" + proof.Component + "\x00" + proof.Role + "\x00" +
-			proof.RecipeDigest + "\x00" + proof.ArtifactDigest
+		key := proof.ReceiptType.String() + "\x00" + proof.Component + "\x00" +
+			proof.BuildDigest + "\x00" + proof.ArtifactDigest
 		if !proof.ReceiptType.valid() || strings.TrimSpace(proof.Component) == "" ||
 			strings.TrimSpace(proof.Component) != proof.Component ||
-			(proof.Role != "" && strings.TrimSpace(proof.Role) != proof.Role) ||
 			!isDigest(proof.ArtifactDigest) || !isDigest(proof.EvidenceDigest) ||
 			!isDigest(proof.BlobDigest) || strings.TrimSpace(proof.EvidenceSchema) == "" ||
 			strings.TrimSpace(proof.EvidenceSchema) != proof.EvidenceSchema ||
 			(previousEvidence != "" && previousEvidence >= key) {
 			return e.New(e.CodeGateUnmet, "release authorization contains an invalid evidence proof")
 		}
-		rowKey := vectorEvidenceKey(proof.Component, proof.RecipeDigest, proof.ArtifactDigest)
-		subjectKey := clearanceSubjectKey(proof.Component, proof.Role,
-			proof.RecipeDigest, proof.ArtifactDigest)
+		rowKey := vectorEvidenceKey(proof.Component, proof.BuildDigest, proof.ArtifactDigest)
+		subjectKey := clearanceSubjectKey(proof.Component,
+			proof.BuildDigest, proof.ArtifactDigest)
 		switch proof.ReceiptType {
 		case EvidenceSBOM, EvidenceProvenance:
 			if proof.SBOMDigest != "" || proof.ResultDigest != "" || proof.ScannerDigest != "" ||
@@ -420,7 +418,7 @@ func (record authorizationRecord) validate() error {
 					"SBOM/provenance proof carries vulnerability-only fields")
 			}
 			if proof.Reference != "" {
-				if proof.Role != "" || proof.RecipeDigest != "" ||
+				if proof.BuildDigest != "" ||
 					!isCanonicalEvidenceRef(proof.Reference) || proof.BlobDigest != proof.EvidenceDigest ||
 					!validExternalEvidenceSchema(proof.ReceiptType, proof.EvidenceSchema) ||
 					externalSubjects[externalClearanceSubjectKey(proof.Component, proof.ArtifactDigest)] != 1 {
@@ -428,9 +426,9 @@ func (record authorizationRecord) validate() error {
 						"external evidence proof is not bound to one exact release subject and verified payload")
 				}
 			} else {
-				if !isDigest(proof.RecipeDigest) {
+				if !isDigest(proof.BuildDigest) {
 					return e.New(e.CodeGateUnmet,
-						"local evidence proof has no exact recipe binding")
+						"local evidence proof has no exact build binding")
 				}
 				if _, exists := memberSubjects[subjectKey]; !exists {
 					return e.New(e.CodeGateUnmet,
@@ -455,7 +453,7 @@ func (record authorizationRecord) validate() error {
 				}
 			}
 		case EvidenceVulnerability:
-			if proof.Reference != "" || !isDigest(proof.RecipeDigest) ||
+			if proof.Reference != "" || !isDigest(proof.BuildDigest) ||
 				proof.EvidenceSchema != vuln.QualifiedReportSchemaVersion ||
 				!isDigest(proof.SBOMDigest) || !isDigest(proof.ResultDigest) ||
 				!isDigest(proof.ScannerDigest) || !isDigest(proof.DatabaseDigest) {
@@ -507,7 +505,7 @@ func (record authorizationRecord) validate() error {
 	previousWaiver := ""
 	for _, waiver := range record.Waivers {
 		if !isDigest(waiver.ReceiptDigest) || !isDigest(waiver.ArtifactDigest) ||
-			!isDigest(waiver.RecipeDigest) || !isDigest(waiver.StatusCheckpointDigest) ||
+			!isDigest(waiver.BuildDigest) || !isDigest(waiver.StatusCheckpointDigest) ||
 			!isDigest(waiver.PromotionPolicyDigest) || waiver.StatusCheckpointDigest != record.StatusCheckpointDigest ||
 			waiver.PromotionPolicyDigest != record.PromotionPolicyDigest {
 			return e.New(e.CodeGateUnmet, "release authorization contains an invalid waiver proof")
@@ -515,15 +513,14 @@ func (record authorizationRecord) validate() error {
 		key := waiverProofKey(waiver)
 		if strings.TrimSpace(waiver.Component) == "" ||
 			strings.TrimSpace(waiver.Component) != waiver.Component ||
-			(waiver.Role != "" && strings.TrimSpace(waiver.Role) != waiver.Role) ||
 			strings.TrimSpace(waiver.ApproverIdentity) == "" ||
 			strings.TrimSpace(waiver.ApproverIdentity) != waiver.ApproverIdentity ||
 			(previousWaiver != "" && previousWaiver >= key) {
 			return e.New(e.CodeGateUnmet,
 				"release authorization contains a non-canonical waiver proof")
 		}
-		member, exists := memberSubjects[clearanceSubjectKey(waiver.Component, waiver.Role,
-			waiver.RecipeDigest, waiver.ArtifactDigest)]
+		member, exists := memberSubjects[clearanceSubjectKey(waiver.Component,
+			waiver.BuildDigest, waiver.ArtifactDigest)]
 		if !exists || (member.ProfileIndependent &&
 			(waiver.ProfileScope != "profile-independent" || waiver.ProfileDigest != "")) ||
 			(!member.ProfileIndependent &&
@@ -546,7 +543,7 @@ func (record authorizationRecord) validate() error {
 		}
 		document := evidenceWaiverDocument{
 			SchemaVersion: EvidenceWaiverSchemaVersion,
-			Component:     waiver.Component, Role: waiver.Role, RecipeDigest: waiver.RecipeDigest,
+			Component:     waiver.Component, BuildDigest: waiver.BuildDigest,
 			ArtifactDigest: waiver.ArtifactDigest, ProfileScope: waiver.ProfileScope,
 			ProfileDigest: waiver.ProfileDigest, StatusCheckpointDigest: waiver.StatusCheckpointDigest,
 			MissingTypes: append([]EvidenceType(nil), waiver.MissingTypes...), Reason: waiver.Reason,
@@ -585,8 +582,8 @@ func validateRecordDigestSet(label string, values []string, allowEmpty bool) err
 	return nil
 }
 
-func clearanceSubjectKey(component, role, recipeDigest, artifactDigest string) string {
-	return component + "\x00" + role + "\x00" + recipeDigest + "\x00" + artifactDigest
+func clearanceSubjectKey(component, buildDigest, artifactDigest string) string {
+	return component + "\x00" + buildDigest + "\x00" + artifactDigest
 }
 
 func externalClearanceSubjectKey(component, artifactDigest string) string {

@@ -6,37 +6,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 func TestDiskImageCatalogSchemaAndIdentity(t *testing.T) {
 	const vmToolchain = "example.invalid/nkd-vm-builder@sha256:59b8183301af6dc358c9258d7b2ab0ee1a9363618552334fb3b160d454cbda72"
-	registry := `apiVersion: nkd.dev/catalog/v1
+	registry := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   image-source:
     repo: https://github.com/example/node-image
     toolchainImage: ` + vmToolchain + `
-recipes:
-  - id: node-amd64
-    criteria:
-      category: os
-      os: ubuntu
-      arch: amd64
-    components:
-      - node-fde
-      - node-plain
-  - id: node-arm64
-    criteria:
-      category: os
-      os: ubuntu
-      arch: arm64
-    components:
-      - node-plain
 components:
   node-fde:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: image-source
     builderType: vm-image
@@ -65,6 +49,7 @@ components:
       - "ARCH={{.Arch}}"
     artifactPath: "image/output-fde/node-{{.Arch}}.qcow2"
   node-plain:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: image-source
     builderType: vm-image
@@ -157,7 +142,7 @@ func TestDiskImageSchemaValidation(t *testing.T) {
 	}
 	validate := func(component Component) error {
 		cat := base(component)
-		cat.Recipes[0].Criteria.Category = "os"
+		cat.Components["x"] = component
 		return cat.Validate()
 	}
 	tests := []struct {
@@ -242,7 +227,8 @@ func TestVMImageHostRouteAndToolchainValidation(t *testing.T) {
 	}
 	validate := func(component Component, guestArch string) error {
 		cat := base(component)
-		cat.Recipes[0].Criteria = criteria.Criteria{Category: "os", OS: "ubuntu", Arch: guestArch}
+		component.Platforms = []string{"linux/" + guestArch}
+		cat.Components["x"] = component
 		return cat.Validate()
 	}
 
@@ -290,9 +276,10 @@ func TestNonVMRequiredKVMHostRouteRemainsDeferred(t *testing.T) {
 		}},
 	}
 	cat := base(component)
-	cat.Recipes[0].Criteria.Arch = "arm64"
+	component.Platforms = []string{"linux/arm64"}
+	cat.Components["x"] = component
 
-	// ADR-18 defines the recipe-architecture/runner-host relationship only for
+	// ADR-18 defines the target-architecture/runner-host relationship only for
 	// vm-image. Preserve the authored requirement for future Environment matching
 	// without inventing guest semantics for an ordinary builder. The pipeline and
 	// factory adapter suites independently prove that every current adapter rejects

@@ -31,18 +31,25 @@ func main() {
 }
 
 func newApp() *cli.App {
-	return &cli.App{
+	app := &cli.App{
 		Name:                 "nkdctl",
 		Usage:                "define, run, and verify immutable release workflows",
 		Version:              version + " (" + commit + ")",
 		HideHelpCommand:      true,
 		EnableBashCompletion: true,
+		OnUsageError:         codedUsageError,
+		Action: func(c *cli.Context) error {
+			if c.Args().Present() {
+				return nkderr.New(nkderr.CodeUsage, "unknown command %q", c.Args().First())
+			}
+			return cli.ShowAppHelp(c)
+		},
 		Commands: []*cli.Command{
 			cmdDefinition(),
 			cmdRun(),
 			// The Definition -> Run -> Release lifecycle is the normal surface (ADR-17).
 			// Low-level execution and evidence tools are hidden from the product workflow.
-			cmdRecipe(), // Name "resolve" (alias "recipe")
+			cmdResolve(),
 			hideCommand(cmdBuild()),
 			hideCommand(cmdBundle()),
 			hideCommand(cmdAssemble()),
@@ -64,6 +71,29 @@ func newApp() *cli.App {
 			cmdTransportUnpack(),
 			cmdSandboxExec(),
 		},
+	}
+	for _, command := range app.Commands {
+		configureCommandUsage(command)
+	}
+	return app
+}
+
+func codedUsageError(_ *cli.Context, err error, _ bool) error {
+	return nkderr.Wrap(nkderr.CodeUsage, err, "invalid command usage")
+}
+
+func configureCommandUsage(command *cli.Command) {
+	command.OnUsageError = codedUsageError
+	if command.Action == nil && len(command.Subcommands) > 0 {
+		command.Action = func(c *cli.Context) error {
+			if c.Args().Present() {
+				return nkderr.New(nkderr.CodeUsage, "unknown %s subcommand %q", c.Command.Name, c.Args().First())
+			}
+			return cli.ShowSubcommandHelp(c)
+		}
+	}
+	for _, child := range command.Subcommands {
+		configureCommandUsage(child)
 	}
 }
 

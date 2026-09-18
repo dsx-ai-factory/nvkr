@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -28,7 +27,6 @@ type GeneratedBundle struct {
 	ManifestPath   string
 	PlanPath       string
 	GraphDir       string
-	CompositionDir string
 	Files          map[string][]byte
 	WorkflowDigest string
 	PlanDigest     string
@@ -87,11 +85,10 @@ func generationCommand(plan *Plan, engine string) string {
 }
 
 type generationLayout struct {
-	workflowPath   string
-	manifestPath   string
-	planPath       string
-	graphDir       string
-	compositionDir string
+	workflowPath string
+	manifestPath string
+	planPath     string
+	graphDir     string
 }
 
 func renderStaticInputs(ctx context.Context, plan *Plan, layout generationLayout) (map[string][]byte, string, map[string]string, error) {
@@ -103,20 +100,10 @@ func renderStaticInputs(ctx context.Context, plan *Plan, layout generationLayout
 	if err != nil {
 		return nil, "", nil, err
 	}
-	// The plan and composition members are read back at runtime with canonical.UnmarshalExact
-	// (`factory execute-node --plan`, cluster composition loads), which rejects a trailing
-	// newline. Write the canonical bytes verbatim, like the graph members below.
+	// Runtime reads canonical plan bytes exactly, without a trailing newline.
 	files := map[string][]byte{layout.planPath: planBytes}
-	for _, composition := range plan.Compositions {
-		raw, err := composition.Composition.Marshal()
-		if err != nil {
-			return nil, "", nil, err
-		}
-		path := filepath.ToSlash(filepath.Join(layout.compositionDir, composition.Name+".json"))
-		files[path] = raw
-	}
-	graphDigests := make(map[string]string, len(plan.Recipes))
-	for _, target := range plan.Recipes {
+	graphDigests := make(map[string]string, len(plan.Builds))
+	for _, target := range plan.Builds {
 		if err := ctx.Err(); err != nil {
 			return nil, "", nil, e.Wrap(e.CodeTimeout, err, "factory rendering canceled")
 		}
@@ -129,7 +116,7 @@ func renderStaticInputs(ctx context.Context, plan *Plan, layout generationLayout
 		// The committed graph file MUST be exactly the bytes hashed above: at runtime
 		// `nkd-exec exec-node --nodes-digest` re-hashes the file it reads and fails closed on
 		// any mismatch, and canonical.UnmarshalExact rejects a trailing newline. So write the
-		// canonical bytes verbatim (no trailing '\n', unlike the plan/composition members).
+		// canonical bytes verbatim (no trailing '\n', like the plan members).
 		files[path] = raw
 	}
 	return files, planDigest, graphDigests, nil
@@ -138,8 +125,8 @@ func renderStaticInputs(ctx context.Context, plan *Plan, layout generationLayout
 func newGeneratedBundle(engine string, layout generationLayout, files map[string][]byte, planDigest string) *GeneratedBundle {
 	return &GeneratedBundle{Engine: engine, WorkflowPath: layout.workflowPath,
 		ManifestPath: layout.manifestPath, PlanPath: layout.planPath,
-		GraphDir: layout.graphDir, CompositionDir: layout.compositionDir,
-		Files: files, WorkflowDigest: pipeline.FileDigest(files[layout.workflowPath]), PlanDigest: planDigest}
+		GraphDir: layout.graphDir,
+		Files:    files, WorkflowDigest: pipeline.FileDigest(files[layout.workflowPath]), PlanDigest: planDigest}
 }
 
 func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedBundle) ([]byte, error) {
@@ -167,11 +154,8 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 			"%s bundle planDigest does not match the authoritative plan", bundle.Engine)
 	}
 	expectedFiles := map[string]bool{bundle.WorkflowPath: true, bundle.PlanPath: true}
-	for _, recipe := range plan.Recipes {
-		expectedFiles[filepath.ToSlash(filepath.Join(bundle.GraphDir, recipe.Name+".json"))] = true
-	}
-	for _, composition := range plan.Compositions {
-		expectedFiles[filepath.ToSlash(filepath.Join(bundle.CompositionDir, composition.Name+".json"))] = true
+	for _, build := range plan.Builds {
+		expectedFiles[filepath.ToSlash(filepath.Join(bundle.GraphDir, build.Name+".json"))] = true
 	}
 	if len(bundle.Files) != len(expectedFiles) {
 		return nil, e.New(e.CodePipelineDrift, "%s bundle has %d files; expected %d", bundle.Engine, len(bundle.Files), len(expectedFiles))
@@ -200,43 +184,29 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if err := rejectUnsupportedPlanRequirements(&decodedPlan, bundle.Engine+" bundle validation"); err != nil {
 		return nil, err
 	}
-	for _, recipe := range plan.Recipes {
-		path := filepath.ToSlash(filepath.Join(bundle.GraphDir, recipe.Name+".json"))
+	for _, build := range plan.Builds {
+		path := filepath.ToSlash(filepath.Join(bundle.GraphDir, build.Name+".json"))
 		raw, ok := bundle.Files[path]
 		if !ok {
-			return nil, e.New(e.CodePipelineDrift, "%s bundle omits graph for target %q", bundle.Engine, recipe.Name)
+			return nil, e.New(e.CodePipelineDrift, "%s bundle omits graph for target %q", bundle.Engine, build.Name)
 		}
-		expectedGraph, err := recipe.Graph.CanonicalJSON()
+		expectedGraph, err := build.Graph.CanonicalJSON()
 		if err != nil {
 			return nil, err
 		}
 		if !bytes.Equal(raw, expectedGraph) {
 			return nil, e.New(e.CodePipelineDrift,
-				"generated graph for %q does not match the authoritative full graph", recipe.Name)
+				"generated graph for %q does not match the authoritative full graph", build.Name)
 		}
 		var graph ir.Graph
 		if err := canonical.UnmarshalExact(raw, &graph); err != nil {
-			return nil, e.Wrap(e.CodePipelineDrift, err, "decoding generated graph for %q", recipe.Name)
+			return nil, e.Wrap(e.CodePipelineDrift, err, "decoding generated graph for %q", build.Name)
 		}
 		if err := graph.Validate(); err != nil {
 			return nil, err
 		}
-		if got, _ := graph.Digest(); got != recipe.RecipeDigest {
-			return nil, e.New(e.CodePipelineDrift, "generated graph for %q changed recipe identity", recipe.Name)
-		}
-	}
-	for _, composition := range plan.Compositions {
-		path := filepath.ToSlash(filepath.Join(bundle.CompositionDir, composition.Name+".json"))
-		raw, ok := bundle.Files[path]
-		if !ok {
-			return nil, e.New(e.CodePipelineDrift, "%s bundle omits composition %q", bundle.Engine, composition.Name)
-		}
-		var decoded cluster.ClusterComposition
-		if err := canonical.UnmarshalExact(bytes.TrimSpace(raw), &decoded); err != nil {
-			return nil, e.Wrap(e.CodePipelineDrift, err, "decoding generated composition %q", composition.Name)
-		}
-		if digest, err := decoded.Digest(); err != nil || digest != composition.Digest {
-			return nil, e.New(e.CodePipelineDrift, "generated composition %q changed identity", composition.Name)
+		if got, _ := graph.Digest(); got != build.BuildDigest {
+			return nil, e.New(e.CodePipelineDrift, "generated graph for %q changed build identity", build.Name)
 		}
 	}
 	return workflow, nil

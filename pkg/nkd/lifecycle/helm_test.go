@@ -10,8 +10,7 @@ import (
 
 func TestHelmImageDependency(t *testing.T) {
 	definition := testDefinition(t)
-	definition.Clusters = nil
-	definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: "charts", Recipe: "cli-recipe", Format: OutputHelm, Components: []string{"charts"}, Helm: &HelmOutput{ImageOutput: "cli", Chart: "007-controller"}})
+	definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: "charts", Platform: "linux/amd64", Format: OutputHelm, Components: []string{"charts"}, Helm: &HelmOutput{ImageOutput: "cli", Chart: "007-controller"}})
 	definition.Outputs[0].Format = OutputOCI
 	sort.Slice(definition.Outputs, func(i, j int) bool { return definition.Outputs[i].Name < definition.Outputs[j].Name })
 	if err := definition.Validate(); err != nil {
@@ -56,7 +55,7 @@ func TestSourceHelmSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			pkg := spec.Packages[0]
-			if pkg.Kind != factory.PackageHelm || len(pkg.Inputs) != 1 || pkg.Inputs[0] != definition.Outputs[0].Recipe+"/nkectl" {
+			if pkg.Kind != factory.PackageHelm || len(pkg.Inputs) != 1 || pkg.Inputs[0] != definition.Outputs[0].Name+"/nkectl" {
 				t.Fatalf("source Helm selection lost: %#v", pkg)
 			}
 		})

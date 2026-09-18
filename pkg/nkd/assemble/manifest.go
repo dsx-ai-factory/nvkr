@@ -3,20 +3,15 @@ package assemble
 import (
 	"context"
 	"sort"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-// This file implements the ADR-14 §1 unified DiskManifest and the §4 node-SKU staging
-// manifest. The DiskManifest is the single canonical description of a bootable node
+// This file implements the ADR-14 §1 unified DiskManifest. The DiskManifest is the single canonical description of a bootable node
 // disk: the logical digest over the decoded RAW stream, the per-block manifest for
 // diagnosable divergence, envelope refs (container digest = PROVENANCE ONLY, never the
-// trust anchor), the pre-encryption boundary, and the SKU role. It serializes through
+// trust anchor), the pre-encryption boundary. It serializes through
 // the ADR-01 canonical codec and folds into the evidence/validation vector (ADR-05).
 
 // DiskKind distinguishes the two canonical disk classes (ADR-14 §1/§4): a block image
@@ -40,17 +35,10 @@ type EnvelopeRef struct {
 // trust anchor (over the decoded RAW / flat ISO logical stream). BlockManifest gives
 // diagnosable per-block granularity. Envelopes are provenance references. PreEncryption
 // marks that LogicalDigest is over the pre-encryption bytes; an encrypted output forks
-// its own non-reproduction identity (§3). Role scopes the node SKU (§4) and is validated
-// against the criteria role domain (never a free-form label). NOTE: Role is a scope
-// annotation, not yet a cryptographic binding — LogicalDigest is over the disk bytes and
-// is not derived from the SKU's exact component/artifact-digest set. Binding the two
-// requires the StagingManifest producer (which needs a qualified build's artifact
-// digests) and is tracked as delivery-adapter work; until then Role must be corroborated
-// against the composing ReleaseSet by the caller, not trusted from this manifest alone.
+// its own non-reproduction identity (§3).
 type DiskManifest struct {
 	SchemaVersion    string         `json:"schemaVersion"`
 	DiskKind         string         `json:"diskKind"` // raw | iso
-	Role             string         `json:"role,omitempty"`
 	LogicalDigest    string         `json:"logicalDigest"`
 	VirtualSizeBytes int64          `json:"virtualSizeBytes"`
 	BlockManifest    *BlockManifest `json:"blockManifest,omitempty"`
@@ -68,7 +56,7 @@ type MaskedRegion struct {
 	Reason      string `json:"reason"`
 }
 
-const DiskManifestSchemaVersion = "nkd.dev/disk-manifest/v1"
+const DiskManifestSchemaVersion = "nkd.dev/disk-manifest/v2"
 
 // Disk block manifests are intentionally bounded in both dimensions. The block-size
 // ceiling bounds the one-chunk working allocation, while the entry ceiling bounds
@@ -82,7 +70,7 @@ const (
 )
 
 // NewDiskManifestContext builds the release-qualified canonical disk manifest.
-func NewDiskManifestContext(ctx context.Context, diskKind, role, rawPath string, blockSize int) (*DiskManifest, error) {
+func NewDiskManifestContext(ctx context.Context, diskKind, rawPath string, blockSize int) (*DiskManifest, error) {
 	if err := checkContext(ctx, "building a canonical disk manifest"); err != nil {
 		return nil, err
 	}
@@ -112,7 +100,7 @@ func NewDiskManifestContext(ctx context.Context, diskKind, role, rawPath string,
 		return nil, err
 	}
 	m := &DiskManifest{
-		SchemaVersion: DiskManifestSchemaVersion, DiskKind: diskKind, Role: role,
+		SchemaVersion: DiskManifestSchemaVersion, DiskKind: diskKind,
 		LogicalDigest: dig, VirtualSizeBytes: size, PreEncryption: true,
 	}
 	if diskKind == DiskKindRAW {
@@ -205,9 +193,6 @@ func (m *DiskManifest) Validate() error {
 	if m.DiskKind != DiskKindRAW && m.DiskKind != DiskKindISO {
 		return e.New(e.CodeUnsupported, "unknown disk kind %q (raw|iso)", m.DiskKind)
 	}
-	if m.Role != "" && !criteria.ValidRole(m.Role) {
-		return e.New(e.CodeUnsupported, "DiskManifest role %q is unsupported", m.Role)
-	}
 	if !canonical.IsDigest(m.LogicalDigest) || m.VirtualSizeBytes <= 0 {
 		return e.New(e.CodeUnverifiedRef, "DiskManifest must bind an exact logical digest and positive virtual size")
 	}
@@ -298,107 +283,4 @@ func (m *DiskManifest) Marshal() ([]byte, error) {
 		return nil, err
 	}
 	return canonical.Marshal(m)
-}
-
-// StagedComponent is one role-scoped member of a node SKU (ADR-14 §4): a category
-// artifact bound by its content digest.
-type StagedComponent struct {
-	Name           string `json:"name"`
-	OutputType     string `json:"outputType"`
-	ArtifactDigest string `json:"artifactDigest"`
-}
-
-// StagingManifest is the node-SKU staging manifest (ADR-14 §4): the role-filtered subset
-// of node-level category artifacts assembled deterministically. Its digest is hashed
-// into the SKU artifact so a control-plane vs worker disk/package-set is distinct and
-// individually reproducible.
-type StagingManifest struct {
-	SchemaVersion string            `json:"schemaVersion"`
-	Role          string            `json:"role"`
-	RecipeDigest  string            `json:"recipeDigest"`
-	Components    []StagedComponent `json:"components"`
-}
-
-const StagingManifestSchemaVersion = "nkd.dev/staging-manifest/v1"
-
-// NewStagingManifest assembles a role-scoped SKU staging manifest from a component set,
-// sorted for determinism. Fail-closed on an empty role or component set — a SKU is
-// always role-scoped and non-empty.
-func NewStagingManifest(role, recipeDigest string, comps []StagedComponent) (*StagingManifest, error) {
-	if !criteria.ValidRole(role) {
-		return nil, e.New(e.CodeUsage, "a node SKU staging manifest is role-scoped; role is empty")
-	}
-	if len(comps) == 0 {
-		return nil, e.New(e.CodeUsage, "staging manifest for role %q has no components", role)
-	}
-	c := append([]StagedComponent(nil), comps...)
-	sort.Slice(c, func(i, j int) bool { return c[i].Name < c[j].Name })
-	manifest := &StagingManifest{
-		SchemaVersion: StagingManifestSchemaVersion, Role: role, RecipeDigest: recipeDigest, Components: c,
-	}
-	if err := manifest.Validate(); err != nil {
-		return nil, err
-	}
-	return manifest, nil
-}
-
-// Validate rejects malformed, duplicate, or unbound node-SKU members.
-func (s *StagingManifest) Validate() error {
-	if s == nil {
-		return e.New(e.CodeInvalidCatalog, "StagingManifest is required")
-	}
-	if s.SchemaVersion != StagingManifestSchemaVersion {
-		return e.New(e.CodeInvalidCatalog, "StagingManifest schemaVersion %q is unsupported", s.SchemaVersion)
-	}
-	if !criteria.ValidRole(s.Role) {
-		return e.New(e.CodeUnsupported, "StagingManifest role %q is unsupported", s.Role)
-	}
-	if !canonical.IsDigest(s.RecipeDigest) {
-		return e.New(e.CodeUnverifiedRef, "StagingManifest recipeDigest %q is not exact", s.RecipeDigest)
-	}
-	if len(s.Components) == 0 {
-		return e.New(e.CodeProvenanceMissing, "StagingManifest has no components")
-	}
-	previous := ""
-	for i, component := range s.Components {
-		if !canonicalText(component.Name) || !canonicalText(component.OutputType) {
-			return e.New(e.CodeInvalidCatalog, "StagingManifest component %d has non-canonical metadata", i)
-		}
-		if i > 0 && component.Name <= previous {
-			return e.New(e.CodeInvalidCatalog, "StagingManifest components must be strictly sorted and duplicate-free")
-		}
-		previous = component.Name
-		if !canonical.IsDigest(component.ArtifactDigest) {
-			return e.New(e.CodeUnverifiedRef, "StagingManifest component %q has no exact artifact digest", component.Name)
-		}
-	}
-	return nil
-}
-
-// Digest is the staging manifest's canonical content digest, hashed into the SKU artifact.
-func (s *StagingManifest) Digest() (string, error) {
-	if err := s.Validate(); err != nil {
-		return "", err
-	}
-	return canonical.Digest(canonical.KindStagingManifest, s)
-}
-
-// Marshal renders the staging manifest in the canonical JCS codec.
-func (s *StagingManifest) Marshal() ([]byte, error) {
-	if err := s.Validate(); err != nil {
-		return nil, err
-	}
-	return canonical.Marshal(s)
-}
-
-func canonicalText(value string) bool {
-	if value == "" || !utf8.ValidString(value) || strings.TrimSpace(value) != value {
-		return false
-	}
-	for _, r := range value {
-		if unicode.IsControl(r) {
-			return false
-		}
-	}
-	return true
 }

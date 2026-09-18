@@ -1,7 +1,6 @@
 package lifecycle
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/cluster"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -89,7 +87,6 @@ func (verified *VerifiedRelease) Description() (Release, error) {
 	}
 	description := verified.release
 	description.Artifacts = cloneArtifacts(verified.release.Artifacts)
-	description.Clusters = cloneClusterRealizations(verified.release.Clusters)
 	return description, nil
 }
 
@@ -180,7 +177,7 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 	if err := delivery.RequireAttestedEvidence(inspection); err != nil {
 		return nil, err
 	}
-	artifacts, contentSubject, clusters, err := artifactsFromBinding(ctx, materialized.path, inspection)
+	artifacts, contentSubject, err := artifactsFromBinding(ctx, materialized.path, inspection)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +189,7 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 		return nil, err
 	}
 	description := Release{SchemaVersion: ReleaseSchemaVersion, Subject: reference, Lane: policy.Lane,
-		Scope: policy.Scope, Artifacts: artifacts, ContentSubject: contentSubject, Clusters: clusters, PolicyDigest: policyDigest}
+		Scope: policy.Scope, Artifacts: artifacts, ContentSubject: contentSubject, PolicyDigest: policyDigest}
 	if err := description.validate(); err != nil {
 		return nil, err
 	}
@@ -214,7 +211,7 @@ func InspectReleaseLayout(ctx context.Context, reference, layoutPath string) ([]
 	if inspection.RootDigest != digest {
 		return nil, e.New(e.CodeVerifyFailed, "publication layout does not match requested reference")
 	}
-	artifacts, _, _, err := artifactsFromBinding(ctx, layoutPath, inspection)
+	artifacts, _, err := artifactsFromBinding(ctx, layoutPath, inspection)
 	if err != nil {
 		return nil, err
 	}
@@ -224,42 +221,42 @@ func InspectReleaseLayout(ctx context.Context, reference, layoutPath string) ([]
 	return artifacts, nil
 }
 
-func artifactsFromBinding(ctx context.Context, layoutPath string, inspection delivery.Inspection) ([]Artifact, string, []clusterRealization, error) {
+func artifactsFromBinding(ctx context.Context, layoutPath string, inspection delivery.Inspection) ([]Artifact, string, error) {
 	if layoutPath == "" {
-		return nil, "", nil, e.New(e.CodeVerifyFailed, "verified publication has no held layout path")
+		return nil, "", e.New(e.CodeVerifyFailed, "verified publication has no held layout path")
 	}
 	var binding factory.LifecycleBinding
 	if metadata := inspection.Root.Release; metadata != nil {
-		binding = factory.LifecycleBinding{SchemaVersion: factory.LifecycleBindingSchema, DefinitionDigest: metadata.DefinitionDigest, EnvironmentDigest: metadata.EnvironmentDigest, ContentSubject: metadata.ContentSubject, Clusters: metadata.Clusters}
+		binding = factory.LifecycleBinding{SchemaVersion: factory.LifecycleBindingSchema, DefinitionDigest: metadata.DefinitionDigest, EnvironmentDigest: metadata.EnvironmentDigest, ContentSubject: metadata.ContentSubject}
 		for _, object := range inspection.Root.Objects {
 			if output := object.Output; output != nil {
 				digest := object.DescriptorDigest
 				if output.Format == OutputAPT {
 					digest = object.SemanticDigest
 				}
-				binding.Outputs = append(binding.Outputs, factory.LifecycleBoundOutput{Name: object.Name, Kind: output.Format, Digest: digest, RecipeDigest: output.RecipeDigest, Components: output.Components, TransportPath: output.TransportPath})
+				binding.Outputs = append(binding.Outputs, factory.LifecycleBoundOutput{Name: object.Name, Kind: output.Format, Digest: digest, BuildDigest: output.BuildDigest, Components: output.Components, TransportPath: output.TransportPath})
 			}
 		}
 	} else {
-		return nil, "", nil, e.New(e.CodeVerifyFailed, "publication has no authoritative release metadata")
+		return nil, "", e.New(e.CodeVerifyFailed, "publication has no authoritative release metadata")
 	}
 
 	objects := make(map[string]delivery.PublishedObject, len(inspection.Root.Objects))
 	for _, candidate := range inspection.Root.Objects {
 		if _, exists := objects[candidate.Name]; exists {
-			return nil, "", nil, e.New(e.CodeVerifyFailed, "publication repeats object name %q", candidate.Name)
+			return nil, "", e.New(e.CodeVerifyFailed, "publication repeats object name %q", candidate.Name)
 		}
 		objects[candidate.Name] = candidate
 	}
 	artifacts := make([]Artifact, 0, len(binding.Outputs))
 	for _, output := range binding.Outputs {
 		if !namePattern.MatchString(output.Name) || (output.Kind != OutputExecutable && output.Kind != OutputAPT && output.Kind != OutputHelm && output.Kind != OutputOCI) || !canonical.IsDigest(output.Digest) ||
-			!canonical.IsDigest(output.RecipeDigest) || (output.Kind != OutputHelm && len(output.Components) == 0) {
-			return nil, "", nil, e.New(e.CodeVerifyFailed, "lifecycle output binding is malformed")
+			!canonical.IsDigest(output.BuildDigest) || (output.Kind != OutputHelm && len(output.Components) == 0) {
+			return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output binding is malformed")
 		}
 		for _, component := range output.Components {
 			if !namePattern.MatchString(component) {
-				return nil, "", nil, e.New(e.CodeVerifyFailed, "lifecycle output %q has an unsafe component", output.Name)
+				return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output %q has an unsafe component", output.Name)
 			}
 		}
 	}
@@ -267,31 +264,31 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 		published, ok := objects[output.Name]
 		if !ok || published.Kind != lifecyclePublishedKind(output.Kind) ||
 			(output.Kind != OutputAPT && published.DescriptorDigest != output.Digest) || (output.Kind == OutputAPT && published.SemanticDigest != output.Digest) {
-			return nil, "", nil, e.New(e.CodeVerifyFailed, "lifecycle output %q does not match its publication object", output.Name)
+			return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output %q does not match its publication object", output.Name)
 		}
 		extracted, err := os.MkdirTemp(filepath.Dir(layoutPath), ".inspect-*")
 		if err != nil {
-			return nil, "", nil, e.Wrap(e.CodeImmutableViolation, err, "creating held bundle inspection workspace")
+			return nil, "", e.Wrap(e.CodeImmutableViolation, err, "creating held bundle inspection workspace")
 		}
 		defer func() { _ = os.RemoveAll(extracted) }()
 		components := append([]string(nil), output.Components...)
 		switch output.Kind {
 		case OutputOCI:
 			if len(components) != 1 || output.TransportPath != "" {
-				return nil, "", nil, e.New(e.CodeVerifyFailed, "OCI output %q has an invalid member or transport binding", output.Name)
+				return nil, "", e.New(e.CodeVerifyFailed, "OCI output %q has an invalid member or transport binding", output.Name)
 			}
 			image, err := delivery.InspectPublishedContainerImage(ctx, layoutPath, output.Name)
 			if err != nil {
-				return nil, "", nil, err
+				return nil, "", err
 			}
 			if image.RootDigest != output.Digest {
-				return nil, "", nil, e.New(e.CodeVerifyFailed, "OCI output %q differs from its image binding", output.Name)
+				return nil, "", e.New(e.CodeVerifyFailed, "OCI output %q differs from its image binding", output.Name)
 			}
 		case OutputExecutable:
 			destination := filepath.Join(extracted, "bundle")
 			bundle, err := delivery.ExtractBinaryBundle(ctx, layoutPath, output.Name, destination)
 			if err != nil {
-				return nil, "", nil, err
+				return nil, "", err
 			}
 			components = components[:0]
 			for _, entry := range bundle.Entries {
@@ -300,19 +297,19 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 		case OutputAPT:
 			expectedPath := filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", output.Name))
 			if output.TransportPath != expectedPath {
-				return nil, "", nil, e.New(e.CodeVerifyFailed, "APT output %q has an unsafe transport binding", output.Name)
+				return nil, "", e.New(e.CodeVerifyFailed, "APT output %q has an unsafe transport binding", output.Name)
 			}
 			archive := filepath.Join(extracted, "repository.tar")
 			if _, err := delivery.ExtractObject(ctx, layoutPath, output.Name, archive); err != nil {
-				return nil, "", nil, err
+				return nil, "", err
 			}
 			unpacked := filepath.Join(extracted, "unpacked")
 			if err := pipeline.UnpackTransport(ctx, archive, unpacked, []string{output.TransportPath}); err != nil {
-				return nil, "", nil, err
+				return nil, "", err
 			}
 			repository, err := delivery.InspectAPTRepository(ctx, filepath.Join(unpacked, filepath.FromSlash(output.TransportPath)))
 			if err != nil || repository.Digest != output.Digest {
-				return nil, "", nil, e.New(e.CodeVerifyFailed, "APT output %q differs from its binding", output.Name)
+				return nil, "", e.New(e.CodeVerifyFailed, "APT output %q differs from its binding", output.Name)
 			}
 			components = components[:0]
 			for _, pkg := range repository.Repository.Packages {
@@ -321,95 +318,47 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 			sort.Strings(components)
 		case OutputHelm:
 			if output.TransportPath != "" {
-				return nil, "", nil, e.New(e.CodeVerifyFailed, "Helm output %q has an unexpected transport path", output.Name)
+				return nil, "", e.New(e.CodeVerifyFailed, "Helm output %q has an unexpected transport path", output.Name)
 			}
 		}
 		if !equalStrings(components, output.Components) {
-			return nil, "", nil, e.New(e.CodeVerifyFailed, "lifecycle output %q component bytes differ from its binding", output.Name)
+			return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output %q component bytes differ from its binding", output.Name)
 		}
 		artifact := Artifact{Name: output.Name, Kind: output.Kind, Digest: output.Digest,
-			RecipeDigest: output.RecipeDigest, Components: append([]string(nil), output.Components...)}
+			BuildDigest: output.BuildDigest, Components: append([]string(nil), output.Components...)}
 		if err := artifact.validate(); err != nil {
-			return nil, "", nil, err
+			return nil, "", err
 		}
 		artifacts = append(artifacts, artifact)
 	}
 	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Name < artifacts[j].Name })
 	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: cloneArtifacts(artifacts)})
 	if err != nil || contentSubject != binding.ContentSubject {
-		return nil, "", nil, e.New(e.CodeVerifyFailed, "release content subject differs from authenticated output payloads")
-	}
-	clusters := make([]clusterRealization, 0, len(binding.Clusters))
-	compositionPlans := make([]factory.CompositionPlan, 0, len(binding.Clusters))
-	clusterPlans := make([]factory.LifecycleClusterPlan, 0, len(binding.Clusters))
-	for _, bound := range binding.Clusters {
-		composition, ok := objects[bound.Name]
-		if !ok || composition.Kind != "cluster-composition" || composition.SemanticDigest != bound.CompositionDigest || bound.ContentSubject != contentSubject {
-			return nil, "", nil, e.New(e.CodeVerifyFailed, "cluster %q does not match its published composition", bound.Name)
-		}
-		_, compositionRaw, err := delivery.ReadObject(ctx, layoutPath, bound.Name)
-		if err != nil {
-			return nil, "", nil, err
-		}
-		var compositionValue cluster.ClusterComposition
-		canonicalComposition := bytes.TrimSuffix(compositionRaw, []byte{'\n'})
-		if err := canonical.UnmarshalExact(canonicalComposition, &compositionValue); err != nil {
-			return nil, "", nil, e.Wrap(e.CodeVerifyFailed, err, "decoding cluster %q composition", bound.Name)
-		}
-		compositionPlans = append(compositionPlans, factory.CompositionPlan{Name: bound.Name,
-			Digest: bound.CompositionDigest, Composition: compositionValue})
-		planned := factory.LifecycleClusterPlan{Name: bound.Name, CompositionDigest: bound.CompositionDigest}
-		realization := clusterRealization{SchemaVersion: bound.SchemaVersion, Name: bound.Name,
-			CompositionDigest: bound.CompositionDigest, ContentSubject: bound.ContentSubject}
-		for _, member := range bound.Members {
-			planned.Members = append(planned.Members, factory.LifecycleClusterMember{Output: member.Output, Role: member.Role})
-			var artifact *Artifact
-			for index := range artifacts {
-				if artifacts[index].Name == member.Output {
-					artifact = &artifacts[index]
-					break
-				}
-			}
-			if artifact == nil || artifact.Digest != member.ArtifactDigest || artifact.RecipeDigest != member.RecipeDigest ||
-				!equalStrings(artifact.Components, member.Components) {
-				return nil, "", nil, e.New(e.CodeVerifyFailed, "cluster %q member %q differs from authenticated release content", bound.Name, member.Output)
-			}
-			realization.Members = append(realization.Members, clusterRealizedMember{Output: member.Output,
-				ArtifactDigest: member.ArtifactDigest, RecipeDigest: member.RecipeDigest,
-				Components: append([]string(nil), member.Components...), Role: member.Role})
-		}
-		if bound.SchemaVersion != clusterRealizationSchema || len(realization.Members) == 0 {
-			return nil, "", nil, e.New(e.CodeVerifyFailed, "cluster %q realization is incomplete", bound.Name)
-		}
-		if _, err := canonical.Digest(canonical.KindClusterRealization, realization); err != nil {
-			return nil, "", nil, err
-		}
-		clusters = append(clusters, realization)
-		clusterPlans = append(clusterPlans, planned)
+		return nil, "", e.New(e.CodeVerifyFailed, "release content subject differs from authenticated output payloads")
 	}
 	expectedOutputs := make([]factory.LifecycleOutputPlan, 0, len(binding.Outputs))
 	boundOutputs := make([]factory.LifecycleBoundOutput, 0, len(binding.Outputs))
 	for _, output := range binding.Outputs {
-		expectedOutputs = append(expectedOutputs, factory.LifecycleOutputPlan{Name: output.Name,
-			RecipeDigest: output.RecipeDigest, Components: append([]string(nil), output.Components...)})
+		expectedOutputs = append(expectedOutputs, factory.LifecycleOutputPlan{Name: output.Name, Kind: output.Kind,
+			BuildDigest: output.BuildDigest, Components: append([]string(nil), output.Components...)})
 		boundOutputs = append(boundOutputs, output)
 	}
-	if err := factory.ValidateLifecycleRealizations(compositionPlans, expectedOutputs, clusterPlans, boundOutputs); err != nil {
-		return nil, "", nil, err
+	if err := factory.ValidateLifecycleOutputs(expectedOutputs, boundOutputs); err != nil {
+		return nil, "", err
 	}
 	evidenceCount := 0
 	if inspection.Root.Release != nil {
 		actual, err := delivery.Inspect(ctx, layoutPath)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", err
 		}
 		expectedDigest, err := inspection.Root.Digest()
 		if err != nil {
-			return nil, "", nil, err
+			return nil, "", err
 		}
 		actualDigest, err := actual.Root.Digest()
 		if err != nil || actualDigest != expectedDigest {
-			return nil, "", nil, e.New(e.CodeVerifyFailed, "release metadata differs from held layout")
+			return nil, "", e.New(e.CodeVerifyFailed, "release metadata differs from held layout")
 		}
 		for _, o := range actual.Root.Objects {
 			if o.Evidence != nil {
@@ -418,10 +367,10 @@ func artifactsFromBinding(ctx context.Context, layoutPath string, inspection del
 		}
 	}
 
-	if len(objects) != len(artifacts)+len(clusters)+evidenceCount {
-		return nil, "", nil, e.New(e.CodeVerifyFailed, "publication closure contains objects outside its lifecycle binding")
+	if len(objects) != len(artifacts)+evidenceCount {
+		return nil, "", e.New(e.CodeVerifyFailed, "publication closure contains objects outside its lifecycle binding")
 	}
-	return artifacts, contentSubject, clusters, nil
+	return artifacts, contentSubject, nil
 }
 
 func lifecyclePublishedKind(kind string) string {

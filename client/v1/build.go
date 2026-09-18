@@ -5,18 +5,18 @@ import (
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 )
 
-// RunRequest executes an already resolved graph. RecipeDigest is required and must
+// RunRequest executes an already resolved graph. BuildDigest is required and must
 // equal the graph's authoritative content digest.
 type RunRequest struct {
-	Graph        *ir.Graph
-	RecipeDigest string
-	Options      pipeline.RunOptions
+	Graph       *ir.Graph
+	BuildDigest string
+	Options     pipeline.RunOptions
 }
 
 // Run delegates graph execution to the injected runner while binding its context and
@@ -40,9 +40,9 @@ func (c *Client) Run(ctx context.Context, request RunRequest) (*pipeline.Report,
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(request.RecipeDigest) == "" || request.RecipeDigest != wantDigest {
+	if strings.TrimSpace(request.BuildDigest) == "" || request.BuildDigest != wantDigest {
 		return nil, e.New(e.CodeVerifyFailed,
-			"pipeline recipeDigest %q does not match graph digest %s", request.RecipeDigest, wantDigest)
+			"pipeline buildDigest %q does not match graph digest %s", request.BuildDigest, wantDigest)
 	}
 	if err := contextError(ctx, "pipeline run"); err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (c *Client) Run(ctx context.Context, request RunRequest) (*pipeline.Report,
 	if options.Runtime == "" {
 		options.Runtime = c.runtime
 	}
-	report, err := c.runner.Run(request.Graph, request.RecipeDigest, options)
+	report, err := c.runner.Run(request.Graph, request.BuildDigest, options)
 	if err != nil {
 		if report != nil {
 			_ = report.Close()
@@ -68,12 +68,11 @@ func (c *Client) Run(ctx context.Context, request RunRequest) (*pipeline.Report,
 	if report == nil {
 		return nil, e.New(e.CodeInternal, "pipeline runner %q returned no report", c.runner.Name())
 	}
-	if report.RecipeID != request.Graph.RecipeID || report.RecipeDigest != request.RecipeDigest {
+	if report.BuildDigest != request.BuildDigest {
 		_ = report.Close()
 		return nil, e.New(e.CodeVerifyFailed,
-			"pipeline runner %q returned report identity %q/%q, want %q/%q",
-			c.runner.Name(), report.RecipeID, report.RecipeDigest,
-			request.Graph.RecipeID, request.RecipeDigest)
+			"pipeline runner %q returned build identity %q, want %q",
+			c.runner.Name(), report.BuildDigest, request.BuildDigest)
 	}
 	if options.Qualification != nil {
 		if err := report.RequireQualified(ctx); err != nil {
@@ -90,7 +89,7 @@ func (c *Client) Run(ctx context.Context, request RunRequest) (*pipeline.Report,
 // publishable vector's canonical bytes.
 type ValidationVectorRequest struct {
 	Report            *pipeline.Report
-	Resolved          *recipe.Resolved
+	Resolved          *buildgraph.Resolved
 	Graph             *ir.Graph
 	PublisherEvidence *attest.PublisherEvidence
 	OutputName        string
@@ -120,7 +119,7 @@ func (c *Client) CreateValidationVector(ctx context.Context, request ValidationV
 	if publisherEvidence == nil && c.publisherEvidence != nil {
 		if request.Resolved == nil || request.Graph == nil {
 			return nil, e.New(e.CodeUsage,
-				"publisher-evidence authority requires the resolved recipe and graph")
+				"publisher-evidence authority requires the resolved producers and graph")
 		}
 		publisherEvidence, err = c.publisherEvidence.Qualify(ctx, PublisherEvidenceRequest{
 			Resolved: request.Resolved, Graph: request.Graph, Report: request.Report,

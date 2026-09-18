@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/recipe"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 	"github.com/urfave/cli/v2"
 )
@@ -17,21 +17,21 @@ import (
 // bytes produced a result, nor that networking was denied. Product integrations
 // may inject a release scanner through runVulnScanWithScanner; only QualifyScan can
 // issue the report capability.
-func runVulnScan(c *cli.Context, resolved *recipe.Resolved, recipeDigest string,
+func runVulnScan(c *cli.Context, resolved *buildgraph.Resolved, buildDigest string,
 	artifactHashes map[string]string,
 ) (string, error) {
 	return "", e.New(e.CodeUnsupported,
 		"qualified vulnerability scanning is disabled until a network-denied scanner adapter can report observed scanner and database identities")
 }
 
-func runVulnScanWithScanner(c *cli.Context, resolved *recipe.Resolved, recipeDigest string,
+func runVulnScanWithScanner(c *cli.Context, resolved *buildgraph.Resolved, buildDigest string,
 	artifactHashes map[string]string, scanner vuln.ReleaseScanner,
 ) (string, error) {
 	component, artifactDigest, err := selectVulnerabilitySubject(c.String("vuln-artifact"), artifactHashes)
 	if err != nil {
 		return "", err
 	}
-	verifiedSBOM, err := buildVerifiedSBOM(c.Context, resolved, recipeDigest, artifactHashes)
+	verifiedSBOM, err := buildVerifiedSBOM(c.Context, resolved, buildDigest, artifactHashes)
 	if err != nil {
 		return "", err
 	}
@@ -54,7 +54,7 @@ func runVulnScanWithScanner(c *cli.Context, resolved *recipe.Resolved, recipeDig
 	}
 	qualified, err := vuln.QualifyScan(c.Context, vuln.QualifiedScanRequest{
 		Scanner: c.String("vuln-scanner"), ScannerDigest: c.String("vuln-scanner-digest"),
-		DatabaseDigest: c.String("vuln-db"), RecipeDigest: recipeDigest,
+		DatabaseDigest: c.String("vuln-db"), BuildDigest: buildDigest,
 		ArtifactDigest: artifactDigest, SBOMDigest: sbomDigest, CanonicalSBOM: sbomBytes,
 	}, scanner)
 	if err != nil {

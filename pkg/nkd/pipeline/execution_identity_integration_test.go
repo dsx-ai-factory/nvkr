@@ -81,7 +81,7 @@ func qualifiedTerminalReport(t *testing.T) (*Report, string) {
 	t.Helper()
 	work := filepath.Join(t.TempDir(), "work")
 	node, opts, receipt := qualifiedResultOptions(t, filepath.Join(work, "src"))
-	graph, recipeDigest := qualifiedResultGraph(t, node)
+	graph, buildDigest := qualifiedResultGraph(t, node)
 	artifact := artifactHostPath(opts, node)
 	if err := os.MkdirAll(filepath.Dir(artifact), 0o755); err != nil {
 		t.Fatal(err)
@@ -100,7 +100,7 @@ func qualifiedTerminalReport(t *testing.T) (*Report, string) {
 		SHA256: digest, Size: size, ProfileDigest: receipt.ProfileDigest(),
 		ExecutionBinding: receipt.ExecutionBinding(),
 	})
-	report, err := (Local{}).VerifyResults(graph, recipeDigest, ResultDirectory(opts.SourceRoot), opts)
+	report, err := (Local{}).VerifyResults(graph, buildDigest, ResultDirectory(opts.SourceRoot), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestLocalQualificationFailurePrecedesArtifactWork(t *testing.T) {
 	p, host, nodes, _ := qualificationFixture(t)
 	fetch := testFetchNode("fetch-z", "https://example.invalid/source", nodes[0].SourceCommit,
 		nodes[0].SourceTreeHash, nodes[0].SourceDest, nodes[0].Toolchain, nodes[0].VendorSpecDigest)
-	graph := testSourceGraph("no-artifact-work", fetch, nodes[0])
+	graph := testSourceGraph(fetch, nodes[0])
 	digest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)
@@ -236,7 +236,7 @@ func TestStageTwoObservationRunsAfterTrustedFetchMaterialization(t *testing.T) {
 	build.SourceCommit = commit
 	build.SourceTreeHash = tree
 	build.VendorSpecDigest = fetch.VendorSpecDigest
-	graph := testSourceGraph("stage-two-order", fetch, build)
+	graph := testSourceGraph(fetch, build)
 	digest, err := graph.Digest()
 	if err != nil {
 		t.Fatal(err)

@@ -66,18 +66,18 @@ func checkMemberCompatibility(in *Inventory, set *ReleaseSet) error {
 			continue
 		}
 		for _, member := range set.Members {
-			if member.Component != required.Name || (required.Role != "" && member.Role != required.Role) {
+			if member.Component != required.Name {
 				continue
 			}
 			if strings.TrimSpace(member.Version) == "" {
-				return e.New(e.CodeCompatMismatch, "member %s/%s/%s has no version for inventory constraint %q", member.Component, member.Role, member.Arch, constraint)
+				return e.New(e.CodeCompatMismatch, "member %s/%s has no version for inventory constraint %q", member.Component, member.Arch, constraint)
 			}
 			matched, err := versionMatches(constraint, member.Version)
 			if err != nil {
 				return e.New(e.CodeCompatMismatch, "invalid version constraint %q for member %s: %v", constraint, required.Name, err)
 			}
 			if !matched {
-				return e.New(e.CodeCompatMismatch, "member %s/%s/%s version %q is outside inventory constraint %q", member.Component, member.Role, member.Arch, member.Version, constraint)
+				return e.New(e.CodeCompatMismatch, "member %s/%s version %q is outside inventory constraint %q", member.Component, member.Arch, member.Version, constraint)
 			}
 		}
 	}

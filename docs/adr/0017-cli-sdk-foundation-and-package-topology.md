@@ -20,28 +20,39 @@ in `main` or double-author types.
 
 ### 1. A `client/v1` SDK facade; deep modules remain authoritative
 
-The normal public objects are **Definition, Recipe, Environment, Run, Artifact, Release, and Verification
-Policy**. The main lifecycle is **Definition → Run → Release**. A cluster is a named view inside Definition and
-its exact realization inside Release; bundles are Artifact formats. Plans, graphs, inventories, vectors, release
+The six public objects are **Definition, Environment, Run, Artifact, Release, and Verification Policy**.
+The main lifecycle is **Definition → Run → Release**. Bundles are Artifact formats. Deployment topology
+belongs to the downstream deployment owner and is not part of the Definition or Release schema. Plans, graphs, inventories, vectors, release
 sets, clearance, publication roots, and qualification records are generated/authenticated internals available
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
-Definition declares reusable recipe selections and named outputs once. Each output selects exact components and
-format; the compiler derives routine package envelopes, required slots, and routes. Byte-changing transformations
-remain explicit. Ambiguous/duplicate selections, missing components, conflicting roles, and unsupported formats
-fail with coded errors. Existing catalog criteria remain explicit; recipe reuse does not require general product
-imports. Definitions are selected directly by file.
+Definition declares named outputs directly. Each output selects exact catalog components and a concrete target
+platform, or an explicit AICR profile and generator, together with its artifact format. An output may explicitly
+select another catalog. The compiler derives its complete pinned build graph, routine package envelopes,
+required slots, and routes. Byte-changing transformations remain explicit. Missing or duplicate selections,
+unsupported platforms and unsupported formats fail with coded errors before work.
+Definitions are selected directly by file. There is no authored Recipe, reusable selection group, criteria
+matching, mixin, or recipe overlay; legacy fields and layouts are rejected rather than converted implicitly.
 
-`format: disk-image` is an authoring contract for exactly one selected component, and its referenced
-RecipeSelection must use `criteria.category: os`. Plain and FDE outputs select different catalog components;
+`format: disk-image` is an authoring contract for exactly one selected catalog component. Disk producer
+admission is based on the catalog component's output type, disk metadata and builder contract, never a category
+or node role.
+Plain and FDE outputs select different catalog components;
 Definition has no disk variant, encryption boolean, build command, or Packer field. Catalog owns disk metadata
-and production details. In this first contract, Definition and catalog validation are supported, while Recipe
+and production details. In this first contract, Definition and catalog validation are supported, while build
 lowering and `run plan|local|generate` fail with `engine-capability` before graph construction, source access, or
 output work.
 
+AICR outputs may declare `aicr.bundle` renderer settings: deployer, storage class, node selectors, node
+tolerations and workload selectors. The compiler normalizes owned lists and records the effective settings,
+including explicit `deployer: helm` when omitted, in the generated AICR activation. These settings participate
+in Build identity and execution reads them directly from that activation. One output's settings cannot alter
+another output's rendering. Definition v4, Run/Release v3, and compiled graph/binding v3 records reject the
+retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
+
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
-(ADR-20). Output-affecting tools such as the AICR generator stay in the Recipe/composition identity they affect.
-Changing transport or signing configuration cannot silently change logical Recipe identity.
+(ADR-20). Output-affecting tools such as the AICR generator stay in the build identity they affect.
+Changing transport or signing configuration cannot silently change logical Build identity.
 
 `pkg/nkd/lifecycle` owns preparation, required/observed joins, Run persistence, generated release relationships,
 and consumer workflow. `factory` owns compilation/execution mechanics; existing domain modules retain their
@@ -50,12 +61,14 @@ with process configuration in functional options and per-call inputs in method a
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
 
 Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
-`--definition` and `--environment`; catalog and Recipe maintenance remain available. Backward compatibility is not required. Remove superseded authoring APIs and wire fixtures; retain
-internal mechanics only when the current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
+`--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
+available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
+is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
+current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
 policy (ADR-04), returning inspectable views plus a closeable capability. The reference selects the sole
 ADR-20 release index: delivery owns its one metadata/descriptor/evidence join; lifecycle projects named
-deliverables, exact sibling artifact references, and cluster realizations. Transport locators are excluded from
+deliverables, exact sibling artifact references, and the release content subject. Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
 
@@ -82,8 +95,7 @@ Catalog parsing and I/O use the same context-aware loading API.
 
 Finite generated workflows follow a value-returning interface: `pipeline.Emitter.Render(ctx, graph, digest)`
 returns the complete bytes after cancellation-aware rendering. It does not accept an arbitrary `io.Writer`,
-because a callback that blocks inside `Write` makes cancellation unenforceable. The writer-shaped `Emit` and
-`WriteGeneratedPipeline` entry points are fail-before-output migration tombstones.
+because a callback that blocks inside `Write` makes cancellation unenforceable.
 
 ### 3. Standard, replaceable external-interface seams
 
@@ -95,8 +107,10 @@ is no permissive production default that can manufacture authority.
 
 ### 4. Package topology and single-owner rule
 
-- A documented **single-owner package map** — `canonical`, `execution`, `ir`, `recipe`, `pipeline`, `attest`, `release`,
-  `status`, `provenance`, `sbom`, `vuln`, and `trust`. Each owns its schema, returns typed coded
+- A documented **single-owner package map** — `canonical`, `catalog`, `buildgraph`, `target`,
+  `aicr`, `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, and `trust`.
+  Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
+  target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
   own a competing schema, verifier, receipt constructor, or policy decision. Remaining multi-step command
   orchestration is migration debt tracked independently rather than declared absent.
@@ -117,6 +131,12 @@ Preparation freezes admitted Definition/Environment inputs and required slots be
 of attempt storage. Execution binds independently observed bytes and evidence; missing/conflicting/extra members
 fail completeness (ADR-05). A failed Run retains its original requirements and coded failure. Retry requires a
 new explicit attempt and cannot overwrite the previous observation. A completed descriptive Run is not clearance.
+
+Each named output is an independent required use. Equal Build Digests do not merge producer jobs, restore
+results, terminal observations or evidence. Joins bind the exact output and selected target as well as the
+Build Digest; a successful sibling cannot satisfy an output whose production or evidence is missing. Output
+names remain authenticated by the owning Plan and catalog producer records retain their own snapshot
+identity, even though output labels and non-output-affecting metadata are excluded from logical Build identity.
 
 Persisted Run descriptions cannot resume execution. Any future resume path must own locking, byte-CAS/no-replace,
 deterministic recovery and fsync; until implemented, reject resume. Dry-run admits the plan without creating an
@@ -172,6 +192,11 @@ catalog I/O; the independent disk-envelope decode lane does not require producer
 additionally prove pre-canceled/no-I/O admission, legacy-provider rejection, no-follow regular-file reads,
 file/aggregate byte ceilings, deterministic directory count/depth ceilings, and context-aware lock
 snapshot/update behavior.
+
+The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and
+Linux race tests provide contract evidence; repository checks are recorded in reconciliation. The
+[2026-09-17 local NKE build](../evidence/2026-09-17-direct-output-local-build.md) separately exercised direct
+output selection, production, loopback publication and recovered CLI execution with dry-run signing.
 
 End-to-end acceptance requires a separate consumer module using only `client/v1` to perform the complete
 authenticated resolve/results/evidence/release/publication flow, plus cancellation tests against every real

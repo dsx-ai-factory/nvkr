@@ -15,7 +15,7 @@
 
 ## Context
 
-The SRD requires that a published recipe or release be **immutable** — a correction is a **new signed identity,
+The SRD requires that a published build or release be **immutable** — a correction is a **new signed identity,
 never a mutation** — and that a publisher be able to **supersede, deprecate, or withdraw** a release **without
 modifying** the original publication or its evidence. This must hold with **no NVIDIA-hosted service** and only
 standard interfaces.
@@ -30,8 +30,8 @@ status. The status path therefore needs its own authenticated freshness and anti
 
 ### 1. Publication identity via content-addressing (no maintained ledger)
 
-`publicationIdentity = Digest("publication", <signed ValidationVector / ReleaseSet>)`, **distinct** from
-`recipeDigest`, which covers only the compiled graph — two profiles or manifests over one Resolved Recipe would
+`publicationIdentity = Digest("nkd.publication", <exact canonical ValidationVector / ReleaseSet>)`, **distinct** from
+`buildDigest`, which covers only the compiled graph's logical projection — two profiles or manifests over one graph would
 otherwise collide. Immutability needs no ledger: a publication *is* its digest, so any byte change is a
 **different publication**. Registry listing is a discovery aid; the signed objects and their transparency
 inclusion are the auditable record. Freshness comes from §4's status checkpoints, never from assuming the listing

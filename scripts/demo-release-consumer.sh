@@ -22,7 +22,7 @@ Usage: scripts/demo-release-consumer.sh [options]
 Verify one digest-pinned lifecycle publication under an explicit
 pipeline-attested/artifact-publication Verification Policy. The consumer checks
 the exact signature, provenance attestation subject, signer identity and issuer,
-publication closure, named Artifacts, and cluster views before returning a
+publication closure, named Artifacts, and exact evidence membership before returning a
 Release capability scoped to artifact-publication. This does not establish
 qualification verdicts, a release manifest, revocation status, or deployment acceptance.
 

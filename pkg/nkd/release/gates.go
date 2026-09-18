@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	ReproductionSchemaVersion  = "nkd.dev/reproduction-result/v1"
-	CompatibilitySchemaVersion = "nkd.dev/compatibility-result/v1"
+	ReproductionSchemaVersion  = "nkd.dev/reproduction-result/v3"
+	CompatibilitySchemaVersion = "nkd.dev/compatibility-result/v2"
 )
 
 // ReceiptRole is a closed trust-policy role passed to the authentication seam.
@@ -69,9 +69,8 @@ type ReproductionResult struct {
 	SchemaVersion       string   `json:"schemaVersion"`
 	ReleaseSetDigest    string   `json:"releaseSetDigest"`
 	Component           string   `json:"component"`
-	Role                string   `json:"role,omitempty"`
 	Arch                string   `json:"arch"`
-	RecipeDigest        string   `json:"recipeDigest"`
+	BuildDigest         string   `json:"buildDigest"`
 	VectorDigest        string   `json:"vectorDigest"`
 	ProfileDigest       string   `json:"profileDigest,omitempty"`
 	ProfileIndependent  bool     `json:"profileIndependent,omitempty"`
@@ -91,8 +90,8 @@ func (result ReproductionResult) Validate() error {
 	if result.SchemaVersion != ReproductionSchemaVersion {
 		return e.New(e.CodeInvalidCatalog, "reproduction schemaVersion %q is unsupported (want %q)", result.SchemaVersion, ReproductionSchemaVersion)
 	}
-	if !isDigest(result.ReleaseSetDigest) || !isDigest(result.RecipeDigest) || !isDigest(result.VectorDigest) || !isDigest(result.ResolvedInputDigest) {
-		return e.New(e.CodeUnverifiedRef, "reproduction result must bind exact release-set, recipe, vector, and resolved-input digests")
+	if !isDigest(result.ReleaseSetDigest) || !isDigest(result.BuildDigest) || !isDigest(result.VectorDigest) || !isDigest(result.ResolvedInputDigest) {
+		return e.New(e.CodeUnverifiedRef, "reproduction result must bind exact release-set, build, vector, and resolved-input digests")
 	}
 	if strings.TrimSpace(result.Component) == "" || strings.TrimSpace(result.Arch) == "" {
 		return e.New(e.CodeInvalidCatalog, "reproduction result requires component and architecture")
@@ -189,7 +188,7 @@ type CompatibilityResult struct {
 	InventoryDigest           string              `json:"inventoryDigest"`
 	CompatibilityPolicyDigest string              `json:"compatibilityPolicyDigest"`
 	Target                    CompatibilityTarget `json:"target"`
-	RecipeDigests             []string            `json:"recipeDigests"`
+	BuildDigests              []string            `json:"buildDigests"`
 	VectorDigests             []string            `json:"vectorDigests"`
 	ArtifactDigests           []string            `json:"artifactDigests"`
 	Verdict                   string              `json:"verdict"`
@@ -198,7 +197,7 @@ type CompatibilityResult struct {
 }
 
 func (result CompatibilityResult) normalized() CompatibilityResult {
-	result.RecipeDigests = sortedStrings(result.RecipeDigests)
+	result.BuildDigests = sortedStrings(result.BuildDigests)
 	result.VectorDigests = sortedStrings(result.VectorDigests)
 	result.ArtifactDigests = sortedStrings(result.ArtifactDigests)
 	return result
@@ -211,7 +210,7 @@ func (result CompatibilityResult) Validate() error {
 	if !isDigest(result.ReleaseSetDigest) || !isDigest(result.InventoryDigest) || !isDigest(result.CompatibilityPolicyDigest) {
 		return e.New(e.CodeUnverifiedRef, "compatibility result must bind exact release-set, inventory, and policy digests")
 	}
-	if err := validateExactDigestSet("compatibility recipe", result.RecipeDigests, false); err != nil {
+	if err := validateExactDigestSet("compatibility build", result.BuildDigests, false); err != nil {
 		return err
 	}
 	if err := validateExactDigestSet("compatibility vector", result.VectorDigests, false); err != nil {
@@ -265,9 +264,9 @@ func VerifyCompatibility(ctx context.Context, result CompatibilityResult, signat
 	if result.ReleaseSetDigest != release.digest || result.InventoryDigest != invDigest || release.set.InventoryRef != invDigest {
 		return CompatibilityReceipt{}, e.New(e.CodeGateUnmet, "compatibility result is not bound to the exact release set and inventory")
 	}
-	recipes, vectors, artifacts := releaseIdentitySets(release.set.Members)
-	if !reflect.DeepEqual(result.RecipeDigests, recipes) || !reflect.DeepEqual(result.VectorDigests, vectors) || !reflect.DeepEqual(result.ArtifactDigests, artifacts) {
-		return CompatibilityReceipt{}, e.New(e.CodeGateUnmet, "compatibility result does not exhaustively bind release recipes, vectors, and artifacts")
+	builds, vectors, artifacts := releaseIdentitySets(release.set.Members)
+	if !reflect.DeepEqual(result.BuildDigests, builds) || !reflect.DeepEqual(result.VectorDigests, vectors) || !reflect.DeepEqual(result.ArtifactDigests, artifacts) {
+		return CompatibilityReceipt{}, e.New(e.CodeGateUnmet, "compatibility result does not exhaustively bind release builds, vectors, and artifacts")
 	}
 	if result.Verdict == CompatibilityAccepted {
 		if err := CheckCompatibility(inventory, result.Target); err != nil {
@@ -301,19 +300,19 @@ func VerifyCompatibility(ctx context.Context, result CompatibilityResult, signat
 
 func reproductionMatchesMember(result ReproductionResult, member Member) bool {
 	profileMatches := (member.ProfileDigest == "" && result.ProfileIndependent && result.ProfileDigest == "") || (member.ProfileDigest != "" && !result.ProfileIndependent && result.ProfileDigest == member.ProfileDigest)
-	return result.Component == member.Component && result.Role == member.Role && result.Arch == member.Arch && result.RecipeDigest == member.RecipeDigest && result.VectorDigest == member.VectorDigest && result.ResolvedInputDigest == member.ResolvedInputDigest && profileMatches && reflect.DeepEqual(result.ArtifactDigests, sortedStrings(member.ArtifactDigests))
+	return result.Component == member.Component && result.Arch == member.Arch && result.BuildDigest == member.BuildDigest && result.VectorDigest == member.VectorDigest && result.ResolvedInputDigest == member.ResolvedInputDigest && profileMatches && reflect.DeepEqual(result.ArtifactDigests, sortedStrings(member.ArtifactDigests))
 }
 
-func releaseIdentitySets(members []Member) (recipes, vectors, artifacts []string) {
-	recipeSet, vectorSet, artifactSet := map[string]bool{}, map[string]bool{}, map[string]bool{}
+func releaseIdentitySets(members []Member) (builds, vectors, artifacts []string) {
+	buildSet, vectorSet, artifactSet := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, member := range members {
-		recipeSet[member.RecipeDigest] = true
+		buildSet[member.BuildDigest] = true
 		vectorSet[member.VectorDigest] = true
 		for _, artifact := range member.ArtifactDigests {
 			artifactSet[artifact] = true
 		}
 	}
-	return sortedKeys(recipeSet), sortedKeys(vectorSet), sortedKeys(artifactSet)
+	return sortedKeys(buildSet), sortedKeys(vectorSet), sortedKeys(artifactSet)
 }
 
 func validateExactDigestSet(name string, values []string, allowEmpty bool) error {

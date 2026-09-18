@@ -11,7 +11,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
-const PublisherEvidenceSchemaVersion = "nkd.dev/publisher-evidence/v1"
+const PublisherEvidenceSchemaVersion = "nkd.dev/publisher-evidence/v2"
 
 // publisherEvidenceRow is the exact artifact scope of both locally generated
 // evidence families. Semantic identities and transport blob digests are both bound
@@ -29,7 +29,7 @@ type publisherEvidenceRow struct {
 
 type publisherEvidenceCore struct {
 	SchemaVersion         string                 `json:"schemaVersion"`
-	RecipeDigest          string                 `json:"recipeDigest"`
+	BuildDigest           string                 `json:"buildDigest"`
 	SBOMIndexDigest       string                 `json:"sbomIndexDigest"`
 	ProvenanceIndexDigest string                 `json:"provenanceIndexDigest"`
 	Artifacts             []publisherEvidenceRow `json:"artifacts"`
@@ -54,7 +54,7 @@ type PublisherEvidenceArtifactBinding struct {
 // not itself an authority capability.
 type PublisherEvidenceBinding struct {
 	SchemaVersion         string                             `json:"schemaVersion"`
-	RecipeDigest          string                             `json:"recipeDigest"`
+	BuildDigest           string                             `json:"buildDigest"`
 	SBOMIndexDigest       string                             `json:"sbomIndexDigest"`
 	ProvenanceIndexDigest string                             `json:"provenanceIndexDigest"`
 	EvidenceDigest        string                             `json:"evidenceDigest"`
@@ -66,14 +66,14 @@ type PublisherEvidenceBinding struct {
 // independently authenticated vector/clearance containing the binding.
 func (binding PublisherEvidenceBinding) Validate() error {
 	if binding.SchemaVersion != PublisherEvidenceSchemaVersion ||
-		!canonical.IsDigest(binding.RecipeDigest) ||
+		!canonical.IsDigest(binding.BuildDigest) ||
 		!canonical.IsDigest(binding.SBOMIndexDigest) ||
 		!canonical.IsDigest(binding.ProvenanceIndexDigest) ||
 		!canonical.IsDigest(binding.EvidenceDigest) || len(binding.Artifacts) == 0 {
 		return e.New(e.CodeUnverifiedRef, "publisher evidence binding is incomplete")
 	}
 	core := publisherEvidenceCore{SchemaVersion: binding.SchemaVersion,
-		RecipeDigest: binding.RecipeDigest, SBOMIndexDigest: binding.SBOMIndexDigest,
+		BuildDigest: binding.BuildDigest, SBOMIndexDigest: binding.SBOMIndexDigest,
 		ProvenanceIndexDigest: binding.ProvenanceIndexDigest}
 	for index, row := range binding.Artifacts {
 		if strings.TrimSpace(row.Component) == "" || strings.TrimSpace(row.Component) != row.Component ||
@@ -110,7 +110,7 @@ type PublisherEvidence struct {
 }
 
 // QualifyPublisherEvidence joins locally generated SBOM and provenance capabilities
-// by exact recipe, component, and artifact digest. Caller strings never select the
+// by exact build, component, and artifact digest. Caller strings never select the
 // aggregate evidenceDigest.
 func QualifyPublisherEvidence(ctx context.Context, sboms *sbom.VerifiedSet,
 	provenanceSet *provenance.QualifiedSet,
@@ -129,10 +129,10 @@ func QualifyPublisherEvidence(ctx context.Context, sboms *sbom.VerifiedSet,
 	if err != nil {
 		return nil, err
 	}
-	if sbomIndex.RecipeDigest != provenanceIndex.RecipeDigest {
+	if sbomIndex.BuildDigest != provenanceIndex.BuildDigest {
 		return nil, e.New(e.CodeUnverifiedRef,
-			"publisher SBOM recipe %s does not match provenance recipe %s",
-			sbomIndex.RecipeDigest, provenanceIndex.RecipeDigest)
+			"publisher SBOM build %s does not match provenance build %s",
+			sbomIndex.BuildDigest, provenanceIndex.BuildDigest)
 	}
 	sbomIndexDigest, err := sbomIndex.Digest()
 	if err != nil {
@@ -208,7 +208,7 @@ func QualifyPublisherEvidenceReceipts(ctx context.Context, sbomReceipts []sbom.L
 			return nil, err
 		}
 		entry, ok := provenanceByComponent[sbomBinding.Component]
-		if !ok || entry.binding.RecipeDigest != sbomBinding.RecipeDigest ||
+		if !ok || entry.binding.BuildDigest != sbomBinding.BuildDigest ||
 			entry.binding.ArtifactDigest != sbomBinding.ArtifactDigest {
 			return nil, e.New(e.CodeUnverifiedRef,
 				"publisher evidence does not bind the same exact subject for component %q",
@@ -223,17 +223,17 @@ func QualifyPublisherEvidenceReceipts(ctx context.Context, sbomReceipts []sbom.L
 			"publisher provenance contains subjects absent from the SBOM set")
 	}
 	sort.Slice(pairs, func(i, j int) bool { return pairs[i].sbomBinding.Component < pairs[j].sbomBinding.Component })
-	recipeDigest := pairs[0].sbomBinding.RecipeDigest
-	sbomIndex := &sbom.Index{SchemaVersion: sbom.IndexSchemaVersion, RecipeDigest: recipeDigest}
-	provenanceIndex := &provenance.Index{SchemaVersion: provenance.IndexSchemaVersion, RecipeDigest: recipeDigest}
-	core := publisherEvidenceCore{SchemaVersion: PublisherEvidenceSchemaVersion, RecipeDigest: recipeDigest}
+	buildDigest := pairs[0].sbomBinding.BuildDigest
+	sbomIndex := &sbom.Index{SchemaVersion: sbom.IndexSchemaVersion, BuildDigest: buildDigest}
+	provenanceIndex := &provenance.Index{SchemaVersion: provenance.IndexSchemaVersion, BuildDigest: buildDigest}
+	core := publisherEvidenceCore{SchemaVersion: PublisherEvidenceSchemaVersion, BuildDigest: buildDigest}
 	sortedSBOMReceipts := make([]sbom.LocalEvidenceReceipt, 0, len(pairs))
 	sortedProvenanceReceipts := make([]provenance.LocalEvidenceReceipt, 0, len(pairs))
 	for index, item := range pairs {
-		if item.sbomBinding.RecipeDigest != recipeDigest || item.provenanceBinding.RecipeDigest != recipeDigest ||
+		if item.sbomBinding.BuildDigest != buildDigest || item.provenanceBinding.BuildDigest != buildDigest ||
 			(index > 0 && pairs[index-1].sbomBinding.Component >= item.sbomBinding.Component) {
 			return nil, e.New(e.CodeUnverifiedRef,
-				"publisher evidence receipts do not form one canonical recipe-scoped set")
+				"publisher evidence receipts do not form one canonical build-scoped set")
 		}
 		statementBytes, err := item.provenanceReceipt.ExactBytes()
 		if err != nil {
@@ -278,7 +278,7 @@ func QualifyPublisherEvidenceReceipts(ctx context.Context, sbomReceipts []sbom.L
 
 func (evidence *PublisherEvidence) validate() error {
 	if evidence == nil || !evidence.valid || evidence.core.SchemaVersion != PublisherEvidenceSchemaVersion ||
-		!canonical.IsDigest(evidence.core.RecipeDigest) || !canonical.IsDigest(evidence.digest) ||
+		!canonical.IsDigest(evidence.core.BuildDigest) || !canonical.IsDigest(evidence.digest) ||
 		len(evidence.core.Artifacts) == 0 {
 		return e.New(e.CodeProvenanceMissing,
 			"publisher evidence capability is absent or invalid")
@@ -335,7 +335,7 @@ func (evidence *PublisherEvidence) Binding() (PublisherEvidenceBinding, error) {
 		return PublisherEvidenceBinding{}, err
 	}
 	binding := PublisherEvidenceBinding{
-		SchemaVersion: evidence.core.SchemaVersion, RecipeDigest: evidence.core.RecipeDigest,
+		SchemaVersion: evidence.core.SchemaVersion, BuildDigest: evidence.core.BuildDigest,
 		SBOMIndexDigest:       evidence.core.SBOMIndexDigest,
 		ProvenanceIndexDigest: evidence.core.ProvenanceIndexDigest,
 		EvidenceDigest:        evidence.digest,
@@ -371,7 +371,7 @@ func (evidence *PublisherEvidence) VerifyAgainstPublishedVector(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	if local.RecipeDigest != published.RecipeDigest ||
+	if local.BuildDigest != published.BuildDigest ||
 		local.SBOMIndexDigest != published.SBOMIndexDigest ||
 		local.ProvenanceIndexDigest != published.ProvenanceIndexDigest ||
 		local.EvidenceDigest != published.PublisherEvidenceDigest {
@@ -414,10 +414,10 @@ func (evidence *PublisherEvidence) bindManifest(manifest *Manifest) error {
 	if err := evidence.validate(); err != nil {
 		return err
 	}
-	if manifest == nil || manifest.RecipeDigest != evidence.core.RecipeDigest ||
+	if manifest == nil || manifest.BuildDigest != evidence.core.BuildDigest ||
 		len(manifest.Components) != len(evidence.core.Artifacts) {
 		return e.New(e.CodeUnverifiedRef,
-			"publisher evidence does not cover the validation vector's exact recipe/artifact set")
+			"publisher evidence does not cover the validation vector's exact build/artifact set")
 	}
 	for index, component := range manifest.Components {
 		row := evidence.core.Artifacts[index]

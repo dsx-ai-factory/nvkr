@@ -9,11 +9,11 @@ import (
 )
 
 // NewSubject starts a packaging-stage document without inventing upstream source
-// metadata. The recipe identity and inspected package bytes are its inputs.
-func NewSubject(recipeDigest, name, digest string) (*BOM, error) {
-	bom := &BOM{BOMFormat: bomFormat, SpecVersion: specVersion, Version: 1, SerialNumber: deriveURN(recipeDigest + "/" + name), Metadata: Metadata{
+// metadata. The build identity and inspected package bytes are its inputs.
+func NewSubject(buildDigest, name, digest string) (*BOM, error) {
+	bom := &BOM{BOMFormat: bomFormat, SpecVersion: specVersion, Version: 1, SerialNumber: deriveURN(buildDigest + "/" + name), Metadata: Metadata{
 		Component: Component{Type: "application", Name: name, Hashes: []Hash{{Alg: "SHA-256", Content: strings.TrimPrefix(digest, "sha256:")}}},
-		Tools:     []ToolRef{{Vendor: "NVIDIA", Name: "nkdctl"}}, Props: []Property{{Name: "nkd:artifact", Value: name}, {Name: "nkd:recipeDigest", Value: recipeDigest}},
+		Tools:     []ToolRef{{Vendor: "NVIDIA", Name: "nkdctl"}}, Props: []Property{{Name: "nkd:artifact", Value: name}, {Name: "nkd:buildDigest", Value: buildDigest}},
 	}}
 	if !canonical.IsDigest(digest) {
 		return nil, e.New(e.CodeUnverifiedRef, "SBOM subject requires an exact digest")
@@ -35,7 +35,7 @@ func ForSubject(bom *BOM, digest, stage, inputDigest string) (*BOM, error) {
 		return nil, e.New(e.CodeUnverifiedRef, "SBOM stage/subject binding is invalid")
 	}
 	result := cloneBOM(bom)
-	recipe, artifact, err := metadataBindings(result.Metadata.Props)
+	build, artifact, err := metadataBindings(result.Metadata.Props)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func ForSubject(bom *BOM, digest, stage, inputDigest string) (*BOM, error) {
 		result.Metadata.Props = append(result.Metadata.Props, Property{Name: "nkd:inspectionInputDigest", Value: inputDigest})
 	}
 	sort.Slice(result.Metadata.Props, func(i, j int) bool { return result.Metadata.Props[i].Name < result.Metadata.Props[j].Name })
-	result.SerialNumber, err = stageSerialNumber(recipe, artifact, stage, digest)
+	result.SerialNumber, err = stageSerialNumber(build, artifact, stage, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -73,13 +73,13 @@ func validEvidenceStage(stage string) bool {
 	return stage == "build-output" || stage == "source-build" || stage == "packaging"
 }
 
-func stageSerialNumber(recipe, artifact, stage, digest string) (string, error) {
+func stageSerialNumber(build, artifact, stage, digest string) (string, error) {
 	identity, err := canonical.Digest(canonical.KindSBOM, struct {
-		Recipe   string `json:"recipe"`
+		Build    string `json:"build"`
 		Artifact string `json:"artifact"`
 		Stage    string `json:"stage"`
 		Subject  string `json:"subject"`
-	}{recipe, artifact, stage, digest})
+	}{build, artifact, stage, digest})
 	if err != nil {
 		return "", err
 	}

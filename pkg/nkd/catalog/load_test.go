@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/compose"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -41,13 +39,12 @@ const (
 
 func base(c Component) *Catalog {
 	return &Catalog{
-		Recipes:    []Recipe{{ID: "r", Criteria: criteria.Criteria{Category: "kubernetes"}, Components: []string{"x"}}},
 		Components: map[string]Component{"x": c},
 	}
 }
 
 func goodComponent() Component {
-	return Component{
+	return Component{Platforms: []string{"linux/amd64"},
 		FromSource: true, Repo: "https://github.com/kubernetes/kubernetes",
 		Commit: goodCommit, TreeHash: goodTree, ToolchainImage: goodImage,
 		OutputType: "host-package", BuildCommand: []string{"make"},
@@ -55,41 +52,25 @@ func goodComponent() Component {
 	}
 }
 
-func TestLayeredKubernetesFixtureValidates(t *testing.T) {
+func TestKubernetesProducerFixtureValidates(t *testing.T) {
 	if _, err := LoadContext(context.Background(), Dir("../../../testdata/catalogs/kubernetes-layered")); err != nil {
-		t.Fatalf("layered Kubernetes fixture must load and validate: %v", err)
+		t.Fatalf("Kubernetes producer fixture must load and validate: %v", err)
 	}
 }
 
-func TestValidateAllowsOnlyAICRRecipesToBeActivationOnly(t *testing.T) {
+func TestValidateAllowsAICRProfileOnlyCatalog(t *testing.T) {
 	profile := &AICRProfile{
 		Identity: "h100-eks-ubuntu-training",
 		Digest:   "sha256:" + strings.Repeat("a", 64), GeneratorDigest: "sha256:" + strings.Repeat("b", 64),
 		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
 	}
-	cat := &Catalog{Recipes: []Recipe{{
-		ID: "accelerated-runtime", Criteria: criteria.Criteria{Category: "accelerated-runtime", OS: "ubuntu"},
-		AICRProfile: profile,
-	}}}
+	cat := &Catalog{AICRProfiles: map[string]AICRProfile{"accelerated-runtime": *profile}}
 	if err := cat.Validate(); err != nil {
-		t.Fatalf("activation-only AICR recipe must validate: %v", err)
+		t.Fatalf("profile-only AICR catalog must validate: %v", err)
 	}
-	cat.Recipes[0].AICRProfile = nil
+	cat.AICRProfiles = nil
 	if err := cat.Validate(); err == nil {
-		t.Fatal("ordinary empty recipe was accepted")
-	}
-}
-
-func TestValidateLayeredCatalogRequiresConcreteCategoryRecipe(t *testing.T) {
-	cat := base(goodComponent())
-	cat.Recipes = nil
-	cat.Layers = &compose.Store{
-		Base: &compose.RecipeMetadata{}, Overlays: map[string]*compose.RecipeMetadata{},
-	}
-	if err := cat.Validate(); err == nil {
-		t.Fatal("base-only layered catalog validated without a resolvable category")
-	} else if coded, ok := err.(*nkderr.Error); !ok || coded.Code != nkderr.CodeInvalidCatalog {
-		t.Fatalf("base-only layered catalog returned %v", err)
+		t.Fatal("empty catalog was accepted")
 	}
 }
 
@@ -205,12 +186,12 @@ func TestArchTokenAccepted(t *testing.T) {
 
 func TestExclusionMustBeDeclared(t *testing.T) {
 	// Tier-4: not from source and no reason -> fail closed (NKD-FR-RC-026).
-	err := base(Component{FromSource: false}).Validate()
+	err := base(Component{Platforms: []string{"linux/amd64"}, FromSource: false}).Validate()
 	if e, ok := err.(*nkderr.Error); !ok || e.Code != nkderr.CodeInvalidCatalog {
 		t.Fatalf("undeclared exclusion must fail: %v", err)
 	}
 	// with a reason it is accepted as a declared exception.
-	if err := base(Component{FromSource: false, ExclusionReason: "proprietary CSI"}).Validate(); err != nil {
+	if err := base(Component{Platforms: []string{"linux/amd64"}, FromSource: false, ExclusionReason: "proprietary CSI"}).Validate(); err != nil {
 		t.Fatalf("declared exclusion should validate: %v", err)
 	}
 }
@@ -218,65 +199,15 @@ func TestExclusionMustBeDeclared(t *testing.T) {
 // Composition (base/overlays/mixins) is a retained-but-inert v1 hook: the fields
 // are recognized (not stripped) but any populated value fails closed rather than
 // being silently flattened (NKD-FR-RC-014/015, NKD-CON-017).
-func TestCompositionHookFailsClosed(t *testing.T) {
-	for _, mut := range []func(*Recipe){
-		func(r *Recipe) { r.Base = "base-node" },
-		func(r *Recipe) { r.Overlays = []string{"gpu"} },
-		func(r *Recipe) { r.Mixins = []string{"audit"} },
-	} {
-		cat := base(goodComponent())
-		mut(&cat.Recipes[0])
-		if e, ok := cat.Validate().(*nkderr.Error); !ok || e.Code != nkderr.CodeUnsupported {
-			t.Fatalf("populated composition field must fail closed with CodeUnsupported, got %v", cat.Validate())
-		}
-	}
-	// A flat recipe (no composition fields) validates.
-	if err := base(goodComponent()).Validate(); err != nil {
-		t.Fatalf("flat v1 recipe must validate: %v", err)
-	}
-}
-
-func TestReservedAxisInRecipeFailsClosed(t *testing.T) {
-	cat := base(goodComponent())
-	cat.Recipes[0].Reserved = map[string]string{"compliance": "fips"}
-	if e, ok := cat.Validate().(*nkderr.Error); !ok || e.Code != nkderr.CodeReservedAxis {
-		t.Fatal("reserved axis in a recipe must fail closed")
-	}
-}
-
-func TestRecipeCannotUseCompositionAxesForSelection(t *testing.T) {
-	for _, pattern := range []criteria.Criteria{
-		{Category: "kubernetes", Role: "worker"},
-		{Category: "kubernetes", ClusterType: "tenant"},
-	} {
-		cat := base(goodComponent())
-		cat.Recipes[0].Criteria = pattern
-		if err := cat.Validate(); codeOf(err) != nkderr.CodeInvalidCatalog {
-			t.Fatalf("composition criteria %+v must fail closed, got %v", pattern, err)
-		}
-	}
-}
-
-func TestAICRProfileOnlyValidOnAcceleratedRuntime(t *testing.T) {
-	cat := base(goodComponent())
-	cat.Recipes[0].AICRProfile = &AICRProfile{
-		Identity: "h100-eks", Digest: "sha256:" + strings.Repeat("a", 64), GeneratorDigest: "sha256:" + strings.Repeat("b", 64),
-		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-	}
-	if err := cat.Validate(); codeOf(err) != nkderr.CodeInvalidCatalog {
-		t.Fatalf("AICR profile on a non-accelerated category must fail closed, got %v", err)
-	}
-}
 
 func TestAICRProfileRequiresPinnedGeneratorBytes(t *testing.T) {
 	makeCatalog := func(generatorDigest string) *Catalog {
 		cat := base(goodComponent())
-		cat.Recipes[0].Criteria.Category = "accelerated-runtime"
-		cat.Recipes[0].AICRProfile = &AICRProfile{
+		cat.AICRProfiles = map[string]AICRProfile{"accelerated-runtime": {
 			Identity: "h100-eks", Digest: "sha256:" + strings.Repeat("a", 64),
 			GeneratorDigest: generatorDigest,
 			Service:         "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-		}
+		}}
 		return cat
 	}
 	for _, digest := range []string{"", "sha256:short", "sha256:" + strings.Repeat("A", 64)} {
@@ -289,39 +220,6 @@ func TestAICRProfileRequiresPinnedGeneratorBytes(t *testing.T) {
 	}
 }
 
-// A reserved axis written inline in a recipe's criteria: block must fail closed at
-// parse time (strict decode), not be silently dropped and treated as a wildcard.
-func TestStrictParseRejectsInlineReservedAxis(t *testing.T) {
-	doc := `apiVersion: nkd.dev/catalog/v1
-kind: SourceBuildRegistry
-recipes:
-  - id: r
-    criteria: {role: worker, compliance: fips}
-    components: [x]
-components:
-  x:
-    fromSource: false
-    exclusionReason: test
-`
-	_, err := LoadContext(context.Background(), bytesProvider{RegistryFile: []byte(doc)})
-	if e, ok := err.(*nkderr.Error); !ok || e.Code != nkderr.CodeInvalidCatalog {
-		t.Fatalf("inline reserved axis must fail closed at parse, got %v", err)
-	}
-	// a typo'd active axis is likewise rejected rather than silently wildcarded.
-	typo := `apiVersion: nkd.dev/catalog/v1
-kind: SourceBuildRegistry
-recipes:
-  - id: r
-    criteria: {rol: worker}
-    components: [x]
-components:
-  x: {fromSource: false, exclusionReason: test}
-`
-	if _, err := LoadContext(context.Background(), bytesProvider{RegistryFile: []byte(typo)}); err == nil {
-		t.Fatal("typo'd active axis must be rejected by strict decode")
-	}
-}
-
 func TestUpdateReadersValidateSourceDeclarations(t *testing.T) {
 	cases := []string{
 		`{repo: ../mutable-checkout, toolchainImage: ` + goodImage + `}`,
@@ -330,10 +228,10 @@ func TestUpdateReadersValidateSourceDeclarations(t *testing.T) {
 		`{repo: https://github.com/o/r, toolchainImagesByArch: {riscv64: ` + goodImage + `}}`,
 	}
 	for _, source := range cases {
-		doc := `apiVersion: nkd.dev/catalog/v1
+		doc := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources: {s: ` + source + `}
-components: {x: {fromSource: false, exclusionReason: test}}
+components: {x: {platforms: [linux/amd64], fromSource: false, exclusionReason: test}}
 `
 		if _, err := ReadSourcesContext(context.Background(), bytesProvider{RegistryFile: []byte(doc)}); err == nil {
 			t.Fatalf("update-only source reader accepted invalid declaration %s", source)
@@ -345,14 +243,13 @@ components: {x: {fromSource: false, exclusionReason: test}}
 // pin merge into the concrete component and the version-stamp templates render from
 // the pin. This is the --data path and the churn-decoupling in one test.
 func TestLoadResolvesSourceAndRendersStamps(t *testing.T) {
-	reg := `apiVersion: nkd.dev/catalog/v1
+	reg := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   s: {repo: https://github.com/o/r, toolchainImage: ` + goodImage + `}
-recipes:
-  - {id: r, versionFrom: s, criteria: {category: kubernetes}, components: [c]}
 components:
   c:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: s
     outputType: host-package
@@ -376,22 +273,18 @@ pins:
 	if c.VersionStamp["V"] != "v1.32.0" || c.VersionStamp["C"] != goodCommit || c.VersionStamp["MM"] != "1.32" {
 		t.Fatalf("stamps not rendered from pin: %v", c.VersionStamp)
 	}
-	if cat.Recipes[0].Criteria.K8sVersion != "1.32.0" {
-		t.Fatalf("versionFrom did not fill k8sVersion: %q", cat.Recipes[0].Criteria.K8sVersion)
-	}
 }
 
 func TestLoadResolvesAndAuthenticatesPatchBytes(t *testing.T) {
 	patch := []byte("diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n")
 	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(patch))
-	reg := `apiVersion: nkd.dev/catalog/v1
+	reg := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   s: {repo: https://github.com/o/r, toolchainImage: ` + goodImage + `}
-recipes:
-  - {id: r, criteria: {category: kubernetes}, components: [c]}
 components:
   c:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: s
     outputType: host-package
@@ -424,10 +317,11 @@ pins:
 }
 
 func TestRegistryCannotAuthorResolvedPatchContentInline(t *testing.T) {
-	doc := `apiVersion: nkd.dev/catalog/v1
+	doc := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 components:
   x:
+    platforms: [linux/amd64, linux/arm64]
     fromSource: false
     exclusionReason: test
     patches: [{name: p.patch, sha256: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, content: forged}]
@@ -448,12 +342,11 @@ func codeOf(err error) nkderr.Code {
 // source's explicit digest; with neither, the component is unpinned.
 func TestToolchainFromPinPrecedence(t *testing.T) {
 	const pinTC = "golang@sha256:59b8183301af6dc358c9258d7b2ab0ee1a9363618552334fb3b160d454cbda72"
-	reg := `apiVersion: nkd.dev/catalog/v1
+	reg := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources: {s: {repo: https://github.com/o/r, toolchainBaseImage: golang}}
-recipes: [{id: r, criteria: {category: kubernetes}, components: [c]}]
 components:
-  c: {fromSource: true, source: s, outputType: host-package, buildCommand: [make], artifactPath: bin/c}
+  c: {platforms: [linux/amd64, linux/arm64], fromSource: true, source: s, outputType: host-package, buildCommand: [make], artifactPath: bin/c}
 `
 	lock := `apiVersion: nkd.dev/lock/v1
 kind: PinLock
@@ -471,12 +364,11 @@ pins:
 
 // A from-source component whose source has no lock pin fails closed as unpinned.
 func TestLoadUnpinnedSourceFailsClosed(t *testing.T) {
-	reg := `apiVersion: nkd.dev/catalog/v1
+	reg := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources: {s: {repo: https://github.com/o/r, toolchainImage: ` + goodImage + `}}
-recipes: [{id: r, criteria: {category: kubernetes}, components: [c]}]
 components:
-  c: {fromSource: true, source: s, outputType: host-package, buildCommand: [make], artifactPath: bin/c}
+  c: {platforms: [linux/amd64, linux/arm64], fromSource: true, source: s, outputType: host-package, buildCommand: [make], artifactPath: bin/c}
 `
 	_, err := LoadContext(context.Background(), bytesProvider{RegistryFile: []byte(reg)}) // no lock provided
 	if e, ok := err.(*nkderr.Error); !ok || e.Code != nkderr.CodeUnpinnedSource {

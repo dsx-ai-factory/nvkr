@@ -12,16 +12,15 @@ import (
 )
 
 const (
-	GitLabWorkflowPath   = ".gitlab/nkd-factory.yml"
-	GitLabManifestPath   = ".gitlab/nkd-factory/manifest.json"
-	GitLabPlanPath       = ".gitlab/nkd-factory/plan.json"
-	GitLabGraphDir       = ".gitlab/nkd-factory/graphs"
-	GitLabCompositionDir = ".gitlab/nkd-factory/compositions"
+	GitLabWorkflowPath = ".gitlab/nkd-factory.yml"
+	GitLabManifestPath = ".gitlab/nkd-factory/manifest.json"
+	GitLabPlanPath     = ".gitlab/nkd-factory/plan.json"
+	GitLabGraphDir     = ".gitlab/nkd-factory/graphs"
 )
 
 var gitlabLayout = generationLayout{workflowPath: GitLabWorkflowPath,
 	manifestPath: GitLabManifestPath, planPath: GitLabPlanPath,
-	graphDir: GitLabGraphDir, compositionDir: GitLabCompositionDir}
+	graphDir: GitLabGraphDir}
 
 // RenderGitLab lowers the factory artifact graph to a GitLab DAG include. It uses
 // explicit per-edge carrier artifacts and runner tags; it never contacts GitLab.

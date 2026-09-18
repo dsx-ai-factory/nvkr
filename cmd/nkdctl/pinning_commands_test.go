@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -41,7 +42,7 @@ func TestCatalogPinAndBumpPreserveExactLockState(t *testing.T) {
 	git("tag", "v1.0.0")
 	git("tag", "v1.1.0")
 	commit := git("rev-parse", "HEAD")
-	registry := "apiVersion: nkd.dev/catalog/v1\nkind: SourceBuildRegistry\nsources:\n  source: {repo: https://example.invalid/pin-source, constraint: 1.x}\nrecipes:\n  - {id: fixture, criteria: {category: kubernetes}, components: [excluded]}\ncomponents:\n  excluded: {fromSource: false, exclusionReason: fixture}\n"
+	registry := "apiVersion: nkd.dev/catalog/v3\nkind: SourceBuildRegistry\nsources:\n  source: {repo: https://example.invalid/pin-source, constraint: 1.x}\ncomponents:\n  excluded: {platforms: [linux/amd64], fromSource: false, exclusionReason: fixture}\n"
 	if err := os.WriteFile(filepath.Join(data, catalog.RegistryFile), []byte(registry), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -139,4 +140,45 @@ func TestCatalogPinArtifactsUpdatesAndPreservesUnchangedDigests(t *testing.T) {
 	}
 	_, err := runCLIWithCapturedStdout(t, newApp(), "nkdctl", "catalog", "pin-artifacts", "--dir", data)
 	assertLifecycleCommandCode(t, err, e.CodeUnsupported)
+}
+
+func TestCatalogPinArtifactsRejectsSelectionBeforeNetwork(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		args []string
+		code e.Code
+	}{
+		{"architecture subset", []string{"--arch", "amd64", "tool"}, e.CodeUsage},
+		{"duplicate architecture", []string{"--arch", "amd64,arm64,arm64", "tool"}, e.CodeUsage},
+		{"unsupported architecture", []string{"--arch", "amd64,s390x", "tool"}, e.CodeUsage},
+		{"unknown producer", []string{"tool", "absent"}, e.CodeInvalidCatalog},
+		{"unknown with all", []string{"--all", "absent"}, e.CodeInvalidCatalog},
+		{"duplicate producer", []string{"tool", "tool"}, e.CodeUsage},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := acquisitionCatalogFixture(t, "https://must-not-be-contacted.invalid/tool-{{.Arch}}", "sha256:"+strings.Repeat("a", 64))
+			lockPath := filepath.Join(data, catalog.LockFile)
+			before, err := os.ReadFile(lockPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			original := http.DefaultTransport
+			http.DefaultTransport = roundTripFunc(func(*http.Request) (*http.Response, error) {
+				calls++
+				return nil, fmt.Errorf("network must not be reached")
+			})
+			t.Cleanup(func() { http.DefaultTransport = original })
+			args := append([]string{"nkdctl", "catalog", "pin-artifacts", "--dir", data}, test.args...)
+			output, err := runCLIWithCapturedStdout(t, newApp(), args...)
+			assertLifecycleCommandCode(t, err, test.code)
+			after, err := os.ReadFile(lockPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if calls != 0 || len(output) != 0 || !bytes.Equal(before, after) {
+				t.Fatalf("rejected pin selection caused work: requests=%d, output=%q, lock changed=%v", calls, output, !bytes.Equal(before, after))
+			}
+		})
+	}
 }

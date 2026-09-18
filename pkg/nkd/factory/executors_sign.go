@@ -385,15 +385,15 @@ func factoryRunContext(planDigest string, startedOn, finishedOn time.Time) (prov
 }
 
 // productionBuildType classifies the whole plan. A wrapped/networked build
-// prevents a hermetic claim even when another recipe builds offline. A plan
+// prevents a hermetic claim even when another build builds offline. A plan
 // without build nodes only acquired existing artifacts.
 func productionBuildType(plan *Plan) string {
 	hasBuild := false
-	for _, recipePlan := range plan.Recipes {
-		if recipePlan.Graph == nil {
+	for _, buildPlan := range plan.Builds {
+		if buildPlan.Graph == nil {
 			continue
 		}
-		for _, node := range recipePlan.Graph.Nodes {
+		for _, node := range buildPlan.Graph.Nodes {
 			if node.Kind == ir.KindBuild {
 				if node.BuilderType == ir.BuilderBuildKit || node.Network != ir.NetworkNone {
 					return provenance.BuildTypeWrappedBuild
@@ -408,23 +408,23 @@ func productionBuildType(plan *Plan) string {
 	return provenance.BuildTypeAcquired
 }
 
-// resolvedDependencies lists every pinned input the plan resolved: each recipe's
+// resolvedDependencies lists every pinned input the plan resolved: each build's
 // source repository at its exact commit (annotated with the tree hash), each
 // pinned toolchain image, and each pinned prebuilt artifact. URIs are deduplicated
 // because the same toolchain or source legitimately serves many components; the
 // first binding wins, and a second binding of the same URI is by construction the
-// same pin (recipe compilation would have rejected a conflicting one).
+// same pin (build compilation would have rejected a conflicting one).
 func resolvedDependencies(plan *Plan) []provenance.Dependency {
 	byURI := map[string]provenance.Dependency{}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {
 		byURI["nkd:definition"] = provenance.Dependency{URI: "nkd:definition", Digest: map[string]string{"sha256": strings.TrimPrefix(plan.DefinitionDigest, "sha256:")}}
 		byURI["nkd:environment"] = provenance.Dependency{URI: "nkd:environment", Digest: map[string]string{"sha256": strings.TrimPrefix(plan.EnvironmentDigest, "sha256:")}}
 	}
-	for _, recipePlan := range plan.Recipes {
-		if recipePlan.Graph == nil {
+	for _, buildPlan := range plan.Builds {
+		if buildPlan.Graph == nil {
 			continue
 		}
-		for _, node := range recipePlan.Graph.Nodes {
+		for _, node := range buildPlan.Graph.Nodes {
 			var dependency provenance.Dependency
 			switch {
 			case node.Kind == ir.KindFetch && node.Repo != "" && node.Commit != "":
@@ -442,7 +442,7 @@ func resolvedDependencies(plan *Plan) []provenance.Dependency {
 			}
 		}
 		// A fetch node's vendoring image is an executed input too.
-		for _, node := range recipePlan.Graph.Nodes {
+		for _, node := range buildPlan.Graph.Nodes {
 			if node.Kind == ir.KindFetch && node.VendorImage != "" {
 				if _, seen := byURI[node.VendorImage]; !seen {
 					byURI[node.VendorImage] = provenance.ToolchainDependency(node.VendorImage)

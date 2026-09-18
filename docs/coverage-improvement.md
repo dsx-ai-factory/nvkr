@@ -1,5 +1,9 @@
 # Statement coverage improvement
 
+This historical coverage record predates the Recipe removal. The figures and package descriptions below
+apply to the earlier model, including the retired Recipe, criteria, and composition packages; they are not
+measurements of the current implementation.
+
 ## Goal and measurement
 
 Raise repository-wide statement coverage above 80% with meaningful contract and integration tests.

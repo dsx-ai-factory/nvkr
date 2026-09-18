@@ -19,12 +19,12 @@ const maxResultBytes = 1 << 20
 // for every graph producer, reconstructs storage locations from the graph and current
 // workspace (never from producer-controlled absolute paths), and invokes the same
 // authoritative byte verifier as Local.Run.
-func (l Local) VerifyResults(g *ir.Graph, recipeDigest, resultsDir string, opts RunOptions) (*Report, error) {
+func (l Local) VerifyResults(g *ir.Graph, buildDigest, resultsDir string, opts RunOptions) (*Report, error) {
 	if err := requireRunContext(opts.Ctx, "terminal result verification"); err != nil {
 		return &Report{}, err
 	}
 	opts = withDefaults(opts)
-	if err := validateGraphIdentity(g, recipeDigest); err != nil {
+	if err := validateGraphIdentity(g, buildDigest); err != nil {
 		return &Report{}, err
 	}
 	included, err := selectNodes(g.Nodes, opts.Only)
@@ -43,7 +43,7 @@ func (l Local) VerifyResults(g *ir.Graph, recipeDigest, resultsDir string, opts 
 	if resultsDir == "" {
 		resultsDir = filepath.Join(filepath.Dir(opts.SourceRoot), "results")
 	}
-	rep := &Report{RecipeID: g.RecipeID, RecipeDigest: recipeDigest}
+	rep := &Report{BuildDigest: buildDigest}
 	producers := map[string]ir.Node{}
 	var buildNodes []ir.Node
 	for _, n := range g.Nodes {

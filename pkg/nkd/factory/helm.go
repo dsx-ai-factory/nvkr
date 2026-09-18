@@ -18,8 +18,8 @@ func helmPackageTree(ctx context.Context, plan *Plan, input Artifact) (string, s
 		root, relative, err := lifecycleTransportMember(plan, input)
 		return root, relative, noop, err
 	}
-	if input.Kind != "tarball" || input.RecipeTarget == "" {
-		return "", "", noop, e.New(e.CodeInvalidCatalog, "Helm input %q is not a recipe source archive", input.ID)
+	if input.Kind != "tarball" || input.BuildTarget == "" {
+		return "", "", noop, e.New(e.CodeInvalidCatalog, "Helm input %q is not a build source archive", input.ID)
 	}
 	stage, err := os.MkdirTemp("", "nkd-helm-")
 	if err != nil {

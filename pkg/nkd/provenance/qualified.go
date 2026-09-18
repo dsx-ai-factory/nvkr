@@ -22,13 +22,13 @@ type QualifiedSet struct {
 	index              Index
 }
 
-// LocalEvidenceReceipt binds one locally generated statement to its exact recipe
+// LocalEvidenceReceipt binds one locally generated statement to its exact build
 // and artifact subject. EvidenceDigest is the domain-separated statement identity;
 // BlobDigest is the ordinary sha256 used by content transports.
 type LocalEvidenceReceipt struct {
 	valid            bool
 	component        string
-	recipeDigest     string
+	buildDigest      string
 	artifactDigest   string
 	evidenceDigest   string
 	blobDigest       string
@@ -40,7 +40,7 @@ type LocalEvidenceReceipt struct {
 // authority. Binding rechecks the private canonical-payload snapshot.
 type LocalEvidenceBinding struct {
 	Component      string
-	RecipeDigest   string
+	BuildDigest    string
 	ArtifactDigest string
 	EvidenceDigest string
 	BlobDigest     string
@@ -50,7 +50,7 @@ type LocalEvidenceBinding struct {
 // BuildQualifiedFromReport is the sole local producer-to-provenance authority
 // seam. The opaque pipeline report first revalidates its terminal artifact bytes
 // and execution receipt. The supplied graph is then snapshotted, semantically
-// validated, and required to have the report's exact recipe identity. All
+// validated, and required to have the report's exact build identity. All
 // provenance subjects, builder fields, and dependencies are derived from those two
 // authorities; callers cannot supply an Artifact projection.
 func BuildQualifiedFromReport(ctx context.Context, report *pipeline.Report, graph *ir.Graph) (*QualifiedSet, error) {
@@ -71,21 +71,21 @@ func BuildQualifiedFromReport(ctx context.Context, report *pipeline.Report, grap
 	if err != nil {
 		return nil, err
 	}
-	recipeDigest, err := graphSnapshot.Digest()
+	buildDigest, err := graphSnapshot.Digest()
 	if err != nil {
 		return nil, err
 	}
-	if recipeDigest != report.RecipeDigest || graphSnapshot.RecipeID != report.RecipeID {
+	if buildDigest != report.BuildDigest {
 		return nil, e.New(e.CodeVerifyFailed,
-			"provenance graph %s/%s does not match qualified report %s/%s",
-			graphSnapshot.RecipeID, recipeDigest, report.RecipeID, report.RecipeDigest)
+			"provenance graph %s does not match qualified report %s",
+			buildDigest, report.BuildDigest)
 	}
 
 	artifacts, err := projectQualifiedArtifacts(report, graphSnapshot)
 	if err != nil {
 		return nil, err
 	}
-	index := BuildIndex(report.RecipeDigest, report.QualificationProfileDigest(), artifacts)
+	index := BuildIndex(report.BuildDigest, report.QualificationProfileDigest(), artifacts)
 	snapshot, err := snapshotValidatedIndex(index)
 	if err != nil {
 		return nil, err
@@ -151,8 +151,8 @@ func projectQualifiedArtifacts(report *pipeline.Report, graph *ir.Graph) ([]Arti
 		}
 		result, ok := byComponent[node.Component]
 		if !ok {
-			// A qualified pipeline report may represent an exact --only/role
-			// selection from the full recipe graph. Its opaque terminal receipt
+			// A qualified pipeline report may represent an exact --only
+			// selection from the full build graph. Its opaque terminal receipt
 			// already proves that exact selected producer set; unselected graph
 			// producers must not acquire provenance subjects.
 			continue
@@ -222,7 +222,7 @@ func qualifiedBuildDependencies(result pipeline.ArtifactResult, build, fetch ir.
 		{URI: "nkd:vendor-spec/" + build.Component,
 			Digest: map[string]string{"sha256": strings.TrimPrefix(fetch.VendorSpecDigest, "sha256:")}},
 	}
-	// A registry/repository name is a transport locator, not recipe identity. The
+	// A registry/repository name is a transport locator, not build identity. The
 	// graph validator already requires a bare sha256 or repo@sha256 toolchain pin;
 	// project only that stable content address so an online/mirror relocation cannot
 	// perturb deterministic provenance or publisher evidence.
@@ -294,7 +294,7 @@ func (set *QualifiedSet) LocalReceipts() ([]LocalEvidenceReceipt, error) {
 		}
 		receipts = append(receipts, LocalEvidenceReceipt{
 			valid: true, component: statement.Subject[0].Name,
-			recipeDigest:   index.RecipeDigest,
+			buildDigest:    index.BuildDigest,
 			artifactDigest: "sha256:" + statement.Subject[0].Digest["sha256"],
 			evidenceDigest: identity, blobDigest: rawDigest(payload),
 			evidenceSchema: "in-toto-slsa-provenance/v1", canonicalPayload: string(payload),
@@ -305,7 +305,7 @@ func (set *QualifiedSet) LocalReceipts() ([]LocalEvidenceReceipt, error) {
 }
 
 func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
-	if !receipt.valid || !canonical.IsDigest(receipt.recipeDigest) ||
+	if !receipt.valid || !canonical.IsDigest(receipt.buildDigest) ||
 		!canonical.IsDigest(receipt.artifactDigest) || !canonical.IsDigest(receipt.evidenceDigest) ||
 		!canonical.IsDigest(receipt.blobDigest) || receipt.evidenceSchema != "in-toto-slsa-provenance/v1" ||
 		receipt.canonicalPayload == "" {
@@ -316,7 +316,7 @@ func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
 	if err := canonical.UnmarshalExact([]byte(receipt.canonicalPayload), &statement); err != nil {
 		return LocalEvidenceBinding{}, err
 	}
-	if err := (&Index{SchemaVersion: IndexSchemaVersion, RecipeDigest: receipt.recipeDigest,
+	if err := (&Index{SchemaVersion: IndexSchemaVersion, BuildDigest: receipt.buildDigest,
 		Statements: []Statement{statement}}).Validate(); err != nil {
 		return LocalEvidenceBinding{}, err
 	}
@@ -327,11 +327,11 @@ func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
 	if identity != receipt.evidenceDigest || rawDigest([]byte(receipt.canonicalPayload)) != receipt.blobDigest ||
 		len(statement.Subject) != 1 || statement.Subject[0].Name != receipt.component ||
 		"sha256:"+statement.Subject[0].Digest["sha256"] != receipt.artifactDigest ||
-		statement.Predicate.BuildDefinition.ExternalParameters["recipeDigest"] != receipt.recipeDigest {
+		statement.Predicate.BuildDefinition.ExternalParameters["buildDigest"] != receipt.buildDigest {
 		return LocalEvidenceBinding{}, e.New(e.CodeUnverifiedRef,
 			"local provenance receipt no longer matches its canonical artifact binding")
 	}
-	return LocalEvidenceBinding{Component: receipt.component, RecipeDigest: receipt.recipeDigest,
+	return LocalEvidenceBinding{Component: receipt.component, BuildDigest: receipt.buildDigest,
 		ArtifactDigest: receipt.artifactDigest, EvidenceDigest: receipt.evidenceDigest,
 		BlobDigest: receipt.blobDigest, EvidenceSchema: receipt.evidenceSchema}, nil
 }

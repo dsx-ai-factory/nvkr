@@ -84,7 +84,7 @@ func TestRunCommandsPlanGenerateAndCheckDrift(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			if len(plan.Recipes) != 2 || plan.Qualification != "pipeline-attested" {
+			if len(plan.Builds) != 3 || plan.Qualification != "pipeline-attested" {
 				t.Fatalf("unexpected CLI plan: %+v", plan)
 			}
 		} else if !strings.Contains(output, "expected outputs: 3") {

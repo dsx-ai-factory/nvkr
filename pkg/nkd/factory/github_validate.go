@@ -86,13 +86,13 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	graphDigests := make(map[string]string, len(plan.Recipes))
-	for _, recipe := range plan.Recipes {
-		raw, err := recipe.Graph.CanonicalJSON()
+	graphDigests := make(map[string]string, len(plan.Builds))
+	for _, build := range plan.Builds {
+		raw, err := build.Graph.CanonicalJSON()
 		if err != nil {
 			return err
 		}
-		graphDigests[recipe.Name] = pipeline.FileDigest(raw)
+		graphDigests[build.Name] = pipeline.FileDigest(raw)
 	}
 	stages, nodeJobs := githubStages(plan)
 	byNode := make(map[string]githubStage, len(plan.Graph.Nodes))
@@ -239,7 +239,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		// ADR-18 §8: an IR-projected node with a pinned container (build toolchain / fetch
 		// vendor image) is isolated by nkd-exec ITSELF orchestrating that container (--launch),
 		// which reads the container, platform, and network-none posture from the committed
-		// per-recipe graph (re-checked by the recipeDigest drift gate). Glue nodes still run
+		// per-build graph (re-checked by the buildDigest drift gate). Glue nodes still run
 		// through an inline `<runtime> run --network …` wrapper, so they keep the YAML checks.
 		if launchedExecNode(node) {
 			if !strings.Contains(runs, "exec-node --launch") {

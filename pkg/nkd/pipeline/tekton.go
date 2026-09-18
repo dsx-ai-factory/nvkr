@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -26,8 +27,11 @@ func (Tekton) Name() string { return "tekton" }
 // that verification can execute.
 const bootstrapImage = "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161"
 
-func (e Tekton) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([]byte, error) {
+func (e Tekton) Render(ctx context.Context, g *ir.Graph, buildDigest string) ([]byte, error) {
 	if err := requireEmitterContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := validateGraphIdentity(g, buildDigest); err != nil {
 		return nil, err
 	}
 	if err := ValidateEmitterDataPath(e.Data); err != nil {
@@ -57,7 +61,7 @@ func (e Tekton) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 	var body bytes.Buffer
 	bw := io.Writer(&body)
 	fmt.Fprintf(bw, "apiVersion: tekton.dev/v1\nkind: Pipeline\n")
-	fmt.Fprintf(bw, "metadata: {name: nkd-build-%s}\n", g.RecipeID)
+	fmt.Fprintf(bw, "metadata: {name: nkd-build-%s}\n", strings.TrimPrefix(buildDigest, "sha256:")[:16])
 	fmt.Fprintf(bw, "spec:\n  workspaces: [{name: shared}]\n  tasks:\n")
 
 	step := func(indent, name, image string, script []string) {
@@ -93,7 +97,7 @@ func (e Tekton) Render(ctx context.Context, g *ir.Graph, recipeDigest string) ([
 	// finally: the unconditional terminal verify (ADR-18 §7).
 	fmt.Fprintf(bw, "  finally:\n    - name: verify\n      taskSpec:\n        steps:\n")
 	step("          ", "verify", bootstrapImage, append(RunnerGuardScript(e.RunnerDigest), verifyCmd))
-	return GeneratedPipelineBytes(ctx, e.Name(), recipeDigest, g.RecipeID, g, body.Bytes())
+	return GeneratedPipelineBytes(ctx, e.Name(), buildDigest, g, body.Bytes())
 }
 
 func tektonTransportContractImplemented() bool { return false }

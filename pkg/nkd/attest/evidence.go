@@ -8,7 +8,7 @@ import (
 )
 
 // EvidenceSchemaVersion identifies the evidence-bundle shape.
-const EvidenceSchemaVersion = "nkd.dev/evidence-bundle/v1"
+const EvidenceSchemaVersion = "nkd.dev/evidence-bundle/v2"
 
 // Verdict is the top-level outcome recorded in an evidence bundle.
 const (
@@ -27,8 +27,7 @@ const (
 // with stable mismatch cause codes.
 type EvidenceBundle struct {
 	SchemaVersion       string              `json:"schemaVersion"`
-	RecipeID            string              `json:"recipeId"`
-	RecipeDigest        string              `json:"recipeDigest"`
+	BuildDigest         string              `json:"buildDigest"`
 	ProfileDigest       string              `json:"profileDigest,omitempty"`
 	ConformanceClaim    string              `json:"conformanceClaim,omitempty"`
 	ValidationVectorRef string              `json:"validationVectorRef,omitempty"`
@@ -78,8 +77,7 @@ type DiskManifestRef struct {
 func NewEvidence(m *Manifest, verdict string, preflight []profile.Divergence, comps []ComponentEvidence) *EvidenceBundle {
 	eb := &EvidenceBundle{
 		SchemaVersion:       EvidenceSchemaVersion,
-		RecipeID:            m.RecipeID,
-		RecipeDigest:        m.RecipeDigest,
+		BuildDigest:         m.BuildDigest,
 		ProfileDigest:       m.ProfileDigest,
 		ConformanceClaim:    m.ConformanceClaim,
 		ValidationVectorRef: m.ValidationVectorRef,
@@ -97,8 +95,8 @@ func NewEvidence(m *Manifest, verdict string, preflight []profile.Divergence, co
 // Evidence builds a deterministic evidence bundle for a verify decision: the
 // reference manifest (receiver) vs the freshly-built manifest, the verdict, the
 // preflight divergences. Per-component rows carry the match verdict and, on a
-// mismatch, a stable cause code. Reference metadata (recipe/profile/conformance) comes from the
-// receiver; recipeDigest and profile are already asserted equal by Check.
+// mismatch, a stable cause code. Reference metadata (build/profile/conformance) comes from the
+// receiver; buildDigest and profile are already asserted equal by Check.
 func (want *Manifest) BuildEvidence(got *Manifest, verdict string, preflight []profile.Divergence) *EvidenceBundle {
 	wantByName := make(map[string]ComponentDigest, len(want.Components))
 	for _, w := range want.Components {
@@ -118,9 +116,9 @@ func (want *Manifest) BuildEvidence(got *Manifest, verdict string, preflight []p
 		}
 		comps = append(comps, ce)
 	}
-	// Metadata is the reference's (recipe/profile/conformance identity).
+	// Metadata is the reference's (build/profile/conformance identity).
 	meta := &Manifest{
-		RecipeID: want.RecipeID, RecipeDigest: want.RecipeDigest,
+		BuildDigest:   want.BuildDigest,
 		ProfileDigest: want.ProfileDigest, ConformanceClaim: want.ConformanceClaim,
 		ValidationVectorRef: want.ValidationVectorRef,
 	}

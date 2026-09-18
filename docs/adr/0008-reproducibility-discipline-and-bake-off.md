@@ -24,7 +24,7 @@ protocol, specifies how empirical evidence graduates a builder-profile attribute
 
 ### 1. Role: publisher qualification, plus operator verification as the second environment
 
-The standalone **two-machine bake-off is a publisher qualification-time gate**: before a recipe is published, the
+The standalone **two-machine bake-off is a publisher qualification-time gate**: before qualified expectations are published, the
 publisher proves it reproduces bit-identically across two deliberately-different environments. The **operator’s
 gate is a single verify** against the published expected digests, and their independent rebuild supplies the
 second environment in aggregate. The “two-environment reproducibility” guarantee is therefore
@@ -75,7 +75,7 @@ Reproducibility across environments requires the *inputs* to be byte-identical, 
   spike de-risks it.
 - **Normalization inputs are pinned.** The source-date value derived from the pinned commit, locale and timezone
   normalization, and the build-flag discipline that strips non-reproducible metadata are all pinned as part of
-  the recipe identity. They apply uniformly to every build and cannot be overridden by a catalog.
+  the build identity. They apply uniformly to every build and cannot be overridden by a catalog.
 
 ### 6. Pipeline-attested scope
 

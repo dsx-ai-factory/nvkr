@@ -10,16 +10,14 @@ import (
 )
 
 func TestPrebuiltTargetsResolveBeforeArtifactPinning(t *testing.T) {
-	registry := `apiVersion: nkd.dev/catalog/v1
+	registry := `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   s: {repo: https://example.invalid/source}
-recipes:
-  - {id: r, criteria: {category: kubernetes}, components: [alpha, zulu]}
 components:
-  zulu: {source: s, outputType: oci-image, prebuilt: {image: 'example.invalid/zulu:{{.Version}}', evidence: {none: true}}}
-  alpha: {source: s, outputType: raw, prebuilt: {url: 'https://example.invalid/{{.Tag}}/alpha-{{.Arch}}', evidence: {none: true}}}
-  excluded: {fromSource: false, exclusionReason: fixture}
+  zulu: {platforms: [linux/amd64, linux/arm64], source: s, outputType: oci-image, prebuilt: {image: 'example.invalid/zulu:{{.Version}}', evidence: {none: true}}}
+  alpha: {platforms: [linux/amd64, linux/arm64], source: s, outputType: raw, prebuilt: {url: 'https://example.invalid/{{.Tag}}/alpha-{{.Arch}}', evidence: {none: true}}}
+  excluded: {platforms: [linux/amd64, linux/arm64], fromSource: false, exclusionReason: fixture}
 `
 	lock := lockYAML("  s: {tag: v1.2.3, commit: " + strings.Repeat("a", 40) + ", treeHash: " + strings.Repeat("b", 40) + ", sourceDateEpoch: 1}\n")
 	for _, tc := range []struct {
@@ -45,7 +43,7 @@ components:
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := []PrebuiltTarget{{Name: "alpha", Tag: "v1.2.3", URL: "https://example.invalid/v1.2.3/alpha-{{.Arch}}"}, {Name: "zulu", Tag: "v1.2.3", Image: "example.invalid/zulu:1.2.3"}}
+			want := []PrebuiltTarget{{Platforms: []string{"linux/amd64", "linux/arm64"}, Name: "alpha", Tag: "v1.2.3", URL: "https://example.invalid/v1.2.3/alpha-{{.Arch}}"}, {Platforms: []string{"linux/amd64", "linux/arm64"}, Name: "zulu", Tag: "v1.2.3", Image: "example.invalid/zulu:1.2.3"}}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("targets = %+v, want %+v", got, want)
 			}

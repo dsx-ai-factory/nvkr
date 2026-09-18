@@ -20,24 +20,24 @@ func rejectUnsupportedPlanRequirements(plan *Plan, adapter string) error {
 			return err
 		}
 		if node.Kind == NodeBuild {
-			if selected[node.RecipeTarget] == nil {
-				selected[node.RecipeTarget] = make(map[string]struct{})
+			if selected[node.BuildTarget] == nil {
+				selected[node.BuildTarget] = make(map[string]struct{})
 			}
-			selected[node.RecipeTarget][node.IRNode] = struct{}{}
+			selected[node.BuildTarget][node.IRNode] = struct{}{}
 		}
 	}
-	for _, recipe := range plan.Recipes {
-		for _, component := range recipe.ResolvedComponents {
+	for _, build := range plan.Builds {
+		for _, component := range build.ResolvedComponents {
 			if component.BuildRequirements != nil {
 				return e.New(e.CodeEngineCapability,
 					"%s cannot enforce execution requirements for component %q", adapter, component.Name)
 			}
 		}
-		selectedNodes := selected[recipe.Name]
-		if len(selectedNodes) == 0 || recipe.Graph == nil {
+		selectedNodes := selected[build.Name]
+		if len(selectedNodes) == 0 || build.Graph == nil {
 			continue
 		}
-		for _, node := range recipe.Graph.Nodes {
+		for _, node := range build.Graph.Nodes {
 			if node.Kind != ir.KindBuild {
 				continue
 			}

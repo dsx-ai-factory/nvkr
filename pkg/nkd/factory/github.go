@@ -19,14 +19,13 @@ const (
 	GitHubWorkflowPath       = ".github/workflows/nkd-run.yml"
 	FactoryPlanPath          = ".github/nkd-run/plan.json"
 	FactoryGraphDir          = ".github/nkd-run/graphs"
-	FactoryCompositionDir    = ".github/nkd-run/compositions"
 	githubReleaseEnvironment = "nkd-release"
 	githubExecutionCondition = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
 )
 
 var githubLayout = generationLayout{workflowPath: GitHubWorkflowPath,
 	manifestPath: GeneratedManifestPath, planPath: FactoryPlanPath,
-	graphDir: FactoryGraphDir, compositionDir: FactoryCompositionDir}
+	graphDir: FactoryGraphDir}
 
 // RenderGitHub emits a locally inspectable workflow and its exact plan/IR inputs,
 // then runs the semantic static validator before returning any bytes.
@@ -284,15 +283,15 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 	return permissions
 }
 
-// irProjectedNode reports whether a node is a recipe-projected fetch/build/acquire node — one
-// backed by a committed per-recipe IR graph, so it carries BOTH a RecipeTarget and an IRNode.
+// irProjectedNode reports whether a node is a build-projected fetch/build/acquire node — one
+// backed by a committed per-build IR graph, so it carries BOTH a BuildTarget and an IRNode.
 // Such a node runs `nkd-exec exec-node` over that graph. A tool-download acquire node has
-// neither and is NOT IR-projected: it has no recipe graph, so it runs through the glue
+// neither and is NOT IR-projected: it has no build graph, so it runs through the glue
 // `factory execute-node` path instead (routing it to exec-node would reference graphs/.json).
 func irProjectedNode(node Node) bool {
 	switch node.Kind {
 	case NodeFetch, NodeBuild, NodeAcquire:
-		return node.RecipeTarget != "" && node.IRNode != ""
+		return node.BuildTarget != "" && node.IRNode != ""
 	default:
 		return false
 	}
@@ -312,31 +311,31 @@ func generatedNodeCommands(node Node, plan *Plan, graphDigests map[string]string
 	// Environment execution settings (ADR-18 §8), defaulting to rootless podman.
 	runtime := plan.ExecutionSettings.RuntimeBinary()
 	if irProjectedNode(node) {
-		graphPath := filepath.ToSlash(filepath.Join(graphDir, node.RecipeTarget+".json"))
-		sourceRoot := filepath.ToSlash(filepath.Join(".nkd", "factory", node.RecipeTarget, "src"))
+		graphPath := filepath.ToSlash(filepath.Join(graphDir, node.BuildTarget+".json"))
+		sourceRoot := filepath.ToSlash(filepath.Join(".nkd", "factory", node.BuildTarget, "src"))
 		result := ""
 		if node.Kind == NodeBuild || node.Kind == NodeAcquire {
-			result = filepath.ToSlash(filepath.Join(".nkd", "factory", node.RecipeTarget, "results", node.IRNode+".json"))
+			result = filepath.ToSlash(filepath.Join(".nkd", "factory", node.BuildTarget, "results", node.IRNode+".json"))
 		}
 		// ADR-18 §8: a containerized IR node (a build toolchain or a fetch vendor image)
 		// is isolated by nkd-exec ITSELF orchestrating the pinned container (--launch), which
 		// reads that container, its platform, and its --network=none posture from the committed
-		// per-recipe graph node (re-checked by the recipeDigest drift gate) — not by an inline
+		// per-build graph node (re-checked by the buildDigest drift gate) — not by an inline
 		// `<runtime> run` wrapper in the YAML. This is the SAME per-node primitive the
-		// single-recipe pipeline emitter renders, so the two stacks share one topology. An
+		// single-build pipeline emitter renders, so the two stacks share one topology. An
 		// acquire/pull node carries no container and runs the helper directly (Launch=false).
 		return []string{pipeline.ExecNodeCommand(pipeline.NodeExec{
 			NodeID:      node.IRNode,
 			NodesFile:   graphPath,
-			NodesDigest: graphDigests[node.RecipeTarget],
+			NodesDigest: graphDigests[node.BuildTarget],
 			SourceRoot:  sourceRoot,
 			Result:      result,
 			Launch:      launchedExecNode(node),
 			Runtime:     runtime,
 		}, pipeline.BootstrapHelperRef())}
 	}
-	// Glue nodes (package/publish/composition/aicr-render/terminal-observe) AND tool-download
-	// acquire nodes with no recipe graph run `factory execute-node` over the committed plan.
+	// Glue nodes (package/publish/aicr-render/terminal-observe) AND tool-download
+	// acquire nodes with no build graph run `factory execute-node` over the committed plan.
 	command := fmt.Sprintf("./nkd-exec factory execute-node --plan %s --node %s --workspace .nkd/factory",
 		shellQuote(planPath), shellQuote(node.ID))
 	if node.Container == "" {

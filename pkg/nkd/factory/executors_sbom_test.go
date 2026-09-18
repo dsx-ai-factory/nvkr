@@ -10,7 +10,6 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/criteria"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
@@ -31,9 +30,7 @@ func sbomTestPlan(t *testing.T) *Plan {
 		Metadata: Metadata{Name: "ai-factory"}, RunsOn: "ubuntu-24.04", Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
 		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
 		UtilityPlatform:  "linux/amd64",
-		Recipes: []RecipeTarget{{Name: "node-worker", RunsOn: "ubuntu-24.04", Criteria: criteria.Criteria{
-			Category: "kubernetes", Role: "worker", K8sVersion: "1.34.0", OS: "ubuntu", Arch: "amd64",
-		}}},
+		Builds:           []BuildTarget{{Name: "node-worker", RunsOn: "ubuntu-24.04", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
 		Packages: []PackageSpec{
 			{Name: "node-tools", Kind: PackageBinaryBundle, Inputs: []string{"node-worker/*"}},
 		},
@@ -52,13 +49,13 @@ func sbomTestPlan(t *testing.T) *Plan {
 	return plan
 }
 
-func TestCompileEmitsPerRecipeSBOMNodeGatedOnObservation(t *testing.T) {
+func TestCompileEmitsPerBuildSBOMNodeGatedOnObservation(t *testing.T) {
 	plan := sbomTestPlan(t)
 	nodes, artifacts := planIndex(plan)
 
 	node, ok := nodes["node-worker/sbom"]
 	if !ok || node.Kind != NodeSBOM || node.Network != "none" {
-		t.Fatalf("missing isolated per-recipe sbom node: %#v", node)
+		t.Fatalf("missing isolated per-build sbom node: %#v", node)
 	}
 	if !contains(node.Inputs, "observation/node-worker") {
 		t.Fatalf("sbom node is not gated on the terminal observation: %#v", node.Inputs)
@@ -68,19 +65,19 @@ func TestCompileEmitsPerRecipeSBOMNodeGatedOnObservation(t *testing.T) {
 	}
 	out := artifacts[node.Outputs[0]]
 	if out.ID != "sbom/node-worker" || out.Kind != "sbom-set" {
-		t.Fatalf("sbom node output is not the per-recipe SBOM set: %#v", out)
+		t.Fatalf("sbom node output is not the per-build SBOM set: %#v", out)
 	}
 
 	// The plan must persist the resolved composition so the container-isolated
 	// executor can build without the catalog (ADR-13).
 	var billed bool
-	for _, recipe := range plan.Recipes {
-		if recipe.Name == "node-worker" {
-			billed = len(recipe.ResolvedComponents) > 0
+	for _, build := range plan.Builds {
+		if build.Name == "node-worker" {
+			billed = len(build.ResolvedComponents) > 0
 		}
 	}
 	if !billed {
-		t.Fatal("recipe plan persisted no resolved components for the sbom node")
+		t.Fatal("build plan persisted no resolved components for the sbom node")
 	}
 	if _, err := plan.Digest(); err != nil {
 		t.Fatal(err)
@@ -135,8 +132,8 @@ func TestExecuteSBOMBillsEachBuiltComponentAgainstItsObservedDigest(t *testing.T
 	if err := index.Validate(); err != nil {
 		t.Fatalf("emitted sbom index is invalid: %v", err)
 	}
-	if index.RecipeDigest == "" {
-		t.Fatal("sbom index carries no recipe identity")
+	if index.BuildDigest == "" {
+		t.Fatal("sbom index carries no build identity")
 	}
 	for _, entry := range index.Entries {
 		if entry.ArtifactSHA != observed {
