@@ -5,6 +5,8 @@ package transportarchive
 
 import (
 	"archive/tar"
+	"bufio"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -464,6 +466,93 @@ func validateTransportEntryUnchanged(expected transportEntry, observed securepat
 	return nil
 }
 
+// openTransportTarSource detects a gzip-compressed carrier (such as a real `helm
+// package` .tgz) by its magic bytes and transparently decompresses it; an
+// uncompressed carrier is read as plain tar. Detection only consumes from the
+// returned buffered reader, so the caller sees the complete stream from the
+// beginning regardless of which branch is taken.
+func openTransportTarSource(source io.Reader) (io.Reader, func(), error) {
+	buffered := bufio.NewReader(source)
+	magic, err := buffered.Peek(2)
+	if err != nil && err != io.EOF {
+		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive")
+	}
+	if len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
+		gz, err := gzip.NewReader(buffered)
+		if err != nil {
+			return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed transport archive")
+		}
+		return gz, func() { _ = gz.Close() }, nil
+	}
+	return buffered, func() {}, nil
+}
+
+// DetectTransportChartRoot inspects an untrusted carrier and returns the name of
+// its single top-level directory, without extracting any file contents. A real
+// `helm package` archive has no fixed root name (it is rooted at the chart's own
+// name), so a caller that requires a named allow-list (Unpack) must discover
+// that name first. Multiple distinct top-level entries, or an archive with no
+// top-level directory, fail closed; Unpack independently re-validates every
+// entry during extraction.
+func DetectTransportChartRoot(ctx context.Context, archive string) (string, error) {
+	if err := requireTransportContext(ctx, "inspecting transport"); err != nil {
+		return "", err
+	}
+	file, info, err := securepath.OpenRegular(archive)
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "opening transport archive %s", archive)
+	}
+	defer file.Close()
+	if info.Size() < 0 || info.Size() > maxTransportBytes {
+		return "", e.New(e.CodeVerifyFailed, "transport archive %s is not a regular file within the %d-byte limit", archive, maxTransportBytes)
+	}
+	tarSource, closeTarSource, err := openTransportTarSource(file)
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "opening transport archive %s", archive)
+	}
+	defer closeTarSource()
+	tr := tar.NewReader(tarSource)
+	root := ""
+	entries := 0
+	for {
+		if err := ctx.Err(); err != nil {
+			return "", e.Wrap(e.CodeTimeout, err, "inspecting transport canceled")
+		}
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", e.Wrap(e.CodeVerifyFailed, err, "reading transport archive")
+		}
+		entries++
+		if entries > maxTransportEntries {
+			return "", e.New(e.CodeVerifyFailed, "transport exceeds %d entries", maxTransportEntries)
+		}
+		name := strings.TrimSuffix(header.Name, "/")
+		if !filepath.IsLocal(name) {
+			return "", e.New(e.CodeVerifyFailed, "transport contains non-local path %q", header.Name)
+		}
+		top := name
+		if idx := strings.IndexByte(top, '/'); idx >= 0 {
+			top = top[:idx]
+		}
+		if top == "" {
+			continue
+		}
+		if root == "" {
+			root = top
+		} else if root != top {
+			return "", e.New(e.CodeVerifyFailed,
+				"transport archive %s has multiple top-level roots %q and %q", archive, root, top)
+		}
+	}
+	if root == "" {
+		return "", e.New(e.CodeVerifyFailed, "transport archive %s has no top-level directory", archive)
+	}
+	return root, nil
+}
+
 // Unpack extracts an untrusted carrier into a private staging directory,
 // accepts only the producer's declared paths, and publishes them only after the full
 // archive has been validated. Traversal, hard links, devices, duplicate entries,
@@ -509,7 +598,12 @@ func Unpack(ctx context.Context, archive, root string, allowed []string) error {
 		return e.Wrap(e.CodeInternal, err, "opening transport staging root")
 	}
 	defer func() { _ = stageRoot.Close() }()
-	tr := tar.NewReader(file)
+	tarSource, closeTarSource, err := openTransportTarSource(file)
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "opening transport archive %s", archive)
+	}
+	defer closeTarSource()
+	tr := tar.NewReader(tarSource)
 	seen := map[string]bool{}
 	directoryModes := map[string]fs.FileMode{}
 	directories := map[string]bool{"": true}

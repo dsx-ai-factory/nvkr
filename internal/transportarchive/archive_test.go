@@ -3,6 +3,7 @@ package transportarchive
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -437,6 +438,64 @@ func transportCode(err error) nkderr.Code {
 	return ""
 }
 
+func TestDetectTransportChartRootDiscoversTheSingleTopLevelDirectory(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		headers []*tar.Header
+		gzip    bool
+		root    string
+		code    nkderr.Code
+	}{
+		{name: "single root", headers: []*tar.Header{
+			{Name: "postgresql", Typeflag: tar.TypeDir, Mode: 0o755},
+			{Name: "postgresql/Chart.yaml", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+		}, root: "postgresql"},
+		{name: "single root, gzip", headers: []*tar.Header{
+			{Name: "postgresql", Typeflag: tar.TypeDir, Mode: 0o755},
+			{Name: "postgresql/Chart.yaml", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+		}, gzip: true, root: "postgresql"},
+		{name: "multiple roots", headers: []*tar.Header{
+			{Name: "helm", Typeflag: tar.TypeDir, Mode: 0o755},
+			{Name: "other", Typeflag: tar.TypeDir, Mode: 0o755},
+		}, code: nkderr.CodeVerifyFailed},
+		{name: "empty archive", headers: nil, code: nkderr.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			archive := filepath.Join(t.TempDir(), "chart.archive")
+			if test.gzip {
+				writeTestTarGz(t, archive, test.headers)
+			} else {
+				writeTestTar(t, archive, test.headers)
+			}
+			root, err := DetectTransportChartRoot(context.Background(), archive)
+			if test.code != "" {
+				if transportCode(err) != test.code {
+					t.Fatalf("got %v, want code %s", err, test.code)
+				}
+				return
+			}
+			if err != nil || root != test.root {
+				t.Fatalf("root=%q err=%v, want %q", root, err, test.root)
+			}
+		})
+	}
+}
+
+func TestUnpackAcceptsAGzipCompressedCarrier(t *testing.T) {
+	archive := filepath.Join(t.TempDir(), "chart.tgz")
+	writeTestTarGz(t, archive, []*tar.Header{
+		{Name: "postgresql", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "postgresql/Chart.yaml", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+	})
+	root := filepath.Join(t.TempDir(), "extracted")
+	if err := Unpack(context.Background(), archive, root, []string{"postgresql"}); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(filepath.Join(root, "postgresql", "Chart.yaml")); err != nil || info.IsDir() {
+		t.Fatalf("extracted gzip carrier: %v", err)
+	}
+}
+
 func writeTestTar(t *testing.T, path string, headers []*tar.Header) {
 	t.Helper()
 	file, err := os.Create(path)
@@ -455,6 +514,35 @@ func writeTestTar(t *testing.T, path string, headers []*tar.Header) {
 		}
 	}
 	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeTestTarGz(t *testing.T, path string, headers []*tar.Header) {
+	t.Helper()
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz := gzip.NewWriter(file)
+	tw := tar.NewWriter(gz)
+	for _, header := range headers {
+		if err := tw.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if header.Size > 0 {
+			if _, err := tw.Write(bytes.Repeat([]byte{'x'}, int(header.Size))); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := file.Close(); err != nil {

@@ -104,11 +104,16 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 		if output.Kind != "helm-oci" {
 			continue
 		}
-		_, payload, err := delivery.ReadArtifact(ctx, artifact.Path)
+		descriptor, payload, err := delivery.ReadArtifact(ctx, artifact.Path)
 		if err != nil {
 			return nil, err
 		}
-		subject := pipeline.FileDigest(payload)
+		// subject is the OCI manifest digest: the published identity this evidence
+		// attests to. input is the digest of the actual scanned bytes (the chart
+		// tarball layer), recorded as InspectionInputDigest since it differs from
+		// the manifest-level subject.
+		subject := descriptor.Digest
+		input := pipeline.FileDigest(payload)
 		// Helm inspection is internal/offline and executes neither scripts nor a scanner.
 		temporary, err := os.MkdirTemp(filepath.Dir(artifact.Path), ".release-helm-sbom-*")
 		if err != nil {
@@ -120,7 +125,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			if err := writeFactoryFile(ctx, path, payload, 0o600); err != nil {
 				return err
 			}
-			inventory, err := sbom.InspectDependencies(ctx, path, subject, "tarball", sbom.Scanner{})
+			inventory, err := sbom.InspectDependencies(ctx, path, input, "tarball", sbom.Scanner{})
 			if err != nil {
 				return err
 			}
@@ -132,7 +137,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			if err != nil {
 				return err
 			}
-			return add(bom, output.Name, output.Name, "packaging", "helm-bundle", subject, subject)
+			return add(bom, output.Name, output.Name, "packaging", "helm-bundle", subject, input)
 		}()
 		if funcErr != nil {
 			return nil, funcErr

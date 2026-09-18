@@ -12,6 +12,15 @@ import (
 
 const MediaEmptyConfig = "application/vnd.oci.empty.v1+json"
 
+// The Helm OCI support media types (https://helm.sh/docs/topics/registries/), used
+// by BuildHelmChartArtifact so a packaged chart is a standards-conformant Helm OCI
+// artifact: real `helm pull`/`helm show`/`oras pull` resolve content purely from
+// these two media types, never from NKD's own manifest-level ArtifactType.
+const (
+	MediaHelmConfig     = "application/vnd.cncf.helm.config.v1+json"
+	MediaHelmChartLayer = "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
+)
+
 // PayloadDescriptor identifies the single deliverable carried by a local OCI
 // layout. Layout index files are transport scaffolding, not published wrappers.
 func PayloadDescriptor(ctx context.Context, root string) (Descriptor, error) {
@@ -62,7 +71,7 @@ func (writer layoutWriter) importFlatLayout(ctx context.Context, input ObjectInp
 	if err != nil {
 		return Descriptor{}, "", err
 	}
-	if manifest.Config.MediaType == MediaEmptyConfig && len(manifest.Layers) == 1 {
+	if (manifest.Config.MediaType == MediaEmptyConfig || manifest.Config.MediaType == MediaHelmConfig) && len(manifest.Layers) == 1 {
 		blob = manifest.Layers[0].Digest
 	}
 	return selected, blob, nil
@@ -80,44 +89,6 @@ func flatManifest(ctx context.Context, root string, object PublishedObject) (oci
 	return manifest, nil
 }
 
-// BuildArtifact builds one ordinary OCI artifact manifest and payload layer. The
-// index.json is local OCI-layout scaffolding and is not nested in the release.
-func BuildArtifact(ctx context.Context, out string, input ObjectInput) (Result, error) {
-	if err := deliveryContext(ctx); err != nil {
-		return Result{}, err
-	}
-	if input.Layout || !isDigest(input.SemanticDigest) || !validMediaType(input.ArtifactType) || !validMediaType(input.LayerMediaType) {
-		return Result{}, e.New(e.CodeInvalidCatalog, "single artifact requires an exact typed payload")
-	}
-	stage, commit, cleanup, err := stageLayout(out)
-	if err != nil {
-		return Result{}, err
-	}
-	defer cleanup()
-	writer := layoutWriter{root: stage, plain: true}
-	var descriptor Descriptor
-	if input.Bytes != nil {
-		descriptor, _, err = writer.addBytesObject(ctx, input)
-	} else {
-		descriptor, _, err = writer.addFileObject(ctx, input)
-	}
-	if err != nil {
-		return Result{}, err
-	}
-	index := ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, ArtifactType: input.ArtifactType, Manifests: []Descriptor{descriptor}}
-	digest, err := writer.writeIndex(index)
-	if err != nil {
-		return Result{}, err
-	}
-	if _, err := PayloadDescriptor(ctx, stage); err != nil {
-		return Result{}, err
-	}
-	if err := commit(); err != nil {
-		return Result{}, err
-	}
-	return Result{LayoutPath: out, RootDigest: digest, SemanticDigest: input.SemanticDigest}, nil
-}
-
 // ReadArtifact returns a held, verified single-payload artifact for packaging
 // inspection. Binary and native-image manifests require their own typed readers.
 func ReadArtifact(ctx context.Context, root string) (Descriptor, []byte, error) {
@@ -129,12 +100,23 @@ func ReadArtifact(ctx context.Context, root string) (Descriptor, []byte, error) 
 	if err != nil {
 		return Descriptor{}, nil, err
 	}
-	if manifest.Config.MediaType != MediaEmptyConfig || len(manifest.Layers) != 1 {
+	if len(manifest.Layers) != 1 {
 		return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact has an unsupported config or payload count")
 	}
-	config, err := readBlob(ctx, root, manifest.Config, 8<<20)
-	if err != nil || string(config) != "{}" {
-		return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact config is not empty")
+	switch manifest.Config.MediaType {
+	case MediaEmptyConfig:
+		config, err := readBlob(ctx, root, manifest.Config, 8<<20)
+		if err != nil || string(config) != "{}" {
+			return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact config is not empty")
+		}
+	case MediaHelmConfig:
+		// The Helm chart config carries real Chart.yaml-derived metadata, opaque to
+		// this reader beyond confirming it is present and within bound.
+		if _, err := readBlob(ctx, root, manifest.Config, 8<<20); err != nil {
+			return Descriptor{}, nil, err
+		}
+	default:
+		return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact has an unsupported config or payload count")
 	}
 	raw, err := readBlob(ctx, root, manifest.Layers[0], maxDeliveryFileBytes)
 	return descriptor, raw, err

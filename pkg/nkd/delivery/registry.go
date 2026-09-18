@@ -94,6 +94,15 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 		if err := remote.Write(child, img, remoteOptions...); err != nil {
 			return "", e.Wrap(e.CodeUnavailable, err, "publishing deliverable %q", object.Name)
 		}
+		if object.Output != nil && object.Output.Format == "helm-oci" {
+			tag, err := helmChartVersionTag(child, img)
+			if err != nil {
+				return "", err
+			}
+			if err := remote.Tag(tag, img, remoteOptions...); err != nil {
+				return "", e.Wrap(e.CodeUnavailable, err, "tagging Helm chart %q", object.Name)
+			}
+		}
 		if _, err := ResolveDigest(ctx, child.Name(), options); err != nil {
 			return "", err
 		}

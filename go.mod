@@ -6,6 +6,7 @@ require (
 	github.com/google/go-containerregistry v0.22.1
 	github.com/urfave/cli/v2 v2.27.7
 	golang.org/x/sys v0.48.0
+	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/yaml v1.6.0
 )
 

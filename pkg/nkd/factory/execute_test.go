@@ -70,6 +70,9 @@ func TestHelmPackageIsStableAcrossWorkspaceRelocationAndReclaimsCarrier(t *testi
 	if err := os.WriteFile(filepath.Join(canonicalInput, "build.yaml"), []byte("apiVersion: aicr.nvidia.com/v1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(canonicalInput, "Chart.yaml"), []byte("apiVersion: v2\nname: gpu-runtime\nversion: 1.0.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	node := Node{ID: "package/gpu", Kind: NodePackage, PackageKind: PackageHelm,
 		Inputs: []string{"artifact/aicr"}, Outputs: []string{"package/gpu"}}
 	plannedArtifacts := []Artifact{

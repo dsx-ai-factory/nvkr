@@ -34,10 +34,10 @@ flowchart TB
     IS["Artifact signature and SLSA attestation"] -. authenticates .-> I
   end
   subgraph helm["…/nke-helm"]
-    H["Helm artifact manifest"] --> HE["Empty OCI config"]
+    H["Helm artifact manifest"] --> HC["Helm chart config: Chart.yaml metadata"]
     H --> HL["Final chart archive; exact CWE digest embedded"]
     HB["Final-package SBOM referrer manifest"] -. "OCI subject" .-> H
-    HB --> HE
+    HB --> HE["Empty OCI config"]
     HB --> HD["Sigstore bundle containing CycloneDX; final archive subject, packaging stage"]
     SB["Source SBOM referrer manifest"] -. "associated artifact" .-> H
     SB --> HE
@@ -62,7 +62,8 @@ manifest identities, build bindings, and evidence membership. No deliverable or 
 is copied into the release repository, and no separate lifecycle-binding object is published.
 
 The CLI retains its file/platform config for extraction. CWE retains its native manifest, config and layers.
-Helm has one artifact manifest and archive layer, without a nested publication root.
+Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
+standards-conformant Helm OCI chart, without a nested publication root.
 
 Each SBOM has one standard OCI referrer manifest with an empty config and one Sigstore v0.3 bundle layer.
 The bundle contains the signed in-toto statement, CycloneDX predicate, certificate/key verification material
