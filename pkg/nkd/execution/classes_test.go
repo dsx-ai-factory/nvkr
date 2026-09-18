@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"errors"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -228,7 +229,8 @@ func TestBindingValidateForGuards(t *testing.T) {
 }
 
 func errorCode(err error) nkderr.Code {
-	if coded, ok := err.(*nkderr.Error); ok {
+	var coded *nkderr.Error
+	if errors.As(err, &coded) {
 		return coded.Code
 	}
 	return ""

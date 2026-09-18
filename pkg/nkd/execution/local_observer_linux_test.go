@@ -5,6 +5,7 @@ package execution
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -141,8 +142,19 @@ func TestLinuxLocalObserverRechecksWorkspaceAccess(t *testing.T) {
 	}
 }
 
-func TestSystemLocalHostObservationExercisesLinuxProbes(t *testing.T) {
-	facts, err := ObserveLocalHost(context.Background(), openLocalWorkspace(t))
+func TestLinuxLocalObservationExercisesSystemProbesOnce(t *testing.T) {
+	kvm := systemKVMOperations
+	kvm.open = func(string, int, uint32) (int, error) { return -1, unix.ENOENT }
+	lease, err := openLinuxLocalObservation(context.Background(), openLocalWorkspace(t), unix.Faccessat, kvm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := lease.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	facts, err := lease.Observe(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,14 +165,26 @@ func TestSystemLocalHostObservationExercisesLinuxProbes(t *testing.T) {
 	if facts.Platform != wantPlatform {
 		t.Fatalf("platform = %q, want %q", facts.Platform, wantPlatform)
 	}
-	if facts.Resources.CPUMillis == 0 || facts.Resources.MemoryMiB == 0 ||
-		facts.Resources.EphemeralStorageMiB == 0 {
-		t.Fatalf("Linux probes returned empty resources: %#v", facts.Resources)
+	if facts.Resources.CPUMillis == 0 {
+		t.Fatalf("Linux CPU probe returned no capacity: %#v", facts.Resources)
 	}
-	for _, capability := range facts.Capabilities {
-		if capability != CapabilityKVM {
-			t.Fatalf("unexpected capability %q", capability)
-		}
+	if len(facts.Capabilities) != 0 {
+		t.Fatalf("injected absent KVM was exposed: %#v", facts.Capabilities)
+	}
+	if _, err := lease.Observe(context.Background()); errorCode(err) != nkderr.CodeInternal {
+		t.Fatalf("second observation error = %v, want %s", err, nkderr.CodeInternal)
+	}
+}
+
+func TestLinuxLocalObservationFailedAttemptConsumesLease(t *testing.T) {
+	observation := linuxLocalObservation{}
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := observation.Observe(canceled); errorCode(err) != nkderr.CodeTimeout {
+		t.Fatalf("first observation error = %v, want %s", err, nkderr.CodeTimeout)
+	}
+	if _, err := observation.Observe(context.Background()); errorCode(err) != nkderr.CodeInternal {
+		t.Fatalf("second observation error = %v, want %s", err, nkderr.CodeInternal)
 	}
 }
 
@@ -237,11 +261,59 @@ func TestDuplicateWorkspaceDirectoryFailuresAreCoded(t *testing.T) {
 }
 
 func TestLinuxObservationCodedProbeFailures(t *testing.T) {
-	if _, err := availableScratchMiB(-1); errorCode(err) != nkderr.CodePreflightFailed {
-		t.Fatalf("closed workspace capacity error = %v, want %s", err, nkderr.CodePreflightFailed)
+	observation := linuxLocalObservation{workspaceFD: -1}
+	if err := observation.requireWorkspaceAccess(); errorCode(err) != nkderr.CodeInternal {
+		t.Fatalf("closed workspace access error = %v, want %s", err, nkderr.CodeInternal)
+	}
+	if _, err := availableScratchMiB(-1); errorCode(err) != nkderr.CodeInternal {
+		t.Fatalf("closed workspace capacity error = %v, want %s", err, nkderr.CodeInternal)
 	}
 	if _, err := hostPlatformForMachine("riscv64"); errorCode(err) != nkderr.CodeEngineCapability {
 		t.Fatalf("unsupported platform error = %v, want %s", err, nkderr.CodeEngineCapability)
+	}
+}
+
+func TestAvailableScratchMiBFailClosed(t *testing.T) {
+	readFailure := errors.New("statfs failed")
+	for _, test := range []struct {
+		name      string
+		fd        int
+		stat      unix.Statfs_t
+		statfsErr error
+		nilStatfs bool
+		want      uint64
+		wantCode  nkderr.Code
+		wantErr   error
+	}{
+		{name: "closed handle", fd: -1, wantCode: nkderr.CodeInternal},
+		{name: "missing observer", fd: 7, nilStatfs: true, wantCode: nkderr.CodeInternal},
+		{name: "statfs failure", fd: 7, statfsErr: readFailure, wantCode: nkderr.CodeEngineCapability, wantErr: readFailure},
+		{name: "read only", fd: 7, stat: unix.Statfs_t{Flags: unix.ST_RDONLY}, wantCode: nkderr.CodeEngineCapability},
+		{name: "zero block size", fd: 7, stat: unix.Statfs_t{}, wantCode: nkderr.CodeEngineCapability},
+		{name: "negative block size", fd: 7, stat: unix.Statfs_t{Bsize: -1}, wantCode: nkderr.CodeEngineCapability},
+		{name: "overflow", fd: 7, stat: unix.Statfs_t{Bsize: 2, Bavail: math.MaxUint64}, wantCode: nkderr.CodeEngineCapability},
+		{name: "capacity", fd: 7, stat: unix.Statfs_t{Bsize: 4096, Bavail: 512}, want: 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var statfs localStatfs
+			if !test.nilStatfs {
+				statfs = func(fd int, stat *unix.Statfs_t) error {
+					if fd != test.fd {
+						t.Fatalf("statfs fd = %d, want %d", fd, test.fd)
+					}
+					*stat = test.stat
+					return test.statfsErr
+				}
+			}
+			got, err := availableScratchMiBWith(test.fd, statfs)
+			if got != test.want || errorCode(err) != test.wantCode {
+				t.Fatalf("capacity = %d, error = %v; want capacity=%d code=%s",
+					got, err, test.want, test.wantCode)
+			}
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Fatalf("error = %v, want wrapped %v", err, test.wantErr)
+			}
+		})
 	}
 }
 
@@ -268,11 +340,12 @@ func TestObserveKVMDetection(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			closed := false
+			wantFlags := unix.O_RDONLY | unix.O_CLOEXEC | unix.O_NOFOLLOW | unix.O_NONBLOCK
 			observation := linuxLocalObservation{
 				workspaceFD: -1, kvmFD: -1,
 				kvm: localKVMOperations{
 					open: func(path string, flags int, mode uint32) (int, error) {
-						if path != kvmDevicePath || flags == 0 || mode != 0 {
+						if path != kvmDevicePath || flags != wantFlags || mode != 0 {
 							t.Fatalf("open path=%q flags=%d mode=%d", path, flags, mode)
 						}
 						return 41, test.openErr

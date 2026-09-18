@@ -120,6 +120,7 @@ func TestObserveLocalHostRejectsInvalidFacts(t *testing.T) {
 func TestObserveLocalHostFailsClosed(t *testing.T) {
 	observerError := nkderr.New(nkderr.CodeEngineCapability, "observer unavailable")
 	observeError := nkderr.New(nkderr.CodeTimeout, "observation canceled")
+	rawObserveError := errors.New("raw observation failed")
 	closeError := errors.New("close failed")
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -142,6 +143,7 @@ func TestObserveLocalHostFailsClosed(t *testing.T) {
 		{name: "observation failure", ctx: context.Background(), workspace: openLocalWorkspace(t), observer: fakeLocalObserver{lease: &fakeLocalLease{observeErr: observeError}}, wantCode: nkderr.CodeTimeout, wantErr: observeError},
 		{name: "close failure", ctx: context.Background(), workspace: openLocalWorkspace(t), observer: fakeLocalObserver{lease: &fakeLocalLease{facts: localObservationFacts(false), closeErr: closeError}}, wantCode: nkderr.CodeEngineCapability, wantErr: closeError},
 		{name: "observation and close failure", ctx: context.Background(), workspace: openLocalWorkspace(t), observer: fakeLocalObserver{lease: &fakeLocalLease{observeErr: observeError, closeErr: closeError}}, wantCode: nkderr.CodeTimeout, wantErr: observeError, wantAlso: closeError},
+		{name: "uncoded observation and close failure", ctx: context.Background(), workspace: openLocalWorkspace(t), observer: fakeLocalObserver{lease: &fakeLocalLease{observeErr: rawObserveError, closeErr: closeError}}, wantCode: nkderr.CodeInternal, wantErr: rawObserveError, wantAlso: closeError},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			facts, err := observeLocalHost(test.ctx, test.workspace, test.observer)

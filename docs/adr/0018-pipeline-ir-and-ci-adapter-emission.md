@@ -178,9 +178,10 @@ before work; a provider's outer job timeout must permit the authored executor bu
 
 The execution owner provides a narrower diagnostic local Linux observation helper. The caller supplies an
 already-open workspace-directory capability. The helper duplicates that descriptor while its lifetime is
-protected by the runtime, checks effective write and traversal access, observes process CPU affinity, free host
-memory, available workspace capacity and KVM API exposure, then closes every retained workspace and KVM handle
-before returning. It never resolves a replaceable workspace pathname. Non-Linux hosts reject the observation.
+protected by the runtime, checks effective write and traversal access, observes host platform, process CPU
+affinity, free host memory, available workspace capacity and KVM API exposure, then closes every retained
+workspace and KVM handle before returning. It never resolves a replaceable workspace pathname. Non-Linux hosts
+reject the observation.
 
 This helper accepts neither an execution request nor a selected binding. It does not authenticate Environment
 membership or deterministic selection, own or enforce an execution deadline, reserve observed resources, prove a

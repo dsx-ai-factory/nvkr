@@ -11,7 +11,9 @@ import (
 
 // ObservedHostFacts is point-in-time diagnostic data. It is not provider
 // allocation proof: CPU, memory, and workspace capacity are not reserved by
-// observing them. It cannot authorize execution.
+// observing them. It cannot authorize execution. Its JSON tags are only for
+// diagnostic rendering; this value is not canonical identity, manifest, or
+// receipt input.
 type ObservedHostFacts struct {
 	Platform     HostPlatform     `json:"platform"`
 	Resources    ResourceCapacity `json:"resources"`
@@ -28,6 +30,7 @@ func ObserveLocalHost(ctx context.Context, workspace *os.File) (ObservedHostFact
 }
 
 type localObservationLease interface {
+	// Observe is single-use, regardless of whether the observation succeeds.
 	Observe(context.Context) (ObservedHostFacts, error)
 	Close() error
 }

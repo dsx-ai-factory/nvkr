@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
@@ -28,6 +29,7 @@ type linuxLocalObservation struct {
 	kvmFD       int
 	access      localAccessCheck
 	kvm         localKVMOperations
+	observed    atomic.Bool
 }
 
 func (systemLocalObserver) Open(ctx context.Context, workspace *os.File) (localObservationLease, error) {
@@ -37,6 +39,8 @@ func (systemLocalObserver) Open(ctx context.Context, workspace *os.File) (localO
 type localAccessCheck func(int, string, uint32, int) error
 
 type localFDDuplicator func(uintptr) (int, error)
+
+type localStatfs func(int, *unix.Statfs_t) error
 
 type localKVMOperations struct {
 	open  func(string, int, uint32) (int, error)
@@ -124,6 +128,10 @@ func duplicateWorkspaceDirectory(workspace *os.File, duplicate localFDDuplicator
 }
 
 func (observation *linuxLocalObservation) Observe(ctx context.Context) (ObservedHostFacts, error) {
+	if !observation.observed.CompareAndSwap(false, true) {
+		return ObservedHostFacts{}, e.New(e.CodeInternal,
+			"local Linux observation lease has already been used")
+	}
 	if err := localObservationContextError(ctx, "observing local Linux execution host"); err != nil {
 		return ObservedHostFacts{}, err
 	}
@@ -168,7 +176,7 @@ func (observation *linuxLocalObservation) Observe(ctx context.Context) (Observed
 
 func (observation *linuxLocalObservation) requireWorkspaceAccess() error {
 	if observation.workspaceFD < 0 {
-		return e.New(e.CodePreflightFailed, "local workspace directory handle is closed")
+		return e.New(e.CodeInternal, "local workspace directory handle is closed")
 	}
 	if observation.access == nil {
 		return e.New(e.CodeInternal, "local workspace access checker is absent")
@@ -251,20 +259,27 @@ func availableMemoryMiB() (uint64, error) {
 }
 
 func availableScratchMiB(fd int) (uint64, error) {
+	return availableScratchMiBWith(fd, unix.Fstatfs)
+}
+
+func availableScratchMiBWith(fd int, statfs localStatfs) (uint64, error) {
 	if fd < 0 {
-		return 0, e.New(e.CodePreflightFailed, "local scratch directory handle is closed")
+		return 0, e.New(e.CodeInternal, "local scratch directory handle is closed")
+	}
+	if statfs == nil {
+		return 0, e.New(e.CodeInternal, "local scratch filesystem observer is absent")
 	}
 	var stat unix.Statfs_t
-	if err := unix.Fstatfs(fd, &stat); err != nil {
+	if err := statfs(fd, &stat); err != nil {
 		return 0, e.Wrap(e.CodeEngineCapability, err, "reading local scratch capacity")
 	}
 	if uint64(stat.Flags)&uint64(unix.ST_RDONLY) != 0 {
 		return 0, e.New(e.CodeEngineCapability, "local scratch filesystem is read-only")
 	}
-	blockSize := uint64(stat.Bsize)
-	if blockSize == 0 {
-		return 0, e.New(e.CodeEngineCapability, "local scratch filesystem reports a zero block size")
+	if stat.Bsize <= 0 {
+		return 0, e.New(e.CodeEngineCapability, "local scratch filesystem reports an invalid block size")
 	}
+	blockSize := uint64(stat.Bsize)
 	if stat.Bavail > math.MaxUint64/blockSize {
 		return 0, e.New(e.CodeEngineCapability, "local scratch capacity exceeds the supported range")
 	}
@@ -274,7 +289,7 @@ func availableScratchMiB(fd int) (uint64, error) {
 func (observation *linuxLocalObservation) observeKVM() (bool, error) {
 	if observation.kvmFD < 0 {
 		fd, err := observation.kvm.open(kvmDevicePath,
-			unix.O_RDWR|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+			unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 		if err != nil {
 			if errors.Is(err, unix.ENOENT) || errors.Is(err, unix.ENODEV) ||
 				errors.Is(err, unix.ENXIO) || errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM) {
