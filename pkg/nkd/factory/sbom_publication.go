@@ -95,7 +95,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			}
 		}
 		objects = append(objects, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(digest, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: digest, Bytes: bomRaw})
-		if plan.ExecutionSettings.SBOMTool != "" {
+		if plan.Definition.SBOMTool != "" {
 			if len(bom.Components) == 0 {
 				return nil, e.New(e.CodeProvenanceMissing, "hosted SBOM omits required dependency inventory")
 			}
@@ -115,7 +115,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 					kind = input.Kind
 				}
 			}
-			if (kind == "tarball" && method != "helm-manifests/v1") || (kind != "tarball" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.ExecutionSettings.SBOMTool))) {
+			if (kind == "tarball" && method != "helm-manifests/v1") || (kind != "tarball" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.Definition.SBOMTool))) {
 				return nil, e.New(e.CodeVerifyFailed, "hosted SBOM inspection does not match the planned scanner")
 			}
 		}

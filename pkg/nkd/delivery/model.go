@@ -1,7 +1,8 @@
-// Package delivery turns exact NKD objects and artifacts into operator-consumable
-// OCI and APT layouts. It owns representation and transport, never release
-// authorization: a diagnostic root stays diagnostic, while a qualified root must
-// be constructed from the independently authenticated release publication seam.
+// Package delivery owns publication bytes, output membership, and content identity.
+// BuildPublicationRoot assembles exact artifacts into an OCI layout; OpenPublication
+// and PullPublication check and hold its closure for consumption. Close each returned
+// Publication after use. ContentDigest gives producers and consumers one canonical
+// output identity. Consumer policy and release authorization remain separate checks.
 package delivery
 
 import (
@@ -28,6 +29,8 @@ const (
 	MediaPublicationRootConfig = "application/vnd.nkd.publication-root.config.v3+json"
 	MediaDeliveryObject        = "application/vnd.nkd.delivery-object.v1"
 	MediaDeliveryObjectConfig  = "application/vnd.nkd.delivery-object.config.v1+json"
+	MediaReleaseSet            = "application/vnd.nkd.release-set.v4+json"
+	MediaInventory             = "application/vnd.nkd.inventory.v4+json"
 	MediaOctetStream           = "application/octet-stream"
 )
 

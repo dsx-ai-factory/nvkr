@@ -144,7 +144,7 @@ func githubArtifactLabel(plan *Plan, artifact Artifact) string {
 
 // The EXIT trap reports failure without swallowing the command's status. No env
 // dump, command expansion, credentials or destination URLs enter these messages.
-func githubNodeCommands(node Node, plan *Plan, graphDigests map[string]string) []string {
+func githubNodeCommands(node Node, plan *Plan) []string {
 	commands := []string{
 		"set -euo pipefail",
 		"nkd_started=$SECONDS",
@@ -157,7 +157,7 @@ func githubNodeCommands(node Node, plan *Plan, graphDigests map[string]string) [
 	if len(githubSourceEnvironment(plan, node)) > 0 {
 		commands = append(commands, requireSourceToken)
 	}
-	commands = append(commands, generatedNodeCommands(node, plan, graphDigests, FactoryPlanPath, FactoryGraphDir, "$GITHUB_WORKSPACE")...)
+	commands = append(commands, generatedNodeCommands(node, plan, FactoryPlanPath, "$GITHUB_WORKSPACE")...)
 	for _, output := range node.Outputs {
 		commands = append(commands, "printf '%s\\n' "+shellQuote("Produced: "+output))
 	}

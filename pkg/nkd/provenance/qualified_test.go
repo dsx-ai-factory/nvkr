@@ -219,7 +219,7 @@ func qualifiedPrebuiltReport(t *testing.T, payload []byte) (*pipeline.Report, *i
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultDirectory := pipeline.ResultDirectory(sourceRoot)
+	resultDirectory := filepath.Join(filepath.Dir(sourceRoot), "results")
 	if err := os.MkdirAll(resultDirectory, 0o755); err != nil {
 		t.Fatal(err)
 	}

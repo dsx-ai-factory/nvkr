@@ -1,0 +1,296 @@
+package delivery
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
+	"sync"
+
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+)
+
+// Publication owns an exact, independently checked publication closure. Its
+// anonymous file capabilities survive source-path replacement. Only defensive
+// output descriptions leave this owner; Close releases all held bytes.
+// It establishes membership and integrity, not signer or release authorization.
+type Publication struct {
+	mu         sync.RWMutex
+	closed     bool
+	files      []*heldfile.File
+	inspection Inspection
+	outputs    []Output
+}
+
+// OpenPublication captures bounded immutable files, validates the exact root and
+// every reachable descriptor/evidence binding, then checks output payload members.
+// The caller's root digest is an expectation; only the checked bytes establish it.
+func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publication, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return nil, err
+	}
+	if !isDigest(expectedRoot) {
+		return nil, e.New(e.CodeVerifyFailed, "publication requires an exact expected root digest")
+	}
+	stage, err := os.MkdirTemp("", "nkd-publication-*")
+	if err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating publication inspection workspace")
+	}
+	defer func() { _ = os.RemoveAll(stage) }()
+	publication := &Publication{}
+	failed := true
+	defer func() {
+		if failed {
+			_ = publication.Close()
+		}
+	}()
+	layout := filepath.Join(stage, "layout")
+	if err := os.MkdirAll(filepath.Join(layout, "blobs", "sha256"), 0o700); err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating held publication layout")
+	}
+	capture := func(relative, digest string, max int64) error {
+		held, err := heldfile.OpenContext(ctx, filepath.Join(root, relative), heldfile.Options{Label: "publication closure", ExpectedDigest: digest, MaxBytes: max})
+		if err != nil {
+			return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "capturing publication closure member"))
+		}
+		publication.files = append(publication.files, held)
+		out, err := os.OpenFile(filepath.Join(layout, relative), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if err != nil {
+			return e.Wrap(e.CodeImmutableViolation, err, "materializing held publication member")
+		}
+		_, writeErr := held.WriteToContext(ctx, out)
+		if err := errors.Join(writeErr, out.Close()); err != nil {
+			return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "materializing held publication bytes"))
+		}
+		return nil
+	}
+	if err := capture("index.json", expectedRoot, 8<<20); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "blobs", "sha256"))
+	if err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening publication blob inventory")
+	}
+	for _, entry := range entries {
+		digest := "sha256:" + entry.Name()
+		if !isDigest(digest) || !entry.Type().IsRegular() {
+			return nil, e.New(e.CodeVerifyFailed, "publication contains an invalid blob inventory member")
+		}
+		if err := capture(filepath.Join("blobs", "sha256", entry.Name()), digest, maxDeliveryFileBytes); err != nil {
+			return nil, err
+		}
+	}
+	inspection, err := Inspect(ctx, layout)
+	if err != nil {
+		return nil, err
+	}
+	if inspection.RootDigest != expectedRoot || inspection.Root.Release == nil {
+		return nil, e.New(e.CodeVerifyFailed, "publication has no exact release metadata")
+	}
+	outputs, err := inspectOutputs(ctx, layout, inspection, stage)
+	if err != nil {
+		return nil, err
+	}
+	content, err := ContentDigest(outputs)
+	if err != nil {
+		return nil, err
+	}
+	if content != inspection.Root.Release.ContentSubject {
+		return nil, e.New(e.CodeVerifyFailed, "release content subject differs from exact output payloads")
+	}
+	publication.inspection, publication.outputs = inspection, outputs
+	failed = false
+	return publication, nil
+}
+
+// PullPublication owns registry materialization and its cleanup, then returns the
+// same held-byte capability used for already materialized local publications.
+func PullPublication(ctx context.Context, reference, workspace string, options RegistryOptions) (*Publication, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(workspace, 0o700); err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating release verification root")
+	}
+	stage, err := os.MkdirTemp(workspace, ".verify-*")
+	if err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating release verification workspace")
+	}
+	defer func() { _ = os.RemoveAll(stage) }()
+	root := filepath.Join(stage, "layout")
+	inspection, err := Pull(ctx, reference, root, options)
+	if err != nil {
+		return nil, err
+	}
+	return OpenPublication(ctx, root, inspection.RootDigest)
+}
+
+func (publication *Publication) Close() error {
+	if publication == nil {
+		return nil
+	}
+	publication.mu.Lock()
+	defer publication.mu.Unlock()
+	if publication.closed {
+		return nil
+	}
+	publication.closed = true
+	var result error
+	for _, held := range publication.files {
+		result = errors.Join(result, held.Close())
+	}
+	publication.files = nil
+	if result != nil {
+		return e.Wrap(e.CodeVerifyFailed, result, "closing publication snapshots")
+	}
+	return nil
+}
+
+// Artifacts projects exact named outputs, binding their transport references to
+// this root. The content subject never includes those repository locators.
+func (publication *Publication) Artifacts(reference string) ([]Output, string, error) {
+	if publication == nil {
+		return nil, "", e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	publication.mu.RLock()
+	defer publication.mu.RUnlock()
+	if publication.closed || publication.inspection.Root.Release == nil {
+		return nil, "", e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	if _, digest, ok := strings.Cut(reference, "@"); ok && isDigest(digest) && digest != publication.inspection.RootDigest {
+		return nil, "", e.New(e.CodeVerifyFailed, "checked publication root differs from requested subject")
+	}
+	references, err := OutputReferences(reference, publication.inspection)
+	if err != nil {
+		return nil, "", err
+	}
+	outputs := cloneOutputs(publication.outputs)
+	for i := range outputs {
+		ref, ok := references[outputs[i].Name]
+		if !ok {
+			return nil, "", e.New(e.CodeVerifyFailed, "publication output has no bound repository")
+		}
+		outputs[i].Reference = ref
+	}
+	return outputs, publication.inspection.Root.Release.ContentSubject, nil
+}
+
+func (publication *Publication) RequireAttestedEvidence() error {
+	if publication == nil {
+		return e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	publication.mu.RLock()
+	defer publication.mu.RUnlock()
+	if publication.closed {
+		return e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	return RequireAttestedEvidence(publication.inspection)
+}
+
+func inspectOutputs(ctx context.Context, layout string, inspection Inspection, stage string) ([]Output, error) {
+	var outputs []Output
+	for _, object := range inspection.Root.Objects {
+		binding := object.Output
+		if binding == nil {
+			continue
+		} // Inspect already requires exact evidence membership for every other object.
+		output := Output{Name: object.Name, Kind: binding.Format, Digest: object.DescriptorDigest, BuildDigest: binding.BuildDigest, Components: append([]string(nil), binding.Components...)}
+		if binding.Format == "apt-repository" {
+			output.Digest = object.SemanticDigest
+		}
+		if err := output.Validate(); err != nil {
+			return nil, err
+		}
+		members := append([]string(nil), output.Components...)
+		switch output.Kind {
+		case "oci":
+			if len(members) != 1 || binding.TransportPath != "" {
+				return nil, e.New(e.CodeVerifyFailed, "OCI output has invalid members or transport binding")
+			}
+			image, err := inspectPublishedContainerImage(ctx, layout, inspection, output.Name)
+			if err != nil {
+				return nil, err
+			}
+			if image.RootDigest != output.Digest {
+				return nil, e.New(e.CodeVerifyFailed, "OCI output differs from its image binding")
+			}
+		case "executable":
+			bundle, err := extractBinaryBundle(ctx, layout, inspection, output.Name, filepath.Join(stage, output.Name+"-bundle"))
+			if err != nil {
+				return nil, err
+			}
+			members = nil
+			for _, entry := range bundle.Entries {
+				members = append(members, entry.Name)
+			}
+		case "apt-repository":
+			expected := filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", output.Name))
+			if binding.TransportPath != expected {
+				return nil, e.New(e.CodeVerifyFailed, "APT output has an unsafe transport binding")
+			}
+			archive := filepath.Join(stage, output.Name+".tar")
+			if err := materializePayload(ctx, layout, object, archive); err != nil {
+				return nil, err
+			}
+			unpacked := filepath.Join(stage, output.Name+"-repository")
+			if err := transportarchive.Unpack(ctx, archive, unpacked, []string{binding.TransportPath}); err != nil {
+				return nil, err
+			}
+			repository, err := InspectAPTRepository(ctx, filepath.Join(unpacked, filepath.FromSlash(binding.TransportPath)))
+			if err != nil {
+				return nil, err
+			}
+			if repository.Digest != output.Digest {
+				return nil, e.New(e.CodeVerifyFailed, "APT output differs from its binding")
+			}
+			members = nil
+			for _, pkg := range repository.Repository.Packages {
+				members = append(members, pkg.Name)
+			}
+			sort.Strings(members)
+		case "helm-oci":
+			if binding.TransportPath != "" {
+				return nil, e.New(e.CodeVerifyFailed, "Helm output has an unexpected transport path")
+			}
+		default:
+			return nil, e.New(e.CodeVerifyFailed, "unsupported publication output format")
+		}
+		if !slices.Equal(members, output.Components) {
+			return nil, e.New(e.CodeVerifyFailed, "publication output %q payload members differ from its binding", output.Name)
+		}
+		outputs = append(outputs, output)
+	}
+	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
+	return outputs, nil
+}
+
+// The destination is private to OpenPublication; no caller-owned path becomes
+// visible. Stream large APT carriers from verified anonymous bytes.
+func materializePayload(ctx context.Context, root string, object PublishedObject, destination string) error {
+	manifest, err := flatManifest(ctx, root, object)
+	if err != nil {
+		return err
+	}
+	if manifest.ArtifactType != object.ArtifactType || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest {
+		return e.New(e.CodeVerifyFailed, "publication object has no exact single payload")
+	}
+	held, err := holdBlob(ctx, root, manifest.Layers[0], maxDeliveryFileBytes)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = held.Close() }()
+	out, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return e.Wrap(e.CodeImmutableViolation, err, "creating private payload inspection carrier")
+	}
+	_, writeErr := held.WriteToContext(ctx, out)
+	if err := errors.Join(writeErr, out.Close()); err != nil {
+		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "materializing exact payload"))
+	}
+	return nil
+}

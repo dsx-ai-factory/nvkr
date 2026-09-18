@@ -96,7 +96,7 @@ func NewEvidence(m *Manifest, verdict string, preflight []profile.Divergence, co
 // reference manifest (receiver) vs the freshly-built manifest, the verdict, the
 // preflight divergences. Per-component rows carry the match verdict and, on a
 // mismatch, a stable cause code. Reference metadata (build/profile/conformance) comes from the
-// receiver; buildDigest and profile are already asserted equal by Check.
+// receiver; callers verify build and profile equality through VerifyAgainst.
 func (want *Manifest) BuildEvidence(got *Manifest, verdict string, preflight []profile.Divergence) *EvidenceBundle {
 	wantByName := make(map[string]ComponentDigest, len(want.Components))
 	for _, w := range want.Components {
@@ -123,12 +123,6 @@ func (want *Manifest) BuildEvidence(got *Manifest, verdict string, preflight []p
 		ValidationVectorRef: want.ValidationVectorRef,
 	}
 	return NewEvidence(meta, verdict, preflight, comps)
-}
-
-// AddDiskManifest records a disk artifact's canonical logical-disk (RAW) manifest.
-func (eb *EvidenceBundle) AddDiskManifest(ref DiskManifestRef) {
-	eb.DiskManifests = append(eb.DiskManifests, ref)
-	sort.Slice(eb.DiskManifests, func(i, j int) bool { return eb.DiskManifests[i].Artifact < eb.DiskManifests[j].Artifact })
 }
 
 // Marshal renders the unqualified diagnostic bundle deterministically. The returned

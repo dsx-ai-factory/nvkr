@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -1061,7 +1063,7 @@ func requireCleanAbsoluteDirectory(path, label string) (string, error) {
 	if !validCleanAbsolutePath(path) {
 		return "", e.New(e.CodeEngineCapability, "%s must be a clean absolute path", label)
 	}
-	directory, _, err := openDirectoryNoFollow(path)
+	directory, _, err := securepath.OpenDirectory(path)
 	if err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "%s is not a real directory", label)
 	}
@@ -1075,7 +1077,7 @@ func openPackerProjectDirectory(root, relative string) (string, *os.File, error)
 	if !validCleanAbsolutePath(root) || !validPackerProjectPath(relative) {
 		return "", nil, fmt.Errorf("project root and path must be clean")
 	}
-	current, _, err := openDirectoryNoFollow(root)
+	current, _, err := securepath.OpenDirectory(root)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1083,7 +1085,7 @@ func openPackerProjectDirectory(root, relative string) (string, *os.File, error)
 		return root, current, nil
 	}
 	for _, part := range strings.Split(relative, string(filepath.Separator)) {
-		next, _, openErr := openChildNoFollow(current, part, true)
+		next, _, openErr := securepath.OpenChild(current, part, true)
 		_ = current.Close()
 		if openErr != nil {
 			return "", nil, openErr
@@ -1164,12 +1166,12 @@ func stagePackerMaterials(ctx context.Context, root string, inputs []PackerMater
 }
 
 func materializePackerInput(ctx context.Context, root, relative string, material *heldfile.File) error {
-	parent, finalName, err := openOrCreateParentBeneath(root, relative)
+	parent, finalName, err := securepath.CreateParentBeneath(root, relative)
 	if err != nil {
 		return err
 	}
 	defer parent.Close()
-	temporary, temporaryName, err := createTemporarySibling(parent)
+	temporary, temporaryName, err := securepath.CreateTemporarySibling(parent)
 	if err != nil {
 		return err
 	}
@@ -1191,7 +1193,7 @@ func materializePackerInput(ctx context.Context, root, relative string, material
 	if written != material.Size() {
 		return fmt.Errorf("staged material size %d does not match held size %d", written, material.Size())
 	}
-	if err := publishTransportAtNoReplace(int(parent.Fd()), temporaryName, int(parent.Fd()), finalName); err != nil {
+	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), temporaryName, int(parent.Fd()), finalName); err != nil {
 		return err
 	}
 	if err := unix.Fsync(int(parent.Fd())); err != nil {

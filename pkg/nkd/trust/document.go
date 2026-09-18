@@ -38,11 +38,8 @@ const (
 	RolePromotionPolicy  SignerRole = "promotion-policy"
 	RoleReleaseSet       SignerRole = "release-set"
 	RoleClearance        SignerRole = "release-clearance"
-	// RoleReproduction and RoleCompatibility complete the release-gate signer vocabulary
-	// so the reproduction/compatibility/conformance gates authenticate under ONE role
-	// system (trust.SignerRole via DocumentAuthenticator) rather than a parallel one.
-	// release.ReceiptRole.TrustRole() is the single bridge onto these; keeping the trust
-	// roles here means a future wired ReceiptAuthenticator does not fork a second vocabulary.
+	// RoleReproduction and RoleCompatibility keep release-gate signer policies
+	// distinct from the release-set and clearance authorities.
 	RoleReproduction  SignerRole = "release-reproduction"
 	RoleCompatibility SignerRole = "release-compatibility"
 )
@@ -277,7 +274,6 @@ type DocumentReceipt struct {
 	signatureSHA256       string
 	certificateBlobSHA256 string
 	bundleSHA256          string
-	trustedRootSHA256     string
 	snapshotSHA256        string
 }
 
@@ -290,7 +286,6 @@ func (r DocumentReceipt) CertificateSHA256() string     { return r.certificateSH
 func (r DocumentReceipt) SignatureSHA256() string       { return r.signatureSHA256 }
 func (r DocumentReceipt) CertificateBlobSHA256() string { return r.certificateBlobSHA256 }
 func (r DocumentReceipt) BundleSHA256() string          { return r.bundleSHA256 }
-func (r DocumentReceipt) TrustedRootSHA256() string     { return r.trustedRootSHA256 }
 func (r DocumentReceipt) SnapshotSHA256() string        { return r.snapshotSHA256 }
 
 // Decoded returns a fresh strict decode of the authenticated exact bytes. Callers
@@ -398,7 +393,6 @@ func (a *DocumentAuthenticator) Authenticate(ctx context.Context, req Authentica
 		signatureSHA256:       ev.SignatureSHA256,
 		certificateBlobSHA256: ev.CertificateBlobSHA256,
 		bundleSHA256:          ev.BundleSHA256,
-		trustedRootSHA256:     req.Policy.trustedRootDigest,
 		snapshotSHA256:        "sha256:" + hex.EncodeToString(sum[:]),
 	}, nil
 }

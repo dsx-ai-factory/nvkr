@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -29,33 +30,47 @@ func (plan Plan) Validate() error {
 		(plan.DefinitionPath != "" && (!safeGeneratedPath(plan.DefinitionPath) || !safeGeneratedPath(plan.EnvironmentPath))) {
 		return e.New(e.CodeInvalidCatalog, "run plan definition/environment source paths are incomplete or unsafe")
 	}
-	if plan.CompileSpecDigest != "" && !canonical.IsDigest(plan.CompileSpecDigest) {
-		return e.New(e.CodeUnpinnedSource, "run plan compile-spec identity is not digest-pinned")
+	if !canonical.IsDigest(plan.CatalogDigest) {
+		return e.New(e.CodeUnpinnedSource, "run plan catalog identity is not digest-pinned")
 	}
-	if plan.DefinitionDigest != "" && !canonical.IsDigest(plan.DefinitionDigest) {
-		return e.New(e.CodeUnverifiedRef, "run plan has malformed definitionDigest %q", plan.DefinitionDigest)
-	}
-	if plan.EnvironmentDigest != "" && !canonical.IsDigest(plan.EnvironmentDigest) {
-		return e.New(e.CodeUnverifiedRef, "run plan has malformed environmentDigest %q", plan.EnvironmentDigest)
-	}
-	if (plan.DefinitionDigest == "") != (plan.EnvironmentDigest == "") {
-		return e.New(e.CodeUnverifiedRef, "run plan must bind definitionDigest and environmentDigest together")
-	}
-	if err := plan.Qualification.ValidatePlanTier(plan.ExecutionSettings.Signing); err != nil {
+	if err := admitInputs(plan.Definition, plan.Environment); err != nil {
 		return err
 	}
-	if !canonical.IsDigest(plan.CatalogDigest) || !canonical.IsDigest(plan.ExecutionSettingsDigest) {
-		return e.New(e.CodeUnpinnedSource, "run plan catalog/execution-settings identity is not digest-pinned")
-	}
-	if err := plan.ExecutionSettings.Validate(); err != nil {
-		return err
-	}
-	executionSettingsDigest, err := plan.ExecutionSettings.Digest()
+	definitionDigest, err := plan.Definition.Digest()
 	if err != nil {
 		return err
 	}
-	if executionSettingsDigest != plan.ExecutionSettingsDigest {
-		return e.New(e.CodeUnverifiedRef, "run plan execution settings do not match executionSettingsDigest")
+	environmentDigest, err := plan.Environment.Digest()
+	if err != nil {
+		return err
+	}
+	if definitionDigest != plan.DefinitionDigest || plan.Name != plan.Definition.Metadata.Name {
+		return e.New(e.CodeUnverifiedRef, "run plan definition does not match definitionDigest")
+	}
+	if environmentDigest != plan.EnvironmentDigest {
+		return e.New(e.CodeUnverifiedRef, "run plan environment does not match environmentDigest")
+	}
+	if err := plan.Qualification.ValidatePlanTier(plan.Environment.Signing); err != nil {
+		return err
+	}
+	packages, targets, routes, err := derivePublication(plan.Definition, plan.Environment)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(plan.Targets, targets) || !reflect.DeepEqual(plan.Routes, routes) {
+		return e.New(e.CodeUnverifiedRef, "run plan publication routing differs from its authored environment")
+	}
+	if err := plan.validateCompiledOperations(packages); err != nil {
+		return err
+	}
+	if len(plan.LifecycleOutputs) != len(plan.Definition.Outputs) || len(plan.Builds) != len(plan.Definition.Outputs) {
+		return e.New(e.CodeUnverifiedRef, "run plan omits or adds authored output slots")
+	}
+	for i, output := range plan.Definition.Outputs {
+		bound := plan.LifecycleOutputs[i]
+		if bound.Name != output.Name || bound.Kind != output.Format || bound.ArtifactID != "package/"+output.Name || !equalFactoryStrings(bound.Components, output.Components) {
+			return e.New(e.CodeUnverifiedRef, "run plan output %q differs from its definition", output.Name)
+		}
 	}
 	previous := ""
 	for _, applied := range plan.AppliedOverlays {
@@ -121,7 +136,7 @@ func (plan Plan) Validate() error {
 			}
 		}
 	}
-	for source := range plan.ExecutionSettings.SourceAccess {
+	for source := range plan.Environment.SourceAccess {
 		if !resolvedSources[source] {
 			return e.New(e.CodeInvalidCatalog,
 				"execution settings sourceAccess %q does not match a resolved fetch source", source)
@@ -151,9 +166,7 @@ func (plan Plan) Validate() error {
 		}
 	}
 	builds := map[string]ir.Node{}
-	buildRunsOn := map[string]string{}
 	for _, build := range plan.Builds {
-		buildRunsOn[build.Name] = build.RunsOn
 		selected := make(map[string]struct{}, len(build.Components))
 		for _, name := range build.Components {
 			selected[name] = struct{}{}
@@ -191,7 +204,7 @@ func (plan Plan) Validate() error {
 						"build %q build node %q changes its catalog execution requirements", build.Name, node.ID)
 				}
 				expectedBinding, matchErr := execution.Match(
-					node.Requirements, plan.ExecutionSettings.ExecutionClasses, matchOptionsForBuildNode(node))
+					node.Requirements, plan.Environment.ExecutionClasses, matchOptionsForBuildNode(node))
 				if matchErr != nil {
 					return e.Wrap(e.CodeEngineCapability, matchErr,
 						"build %q build node %q has no admitted execution class", build.Name, node.ID)
@@ -219,7 +232,12 @@ func (plan Plan) Validate() error {
 					inputs = append(inputs, id)
 				}
 			}
-			if err := validatePackageInputs(PackageSpec{Kind: PackageHelm, HelmImage: node.HelmImage}, inputs, artifacts); err != nil {
+			if err := validatePackageInputs(packageSpec{Kind: PackageHelm, HelmImage: node.HelmImage}, inputs, artifacts); err != nil {
+				return err
+			}
+		}
+		if node.IRNode != "" {
+			if _, err := plan.ExecutionFor(node); err != nil {
 				return err
 			}
 		}
@@ -227,24 +245,48 @@ func (plan Plan) Validate() error {
 			continue
 		}
 		build, ok := builds[node.BuildTarget+"/"+node.IRNode]
-		if !ok || node.Network != build.Network || node.Container != build.Toolchain || node.Platform != build.Platform ||
-			!execution.Equal(node.Requirements, build.Requirements) ||
-			!execution.EqualBinding(node.ExecutionBinding, build.ExecutionBinding) {
-			return e.New(e.CodePipelineDrift, "build node %q changes its exact build execution settings", node.ID)
+		if !ok {
+			return e.New(e.CodePipelineDrift, "operation %q has no selected producer instruction", node.ID)
 		}
-		expectedRunsOn := buildRunsOn[node.BuildTarget]
-		if build.ExecutionBinding != nil {
-			expectedRunsOn = build.ExecutionBinding.Class.RunsOn
-		}
-		if node.RunsOn != expectedRunsOn {
-			return e.New(e.CodePipelineDrift,
-				"build node %q changes its deterministic execution route", node.ID)
-		}
-		if build.BuilderType == ir.BuilderBuildKit && plan.ExecutionSettings.RuntimeBinary() != "docker" {
+		if build.BuilderType == ir.BuilderBuildKit && plan.Environment.RuntimeBinary() != "docker" {
 			return e.New(e.CodeEngineCapability, "rootless BuildKit node %q requires the Docker runtime in its Environment", node.ID)
 		}
 	}
 	return plan.validateLifecyclePlans()
+}
+
+// validateCompiledOperations keeps derived packaging and utility execution bound
+// to the admitted authored inputs. Runtime changes cannot silently leave stale
+// per-operation settings in an otherwise valid generated Plan.
+func (plan Plan) validateCompiledOperations(packages []packageSpec) error {
+	nodes := make(map[string]Node, len(plan.Graph.Nodes))
+	runsOn := plan.Environment.RunsOn
+	if runsOn == "" {
+		runsOn = DefaultRunsOn
+	}
+	for _, node := range plan.Graph.Nodes {
+		nodes[node.ID] = node
+		if node.IRNode != "" {
+			continue
+		}
+		if node.RunsOn != runsOn {
+			return e.New(e.CodePipelineDrift, "utility operation %q changes its Environment runner", node.ID)
+		}
+		if node.Network == ir.NetworkNone {
+			if node.Container != plan.Environment.UtilityContainer || node.Platform != plan.Environment.UtilityPlatform {
+				return e.New(e.CodePipelineDrift, "utility operation %q changes its Environment container or platform", node.ID)
+			}
+		} else if node.Container != "" || node.Platform != "" {
+			return e.New(e.CodePipelineDrift, "networked operation %q introduces undeclared container execution", node.ID)
+		}
+	}
+	for _, spec := range packages {
+		node, ok := nodes["package/"+spec.Name]
+		if !ok || node.Kind != NodePackage || node.PackageKind != spec.Kind || node.Distribution != spec.Distribution || node.PackageComponent != spec.Component || !reflect.DeepEqual(node.HelmImage, spec.HelmImage) {
+			return e.New(e.CodePipelineDrift, "package operation %q differs from its authored output", spec.Name)
+		}
+	}
+	return nil
 }
 
 func (plan Plan) validateLifecyclePlans() error {
@@ -267,8 +309,7 @@ func (plan Plan) validateLifecyclePlans() error {
 		nodes[node.ID] = node
 	}
 	previous := ""
-	dummy := make([]LifecycleBoundOutput, 0, len(plan.LifecycleOutputs))
-	for _, output := range plan.LifecycleOutputs {
+	for i, output := range plan.LifecycleOutputs {
 		artifact, ok := artifacts[output.ArtifactID]
 		build, buildOK := builds[output.Name]
 		producer := nodes[artifact.Producer]
@@ -294,12 +335,22 @@ func (plan Plan) validateLifecyclePlans() error {
 			build.BuildDigest != output.BuildDigest || build.Name != actualBuild || !equalFactoryStrings(actualComponents, output.Components) {
 			return e.New(e.CodeUnverifiedRef, "lifecycle output %q is malformed or not bound to its graph build", output.Name)
 		}
-		dummy = append(dummy, LifecycleBoundOutput{Name: output.Name, Kind: output.Kind,
-			Digest: "sha256:" + strings.Repeat("0", 64), BuildDigest: output.BuildDigest,
-			Components: append([]string(nil), output.Components...)})
+		authored := plan.Definition.Outputs[i]
+		if build.Platform != authored.Platform || !equalFactoryStrings(build.Components, authored.Components) || build.AICRProfileName != aicrProfile(authored) {
+			return e.New(e.CodeUnverifiedRef, "output %q producer selection differs from its definition", output.Name)
+		}
+		if authored.AICR != nil {
+			bundle, err := aicr.NormalizeBundleInputs(authored.AICR.Bundle)
+			if err != nil {
+				return err
+			}
+			if build.Graph.AICR == nil || !reflect.DeepEqual(build.Graph.AICR.Bundle, bundle) || build.Graph.AICR.GeneratorDigest != toolExecutableDigest(&plan, authored.AICR.Generator) {
+				return e.New(e.CodeUnverifiedRef, "output %q rendering settings differ from its definition", output.Name)
+			}
+		}
 		previous = output.Name
 	}
-	return ValidateLifecycleOutputs(plan.LifecycleOutputs, dummy)
+	return nil
 }
 
 func lifecyclePackageKind(kind string) string {
@@ -337,16 +388,16 @@ func (plan Plan) validateSigningGraph() error {
 		default:
 			continue
 		}
-		if plan.ExecutionSettings.Signing == nil {
+		if plan.Environment.Signing == nil {
 			return e.New(e.CodeTrustPolicyMissing,
 				"factory plan node %q has no delivery signing profile authorizing it", node.ID)
 		}
-		if plan.ExecutionSettings.Targets[node.Target].Kind != TargetOCI {
+		if plan.Targets[node.Target].Kind != TargetOCI {
 			return e.New(e.CodeEngineCapability,
 				"factory plan node %q signs target %q, which is not an OCI registry", node.ID, node.Target)
 		}
 	}
-	if plan.ExecutionSettings.Signing == nil {
+	if plan.Environment.Signing == nil {
 		return nil
 	}
 	for target := range published {
@@ -367,70 +418,84 @@ func (graph ArtifactGraph) Validate() error {
 		if !safeGraphID(node.ID) || nodes[node.ID].ID != "" {
 			return e.New(e.CodeInvalidCatalog, "artifact graph node %q is invalid or repeated", node.ID)
 		}
-		if strings.TrimSpace(node.RunsOn) == "" || strings.ContainsAny(node.RunsOn, "\r\n\x00") {
-			return e.New(e.CodeInvalidCatalog, "artifact graph node %q has no safe runner label", node.ID)
+		producer := node.IRNode != ""
+		if producer {
+			if node.BuildTarget == "" || (node.Kind != NodeFetch && node.Kind != NodeBuild && node.Kind != NodeAcquire) {
+				return e.New(e.CodePipelineDrift, "operation %q has an invalid producer reference", node.ID)
+			}
+			if node.RunsOn != "" || node.Network != "" || node.Container != "" || node.Platform != "" || node.Requirements != nil || node.ExecutionBinding != nil {
+				return e.New(e.CodePipelineDrift, "operation %q duplicates producer execution settings", node.ID)
+			}
 		}
-		if node.Container != "" && !containerPin.MatchString(node.Container) {
-			return e.New(e.CodeUnpinnedSource, "artifact graph node %q has unpinned container %q", node.ID, node.Container)
-		}
-		if node.Platform != "" && node.Platform != "linux/amd64" && node.Platform != "linux/arm64" {
-			return e.New(e.CodeInvalidCatalog, "artifact graph node %q has unsupported platform %q", node.ID, node.Platform)
-		}
-		if node.Kind != NodeBuild && (node.Requirements != nil || node.ExecutionBinding != nil) {
-			return e.New(e.CodeInvalidCatalog,
-				"artifact graph execution requirements and bindings are supported only on build node %q", node.ID)
-		}
-		if err := node.Requirements.Validate(); err != nil {
-			return e.Wrap(e.CodeInvalidCatalog, err,
-				"artifact graph node %q has invalid execution requirements", node.ID)
-		}
-		if node.ExecutionBinding != nil {
-			if err := node.ExecutionBinding.ValidateFor(node.Requirements); err != nil {
+		if !producer {
+			if node.Kind == NodeBuild || node.Kind == NodeFetch {
+				return e.New(e.CodeEngineCapability, "operation %q lacks an exact producer reference", node.ID)
+			}
+			if strings.TrimSpace(node.RunsOn) == "" || strings.ContainsAny(node.RunsOn, "\r\n\x00") {
+				return e.New(e.CodeInvalidCatalog, "artifact graph node %q has no safe runner label", node.ID)
+			}
+			if node.Container != "" && !containerPin.MatchString(node.Container) {
+				return e.New(e.CodeUnpinnedSource, "artifact graph node %q has unpinned container %q", node.ID, node.Container)
+			}
+			if node.Platform != "" && node.Platform != "linux/amd64" && node.Platform != "linux/arm64" {
+				return e.New(e.CodeInvalidCatalog, "artifact graph node %q has unsupported platform %q", node.ID, node.Platform)
+			}
+			if node.Kind != NodeBuild && (node.Requirements != nil || node.ExecutionBinding != nil) {
+				return e.New(e.CodeInvalidCatalog,
+					"artifact graph execution requirements and bindings are supported only on build node %q", node.ID)
+			}
+			if err := node.Requirements.Validate(); err != nil {
 				return e.Wrap(e.CodeInvalidCatalog, err,
-					"artifact graph node %q has invalid execution binding", node.ID)
+					"artifact graph node %q has invalid execution requirements", node.ID)
+			}
+			if node.ExecutionBinding != nil {
+				if err := node.ExecutionBinding.ValidateFor(node.Requirements); err != nil {
+					return e.Wrap(e.CodeInvalidCatalog, err,
+						"artifact graph node %q has invalid execution binding", node.ID)
+				}
+			}
+			switch node.Kind {
+			case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence:
+				if node.Network != ir.NetworkDefault {
+					return e.New(e.CodeInvalidCatalog, "artifact graph networked node %q does not declare default network", node.ID)
+				}
+			case NodeBuild:
+				if node.Network != ir.NetworkNone && node.Network != ir.NetworkDefault {
+					return e.New(e.CodeInvalidCatalog, "artifact graph build node %q has an unknown network mode", node.ID)
+				}
+			case NodeAICR, NodeVerify, NodeSBOM, NodePackage, NodeInventory:
+				if node.Network != ir.NetworkNone {
+					return e.New(e.CodeInvalidCatalog, "artifact graph isolated node %q does not declare network none", node.ID)
+				}
+			default:
+				return e.New(e.CodeInvalidCatalog, "artifact graph node %q has unsupported kind %q", node.ID, node.Kind)
+			}
+			if node.Kind == NodeBuild {
+				if node.IRNode == "" || node.Container == "" || node.Platform == "" {
+					return e.New(e.CodeEngineCapability, "artifact graph build node %q lacks exact IR/container/platform execution inputs", node.ID)
+				}
+			}
+			if node.Network == ir.NetworkNone && node.Kind != NodeBuild &&
+				(node.Container == "" || node.Platform == "") {
+				return e.New(e.CodeEngineCapability,
+					"artifact graph isolated node %q lacks exact utility container/platform execution inputs", node.ID)
+			}
+			if node.Kind == NodeFetch && node.IRNode != "" && node.Container == "" {
+				return e.New(e.CodeEngineCapability, "artifact graph fetch node %q has no pinned vendoring container", node.ID)
+			}
+			if node.Kind == NodeAcquire && node.IRNode == "" {
+				if !strings.HasPrefix(node.URL, "https://") || !canonical.IsDigest(node.Digest) ||
+					node.Executable == "" || !canonical.IsDigest(node.ExecutableDigest) ||
+					(node.ToolFormat != ToolFormatRaw && node.ToolFormat != ToolFormatTarGzip) {
+					return e.New(e.CodeUnpinnedSource, "artifact graph tool acquisition %q is not transport- and executable-pinned", node.ID)
+				}
+				if node.ToolFormat == ToolFormatRaw && node.Digest != node.ExecutableDigest {
+					return e.New(e.CodeUnverifiedRef, "artifact graph raw tool acquisition %q has distinct transport and executable digests", node.ID)
+				}
 			}
 		}
 		if index > 0 && graph.Nodes[index-1].ID >= node.ID {
 			return e.New(e.CodeInvalidCatalog, "artifact graph nodes are not canonical")
-		}
-		switch node.Kind {
-		case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence:
-			if node.Network != ir.NetworkDefault {
-				return e.New(e.CodeInvalidCatalog, "artifact graph networked node %q does not declare default network", node.ID)
-			}
-		case NodeBuild:
-			if node.Network != ir.NetworkNone && node.Network != ir.NetworkDefault {
-				return e.New(e.CodeInvalidCatalog, "artifact graph build node %q has an unknown network mode", node.ID)
-			}
-		case NodeAICR, NodeVerify, NodeSBOM, NodePackage, NodeInventory:
-			if node.Network != ir.NetworkNone {
-				return e.New(e.CodeInvalidCatalog, "artifact graph isolated node %q does not declare network none", node.ID)
-			}
-		default:
-			return e.New(e.CodeInvalidCatalog, "artifact graph node %q has unsupported kind %q", node.ID, node.Kind)
-		}
-		if node.Kind == NodeBuild {
-			if node.IRNode == "" || node.Container == "" || node.Platform == "" {
-				return e.New(e.CodeEngineCapability, "artifact graph build node %q lacks exact IR/container/platform execution inputs", node.ID)
-			}
-		}
-		if node.Network == ir.NetworkNone && node.Kind != NodeBuild &&
-			(node.Container == "" || node.Platform == "") {
-			return e.New(e.CodeEngineCapability,
-				"artifact graph isolated node %q lacks exact utility container/platform execution inputs", node.ID)
-		}
-		if node.Kind == NodeFetch && node.IRNode != "" && node.Container == "" {
-			return e.New(e.CodeEngineCapability, "artifact graph fetch node %q has no pinned vendoring container", node.ID)
-		}
-		if node.Kind == NodeAcquire && node.IRNode == "" {
-			if !strings.HasPrefix(node.URL, "https://") || !canonical.IsDigest(node.Digest) ||
-				node.Executable == "" || !canonical.IsDigest(node.ExecutableDigest) ||
-				(node.ToolFormat != ToolFormatRaw && node.ToolFormat != ToolFormatTarGzip) {
-				return e.New(e.CodeUnpinnedSource, "artifact graph tool acquisition %q is not transport- and executable-pinned", node.ID)
-			}
-			if node.ToolFormat == ToolFormatRaw && node.Digest != node.ExecutableDigest {
-				return e.New(e.CodeUnverifiedRef, "artifact graph raw tool acquisition %q has distinct transport and executable digests", node.ID)
-			}
 		}
 		if len(node.Outputs) == 0 {
 			return e.New(e.CodeInvalidCatalog, "artifact graph node %q has no named outputs", node.ID)

@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -56,7 +57,7 @@ func (tier EvidenceTier) String() string { return string(tier.Normalize()) }
 
 // ValidatePlanTier admits only the two tiers a compiled plan may claim, and binds
 // the attested tier to the one signing mode that can actually produce evidence.
-func (tier EvidenceTier) ValidatePlanTier(signing *SigningProfile) error {
+func (tier EvidenceTier) ValidatePlanTier(signing *definition.Signing) error {
 	switch tier.Normalize() {
 	case TierStaticUnqualified:
 		return nil
@@ -75,7 +76,7 @@ func (tier EvidenceTier) ValidatePlanTier(signing *SigningProfile) error {
 // planTier is the tier a plan compiled against this delivery profile may claim.
 // Only cosign-mode signing produces an attestation, so a dry-run (or absent)
 // signing profile keeps the plan explicitly unqualified.
-func planTier(signing *SigningProfile) EvidenceTier {
+func planTier(signing *definition.Signing) EvidenceTier {
 	if signing != nil && signing.Mode == SigningModeCosign {
 		return TierPipelineAttested
 	}

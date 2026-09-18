@@ -29,7 +29,7 @@ func TestPublicationExecutorPersistsExactRegistryIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	repository := strings.TrimPrefix(server.URL, "http://") + "/fixture/publication"
-	plan := &Plan{ExecutionSettings: ExecutionSettings{Targets: map[string]Target{"registry": {Kind: TargetOCI, Ref: repository + ":run", Anonymous: true, PlainHTTP: true}}}}
+	plan := &Plan{Targets: map[string]Target{"registry": {Kind: TargetOCI, Ref: repository + ":run", Anonymous: true, PlainHTTP: true}}}
 	node := Node{ID: "publish/record", Target: "registry", Inputs: []string{"input"}, Outputs: []string{"result"}}
 	artifacts := map[string]Artifact{"input": {Path: layout}, "result": {Path: output}}
 	var outputLog bytes.Buffer
@@ -64,7 +64,7 @@ func TestPublicationExecutorRejectsBeforeOutput(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			output := filepath.Join(t.TempDir(), "published.ref")
-			plan := &Plan{ExecutionSettings: ExecutionSettings{Targets: map[string]Target{"registry": tc.target}}}
+			plan := &Plan{Targets: map[string]Target{"registry": tc.target}}
 			node := Node{ID: "publish/record", Target: "registry", Inputs: []string{"input"}, Outputs: []string{"result"}}
 			if tc.nonUnary {
 				node.Inputs = nil

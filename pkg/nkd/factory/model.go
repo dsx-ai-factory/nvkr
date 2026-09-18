@@ -1,33 +1,30 @@
-// Package factory compiles operator intent into a static, inspectable AI-factory
-// plan. It joins catalog resolution, build IR, artifact dataflow, packaging, and
-// environment-specific delivery routes without minting runtime authority.
+// Package factory compiles and executes complete Run plans.
+// CompileDocuments resolves catalogs and derives a Plan from Definition and
+// Environment; Compile accepts an already resolved catalog. RunLocal executes the
+// same artifact graph that Render schedules for hosted execution. This package
+// owns producer references, output completeness, packaging, and evidence joins;
+// a compiled Plan describes required work and carries no runtime authority.
 package factory
 
 import (
 	"context"
-	"net/url"
 	"regexp"
 	"sort"
-	"strings"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
 const (
-	CompileSpecAPIVersion       = "nkd.dev/compile-spec/v3"
-	CompileSpecKind             = "CompileSpec"
-	ExecutionSettingsAPIVersion = "nkd.dev/execution-settings/v1"
-	ExecutionSettingsKind       = "ExecutionSettings"
-	PlanSchemaVersion           = "nkd.dev/run-plan/v3"
-	ArtifactGraphSchema         = "nkd.dev/artifact-graph/v3"
-	MaxDefinitionBytes          = int64(4 << 20)
-	// DefaultRunsOn is the runner an unset definition.runsOn falls back to. ADR-18 §8
+	MaxPlanBytes        = int64(4 << 20)
+	PlanSchemaVersion   = "nkd.dev/run-plan/v4"
+	ArtifactGraphSchema = "nkd.dev/artifact-graph/v4"
+	// DefaultRunsOn is the runner an unset Environment.runsOn falls back to. ADR-18 §8
 	// runs on a GENERIC hosted runner — the helper orchestrates the pinned container itself —
 	// so no bespoke self-hosted runner label is required; operators override runsOn only when
 	// they genuinely need a specific runner (e.g. a native arm64 host).
@@ -85,61 +82,9 @@ const (
 	ToolFormatTarGzip = "tar-gzip"
 )
 
-type Metadata struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-}
-
-// CompileSpec is the compiler-owned handoff derived from a public Definition.
-// Publication destinations stay in ExecutionSettings so changing registries cannot
-// perturb buildDigest.
-type CompileSpec struct {
-	APIVersion       string          `json:"apiVersion"`
-	Kind             string          `json:"kind"`
-	Metadata         Metadata        `json:"metadata"`
-	RunsOn           string          `json:"runsOn"`           // default GitHub runner for packaging/publication and build targets
-	UtilityContainer string          `json:"utilityContainer"` // exact image for offline non-build nodes
-	UtilityPlatform  string          `json:"utilityPlatform"`  // linux/amd64 or linux/arm64
-	Catalog          CatalogStack    `json:"catalog"`
-	Tools            map[string]Tool `json:"tools,omitempty"`
-	SelectedTools    []string        `json:"selectedTools,omitempty"`
-	Builds           []BuildTarget   `json:"builds"`
-	Packages         []PackageSpec   `json:"packages,omitempty"`
-}
-
-// Tool is a content-addressed pipeline executable distributed independently of
-// release components. ArchiveDigest authenticates transport bytes while
-// ExecutableDigest authenticates the exact member that is executed after extraction.
-// Keeping tools outside the catalog prevents the factory implementation itself from
-// becoming an accidental member of an NKE ReleaseSet.
-type Tool struct {
-	Format           string `json:"format"`
-	URL              string `json:"url"`
-	ArchiveDigest    string `json:"archiveDigest"`
-	ExecutablePath   string `json:"executablePath"`
-	ExecutableDigest string `json:"executableDigest"`
-}
-
-type CatalogStack struct {
-	Base     string   `json:"base"` // explicit catalog directory
-	Overlays []string `json:"overlays,omitempty"`
-}
-
-// BuildTarget is compiler-derived from one Definition output, never authored independently.
-type BuildTarget struct {
-	Bundle        *aicr.BundleInputs `json:"bundle,omitempty"`
-	Name          string             `json:"name"`
-	Catalog       *CatalogStack      `json:"catalog,omitempty"`
-	Components    []string           `json:"components"`
-	Platform      string             `json:"platform"`
-	AICRProfile   string             `json:"aicrProfile,omitempty"`
-	AICRGenerator string             `json:"aicrGenerator,omitempty"`
-	RunsOn        string             `json:"runsOn"`
-}
-
-// PackageSpec describes dataflow, not ordering. Inputs are artifact selectors:
+// packageSpec describes dataflow, not ordering. Inputs are artifact selectors:
 // target/component, target/*, target/aicr-bundle, or package/name.
-type PackageSpec struct {
+type packageSpec struct {
 	HelmImage    *HelmImageBinding `json:"helmImage,omitempty"`
 	Name         string            `json:"name"`
 	Kind         string            `json:"kind"`
@@ -152,184 +97,6 @@ type PackageSpec struct {
 type HelmImageBinding struct {
 	Image string `json:"image"`
 	Chart string `json:"chart"`
-}
-
-// ExecutionSettings is the compiler-owned handoff derived from a public Environment.
-// Routes bind artifact/package selectors to named targets; credentials remain references.
-// Runtime is the operator's container-runtime environment for the generated pipeline —
-// which runtime binary the helper orchestrates with and the pinned base/helper images.
-type ExecutionSettings struct {
-	SBOMTool   string   `json:"sbomTool,omitempty"`
-	APIVersion string   `json:"apiVersion"`
-	Kind       string   `json:"kind"`
-	Metadata   Metadata `json:"metadata"`
-	// SourceAccess is transport-only source authentication and mirroring keyed by
-	// the canonical repository URL carried by fetch nodes.
-	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
-	// RunsOn optionally overrides the definition's default runner for THIS environment (e.g. a
-	// GitLab tag such as "generic"). The runner is environment config, not build identity, so
-	// it may be set per-delivery without duplicating the definition or perturbing buildDigest.
-	RunsOn string `json:"runsOn,omitempty"`
-	// ExecutionClasses is the exact Environment-advertised inventory available to
-	// deterministic per-step matching. These declarations are planning inputs, not
-	// runtime proof that a selected host satisfies them.
-	ExecutionClasses []execution.Class `json:"executionClasses,omitempty"`
-	// Targets and Routes are OPTIONAL: a delivery with no routes is a valid build-only profile
-	// that publishes nothing (the generated pipeline builds and packages, but pushes nowhere).
-	Targets map[string]Target `json:"targets,omitempty"`
-	Routes  []Route           `json:"routes,omitempty"`
-	Runtime RuntimeProfile    `json:"runtime,omitempty"`
-	// Signing is the OPTIONAL publication signing policy for this environment. It is
-	// delivery configuration, never build identity: which identity signs, and where
-	// its certificates come from, is a property of the environment that publishes,
-	// so turning signing on cannot perturb buildDigest. Absent (the zero value)
-	// means the plan emits no sign or verify-publication node at all.
-	Signing *SigningProfile `json:"signing,omitempty"`
-}
-
-type SourceAccess struct {
-	Mirror        string `json:"mirror"`
-	CredentialRef string `json:"credentialRef"`
-}
-
-// SigningProfile is the exact publication signing policy of one environment.
-// Identity and Issuer are mandatory whenever signing is configured — including in
-// dry-run mode — because a dry run that does not name the trust policy it stands
-// in for describes nothing that could later be enforced.
-type SigningProfile struct {
-	// Mode is dry-run or cosign. dry-run records the exact invocations a real
-	// signer would run and touches no registry; cosign executes the pinned tool.
-	Mode string `json:"mode"`
-	// Identity is the certificate-identity REGEXP a verifier must require
-	// (cosign --certificate-identity-regexp).
-	Identity string `json:"identity"`
-	// Issuer is the exact OIDC issuer a verifier must require
-	// (cosign --certificate-oidc-issuer).
-	Issuer string `json:"issuer"`
-	// CosignTool names a pinned tool in the compile spec holding the exact
-	// pinned cosign executable. It is mandatory in cosign mode: an ambient `cosign`
-	// on the runner's PATH is not an authenticated capability.
-	CosignTool string `json:"cosignTool,omitempty"`
-}
-
-// Validate enforces the signing contract that is checkable from the profile
-// alone. Whether CosignTool actually names a defined tool is a definition/profile
-// join and is checked by the compiler, which holds both documents.
-func (signing *SigningProfile) Validate(targets map[string]Target, routes []Route) error {
-	if signing == nil {
-		return nil
-	}
-	switch signing.Mode {
-	case SigningModeDryRun, SigningModeCosign:
-	default:
-		return e.New(e.CodeInvalidCatalog,
-			"delivery signing mode %q is unsupported (%s|%s)", signing.Mode, SigningModeDryRun, SigningModeCosign)
-	}
-	if strings.TrimSpace(signing.Identity) == "" || strings.TrimSpace(signing.Issuer) == "" ||
-		strings.TrimSpace(signing.Identity) != signing.Identity || strings.TrimSpace(signing.Issuer) != signing.Issuer {
-		return e.New(e.CodeTrustPolicyMissing,
-			"delivery signing requires a canonical certificate identity and OIDC issuer")
-	}
-	if strings.ContainsAny(signing.Identity, "\r\n\x00") || strings.ContainsAny(signing.Issuer, "\r\n\x00") {
-		return e.New(e.CodeInvalidCatalog, "delivery signing identity/issuer must not contain control characters")
-	}
-	if _, err := regexp.Compile(signing.Identity); err != nil {
-		return e.Wrap(e.CodeTrustPolicyMissing, err, "delivery signing identity %q is not a valid regexp", signing.Identity)
-	}
-	if signing.Mode == SigningModeCosign && signing.CosignTool == "" {
-		return e.New(e.CodeTrustPolicyMissing,
-			"delivery signing mode %s requires cosignTool naming an exact pinned tools: entry", SigningModeCosign)
-	}
-	if signing.CosignTool != "" && !canonicalName.MatchString(signing.CosignTool) {
-		return e.New(e.CodeInvalidCatalog, "delivery signing cosignTool %q is not a canonical tool name", signing.CosignTool)
-	}
-	if len(routes) == 0 {
-		return e.New(e.CodeInvalidCatalog, "delivery signing is configured but no route publishes anything to sign")
-	}
-	for _, route := range routes {
-		if targets[route.Target].Kind != TargetOCI {
-			return e.New(e.CodeEngineCapability,
-				"delivery signing requires every route target to be an OCI registry; route %q targets %q of kind %q",
-				route.Name, route.Target, targets[route.Target].Kind)
-		}
-	}
-	return nil
-}
-
-// RuntimeProfile is the ADR-18 §8 runtime environment. It is delivery/environment config, not
-// build identity: it lives in Environment execution settings, so
-// changing the runtime or repinning an image cannot perturb buildDigest. It is the home
-// for the values that were previously a hardcoded emitter constant, so `run generate`
-// sources them from the operator's config.
-type RuntimeProfile struct {
-	// Runtime is the container runtime binary the helper orchestrates with
-	// (podman | docker). Empty defaults to rootless podman (ADR-18 §8).
-	Runtime string `json:"runtime,omitempty"`
-	// RuntimeImage is the digest-pinned base image (carrying the container runtime) that
-	// fetch/build jobs run on so the helper can launch the toolchain container. Empty in
-	// the from-source bootstrap default; required for pinned-image delivery.
-	RuntimeImage string `json:"runtimeImage,omitempty"`
-	// HelperImage is the operator's digest-pinned nkd-exec image (ADR-18 §8): when set,
-	// jobs run on it with nkd-exec on PATH and the from-source bootstrap is omitted.
-	HelperImage string `json:"helperImage,omitempty"`
-	// BuilderImage is the digest-pinned image the from-source bootstrap job runs on to `go
-	// build` nkd-exec — it must carry the Go toolchain (GitLab has no setup-go action, and a
-	// bare docker/dind runner has no Go). Empty leaves the bootstrap on the runner's default
-	// image.
-	BuilderImage string `json:"builderImage,omitempty"`
-	// Services are digest-pinned CI service images attached to every node job (GitLab), e.g. a
-	// docker:dind daemon so the helper's `docker run` has a daemon to reach. Environment config.
-	Services []string `json:"services,omitempty"`
-	// Variables are CI job variables set on every node job (e.g. DOCKER_HOST, DOCKER_TLS_CERTDIR).
-	// Environment config, not build identity.
-	Variables map[string]string `json:"variables,omitempty"`
-	// Setup is a before_script run on every node job before the helper — e.g. `docker login`
-	// so the dind daemon can pull a private, digest-pinned toolchain from the operator registry.
-	// Environment config, never build identity (it authenticates transport, it does not build).
-	Setup []string `json:"setup,omitempty"`
-	// ToolchainRegistry is the operator registry that materialized the custom toolchains (those
-	// the build pins registry-agnostically as `nkd-toolchain-*@sha256:…`). At compile time it
-	// is prepended to those refs (digest preserved, so buildDigest is unaffected — the same
-	// transport-vs-identity split as airgap relocation). Engine/operator environment config.
-	ToolchainRegistry string `json:"toolchainRegistry,omitempty"`
-}
-
-// RuntimeBinary is the configured container runtime binary, defaulting to podman.
-func (profile ExecutionSettings) RuntimeBinary() string {
-	if r := strings.TrimSpace(profile.Runtime.Runtime); r != "" {
-		return r
-	}
-	return "podman"
-}
-
-func (profile RuntimeProfile) validate() error {
-	if profile.Runtime != "" && profile.Runtime != "podman" && profile.Runtime != "docker" {
-		return e.New(e.CodeInvalidCatalog, "delivery runtime %q is unsupported (podman|docker)", profile.Runtime)
-	}
-	for label, image := range map[string]string{"runtimeImage": profile.RuntimeImage, "helperImage": profile.HelperImage, "builderImage": profile.BuilderImage} {
-		if image != "" && !strings.Contains(image, "@sha256:") {
-			return e.New(e.CodeUnpinnedSource, "delivery %s %q must be digest-pinned (name@sha256:...)", label, image)
-		}
-	}
-	for _, service := range profile.Services {
-		if !strings.Contains(service, "@sha256:") {
-			return e.New(e.CodeUnpinnedSource, "delivery service %q must be digest-pinned (name@sha256:...)", service)
-		}
-	}
-	for name, value := range profile.Variables {
-		if strings.TrimSpace(name) == "" || strings.ContainsAny(name, "\r\n\x00 ") || strings.ContainsAny(value, "\r\n\x00") {
-			return e.New(e.CodeInvalidCatalog, "delivery variable %q has an unsafe name or value", name)
-		}
-	}
-	for _, line := range profile.Setup {
-		if strings.ContainsAny(line, "\r\n\x00") {
-			return e.New(e.CodeInvalidCatalog, "delivery setup line must not contain control characters")
-		}
-	}
-	if strings.ContainsAny(profile.ToolchainRegistry, "\r\n\x00 ") {
-		return e.New(e.CodeInvalidCatalog, "delivery toolchainRegistry %q is unsafe", profile.ToolchainRegistry)
-	}
-	return nil
 }
 
 type Target struct {
@@ -347,23 +114,24 @@ type Route struct {
 }
 
 type Plan struct {
-	Actions                 map[string]catalog.ActionPin `json:"actions,omitempty"`
-	SchemaVersion           string                       `json:"schemaVersion"`
-	Name                    string                       `json:"name"`
-	GeneratorVersion        string                       `json:"generatorVersion"`
-	DefinitionPath          string                       `json:"definitionPath,omitempty"`
-	CompileSpecDigest       string                       `json:"compileSpecDigest,omitempty"`
-	DefinitionDigest        string                       `json:"definitionDigest,omitempty"`
-	EnvironmentPath         string                       `json:"environmentPath,omitempty"`
-	Qualification           EvidenceTier                 `json:"qualification"`
-	CatalogDigest           string                       `json:"catalogDigest"`
-	AppliedOverlays         []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
-	ExecutionSettingsDigest string                       `json:"executionSettingsDigest"`
-	EnvironmentDigest       string                       `json:"environmentDigest,omitempty"`
-	ExecutionSettings       ExecutionSettings            `json:"executionSettings"`
-	Builds                  []BuildPlan                  `json:"builds"`
-	LifecycleOutputs        []LifecycleOutputPlan        `json:"lifecycleOutputs,omitempty"`
-	Graph                   ArtifactGraph                `json:"graph"`
+	Actions           map[string]catalog.ActionPin `json:"actions,omitempty"`
+	SchemaVersion     string                       `json:"schemaVersion"`
+	Name              string                       `json:"name"`
+	GeneratorVersion  string                       `json:"generatorVersion"`
+	DefinitionPath    string                       `json:"definitionPath,omitempty"`
+	DefinitionDigest  string                       `json:"definitionDigest,omitempty"`
+	EnvironmentPath   string                       `json:"environmentPath,omitempty"`
+	Qualification     EvidenceTier                 `json:"qualification"`
+	CatalogDigest     string                       `json:"catalogDigest"`
+	AppliedOverlays   []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
+	EnvironmentDigest string                       `json:"environmentDigest,omitempty"`
+	Definition        definition.Definition        `json:"definition"`
+	Environment       definition.Environment       `json:"environment"`
+	Targets           map[string]Target            `json:"targets,omitempty"`
+	Routes            []Route                      `json:"routes,omitempty"`
+	Builds            []BuildPlan                  `json:"builds"`
+	LifecycleOutputs  []LifecycleOutputPlan        `json:"lifecycleOutputs,omitempty"`
+	Graph             ArtifactGraph                `json:"graph"`
 
 	// identityDigest is the digest of this plan AS COMPILED, carried across the local
 	// runner's workspace relocation. It is deliberately unexported: it never reaches the
@@ -386,27 +154,7 @@ type LifecycleOutputPlan struct {
 	Components  []string `json:"components"`
 }
 
-const LifecycleBindingSchema = "nkd.dev/lifecycle-binding/v3"
-
-// LifecycleBinding is generated content carried inside a signed publication
-// root. It preserves authored output names and exact build membership without
-// exposing compiler graph joins to consumers.
-type LifecycleBinding struct {
-	SchemaVersion     string                 `json:"schemaVersion"`
-	DefinitionDigest  string                 `json:"definitionDigest"`
-	EnvironmentDigest string                 `json:"environmentDigest"`
-	ContentSubject    string                 `json:"contentSubject"`
-	Outputs           []LifecycleBoundOutput `json:"outputs"`
-}
-
-type LifecycleBoundOutput struct {
-	Name          string   `json:"name"`
-	Kind          string   `json:"kind"`
-	Digest        string   `json:"digest"`
-	BuildDigest   string   `json:"buildDigest"`
-	Components    []string `json:"components"`
-	TransportPath string   `json:"transportPath,omitempty"`
-}
+type LifecycleBoundOutput = delivery.Output
 
 type BuildPlan struct {
 	Name                string                   `json:"name"`
@@ -415,7 +163,6 @@ type BuildPlan struct {
 	BuildDigest         string                   `json:"buildDigest"`
 	Platform            string                   `json:"platform"`
 	CatalogSnapshot     *catalog.Catalog         `json:"catalogSnapshot"`
-	RunsOn              string                   `json:"runsOn"`
 	Components          []string                 `json:"components,omitempty"`
 	AICRProfileName     string                   `json:"aicrProfileName,omitempty"`
 	AICRProfileIdentity string                   `json:"aicrProfileIdentity,omitempty"`
@@ -444,7 +191,7 @@ type Node struct {
 	Distribution     string            `json:"distribution,omitempty"`
 	PackageComponent string            `json:"packageComponent,omitempty"`
 	Target           string            `json:"target,omitempty"`
-	RunsOn           string            `json:"runsOn"`
+	RunsOn           string            `json:"runsOn,omitempty"`
 	Network          string            `json:"network,omitempty"`
 	Container        string            `json:"container,omitempty"`
 	Platform         string            `json:"platform,omitempty"`
@@ -474,186 +221,6 @@ type Artifact struct {
 
 var canonicalName = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 var containerPin = regexp.MustCompile(`(?:@|^)sha256:[0-9a-f]{64}$`)
-var githubCredentialRef = regexp.MustCompile(`^github:[A-Za-z_][A-Za-z0-9_]*$`)
-
-func (definition CompileSpec) Validate() error {
-	if definition.APIVersion != CompileSpecAPIVersion || definition.Kind != CompileSpecKind {
-		return e.New(e.CodeInvalidCatalog, "compile spec has unsupported apiVersion/kind %q/%q", definition.APIVersion, definition.Kind)
-	}
-	if !canonicalName.MatchString(definition.Metadata.Name) {
-		return e.New(e.CodeInvalidCatalog, "compile spec name %q is not canonical", definition.Metadata.Name)
-	}
-	if definition.Catalog.Base == "" {
-		return e.New(e.CodeInvalidCatalog, "compile spec requires an explicit catalog directory")
-	}
-	// runsOn is optional: an unset label defaults to the generic hosted runner (DefaultRunsOn,
-	// applied in compileWithTargetStacks), since ADR-18 §8 needs no bespoke runner. Only a
-	// label with control characters is rejected here.
-	if strings.ContainsAny(definition.RunsOn, "\r\n\x00") {
-		return e.New(e.CodeInvalidCatalog, "compile spec runsOn label must not contain control characters")
-	}
-	if !containerPin.MatchString(definition.UtilityContainer) ||
-		(definition.UtilityPlatform != "linux/amd64" && definition.UtilityPlatform != "linux/arm64") {
-		return e.New(e.CodeUnpinnedSource, "compile spec requires a digest-pinned utilityContainer and linux/amd64|linux/arm64 utilityPlatform")
-	}
-	if len(definition.Builds) == 0 {
-		return e.New(e.CodeInvalidCatalog, "compile spec requires at least one build target")
-	}
-	for name, tool := range definition.Tools {
-		if tool.Format != ToolFormatRaw && tool.Format != ToolFormatTarGzip {
-			return e.New(e.CodeInvalidCatalog, "factory tool %q has unsupported format %q", name, tool.Format)
-		}
-		if !canonicalName.MatchString(name) || !strings.HasPrefix(tool.URL, "https://") ||
-			!canonical.IsDigest(tool.ArchiveDigest) || !canonical.IsDigest(tool.ExecutableDigest) ||
-			tool.ExecutablePath == "" || strings.HasPrefix(tool.ExecutablePath, "/") ||
-			strings.Contains(tool.ExecutablePath, "\\") || strings.ContainsAny(tool.ExecutablePath, "\x00\r\n") {
-			return e.New(e.CodeInvalidCatalog, "factory tool %q must bind an https archive, exact archive/executable digests, and a safe member path", name)
-		}
-		if tool.Format == ToolFormatRaw && tool.ArchiveDigest != tool.ExecutableDigest {
-			return e.New(e.CodeInvalidCatalog, "factory raw tool %q must bind identical transport and executable digests", name)
-		}
-		for _, part := range strings.Split(tool.ExecutablePath, "/") {
-			if part == "" || part == "." || part == ".." {
-				return e.New(e.CodeInvalidCatalog, "factory tool %q has unsafe executablePath %q", name, tool.ExecutablePath)
-			}
-		}
-	}
-	seen := map[string]bool{}
-	for _, buildTarget := range definition.Builds {
-		if !canonicalName.MatchString(buildTarget.Name) || seen[buildTarget.Name] {
-			return e.New(e.CodeInvalidCatalog, "factory build target name %q is invalid or repeated", buildTarget.Name)
-		}
-		seen[buildTarget.Name] = true
-		if err := target.ValidatePlatform(buildTarget.Platform); err != nil {
-			return err
-		}
-		if buildTarget.Catalog != nil && buildTarget.Catalog.Base == "" {
-			return e.New(e.CodeInvalidCatalog, "factory build target %q has an empty catalog override", buildTarget.Name)
-		}
-		if strings.ContainsAny(buildTarget.RunsOn, "\r\n\x00") {
-			return e.New(e.CodeInvalidCatalog, "factory build target %q has an unsafe runsOn label", buildTarget.Name)
-		}
-		if buildTarget.AICRGenerator != "" {
-			if _, ok := definition.Tools[buildTarget.AICRGenerator]; !ok {
-				return e.New(e.CodeInvalidCatalog, "factory build target %q references unknown AICR tool %q", buildTarget.Name, buildTarget.AICRGenerator)
-			}
-		}
-	}
-	seen = map[string]bool{}
-	for _, spec := range definition.Packages {
-		if !canonicalName.MatchString(spec.Name) || seen[spec.Name] {
-			return e.New(e.CodeInvalidCatalog, "factory package name %q is invalid or repeated", spec.Name)
-		}
-		seen[spec.Name] = true
-		switch spec.Kind {
-		case PackageBinaryBundle, PackageAPT, PackageOCI, PackageHelm, PackageImage:
-		default:
-			return e.New(e.CodeInvalidCatalog, "factory package %q has unsupported kind %q", spec.Name, spec.Kind)
-		}
-		if len(spec.Inputs) == 0 {
-			return e.New(e.CodeInvalidCatalog, "factory package %q has no artifact inputs", spec.Name)
-		}
-		if spec.Kind == PackageAPT && (spec.Distribution == "" || spec.Component == "") {
-			return e.New(e.CodeInvalidCatalog, "APT package %q requires distribution and component", spec.Name)
-		}
-		if spec.HelmImage != nil && (spec.Kind != PackageHelm || !canonicalName.MatchString(spec.HelmImage.Chart) || !strings.HasPrefix(spec.HelmImage.Image, "package/")) {
-			return e.New(e.CodeInvalidCatalog, "package %q has invalid Helm image binding", spec.Name)
-		}
-	}
-	return nil
-}
-
-func (profile ExecutionSettings) Validate() error {
-	if profile.SBOMTool != "" && !canonicalName.MatchString(profile.SBOMTool) {
-		return e.New(e.CodeInvalidCatalog, "sbomTool must be a canonical tool name")
-	}
-	if profile.APIVersion != ExecutionSettingsAPIVersion || profile.Kind != ExecutionSettingsKind {
-		return e.New(e.CodeInvalidCatalog, "execution settings have unsupported apiVersion/kind %q/%q", profile.APIVersion, profile.Kind)
-	}
-	if !canonicalName.MatchString(profile.Metadata.Name) {
-		return e.New(e.CodeInvalidCatalog, "execution settings require a canonical name")
-	}
-	if strings.ContainsAny(profile.RunsOn, "\r\n\x00") {
-		return e.New(e.CodeInvalidCatalog, "execution settings runsOn label must not contain control characters")
-	}
-	if err := execution.ValidateClasses(profile.ExecutionClasses); err != nil {
-		return err
-	}
-	for source, access := range profile.SourceAccess {
-		if err := validateSourceAccessURL("source", source); err != nil {
-			return err
-		}
-		if err := validateSourceAccessURL("mirror", access.Mirror); err != nil {
-			return err
-		}
-		if !githubCredentialRef.MatchString(access.CredentialRef) {
-			return e.New(e.CodeInvalidCatalog,
-				"execution settings sourceAccess %q credentialRef must be github:SECRET_NAME", source)
-		}
-	}
-	// Build-only is a valid mode: a profile with no routes publishes nothing. Routes still
-	// require targets to publish to (each route's target is verified below).
-	if len(profile.Routes) > 0 && len(profile.Targets) == 0 {
-		return e.New(e.CodeInvalidCatalog, "execution settings have routes but no targets to publish to")
-	}
-	for name, target := range profile.Targets {
-		if !canonicalName.MatchString(name) || strings.TrimSpace(target.Ref) == "" {
-			return e.New(e.CodeInvalidCatalog, "delivery target %q has an invalid name or empty ref", name)
-		}
-		switch target.Kind {
-		case TargetOCI, TargetAPT, TargetObject:
-		default:
-			return e.New(e.CodeInvalidCatalog, "delivery target %q has unsupported kind %q", name, target.Kind)
-		}
-		if target.Anonymous == (target.CredentialRef != "") {
-			return e.New(e.CodeInvalidCatalog, "delivery target %q requires exactly one of anonymous or credentialRef", name)
-		}
-		if strings.ContainsAny(target.CredentialRef, "\r\n\x00") {
-			return e.New(e.CodeInvalidCatalog, "delivery target %q credentialRef is unsafe", name)
-		}
-	}
-	seen := map[string]bool{}
-	for _, route := range profile.Routes {
-		if !canonicalName.MatchString(route.Name) || seen[route.Name] || strings.TrimSpace(route.Input) == "" {
-			return e.New(e.CodeInvalidCatalog, "delivery route name/input %q/%q is invalid or repeated", route.Name, route.Input)
-		}
-		seen[route.Name] = true
-		if _, ok := profile.Targets[route.Target]; !ok {
-			return e.New(e.CodeInvalidCatalog, "delivery route %q references unknown target %q", route.Name, route.Target)
-		}
-	}
-	if err := profile.Runtime.validate(); err != nil {
-		return err
-	}
-	return profile.Signing.Validate(profile.Targets, profile.Routes)
-}
-
-func validateSourceAccessURL(label, value string) error {
-	parsed, err := url.Parse(value)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil ||
-		parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || strings.ContainsAny(value, "?#") ||
-		parsed.Opaque != "" || parsed.String() != value {
-		return e.New(e.CodeInvalidCatalog,
-			"execution settings sourceAccess %s %q must be a canonical HTTPS URL without userinfo, query, or fragment", label, value)
-	}
-	return nil
-}
-
-func (profile ExecutionSettings) Digest() (string, error) {
-	if err := profile.Validate(); err != nil {
-		return "", err
-	}
-	return canonical.Digest(canonical.KindExecutionSettings, profile)
-}
-
-// Digest identifies the exact validated compiler input independently of catalog
-// location, environment selection, generator version, or its resolved run plan.
-func (definition CompileSpec) Digest() (string, error) {
-	if err := definition.Validate(); err != nil {
-		return "", err
-	}
-	return canonical.Digest(canonical.KindCompileSpec, definition)
-}
 
 func (graph ArtifactGraph) Digest() (string, error) {
 	if err := graph.Validate(); err != nil {

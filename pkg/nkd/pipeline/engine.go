@@ -1,7 +1,7 @@
-// Package pipeline turns the engine-neutral IR into concrete build execution or
-// emitted CI YAML. Every engine adapter lowers the same IR (one front-end, many
-// back-ends): the local runner executes it directly and is the ground-truth
-// oracle; other adapters only translate syntax (SRD §5.1, NKD-FR-BLD-002/003).
+// Package pipeline executes exact producer instructions and observes their results.
+// Local.Run executes a build graph; ExecNode executes one referenced instruction.
+// This package owns source snapshots, process lifetimes, and terminal artifact
+// receipts. Whole-Run scheduling and hosted generation belong to factory.
 package pipeline
 
 import (
@@ -12,24 +12,6 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
-
-// Emitter renders the finite IR to an in-memory CI definition. Returning bytes keeps
-// caller-controlled blocking writers outside the deep module and makes cancellation
-// an enforceable part of the authority-bearing generation interface.
-type Emitter interface {
-	Name() string
-	Render(context.Context, *ir.Graph, string) ([]byte, error)
-}
-
-func requireEmitterContext(ctx context.Context) error {
-	if ctx == nil {
-		return e.New(e.CodeUsage, "pipeline rendering requires a non-nil context")
-	}
-	if err := ctx.Err(); err != nil {
-		return e.Wrap(e.CodeTimeout, err, "pipeline rendering canceled")
-	}
-	return nil
-}
 
 // Runner executes the IR in the operator's own environment. Context is carried in
 // RunOptions; implementations MUST reject a nil RunOptions.Ctx at admission, before

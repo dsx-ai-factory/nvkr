@@ -24,6 +24,11 @@ and defines the digest-authentication chain.
 
 ## Decision
 
+The retained implementation supports document authoring/authentication, qualified reproduction diagnostics and
+required membership checks. Qualified release authorization and its receipt assembly are deferred: their
+unused implementation has been removed. The chain described below remains the proposed acceptance contract,
+not a claim that a maintained command or SDK can clear or publish a qualified release.
+
 ### 1. The ValidationVector *is* the expected-digests manifest
 
 **One** signed object binds one resolved build graph and one builder profile to expected artifacts and evidence. There
@@ -96,13 +101,18 @@ Those rows derive only from qualified SBOM and provenance capabilities that rech
 evidence bytes. The ValidationVector references the three publisher aggregates shown above. Attaching digest
 strings never makes a vector publishable.
 
+The retained verification diagnostic recomputes those publisher aggregates against the authenticated vector.
+The unused digest setter and separate external-evidence release-receipt projections are removed. Acquisition
+still verifies exact external bytes, schema and subject before embedding their verified SBOM properties; it
+does not issue a release authorization.
+
 A later operator comparison produces a separate **ReproductionObservation** carrying the reference-vector digest,
 produced-report digest, comparison policy, verdict, and diagnosable mismatches. An observation is not publisher
 evidence and is never included in, or hashed back into, the reference vector it evaluates. Runtime conformance,
 compatibility, and vulnerability results are likewise release-gate receipts under ADR-13/16, not mutable fields
 added to an already published vector. Every claim therefore has exactly one owner and no vector self-compares.
 
-Every trust object — resolved build graph, pipeline bundle, ValidationVector, ReleaseSet, Inventory,
+Every retained trust object — resolved build graph, ValidationVector, ReleaseSet, Inventory,
 publisher-evidence index, and ReproductionObservation — is independently digest-addressable via the ADR-01 codec,
 satisfying SEC-01.
 

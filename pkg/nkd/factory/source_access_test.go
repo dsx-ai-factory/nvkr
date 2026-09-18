@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -20,14 +22,14 @@ func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 	if source == "" {
 		t.Fatal("test plan has no fetch source")
 	}
-	plan.ExecutionSettings.SourceAccess = map[string]SourceAccess{source: {
+	plan.Environment.SourceAccess = map[string]authored.SourceAccess{source: {
 		Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
 	}}
-	digest, err := plan.ExecutionSettings.Digest()
+	digest, err := plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = digest
+	plan.EnvironmentDigest = digest
 	if err := plan.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -37,20 +39,14 @@ func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 	} else {
 		assertSourceAccessCode(t, err, nkderr.CodeEngineCapability)
 	}
-	if _, err := RenderGitLab(context.Background(), plan); err == nil {
-		t.Fatal("GitLab generation accepted source authentication it cannot enforce")
-	} else {
-		assertSourceAccessCode(t, err, nkderr.CodeEngineCapability)
-	}
-
-	plan.ExecutionSettings.SourceAccess = map[string]SourceAccess{"https://github.com/unknown/source": {
+	plan.Environment.SourceAccess = map[string]authored.SourceAccess{"https://github.com/unknown/source": {
 		Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
 	}}
-	digest, err = plan.ExecutionSettings.Digest()
+	digest, err = plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = digest
+	plan.EnvironmentDigest = digest
 	if err := plan.Validate(); err == nil {
 		t.Fatal("unmatched source access accepted")
 	} else {

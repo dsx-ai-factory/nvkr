@@ -12,22 +12,19 @@ import (
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 const (
 	GitHubWorkflowPath       = ".github/workflows/nkd-run.yml"
 	FactoryPlanPath          = ".github/nkd-run/plan.json"
-	FactoryGraphDir          = ".github/nkd-run/graphs"
 	githubReleaseEnvironment = "nkd-release"
 	githubExecutionCondition = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
 )
 
 var githubLayout = generationLayout{workflowPath: GitHubWorkflowPath,
-	manifestPath: GeneratedManifestPath, planPath: FactoryPlanPath,
-	graphDir: FactoryGraphDir}
+	manifestPath: GeneratedManifestPath, planPath: FactoryPlanPath}
 
-// RenderGitHub emits a locally inspectable workflow and its exact plan/IR inputs,
+// RenderGitHub emits a locally inspectable workflow and its complete canonical Plan,
 // then runs the semantic static validator before returning any bytes.
 func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	return renderGitHub(ctx, plan, true)
@@ -58,7 +55,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err != nil {
 		return nil, err
 	}
-	files, planDigest, graphDigest, err := renderStaticInputs(ctx, plan, githubLayout)
+	files, planDigest, err := renderStaticInputs(ctx, plan, githubLayout)
 	if err != nil {
 		return nil, err
 	}
@@ -67,9 +64,16 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	stages, nodeJobs := githubStages(plan)
+	stages, nodeJobs, err := githubStages(plan)
+	if err != nil {
+		return nil, err
+	}
 	bootstrapJobs := map[string]string{}
 	for _, node := range plan.Graph.Nodes {
+		node, err := plan.ExecutionFor(node)
+		if err != nil {
+			return nil, err
+		}
 		bootstrapJobs[node.RunsOn] = "build-runner-" + shortStableName(node.RunsOn)
 	}
 
@@ -109,11 +113,11 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintln(&body, "    timeout-minutes: 60")
 		// Engine-agnostic environment config (ADR-18 §8), rendered in GitHub syntax: a docker-capable
 		// job container, dind service containers, and job env — for a runner that lacks them
-		// natively. (BuilderImage stays GitLab-only: GitHub provisions Go via setup-go.)
-		if img := strings.TrimSpace(plan.ExecutionSettings.Runtime.RuntimeImage); img != "" {
+		// natively. GitHub provisions Go via setup-go.
+		if img := strings.TrimSpace(plan.Environment.Runtime.RuntimeImage); img != "" {
 			fmt.Fprintf(&body, "    container: %s\n", yamlSingle(img))
 		}
-		if svcs := plan.ExecutionSettings.Runtime.Services; len(svcs) > 0 {
+		if svcs := plan.Environment.Runtime.Services; len(svcs) > 0 {
 			fmt.Fprintln(&body, "    services:")
 			for i, svc := range svcs {
 				fmt.Fprintf(&body, "      svc-%02d:\n        image: %s\n", i, yamlSingle(svc))
@@ -125,11 +129,11 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
 		}
 		env := map[string]string{}
-		for k, v := range plan.ExecutionSettings.Runtime.Variables {
+		for k, v := range plan.Environment.Runtime.Variables {
 			env[k] = v
 		}
 		if node.Kind == NodePublish {
-			target := plan.ExecutionSettings.Targets[node.Target]
+			target := plan.Targets[node.Target]
 			fmt.Fprintf(&body, "    permissions:\n      contents: read\n")
 			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence {
 				secret, ok := strings.CutPrefix(target.CredentialRef, "github:")
@@ -144,7 +148,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			}
 		}
 		if signFamilyNode(node.Kind) {
-			signing := plan.ExecutionSettings.Signing
+			signing := plan.Environment.Signing
 			if signing == nil {
 				return nil, e.New(e.CodeTrustPolicyMissing,
 					"GitHub node %q signs without a delivery signing profile", node.ID)
@@ -156,7 +160,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for _, name := range sortedKeys(permissions) {
 				fmt.Fprintf(&body, "      %s: %s\n", name, permissions[name])
 			}
-			target := plan.ExecutionSettings.Targets[node.Target]
+			target := plan.Targets[node.Target]
 			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence {
 				secret, ok := strings.CutPrefix(target.CredentialRef, "github:")
 				if !ok || !regexpSecret(secret) {
@@ -187,8 +191,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				yamlSingle("Restore "+githubArtifactLabel(plan, artifacts[input])), shellQuote(carrierPath(input)), shellQuote(artifacts[input].Path))
 		}
 		// Operator setup before the helper runs (e.g. `docker login` to pull a private,
-		// digest-pinned toolchain). Same engine-agnostic delivery.runtime.setup as GitLab.
-		if setup := plan.ExecutionSettings.Runtime.Setup; len(setup) > 0 {
+		// digest-pinned toolchain), configured by the admitted Environment.
+		if setup := plan.Environment.Runtime.Setup; len(setup) > 0 {
 			fmt.Fprintf(&body, "      - name: Configure build environment\n        run: |\n")
 			for _, line := range setup {
 				fmt.Fprintf(&body, "          %s\n", line)
@@ -205,7 +209,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				}
 			}
 			fmt.Fprintln(&body, "        run: |")
-			for _, line := range githubNodeCommands(node, plan, graphDigest) {
+			for _, line := range githubNodeCommands(node, plan) {
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
 			for _, output := range node.Outputs {
@@ -283,62 +287,16 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 	return permissions
 }
 
-// irProjectedNode reports whether a node is a build-projected fetch/build/acquire node — one
-// backed by a committed per-build IR graph, so it carries BOTH a BuildTarget and an IRNode.
-// Such a node runs `nkd-exec exec-node` over that graph. A tool-download acquire node has
-// neither and is NOT IR-projected: it has no build graph, so it runs through the glue
-// `factory execute-node` path instead (routing it to exec-node would reference graphs/.json).
-func irProjectedNode(node Node) bool {
-	switch node.Kind {
-	case NodeFetch, NodeBuild, NodeAcquire:
-		return node.BuildTarget != "" && node.IRNode != ""
-	default:
-		return false
-	}
-}
+// irProjectedNode identifies a reference to an exact producer instruction.
+func irProjectedNode(node Node) bool { return node.BuildTarget != "" && node.IRNode != "" }
 
-// launchedExecNode reports whether a node is emitted as an ADR-18 §8 `exec-node --launch`
-// invocation: an IR-projected node that carries a pinned container the helper must orchestrate
-// itself. It is the ONE definition the emitter's Launch decision and the GitHub/GitLab
-// validators' isolation checks both consult, so the rendered and accepted topology cannot
-// diverge. An acquire/pull node with no container runs the helper directly and is not launched.
-func launchedExecNode(node Node) bool {
-	return irProjectedNode(node) && node.Container != ""
-}
-
-func generatedNodeCommands(node Node, plan *Plan, graphDigests map[string]string, planPath, graphDir, workspaceVariable string) []string {
+func generatedNodeCommands(node Node, plan *Plan, planPath, workspaceVariable string) []string {
 	// The container runtime the helper orchestrates with is sourced from the operator's
 	// Environment execution settings (ADR-18 §8), defaulting to rootless podman.
-	runtime := plan.ExecutionSettings.RuntimeBinary()
-	if irProjectedNode(node) {
-		graphPath := filepath.ToSlash(filepath.Join(graphDir, node.BuildTarget+".json"))
-		sourceRoot := filepath.ToSlash(filepath.Join(".nkd", "factory", node.BuildTarget, "src"))
-		result := ""
-		if node.Kind == NodeBuild || node.Kind == NodeAcquire {
-			result = filepath.ToSlash(filepath.Join(".nkd", "factory", node.BuildTarget, "results", node.IRNode+".json"))
-		}
-		// ADR-18 §8: a containerized IR node (a build toolchain or a fetch vendor image)
-		// is isolated by nkd-exec ITSELF orchestrating the pinned container (--launch), which
-		// reads that container, its platform, and its --network=none posture from the committed
-		// per-build graph node (re-checked by the buildDigest drift gate) — not by an inline
-		// `<runtime> run` wrapper in the YAML. This is the SAME per-node primitive the
-		// single-build pipeline emitter renders, so the two stacks share one topology. An
-		// acquire/pull node carries no container and runs the helper directly (Launch=false).
-		return []string{pipeline.ExecNodeCommand(pipeline.NodeExec{
-			NodeID:      node.IRNode,
-			NodesFile:   graphPath,
-			NodesDigest: graphDigests[node.BuildTarget],
-			SourceRoot:  sourceRoot,
-			Result:      result,
-			Launch:      launchedExecNode(node),
-			Runtime:     runtime,
-		}, pipeline.BootstrapHelperRef())}
-	}
-	// Glue nodes (package/publish/aicr-render/terminal-observe) AND tool-download
-	// acquire nodes with no build graph run `factory execute-node` over the committed plan.
+	runtime := plan.Environment.RuntimeBinary()
 	command := fmt.Sprintf("./nkd-exec factory execute-node --plan %s --node %s --workspace .nkd/factory",
 		shellQuote(planPath), shellQuote(node.ID))
-	if node.Container == "" {
+	if node.IRNode != "" || node.Container == "" {
 		return []string{command}
 	}
 	network := "bridge"
@@ -391,7 +349,7 @@ func (actions githubActionRefs) writeDownloadStep(out *bytes.Buffer, label, name
 	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n", yamlSingle("Download "+label), actions.Download, yamlSingle(name), yamlSingle(path))
 }
 
-func githubJobID(id string) string { return generatedJobID(id) }
+func githubJobID(id string) string { return "nkd-" + shortStableName(id) }
 
 func shortStableName(value string) string {
 	clean := strings.ToLower(value)
@@ -477,6 +435,6 @@ func sortedFileNames(files map[string][]byte) []string {
 }
 
 func githubProtectedPublication(plan *Plan, node Node) bool {
-	return plan.ExecutionSettings.Signing != nil && plan.ExecutionSettings.Signing.Mode == SigningModeCosign &&
+	return plan.Environment.Signing != nil && plan.Environment.Signing.Mode == SigningModeCosign &&
 		(node.Kind == NodePublish || signFamilyNode(node.Kind))
 }

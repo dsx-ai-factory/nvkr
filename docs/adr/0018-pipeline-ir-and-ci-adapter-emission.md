@@ -12,7 +12,9 @@
 - **Satisfies:** FR-05 (CI portability), FR-06 (hermetic build), SEC-06 (terminal verify), SEC-11 (build
   isolation).
 
-- **Scope:** Sections 1–7 preserve qualified graph/transport authority with helper-owned isolation. Section 8 defines the separate v1 emitter and event policy.
+- **Scope:** Sections 1–7 define shared execution requirements and the deferred qualified provider protocol.
+  Qualified CI renderers and their TransportPlan implementation are removed; shared local authority primitives
+  remain. Section 8 defines the implemented GitHub Run emitter and event policy.
 
 ## Context
 
@@ -25,7 +27,11 @@ kept in sync.
 
 ### 1. One IR, many adapters — topology/transport only
 
-Each CI adapter (GitHub, GitLab, Tekton, Argo) and the local runner **lower the same IR**. Adapters map **job/step
+The maintained GitHub adapter and local runner use the same producer IR. GitLab, Tekton and Argo generation
+are unavailable; their unused adapters are removed, as are the separate qualified GitHub/GitLab renderers.
+The former GitLab-only `runtime.builderImage` schema field has no retained adapter and any nonempty value
+fails capability admission. GitHub uses its pinned setup-go action for source bootstrap.
+A future provider must satisfy its evidence admission before receiving an implementation. Adapters map **job/step
 topology and artifact transport only**, never build semantics. Adding an engine is one thin adapter; adding a
 component is one catalog entry and no code. Definition v4 names each output, its exact catalog producers,
 and its concrete platform. Compilation derives one internal build target per output; no authored reusable
@@ -34,11 +40,12 @@ identifies the selected executable producer closure and excludes the output name
 Two named outputs with equal BuildDigest retain independent executions, results and evidence obligations.
 Existing Helm image-output dependencies remain explicit packaging edges. AICR renderer settings belong to the
 individual output and the generated IR v3 activation. The effective deployer and selectors participate in its
-BuildDigest. Run-plan, compile-spec and artifact-graph v3 contain no cluster-composition nodes or records.
+BuildDigest. Run-plan and artifact-graph v4 contain no cluster-composition nodes or records. Compiler handoff documents
+are removed; the complete Plan retains the exact authored Definition and Environment.
 
 #### Required engine capability and transport contract
 
-An adapter declares an `EngineCapabilities` contract before lowering. At minimum the engine or its configuration
+A future qualified adapter must admit an explicit capability contract before lowering. At minimum the engine or its configuration
 must provide:
 
 1. a digest-pinned toolchain container launched by the admitted helper/runtime per execution node;
@@ -54,17 +61,18 @@ must provide:
    produces ADR-07's stage-two receipt before artifact work.
 
 
-Lowering also produces a canonical `TransportPlan`. The plan binds each logical item to its producer, exhaustive
+The deferred qualified protocol requires a canonical transport plan. It must bind each logical item to its producer, exhaustive
 consumer set, allow-listed workspace paths, media type, and authentication method: verified runner binary,
 canonical node bundle and bundle manifest, fetched input blobs and bindings, component outputs, per-node result
 receipts, ValidationVector, and terminal verification result. An implicit shared path is not a transport
 contract.
 
-The plan **does not claim the future content digest** of a runner, source closure, component output, or result
+Such a plan **cannot claim the future content digest** of a runner, source closure, component output, or result
 that does not exist at emission time; such a digest is unknowable then. The runtime producer emits a content
 receipt after creating the item, transport carries the item plus receipt, and every consumer re-hashes the
 received bytes before use. Exact digests of already-existing static bundle members stay in the execution-bundle
-identity and are never fabricated as future `TransportPlan` values.
+identity and must never be fabricated as future transport-plan values. The former unused TransportPlan and
+qualified bundle writer are removed. Maintained Runs use their complete Plan and generated ownership manifest.
 
 Emission validates both the adapter's declared capabilities and the requested policy. If the target engine cannot
 express offline isolation, immutable container selection, required transport, or unconditional finalization, the
@@ -74,7 +82,7 @@ observations. The emitter MUST NOT emit a best-effort pipeline or silently weake
 external infrastructure — a Kubernetes NetworkPolicy, for example — are named as immutable configuration inputs
 and checked by an emitted preflight rather than assumed.
 
-The admitted emitter interface is context-first and returns one finite byte value. Publication to a terminal,
+The maintained renderer is context-first and returns one finite bundle value. Publication to a terminal,
 file, repository, or provider is a separate owning boundary. Writer-callback emission is rejected before graph
 inspection or output, so a blocking caller-controlled writer cannot defeat cancellation.
 
@@ -82,16 +90,22 @@ inspection or output, so a blocking caller-controlled writer cannot defeat cance
 
 Build execution is a single **static, from-source runner** (`nkd-exec`, a mode/subset of `nkdctl`) that executes
 one IR node (`fetch → build → collect`). Every job uses the same execution code as the local runner, avoiding duplicated build semantics. Reproduction still requires independently checked bytes and execution evidence.
-The IR node is passed as a **pinned data file** for auditability: a job runs `nkd-exec exec-node <node.json>`.
+The IR is pinned data. Qualified graph diagnostics execute the exact admitted node bundle; maintained Runs
+execute a producer reference from the complete Plan through `factory execute-node`.
 
 ### 3. Helper-owned isolation on generic hosted runners
 
 Every job uses a generic hosted runner. The verified `nkd-exec` helper launches each pinned toolchain container
-through the same `exec-node --launch` / `Local.Run` path used locally. Adapters render job topology, dependencies
+through the shared `pipeline.Local.ExecNode` launcher used by local and hosted Run operations. Adapters render job topology, dependencies
 and declared transport; they do not reproduce isolation as provider-specific build syntax. Fetch/pull nodes
 materialize pinned inputs first; hermetic build and verification nodes enforce network denial, read-only inputs,
 private output and a fixed credential-free environment. Shared code prevents semantic drift; it does not alone
 prove byte identity across hosts.
+
+Landlock/seccomp application and process replacement run on one dedicated locked OS thread. Restrictions are
+thread-local before exec; a Go scheduler handoff must not change the thread that enters the build command.
+If the transition fails, its goroutine exits without unlocking so the runtime retires the possibly restricted
+thread instead of returning it to the scheduler.
 
 Environment selects the runtime and its pins. Rootless podman is the intended default, with docker an explicit
 operator-selected alternative. Admit the configured runtime before work; do not silently choose another sandbox
@@ -120,9 +134,9 @@ belong to Environment/profile configuration; component toolchains remain produce
 
 The profile-free prebuilt artifact lane still executes a runner to acquire bytes, enforce the transport
 allow-list, and perform terminal verification. That runner therefore needs authority even though the artifact
-does not need a build-environment profile. Before any provider bundle reads a catalog or graph, the generator
-authenticates the exact canonical runner profile under `RoleBuilderProfile` with explicit signer, issuer,
-trusted-root, and verifier pins, then derives `RunnerDigest` only from that opaque receipt. The emitted digest
+does not need a build-environment profile. Before a future qualified provider bundle reads a catalog or graph, its generator must
+authenticate the exact canonical runner profile under `RoleBuilderProfile` with explicit signer, issuer,
+trusted-root, and verifier pins, then derive its helper digest only from that opaque receipt. The emitted digest
 authenticates the interpreter. It does **not** attach the profile to a prebuilt artifact, create a stage-two
 build observation, or change the artifact's profile-free identity.
 
@@ -139,9 +153,10 @@ Isolation and the fixed environment/mount contract are identical across all engi
 
 - `oci-hermetic` and proposed `nix` build nodes use helper-launched pinned toolchains; unsupported execution adapters fail admission.
 - `buildkit-rootless` is the networked wrapped OCI-export mode for generated lifecycle Runs (ADR-10).
-  The shared Docker launcher owns its fixed non-root isolation settings and child-process cleanup. Factory
-  build projections must match the embedded output build IR's network, container and platform exactly. The qualified
-  pipeline emitter rejects this mode; it cannot silently render it as a network-denied build.
+  The shared Docker launcher owns its fixed non-root isolation settings and child-process cleanup. Run
+  scheduler records reference the exact embedded producer instruction; network, container and platform are
+  resolved from that instruction at execution or rendering, never serialized a second time. A future qualified
+  pipeline emitter must reject this mode rather than silently render it as a network-denied build.
 - `prebuilt` nodes lower to acquire-and-digest-verify.
 - `exclusion` emits no node.
 
@@ -154,8 +169,8 @@ executor-owned wall-time budget. `kvm` is the first admitted capability with `re
 existing T1 IR field and is not duplicated in execution requirements.
 
 The currently admitted authoring path is deliberately narrower: a from-source catalog producer authors
-`buildRequirements`, and compilation copies it unchanged into the corresponding build node in the full IR and
-Plan. It changes catalog and Plan identity but is structurally excluded from logical build identity. Other node kinds
+`buildRequirements`, and compilation copies it unchanged into the corresponding build node in the full IR embedded in the
+Plan. The scheduler holds only its exact producer reference. It changes catalog and Plan identity but is structurally excluded from logical build identity. Other node kinds
 reject the field until their compiler projection and admission semantics exist. The request is optional for
 ordinary from-source builders. A `vm-image` producer requires positive values for all three resources, at least
 one eligible host platform, an explicit KVM policy, and a positive timeout. Host-platform and capability sets are
@@ -171,11 +186,10 @@ invalid. Class names and capability sets are sorted and duplicate-free, route la
 unrepresentable values fail validation.
 
 Compilation filters by every hard request, prefers classes exposing each `preferred` capability, and breaks equal
-scores by canonical class name. It copies the selected class and resolved capability choice into the full IR and
-Plan, routes that node through the selected class, and does not infer an ordinary build host from target/toolchain
+scores by canonical class name. It records the selected class and resolved capability choice once in the full IR embedded in the
+Plan, resolves scheduling through that selected class, and does not infer an ordinary build host from target/toolchain
 architecture. Plan admission recomputes the deterministic selection from the exact Environment inventory and
-rejects a substituted class, route, request, or binding. The class inventory affects Environment,
-execution-settings, and Plan identities; the selected binding affects full-IR bytes and Plan identity. Neither
+rejects a substituted class, route, request, or binding. The class inventory affects Environment and Plan identities; the selected binding affects full-IR bytes and Plan identity. Neither
 enters logical build identity.
 
 Execution-class declarations are planning input, not runtime proof. Every current local or hosted adapter still
@@ -223,9 +237,9 @@ receipt authentication and no-replace restoration remain mandatory.
 
 ### 7. Terminal verify + granularity
 
-Every emitted pipeline is **job-per-component** and ends in an **unconditional terminal verify** (GitHub
-`if: always()`, GitLab `when: always`, Tekton `finally:`, Argo finished-state `depends`), so verify runs even if a
-build fails, on every engine (SEC-06). Equal logical build identities do not collapse named output executions
+Every admitted Run retains component operations and an **unconditional terminal verify** (GitHub
+`if: always()`), so verification runs even after a build failure (SEC-06). A future provider must enforce the
+same failure behavior before it is admitted. Equal logical build identities do not collapse named output executions
 or their evidence slots. The current Definition path performs no general reuse of prior builds or verification;
 any future reuse needs an authenticated prior result bound to the exact output, members, policy, status and time.
 
@@ -241,16 +255,24 @@ missing, zero, changed-selection, or forged bindings.
 
 ### 8. Pipeline-attested generation and credential admission
 
-Two emitters share the node-execution primitive. The single-graph authoritative emitter retains §1's qualified
-provider-attestation gate and stays frozen where adapters are incomplete. The output-oriented factory emitter
-may render from-source production for GitHub at the pipeline-attested tier without a qualified provider receipt.
+The factory emitter shares the local node-execution primitive and renders from-source production for GitHub
+at the pipeline-attested tier without a qualified provider receipt. The unused single-graph qualified emitters
+are removed; future qualified provider work must satisfy §1 before reintroducing an adapter.
 Self-reported isolation is recorded, never promoted to qualification. Wrapped production uses ADR-10's deferred
 fused-job contract. Invoking an upstream reusable workflow needs a separate execution and evidence contract;
 v1 invokes pinned source entrypoints instead.
 
-The retained GitLab adapter is build/package-only; maintained lifecycle targets are local and GitHub.
-GitLab, Tekton and Argo reject signing plans with `CodeEngineCapability` before
-output; omitting unsupported signing jobs silently is forbidden. Tekton/Argo factory adapters remain unavailable.
+Maintained local and hosted Runs share the factory producer operation and `pipeline.Local.ExecNode` launcher.
+A producer reference resolves the exact embedded IR instruction; utility operations retain their pinned execution
+containers. Local execution schedules the whole Run graph once in bounded ready batches, retains source receipts
+through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted jobs enter through
+`factory.ExecuteNode`, which dispatches producers to that same operation. Neither path converts a whole producer
+report into a second scheduling result model.
+Source receipts remain reusable; result slots and completeness still belong to each exact named output.
+The generated Plan is the single executable input document; separate per-build graph files are retired.
+
+Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selection returns
+`CodeEngineCapability` before reading authored inputs or producing output. No fallback renderer exists.
 
 | Event | Admitted work and credentials |
 |---|---|
@@ -322,8 +344,8 @@ the finalizer itself from starting; inspect provider status when no Run record e
   artifact storage; emission correctly fails for those configurations.
 
 **Neutral**
-- The runner is a mode/subset of `nkdctl`; `nkdctl` orchestrator mode (local dev) and `nkd-exec exec-node` (CI)
-  share the same execution code.
+- The runner is a mode/subset of `nkdctl`. Maintained hosted jobs use `nkd-exec factory execute-node` and
+  share producer execution with local Runs. Qualified graph protocols retain the separate `exec-node` entry point.
 
 ## Alternatives considered
 
@@ -349,16 +371,15 @@ the finalizer itself from starting; inspect provider status when no Run record e
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nkd/pipeline/emitters_test.go`, `pkg/nkd/pipeline/execnode_test.go`, and
-`pkg/nkd/pipeline/results_test.go` proves engine-neutral lowering, node serialization, exact bundle/build
-binding, explicit unqualified exec-node results, terminal receipt enforcement, and that all four default adapters
-reject a from-source graph before emitting bytes when provider execution attestation is absent. Prebuilt-only
-GitLab emission tests retain unconditional-verify, exact pinned-verifier arguments, transport-shape coverage,
-and fail-before-catalog authentication of the exact signed runner profile, including authored-path substitution;
-incomplete GitHub, Tekton, and Argo transport adapters reject emission. These tests are **not** evidence that a
-provider accepts or can execute the emitted configuration.
+Current contract evidence in `pkg/nkd/pipeline/execnode_test.go` and `pkg/nkd/pipeline/results_test.go`
+retains exact-node execution, explicit unqualified results and terminal receipt enforcement. Factory generation
+and lifecycle tests cover GitHub semantic validation and fail-before-input/output rejection of retired engines.
+The qualified renderers, their bundle/transport-plan models, and self-referential renderer tests are removed.
+The shared archive transport, source receipts and local execution contracts remain. These tests do not establish
+new provider execution or qualified acceptance.
 
-Acceptance requires, for GitHub, GitLab, Tekton, and Argo independently:
+Qualified external acceptance requires each implemented provider independently; adding another provider requires
+the same evidence before its capability can be admitted:
 
 1. schema/provider validation of the emitted document and a fixture run that transports the runner, fetched
    source, outputs, node receipts, and the ValidationVector through separate jobs or pods;

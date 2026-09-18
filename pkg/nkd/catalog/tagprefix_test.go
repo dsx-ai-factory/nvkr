@@ -52,7 +52,7 @@ func TestSelectTagForSourceOnlyConsidersPrefixedTags(t *testing.T) {
 // tag's trailing segment parses as a newer semver.
 func TestSelectTagIgnoresForeignPrefixedTags(t *testing.T) {
 	tags := []string{"v1.32.0", "cli/v1.32.9", "sub/module/v1.32.8"}
-	got, err := SelectTag(tags, "1.32.x")
+	got, err := SelectTagForSource(tags, Source{Constraint: "1.32.x"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -44,7 +44,10 @@ func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
 			if test.mutate != nil {
 				test.mutate(&first, &second)
 			}
-			stages, jobs := githubStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second}}})
+			stages, jobs, err := githubStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second}}})
+			if err != nil {
+				t.Fatal(err)
+			}
 			if len(stages) != test.want {
 				t.Fatalf("got %d stages, want %d: %#v", len(stages), test.want, stages)
 			}
@@ -66,7 +69,10 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	stages, nodeJobs := githubStages(plan)
+	stages, nodeJobs, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
 	stage := requireGroupedGitHubStage(t, stages)
 	job := document.Jobs[stage.ID]
 
@@ -152,7 +158,10 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 				t.Fatal(err)
 			}
 			document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
-			stages, _ := githubStages(plan)
+			stages, _, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
 			stage := requireGroupedGitHubStage(t, stages)
 			job := document.Jobs[stage.ID]
 			var execute []int
@@ -276,74 +285,6 @@ func stepDownloadsArtifact(plan *Plan, steps []githubStep, name string) bool {
 
 func githubLifecycleTestPlan(t *testing.T) *Plan {
 	t.Helper()
-	plan := githubTestPlan(t)
-	// Lifecycle targets derive from output names. The low-level fixture uses a
-	// differently named target, so migrate every generated reference consistently.
-	rename := func(value string) string {
-		value = strings.ReplaceAll(value, "worker/", "tools/")
-		if strings.HasSuffix(value, "/worker") {
-			value = strings.TrimSuffix(value, "/worker") + "/tools"
-		}
-		return value
-	}
-	plan.Builds[0].Name = "tools"
-	for i := range plan.Graph.Nodes {
-		node := &plan.Graph.Nodes[i]
-		node.ID = rename(node.ID)
-		if node.BuildTarget == "worker" {
-			node.BuildTarget = "tools"
-		}
-		for j := range node.Inputs {
-			node.Inputs[j] = rename(node.Inputs[j])
-		}
-		for j := range node.Outputs {
-			node.Outputs[j] = rename(node.Outputs[j])
-		}
-	}
-	for i := range plan.Graph.Artifacts {
-		artifact := &plan.Graph.Artifacts[i]
-		artifact.ID = rename(artifact.ID)
-		artifact.Producer = rename(artifact.Producer)
-		artifact.Path = rename(artifact.Path)
-		if artifact.BuildTarget == "worker" {
-			artifact.BuildTarget = "tools"
-		}
-	}
-
-	plan.DefinitionDigest = "sha256:" + strings.Repeat("a", 64)
-	plan.EnvironmentDigest = "sha256:" + strings.Repeat("b", 64)
-	artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
-	nodes := make(map[string]Node, len(plan.Graph.Nodes))
-	for _, artifact := range plan.Graph.Artifacts {
-		artifacts[artifact.ID] = artifact
-	}
-	for _, node := range plan.Graph.Nodes {
-		nodes[node.ID] = node
-	}
-	output := artifacts["package/tools"]
-	producer := nodes[output.Producer]
-	var components []string
-	buildTarget := ""
-	for _, inputID := range producer.Inputs {
-		input := artifacts[inputID]
-		if input.BuildTarget == "" || input.Component == "" || input.Kind == "producer-result" {
-			continue
-		}
-		components = append(components, input.Component)
-		buildTarget = input.BuildTarget
-	}
-	buildDigest := ""
-	for _, build := range plan.Builds {
-		if build.Name == buildTarget {
-			buildDigest = build.BuildDigest
-		}
-	}
-	plan.LifecycleOutputs = []LifecycleOutputPlan{{
-		Name: output.Name, Kind: "executable", ArtifactID: output.ID,
-		BuildDigest: buildDigest, Components: uniqueSorted(components),
-	}}
-	if err := plan.Validate(); err != nil {
-		t.Fatalf("lifecycle GitHub fixture is invalid: %v", err)
-	}
-	return plan
+	// Compilation returns complete public identities and output bindings.
+	return githubTestPlan(t)
 }

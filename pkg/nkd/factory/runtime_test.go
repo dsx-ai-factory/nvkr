@@ -4,38 +4,36 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 )
 
-func baseExecutionSettings() ExecutionSettings {
-	return ExecutionSettings{
-		APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "env"},
-		Targets:  map[string]Target{"reg": {Kind: TargetOCI, Ref: "r.example/x", Anonymous: true}},
-		Routes:   []Route{{Name: "r", Input: "target/component", Target: "reg"}},
-	}
+func baseEnvironment() authored.Environment {
+	_, env := fixtureInputs("runtime", "worker", "")
+	return env
 }
 
-// TestDeliveryRuntimeValidation covers ADR-18 §8 §1's ExecutionSettings.Runtime home for the
+// TestDeliveryRuntimeValidation covers ADR-18 §8 §1's Environment.Runtime home for the
 // runtime env: it is optional, defaults to podman, and demands digest-pinned images.
 func TestDeliveryRuntimeValidation(t *testing.T) {
-	if baseExecutionSettings().RuntimeBinary() != "podman" {
+	if baseEnvironment().RuntimeBinary() != "podman" {
 		t.Fatal("an unset runtime must default to rootless podman")
 	}
-	ok := baseExecutionSettings()
-	ok.Runtime = RuntimeProfile{Runtime: "docker", RuntimeImage: "quay.io/podman/stable@sha256:" + strings.Repeat("a", 64)}
+	ok := baseEnvironment()
+	ok.Runtime = authored.Runtime{Runtime: "docker", RuntimeImage: "quay.io/podman/stable@sha256:" + strings.Repeat("a", 64)}
 	if err := ok.Validate(); err != nil {
 		t.Fatalf("valid runtime profile rejected: %v", err)
 	}
 	if ok.RuntimeBinary() != "docker" {
 		t.Fatal("configured runtime binary not honored")
 	}
-	unpinned := baseExecutionSettings()
-	unpinned.Runtime = RuntimeProfile{HelperImage: "ghcr.io/nvidia/nkd-exec:latest"}
+	unpinned := baseEnvironment()
+	unpinned.Runtime = authored.Runtime{HelperImage: "ghcr.io/nvidia/nkd-exec:latest"}
 	if err := unpinned.Validate(); err == nil {
 		t.Fatal("an unpinned helperImage must be rejected")
 	}
-	badRuntime := baseExecutionSettings()
-	badRuntime.Runtime = RuntimeProfile{Runtime: "containerd"}
+	badRuntime := baseEnvironment()
+	badRuntime.Runtime = authored.Runtime{Runtime: "containerd"}
 	if err := badRuntime.Validate(); err == nil {
 		t.Fatal("an unsupported runtime binary must be rejected")
 	}
@@ -45,36 +43,35 @@ func TestDeliveryRuntimeValidation(t *testing.T) {
 // container runtime from internal Environment execution settings (default podman; overridable to
 // docker) instead of a hardcoded value.
 func TestDeliveryRuntimeSourcesGeneratedRuntime(t *testing.T) {
-	plan := gitlabTestPlan(t)
-	bundle, err := Render(context.Background(), plan, EngineGitLab)
+	plan := githubTestPlan(t)
+	bundle, err := Render(context.Background(), plan, EngineGitHub)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wf := string(bundle.Files[GitLabWorkflowPath])
-	// The runtime flows to BOTH the Model-B launch line (IR build/fetch nodes orchestrate
-	// their pinned container via `exec-node --launch --runtime <rt>`) and the glue wrapper
-	// (`<rt> run`). Default is rootless podman; docker must appear in neither place.
-	if !strings.Contains(wf, "exec-node --launch --runtime podman") || !strings.Contains(wf, "podman run") {
-		t.Fatalf("default ExecutionSettings runtime must generate podman:\n%s", wf)
+	wf := string(bundle.Files[GitHubWorkflowPath])
+	// Utility containers render the authored runtime. Producer runtime selection
+	// is tested through the shared execution operation.
+	if !strings.Contains(wf, "podman run") {
+		t.Fatalf("default Environment runtime must generate podman:\n%s", wf)
 	}
 	if strings.Contains(wf, "--runtime docker") || strings.Contains(wf, "docker run") {
-		t.Fatalf("default ExecutionSettings runtime must not emit docker:\n%s", wf)
+		t.Fatalf("default Environment runtime must not emit docker:\n%s", wf)
 	}
 
-	override := gitlabTestPlan(t)
-	override.ExecutionSettings.Runtime = RuntimeProfile{Runtime: "docker"}
-	digest, err := override.ExecutionSettings.Digest()
+	override := githubTestPlan(t)
+	override.Environment.Runtime = authored.Runtime{Runtime: "docker"}
+	digest, err := override.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	override.ExecutionSettingsDigest = digest
-	bundle2, err := Render(context.Background(), override, EngineGitLab)
+	override.EnvironmentDigest = digest
+	bundle2, err := Render(context.Background(), override, EngineGitHub)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wf2 := string(bundle2.Files[GitLabWorkflowPath])
-	if !strings.Contains(wf2, "exec-node --launch --runtime docker") || !strings.Contains(wf2, "docker run") {
-		t.Fatalf("ExecutionSettings runtime override to docker was not honored:\n%s", wf2)
+	wf2 := string(bundle2.Files[GitHubWorkflowPath])
+	if !strings.Contains(wf2, "docker run") {
+		t.Fatalf("Environment runtime override to docker was not honored:\n%s", wf2)
 	}
 }
 
@@ -82,12 +79,12 @@ func TestGitHubDockerUtilityPreservesRunnerOwnership(t *testing.T) {
 	for _, runtime := range []string{"docker", "podman"} {
 		t.Run(runtime, func(t *testing.T) {
 			plan := githubTestPlan(t)
-			plan.ExecutionSettings.Runtime.Runtime = runtime
-			digest, err := plan.ExecutionSettings.Digest()
+			plan.Environment.Runtime.Runtime = runtime
+			digest, err := plan.Environment.Digest()
 			if err != nil {
 				t.Fatal(err)
 			}
-			plan.ExecutionSettingsDigest = digest
+			plan.EnvironmentDigest = digest
 			bundle, err := RenderGitHub(context.Background(), plan)
 			if err != nil {
 				t.Fatal(err)

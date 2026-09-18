@@ -2,6 +2,8 @@ package assemble
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -45,10 +47,6 @@ func TestDiskManifestBlockBoundsFailBeforeScanningContent(t *testing.T) {
 			t.Fatalf("NewDiskManifest block size %d code = %q, want %q (%v)",
 				blockSize, code(err), nkderr.CodeInvalidCatalog, err)
 		}
-		if _, err := BlockManifestOfContext(context.Background(), missing, blockSize); code(err) != nkderr.CodeInvalidCatalog {
-			t.Fatalf("BlockManifestOf block size %d code = %q, want %q (%v)",
-				blockSize, code(err), nkderr.CodeInvalidCatalog, err)
-		}
 	}
 
 	// A sparse fixture proves the entry bound is derived from metadata before the
@@ -65,10 +63,6 @@ func TestDiskManifestBlockBoundsFailBeforeScanningContent(t *testing.T) {
 		t.Fatalf("oversized DiskManifest code = %q, want %q (%v)",
 			code(err), nkderr.CodeInvalidCatalog, err)
 	}
-	if _, err := BlockManifestOfContext(context.Background(), oversized, MinDiskBlockSizeBytes); code(err) != nkderr.CodeInvalidCatalog {
-		t.Fatalf("oversized BlockManifestOf code = %q, want %q (%v)",
-			code(err), nkderr.CodeInvalidCatalog, err)
-	}
 }
 
 func TestDiskManifestContextFailsBeforeInputIO(t *testing.T) {
@@ -78,12 +72,6 @@ func TestDiskManifestContextFailsBeforeInputIO(t *testing.T) {
 	if _, err := NewDiskManifestContext(ctx, DiskKindRAW, missing,
 		MinDiskBlockSizeBytes); code(err) != nkderr.CodeTimeout || !nkderr.Retryable(err) {
 		t.Fatalf("canceled manifest construction returned %v", err)
-	}
-	if _, _, err := LogicalDiskDigestContext(ctx, missing); code(err) != nkderr.CodeTimeout {
-		t.Fatalf("canceled logical digest returned %v", err)
-	}
-	if _, err := BlockManifestOfContext(ctx, missing, MinDiskBlockSizeBytes); code(err) != nkderr.CodeTimeout {
-		t.Fatalf("canceled block manifest returned %v", err)
 	}
 }
 
@@ -195,12 +183,12 @@ func TestCanonicalDiskCapabilityDetectsMutationBetweenDerivations(t *testing.T) 
 	if err := os.WriteFile(raw, []byte("hello world!"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	capability, err := openRegularFileCapability(raw, "canonical disk")
+	capability, err := openRegularFileCapabilityContext(t.Context(), raw, "canonical disk")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer capability.Close()
-	if _, _, err := capability.logicalDigest(); err != nil {
+	if _, _, _, err := capability.diskEvidenceContext(t.Context(), MinDiskBlockSizeBytes, true); err != nil {
 		t.Fatal(err)
 	}
 	file, err := os.OpenFile(raw, os.O_APPEND|os.O_WRONLY, 0)
@@ -214,7 +202,7 @@ func TestCanonicalDiskCapabilityDetectsMutationBetweenDerivations(t *testing.T) 
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := capability.blockManifest(MinDiskBlockSizeBytes); code(err) != nkderr.CodeVerifyFailed {
+	if _, _, _, err := capability.diskEvidenceContext(t.Context(), MinDiskBlockSizeBytes, true); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("mutated held canonical-disk capability code = %q, want %q (%v)",
 			code(err), nkderr.CodeVerifyFailed, err)
 	}
@@ -238,10 +226,7 @@ func TestAddEnvelopeUsesOneSnapshotWhenCallerPathMutates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantContainerDigest, _, err := LogicalDiskDigestContext(context.Background(), envelope)
-	if err != nil {
-		t.Fatal(err)
-	}
+	wantContainerDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(initial))
 	qemu, qemuDigest := fakeQemuImg(t, `{"format":"qcow2","virtual-size":12,"encrypted":false}`)
 	codec, err := OpenQemuImgCodec(context.Background(), qemu, qemuDigest)
 	if err != nil {

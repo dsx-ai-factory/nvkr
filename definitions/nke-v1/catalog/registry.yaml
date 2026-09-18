@@ -46,7 +46,7 @@ components:
     fromSource: true
     outputType: host-package
     platforms:
-    - linux/amd64f
+    - linux/amd64
     source: nke
     versionStamp:
       NKECTL_CAPI_VERSION: v1.12.3

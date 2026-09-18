@@ -539,13 +539,6 @@ func (s Source) QualifiedTag(tag string) string {
 	return s.TagPrefix + tag
 }
 
-// SelectTag picks the newest stable tag matching a constraint (e.g. 1.32.x, 1.x,
-// or an exact 1.32.0). Pre-release tags are ignored. It is the root-tagged form of
-// SelectTagForSource.
-func SelectTag(tags []string, constraint string) (string, error) {
-	return SelectTagForSource(tags, Source{Constraint: constraint})
-}
-
 // SelectTagForSource picks the newest stable tag a source's constraint admits, honoring
 // its optional module-scoped tag prefix: only tags carrying the prefix are candidates
 // (a monorepo's other modules bump independently and must never be selected here), the

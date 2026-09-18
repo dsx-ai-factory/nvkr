@@ -67,7 +67,7 @@ func TestConsumerMaterializationFailureCleansWorkspace(t *testing.T) {
 				t.Fatal(err)
 			}
 			materialized, err := consumer.materialize(t.Context(), "invalid")
-			if err == nil || materialized.path != "" || materialized.cleanup != nil {
+			if err == nil || materialized != nil {
 				t.Fatalf("failed materialization returned state: %+v, %v", materialized, err)
 			}
 			if blocked {
@@ -86,16 +86,44 @@ func TestConsumerMaterializationFailureCleansWorkspace(t *testing.T) {
 	}
 }
 
-func TestInspectionRejectsInvalidObjectIdentity(t *testing.T) {
-	for _, object := range []delivery.PublishedObject{
-		{Name: "../escape", Kind: "binary-bundle", BlobDigest: "sha256:" + repeat("a", 64)},
-		{Name: "tools", Kind: "binary-bundle", BlobDigest: "invalid"},
-	} {
-		inspection := delivery.Inspection{Root: delivery.PublicationRoot{Objects: []delivery.PublishedObject{object}}}
-		got, _, err := artifactsFromBinding(t.Context(), t.TempDir(), inspection)
-		assertCode(t, err, e.CodeVerifyFailed)
-		if got != nil {
-			t.Fatalf("invalid object returned artifacts: %+v", got)
+func TestPublicationCapabilitySurvivesSourceReplacement(t *testing.T) {
+	layout, digest := testPublicationLayout(t)
+	publication, err := delivery.OpenPublication(t.Context(), layout, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference := "registry.example.test/product@" + digest
+	outputs, subject, err := publication.Artifacts(reference)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs[0].Name = "mutated"
+	outputs[0].Components[0] = "mutated"
+	entries, err := os.ReadDir(filepath.Join(layout, "blobs", "sha256"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if err := os.WriteFile(filepath.Join(layout, "blobs", "sha256", entry.Name()), []byte("substituted"), 0o600); err != nil {
+			t.Fatal(err)
 		}
 	}
+	if err := os.WriteFile(filepath.Join(layout, "index.json"), []byte("substituted"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	again, againSubject, err := publication.Artifacts(reference)
+	if err != nil || againSubject != subject || again[0].Name == "mutated" || again[0].Components[0] == "mutated" {
+		t.Fatalf("held projection changed: %v %s %v", again, againSubject, err)
+	}
+	_, err = delivery.OpenPublication(t.Context(), layout, digest)
+	assertCode(t, err, e.CodeVerifyFailed)
+	if err := publication.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := publication.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = publication.Artifacts(reference)
+	assertCode(t, err, e.CodeGateUnmet)
+	assertCode(t, publication.RequireAttestedEvidence(), e.CodeGateUnmet)
 }

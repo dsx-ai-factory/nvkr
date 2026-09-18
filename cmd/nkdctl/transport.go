@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/urfave/cli/v2"
 )
@@ -19,7 +20,7 @@ func cmdTransportPack() *cli.Command {
 			&cli.StringSliceFlag{Name: "path", Required: true},
 		},
 		Action: func(c *cli.Context) error {
-			return pipeline.PackTransport(c.Context, c.String("archive"), c.String("root"), c.StringSlice("path"))
+			return transportarchive.Pack(c.Context, c.String("archive"), c.String("root"), c.StringSlice("path"))
 		},
 	}
 }
@@ -34,7 +35,7 @@ func cmdTransportUnpack() *cli.Command {
 			&cli.StringSliceFlag{Name: "path", Required: true},
 		},
 		Action: func(c *cli.Context) error {
-			return pipeline.UnpackTransport(c.Context, c.String("archive"), c.String("root"), c.StringSlice("path"))
+			return transportarchive.Unpack(c.Context, c.String("archive"), c.String("root"), c.StringSlice("path"))
 		},
 	}
 }

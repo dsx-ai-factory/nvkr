@@ -12,7 +12,8 @@
 - **Satisfies:** FR-21 (standard, replaceable interfaces), SEC-03 (zero-binary), SEC-09 (secret handling),
   SEC-13 (registry-by-digest).
 
-- **Scope:** Sections 3–4 describe qualified publication. Section 6 defines v1 publication; §7 is deferred registration.
+- **Scope:** Sections 3–4 specify deferred qualified publication. Diagnostic transport construction is
+  implemented as stated in §4. Section 6 defines v1 publication; §7 is deferred registration.
 
 ## Context
 
@@ -66,7 +67,7 @@ adapters support equivalent credential isolation.
 
 OCI is the current v1 publication transport. Executable, APT-repository and Helm outputs can share a recursive
 OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Package repository and object
-store targets remain separately capability-gated adapters. Credential values never enter serialized inputs.
+store publishers remain deferred and fail capability admission. Credential values never enter serialized inputs.
 Transport settings stay replaceable by environment owners.
 
 The disk target is a future OCI evidence and control root over an exact QCOW2 payload. An optional S3 object and
@@ -84,10 +85,13 @@ The generated pipeline gains a **publish phase after the unconditional terminal 
 - **only verified artifacts publish** — publish is gated on verify;
 - for an atomic release, publish and promote are gated on the **completeness check** (ADR-16), so a partial set is
   not publishable as a release;
-- pushes go through the **ADR-17 external-interface seams** (`OCIRegistry` / `PackageRepo` / `ObjectStore`), so
-  the default implementations are operator-swappable.
+- maintained OCI pushes use the delivery module's registry adapter with Environment-owned destinations and
+  credentials. Qualified publication, direct package repositories and object stores have no production adapter.
 
 ### 4. Content-addressed, referrers-attached
+
+The qualified clearance and commit protocol below is deferred. Its unused same-process implementation has
+been removed; the transport representation remains implemented for diagnostic and pipeline publication.
 
 Artifacts publish **by digest**. The authenticated Authorization (clearance) carries an exhaustive canonical
 publication manifest for every cleared subject and every required ValidationVector, SBOM, provenance, and status
@@ -115,9 +119,9 @@ complete recursive closure before the destination becomes visible.
 
 The config uses `nkd.dev/publication-root/v3` and `application/vnd.nkd.publication-root.config.v3+json`.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
-removed. Readers reject earlier metadata and removed fields. Qualified attachments use the owning schema
-versions: validation vector v3, ReleaseSet/Inventory v4 and clearance v9.
-Their MIME versions track these schemas while their canonical digest-family allocations remain frozen.
+removed. Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
+remain implemented. The retired clearance and publication-manifest families remain reserved and nonminting;
+retained transport media identifiers do not imply a current clearance issuer or verifier.
 
 Loose executables use `application/vnd.nkd.binary-bundle.v1`. The Binary Bundle's canonical config binds OS,
 architecture, purpose, optional ReleaseSet and Inventory identities, and every file's name, absolute install
@@ -128,14 +132,14 @@ Acquire-By-Hash repository; that APT Projection is not a new release artifact, a
 development-only.
 
 The public CLI constructor emits only a visibly `diagnostic` root and requires `--allow-diagnostic` before push.
-It cannot set publication identity, publication-manifest digest, or clearance digest. The package-level
-`delivery.BuildQualifiedPublicationRoot` is the only qualified publisher constructor: it consumes the opaque
-authenticated `RoleClearance` capability, rehydrates the exact `Authorization`, matches its ReleaseSet,
-Inventory, publication manifest, artifacts, referrers, optional derived Binary Bundles, and detached proof
-material, then emits an opaque `QualifiedRoot`. `Authorization` alone and the legacy transport entry point remain
-fail-closed, because neither carries those proof bytes. Remote CLI inspection verifies structural and content
-closure but does not authenticate a claimed qualified root; production consumption still requires the operator's
-trust policy and clearance authentication.
+It cannot set publication identity, publication-manifest digest, or clearance digest. Qualified publishing is
+not implemented. The unused qualified constructor, legacy filesystem publication adapters, clearance authentication and
+release-only receipt implementation are removed. A future qualified publisher must consume
+authenticated clearance, match its exact ReleaseSet, Inventory, publication manifest, payloads, referrers and
+detached proof bytes, and implement the complete root commit protocol before it may emit a qualified root.
+Remote CLI inspection verifies structural and content closure but does not authenticate a claimed qualified
+root. Qualified consumption requires an implemented clearance verifier and the operator's trust policy;
+no current diagnostic operation grants that authority.
 
 ### 5. Credentials by reference, never embedded
 
@@ -160,6 +164,21 @@ required evidence membership. There is no separately published lifecycle-binding
 the deliverable manifest digest (APT retains its typed repository identity); input layout-index hashes are not
 Artifact identities. The qualified representation in §4 remains a separate protocol, not a compatibility path
 for former pipeline publications. The current consumer rejects pipeline roots without this metadata.
+
+The delivery module owns the one canonical release-content projection and its digest for both producer and
+consumer. It contains sorted exact output names, kinds, artifact digests, Build Digests and components; repository
+references are excluded. This ownership consolidation preserves existing canonical content bytes. The compiler
+still joins independently frozen output requirements to observed payloads before publication. The consumer does
+not reconstruct compiler records or derive both expectations and observations from release metadata.
+
+Consumer integrity checking opens an opaque delivery publication with an explicit lifetime. It snapshots the
+index and blobs into bounded anonymous immutable files, verifies every reachable descriptor and evidence slot,
+and checks format-specific payload membership against that exact closure. Private extraction workspaces are
+removed before the capability is returned. Later source-path replacement cannot change the checked output
+projection, and defensive copies cannot mutate the held view; closing releases the file capabilities and rejects
+further projections. Signature and policy verification remain in the lifecycle consumer. This capability proves
+integrity and membership only, never signer authority by itself. Path-based diagnostic operations retain their
+independent revalidation at each call.
 
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
 Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
@@ -249,7 +268,7 @@ it cannot derive availability or qualification from a plan or caller-provided su
 
 ## Follow-ups
 
-- **ADR-17:** the `OCIRegistry` / `PackageRepo` / `ObjectStore` seams the publish phase uses.
+- **ADR-17:** ownership and capability admission for production publication adapters.
 - **ADR-16:** the completeness/promotion gate the release publish is bound to.
 
 ## Acceptance evidence
@@ -265,9 +284,9 @@ exercise the native image, recovered CLI and rendered chart binding. Acquired-im
 unavailable. Source Helm archive selection and exact producer observation also have focused contract tests.
 This adapter does not mint qualified execution or release authority.
 
-Current contract evidence in `pkg/nkd/transport/*_test.go`, `pkg/nkd/release/*_test.go`, and
-`pkg/nkd/delivery/*_test.go` covers target exclusion from build identity, authorization-bound subjects,
-exhaustive referrer matching, semantic-versus-blob digest separation, no implicit I/O, deterministic binary and
+Current contract evidence in `pkg/nkd/factory/*_test.go` and `pkg/nkd/delivery/*_test.go` covers target exclusion
+from build identity, independently required output membership, exact evidence closure, semantic-versus-blob
+digest separation, no implicit I/O, deterministic binary and
 APT layouts, recursive OCI closure verification, extraction, and rejection of missing, extra, or substituted
 bytes. The dated local NKE record in reconciliation establishes development registry interoperability for
 earlier inputs, not authenticated release publication or production-registry acceptance.

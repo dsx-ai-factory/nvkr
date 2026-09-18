@@ -128,7 +128,7 @@ func TestHostPreflightDoesNotConsumeExecutionIdentities(t *testing.T) {
 	if err != nil || len(forgedDivs) != 0 {
 		t.Fatalf("execution strings must not be interpreted as host facts: %v %v", err, forgedDivs)
 	}
-	if minimalReceipt.ObservationBinding() != forgedReceipt.ObservationBinding() {
+	if minimalReceipt.observationBinding != forgedReceipt.observationBinding {
 		t.Fatal("host receipt bound caller-supplied execution identity strings")
 	}
 }
@@ -152,10 +152,10 @@ func TestVerifyExecutionBindsExactProfileNodesAndObservations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if receipt.ProfileDigest() != host.ProfileDigest() || receipt.HostObservationBinding() != host.ObservationBinding() {
+	if receipt.ProfileDigest() != host.ProfileDigest() || receipt.hostObservationBinding != host.observationBinding {
 		t.Fatal("execution receipt did not consume and bind the host stage")
 	}
-	if receipt.SelectionBinding() == "" || receipt.ExecutionBinding() == "" {
+	if receipt.selectionBinding == "" || receipt.ExecutionBinding() == "" {
 		t.Fatal("execution receipt lacks exact bindings")
 	}
 	if err := receipt.RequireFor(context.Background(), p, nodes); err != nil {

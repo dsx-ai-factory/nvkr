@@ -84,16 +84,6 @@ func (s SignedDocument) Bundle() ([]byte, error) {
 	return append([]byte(nil), s.bundle...), nil
 }
 
-// CertificateClaims returns claims parsed from the certificate bytes that
-// cosign actually emitted. These are informational at signing time; only a
-// qualified verifier and role policy may authorize them.
-func (s SignedDocument) CertificateClaims() ([]string, string, error) {
-	if err := s.requireReceipt(); err != nil {
-		return nil, "", err
-	}
-	return append([]string(nil), s.identities...), s.issuer, nil
-}
-
 // RequireFor rebinds this receipt to exact live document bytes before a caller
 // publishes the captured signature material.
 func (s SignedDocument) RequireFor(ctx context.Context, document []byte) error {

@@ -99,10 +99,10 @@ verified diagnostic output, not a release-authorizing bundle. A later content-ad
 be added only when it is stable across hosts.
 
 The authority-bearing render result is an opaque, same-process `QualifiedResult`, minted only by the built-in
-verified-snapshot adapter. The public `Result` and the externally implementable `UnqualifiedBundler` seam are
-diagnostic: even a caller-composed result whose paths and digests are internally consistent cannot authorize an
-AICR reference. A future SDK adapter needs its own authenticated execution-evidence design before it can mint the
-opaque capability; structural fields are not proof that the pinned generator ran.
+verified-snapshot adapter. The public `Result` is diagnostic: even a caller-composed result whose paths and
+digests are internally consistent cannot authorize an AICR reference. There is no SDK bundler extension
+interface. A future adapter needs its own authenticated execution-evidence design before it can mint the opaque
+capability; structural fields are not proof that the pinned generator ran.
 
 The frozen v2 tree object has `schemaVersion: nkd.dev/aicr-bundle/v2` and an `entries` array sorted by relative
 slash path. Each entry is exactly `{path, type, mode}` for a directory or `{path, type, sha256, mode}` for a file;

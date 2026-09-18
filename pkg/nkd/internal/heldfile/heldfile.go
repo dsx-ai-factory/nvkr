@@ -104,11 +104,6 @@ func OpenContext(ctx context.Context, path string, options Options) (*File, erro
 	return fromReader(ctx, source, options)
 }
 
-// FromBytes creates an immutable anonymous capability containing a defensive copy.
-func FromBytes(raw []byte, options Options) (*File, error) {
-	return FromBytesContext(context.Background(), raw, options)
-}
-
 // FromBytesContext creates an immutable capability while observing cancellation
 // during the defensive copy and seal.
 func FromBytesContext(ctx context.Context, raw []byte, options Options) (*File, error) {
@@ -118,13 +113,8 @@ func FromBytesContext(ctx context.Context, raw []byte, options Options) (*File, 
 	return fromReader(ctx, bytes.NewReader(raw), options)
 }
 
-// FromReader streams the caller's already-opened capability into an anonymous
-// immutable file. It never resolves a pathname and does not close source.
-func FromReader(source io.Reader, options Options) (*File, error) {
-	return FromReaderContext(context.Background(), source, options)
-}
-
-// FromReaderContext is FromReader with cancellation observed between chunks.
+// FromReaderContext snapshots the caller's already-opened capability while
+// observing cancellation between chunks. It does not close source.
 func FromReaderContext(ctx context.Context, source io.Reader, options Options) (*File, error) {
 	if ctx == nil {
 		return nil, errors.New("held input reader requires a non-nil context")
@@ -217,7 +207,7 @@ func (f *File) Size() int64 {
 }
 
 // ReadAll returns the exact held bytes only when they fit the caller's explicit
-// memory bound. Large disk callers should use ReadAt or WriteTo.
+// memory bound. Large disk callers should use ReadAt or WriteToContext.
 func (f *File) ReadAll(maxBytes int64) ([]byte, error) {
 	return f.ReadAllContext(context.Background(), maxBytes)
 }
@@ -260,10 +250,6 @@ func (f *File) ReadAt(p []byte, offset int64) (int, error) {
 	return f.file.ReadAt(p, offset)
 }
 
-func (f *File) WriteTo(destination io.Writer) (int64, error) {
-	return f.WriteToContext(context.Background(), destination)
-}
-
 // WriteToContext writes the exact held bytes and observes cancellation between
 // bounded chunks.
 func (f *File) WriteToContext(ctx context.Context, destination io.Writer) (int64, error) {
@@ -281,11 +267,6 @@ func (f *File) WriteToContext(ctx context.Context, destination io.Writer) (int64
 		return 0, errors.New("held file is closed")
 	}
 	return copyContext(ctx, destination, io.NewSectionReader(f.file, 0, f.size))
-}
-
-// AssertUnchanged re-reads the held inode and compares it with the captured bytes.
-func (f *File) AssertUnchanged() error {
-	return f.AssertUnchangedContext(context.Background())
 }
 
 // AssertUnchangedContext re-hashes the held inode with bounded cancellation.
@@ -333,7 +314,7 @@ func (f *File) Close() error {
 	return err
 }
 
-// Output is an anonymous mutable child output. Seal must be called after the child
+// Output is an anonymous mutable child output. SealContext must be called after the child
 // exits; it checks the bound and transfers ownership to an immutable File.
 type Output struct {
 	mu       sync.Mutex
@@ -370,10 +351,6 @@ func (o *Output) OSFile() *os.File {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.file
-}
-
-func (o *Output) Seal() (*File, error) {
-	return o.SealContext(context.Background())
 }
 
 // SealContext freezes and hashes a held output while observing cancellation.

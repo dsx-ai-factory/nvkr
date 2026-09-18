@@ -367,7 +367,7 @@ func (evidence *PublisherEvidence) VerifyAgainstPublishedVector(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	published, err := receipt.ReleaseBinding()
+	published, err := receipt.evidenceBinding()
 	if err != nil {
 		return err
 	}
@@ -396,18 +396,6 @@ func (evidence *PublisherEvidence) VerifyAgainstPublishedVector(ctx context.Cont
 			"comparing publisher evidence with authenticated validation vector")
 	}
 	return nil
-}
-
-// LocalReceipts returns defensive copies for the release evidence gate. It keeps
-// publisher generation and operator reproduction observations as separate inputs.
-func (evidence *PublisherEvidence) LocalReceipts() ([]sbom.LocalEvidenceReceipt,
-	[]provenance.LocalEvidenceReceipt, error,
-) {
-	if err := evidence.validate(); err != nil {
-		return nil, nil, err
-	}
-	return append([]sbom.LocalEvidenceReceipt(nil), evidence.sbomReceipts...),
-		append([]provenance.LocalEvidenceReceipt(nil), evidence.provenanceReceipts...), nil
 }
 
 func (evidence *PublisherEvidence) bindManifest(manifest *Manifest) error {

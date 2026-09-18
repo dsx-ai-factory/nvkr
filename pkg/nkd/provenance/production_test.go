@@ -40,14 +40,14 @@ func testRunTimes() (time.Time, time.Time) {
 
 func testProductionInputs() ProductionInputs {
 	return ProductionInputs{
-		BuildType:               BuildTypeWrappedBuild,
-		PlanDigest:              testPlanDigest,
-		RunPlanReference:        "nke-v1@0.1.0",
-		CompileSpecDigest:       testDefinitionDigest,
-		ExecutionSettingsDigest: testProfileDigest,
-		CatalogDigest:           testCatalogDigest,
-		GeneratorVersion:        "nkdctl/0.1.0",
-		SigningMode:             SigningModeDryRun,
+		BuildType:         BuildTypeWrappedBuild,
+		PlanDigest:        testPlanDigest,
+		RunPlanReference:  "nke-v1@0.1.0",
+		DefinitionDigest:  testDefinitionDigest,
+		EnvironmentDigest: testProfileDigest,
+		CatalogDigest:     testCatalogDigest,
+		GeneratorVersion:  "nkdctl/0.1.0",
+		SigningMode:       SigningModeDryRun,
 		ResolvedDependencies: []Dependency{
 			ToolchainDependency(testToolchain),
 			SourceDependency("https://github.com/NVIDIA/nke", testCommit, testTree),
@@ -67,7 +67,7 @@ func testLocalRunContext(t *testing.T) RunContext {
 
 // The exact canonical predicate bytes are what a signer hashes and what cosign
 // attest consumes, so they are pinned here byte for byte.
-const goldenProductionPredicate = `{"buildDefinition":{"buildType":"https://nkd.dev/buildtypes/wrapped-build/v1","externalParameters":{"catalogDigest":"sha256:4444444444444444444444444444444444444444444444444444444444444444","compileSpecDigest":"sha256:2222222222222222222222222222222222222222222222222222222222222222","executionSettingsDigest":"sha256:3333333333333333333333333333333333333333333333333333333333333333","planDigest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","runPlanReference":"nke-v1@0.1.0"},"internalParameters":{"generatorVersion":"nkdctl/0.1.0","signingMode":"dry-run"},"resolvedDependencies":[{"uri":"docker.io/library/golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6"},{"digest":{"gitCommit":"ed9fb09b04fd40bf331d25df2222206ffaca593e","gitTree":"309887e8cdb8ee24a39785b864390eda3afce5ec"},"uri":"https://github.com/NVIDIA/nke@ed9fb09b04fd40bf331d25df2222206ffaca593e"},{"digest":{"sha256":"1111111111111111111111111111111111111111111111111111111111111111"},"uri":"nkd:run-plan"}]},"runDetails":{"builder":{"id":"https://nkd.dev/builders/local-factory-run/v1"},"metadata":{"finishedOn":"2026-09-04T17:06:35Z","invocationId":"sha256:1111111111111111111111111111111111111111111111111111111111111111/2026-09-04T17:05:03Z","startedOn":"2026-09-04T17:05:03Z"}}}`
+const goldenProductionPredicate = `{"buildDefinition":{"buildType":"https://nkd.dev/buildtypes/wrapped-build/v2","externalParameters":{"catalogDigest":"sha256:4444444444444444444444444444444444444444444444444444444444444444","definitionDigest":"sha256:2222222222222222222222222222222222222222222222222222222222222222","environmentDigest":"sha256:3333333333333333333333333333333333333333333333333333333333333333","planDigest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","runPlanReference":"nke-v1@0.1.0"},"internalParameters":{"generatorVersion":"nkdctl/0.1.0","signingMode":"dry-run"},"resolvedDependencies":[{"uri":"docker.io/library/golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6"},{"digest":{"gitCommit":"ed9fb09b04fd40bf331d25df2222206ffaca593e","gitTree":"309887e8cdb8ee24a39785b864390eda3afce5ec"},"uri":"https://github.com/NVIDIA/nke@ed9fb09b04fd40bf331d25df2222206ffaca593e"},{"digest":{"sha256":"1111111111111111111111111111111111111111111111111111111111111111"},"uri":"nkd:run-plan"}]},"runDetails":{"builder":{"id":"https://nkd.dev/builders/local-factory-run/v1"},"metadata":{"finishedOn":"2026-09-04T17:06:35Z","invocationId":"sha256:1111111111111111111111111111111111111111111111111111111111111111/2026-09-04T17:05:03Z","startedOn":"2026-09-04T17:05:03Z"}}}`
 
 func TestProductionPredicateGolden(t *testing.T) {
 	predicate := ProductionPredicate(testLocalRunContext(t), testProductionInputs())
@@ -336,5 +336,21 @@ func TestReproductionStatementsOmitInternalParameters(t *testing.T) {
 		if statement.Predicate.BuildDefinition.InternalParameters != nil {
 			t.Fatal("reproduction statements must not carry internal parameters")
 		}
+	}
+}
+
+func TestProductionRejectsRetiredCompilerHandoff(t *testing.T) {
+	for _, name := range []string{"hermetic-build", "wrapped-build", "acquired"} {
+		t.Run(name, func(t *testing.T) {
+			inputs := testProductionInputs()
+			inputs.BuildType = "https://nkd.dev/buildtypes/" + name + "/v1"
+			requireCode(t, ValidateProduction(ProductionPredicate(testLocalRunContext(t), inputs)), nkderr.CodeInvalidCatalog)
+		})
+	}
+	predicate := ProductionPredicate(testLocalRunContext(t), testProductionInputs())
+	predicate.BuildDefinition.ExternalParameters["compileSpecDigest"] = testDefinitionDigest
+	delete(predicate.BuildDefinition.ExternalParameters, "definitionDigest")
+	if err := ValidateProduction(predicate); err == nil {
+		t.Fatal("retired compiler handoff parameter admitted under v2")
 	}
 }

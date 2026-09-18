@@ -11,11 +11,12 @@
   profile), ADR-19 (fleet boundary).
 - **Satisfies:** FR-15 (deterministic SBOM), SEC-18 (vulnerability reporting).
 
-- **Scope:** SBOM generation applies to both lanes. V1 acquisition and scanning limits are stated in §6.
+- **Scope:** SBOM generation applies to both lanes. Qualified release receipts, evidence waivers and
+  vulnerability scanning remain deferred. V1 acquisition and scanning limits are stated in §6.
 
 ## Context
 
-NKD emits a per-artifact supply-chain evidence set: SBOM, external references for `acquired` artifacts, and
+The evidence contract includes per-artifact SBOMs, external references for acquired artifacts, and deferred
 vulnerability results. The set is deterministic, bound to artifact identity, and folds into the evidence bundle
 (ADR-05). One boundary governs all of it: NKD **produces** evidence and does not operate the fleet.
 
@@ -50,9 +51,9 @@ schema defines the reference, consumed by both the acquire lane and the SBOM emi
 
 `evidence: none` is an honest statement about an acquisition. It is **not evidence and never satisfies an
 evidence-required promotion gate**. If release policy permits a missing evidence class, the exception is an
-explicit, authenticated `EvidenceWaiverReceipt` naming the exact artifact digest, missing evidence types, policy
+explicit, authenticated waiver naming the exact artifact digest, missing evidence types, policy
 digest, reason, approver identity, and expiry. The waiver is policy evidence; it does not masquerade as an SBOM
-or provenance receipt.
+or provenance receipt. Waiver issuance and release evaluation are not implemented.
 
 ### 3. Vulnerability-report determinism
 
@@ -64,18 +65,21 @@ spike covers this (below).
 
 ### 4. Advisory → affected-build boundary
 
-Advisory generation is outside the current product scope. The unused advisory emitter and scanner-argv
-prototype are removed. The retained vulnerability module validates subject-bound scanner observations consumed
-by release gates; it does not implement scanner execution or a fleet index.
+Advisory generation and vulnerability scanning are outside the current product scope. The unused advisory,
+scanner-argv and release-only vulnerability receipt implementations are removed. Pinned Syft composition
+inspection in §6 remains implemented; it does not evaluate vulnerabilities or grant release clearance.
 
-### 5. Typed qualified capabilities and authenticated evidence receipts
+### 5. Qualified release evidence receipts — deferred
 
-Within one process, evidence becomes gate input only through an **opaque qualified capability**. Its private
-state can be created only after the module has read and recomputed the exact subject and evidence bytes and
-applied the typed verification policy. The capability is non-serializable, cannot be constructed from a decoded
-report or a boolean, and is consumed before that process exits. Locally generated per-artifact SBOM/provenance
-receipts, verified external-evidence receipts, and qualified vulnerability reports are distinct ephemeral forms;
-release policy accepts each only for its exact artifact, evidence type, schema, and policy binding.
+The maintained verifier recomputes same-process SBOM and provenance from exact qualified producer bytes and
+compares their digests with an authenticated ValidationVector. External-reference acquisition still checks
+exact payload bytes, schema and artifact subject before adding SBOM properties or recording explicit gaps.
+These operations do not assemble release clearance. The unused external-evidence receipt adapters and release
+waiver subsystem are removed.
+
+A future qualified release gate must accept evidence only through opaque, exact-byte capabilities or the
+signed receipts below. Same-process capabilities cannot be reconstructed from a decoded report or a boolean;
+release policy must bind each input to its exact artifact, evidence type, schema and policy.
 
 Any evidence crossing a persistence, process, registry, or organizational boundary uses a canonical,
 digest-addressed receipt:
@@ -101,13 +105,14 @@ issuer process, it is promoted into the signed form first.
 A path, transport URL, mutable tag, untyped boolean, decoded report, or caller assertion such as `--verified` is
 neither form. A qualified capability or receipt for one artifact, evidence document, schema, or policy cannot
 satisfy another. Component-level references are not implicitly reusable across produced artifacts: every receipt
-names the exact artifact subject it covers. ADR-16 consumes only the typed qualified capabilities or the
+names the exact artifact subject it covers. The deferred ADR-16 release gate must consume only those capabilities or the
 authenticated receipt set; raw evidence files remain the auditable payloads those receipts reference.
 
-The exact evidence-gap waiver uses `nkd.dev/evidence-waiver/v3`. It binds the component, build, artifact,
-builder-profile scope, status checkpoint, missing evidence types, policy, approver and validity interval.
-Deployment roles are absent; waiver-approver and receipt-type trust policies remain required. Readers reject
-earlier waiver schemas and removed deployment-role fields instead of reinterpreting signed bytes.
+The removed evidence-gap waiver implementation used `nkd.dev/evidence-waiver/v3`. Its digest family remains
+reserved and nonminting; no current reader or issuer accepts this as clearance. A future waiver protocol must
+bind component, build, artifact, builder-profile scope, status checkpoint, missing evidence types, policy,
+approver and validity interval. It must authenticate its own schema and signer policy without reinterpreting
+older signed bytes or reintroducing deployment roles.
 
 ### 6. Pipeline SBOM and acquisition scope
 
@@ -226,11 +231,11 @@ Curated/embedded aggregates use dependency edges from aggregate to members (ADR-
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nkd/sbom/*_test.go`, `pkg/nkd/vuln/*_test.go`,
-`pkg/nkd/release/evidence_test.go`, and `pkg/nkd/catalog/prebuilt_test.go` covers deterministic documents,
-prebuilt declarations, publisher-SBOM and publisher-evidence equality across online/mirror transport relocation,
-opaque same-process qualification, exact HTTPS-reference byte verification, policy-driven consumption, waiver
-replay, and mutation negatives. It does not prove signed cross-process receipt publication.
+Current module evidence in `pkg/nkd/sbom/*_test.go`, `pkg/nkd/attest/*_test.go`, and
+`pkg/nkd/catalog/prebuilt_test.go` covers deterministic documents, prebuilt declarations, publisher evidence
+equality across online/mirror transport relocation, same-process exact-byte qualification, HTTPS-reference byte
+and subject verification, and mutation rejection. It does not prove vulnerability scanning, waiver evaluation,
+release clearance or signed cross-process receipt publication.
 
 Acceptance additionally requires a boundary fixture that promotes same-process capabilities into canonical
 signed receipts, publishes and reloads them, recomputes the exact artifact/evidence bytes, rejects receipt-type

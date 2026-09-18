@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -23,17 +25,8 @@ func githubTestPlan(t *testing.T) *Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
-		Metadata: Metadata{Name: "github-static"}, RunsOn: "ubuntu-24.04", Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
-		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
-		UtilityPlatform:  "linux/amd64",
-		Builds:           []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-		Packages:         []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
-	}
-	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "prod"}, Targets: map[string]Target{
-			"registry": {Kind: TargetOCI, Ref: "ghcr.io/example/nkd-tools:latest", CredentialRef: "github:NKD_REGISTRY_AUTH"},
-		}, Routes: []Route{{Name: "tools", Input: "package/tools", Target: "registry"}}}
+	definition, delivery := fixtureInputs("github-static", "worker", "ubuntu-24.04")
+	delivery.Publication = &authored.Publication{RepositoryPrefix: "ghcr.io/example/nkd-tools", CredentialRef: "github:NKD_REGISTRY_AUTH"}
 	plan, err := Compile(context.Background(), definition, delivery, stack, "v1.2.3 (deadbeef)")
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +51,7 @@ func TestRenderGitHubProducesStaticallyValidCompleteBundle(t *testing.T) {
 		[]byte("go-version-file: '.go-version'"),
 		// IR build/fetch nodes are isolated by the helper orchestrating their pinned
 		// container itself (ADR-18 §8), sharing the pipeline emitter's per-node primitive.
-		[]byte("exec-node --launch --runtime podman"),
+		[]byte("factory execute-node --plan"),
 		// glue nodes still use the inline `<runtime> run --network none` wrapper.
 		[]byte("--network none"),
 		[]byte("factory execute-node"),
@@ -92,7 +85,7 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 		{name: "job-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 15"), new: []byte("timeout-minutes: 0")},
 		{name: "cancel-running-publication", code: e.CodeEngineCapability, old: []byte("cancel-in-progress: false"), new: []byte("cancel-in-progress: true")},
 		{name: "network", old: []byte("--network none"), new: []byte("--network bridge")},
-		{name: "launch", old: []byte("exec-node --launch"), new: []byte("exec-node")},
+		{name: "node-dispatch", old: []byte("factory execute-node --plan"), new: []byte("exec-node --nodes")},
 		{name: "setup-go-version", old: []byte("go-version-file: '.go-version'"), new: []byte("go-version-file: 'go.mod'")},
 		{name: "output", old: []byte("if-no-files-found: error"), new: []byte("if-no-files-found: ignore")},
 		{name: "checkout-credential", old: []byte("persist-credentials: 'false'"), new: []byte("persist-credentials: 'true'")},

@@ -17,7 +17,7 @@ func cmdFactory() *cli.Command {
 		Subcommands: []*cli.Command{{
 			Name:   "execute-node",
 			Hidden: true,
-			Usage:  "execute one non-IR node from an exact generated plan",
+			Usage:  "execute one node from an exact generated plan",
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "plan", Required: true},
 				&cli.StringFlag{Name: "node", Required: true},

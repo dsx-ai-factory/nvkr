@@ -222,7 +222,7 @@ func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, v
 		return nil
 	}
 	visited[descriptor.Digest] = true
-	raw, err := readBlob(ctx, root, descriptor, maxDeliveryFileBytes)
+	raw, err := readBlob(ctx, root, descriptor, 8<<20)
 	if err != nil {
 		return err
 	}
@@ -257,8 +257,12 @@ func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, v
 		}
 		visited[manifest.Config.Digest] = true
 		for _, layer := range manifest.Layers {
-			if _, err := readBlob(ctx, root, layer, maxDeliveryFileBytes); err != nil {
+			held, err := holdBlob(ctx, root, layer, maxDeliveryFileBytes)
+			if err != nil {
 				return err
+			}
+			if err := held.Close(); err != nil {
+				return e.Wrap(e.CodeVerifyFailed, err, "closing verified OCI blob")
 			}
 			visited[layer.Digest] = true
 		}
@@ -286,19 +290,28 @@ func verifyBlobInventory(root string, reachable map[string]bool) error {
 }
 
 func readBlob(ctx context.Context, root string, descriptor Descriptor, max int64) ([]byte, error) {
+	held, err := holdBlob(ctx, root, descriptor, max)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = held.Close() }()
+	return held.ReadAllContext(ctx, max)
+}
+
+func holdBlob(ctx context.Context, root string, descriptor Descriptor, max int64) (*heldfile.File, error) {
 	if !isDigest(descriptor.Digest) || descriptor.Size < 0 || descriptor.Size > max {
 		return nil, e.New(e.CodeVerifyFailed, "OCI descriptor is malformed or exceeds its byte bound")
 	}
 	path := filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(descriptor.Digest, "sha256:"))
-	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "OCI blob", MaxBytes: max})
+	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "OCI blob", ExpectedDigest: descriptor.Digest, MaxBytes: max})
 	if err != nil {
 		return nil, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "opening OCI blob %s", descriptor.Digest))
 	}
-	defer func() { _ = held.Close() }()
-	if held.Digest() != descriptor.Digest || held.Size() != descriptor.Size {
+	if held.Size() != descriptor.Size {
+		_ = held.Close()
 		return nil, e.New(e.CodeVerifyFailed, "OCI blob %s bytes do not match descriptor", descriptor.Digest)
 	}
-	return held.ReadAllContext(ctx, max)
+	return held, nil
 }
 
 // ExtractBinaryBundle verifies a publication root, selects one binary-bundle
@@ -309,6 +322,12 @@ func ExtractBinaryBundle(ctx context.Context, layoutRoot, name, out string) (Bin
 	if err != nil {
 		return BinaryBundle{}, err
 	}
+	return extractBinaryBundle(ctx, layoutRoot, inspection, name, out)
+}
+
+// Only the owner of an independently checked closure may reuse its inspection.
+func extractBinaryBundle(ctx context.Context, layoutRoot string, inspection Inspection, name, out string) (BinaryBundle, error) {
+	var err error
 	var object PublishedObject
 	for _, candidate := range inspection.Root.Objects {
 		if candidate.Name == name && candidate.ArtifactType == MediaBinaryBundle {

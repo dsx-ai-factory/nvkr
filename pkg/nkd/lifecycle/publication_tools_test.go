@@ -49,10 +49,10 @@ func TestCatalogToolsAndDerivedPublication(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(plan.ExecutionSettings.Targets) != 1 || len(plan.ExecutionSettings.Routes) != 1 {
+			if len(plan.Targets) != 1 || len(plan.Routes) != 1 {
 				t.Fatal("publication must have exactly one repository route")
 			}
-			if plan.ExecutionSettings.Targets["release"].Ref != "127.0.0.1:5000/nke/releases" || plan.ExecutionSettings.Routes[0].Input != "package/release" {
+			if plan.Targets["release"].Ref != "127.0.0.1:5000/nke/releases" || plan.Routes[0].Input != "package/release" {
 				t.Fatal("wrong shared publication target")
 			}
 			roots := 0

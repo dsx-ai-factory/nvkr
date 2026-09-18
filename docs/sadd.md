@@ -2,7 +2,7 @@
 
 ## PLC-L1: Basic PLC: Software Architecture and Design Document
 
-- **Revision:** 2026-09-17 — output-only build and release model
+- **Revision:** 2026-09-18 — consolidated compilation and publication ownership
 - **Status:** Draft; ADR-01 through ADR-22 pending named-decider ratification
 - **Review scope:** shared definition architecture, v1 artifact delivery, and the separate qualified release contract
 
@@ -232,7 +232,8 @@ separate qualification verdicts, identity, membership, and revocation requiremen
 its own authorization and lifecycle checks. An unavailable scope fails explicitly; it never falls back to
 build-evidence verification. The returned capability applies only to its exact reference and policy.
 
-Each named output supplies its selection and format once. The compiler derives standard package envelopes,
+Each named output supplies its selection and format once. One compiler accepts admitted Definition and
+Environment values and returns a complete Plan, including the original input identities. It derives standard package envelopes,
 publication routes, and required output slots, then joins independently observed bytes into those slots.
 Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
 Specialized byte-changing transformations remain explicit product intent.
@@ -256,6 +257,12 @@ Each AICR output selects its own typed bundle settings. The compiler normalizes 
 to build identity, and passes those exact settings to the renderer. Removing deployment topology cannot silently
 change the generated artifact.
 
+The Run Plan embeds the admitted authored inputs and each output’s executable graph. Producer scheduling
+records carry exact output/node references; container, network, platform and execution-class settings live
+only in the referenced instruction. Rendering and local execution resolve those references through the same
+operation. Lifecycle owns attempts and persistence without constructing another compiler-input document or
+completing a returned Plan.
+
 A named Artifact keeps its payload digest across Run and Release views. The enclosing publication root has a
 separate identity. Release content binds the exact named payload membership, and the outer publication carries
 that content with its output and evidence bindings. Using the outer root as one of its own
@@ -263,7 +270,7 @@ content members would create a circular identity and is forbidden.
 
 | Identity or record | Owner and purpose | Boundary |
 |---|---|---|
-| Definition | Product author → lifecycle compiler | Named output intent; the single product-authoring input |
+| Definition | Product author → definition admission → compiler | Named output intent; the single product-authoring input |
 | Generated build graph | Compiler → executor | Full validated graph retains transport and execution settings; its logical projection supplies Build Digest |
 | Environment | Environment owner → compiler/executor | Runner routes, execution-class inventory, transport, and signing settings; changes may alter prepared execution |
 | Execution plan and graph | Compiler → renderer/executor | Closed inputs, required outputs, dependencies, and generator identity |
@@ -277,7 +284,9 @@ All structured identities use ADR-01's canonical codec and named digest families
 integer-only numeric profile; an arbitrary JSON serialization is not an identity implementation. Raw SHA-256
 remains appropriate for exact blob integrity. These distinctions explain why one build can produce different
 run evidence without changing Build Digest. The retired `nkd.recipe` family remains reserved for historical
-identities. Definition v4, catalog v3 and IR v3 readers reject old shapes; signed bytes are not converted.
+identities. Definition v4, catalog v3, IR v3 and Run plan/artifact graph v4 readers reject old shapes; signed bytes are not converted.
+Compiler-handoff and execution-settings digest families remain reserved after removal. Production SLSA
+build-type `/v2` parameters bind the original Definition and Environment identities directly.
 
 ## Module topology
 
@@ -289,12 +298,13 @@ in reconciliation; a facade alone does not discharge that debt.
 |---|---|---|
 | Canonical identity and resolution | `canonical`, `ir`, `target`, `catalog`, `buildgraph` | Authenticate and normalize inputs into deterministic logical identities |
 | Execution requirements | `execution` | Own reusable per-step runner request shape; grant no runner capability |
-| Public lifecycle | `lifecycle` | Own Definition/Environment preparation, required-output construction, Run and Release views; delegate authority |
-| Compilation and execution | `factory` | Derive output build graphs and join their exact results into an artifact graph; render and execute admitted nodes |
-| Qualified graph execution | `pipeline` | Graph admission, runtime observations, terminal receipts, and provider transport |
+| Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
+| Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
+| Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction |
+| Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
-| Packaging and transport | `assemble`, `delivery`, `transport` | Artifact representation, OCI layout/closure and target transport |
+| Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
 | Release authority and durable status | `release`, `status` | Authorization, freshness, durable publication/activation contracts |
 | External rendering | `aicr` | Typed output settings and exact pinned external AICR execution |
 | Public adaptation | `errors`; `client/v1` and `cmd/nkdctl` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
@@ -356,7 +366,7 @@ milestone specification.
 This summary separates the current architecture from historical operational evidence. Detailed module
 contracts, migration verification and remaining external acceptance live in reconciliation.
 
-The public workflow includes local immutable attempts, a scoped Release consumer, and hosted renderers.
+The public workflow includes local immutable attempts, a scoped Release consumer, and GitHub generation.
 Earlier contract coverage included executable/APT/Helm GPU closure on amd64 and arm64 with controlled
 producers. The [combined hosted Run](evidence/2026-09-10-combined-run.md) built the CLI, complete upstream CWE
 image and pinned quickstart Helm tree, then published, signed, verified and finalized all three outputs.
@@ -368,7 +378,9 @@ not validate the direct-output migration or the current single-entry publication
 directly selected outputs, loopback publication and recovered CLI execution with dry-run signing. Repository
 checks are recorded in reconciliation. Full v1 release qualification, fused large-output
 wrapped execution, derived pin sets, registration remains unimplemented; cluster qualification is outside NKD. Qualified
-production flows remain capability-gated where authority adapters are absent. Air-gap execution is outside scope and its dormant implementation has been removed.
+release authorization, its receipt assembly and release-specific trusted time have no retained implementation.
+Authenticated document/status diagnostics remain, but do not supply clearance. Air-gap execution is outside
+scope and its dormant implementation has been removed.
 
 [Reconciliation](adr/reconciliation.md) is the single detailed support and evidence matrix. Multi-architecture
 example coverage does not expand the amd64 NKE v1 delivery milestone.
@@ -453,8 +465,10 @@ Compilation resolves the selected Definition, Environment, and component catalog
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
 
-Execution consumes this closed plan. Component producers create bytes and run records; factory nodes add
-packaging, composition and evidence dependencies. Publication is followed by signature/attestation and pull-back
+Execution consumes this closed plan through shared producer operations and the same launcher for local and
+hosted Runs. Local scheduling retains a source session; hosted jobs use the Plan dispatcher. Component
+producers create bytes and run records; utility operations add packaging and evidence dependencies. Producer
+instructions are read from the embedded IR, never reconstructed from duplicated scheduler fields. Publication is followed by signature/attestation and pull-back
 verification in v1. The qualified path performs its independent gates before constructing a cleared publication.
 The following flows describe intended contracts; the support table identifies what has been implemented.
 
@@ -492,6 +506,10 @@ artifacts with passing qualification in a canonical release manifest, under an i
 and one mutable channel tag. A failing verdict prevents manifest issuance. These gates remain proposed.
 
 #### Qualified reproduction and release
+
+This is a deferred architecture, not a second maintained lifecycle. The unused authorization, gate receipts,
+qualified publisher and release-specific trusted-time implementation have been removed. Current diagnostics
+can authenticate their retained documents and status checkpoints without authorizing release.
 
 The publisher creates a signed ValidationVector of expected identities. The operator admits the signed builder
 profile, materializes exact inputs, executes through authenticated runtime boundaries, and independently compares
@@ -649,7 +667,7 @@ an old workspace. Revocation is proposed: a signed marker from the qualification
 channel reference, and consumer rejection while immutable release evidence remains (ADR-06 §6). It has none of
 ADR-06's trusted-time or anti-rollback guarantees.
 
-The qualified lifecycle advances through reproduced, attested, authorized and published conditions. Later signed
+The proposed qualified lifecycle advances through reproduced, attested, authorized and published conditions. Later signed
 status declarations mark a publication superseded, deprecated or withdrawn without mutating its identity.
 Consumers authenticate checkpoint completeness, freshness and monotonicity; a valid old signature alone does not
 establish current release status (ADR-06/16).
@@ -776,8 +794,8 @@ identities rather than rebuilding those members merely to describe the compositi
 
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
-reuse requires prior authenticated evidence rebound to the current policy and member; the existing
-IncrementalPlan is diagnostic (ADR-16). v1 production acceptance remains amd64-only;
+reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
+rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance remains amd64-only;
 additional architectures require their own source and runner acceptance.
 
 ### Quality-attribute scenarios

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -29,10 +30,10 @@ func TestIndependentSourceReceiptsRestoreTogether(t *testing.T) {
 			t.Fatal(err)
 		}
 		archive := filepath.Join(producer, "receipt.tar")
-		if err := PackTransport(ctx, archive, producer, []string{relative}); err != nil {
+		if err := transportarchive.Pack(ctx, archive, producer, []string{relative}); err != nil {
 			t.Fatal(err)
 		}
-		if err := UnpackTransport(ctx, archive, consumer, []string{relative}); err != nil {
+		if err := transportarchive.Unpack(ctx, archive, consumer, []string{relative}); err != nil {
 			t.Fatal(err)
 		}
 		got, err := os.ReadFile(filepath.Join(consumer, relative))

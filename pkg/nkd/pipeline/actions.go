@@ -10,7 +10,7 @@ import (
 // GitHubActionRefs contains the catalog references admitted by the adapter.
 type GitHubActionRefs struct{ Checkout, Upload, Download, SetupGo string }
 
-// ResolveGitHubActions admits the action interfaces used by both emitters.
+// ResolveGitHubActions admits the action interfaces used by the GitHub renderer.
 // Only supported repositories and major versions live in code; releases and
 // commits belong to the catalog and are bound into each generated Run.
 func ResolveGitHubActions(pins map[string]catalog.ActionPin) (GitHubActionRefs, error) {

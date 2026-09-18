@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -370,7 +371,7 @@ func snapshotRegularTreeContext(ctx context.Context, root string) (*terminalHeld
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	source, sourceInfo, err := openDirectoryNoFollow(root)
+	source, sourceInfo, err := securepath.OpenDirectory(root)
 	if err != nil {
 		return nil, fmt.Errorf("artifact tree %s is not a real directory: %w", root, err)
 	}
@@ -465,7 +466,7 @@ func captureTerminalDirectoryContext(ctx context.Context, source *os.File, sourc
 			relative = filepath.Join(prefix, name)
 		}
 		if child.IsDir() {
-			opened, info, err := openChildNoFollow(source, name, true)
+			opened, info, err := securepath.OpenChild(source, name, true)
 			if err != nil {
 				return nil, nil, fmt.Errorf("opening artifact directory %s: %w", relative, err)
 			}
@@ -475,7 +476,7 @@ func captureTerminalDirectoryContext(ctx context.Context, source *os.File, sourc
 			if captureErr != nil {
 				return nil, nil, captureErr
 			}
-			if sourceStatErr != nil || !sameFileMetadata(info, after) {
+			if sourceStatErr != nil || !securepath.SameMetadata(info, after) {
 				return nil, nil, fmt.Errorf("artifact directory %s changed while being captured", relative)
 			}
 			if sourceCloseErr != nil {
@@ -487,7 +488,7 @@ func captureTerminalDirectoryContext(ctx context.Context, source *os.File, sourc
 			continue
 		}
 
-		opened, info, err := openChildNoFollow(source, name, false)
+		opened, info, err := securepath.OpenChild(source, name, false)
 		if err != nil {
 			return nil, nil, fmt.Errorf("artifact tree entry %s is not a regular file: %w", relative, err)
 		}
@@ -539,7 +540,7 @@ func captureTerminalRegularContext(ctx context.Context, source *os.File, before 
 	size, copyErr := copyPipelineContext(ctx, writer, io.LimitReader(source, before.Size()+1))
 	after, statErr := source.Stat()
 	if copyErr == nil && statErr == nil &&
-		(!sameFileMetadata(before, after) || size != before.Size() || after.Size() != before.Size()) {
+		(!securepath.SameMetadata(before, after) || size != before.Size() || after.Size() != before.Size()) {
 		copyErr = fmt.Errorf("artifact file %s changed while being captured", relative)
 	}
 	if copyErr != nil {
@@ -554,12 +555,6 @@ func captureTerminalRegularContext(ctx context.Context, source *os.File, before 
 		held.raw = append([]byte(nil), bounded.Bytes()...)
 	}
 	return held, after, nil
-}
-
-func sameFileMetadata(before, after os.FileInfo) bool {
-	return before != nil && after != nil && os.SameFile(before, after) &&
-		before.Mode() == after.Mode() && before.Size() == after.Size() &&
-		before.ModTime().Equal(after.ModTime())
 }
 
 func (tree *terminalHeldTree) readRegular(ctx context.Context, relative string, limit int64) ([]byte, error) {
@@ -618,7 +613,7 @@ func captureRegularTreeContext(ctx context.Context, root string) ([]terminalTree
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	rootDir, rootInfo, err := openDirectoryNoFollow(root)
+	rootDir, rootInfo, err := securepath.OpenDirectory(root)
 	if err != nil {
 		return nil, fmt.Errorf("artifact tree %s is not a real directory: %w", root, err)
 	}
@@ -654,7 +649,7 @@ func captureRegularTreeOpenContext(ctx context.Context, rootDir *os.File, rootIn
 				relative = filepath.Join(prefix, name)
 			}
 			if child.IsDir() {
-				opened, info, err := openChildNoFollow(directory, name, true)
+				opened, info, err := securepath.OpenChild(directory, name, true)
 				if err != nil {
 					return fmt.Errorf("opening artifact directory %s: %w", relative, err)
 				}
@@ -669,7 +664,7 @@ func captureRegularTreeOpenContext(ctx context.Context, rootDir *os.File, rootIn
 				}
 				continue
 			}
-			opened, info, err := openChildNoFollow(directory, name, false)
+			opened, info, err := securepath.OpenChild(directory, name, false)
 			if err != nil {
 				return fmt.Errorf("artifact tree entry %s is not a regular file: %w", relative, err)
 			}

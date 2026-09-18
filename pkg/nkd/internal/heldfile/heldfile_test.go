@@ -93,14 +93,14 @@ func TestOpenHoldsOriginalAfterPathReplacementAndRejectsSymlink(t *testing.T) {
 }
 
 func TestImmutableWriteRejectedAndCloseIsIdempotent(t *testing.T) {
-	held, err := FromBytes([]byte("immutable"), Options{Label: "immutable", MaxBytes: 1024})
+	held, err := FromBytesContext(t.Context(), []byte("immutable"), Options{Label: "immutable", MaxBytes: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := held.OSFile().WriteAt([]byte("X"), 0); err == nil {
 		t.Fatal("immutable held descriptor accepted a write")
 	}
-	if err := held.AssertUnchanged(); err != nil {
+	if err := held.AssertUnchangedContext(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if err := held.Close(); err != nil {
@@ -150,7 +150,7 @@ func TestContextAwareHeldIOStopsBetweenChunks(t *testing.T) {
 		t.Fatalf("context-aware capture returned %v", err)
 	}
 
-	held, err := FromBytes(bytes.Repeat([]byte("x"), 2<<20), Options{
+	held, err := FromBytesContext(t.Context(), bytes.Repeat([]byte("x"), 2<<20), Options{
 		Label: "cancel-write", MaxBytes: 3 << 20,
 	})
 	if err != nil {
@@ -200,7 +200,7 @@ func TestRunContextExecutesHeldMachOOrELFAndReusesInput(t *testing.T) {
 	if err := os.WriteFile(configured, []byte("attacker"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	input, err := FromBytes([]byte("held-input"), Options{Label: "input", MaxBytes: 1024})
+	input, err := FromBytesContext(t.Context(), []byte("held-input"), Options{Label: "input", MaxBytes: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +285,7 @@ func TestRunContextSerializesSharedInputUntilChildExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer executable.Close()
-	input, err := FromBytes([]byte("shared"), Options{Label: "shared", MaxBytes: 1024})
+	input, err := FromBytesContext(t.Context(), []byte("shared"), Options{Label: "shared", MaxBytes: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +341,7 @@ func TestOutputSealStreamsSparseLogicalBytesAndEnforcesBound(t *testing.T) {
 	if _, err := output.OSFile().WriteAt([]byte{0x7f}, offset); err != nil {
 		t.Fatal(err)
 	}
-	sealed, err := output.Seal()
+	sealed, err := output.SealContext(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestOutputSealStreamsSparseLogicalBytesAndEnforcesBound(t *testing.T) {
 		t.Fatalf("last byte=%x err=%v", last, err)
 	}
 	hash := sha256.New()
-	if _, err := sealed.WriteTo(hash); err != nil {
+	if _, err := sealed.WriteToContext(t.Context(), hash); err != nil {
 		t.Fatal(err)
 	}
 	want := "sha256:" + hex.EncodeToString(hash.Sum(nil))
@@ -370,7 +370,7 @@ func TestOutputSealStreamsSparseLogicalBytesAndEnforcesBound(t *testing.T) {
 	if _, err := tooLarge.OSFile().Write([]byte("xx")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tooLarge.Seal(); err == nil {
+	if _, err := tooLarge.SealContext(t.Context()); err == nil {
 		t.Fatal("oversized held output was sealed")
 	}
 }

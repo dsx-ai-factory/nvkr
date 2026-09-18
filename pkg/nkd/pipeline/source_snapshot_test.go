@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -165,7 +166,7 @@ func TestSourceInspectionRejectsDirectorySwappedToHostSymlink(t *testing.T) {
 	if err := os.Mkdir(original, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	rootDir, _, err := openDirectoryNoFollow(root)
+	rootDir, _, err := securepath.OpenDirectory(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +190,7 @@ func TestSourceInspectionRejectsDirectorySwappedToHostSymlink(t *testing.T) {
 	if err := os.Symlink(external, original); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := inspectSourceChild(rootDir, names[0], names[0]); err == nil {
+	if _, err := securepath.InspectChild(rootDir, names[0], names[0]); err == nil {
 		t.Fatal("source inspection followed a directory pathname swapped to a host symlink")
 	}
 	destination := t.TempDir()

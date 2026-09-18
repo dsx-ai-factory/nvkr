@@ -14,6 +14,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
@@ -96,7 +97,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeCanonicalTestFile(t, local(result.Path), pipeline.ArtifactResult{Component: "nkectl", SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))})
+	writeCanonicalTestFile(t, local(result.Path), fixtureProducerResult(t, plan, result, payloadPath))
 	other := "sha256:" + strings.Repeat("9", 64)
 	verification := artifacts["verification/release"]
 	writeCanonicalTestFile(t, local(verification.Path), sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
@@ -142,8 +143,8 @@ func TestFinalizeGeneratedRequiresExactStaticHostedEvidenceClosure(t *testing.T)
 					artifact := artifacts[id]
 					payload := []byte("synthetic producer payload for " + artifact.Component)
 					if artifact.Kind == "producer-result" {
-						writeCanonicalTestFile(t, artifact.Path, pipeline.ArtifactResult{Component: artifact.Component, OutputType: "binary",
-							Path: artifact.Component, SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))})
+						input := artifacts["artifact/"+artifact.BuildTarget+"/"+artifact.Component]
+						writeCanonicalTestFile(t, artifact.Path, fixtureProducerResult(t, plan, artifact, input.Path))
 					} else {
 						if err := os.MkdirAll(filepath.Dir(artifact.Path), 0o700); err != nil {
 							t.Fatal(err)
@@ -261,8 +262,7 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 				t.Fatal(err)
 			}
 			result := artifacts["result/"+artifact.BuildTarget+"/"+artifact.Component]
-			writeCanonicalTestFile(t, result.Path, pipeline.ArtifactResult{Component: artifact.Component,
-				OutputType: "binary", Path: artifact.Component, SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))})
+			writeCanonicalTestFile(t, result.Path, fixtureProducerResult(t, plan, artifact, artifact.Path))
 		}
 	}
 	for _, kind := range []string{factory.NodeVerify, factory.NodeSBOM} {
@@ -353,6 +353,42 @@ func (r hostedTestRun) StartedOn() time.Time  { return r.started }
 func (r hostedTestRun) FinishedOn() time.Time { return r.finished }
 
 var _ provenance.RunContext = hostedTestRun{}
+
+// fixtureProducerResult describes bytes materialized by a test for one exact
+// planned producer. These fixture records grant no execution qualification.
+func fixtureProducerResult(t *testing.T, plan *factory.Plan, artifact factory.Artifact, payloadPath string) pipeline.ArtifactResult {
+	t.Helper()
+	var producer ir.Node
+	matches := 0
+	for _, build := range plan.Builds {
+		if build.Name != artifact.BuildTarget {
+			continue
+		}
+		for _, node := range build.Graph.Nodes {
+			if build.Name+"/"+node.ID == artifact.Producer && node.Component == artifact.Component && (node.Kind == ir.KindBuild || node.Kind == ir.KindPull) {
+				producer = node
+				matches++
+			}
+		}
+	}
+	if matches != 1 {
+		t.Fatalf("fixture artifact %q has %d exact producers", artifact.ID, matches)
+	}
+	raw, err := os.ReadFile(payloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := pipeline.ArtifactResult{Component: producer.Component, OutputType: producer.OutputType,
+		Qualification: pipeline.ArtifactUnqualified, Toolchain: producer.Toolchain, BuilderType: producer.BuilderType,
+		Path: producer.ArtifactPath, SHA256: pipeline.FileDigest(raw), Size: int64(len(raw))}
+	if producer.Kind == ir.KindPull {
+		if result.SHA256 != producer.Digest {
+			t.Fatalf("fixture payload for %q does not match its pinned acquisition", artifact.ID)
+		}
+		result.EngineClass = ir.EnginePrebuiltAcquire
+	}
+	return result
+}
 
 func writeHostedRestoreOutcomes(t *testing.T, workspace string, plan *factory.Plan) {
 	t.Helper()

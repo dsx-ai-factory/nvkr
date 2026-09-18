@@ -17,14 +17,14 @@ func TestPlanRejectsSubstitutedInputsAndBuildBindings(t *testing.T) {
 		{"missing generator", func(p *Plan) { p.GeneratorVersion = " " }, e.CodeInvalidCatalog, "generator"},
 		{"missing environment path", func(p *Plan) { p.EnvironmentPath = "" }, e.CodeInvalidCatalog, "source paths"},
 		{"escaping definition path", func(p *Plan) { p.DefinitionPath = "../definition.yaml" }, e.CodeInvalidCatalog, "source paths"},
-		{"bad compile identity", func(p *Plan) { p.CompileSpecDigest = "latest" }, e.CodeUnpinnedSource, "compile-spec"},
+
 		{"bad definition identity", func(p *Plan) { p.DefinitionDigest = "latest" }, e.CodeUnverifiedRef, "definitionDigest"},
 		{"bad environment identity", func(p *Plan) { p.EnvironmentDigest = "latest" }, e.CodeUnverifiedRef, "environmentDigest"},
-		{"partial lifecycle identity", func(p *Plan) { p.DefinitionDigest = "sha256:" + strings.Repeat("a", 64); p.EnvironmentDigest = "" }, e.CodeUnverifiedRef, "together"},
-		{"bad catalog identity", func(p *Plan) { p.CatalogDigest = "latest" }, e.CodeUnpinnedSource, "catalog/execution-settings"},
-		{"substituted environment", func(p *Plan) { p.ExecutionSettings.RunsOn = "ubuntu-22.04" }, e.CodeUnverifiedRef, "executionSettingsDigest"},
-		{"empty builds", func(p *Plan) { p.Builds = nil }, e.CodeInvalidCatalog, "no builds"},
-		{"duplicate build", func(p *Plan) { p.Builds = append(p.Builds, p.Builds[0]) }, e.CodeInvalidCatalog, "repeated"},
+		{"partial lifecycle identity", func(p *Plan) { p.DefinitionDigest = "sha256:" + strings.Repeat("a", 64); p.EnvironmentDigest = "" }, e.CodeUnverifiedRef, "definitionDigest"},
+		{"bad catalog identity", func(p *Plan) { p.CatalogDigest = "latest" }, e.CodeUnpinnedSource, "catalog identity"},
+		{"substituted environment", func(p *Plan) { p.Environment.RunsOn = "ubuntu-22.04" }, e.CodeUnverifiedRef, "environmentDigest"},
+		{"empty builds", func(p *Plan) { p.Builds = nil }, e.CodeUnverifiedRef, "output slots"},
+		{"duplicate build", func(p *Plan) { p.Builds = append(p.Builds, p.Builds[0]) }, e.CodeUnverifiedRef, "output slots"},
 		{"missing build graph", func(p *Plan) { p.Builds[0].Graph = nil }, e.CodeInvalidCatalog, "invalid"},
 		{"missing build catalog", func(p *Plan) { p.Builds[0].CatalogDigest = "" }, e.CodeUnpinnedSource, "catalog digest"},
 		{"substituted build identity", func(p *Plan) { p.Builds[0].BuildDigest = "sha256:" + strings.Repeat("a", 64) }, e.CodeUnverifiedRef, "graph identity"},
@@ -47,6 +47,28 @@ func TestPlanRejectsSubstitutedInputsAndBuildBindings(t *testing.T) {
 			if !strings.Contains(err.Error(), tc.message) {
 				t.Fatalf("wrong rejection boundary: %v; want %q", err, tc.message)
 			}
+		})
+	}
+}
+
+func TestPlanRejectsStaleRuntimeAfterEnvironmentIdentityChanges(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*Plan)
+	}{
+		{"runner", func(plan *Plan) { plan.Environment.RunsOn = "ubuntu-24.04" }},
+		{"utility container", func(plan *Plan) { plan.Environment.UtilityContainer = "golang@sha256:" + strings.Repeat("a", 64) }},
+		{"utility platform", func(plan *Plan) { plan.Environment.UtilityPlatform = "linux/arm64" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := buildOnlyPlan(t, DefaultRunsOn)
+			tc.edit(plan)
+			digest, err := plan.Environment.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.EnvironmentDigest = digest
+			assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
 		})
 	}
 }

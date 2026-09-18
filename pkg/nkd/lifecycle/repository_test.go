@@ -95,7 +95,7 @@ func TestSeparateRepositoryPublicationAndConsumption(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			artifacts, _, err := artifactsFromBinding(t.Context(), out, actual)
+			artifacts, _, err := inspectTestPublication(t, t.Context(), out, actual.RootDigest)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -7,7 +7,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-// validateGraphIdentity is the common execution/lowering gate. A buildDigest is
+// validateGraphIdentity is the common execution gate. A buildDigest is
 // authority only for the exact semantically valid graph that produced it; accepting
 // a caller-supplied label here would let an unsafe graph masquerade as another build.
 func validateGraphIdentity(g *ir.Graph, buildDigest string) error {

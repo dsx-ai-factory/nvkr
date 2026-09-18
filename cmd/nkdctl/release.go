@@ -16,8 +16,7 @@ import (
 
 // cmdRelease exposes the release object-authoring and authentication utilities that
 // have production adapters. Promotion, selection, rollback, and publication remain
-// explicit fail-closed capability stubs; the package-level receipt APIs own those
-// decisions until a complete external adapter exists.
+// explicit fail-closed capability stubs until their protocols are implemented.
 func cmdRelease() *cli.Command {
 	legacy := []*cli.Command{
 		{
@@ -32,7 +31,7 @@ func cmdRelease() *cli.Command {
 			},
 			Action: func(*cli.Context) error {
 				return e.New(e.CodeUnsupported,
-					"legacy release promote is disabled: caller-provided reproduction/conformance verdicts cannot authorize a release; use the SDK's authenticated typed receipt flow until a production role authenticator is configured")
+					"legacy release promote is disabled: caller-provided reproduction/conformance verdicts cannot authorize a release; qualified release promotion is not implemented")
 			},
 		},
 		{
@@ -46,7 +45,7 @@ func cmdRelease() *cli.Command {
 			Name: "rollback", Usage: "disabled standalone rollback path (fresh authorization and status capabilities required)",
 			Flags: []cli.Flag{&cli.StringFlag{Name: "to", Hidden: true}, &cli.StringFlag{Name: "known", Hidden: true}},
 			Action: func(*cli.Context) error {
-				return e.New(e.CodeUnsupported, "standalone rollback is disabled: historical JSON/map entries are not authority; rerun AuthorizeRollback in-process with fresh typed receipts and a verified status checkpoint")
+				return e.New(e.CodeUnsupported, "standalone rollback is disabled: historical JSON/map entries are not authority; a production rollback adapter with fresh authenticated evidence and status is not implemented")
 			},
 		},
 		releaseStatusCmd(), releaseSetCmd(), releasePromotionPolicyCmd(),

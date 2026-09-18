@@ -11,7 +11,6 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
@@ -20,7 +19,7 @@ func publicationSBOMFixture(t *testing.T) (*Plan, map[string]Artifact, Node) {
 	plan := sbomTestPlan(t)
 	t.Chdir(t.TempDir())
 	nodes, artifacts := planIndex(plan)
-	for id, a := range artifacts {
+	for _, a := range artifacts {
 		if a.Kind != "producer-result" {
 			continue
 		}
@@ -30,31 +29,25 @@ func publicationSBOMFixture(t *testing.T) (*Plan, map[string]Artifact, Node) {
 				if err := writeFactoryFile(t.Context(), payload.Path, raw, 0o755); err != nil {
 					t.Fatal(err)
 				}
+				writeProducerRecordFixture(t, plan, payload, a.Path)
 			}
-		}
-		result, err := canonical.Marshal(pipeline.ArtifactResult{Component: a.Component, SHA256: pipeline.FileDigest(raw), Size: int64(len(raw))})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := writeFactoryFile(t.Context(), artifacts[id].Path, result, 0o644); err != nil {
-			t.Fatal(err)
 		}
 	}
 	if err := executeSBOM(t.Context(), plan, nodes["node-worker/sbom"], artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	if err := executePackage(t.Context(), plan, nodes["package/node-tools"], artifacts, io.Discard); err != nil {
+	if err := executePackage(t.Context(), plan, nodes["package/node-worker"], artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	inputs := []string{"package/node-tools"}
+	inputs := []string{"package/node-worker"}
 	inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
 	inputs = uniqueSorted(append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...))
-	node := Node{ID: "package/publication", Kind: NodePackage, PackageKind: PackageOCI, Inputs: inputs, Outputs: []string{"package/publication"}}
+	node := Node{ID: "package/release", Kind: NodePackage, PackageKind: PackageOCI, Inputs: inputs, Outputs: []string{"package/release"}}
 	artifacts[node.Outputs[0]] = Artifact{ID: node.Outputs[0], Kind: PackageOCI, Name: "publication", Path: "publication", Producer: node.ID}
 	return plan, artifacts, node
 }
 
-func TestPublicationContainsExactSBOMBytes(t *testing.T) {
+func TestPublicationContainsExactBoundSBOMBytes(t *testing.T) {
 	plan, artifacts, node := publicationSBOMFixture(t)
 	if err := executePackage(t.Context(), plan, node, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
@@ -90,12 +83,25 @@ func TestPublicationContainsExactSBOMBytes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(raw, source) {
-			t.Fatal("publication changed SBOM bytes")
+		var sourceBOM sbom.BOM
+		if err := canonical.UnmarshalExact(bytes.TrimSuffix(source, []byte{'\n'}), &sourceBOM); err != nil {
+			t.Fatal(err)
+		}
+		subject := "sha256:" + sourceBOM.Metadata.Component.Hashes[0].Content
+		bound, err := sbom.ForSubject(&sourceBOM, subject, "build-output", subject)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected, err := bound.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if object.Evidence == nil || object.Evidence.Stage != "build-output" || object.Evidence.SubjectDigest != subject || !bytes.Equal(raw, expected) {
+			t.Fatal("publication changed the exact stage-bound SBOM bytes or subject")
 		}
 		count++
 	}
-	expected := len(plan.Builds[0].ResolvedComponents) + 1
+	expected := len(plan.Builds[0].ResolvedComponents)
 	if count != expected {
 		t.Fatalf("got %d evidence objects, want %d", count, expected)
 	}

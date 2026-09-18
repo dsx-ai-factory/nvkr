@@ -29,13 +29,13 @@ import (
 const (
 	// BuildTypeHermeticBuild is a build executed from pinned source inside a
 	// pinned toolchain container with no unpinned network input.
-	BuildTypeHermeticBuild = "https://nkd.dev/buildtypes/hermetic-build/v1"
+	BuildTypeHermeticBuild = "https://nkd.dev/buildtypes/hermetic-build/v2"
 	// BuildTypeWrappedBuild is a build that shells an upstream project's own
 	// build entrypoint (its Makefile or script) inside a pinned toolchain.
-	BuildTypeWrappedBuild = "https://nkd.dev/buildtypes/wrapped-build/v1"
+	BuildTypeWrappedBuild = "https://nkd.dev/buildtypes/wrapped-build/v2"
 	// BuildTypeAcquired is a prebuilt artifact acquired by exact digest; NKD
 	// verified its identity but did not compile it.
-	BuildTypeAcquired = "https://nkd.dev/buildtypes/acquired/v1"
+	BuildTypeAcquired = "https://nkd.dev/buildtypes/acquired/v2"
 )
 
 // LocalBuilderID is the builder identity for a `factory run` executed on an
@@ -175,14 +175,14 @@ func (l *LocalRunContext) InvocationID() string { return l.invocationID }
 // digest field is a canonical `sha256:<hex>` identity produced by the owning
 // module; this struct never derives one.
 type ProductionInputs struct {
-	BuildType               string
-	PlanDigest              string
-	RunPlanReference        string
-	CompileSpecDigest       string
-	ExecutionSettingsDigest string
-	CatalogDigest           string
-	GeneratorVersion        string
-	SigningMode             string
+	BuildType         string
+	PlanDigest        string
+	RunPlanReference  string
+	DefinitionDigest  string
+	EnvironmentDigest string
+	CatalogDigest     string
+	GeneratorVersion  string
+	SigningMode       string
 	// ResolvedDependencies are the pinned source and toolchain inputs. The plan
 	// dependency is appended by ProductionPredicate and must not be supplied here.
 	ResolvedDependencies []Dependency
@@ -239,11 +239,11 @@ func ProductionPredicate(run RunContext, in ProductionInputs) Predicate {
 		BuildDefinition: BuildDefinition{
 			BuildType: in.BuildType,
 			ExternalParameters: map[string]string{
-				"planDigest":              in.PlanDigest,
-				"runPlanReference":        in.RunPlanReference,
-				"compileSpecDigest":       in.CompileSpecDigest,
-				"executionSettingsDigest": in.ExecutionSettingsDigest,
-				"catalogDigest":           in.CatalogDigest,
+				"planDigest":        in.PlanDigest,
+				"runPlanReference":  in.RunPlanReference,
+				"definitionDigest":  in.DefinitionDigest,
+				"environmentDigest": in.EnvironmentDigest,
+				"catalogDigest":     in.CatalogDigest,
 			},
 			InternalParameters: map[string]string{
 				"generatorVersion": in.GeneratorVersion,
@@ -275,7 +275,7 @@ var productionBuildTypes = map[string]bool{
 }
 
 var productionExternalParameters = []string{
-	"catalogDigest", "compileSpecDigest", "executionSettingsDigest",
+	"catalogDigest", "definitionDigest", "environmentDigest",
 	"planDigest", "runPlanReference",
 }
 
@@ -283,11 +283,11 @@ var productionExternalParameters = []string{
 // content identities. runPlanReference is a human/logical reference and is only
 // required to be non-empty and canonical whitespace.
 var productionExternalDigests = []string{
-	"catalogDigest", "compileSpecDigest", "executionSettingsDigest", "planDigest",
+	"catalogDigest", "definitionDigest", "environmentDigest", "planDigest",
 }
 
 // ValidateProduction enforces the production predicate contract: a known build
-// type, exact run-plan/compile-spec/execution-settings/catalog identities, a declared generator
+// type, exact run-plan/definition/environment/catalog identities, a declared generator
 // and signing mode, canonically sorted and content-addressed dependencies
 // including the plan itself, a non-empty builder identity, and a complete,
 // ordered invocation/time triple. It is INDEPENDENT of Index.Validate, which

@@ -26,7 +26,7 @@ func githubSourceEnvironment(plan *Plan, node Node) map[string]string {
 			if source.ID != node.IRNode || source.Kind != ir.KindFetch {
 				continue
 			}
-			access, ok := plan.ExecutionSettings.SourceAccess[source.Repo]
+			access, ok := plan.Environment.SourceAccess[source.Repo]
 			if !ok {
 				return nil
 			}

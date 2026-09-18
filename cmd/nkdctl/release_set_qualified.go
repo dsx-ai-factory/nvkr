@@ -10,9 +10,7 @@ import (
 )
 
 // releaseSetCmd authenticates the exact normalized ReleaseSet bytes under the
-// dedicated release-set role, then narrows the generic document receipt into the
-// opaque capability consumed by release.Authorize. It intentionally does not
-// serialize that capability or claim that the remaining promotion gates passed.
+// dedicated release-set role. Document authentication grants no release clearance.
 func releaseSetCmd() *cli.Command {
 	return releaseSetCmdWithVerifier(nil)
 }
@@ -77,7 +75,7 @@ func authenticateReleaseSet(c *cli.Context, verifier trust.DocumentVerifier) err
 	if err != nil {
 		return err
 	}
-	if _, err := release.VerifyAuthenticatedReleaseSet(c.Context, document); err != nil {
+	if err := release.VerifyAuthenticatedReleaseSet(c.Context, document); err != nil {
 		return err
 	}
 	set, ok := document.Decoded().(release.ReleaseSet)

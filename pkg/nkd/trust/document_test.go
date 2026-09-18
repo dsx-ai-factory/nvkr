@@ -457,8 +457,8 @@ func TestAuthenticateBindsOfflineRootToImmutableRolePolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if receipt.TrustedRootSHA256() != rootDigest {
-		t.Fatalf("receipt root pin=%q", receipt.TrustedRootSHA256())
+	if !receipt.Authenticated() {
+		t.Fatal("matching trusted root policy did not authenticate the document")
 	}
 	if calls != 1 {
 		t.Fatalf("verifier calls=%d want=1", calls)

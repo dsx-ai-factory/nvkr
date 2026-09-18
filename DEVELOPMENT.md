@@ -13,7 +13,7 @@ make check
 `make help` lists targets. The full release-blocking verification includes:
 
 ```sh
-gofmt -l cmd client pkg
+gofmt -l cmd client internal pkg
 go test ./... -count=1
 go test -race ./... -count=1
 go vet ./...
@@ -46,28 +46,34 @@ go run ./cmd/nkdctl run generate \
 
 Use the same generator version and input selection for generation and checking. Generated files are owned by
 the generator; edit authored inputs. Selected producer pin changes are build-identity changes; destinations and runtime/signing
-configuration belong to Environment. Legacy factory wire fixtures are test inputs, not authoring templates.
+configuration belong to Environment. The complete generated Plan is the executable document; there are no separately authored compiler handoffs.
 
 ## Repository layout
 
 - `definitions/`: maintained NKE CLI and AICR Definitions, Environments, and their catalogs.
 - `testdata/examples/`: multi-output, worker, AICR rendering, and catalog contract fixtures.
-- `pkg/nkd/factory/`: internal compiler/executor shared by lifecycle adapters; current Runs are its callers.
+- `pkg/nkd/definition/`: authored inputs, admission and identity.
+- `pkg/nkd/factory/`: complete compilation, Run operations and provider generation.
+- `pkg/nkd/lifecycle/`: immutable attempts and policy-scoped Release consumption.
+- `pkg/nkd/delivery/`: checked publication content and bounded held-resource lifetime.
 - `.github/nkd-run/`: generated NKE bundle; regenerate from its Definition and Environment.
 - `toolchains/`: development adapter toolchains and helper pins; maintained demos use their declared utility image.
 
 The [cleanup record](docs/repository-cleanup.md) explains current package responsibilities and removed material.
+The [locality record](docs/codebase-locality-implementation.md) describes the ownership changes and before/after traces.
 
 ## Find the owner
 
 | Work | Owner |
 |---|---|
-| Public lifecycle and expected/observed joins | `pkg/nkd/lifecycle` |
-| Internal artifact graph, packaging and provider generation | `pkg/nkd/factory` |
+| Definition/Environment admission and identity | `pkg/nkd/definition` |
+| Immutable attempts and Release consumer workflow | `pkg/nkd/lifecycle` |
+| Complete compilation, output joins, scheduling, packaging and provider generation | `pkg/nkd/factory` |
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
-| Execution observations and qualified node transport | `pipeline`, `profile` |
+| Producer execution, observations and qualified receipts | `pipeline`, `profile` |
+| Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
 | Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `vuln`, `trust`, `sign` |
-| Release authority and delivery | `release`, `status`, `delivery`, `transport` |
+| Release authority and delivery | `release`, `status`, `delivery` |
 | Public adapters | `client/v1`, `cmd/nkdctl` — delegate authority |
 
 Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation.md) before changing authority.

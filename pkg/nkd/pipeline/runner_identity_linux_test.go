@@ -81,14 +81,14 @@ func TestMappedRunnerSnapshotIsAnonymousAndImmutable(t *testing.T) {
 	if _, err := file.WriteAt([]byte("attacker"), 0); err == nil {
 		t.Fatal("mapped runner capability remained writable after sealing")
 	}
-	if err := held.AssertUnchanged(); err != nil {
+	if err := held.AssertUnchangedContext(t.Context()); err != nil {
 		t.Fatalf("failed mutation changed mapped runner capability: %v", err)
 	}
 }
 
 func digestHeldRunner(t *testing.T, file *heldfile.File) string {
 	t.Helper()
-	if err := file.AssertUnchanged(); err != nil {
+	if err := file.AssertUnchangedContext(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return file.Digest()

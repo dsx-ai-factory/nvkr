@@ -59,7 +59,7 @@ func TestVerifyResultsRehydratesAndRehashesExactProducerSet(t *testing.T) {
 		EngineClass: ir.EngineOCIHermetic, Path: node.ArtifactPath, SHA256: digest, Size: size,
 		ProfileDigest: receipt.ProfileDigest(), ExecutionBinding: receipt.ExecutionBinding(),
 	}
-	results := ResultDirectory(opts.SourceRoot)
+	results := filepath.Join(filepath.Dir(opts.SourceRoot), "results")
 	writeResultForTest(t, results, node.ID, result)
 	rep, err := (Local{}).VerifyResults(g, buildDigest, results, opts)
 	if err != nil {
@@ -116,7 +116,7 @@ func TestVerifyResultsBindsOnlyTheSelectedProducerSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeResultForTest(t, ResultDirectory(opts.SourceRoot), selected.ID, ArtifactResult{
+	writeResultForTest(t, filepath.Join(filepath.Dir(opts.SourceRoot), "results"), selected.ID, ArtifactResult{
 		Component: selected.Component, OutputType: selected.OutputType, Toolchain: selected.Toolchain,
 		Qualification: ArtifactQualifiedExecution, InputDigest: "sha256:" + repeatHex("b"),
 		BuilderType: selected.BuilderType, EngineClass: ir.EngineOCIHermetic, Path: selected.ArtifactPath,
@@ -124,7 +124,7 @@ func TestVerifyResultsBindsOnlyTheSelectedProducerSet(t *testing.T) {
 		ExecutionBinding: receipt.ExecutionBinding(),
 	})
 
-	report, err := (Local{}).VerifyResults(graph, buildDigest, ResultDirectory(opts.SourceRoot), opts)
+	report, err := (Local{}).VerifyResults(graph, buildDigest, filepath.Join(filepath.Dir(opts.SourceRoot), "results"), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestVerifyResultsRejectsMissingExtraAndForgedFields(t *testing.T) {
 	work := filepath.Join(t.TempDir(), "work")
 	node, opts, receipt := qualifiedResultOptions(t, filepath.Join(work, "src"))
 	g, buildDigest := qualifiedResultGraph(t, node)
-	results := ResultDirectory(opts.SourceRoot)
+	results := filepath.Join(filepath.Dir(opts.SourceRoot), "results")
 	if err := os.MkdirAll(results, 0o755); err != nil {
 		t.Fatal(err)
 	}

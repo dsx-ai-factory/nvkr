@@ -11,6 +11,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
+	"sigs.k8s.io/yaml"
 )
 
 func code(err error) nkderr.Code {
@@ -77,9 +78,9 @@ func TestMarshalIsExactCanonicalSigningPayload(t *testing.T) {
 	}
 }
 
-func TestDisplayYAMLIsDistinctAndLoadAcceptsAuthoredYAML(t *testing.T) {
+func TestLoadAcceptsAuthoredYAML(t *testing.T) {
 	p := Embedded("arm64")
-	display, err := p.MarshalDisplayYAML()
+	display, err := yaml.Marshal(p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +113,7 @@ func TestLoadContextRejectsUnsafeOrOversizedProfilePaths(t *testing.T) {
 		dir := t.TempDir()
 		target := filepath.Join(dir, "target.yaml")
 		link := filepath.Join(dir, "profile.yaml")
-		raw, err := Embedded("amd64").MarshalDisplayYAML()
+		raw, err := Embedded("amd64").Marshal()
 		if err != nil {
 			t.Fatal(err)
 		}

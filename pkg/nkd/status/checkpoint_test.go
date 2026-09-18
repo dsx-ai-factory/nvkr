@@ -95,30 +95,6 @@ func checkpointPolicy(t *testing.T, signers ...string) CheckpointPolicy {
 	return policy
 }
 
-func releaseCheckpointPolicy(t *testing.T, timeAuthority string, signers ...string) CheckpointPolicy {
-	t.Helper()
-	policy, err := NewReleaseCheckpointPolicy(target, checkpointAuthority, checkpointIssuer,
-		signers, timeAuthority)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return policy
-}
-
-func trustedEpoch(t *testing.T, authority string, epoch int64) TrustedTime {
-	t.Helper()
-	clock, err := NewTimeAuthority(authority,
-		EpochSourceFunc(func(context.Context) (int64, error) { return epoch, nil }))
-	if err != nil {
-		t.Fatal(err)
-	}
-	observation, err := clock.Now(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return observation
-}
-
 func highWater(t *testing.T, sequence uint64, digest string) HighWaterMark {
 	t.Helper()
 	mark, err := NewHighWaterMark(target, checkpointAuthority, sequence, digest)
@@ -192,44 +168,11 @@ func TestCheckpointReceiptBindsAuthenticatedCompleteView(t *testing.T) {
 	if got, err := receipt.CheckpointDigest(); err != nil || got != digest {
 		t.Fatalf("checkpoint digest accessor: %q %v", got, err)
 	}
-	if got, err := receipt.PreviousCheckpointDigest(); err != nil || got != statusDigest('0') {
-		t.Fatalf("predecessor accessor: %q %v", got, err)
-	}
-	if got, err := receipt.AsOfEpoch(); err != nil || got != 200 {
-		t.Fatalf("as-of accessor: %d %v", got, err)
-	}
-	if got, err := receipt.CheckpointSigner(); err != nil || got != checkpointSigner {
-		t.Fatalf("signer accessor: %q %v", got, err)
-	}
-	if got, err := receipt.CheckpointIssuer(); err != nil || got != checkpointIssuer {
-		t.Fatalf("issuer accessor: %q %v", got, err)
-	}
-	if binding, err := receipt.PolicyBinding(); err != nil || !isDigest(binding) {
-		t.Fatalf("policy binding accessor: %q %v", binding, err)
-	}
-	digests, err := receipt.DeclarationDigests()
-	if err != nil || len(digests) != 2 || digests[0] != checkpoint.DeclarationDigests[0] {
-		t.Fatalf("complete digest set accessor: %v %v", digests, err)
-	}
-	digests[0] = statusDigest('f')
-	again, _ := receipt.DeclarationDigests()
-	if again[0] != checkpoint.DeclarationDigests[0] {
-		t.Fatal("declaration digest accessor leaked mutable receipt state")
-	}
 	decision, err := receipt.Decision()
 	if err != nil || decision.Action != ActionSuperseded || decision.ReplacedBy != replacement {
 		t.Fatalf("checkpoint decision did not use its exact declarations: %+v %v", decision, err)
 	}
-	next, err := receipt.HighWater()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sequence, _ := next.Sequence(); sequence != 10 {
-		t.Fatalf("high-water did not advance to accepted checkpoint: %d", sequence)
-	}
-	if nextDigest, _ := next.CheckpointDigest(); nextDigest != digest {
-		t.Fatalf("high-water did not bind accepted digest: %s", nextDigest)
-	}
+
 }
 
 func TestEmptyCheckpointSetIsCompleteAndMeaningful(t *testing.T) {
@@ -248,9 +191,9 @@ func TestEmptyCheckpointSetIsCompleteAndMeaningful(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digests, err := receipt.DeclarationDigests()
-	if err != nil || digests == nil || len(digests) != 0 {
-		t.Fatalf("empty complete set was not preserved: %#v %v", digests, err)
+	digests := receipt.checkpoint.DeclarationDigests
+	if digests == nil || len(digests) != 0 {
+		t.Fatalf("empty complete set was not preserved: %#v", digests)
 	}
 	decision, err := receipt.Decision()
 	if err != nil || decision.Effective {
@@ -295,17 +238,15 @@ func TestCheckpointRejectsRollbackEquivocationAndBrokenPredecessor(t *testing.T)
 	}
 }
 
-func TestTwoSuccessiveCheckpointsRejectOldReplayFromEveryDiscoveryAdapter(t *testing.T) {
+func TestTwoSuccessiveCheckpointsRejectOldReplay(t *testing.T) {
 	firstRequest, first, _ := checkpointFixture(t)
 	firstReceipt, err := VerifyCheckpoint(context.Background(), firstRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstHighWater, err := firstReceipt.HighWater()
-	if err != nil {
-		t.Fatal(err)
-	}
 	firstDigest, _ := firstReceipt.CheckpointDigest()
+	firstSequence, _ := firstReceipt.Sequence()
+	firstHighWater := highWater(t, firstSequence, firstDigest)
 
 	second := first
 	second.Sequence = 11
@@ -319,19 +260,14 @@ func TestTwoSuccessiveCheckpointsRejectOldReplayFromEveryDiscoveryAdapter(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	latest, err := secondReceipt.HighWater()
-	if err != nil {
-		t.Fatal(err)
-	}
+	secondDigest, _ := secondReceipt.CheckpointDigest()
+	secondSequence, _ := secondReceipt.Sequence()
+	latest := highWater(t, secondSequence, secondDigest)
 
-	for _, adapter := range []string{"registry-referrer", "air-gap-bundle"} {
-		t.Run(adapter, func(t *testing.T) {
-			replay := firstRequest
-			replay.HighWater = latest
-			if _, err := VerifyCheckpoint(context.Background(), replay); code(err) != nkderr.CodeStatusCheckpoint {
-				t.Fatalf("%s replayed older checkpoint without rollback rejection: %v", adapter, err)
-			}
-		})
+	replay := firstRequest
+	replay.HighWater = latest
+	if _, err := VerifyCheckpoint(context.Background(), replay); code(err) != nkderr.CodeStatusCheckpoint {
+		t.Fatalf("older checkpoint replayed without rollback rejection: %v", err)
 	}
 }
 
@@ -364,7 +300,7 @@ func TestCheckpointRejectsIncompleteOrExtraneousDeclarationSet(t *testing.T) {
 func TestCheckpointRequiresFreshExplicitAsOf(t *testing.T) {
 	request, _, _ := checkpointFixture(t)
 	tests := map[string]AsOf{
-		"omitted":      WithoutAsOf(),
+		"omitted":      {},
 		"before issue": explicitAsOf(t, 99),
 		"expired":      explicitAsOf(t, 301),
 	}
@@ -445,18 +381,9 @@ func TestCheckpointZeroValuesAndPostAcceptanceMutationFailClosed(t *testing.T) {
 	if _, err := zero.CheckpointDigest(); code(err) != nkderr.CodeStatusCheckpoint {
 		t.Fatalf("zero receipt digest accessor did not fail closed: %v", err)
 	}
-	if _, err := zero.AsOfEpoch(); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("zero receipt as-of accessor did not fail closed: %v", err)
-	}
-	if _, err := zero.CheckpointIssuer(); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("zero receipt issuer accessor did not fail closed: %v", err)
-	}
-	if _, err := zero.HighWater(); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("zero receipt high-water accessor did not fail closed: %v", err)
-	}
 	var zeroMark HighWaterMark
-	if _, err := zeroMark.CheckpointDigest(); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("zero high-water accessor did not fail closed: %v", err)
+	if err := zeroMark.validate(); code(err) != nkderr.CodeStatusCheckpoint {
+		t.Fatalf("zero high-water mark did not fail closed: %v", err)
 	}
 
 	request, _, _ := checkpointFixture(t)
@@ -507,99 +434,6 @@ func TestCheckpointDecisionHonorsOnlyEffectiveDeclarations(t *testing.T) {
 		t.Fatalf("effective authenticated withdrawal did not fail closed: %v", err)
 	}
 
-	// A caller-selected historical epoch remains a useful diagnostic, but it has
-	// no trusted-time capability and therefore cannot cross the release boundary.
-	if _, err := before.TrustedTimeBinding(); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("caller-selected historical epoch acquired release authority: %v", err)
-	}
-	const timeAuthority = "release-policy-clock"
-	releaseReceipt, err := VerifyCheckpointForRelease(context.Background(), ReleaseCheckpointRequest{
-		Policy:       releaseCheckpointPolicy(t, timeAuthority, checkpointSigner),
-		HighWater:    base.HighWater,
-		Time:         trustedEpoch(t, timeAuthority, 300),
-		Checkpoint:   base.Checkpoint,
-		Declarations: base.Declarations,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := releaseReceipt.Decision(); code(err) != nkderr.CodeWithdrawn {
-		t.Fatalf("trusted current epoch failed to enforce effective withdrawal: %v", err)
-	}
-	if authority, err := releaseReceipt.TrustedTimeAuthority(); err != nil || authority != timeAuthority {
-		t.Fatalf("release receipt lost trusted-time authority: %q %v", authority, err)
-	}
-	if binding, err := releaseReceipt.TrustedTimeBinding(); err != nil || !isDigest(binding) {
-		t.Fatalf("release receipt lost trusted-time identity: %q %v", binding, err)
-	}
-}
-
-func TestTrustedTimeFailsClosedAndMustMatchReleasePolicy(t *testing.T) {
-	//nolint:staticcheck // Nil admission is the public boundary behavior under test.
-	if _, err := (TimeAuthority{}).Now(nil); code(err) != nkderr.CodeUsage {
-		t.Fatalf("nil trusted-time context code = %q, want usage (%v)", code(err), err)
-	}
-	if _, err := (TrustedTime{}).Epoch(); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("zero trusted time did not fail closed: %v", err)
-	}
-	if _, err := NewTimeAuthority("clock", EpochSourceFunc(nil)); code(err) != nkderr.CodeTrustPolicyMissing {
-		t.Fatalf("typed-nil epoch source was accepted: %v", err)
-	}
-	zeroClock, err := NewTimeAuthority("clock",
-		EpochSourceFunc(func(context.Context) (int64, error) { return 0, nil }))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := zeroClock.Now(context.Background()); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("zero trusted epoch was accepted: %v", err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancelingClock, err := NewTimeAuthority("clock",
-		EpochSourceFunc(func(context.Context) (int64, error) {
-			cancel()
-			return 0, ctx.Err()
-		}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := cancelingClock.Now(ctx); code(err) != nkderr.CodeTimeout || !nkderr.Retryable(err) {
-		t.Fatalf("trusted-time adapter cancellation = %v, want retryable timeout", err)
-	}
-
-	request, _, _ := checkpointFixture(t)
-	if _, err := VerifyCheckpointForRelease(context.Background(), ReleaseCheckpointRequest{
-		Policy: request.Policy, HighWater: request.HighWater,
-		Time: trustedEpoch(t, "clock", 200), Checkpoint: request.Checkpoint,
-		Declarations: request.Declarations,
-	}); code(err) != nkderr.CodeTrustPolicyMissing {
-		t.Fatalf("diagnostic checkpoint policy authorized release time: %v", err)
-	}
-	if _, err := VerifyCheckpointForRelease(context.Background(), ReleaseCheckpointRequest{
-		Policy:    releaseCheckpointPolicy(t, "pinned-clock", checkpointSigner),
-		HighWater: request.HighWater, Time: trustedEpoch(t, "other-clock", 200),
-		Checkpoint: request.Checkpoint, Declarations: request.Declarations,
-	}); code(err) != nkderr.CodeTrustPolicyMissing {
-		t.Fatalf("untrusted clock identity bypassed pinned release policy: %v", err)
-	}
-
-	observation := trustedEpoch(t, "clock", 200)
-	binding, err := observation.Binding()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := VerifyTrustedTimeBinding("clock", 200, binding); err != nil {
-		t.Fatalf("versioned trusted-time binding did not rehydrate: %v", err)
-	}
-	legacyBinding, err := canonical.Digest(canonical.KindTrustedTime, struct {
-		Authority string `json:"authority"`
-		Epoch     int64  `json:"epoch"`
-	}{Authority: "clock", Epoch: 200})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := VerifyTrustedTimeBinding("clock", 200, legacyBinding); code(err) != nkderr.CodeStatusCheckpoint {
-		t.Fatalf("unversioned trusted-time core was accepted: %v", err)
-	}
 }
 
 func TestCheckpointConcurrentVerificationAndAccess(t *testing.T) {
@@ -622,7 +456,7 @@ func TestCheckpointConcurrentVerificationAndAccess(t *testing.T) {
 					errCh <- err
 					return
 				}
-				if _, err := receipt.HighWater(); err != nil {
+				if _, err := receipt.Sequence(); err != nil {
 					errCh <- err
 					return
 				}

@@ -99,7 +99,7 @@ type PromotionRule struct {
 
 // PromotionPolicy is immutable governance input. It selects the exact
 // compatibility and conformance policies and, per artifact kind, the evidence and
-// waiver rules Authorize must enforce.
+// waiver rules reserved for a future promotion implementation.
 type PromotionPolicy struct {
 	SchemaVersion             string          `json:"schemaVersion"`
 	CompatibilityPolicyDigest string          `json:"compatibilityPolicyDigest"`
@@ -196,7 +196,7 @@ func (policy PromotionPolicy) Marshal() ([]byte, error) {
 }
 
 // Digest returns the content identity of the normalized policy document. A digest
-// alone is not authorization; Authorize accepts only PromotionPolicyReceipt.
+// alone is not authorization.
 func (policy PromotionPolicy) Digest() (string, error) {
 	if err := policy.Validate(); err != nil {
 		return "", err
@@ -204,29 +204,18 @@ func (policy PromotionPolicy) Digest() (string, error) {
 	return canonical.Digest(canonical.KindPromotionPolicy, policy.normalized())
 }
 
-// PromotionPolicyReceipt is issued only from an authenticated trust document under
-// trust.RolePromotionPolicy. Critical fields are private and rechecked by Authorize.
-type PromotionPolicyReceipt struct {
-	valid            bool
-	policy           PromotionPolicy
-	canonicalPayload string
-	digest           string
-	verifiedSigner   string
-}
-
-// VerifyPromotionPolicy narrows the general authenticated-document capability into
-// the exact release policy capability. It never accepts a raw digest, decoded value,
-// signer string, or generic release receipt authenticator.
-func VerifyPromotionPolicy(ctx context.Context, document trust.DocumentReceipt) (PromotionPolicyReceipt, error) {
+// VerifyPromotionPolicy validates the exact authenticated document and returns
+// its canonical identity. Authentication grants no release clearance.
+func VerifyPromotionPolicy(ctx context.Context, document trust.DocumentReceipt) (string, error) {
 	if err := contextErr(ctx); err != nil {
-		return PromotionPolicyReceipt{}, err
+		return "", err
 	}
 	if !document.Authenticated() || document.Role() != trust.RolePromotionPolicy {
-		return PromotionPolicyReceipt{}, e.New(e.CodeSignatureInvalid,
+		return "", e.New(e.CodeSignatureInvalid,
 			"promotion policy requires an authenticated %s document", trust.RolePromotionPolicy)
 	}
 	if document.SchemaVersion() != PromotionPolicySchemaVersion {
-		return PromotionPolicyReceipt{}, e.New(e.CodeInvalidCatalog,
+		return "", e.New(e.CodeInvalidCatalog,
 			"authenticated promotion policy schemaVersion %q is unsupported (want %q)",
 			document.SchemaVersion(), PromotionPolicySchemaVersion)
 	}
@@ -236,97 +225,34 @@ func VerifyPromotionPolicy(ctx context.Context, document trust.DocumentReceipt) 
 		policy = decoded
 	case *PromotionPolicy:
 		if decoded == nil {
-			return PromotionPolicyReceipt{}, e.New(e.CodeSignatureInvalid,
+			return "", e.New(e.CodeSignatureInvalid,
 				"authenticated promotion policy decoded to nil")
 		}
 		policy = *decoded
 	default:
-		return PromotionPolicyReceipt{}, e.New(e.CodeSignatureInvalid,
+		return "", e.New(e.CodeSignatureInvalid,
 			"authenticated promotion policy has unexpected decoded type")
 	}
 	if err := policy.Validate(); err != nil {
-		return PromotionPolicyReceipt{}, err
+		return "", err
 	}
 	normalized := policy.normalized()
 	payload, err := canonical.Marshal(normalized)
 	if err != nil {
-		return PromotionPolicyReceipt{}, err
+		return "", err
 	}
 	if !bytes.Equal(document.ExactBytes(), payload) {
-		return PromotionPolicyReceipt{}, e.New(e.CodeInvalidCatalog,
+		return "", e.New(e.CodeInvalidCatalog,
 			"authenticated promotion policy does not use the canonical rule ordering")
 	}
 	signer := strings.TrimSpace(document.SignerIdentity())
 	if signer == "" {
-		return PromotionPolicyReceipt{}, e.New(e.CodeSignatureInvalid,
+		return "", e.New(e.CodeSignatureInvalid,
 			"authenticated promotion policy has no signer identity")
 	}
 	digest, err := canonical.Digest(canonical.KindPromotionPolicy, normalized)
 	if err != nil {
-		return PromotionPolicyReceipt{}, err
+		return "", err
 	}
-	return PromotionPolicyReceipt{valid: true, policy: normalized,
-		canonicalPayload: string(payload), digest: digest, verifiedSigner: signer}, nil
-}
-
-func (receipt PromotionPolicyReceipt) Digest() (string, error) {
-	if !receipt.valid {
-		return "", e.New(e.CodeSignatureInvalid, "promotion policy is not authenticated")
-	}
-	return receipt.digest, nil
-}
-
-func (receipt PromotionPolicyReceipt) validate(asOfEpoch int64) (PromotionPolicy, error) {
-	if !receipt.valid || strings.TrimSpace(receipt.verifiedSigner) == "" {
-		return PromotionPolicy{}, e.New(e.CodeGateUnmet,
-			"release authorization requires an authenticated promotion policy")
-	}
-	if err := receipt.policy.Validate(); err != nil {
-		return PromotionPolicy{}, err
-	}
-	if err := verifyStoredReceipt(receipt.policy, receipt.canonicalPayload, receipt.digest,
-		canonical.KindPromotionPolicy); err != nil {
-		return PromotionPolicy{}, err
-	}
-	if err := receiptCurrent(receipt.policy.EffectiveEpoch, receipt.policy.ExpiresEpoch,
-		asOfEpoch, "promotion policy"); err != nil {
-		return PromotionPolicy{}, err
-	}
-	return receipt.policy.normalized(), nil
-}
-
-type promotionRuleSet map[ArtifactKind]map[EvidenceType]map[EvidenceGapReason]bool
-
-func newPromotionRuleSet(policy PromotionPolicy) promotionRuleSet {
-	rules := make(promotionRuleSet, len(policy.Rules))
-	for _, rule := range policy.Rules {
-		evidence := make(map[EvidenceType]map[EvidenceGapReason]bool, len(rule.Evidence))
-		for _, requirement := range rule.Evidence {
-			reasons := make(map[EvidenceGapReason]bool, len(requirement.WaivableReasons))
-			for _, reason := range requirement.WaivableReasons {
-				reasons[reason] = true
-			}
-			evidence[requirement.Type] = reasons
-		}
-		rules[rule.ArtifactKind] = evidence
-	}
-	return rules
-}
-
-func (rules promotionRuleSet) requires(kind ArtifactKind, evidenceType EvidenceType) bool {
-	requirements, exists := rules[kind]
-	if !exists {
-		return false
-	}
-	_, required := requirements[evidenceType]
-	return required
-}
-
-func (rules promotionRuleSet) allowsWaiver(kind ArtifactKind, evidenceType EvidenceType, reason EvidenceGapReason) bool {
-	requirements, exists := rules[kind]
-	if !exists {
-		return false
-	}
-	reasons, required := requirements[evidenceType]
-	return required && reasons[reason]
+	return digest, nil
 }

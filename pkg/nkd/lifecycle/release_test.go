@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -38,12 +38,11 @@ func TestConsumerVerifiesExactSignedArtifactPublicationClosure(t *testing.T) {
 	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: reference, Digest: digest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
 		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
-	consumer := &Consumer{verifier: verifier, materialize: func(ctx context.Context, got string) (materializedRelease, error) {
+	consumer := &Consumer{verifier: verifier, materialize: func(ctx context.Context, got string) (*delivery.Publication, error) {
 		if got != reference {
 			t.Fatalf("reference = %s", got)
 		}
-		inspection, err := delivery.Inspect(ctx, layout)
-		return materializedRelease{inspection: inspection, path: layout, cleanup: func() {}}, err
+		return delivery.OpenPublication(ctx, layout, digest)
 	}}
 	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
 		IdentityRegexp: "^builder$", Issuer: "issuer"}
@@ -77,9 +76,9 @@ func TestConsumerRejectsRecordForWrongObservedSigner(t *testing.T) {
 	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: reference, Digest: digest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
 		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "attacker", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
-	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (materializedRelease, error) {
+	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
 		t.Fatal("wrong signer reached closure materialization")
-		return materializedRelease{}, nil
+		return nil, nil
 	}}
 	_, err := consumer.Verify(context.Background(), reference, VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
 		IdentityRegexp: "^builder$", Issuer: "issuer"})
@@ -115,9 +114,9 @@ func TestConsumerRejectsWeakerEvidenceBeforeMaterialization(t *testing.T) {
 				SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}
 			test.mutate(&record, &policy)
 			verifier := &releaseVerifier{record: record}
-			consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (materializedRelease, error) {
+			consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
 				t.Fatal("weaker evidence reached closure materialization")
-				return materializedRelease{}, nil
+				return nil, nil
 			}}
 			capability, err := consumer.Verify(context.Background(), reference, policy)
 			assertCode(t, err, test.want)
@@ -146,9 +145,9 @@ func TestConsumerRejectsStrongerOrUnconfiguredPolicyBeforeAdapters(t *testing.T)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			verifier := &releaseVerifier{}
-			consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (materializedRelease, error) {
+			consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
 				t.Fatal("stronger policy reached materialization adapter")
-				return materializedRelease{}, nil
+				return nil, nil
 			}}
 			_, err := consumer.Verify(context.Background(), reference, test.policy)
 			assertCode(t, err, test.want)
@@ -217,7 +216,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 		t.Fatal(err)
 	}
 	aptArchive := filepath.Join(transportRoot, "repository.tar")
-	if err := pipeline.PackTransport(ctx, aptArchive, transportRoot, []string{filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", "worker-apt"))}); err != nil {
+	if err := transportarchive.Pack(ctx, aptArchive, transportRoot, []string{filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", "worker-apt"))}); err != nil {
 		t.Fatal(err)
 	}
 	aptRaw, err := os.ReadFile(aptArchive)
@@ -229,7 +228,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 		{Name: "gpu-runtime", Kind: OutputHelm, Digest: helm.Digest, BuildDigest: buildHelm},
 		{Name: "worker-apt", Kind: OutputAPT, Digest: apt.Digest, BuildDigest: buildAPT, Components: []string{"agent"}},
 	}
-	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: artifacts})
+	contentSubject, err := delivery.ContentDigest(artifacts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,9 +256,8 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: reference, Digest: publication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
 		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
-	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (materializedRelease, error) {
-		inspection, inspectErr := delivery.Inspect(ctx, layout)
-		return materializedRelease{inspection: inspection, path: layout, cleanup: func() {}}, inspectErr
+	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
+		return delivery.OpenPublication(ctx, layout, publication.RootDigest)
 	}}
 	verified, err := consumer.Verify(ctx, reference, VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer"})
 	if err != nil {
@@ -275,7 +273,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	}
 	badArtifacts := append([]Artifact(nil), artifacts...)
 	badArtifacts[0].Digest = "sha256:" + repeat("9", 64)
-	badContentSubject, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: badArtifacts})
+	badContentSubject, err := delivery.ContentDigest(badArtifacts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,9 +288,8 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	badVerifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: badReference, Digest: badPublication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
 		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
-	badConsumer := &Consumer{verifier: badVerifier, materialize: func(context.Context, string) (materializedRelease, error) {
-		inspection, inspectErr := delivery.Inspect(ctx, badLayout)
-		return materializedRelease{inspection: inspection, path: badLayout, cleanup: func() {}}, inspectErr
+	badConsumer := &Consumer{verifier: badVerifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
+		return delivery.OpenPublication(ctx, badLayout, badPublication.RootDigest)
 	}}
 	if _, err := badConsumer.Verify(ctx, badReference, VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
 		IdentityRegexp: "^builder$", Issuer: "issuer"}); err == nil {
@@ -339,7 +336,7 @@ func testPreparedPublicationLayout(t *testing.T) (string, string) {
 // testReleaseRequest creates real digest-bound evidence for consumer fixtures.
 func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.ObjectInput, subjects map[string]string) delivery.PublicationRequest {
 	t.Helper()
-	content, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: artifacts})
+	content, err := delivery.ContentDigest(artifacts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,4 +405,35 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 		}
 	}
 	return request
+}
+
+func inspectTestPublication(t *testing.T, ctx context.Context, root, digest string) ([]Artifact, string, error) {
+	t.Helper()
+	publication, err := delivery.OpenPublication(ctx, root, digest)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = publication.Close() }()
+	return publication.Artifacts("registry.example.test/product@" + digest)
+}
+
+func TestConsumerRejectsDifferentCheckedPublicationSubject(t *testing.T) {
+	layout, digest := testPublicationLayout(t)
+	reference := "registry.example.test/product@sha256:" + repeat("9", 64)
+	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
+		Ref: reference, Digest: referenceDigest(reference), Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
+		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
+	var held *delivery.Publication
+	consumer := &Consumer{verifier: verifier, materialize: func(ctx context.Context, _ string) (*delivery.Publication, error) {
+		publication, err := delivery.OpenPublication(ctx, layout, digest)
+		held = publication
+		return publication, err
+	}}
+	verified, err := consumer.Verify(t.Context(), reference, VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer"})
+	assertCode(t, err, nkderr.CodeVerifyFailed)
+	if verified != nil {
+		t.Fatal("substituted checked publication returned authorization")
+	}
+	_, _, err = held.Artifacts("registry.example.test/product@" + digest)
+	assertCode(t, err, nkderr.CodeGateUnmet)
 }

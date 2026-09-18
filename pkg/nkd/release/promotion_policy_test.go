@@ -75,95 +75,38 @@ func authenticatedReleaseSetDocument(t *testing.T, raw []byte, role trust.Signer
 	return document
 }
 
-func TestPromotionPolicyCapabilityIsRoleSeparatedAndMutationSafe(t *testing.T) {
-	inv := inventory()
-	set := releaseSet(t, inv)
-	req := authorizationRequest(t, inv, set)
-
-	without := req
-	without.PromotionPolicy = PromotionPolicyReceipt{}
-	if _, err := Authorize(context.Background(), without); code(err) != nkderr.CodeGateUnmet {
-		t.Fatalf("zero promotion-policy capability must fail closed: %v", err)
-	}
-
-	mutated := req
-	mutated.PromotionPolicy.policy.Rules[0].Evidence[0].Type = EvidenceSBOM
-	if _, err := Authorize(context.Background(), mutated); code(err) != nkderr.CodeSignatureInvalid {
-		t.Fatalf("post-authentication promotion-policy mutation must fail: %v", err)
-	}
-
+func TestPromotionPolicyAuthenticationRequiresExactRoleAndContext(t *testing.T) {
 	policy := PromotionPolicy{
 		SchemaVersion:             PromotionPolicySchemaVersion,
 		CompatibilityPolicyDigest: digest('8'), ConformancePolicyDigest: digest('9'),
-		Rules:          []PromotionRule{vulnerabilityPromotionRule(ArtifactHostPackage)},
+		Rules:          []PromotionRule{{ArtifactKind: ArtifactHostPackage, Evidence: []EvidenceRequirement{{Type: EvidenceVulnerability}}}},
 		EffectiveEpoch: 1, ExpiresEpoch: 20,
 	}
 	wrongRole := authenticatedPromotionDocument(t, policy, PromotionPolicySchemaVersion, trust.RoleConformance)
 	if _, err := VerifyPromotionPolicy(context.Background(), wrongRole); code(err) != nkderr.CodeSignatureInvalid {
-		t.Fatalf("conformance-authenticated document must not become a promotion-policy capability: %v", err)
+		t.Fatalf("conformance-authenticated document must not authenticate promotion policy: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	properRole := authenticatedPromotionDocument(t, policy, PromotionPolicySchemaVersion, trust.RolePromotionPolicy)
+	wantDigest, err := policy.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotDigest, err := VerifyPromotionPolicy(context.Background(), properRole); err != nil || gotDigest != wantDigest {
+		t.Fatalf("exact promotion-policy identity = %q, %v; want %q", gotDigest, err, wantDigest)
+	}
 	if _, err := VerifyPromotionPolicy(ctx, properRole); code(err) != nkderr.CodeTimeout {
 		t.Fatalf("promotion-policy verification must honor cancellation: %v", err)
 	}
 }
 
-func TestAuthorizeDerivesEvidenceAndGatePoliciesFromAuthenticatedPolicy(t *testing.T) {
-	inv := inventory()
-	set := releaseSet(t, inv)
-	req := authorizationRequest(t, inv, set)
-
-	missing := req
-	missing.VulnerabilityReports = nil
-	if _, err := Authorize(context.Background(), missing); code(err) != nkderr.CodeGateUnmet {
-		t.Fatalf("policy-required vulnerability reports must be enforced: %v", err)
-	}
-
-	noEvidence := req
-	noEvidence.PromotionPolicy = verifiedPromotionPolicy(t,
-		req.PromotionPolicy.policy.CompatibilityPolicyDigest,
-		req.PromotionPolicy.policy.ConformancePolicyDigest,
-		[]PromotionRule{{ArtifactKind: ArtifactHostPackage}},
-	)
-	noEvidence.VulnerabilityReports = nil
-	if _, err := Authorize(context.Background(), noEvidence); err != nil {
-		t.Fatalf("an explicit authenticated no-evidence rule must not inherit hard-coded scanner requirements: %v", err)
-	}
-
-	extra := noEvidence
-	extra.VulnerabilityReports = req.VulnerabilityReports
-	if _, err := Authorize(context.Background(), extra); code(err) != nkderr.CodeGateUnmet {
-		t.Fatalf("evidence not required by the authenticated policy must be rejected as substitution: %v", err)
-	}
-
-	missingKind := req
-	missingKind.PromotionPolicy = verifiedPromotionPolicy(t,
-		req.PromotionPolicy.policy.CompatibilityPolicyDigest,
-		req.PromotionPolicy.policy.ConformancePolicyDigest,
-		[]PromotionRule{vulnerabilityPromotionRule(ArtifactOCIImage)},
-	)
-	if _, err := Authorize(context.Background(), missingKind); code(err) != nkderr.CodeGateUnmet {
-		t.Fatalf("policy without the release artifact kind must fail closed: %v", err)
-	}
-
-	wrongCompatibility := req
-	wrongCompatibility.PromotionPolicy = verifiedPromotionPolicy(t, digest('a'),
-		req.PromotionPolicy.policy.ConformancePolicyDigest,
-		[]PromotionRule{vulnerabilityPromotionRule(ArtifactHostPackage)},
-	)
-	if _, err := Authorize(context.Background(), wrongCompatibility); code(err) != nkderr.CodeGateUnmet {
-		t.Fatalf("compatibility policy must be derived from the authenticated promotion policy: %v", err)
-	}
-}
-
-func TestPromotionPolicyRejectsUnknownSchemaDuplicateRulesAndExpiry(t *testing.T) {
+func TestPromotionPolicyRejectsUnknownSchemaAndDuplicateRules(t *testing.T) {
 	base := PromotionPolicy{
 		SchemaVersion:             PromotionPolicySchemaVersion,
 		CompatibilityPolicyDigest: digest('8'), ConformancePolicyDigest: digest('9'),
-		Rules:          []PromotionRule{vulnerabilityPromotionRule(ArtifactHostPackage)},
+		Rules:          []PromotionRule{{ArtifactKind: ArtifactHostPackage, Evidence: []EvidenceRequirement{{Type: EvidenceVulnerability}}}},
 		EffectiveEpoch: 1, ExpiresEpoch: 20,
 	}
 
@@ -175,25 +118,11 @@ func TestPromotionPolicyRejectsUnknownSchemaDuplicateRulesAndExpiry(t *testing.T
 	}
 
 	duplicate := base
-	duplicate.Rules = append(duplicate.Rules, vulnerabilityPromotionRule(ArtifactHostPackage))
+	duplicate.Rules = append(duplicate.Rules, PromotionRule{ArtifactKind: ArtifactHostPackage, Evidence: []EvidenceRequirement{{Type: EvidenceVulnerability}}})
 	if err := duplicate.Validate(); code(err) != nkderr.CodeInvalidCatalog {
 		t.Fatalf("duplicate artifact-kind rule must fail closed: %v", err)
 	}
 
-	inv := inventory()
-	set := releaseSet(t, inv)
-	req := authorizationRequest(t, inv, set)
-	expired := base
-	expired.ExpiresEpoch = 5
-	receipt, err := VerifyPromotionPolicy(context.Background(),
-		authenticatedPromotionDocument(t, expired, PromotionPolicySchemaVersion, trust.RolePromotionPolicy))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.PromotionPolicy = receipt
-	if _, err := Authorize(context.Background(), req); code(err) != nkderr.CodeGateUnmet {
-		t.Fatalf("expired promotion policy must fail closed: %v", err)
-	}
 }
 
 func TestInventoryArtifactKindsAreExactAndClosed(t *testing.T) {
@@ -217,7 +146,7 @@ func TestInventoryArtifactKindsAreExactAndClosed(t *testing.T) {
 	}
 }
 
-func TestReleaseSetCapabilityRequiresExactAuthenticatedBytesAndRole(t *testing.T) {
+func TestReleaseSetAuthenticationRequiresExactBytesRoleAndContext(t *testing.T) {
 	inv := inventory()
 	set := releaseSet(t, inv)
 	raw, err := set.Marshal()
@@ -226,7 +155,7 @@ func TestReleaseSetCapabilityRequiresExactAuthenticatedBytesAndRole(t *testing.T
 	}
 
 	wrongRole := authenticatedReleaseSetDocument(t, raw, trust.RolePromotionPolicy)
-	if _, err := VerifyAuthenticatedReleaseSet(context.Background(), wrongRole); code(err) != nkderr.CodeSignatureInvalid {
+	if err := VerifyAuthenticatedReleaseSet(context.Background(), wrongRole); code(err) != nkderr.CodeSignatureInvalid {
 		t.Fatalf("promotion-policy role must not authenticate a release set: %v", err)
 	}
 
@@ -240,21 +169,17 @@ func TestReleaseSetCapabilityRequiresExactAuthenticatedBytesAndRole(t *testing.T
 		t.Fatal("fixture unexpectedly uses canonical release member order")
 	}
 	unsortedDocument := authenticatedReleaseSetDocument(t, unsorted, trust.RoleReleaseSet)
-	if _, err := VerifyAuthenticatedReleaseSet(context.Background(), unsortedDocument); code(err) != nkderr.CodeInvalidCatalog {
+	if err := VerifyAuthenticatedReleaseSet(context.Background(), unsortedDocument); code(err) != nkderr.CodeInvalidCatalog {
 		t.Fatalf("authenticated but semantically noncanonical member ordering must fail: %v", err)
-	}
-
-	req := authorizationRequest(t, inv, set)
-	mutated := req
-	mutated.Release.set.Members[0].ArtifactDigests[0] = digest('9')
-	if _, err := Authorize(context.Background(), mutated); code(err) != nkderr.CodeUnverifiedRef {
-		t.Fatalf("post-authentication release-set mutation must fail exact identity: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	proper := authenticatedReleaseSetDocument(t, raw, trust.RoleReleaseSet)
-	if _, err := VerifyAuthenticatedReleaseSet(ctx, proper); code(err) != nkderr.CodeTimeout {
-		t.Fatalf("release-set narrowing must honor cancellation: %v", err)
+	if err := VerifyAuthenticatedReleaseSet(context.Background(), proper); err != nil {
+		t.Fatalf("exact release-set document rejected: %v", err)
+	}
+	if err := VerifyAuthenticatedReleaseSet(ctx, proper); code(err) != nkderr.CodeTimeout {
+		t.Fatalf("release-set verification must honor cancellation: %v", err)
 	}
 }

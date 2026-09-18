@@ -25,9 +25,6 @@ type HostPreflightReceipt struct {
 // ProfileDigest identifies the exact signed profile checked at the host stage.
 func (r HostPreflightReceipt) ProfileDigest() string { return r.profileDigest }
 
-// ObservationBinding binds only the observable host facts used by the host stage.
-func (r HostPreflightReceipt) ObservationBinding() string { return r.observationBinding }
-
 // RequireFor validates the opaque stage-one receipt against an exact profile. It is
 // intentionally usable before network access so artifact runners can snapshot the
 // authenticated profile and reject a zero, forged, or changed host receipt before
@@ -112,10 +109,8 @@ type ExecutionReceipt struct {
 	valid                  bool
 }
 
-func (r ExecutionReceipt) ProfileDigest() string          { return r.profileDigest }
-func (r ExecutionReceipt) SelectionBinding() string       { return r.selectionBinding }
-func (r ExecutionReceipt) HostObservationBinding() string { return r.hostObservationBinding }
-func (r ExecutionReceipt) ExecutionBinding() string       { return r.executionBinding }
+func (r ExecutionReceipt) ProfileDigest() string    { return r.profileDigest }
+func (r ExecutionReceipt) ExecutionBinding() string { return r.executionBinding }
 
 // NodeIdentities returns a defensive copy of the exact verified per-node identity.
 func (r ExecutionReceipt) NodeIdentities() []VerifiedNodeIdentity {

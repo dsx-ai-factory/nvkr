@@ -70,12 +70,8 @@ func TestQualifiedSignerConsumesExactPrivateBytesAndCapturesOutputs(t *testing.T
 	if _, err := os.Stat(snapshotPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("private signing directory was not cleaned up: %v", err)
 	}
-	identities, gotIssuer, err := signed.CertificateClaims()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(identities) != 1 || identities[0] != identity || gotIssuer != issuer {
-		t.Fatalf("claims=(%v,%q)", identities, gotIssuer)
+	if len(signed.identities) != 1 || signed.identities[0] != identity || signed.issuer != issuer {
+		t.Fatalf("claims=(%v,%q)", signed.identities, signed.issuer)
 	}
 	bundle, err := signed.Bundle()
 	if err != nil || !bytes.Contains(bundle, []byte("fixture")) {

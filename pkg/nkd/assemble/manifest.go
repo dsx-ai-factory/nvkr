@@ -31,6 +31,15 @@ type EnvelopeRef struct {
 	DecoderDigest   string `json:"decoderDigest"`
 }
 
+// BlockManifest records fixed-size block digests in canonical RAW LBA order.
+// Aggregate identifies the complete logical stream, excluding envelope headers
+// and allocation metadata; block digests locate divergence within that stream.
+type BlockManifest struct {
+	BlockSizeBytes int      `json:"blockSizeBytes"`
+	Aggregate      string   `json:"aggregate"`
+	Blocks         []string `json:"blocks"`
+}
+
 // DiskManifest is the unified canonical-disk manifest (ADR-14 §1). LogicalDigest is the
 // trust anchor (over the decoded RAW / flat ISO logical stream). BlockManifest gives
 // diagnosable per-block granularity. Envelopes are provenance references. PreEncryption

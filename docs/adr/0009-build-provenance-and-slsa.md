@@ -41,23 +41,25 @@ the ValidationVector (ADR-05), so verify recomputes and compares it.
 
 The NKD reproduction build-type URIs use `/v2` (`oci-hermetic`, `nix`, `prebuilt-acquire`) and bind
 `externalParameters.buildDigest`. The surrounding standard in-toto Statement/v1 and SLSA provenance/v1 formats
-remain unchanged. The owning provenance index and build-observations records use
-`nkd.dev/provenance-index/v2` and `nkd.dev/build-observations/v2`; legacy Recipe fields and build-type versions
-cannot be relabeled as this graph identity.
+remain unchanged. The owning provenance index uses `nkd.dev/provenance-index/v2`; legacy Recipe fields and
+build-type versions cannot be relabeled as this graph identity.
 
-### 2. Two attestations: reproducible provenance vs signed observations
+### 2. Reproducible provenance and deferred signed observations
 
-"Signed" and "part of the reproducibility identity" are **independent** properties. NKD emits **two** attestations,
-both signable:
+"Signed" and "part of the reproducibility identity" are **independent** properties. The qualified-lane design
+separates deterministic provenance from per-attempt observations:
 
 - **Deterministic SLSA provenance** (§1) — reproducible, digest-addressed, a covered expected-evidence digest.
-- **Signed build-observations attestation** — the **actual build times, the observed host facts, and the observed
-  `engineClass`** (ADR-07). It is **signed** (authenticated) but **non-reproducible** and **not part of any
-  identity or of the expected evidence digests**. It attaches per build to the artifact as a referrer, for audit
-  and diagnosis.
+- **Signed build-observations attestation (deferred)** — actual build times, observed host facts, and observed
+  `engineClass` (ADR-07), authenticated separately from reproducible evidence. A future publisher must bind
+  those observations to the exact attempt and artifact; they cannot enter reproducible identity or expected
+  evidence digests.
 
-This refines ADR-02's T3: a detached, non-identity record **may be independently signed**. Build times are kept
-without perturbing the reproducible provenance.
+No supported operation produces, signs, or consumes a separate build-observations attestation today. The unused
+descriptive schema is removed until such an operation exists. Current pipeline-attested production provenance
+records invocation times under §5; it does not establish observed host facts or qualified execution authority.
+ADR-02's T3 still permits a detached observation record to be independently signed without affecting
+reproducible identity.
 
 ### 3. `nix` provenance is builder-agnostic
 
@@ -80,12 +82,18 @@ reproducible identity and cannot replace §1's reproduction predicate.
 
 | Field | Production contract |
 |---|---|
-| `buildType` | Versioned NKD URI identifying `hermetic-build`, `wrapped-build`, or `acquired`; any wrapped/network-enabled build makes the complete plan `wrapped-build`, regardless of build order |
+| `buildType` | NKD `/v2` URI identifying `hermetic-build`, `wrapped-build`, or `acquired`; any wrapped/network-enabled build makes the complete plan `wrapped-build`, regardless of build order |
 | `builder.id` | Committed workflow path and ref; a local Run uses a distinct local builder URI |
 | Invocation metadata | Exact Run identity with start and finish times |
-| `externalParameters` | Definition, Environment, catalog/selection and prepared plan identities |
-| `internalParameters` | Generator version, signing mode, and pipeline-helper digest |
+| `externalParameters` | Exactly `definitionDigest`, `environmentDigest`, `catalogDigest`, `planDigest`, and the descriptive `runPlanReference` |
+| `internalParameters` | Exactly generator version and signing mode; an authenticated helper-execution identity remains a distinct qualified-lane requirement |
 | `resolvedDependencies` | Source commits/trees, toolchains, plan, and declared embedded components |
+
+The Definition and Environment parameters identify the admitted authored inputs directly. Run plan v4 carries
+those exact values and revalidates their identities before execution or attestation. The retired compile-spec
+and execution-settings objects are not provenance dependencies. Their replacement changes the NKD build-type
+URI major; a `/v1` production predicate cannot be interpreted with `/v2` parameter meanings. Reproduction
+build types retain their separate semantics and validators.
 
 Cosign wraps the predicate in an in-toto statement whose subjects are the independently re-derived published
 digests. Signing mode remains inside the predicate so dry-run evidence cannot lose its meaning when copied.
@@ -100,31 +108,32 @@ build or signature-verification claim. Without declared digest-pinned upstream e
 ## Consequences
 
 **Positive**
-- Provenance stays reproducible and verifiable (times omitted) while per-build times and host facts remain
-  attested in the signed observations — nothing is lost.
+- Provenance stays reproducible and verifiable with times omitted. Production provenance records invocation
+  times; independently authenticated host observations remain a future capability.
 - One provenance format across builder types.
 - Prebuilt components are honestly marked: a verified reference or `evidence: none`.
 
 **Negative / costs**
-- Two attestations per build to produce and store.
+- A future qualified observations publisher would produce and store a separate attestation.
 - The build-type URI and the omit-times profile must be documented as part of the serialization profile (ADR-01).
 
 **Neutral**
-- Reuses the canonical codec, the signing seam, and the evidence bundle; adds shapes, not mechanisms.
+- Reuses the canonical codec, the signing seam, and the evidence bundle.
 
 ## Alternatives considered
 
 - **Include build times in the SLSA statement.** Rejected for the *reproducible* provenance — it makes the
-  statement non-reproducible. The times live in the signed observations attestation instead.
-- **Drop build times entirely.** Rejected — the audit value of when and where is worth keeping, and costs nothing
-  once it lives in a non-identity signed record.
+  statement non-reproducible. Production provenance keeps invocation times separately; qualified observations
+  remain deferred.
+- **Drop build times entirely.** Rejected — production provenance preserves their audit value without adding
+  them to reproducible evidence.
 - **A bespoke, non-SLSA provenance format.** Rejected — downstream tooling expects SLSA/in-toto.
 
 ## Follow-ups
 
 - **ADR-02:** T3 wording updated to "not part of the identity, may be independently signed."
-- **ADR-05:** the deterministic provenance digest is an expected evidence digest in the ValidationVector; the
-  signed observations attestation is attached per-build, not a covered digest.
+- **ADR-05:** the deterministic provenance digest is an expected evidence digest in the ValidationVector; a
+  future signed observations attestation must be attached per build, not included as a covered digest.
 - **ADR-13:** external-provenance references for prebuilt artifacts.
 
 ## Acceptance evidence
@@ -133,6 +142,11 @@ Current contract evidence in `pkg/nkd/provenance/provenance_test.go` covers the 
 SLSA provenance/v1 profile, exact single-artifact subjects, build/input/builder binding, pinned dependencies,
 stable ordering, and rejection of mutable or type-confused inputs. It does not prove producer signing or
 cross-process observation provenance.
+
+`pkg/nkd/provenance/production_test.go` pins exact `/v2` production predicate bytes, verifies the original
+Definition/Environment parameter set, and rejects retired build types and compiler-handoff parameters. The
+compiler/signing tests bind the same exact values from a completed Plan. These tests do not establish a new
+hosted signing or independent-consumer result.
 
 End-to-end acceptance requires a qualified producer to sign and publish deterministic provenance plus the
 separate non-identity observation, then an independent verifier to rehash the artifact and reject subject,

@@ -1,44 +1,40 @@
 package lifecycle
 
 import (
-	"reflect"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-func TestEnvironmentSourceAccessValidationAndLowering(t *testing.T) {
+func TestEnvironmentSourceAccessPreservesBuildIdentity(t *testing.T) {
 	definition := testDefinition(t)
 	baseEnvironment := testEnvironment()
-	baseCompileSpec, _, err := lower(definition, baseEnvironment)
+	basePlan, err := Compile(t.Context(), "definition.yaml", definition, "environment.yaml", baseEnvironment, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	baseBuildDigest, err := definition.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	environment := testEnvironment()
-	source := "https://github.com/NVIDIA/nke"
+	source := "https://github.com/kubernetes/kubernetes"
 	environment.SourceAccess = map[string]SourceAccess{source: {
-		Mirror: "https://github.com/example/nke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
+		Mirror: "https://github.com/example/kubernetes-mirror", CredentialRef: "github:SOURCE_TOKEN",
 	}}
-	if err := environment.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	compileSpec, settings, err := lower(definition, environment)
+	plan, err := Compile(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(compileSpec, baseCompileSpec) {
-		t.Fatal("source access changed the Build-affecting compile spec")
+	if len(plan.Builds) != len(basePlan.Builds) {
+		t.Fatal("source access changed selected producers")
 	}
-	if got := settings.SourceAccess[source]; got.Mirror != "https://github.com/example/nke-mirror" || got.CredentialRef != "github:NKE_SOURCE_TOKEN" {
-		t.Fatalf("lowered source access = %+v", got)
+	for i, build := range plan.Builds {
+		if build.Name != basePlan.Builds[i].Name || build.BuildDigest != basePlan.Builds[i].BuildDigest {
+			t.Fatal("source access changed a logical Build identity")
+		}
 	}
-	if digest, err := definition.Digest(); err != nil || digest != baseBuildDigest {
-		t.Fatalf("source access changed Definition identity: %q, %v", digest, err)
+	if got := plan.Environment.SourceAccess[source]; got.Mirror != "https://github.com/example/kubernetes-mirror" || got.CredentialRef != "github:SOURCE_TOKEN" {
+		t.Fatalf("compiled source access = %+v", got)
+	}
+	if plan.DefinitionDigest != basePlan.DefinitionDigest || plan.EnvironmentDigest == basePlan.EnvironmentDigest {
+		t.Fatal("source access did not remain an Environment-only identity change")
 	}
 }
 

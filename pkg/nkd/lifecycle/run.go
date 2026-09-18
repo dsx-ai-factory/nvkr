@@ -96,7 +96,7 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 	}
 	seen := make(map[string]bool, len(artifacts))
 	for _, artifact := range artifacts {
-		if err := artifact.validate(); err != nil {
+		if err := artifact.Validate(); err != nil {
 			return nil, err
 		}
 		slot, ok := required[artifact.Name]
@@ -167,14 +167,6 @@ func failedRun(run *Run, cause error) *Run {
 	}
 	copyRun.Failure = &runFailure{Code: string(code), Message: cause.Error()}
 	return &copyRun
-}
-
-func (artifact Artifact) validate() error {
-	if !namePattern.MatchString(artifact.Name) || artifact.Kind == "" || !canonical.IsDigest(artifact.Digest) ||
-		(artifact.BuildDigest != "" && !canonical.IsDigest(artifact.BuildDigest)) || sortedUnique("artifact components", artifact.Components) != nil {
-		return e.New(e.CodeVerifyFailed, "artifact %q must identify exact immutable bytes", artifact.Name)
-	}
-	return nil
 }
 
 func equalStrings(left, right []string) bool {

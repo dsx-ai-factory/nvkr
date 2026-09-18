@@ -15,9 +15,13 @@ type githubStage struct {
 	Nodes []Node
 }
 
-func githubStages(plan *Plan) ([]githubStage, map[string]string) {
+func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 	var stages []githubStage
 	for _, node := range topologicalFactoryNodes(plan.Graph) {
+		node, err := plan.ExecutionFor(node)
+		if err != nil {
+			return nil, nil, err
+		}
 		if len(stages) > 0 {
 			last := &stages[len(stages)-1]
 			first := last.Nodes[0]
@@ -45,7 +49,7 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string) {
 			jobs[node.ID] = stage.ID
 		}
 	}
-	return stages, jobs
+	return stages, jobs, nil
 }
 
 func githubUtilityNode(node Node) bool {

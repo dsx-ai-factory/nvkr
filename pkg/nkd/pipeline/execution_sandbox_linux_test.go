@@ -3,15 +3,77 @@
 package pipeline
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
+
+func TestSandboxTransitionStaysOnOneThread(t *testing.T) {
+	previous := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(previous)
+	want := errors.New("sandbox transition failure")
+	err := runOnSandboxThread(func() error {
+		before := unix.Gettid()
+		occupied := make(chan struct{})
+		release := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			runtime.LockOSThread()
+			defer close(done)
+			close(occupied)
+			<-release
+		}()
+		// With one Go processor, this goroutine takes the transition's current
+		// thread unless it was pinned. Blocking it forces an unpinned transition
+		// onto another thread, like a scheduler handoff between policy and exec.
+		<-occupied
+		runtime.Gosched()
+		after := unix.Gettid()
+		close(release)
+		<-done
+		if before != after {
+			return fmt.Errorf("sandbox transition moved from OS thread %d to %d", before, after)
+		}
+		return want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("sandbox transition did not retain its thread and error: %v", err)
+	}
+}
+
+func TestFailedSandboxTransitionRetiresThread(t *testing.T) {
+	want := errors.New("partial sandbox failure")
+	var thread int
+	err := runOnSandboxThread(func() error {
+		thread = unix.Gettid()
+		return want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("sandbox transition lost failure: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, err := os.Stat(fmt.Sprintf("/proc/self/task/%d", thread))
+		if errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("failed sandbox thread %d was returned to the runtime", thread)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
 
 func TestExecutionSandboxEnforcesFilesystemAndNetworkPolicy(t *testing.T) {
 	abi, _, errno := unix.Syscall6(unix.SYS_LANDLOCK_CREATE_RULESET, 0, 0, unix.LANDLOCK_CREATE_RULESET_VERSION, 0, 0, 0)

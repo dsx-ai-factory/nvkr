@@ -8,12 +8,78 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 const maxResultBytes = 1 << 20
+
+// ObserveResult reopens one producer's recorded result and its expected output.
+// The caller supplies the paths from a validated execution plan; paths recorded by
+// the producer never select bytes. This checks descriptive metadata and current
+// bytes only, and issues no execution qualification or terminal receipt.
+func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath string) (ArtifactResult, error) {
+	if err := requireRunContext(ctx, "producer result observation"); err != nil {
+		return ArtifactResult{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return ArtifactResult{}, e.Wrap(e.CodeTimeout, err, "producer result observation canceled")
+	}
+	if node.Kind != ir.KindBuild && node.Kind != ir.KindPull {
+		return ArtifactResult{}, e.New(e.CodeVerifyFailed, "node %q is not an artifact producer", node.ID)
+	}
+	result, err := readArtifactResultContext(ctx, resultPath)
+	if err != nil {
+		return ArtifactResult{}, err
+	}
+	if result.Component != node.Component || result.OutputType != node.OutputType ||
+		!canonical.IsDigest(result.SHA256) || result.Size < 0 {
+		return ArtifactResult{}, e.New(e.CodeVerifyFailed, "producer result %q has no exact component, output type or byte identity", node.ID)
+	}
+	if node.Kind == ir.KindBuild {
+		if result.Toolchain != node.Toolchain || result.BuilderType != node.BuilderType || result.Path != node.ArtifactPath ||
+			result.Ref != "" || result.Packaged {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "build result %q differs from its declared producer", node.ID)
+		}
+	} else {
+		if result.SHA256 != node.Digest || result.EngineClass != ir.EnginePrebuiltAcquire {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q differs from its pinned acquisition", node.ID)
+		}
+		if node.OutputType == "oci-image" {
+			if result.Ref != node.Artifact+"@"+node.Digest {
+				return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q differs from its pinned image reference", node.ID)
+			}
+			size, err := verifyOCILayoutAndSize(ctx, payloadPath, node.Digest)
+			if err != nil {
+				return ArtifactResult{}, err
+			}
+			if result.Size != size {
+				return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q differs from its observed OCI closure size", node.ID)
+			}
+			result.TransportPath = payloadPath
+			result.Path = result.Ref
+			return result, nil
+		}
+		if result.Ref != "" || result.Packaged {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q does not describe a raw acquired file", node.ID)
+		}
+	}
+	digest, size, _, err := hashRegularBeneathContext(ctx, filepath.Dir(payloadPath), filepath.Base(payloadPath))
+	if err != nil {
+		return ArtifactResult{}, mapCancellation(ctx, e.Wrap(e.CodeVerifyFailed, err, "observing producer %q bytes", node.ID), "producer result observation")
+	}
+	if result.SHA256 != digest || result.Size != size {
+		return ArtifactResult{}, e.New(e.CodeVerifyFailed, "producer %q bytes differ from its recorded digest or size", node.ID)
+	}
+	result.AbsPath = payloadPath
+	result.TransportPath = ""
+	if node.Kind == ir.KindPull {
+		result.Path = payloadPath
+	}
+	return result, nil
+}
 
 // VerifyResults is the terminal CI seam. It accepts only one strict result document
 // for every graph producer, reconstructs storage locations from the graph and current
@@ -75,7 +141,7 @@ func (l Local) VerifyResults(g *ir.Graph, buildDigest, resultsDir string, opts R
 		expectedFiles[sanitizeName(id)+".json"] = true
 	}
 	sort.Strings(ids)
-	results, _, err := openDirectoryNoFollow(resultsDir)
+	results, _, err := securepath.OpenDirectory(resultsDir)
 	if err != nil {
 		return rep, e.Wrap(e.CodeVerifyFailed, err, "reading terminal result directory %s", resultsDir)
 	}
@@ -219,12 +285,4 @@ func bindResultToNode(a *ArtifactResult, n ir.Node, opts RunOptions) error {
 		return e.New(e.CodeVerifyFailed, "producer result %q has malformed artifact digest %q", n.ID, a.SHA256)
 	}
 	return nil
-}
-
-// ResultDirectory is the stable workspace path used by emitted jobs.
-func ResultDirectory(sourceRoot string) string {
-	if sourceRoot == "" {
-		sourceRoot = filepath.Join(".nkd", "work", "src")
-	}
-	return filepath.Join(filepath.Dir(sourceRoot), "results")
 }

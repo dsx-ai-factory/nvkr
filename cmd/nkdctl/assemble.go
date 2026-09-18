@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/transport"
 	"github.com/urfave/cli/v2"
 )
 
@@ -202,7 +200,7 @@ func cmdPublish() *cli.Command {
 		},
 		Action: func(*cli.Context) error {
 			return e.New(e.CodeUnsupported,
-				"standalone publish is disabled: --verified/--release/--complete booleans are not authority; publication must receive an in-process release.Authorization capability")
+				"standalone publish is disabled: --verified/--release/--complete booleans are not authority; qualified release publication is not implemented")
 		},
 	}
 }
@@ -457,17 +455,4 @@ func assignmentMap(values []string, flag string) (map[string]string, error) {
 		out[name] = path
 	}
 	return out, nil
-}
-
-// publishAuthorized is the only CLI publication adapter. Its caller must retain
-// the opaque authorization in-process; a JSON file or a caller boolean cannot be
-// upgraded into this capability across a process boundary.
-func publishAuthorized(ctx context.Context, authorization *release.Authorization, seams transport.Seams,
-	targets transport.Targets, artifacts []transport.Artifact,
-) error {
-	set, err := transport.BindClearedArtifactSet(authorization, artifacts)
-	if err != nil {
-		return err
-	}
-	return transport.PublishCleared(ctx, seams, targets, set)
 }

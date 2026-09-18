@@ -96,12 +96,8 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 	if reads[evidence.SBOMRef] != 1 || reads[evidence.ProvenanceRef] != 1 {
 		t.Fatalf("external evidence was not acquired exactly once: %+v", reads)
 	}
-	if err := set.RequireCompleteExternalEvidence(); err != nil {
-		t.Fatal(err)
-	}
-	receipts, err := set.ExternalReceipts()
-	if err != nil || len(receipts) != 2 {
-		t.Fatalf("want two verified receipts, got %+v, %v", receipts, err)
+	if gaps, err := set.EvidenceGaps(); err != nil || len(gaps) != 0 {
+		t.Fatalf("complete verified evidence retained gaps: %+v, %v", gaps, err)
 	}
 	aggregate, err := set.Aggregate()
 	if err != nil {
@@ -164,16 +160,9 @@ func TestEvidenceNoneIsWaiverSignalNeverReceipt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receipts, _ := set.ExternalReceipts()
-	if len(receipts) != 0 {
-		t.Fatalf("evidence:none produced passing receipts: %+v", receipts)
-	}
 	gaps, _ := set.EvidenceGaps()
 	if len(gaps) != 1 || gaps[0].Reason != "evidence:none" || strings.Join(gaps[0].MissingTypes, ",") != "provenance,sbom" {
 		t.Fatalf("evidence:none was not preserved as an explicit waiver signal: %+v", gaps)
-	}
-	if err := set.RequireCompleteExternalEvidence(); sbomCode(err) != nkderr.CodeProvenanceMissing {
-		t.Fatalf("evidence:none must never satisfy completeness, got %v", err)
 	}
 	aggregate, _ := set.Aggregate()
 	foundNone := false
@@ -502,9 +491,8 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	external, err := set.ExternalReceipts()
-	if err != nil || len(external) != 2 {
-		t.Fatalf("caller-hash path lost independently verified external receipts: %+v, %v", external, err)
+	if gaps, err := set.EvidenceGaps(); err != nil || len(gaps) != 0 {
+		t.Fatalf("caller-hash path lost independently verified external evidence: %+v, %v", gaps, err)
 	}
 	if _, err := set.LocalReceipts(); sbomCode(err) != nkderr.CodePreflightFailed {
 		t.Fatalf("caller artifact hashes minted publisher SBOM authority: %v", err)
@@ -742,7 +730,7 @@ func qualifiedSourceSBOMReport(t *testing.T, repo, toolchain string) (*buildgrap
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultsDir := pipeline.ResultDirectory(options.SourceRoot)
+	resultsDir := filepath.Join(filepath.Dir(options.SourceRoot), "results")
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -64,13 +64,6 @@ func (s Selection) Validate() error {
 	return ValidateValues(s.Service, s.Accelerator, s.OS, s.Intent, s.Platform)
 }
 
-// Matches reports exact selection equality. The optional platform matches only when
-// both sides omit it; it is never a wildcard.
-func (p Profile) Matches(s Selection) bool {
-	return p.Service == s.Service && p.Accelerator == s.Accelerator &&
-		p.OS == s.OS && p.Intent == s.Intent && p.Platform == s.Platform
-}
-
 // Options parameterize a bundle render. Qualified renders always use a private
 // recipe file inside the staging tree and always verify the pinned generator.
 type Options struct {
@@ -93,20 +86,9 @@ type Result struct {
 	ChecksumsFile   string
 }
 
-// ValidateUnqualifiedForContext is the cancelable form of the diagnostic tree
-// check. It does not mint or consume execution authority.
-func (r Result) ValidateUnqualifiedForContext(ctx context.Context, expected Profile) error {
-	return r.validateForContext(ctx, expected, digestBundle)
-}
-
-type bundleDigester func(context.Context, string) (string, error)
-
-func (r Result) validateForContext(ctx context.Context, expected Profile, digestTree bundleDigester) error {
+func (r Result) validateForContext(ctx context.Context, expected Profile) error {
 	if err := contextError(ctx, "validating AICR result"); err != nil {
 		return err
-	}
-	if digestTree == nil {
-		return e.New(e.CodeInternal, "AICR result validation has no tree digester")
 	}
 	if err := expected.Validate(); err != nil {
 		return err
@@ -136,7 +118,7 @@ func (r Result) validateForContext(ctx context.Context, expected Profile, digest
 		return e.New(e.CodeVerifyFailed,
 			"AICR bundler receipt checksums path %q does not match published path %q", r.ChecksumsFile, want)
 	}
-	observed, err := digestTree(ctx, r.OutputDir)
+	observed, err := descriptorBundleDigest(ctx, r.OutputDir)
 	if err != nil {
 		return err
 	}
@@ -149,7 +131,7 @@ func (r Result) validateForContext(ctx context.Context, expected Profile, digest
 
 // QualifiedResult is an opaque same-process capability minted only after
 // CLIBundler executed one verified generator snapshot through every phase. Its
-// fields are private so an external Bundler adapter cannot fabricate authority.
+// fields are private so callers cannot fabricate authority from descriptive fields.
 type QualifiedResult struct {
 	result        Result
 	qualification *resultQualification
@@ -179,17 +161,10 @@ func (q *QualifiedResult) ValidateFor(ctx context.Context, expected Profile) (Re
 		receipt.bundleDigest != q.result.BundleDigest {
 		return Result{}, e.New(e.CodeVerifyFailed, "AICR qualified execution receipt binding changed")
 	}
-	if err := q.result.validateForContext(ctx, expected, descriptorBundleDigest); err != nil {
+	if err := q.result.validateForContext(ctx, expected); err != nil {
 		return Result{}, err
 	}
 	return q.result, nil
-}
-
-// UnqualifiedBundler is the extension seam for SDK-backed or diagnostic adapters.
-// Its Result never carries execution authority, even when structurally valid.
-type UnqualifiedBundler interface {
-	Available() bool
-	Bundle(ctx context.Context, p Profile, o Options, stdout, stderr io.Writer) (Result, error)
 }
 
 // Validate checks the complete, concrete AICR selection and both content pins.
@@ -270,24 +245,7 @@ func (c CLIBundler) bin() string {
 	return DefaultBinary
 }
 
-// Available is a UI convenience only. Bundle never trusts this observation; it
-// resolves, snapshots, hashes, and executes one private copy in a single call.
-func (c CLIBundler) Available() bool {
-	_, err := exec.LookPath(c.bin())
-	return err == nil
-}
-
 var evidenceDigestOutput = regexp.MustCompile(`^(?:sha256:)?([0-9a-f]{64})$`)
-
-// Bundle implements the explicitly unqualified extension seam. Callers that need
-// attestation authority must use BundleQualified and retain its opaque capability.
-func (c CLIBundler) Bundle(ctx context.Context, p Profile, o Options, stdout, stderr io.Writer) (Result, error) {
-	qualified, err := c.BundleQualified(ctx, p, o, stdout, stderr)
-	if err != nil {
-		return Result{}, err
-	}
-	return qualified.result, nil
-}
 
 // BundleQualified executes the verified generator capability through all four phases, validates
 // the complete output tree, atomically publishes it, and mints an opaque receipt.

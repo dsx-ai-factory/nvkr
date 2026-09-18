@@ -3,7 +3,6 @@ package factory
 import (
 	"bytes"
 	"context"
-	"path/filepath"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -52,24 +51,21 @@ func bindTestPlanExecution(t *testing.T, plan *Plan, buildIndex, irIndex, nodeIn
 	requirements *execution.Requirements,
 ) {
 	t.Helper()
-	plan.ExecutionSettings.ExecutionClasses = testExecutionClasses()
-	digest, err := plan.ExecutionSettings.Digest()
+	plan.Environment.ExecutionClasses = testExecutionClasses()
+	digest, err := plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = digest
+	plan.EnvironmentDigest = digest
 
 	irNode := &plan.Builds[buildIndex].Graph.Nodes[irIndex]
 	irNode.Requirements = execution.Clone(requirements)
 	binding, err := execution.Match(
-		irNode.Requirements, plan.ExecutionSettings.ExecutionClasses, matchOptionsForBuildNode(*irNode))
+		irNode.Requirements, plan.Environment.ExecutionClasses, matchOptionsForBuildNode(*irNode))
 	if err != nil {
 		t.Fatal(err)
 	}
 	irNode.ExecutionBinding = binding
-	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(requirements)
-	plan.Graph.Nodes[nodeIndex].ExecutionBinding = execution.CloneBinding(binding)
-	plan.Graph.Nodes[nodeIndex].RunsOn = binding.Class.RunsOn
 	for i := range plan.Builds[buildIndex].ResolvedComponents {
 		if plan.Builds[buildIndex].ResolvedComponents[i].Name == irNode.Component {
 			plan.Builds[buildIndex].ResolvedComponents[i].BuildRequirements = execution.Clone(requirements)
@@ -121,7 +117,7 @@ func bindFirstTestPlanExecution(t *testing.T, plan *Plan, requirements *executio
 	return -1
 }
 
-func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
+func TestCompilerReferencesAuthoritativeProducerRequirements(t *testing.T) {
 	base, err := catalog.LoadContext(context.Background(), testCatalogProvider(t))
 	if err != nil {
 		t.Fatal(err)
@@ -133,15 +129,8 @@ func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
-		Metadata: Metadata{Name: "requirements"}, Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
-		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
-		UtilityPlatform:  "linux/amd64",
-		Builds:           []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-		Packages:         []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
-	}
-	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "requirements"}, ExecutionClasses: testExecutionClasses()}
+	definition, delivery := fixtureInputs("requirements", "worker", "")
+	delivery.ExecutionClasses = testExecutionClasses()
 	plan, err := Compile(context.Background(), definition, delivery, stack, "v0.0.0 (test)")
 	if err != nil {
 		t.Fatal(err)
@@ -158,6 +147,13 @@ func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
 	}
 	for _, node := range plan.Graph.Nodes {
 		if node.Kind == NodeBuild && node.BuildTarget == "worker" && node.IRNode == "build-kubelet" {
+			if node.Requirements != nil || node.ExecutionBinding != nil {
+				t.Fatal("scheduler copied producer configuration")
+			}
+			node, err = plan.ExecutionFor(node)
+			if err != nil {
+				t.Fatal(err)
+			}
 			planRequest = node.Requirements
 			planBinding = node.ExecutionBinding
 			planRunsOn = node.RunsOn
@@ -186,8 +182,8 @@ func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatal("caller-owned execution class storage aliases the compiled Plan")
 	}
-	unsatisfied := plan.ExecutionSettings
-	unsatisfied.ExecutionClasses = execution.CloneClasses(plan.ExecutionSettings.ExecutionClasses)
+	unsatisfied := plan.Environment
+	unsatisfied.ExecutionClasses = execution.CloneClasses(plan.Environment.ExecutionClasses)
 	unsatisfied.ExecutionClasses[0].Resources.MemoryMiB = 1
 	unsatisfied.ExecutionClasses[1].Resources.MemoryMiB = 1
 	if failed, compileErr := Compile(context.Background(), definition, unsatisfied, stack, "v0.0.0 (test)"); failed != nil {
@@ -197,11 +193,9 @@ func TestCompileProjectsProducerRequirementsOntoGenericPlanNode(t *testing.T) {
 	}
 }
 
-func TestExecutionClassFieldsChangeExecutionSettingsIdentity(t *testing.T) {
-	base := ExecutionSettings{
-		APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "identity"}, ExecutionClasses: testExecutionClasses(),
-	}
+func TestExecutionClassFieldsChangeEnvironmentIdentity(t *testing.T) {
+	_, base := fixtureInputs("identity", "worker", "")
+	base.ExecutionClasses = testExecutionClasses()
 	baseline, err := base.Digest()
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +222,7 @@ func TestExecutionClassFieldsChangeExecutionSettingsIdentity(t *testing.T) {
 				t.Fatal(err)
 			}
 			if digest == baseline {
-				t.Fatalf("changing execution class %s did not change ExecutionSettings identity", test.name)
+				t.Fatalf("changing execution class %s did not change Environment identity", test.name)
 			}
 		})
 	}
@@ -263,12 +257,12 @@ func TestPlanValidationRejectsAlternativeSatisfyingExecutionClass(t *testing.T) 
 	requirements := testExecutionRequirements()
 	classes := testExecutionClasses()
 	classes[0].Capabilities = []execution.CapabilityName{execution.CapabilityKVM}
-	plan.ExecutionSettings.ExecutionClasses = classes
-	settingsDigest, err := plan.ExecutionSettings.Digest()
+	plan.Environment.ExecutionClasses = classes
+	settingsDigest, err := plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = settingsDigest
+	plan.EnvironmentDigest = settingsDigest
 	irNode := &plan.Builds[buildIndex].Graph.Nodes[irIndex]
 	irNode.Requirements = execution.Clone(requirements)
 	for i := range plan.Builds[buildIndex].ResolvedComponents {
@@ -284,9 +278,6 @@ func TestPlanValidationRejectsAlternativeSatisfyingExecutionClass(t *testing.T) 
 		t.Fatalf("deterministic tie selected %q, want alpha-tcg", expected.Class.Name)
 	}
 	irNode.ExecutionBinding = expected
-	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(requirements)
-	plan.Graph.Nodes[nodeIndex].ExecutionBinding = execution.CloneBinding(expected)
-	plan.Graph.Nodes[nodeIndex].RunsOn = expected.Class.RunsOn
 	syncTestCatalogComponents(t, plan)
 	if err := plan.Validate(); err != nil {
 		t.Fatal(err)
@@ -297,8 +288,6 @@ func TestPlanValidationRejectsAlternativeSatisfyingExecutionClass(t *testing.T) 
 		t.Fatal(err)
 	}
 	irNode.ExecutionBinding = alternative
-	plan.Graph.Nodes[nodeIndex].ExecutionBinding = execution.CloneBinding(alternative)
-	plan.Graph.Nodes[nodeIndex].RunsOn = alternative.Class.RunsOn
 	assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
 }
 
@@ -341,14 +330,14 @@ func TestPlanValidationRejectsUnsatisfiedExecutionClassInventory(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
 	bindFirstTestPlanExecution(t, plan, testExecutionRequirements())
 
-	for index := range plan.ExecutionSettings.ExecutionClasses {
-		plan.ExecutionSettings.ExecutionClasses[index].Resources.MemoryMiB = 1
+	for index := range plan.Environment.ExecutionClasses {
+		plan.Environment.ExecutionClasses[index].Resources.MemoryMiB = 1
 	}
-	digest, err := plan.ExecutionSettings.Digest()
+	digest, err := plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = digest
+	plan.EnvironmentDigest = digest
 
 	assertFactoryErrorCode(t, plan.Validate(), e.CodeEngineCapability)
 }
@@ -393,12 +382,12 @@ func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {
 		t.Fatal("build plan does not retain its resolved build component")
 	}
 
-	plan.ExecutionSettings.ExecutionClasses = testExecutionClasses()
-	settingsDigest, err := plan.ExecutionSettings.Digest()
+	plan.Environment.ExecutionClasses = testExecutionClasses()
+	settingsDigest, err := plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = settingsDigest
+	plan.EnvironmentDigest = settingsDigest
 	baselineDigest, err := plan.Digest()
 	if err != nil {
 		t.Fatal(err)
@@ -470,10 +459,11 @@ func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {
 	assertFactoryErrorCode(t, plan.Validate(), e.CodeUnverifiedRef)
 	plan.Builds[buildIndex].ResolvedComponents = savedComponents
 
+	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(irNode.Requirements)
 	plan.Graph.Nodes[nodeIndex].Requirements.Resources.MemoryMiB++
 	assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
 
-	plan.Graph.Nodes[nodeIndex].Requirements = execution.Clone(irNode.Requirements)
+	plan.Graph.Nodes[nodeIndex].Requirements = nil
 	plan.Builds[buildIndex].ResolvedComponents[componentIndex].BuildRequirements.Resources.MemoryMiB++
 	assertFactoryErrorCode(t, plan.Validate(), e.CodeUnverifiedRef)
 }
@@ -496,14 +486,14 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 		t.Fatal("test plan has no build node")
 	}
 	buildNode.Requirements = testExecutionRequirements()
-	plan.ExecutionSettings.ExecutionClasses = testExecutionClasses()
-	settingsDigest, err := plan.ExecutionSettings.Digest()
+	plan.Environment.ExecutionClasses = testExecutionClasses()
+	settingsDigest, err := plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = settingsDigest
+	plan.EnvironmentDigest = settingsDigest
 	buildNode.ExecutionBinding, err = execution.Match(
-		buildNode.Requirements, plan.ExecutionSettings.ExecutionClasses, execution.MatchOptions{})
+		buildNode.Requirements, plan.Environment.ExecutionClasses, execution.MatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -523,9 +513,6 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 	for i := range plan.Graph.Nodes {
 		node := &plan.Graph.Nodes[i]
 		if node.BuildTarget == plan.Builds[0].Name && node.IRNode == buildNode.ID {
-			node.Requirements = execution.Clone(buildNode.Requirements)
-			node.ExecutionBinding = execution.CloneBinding(buildNode.ExecutionBinding)
-			node.RunsOn = buildNode.ExecutionBinding.Class.RunsOn
 			factoryNodeID = node.ID
 			break
 		}
@@ -559,16 +546,12 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 	} else {
 		assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 	}
-	if bundle, err := RenderGitLab(context.Background(), plan); bundle != nil {
-		t.Fatalf("GitLab rejection returned partial output: %#v", bundle)
-	} else {
-		assertFactoryErrorCode(t, err, e.CodeEngineCapability)
-	}
+
 	assertFactoryErrorCode(t,
 		AdmitLocal(context.Background(), plan, LocalRunOptions{DryRun: true, Workspace: t.TempDir()}),
 		e.CodeEngineCapability)
 	assertFactoryErrorCode(t,
-		ValidateGeneratedBundle(context.Background(), plan, baselineBundle),
+		ValidateGitHubBundle(context.Background(), plan, baselineBundle),
 		e.CodeEngineCapability)
 	assertFactoryErrorCode(t,
 		ExecuteNode(context.Background(), plan, factoryNodeID, nil, nil),
@@ -585,8 +568,7 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 
 	for i := range plan.Graph.Nodes {
 		if plan.Graph.Nodes[i].ID == factoryNodeID {
-			plan.Graph.Nodes[i].Requirements = nil
-			plan.Graph.Nodes[i].ExecutionBinding = nil
+			plan.Graph.Nodes[i].Requirements = execution.Clone(buildNode.Requirements)
 			break
 		}
 	}
@@ -597,6 +579,9 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 		ValidateHostedOutcomes(context.Background(), t.TempDir(), plan),
 		e.CodePipelineDrift)
 
+	for i := range plan.Graph.Nodes {
+		plan.Graph.Nodes[i].Requirements = nil
+	}
 	retainedNodes := plan.Graph.Nodes
 	plan.Graph.Nodes = nil
 	for _, node := range retainedNodes {
@@ -615,30 +600,30 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 		e.CodeInvalidCatalog)
 }
 
-func TestGeneratedBundleRejectsRequirementsInjectedIntoGraphMember(t *testing.T) {
+func TestGeneratedBundleRejectsRequirementsInjectedIntoPlan(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
 	bundle, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	path := filepath.ToSlash(filepath.Join(bundle.GraphDir, plan.Builds[0].Name+".json"))
-	var graph ir.Graph
-	if err := canonical.UnmarshalExact(bundle.Files[path], &graph); err != nil {
+	path := bundle.PlanPath
+	var decoded Plan
+	if err := canonical.UnmarshalExact(bundle.Files[path], &decoded); err != nil {
 		t.Fatal(err)
 	}
 	found := false
-	for i := range graph.Nodes {
-		if graph.Nodes[i].Kind == ir.KindBuild {
-			graph.Nodes[i].Requirements = testExecutionRequirements()
+	for i := range decoded.Builds[0].Graph.Nodes {
+		if decoded.Builds[0].Graph.Nodes[i].Kind == ir.KindBuild {
+			decoded.Builds[0].Graph.Nodes[i].Requirements = testExecutionRequirements()
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatal("generated graph has no build node")
+		t.Fatal("generated Plan has no build instruction")
 	}
-	raw, err := graph.CanonicalJSON()
+	raw, err := canonical.Marshal(decoded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -650,7 +635,7 @@ func TestGeneratedBundleRejectsRequirementsInjectedIntoGraphMember(t *testing.T)
 	mutated.Files[path] = raw
 
 	assertFactoryErrorCode(t,
-		ValidateGeneratedBundle(context.Background(), plan, &mutated),
+		ValidateGitHubBundle(context.Background(), plan, &mutated),
 		e.CodePipelineDrift)
 }
 

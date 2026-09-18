@@ -9,10 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
@@ -107,7 +109,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		t.Fatal(err)
 	}
 	archive := filepath.Join(root, "source.tar")
-	if err := pipeline.PackTransport(ctx, archive, root, []string{"helm"}); err != nil {
+	if err := transportarchive.Pack(ctx, archive, root, []string{"helm"}); err != nil {
 		t.Fatal(err)
 	}
 	digest, err := digestFactoryPath(ctx, archive)
@@ -118,7 +120,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record := pipeline.ArtifactResult{Component: "charts", SHA256: digest, Size: info.Size()}
+	record := pipeline.ArtifactResult{Component: "charts", OutputType: "tarball", SHA256: digest, Size: info.Size()}
 	recordPath := filepath.Join(root, "result.json")
 	writeRecord := func() {
 		raw, marshalErr := canonical.Marshal(record)
@@ -137,7 +139,8 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	}
 	node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, Inputs: []string{"source"}, Outputs: []string{"package/charts"}}
 	buildDigest := "sha256:" + strings.Repeat("a", 64)
-	plan := &Plan{Builds: []BuildPlan{{Name: "charts", BuildDigest: buildDigest, Platform: "linux/amd64"}}}
+	plan := &Plan{Builds: []BuildPlan{{Name: "charts", BuildDigest: buildDigest, Platform: "linux/amd64",
+		Graph: &ir.Graph{Nodes: []ir.Node{{Kind: ir.KindBuild, Component: "charts", OutputType: "tarball"}}}}}}
 	if binding {
 		binary := filepath.Join(root, "worker")
 		if err := os.WriteFile(binary, []byte("fixture worker"), 0o755); err != nil {

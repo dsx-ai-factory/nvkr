@@ -11,9 +11,10 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func TestRemovedRecipeInterfacesRejectBeforeResolution(t *testing.T) {
+func TestRemovedInterfacesRejectBeforeResolution(t *testing.T) {
 	for _, args := range [][]string{
 		{"recipe"},
+		{"bundle", "--engine", "gitlab", "--data", "must-not-be-read"},
 		{"catalog", "recipes"},
 		{"resolve", "--recipe", "old"},
 		{"resolve", "--category", "kubernetes"},
@@ -97,4 +98,31 @@ func layeredCatalogPath(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func TestCatalogUpdateCIFailsBeforeOutputOrCatalogIO(t *testing.T) {
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = writer
+	t.Cleanup(func() { os.Stdout = oldStdout })
+	app := &cli.App{Commands: []*cli.Command{cmdCatalog()}}
+	runErr := app.Run([]string{"nkdctl", "catalog", "update-ci", "--dir", "must-not-be-read"})
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = oldStdout
+	output, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cliErrorCode(runErr) != e.CodeEngineCapability {
+		t.Fatalf("update-ci code = %q, want %q: %v",
+			cliErrorCode(runErr), e.CodeEngineCapability, runErr)
+	}
+	if len(output) != 0 {
+		t.Fatalf("unsupported update-ci emitted bytes: %q", output)
+	}
 }

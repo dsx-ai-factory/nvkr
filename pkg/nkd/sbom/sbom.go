@@ -97,14 +97,10 @@ func fromBuild(res *buildgraph.Resolved, buildDigest string, artifactHashes map[
 	return bom
 }
 
-// FromComponent builds a per-artifact SBOM bound to one component's artifact digest
+// fromComponentForArch builds a per-artifact SBOM bound to one component's artifact digest
 // (ADR-13 §1 / FR-15): a CycloneDX document whose subject is that single artifact.
 // Its serial number is derived from buildDigest + the component name, so it is unique
 // per artifact yet reproducible (no random UUID, no timestamp).
-func FromComponent(nc catalog.NamedComponent, buildDigest, artifactHash string) *BOM {
-	return fromComponentForArch(nc, buildDigest, artifactHash, "")
-}
-
 func fromComponentForArch(nc catalog.NamedComponent, buildDigest, artifactHash, arch string) *BOM {
 	metadataProps := []Property{
 		{Name: "nkd:buildDigest", Value: buildDigest},

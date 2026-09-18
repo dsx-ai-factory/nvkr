@@ -34,19 +34,6 @@ func TestPrecedence(t *testing.T) {
 	}
 }
 
-func TestMeasureVerify(t *testing.T) {
-	exp := map[string]string{"kubectl": "sha256:1", "etcd": "sha256:2"}
-	if err := MeasureVerify(exp, map[string]string{"kubectl": "sha256:1"}); err != nil {
-		t.Fatalf("subset match must verify: %v", err)
-	}
-	if code(MeasureVerify(exp, map[string]string{"kubectl": "sha256:9"})) != nkderr.CodeVerifyFailed {
-		t.Fatal("divergence must fail closed")
-	}
-	if code(MeasureVerify(exp, map[string]string{"mystery": "sha256:1"})) != nkderr.CodeVerifyFailed {
-		t.Fatal("unattested component must fail closed")
-	}
-}
-
 // TestVerifierIsolation enforces ADR-04 §3: the measure-only verify path must not
 // import the build engine (pkg/nkd/pipeline) or the report-shaped attest package,
 // directly OR transitively, so a shared defect cannot bias both artifact and proof.

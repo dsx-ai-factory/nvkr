@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"golang.org/x/sys/unix"
@@ -145,12 +146,12 @@ func downloadVerify(ctx context.Context, url, root, relative, want string) (stri
 	if resp.StatusCode != http.StatusOK {
 		return "", 0, e.New(e.CodeFetchFailed, "GET %s: HTTP %s", url, resp.Status)
 	}
-	parent, finalName, err := openOrCreateParentBeneath(root, relative)
+	parent, finalName, err := securepath.CreateParentBeneath(root, relative)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeFetchFailed, err, "resolving safe download destination %s", dest)
 	}
 	defer parent.Close()
-	f, temporaryName, err := createTemporarySibling(parent)
+	f, temporaryName, err := securepath.CreateTemporarySibling(parent)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeFetchFailed, err, "creating private download for %s", dest)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func TestExecuteNodeObservesAndPackagesCompiledInputs(t *testing.T) {
@@ -28,9 +29,13 @@ func TestExecuteNodeObservesAndPackagesCompiledInputs(t *testing.T) {
 		t.Fatal("fixture has no terminal observation")
 	}
 	for _, id := range terminal.Inputs {
+		if artifacts[id].Kind == "producer-result" {
+			continue
+		}
 		if err := writeFactoryFile(ctx, artifacts[id].Path, []byte("fixture for "+id), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		writeProducerRecordFixture(t, plan, artifacts[id], artifacts["result/"+terminal.BuildTarget+"/"+artifacts[id].Component].Path)
 	}
 	raw, err := canonical.Marshal(plan)
 	if err != nil {
@@ -75,7 +80,7 @@ func TestExecuteNodeObservesAndPackagesCompiledInputs(t *testing.T) {
 			t.Fatalf("input = %+v", input)
 		}
 	}
-	packageNode := nodes["package/tools"]
+	packageNode := nodes["package/worker"]
 	if err := ExecuteNode(ctx, loaded, packageNode.ID, nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -87,12 +92,112 @@ func TestExecuteNodeObservesAndPackagesCompiledInputs(t *testing.T) {
 		t.Fatal("package contains no executable payloads")
 	}
 	assertFactoryErrorCode(t, ExecuteNode(ctx, loaded, "missing", nil, nil), e.CodeInvalidCatalog)
-	for _, node := range loaded.Graph.Nodes {
-		if node.IRNode != "" {
-			assertFactoryErrorCode(t, ExecuteNode(ctx, loaded, node.ID, nil, nil), e.CodeUsage)
-			break
-		}
+
+}
+
+func writeProducerRecordFixture(t *testing.T, plan *Plan, artifact Artifact, resultPath string) pipeline.ArtifactResult {
+	t.Helper()
+	_, instruction, err := plan.producerInstruction(planNode(plan, artifact.Producer))
+	if err != nil {
+		t.Fatal(err)
 	}
+	digest, err := digestFactoryPath(t.Context(), artifact.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(artifact.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := pipeline.ArtifactResult{Component: instruction.Component, OutputType: instruction.OutputType,
+		Qualification: pipeline.ArtifactUnqualified, Toolchain: instruction.Toolchain, BuilderType: instruction.BuilderType,
+		Path: instruction.ArtifactPath, SHA256: digest, Size: info.Size()}
+	raw, err := canonical.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFactoryFile(t.Context(), resultPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func TestTerminalObservationRechecksExactProducerResults(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*pipeline.ArtifactResult)
+	}{
+		{name: "changed payload"},
+		{name: "missing payload"},
+		{name: "missing result"},
+		{name: "wrong component", mutate: func(r *pipeline.ArtifactResult) { r.Component = "sibling" }},
+		{name: "wrong type", mutate: func(r *pipeline.ArtifactResult) { r.OutputType = "tarball" }},
+		{name: "wrong path", mutate: func(r *pipeline.ArtifactResult) { r.Path = "sibling/payload" }},
+		{name: "wrong size", mutate: func(r *pipeline.ArtifactResult) { r.Size++ }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := githubTestPlan(t)
+			t.Chdir(t.TempDir())
+			_, artifacts := planIndex(plan)
+			terminal := planNode(plan, "worker/terminal-observe")
+			var selected Artifact
+			for _, id := range terminal.Inputs {
+				artifact := artifacts[id]
+				if artifact.Kind == "producer-result" {
+					continue
+				}
+				if err := writeFactoryFile(t.Context(), artifact.Path, []byte("built bytes"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				writeProducerRecordFixture(t, plan, artifact, artifacts["result/worker/"+artifact.Component].Path)
+				selected = artifact
+			}
+			resultPath := artifacts["result/worker/"+selected.Component].Path
+			if tc.mutate != nil {
+				record, err := readProducerResult(t.Context(), resultPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tc.mutate(&record)
+				raw, err := canonical.Marshal(record)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(resultPath, raw, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var err error
+				switch tc.name {
+				case "changed payload":
+					err = os.WriteFile(selected.Path, []byte("other bytes"), 0o755)
+				case "missing payload":
+					err = os.Rename(selected.Path, selected.Path+".missing")
+				case "missing result":
+					err = os.Rename(resultPath, resultPath+".missing")
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			assertFactoryErrorCode(t, ExecuteNode(t.Context(), plan, terminal.ID, nil, nil), e.CodeVerifyFailed)
+			if _, err := os.Stat(artifacts[terminal.Outputs[0]].Path); !os.IsNotExist(err) {
+				t.Fatalf("failed producer observation persisted success: %v", err)
+			}
+		})
+	}
+}
+
+func TestObservedProducerCannotBorrowSiblingResult(t *testing.T) {
+	plan, artifacts := lifecyclePackageFixture(t, "apt-repository")
+	duplicate := plan.Builds[0]
+	duplicate.Name = "sibling"
+	plan.Builds = append(plan.Builds, duplicate)
+	record := artifacts["result"]
+	record.BuildTarget = duplicate.Name
+	artifacts["result"] = record
+	_, err := observeProducerPayload(t.Context(), plan, artifacts["raw"], artifacts)
+	assertFactoryErrorCode(t, err, e.CodeReleaseIncomplete)
 }
 
 func TestFactoryPlanLoaderRejectsMalformedFiles(t *testing.T) {

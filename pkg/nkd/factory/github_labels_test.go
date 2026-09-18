@@ -52,7 +52,7 @@ func TestGitHubOperationLogsPreserveExitStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 			node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, Outputs: []string{"package/charts"}, HelmImage: &HelmImageBinding{Image: "package/image"}}
-			commands := githubNodeCommands(node, &Plan{}, nil)
+			commands := githubNodeCommands(node, &Plan{})
 			cmd := exec.CommandContext(t.Context(), "bash", "-c", strings.Join(commands, "\n"))
 			cmd.Dir = dir
 			cmd.Env = append(os.Environ(), "TEST_STATUS="+tc.status, "NKD_CREDENTIAL=do-not-log-this")

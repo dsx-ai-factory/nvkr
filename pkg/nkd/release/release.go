@@ -1,12 +1,6 @@
-// Package release is the release-lifecycle layer above per-component verification
-// (ADR-05 §2, ADR-16): the Inventory (single source of the required set +
-// compatibility), the atomic ReleaseSet, the two independent gates (reproduction +
-// handed-off conformance), digest-first selection, incremental validation, rollback,
-// and the downstream clearance result. NKD PRODUCES these objects and re-selectable
-// verified sets; it does not operate the fleet — it never runs the conformance suite
-// and performs no infrastructure mutation (ADR-16 §4).
-//
-// Every object is digest-addressable through the one canonical codec (ADR-01).
+// Package release validates diagnostic Inventory, ReleaseSet and PromotionPolicy
+// documents and authenticates their exact canonical bytes. These operations do
+// not grant release clearance; qualified promotion and publication are deferred.
 package release
 
 import (
@@ -16,25 +10,11 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
 )
 
 const (
-	InventorySchemaVersion   = "nkd.dev/inventory/v4"
-	ReleaseSetSchemaVersion  = "nkd.dev/release-set/v4"
-	ConformanceSchemaVersion = "nkd.dev/conformance-result/v2"
-)
-
-// Reproduction verdicts a member may carry (from verify, ADR-04/07).
-const (
-	Reproduced         = "reproduced"
-	ReproductionFailed = "failed"
-)
-
-// Conformance verdicts (handed off, ADR-16 §2).
-const (
-	ConformancePassed = "passed"
-	ConformanceFailed = "failed"
+	InventorySchemaVersion  = "nkd.dev/inventory/v4"
+	ReleaseSetSchemaVersion = "nkd.dev/release-set/v4"
 )
 
 // InventoryComponent is one required component in the Inventory: what MUST be present
@@ -272,16 +252,6 @@ func (rs *ReleaseSet) Digest() (string, error) {
 	return canonical.Digest(canonical.KindReleaseSet, rs.sorted())
 }
 
-// PublicationIdentity is ADR-06's immutable lifecycle target over the normalized
-// ReleaseSet document. It is distinct from Digest and must be used instead of
-// passing an unsorted caller-owned ReleaseSet directly to status.PublicationIdentity.
-func (rs *ReleaseSet) PublicationIdentity() (string, error) {
-	if err := rs.Validate(); err != nil {
-		return "", err
-	}
-	return status.PublicationIdentity(rs.sorted())
-}
-
 // Marshal returns the normalized canonical bytes that must be authenticated for a
 // ReleaseSet to become an authorization capability.
 func (rs *ReleaseSet) Marshal() ([]byte, error) {
@@ -307,8 +277,7 @@ func (rs *ReleaseSet) sorted() *ReleaseSet {
 	return &c
 }
 
-// Validate checks the release-set document. It does not authorize the set; that
-// requires verified receipts through Authorize.
+// Validate checks the release-set document. Release authorization is unimplemented.
 func (rs *ReleaseSet) Validate() error {
 	if rs == nil {
 		return e.New(e.CodeUnverifiedRef, "release set is required")
@@ -335,44 +304,6 @@ func (rs *ReleaseSet) Validate() error {
 			return e.New(e.CodeInvalidCatalog, "release set contains duplicate member %s/%s", member.Component, member.Arch)
 		}
 		seen[k] = true
-	}
-	return nil
-}
-
-// ConformanceResult is the independently-signed, handed-off runtime-conformance gate
-// (ADR-16 §2). resultsDigest is opaque to NKD; nkdctl never runs the suite.
-type ConformanceResult struct {
-	SchemaVersion     string   `json:"schemaVersion"`
-	ReleaseSetDigest  string   `json:"releaseSetDigest"`
-	InventoryDigest   string   `json:"inventoryDigest"`
-	VectorDigests     []string `json:"vectorDigests"`
-	Suite             string   `json:"suite"`
-	SuitePolicyDigest string   `json:"suitePolicyDigest"`
-	Verdict           string   `json:"verdict"` // passed | failed
-	ResultsDigest     string   `json:"resultsDigest"`
-	EffectiveEpoch    int64    `json:"effectiveEpoch"` // operator-supplied input, never a wall-clock read
-	ExpiresEpoch      int64    `json:"expiresEpoch"`
-}
-
-// Validate checks a conformance document before signature verification.
-func (cr ConformanceResult) Validate() error {
-	if cr.SchemaVersion != ConformanceSchemaVersion {
-		return e.New(e.CodeInvalidCatalog, "conformance schemaVersion %q is unsupported (want %q)", cr.SchemaVersion, ConformanceSchemaVersion)
-	}
-	if !isDigest(cr.ReleaseSetDigest) || !isDigest(cr.InventoryDigest) || !isDigest(cr.SuitePolicyDigest) || !isDigest(cr.ResultsDigest) {
-		return e.New(e.CodeUnverifiedRef, "conformance result must bind immutable release-set, inventory, suite-policy, and results digests")
-	}
-	if err := validateExactDigestSet("conformance vector", cr.VectorDigests, false); err != nil {
-		return err
-	}
-	if strings.TrimSpace(cr.Suite) == "" {
-		return e.New(e.CodeInvalidCatalog, "conformance result suite is required")
-	}
-	if cr.Verdict != ConformancePassed && cr.Verdict != ConformanceFailed {
-		return e.New(e.CodeInvalidCatalog, "unknown conformance verdict %q", cr.Verdict)
-	}
-	if cr.EffectiveEpoch <= 0 || cr.ExpiresEpoch <= cr.EffectiveEpoch {
-		return e.New(e.CodeGateUnmet, "conformance receipt requires positive effective and later expiry epochs")
 	}
 	return nil
 }
@@ -485,11 +416,4 @@ func isDigest(value string) bool {
 func isCanonicalEvidenceRef(value string) bool {
 	return value != "" && strings.TrimSpace(value) == value &&
 		!strings.ContainsAny(value, "\x00\r\n\t")
-}
-
-func orNone(s string) string {
-	if s == "" {
-		return "<none>"
-	}
-	return s
 }

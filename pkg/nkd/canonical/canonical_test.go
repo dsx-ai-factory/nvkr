@@ -74,6 +74,19 @@ func TestDigestRejectsUnregisteredDomain(t *testing.T) {
 func TestRetiredDomainsRemainReservedButCannotMint(t *testing.T) {
 	for _, allocation := range []struct{ kind, want string }{
 		{KindLegacyRecipe, "nkd.recipe"},
+		{KindBundle, "nkd.bundle"},
+		{KindReproductionResult, "nkd.reproduction-result"},
+		{KindCompatibilityResult, "nkd.compatibility-result"},
+		{KindConformanceResult, "nkd.conformance-result"},
+		{KindEvidenceWaiver, "nkd.evidence-waiver"},
+		{KindClearance, "nkd.clearance"},
+		{KindTrustedTime, "nkd.status-trusted-time/v1"},
+		{KindPublication, "nkd.publication"},
+		{KindPublicationManifest, "nkd.publication-manifest"},
+		{KindVulnReport, "nkd.vuln-report"},
+		{KindCompileSpec, "nkd.compile-spec/v1"},
+		{KindExecutionSettings, "nkd.execution-settings/v1"},
+		{KindLifecycleBinding, "nkd.lifecycle-binding/v1"},
 		{KindClusterDefinition, "nkd.cluster-definition"},
 		{KindClusterComposition, "nkd.cluster-composition"},
 		{KindClusterRealization, "nkd.cluster-realization/v1"},
@@ -85,26 +98,10 @@ func TestRetiredDomainsRemainReservedButCannotMint(t *testing.T) {
 				t.Fatal("retired domain allocation must remain reserved")
 			}
 			value := map[string]string{"value": "new-object"}
-			for _, test := range []struct {
-				name string
-				mint func() (string, error)
-			}{
-				{"digest", func() (string, error) { return Digest(kind, value) }},
-				{"typed digest", func() (string, error) {
-					digest, err := DigestTyped(kind, value)
-					if digest.Kind != "" {
-						t.Fatal("rejected typed identity retained a kind")
-					}
-					return digest.Value, err
-				}},
-			} {
-				t.Run(test.name, func(t *testing.T) {
-					digest, err := test.mint()
-					var coded *e.Error
-					if digest != "" || !errors.As(err, &coded) || coded.Code != e.CodeUnsupported {
-						t.Fatalf("retired identity = %q, %v; want no digest and %s", digest, err, e.CodeUnsupported)
-					}
-				})
+			digest, err := Digest(kind, value)
+			var coded *e.Error
+			if digest != "" || !errors.As(err, &coded) || coded.Code != e.CodeUnsupported {
+				t.Fatalf("retired identity = %q, %v; want no digest and %s", digest, err, e.CodeUnsupported)
 			}
 		})
 	}
@@ -116,12 +113,12 @@ func TestAICRBundleHasItsOwnDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pipelineDigest, err := Digest(KindBundle, value)
+	buildDigest, err := Digest(KindBuild, value)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if aicrDigest == pipelineDigest {
-		t.Fatal("AICR output tree can be substituted for a pipeline bundle")
+	if aicrDigest == buildDigest {
+		t.Fatal("AICR output tree can be substituted for a producer build graph")
 	}
 }
 
@@ -131,9 +128,9 @@ func TestAuthorityFamiliesRejectSameByteSubstitution(t *testing.T) {
 		name        string
 		left, right string
 	}{
-		{name: "publication identity vs manifest", left: KindPublication, right: KindPublicationManifest},
+		{name: "publication root vs content", left: KindPublicationRoot, right: KindReleaseContent},
 		{name: "publisher evidence vs reproduction", left: KindPublisherEvidence, right: KindReproductionObservation},
-		{name: "trusted time vs checkpoint policy", left: KindTrustedTime, right: KindStatusCheckpointPolicy},
+		{name: "status checkpoint vs policy", left: KindStatusCheckpoint, right: KindStatusCheckpointPolicy},
 		{name: "provenance index vs statement", left: KindProvenance, right: KindProvenanceStatement},
 	} {
 		t.Run(pair.name, func(t *testing.T) {

@@ -93,14 +93,14 @@ func qualifiedTerminalReport(t *testing.T) (*Report, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeResultForTest(t, ResultDirectory(opts.SourceRoot), node.ID, ArtifactResult{
+	writeResultForTest(t, filepath.Join(filepath.Dir(opts.SourceRoot), "results"), node.ID, ArtifactResult{
 		Component: node.Component, OutputType: node.OutputType, Toolchain: node.Toolchain,
 		Qualification: ArtifactQualifiedExecution, InputDigest: "sha256:" + repeatHex("f"),
 		BuilderType: node.BuilderType, EngineClass: ir.EngineOCIHermetic, Path: node.ArtifactPath,
 		SHA256: digest, Size: size, ProfileDigest: receipt.ProfileDigest(),
 		ExecutionBinding: receipt.ExecutionBinding(),
 	})
-	report, err := (Local{}).VerifyResults(graph, buildDigest, ResultDirectory(opts.SourceRoot), opts)
+	report, err := (Local{}).VerifyResults(graph, buildDigest, filepath.Join(filepath.Dir(opts.SourceRoot), "results"), opts)
 	if err != nil {
 		t.Fatal(err)
 	}

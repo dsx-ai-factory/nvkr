@@ -72,11 +72,7 @@ func authenticatePromotionPolicy(c *cli.Context, verifier trust.DocumentVerifier
 	if err != nil {
 		return err
 	}
-	receipt, err := release.VerifyPromotionPolicy(c.Context, document)
-	if err != nil {
-		return err
-	}
-	digest, err := receipt.Digest()
+	digest, err := release.VerifyPromotionPolicy(c.Context, document)
 	if err != nil {
 		return err
 	}

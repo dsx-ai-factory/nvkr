@@ -3,7 +3,6 @@ package status
 import (
 	"crypto/sha256"
 	"fmt"
-	"reflect"
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -53,51 +52,8 @@ func TestCheckpointReceiptSeparatesBlobAndChainIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
-	blob, err := receipt.PayloadSHA256()
-	if err != nil || blob != want {
-		t.Fatalf("payload digest = %q, %v; want %q", blob, err, want)
-	}
 	chain, err := receipt.CheckpointDigest()
-	if err != nil || chain == blob {
+	if err != nil || chain == want {
 		t.Fatalf("chain identity must remain domain separated: %q, %v", chain, err)
-	}
-	signers, err := receipt.DeclarationSigners()
-	if err != nil || !reflect.DeepEqual(signers, []string{checkpointSigner}) {
-		t.Fatalf("signers = %v, %v", signers, err)
-	}
-	signers[0] = "substituted"
-	again, err := receipt.DeclarationSigners()
-	if err != nil || !reflect.DeepEqual(again, []string{checkpointSigner}) {
-		t.Fatalf("caller changed receipt signers: %v, %v", again, err)
-	}
-	mark, err := receipt.HighWater()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, tc := range []struct {
-		name  string
-		mark  HighWaterMark
-		valid bool
-	}{
-		{"accepted", mark, true}, {"zero", HighWaterMark{}, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			gotTarget, targetErr := tc.mark.Target()
-			gotAuthority, authorityErr := tc.mark.Authority()
-			if tc.valid {
-				if targetErr != nil || authorityErr != nil || gotTarget != target || gotAuthority != checkpointAuthority {
-					t.Fatalf("high-water binding: %q/%q, %v/%v", gotTarget, gotAuthority, targetErr, authorityErr)
-				}
-			} else if gotTarget != "" || gotAuthority != "" || code(targetErr) != e.CodeStatusCheckpoint || code(authorityErr) != e.CodeStatusCheckpoint {
-				t.Fatalf("zero mark exposed authority: %q/%q, %v/%v", gotTarget, gotAuthority, targetErr, authorityErr)
-			}
-		})
-	}
-	var zero CheckpointReceipt
-	if got, err := zero.PayloadSHA256(); got != "" || code(err) != e.CodeStatusCheckpoint {
-		t.Fatalf("zero receipt payload: %q, %v", got, err)
-	}
-	if got, err := zero.DeclarationSigners(); got != nil || code(err) != e.CodeStatusCheckpoint {
-		t.Fatalf("zero receipt signers: %v, %v", got, err)
 	}
 }

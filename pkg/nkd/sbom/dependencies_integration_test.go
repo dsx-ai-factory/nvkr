@@ -49,7 +49,7 @@ func TestRealArtifactDependencies(t *testing.T) {
 			component.Commit = strings.Repeat("a", 40)
 			component.TreeHash = strings.Repeat("b", 40)
 			component.ToolchainImage = "fixture@sha256:" + strings.Repeat("c", 64)
-			bom := FromComponent(component, "sha256:"+strings.Repeat("a", 64), digest)
+			bom := fromComponentForArch(component, "sha256:"+strings.Repeat("a", 64), digest, "")
 			populated, err := WithDependencies(bom, inventory.Components, inventory.Method, inventory.ScannerDigest)
 			if err != nil {
 				t.Fatal(err)

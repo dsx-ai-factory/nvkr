@@ -51,7 +51,6 @@ func newApp() *cli.App {
 			// Low-level execution and evidence tools are hidden from the product workflow.
 			cmdResolve(),
 			hideCommand(cmdBuild()),
-			hideCommand(cmdBundle()),
 			hideCommand(cmdAssemble()),
 			hideCommand(cmdAttest()),
 			hideCommand(cmdVerify()),

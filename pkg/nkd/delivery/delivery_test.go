@@ -185,17 +185,6 @@ func TestAPTRepositoryProjectsExactDebianPackage(t *testing.T) {
 	}
 }
 
-func TestQualifiedPublicationAdmissionRequiresOpaqueAuthorityBeforeOutput(t *testing.T) {
-	t.Parallel()
-	out := filepath.Join(t.TempDir(), "qualified")
-	if _, err := BuildQualifiedPublicationRoot(context.Background(), out, QualifiedPublicationRequest{}); err == nil {
-		t.Fatal("zero caller input minted a qualified publication root")
-	}
-	if _, err := os.Stat(out); !os.IsNotExist(err) {
-		t.Fatalf("qualified admission touched output before authority: %v", err)
-	}
-}
-
 func TestRegistryOptionsRejectPartialOrConflictingCredentialsBeforeLayoutIO(t *testing.T) {
 	t.Parallel()
 	for name, options := range map[string]RegistryOptions{

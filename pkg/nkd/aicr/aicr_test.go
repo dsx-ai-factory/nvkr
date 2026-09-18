@@ -89,12 +89,9 @@ func TestPreviewIncludesFinalRecipeVerification(t *testing.T) {
 // nkdctl never fabricates a bundle: with no aicr binary the render fails closed.
 func TestCLIBundlerFailsClosedWithoutBinary(t *testing.T) {
 	b := CLIBundler{Binary: "aicr-does-not-exist-xyz"}
-	if b.Available() {
-		t.Fatal("Available() must be false for a missing binary")
-	}
 	outputParent := filepath.Join(t.TempDir(), "must-not-be-created")
 	output := filepath.Join(outputParent, "bundle")
-	_, err := b.Bundle(context.Background(), demo, Options{OutputDir: output}, io.Discard, io.Discard)
+	_, err := b.BundleQualified(context.Background(), demo, Options{OutputDir: output}, io.Discard, io.Discard)
 	wantCode := nkderr.CodeUnsupported
 	if runtime.GOOS != "linux" {
 		wantCode = nkderr.CodeEngineCapability
@@ -131,7 +128,7 @@ func TestCLIBundlerFailsClosedWhenHeldExecutionIsUnsupported(t *testing.T) {
 
 func TestBundleRejectsIncompleteProfile(t *testing.T) {
 	b := CLIBundler{Binary: "aicr-does-not-exist-xyz"}
-	_, err := b.Bundle(context.Background(), Profile{Service: "eks"}, Options{}, io.Discard, io.Discard)
+	_, err := b.BundleQualified(context.Background(), Profile{Service: "eks"}, Options{}, io.Discard, io.Discard)
 	if code(err) != nkderr.CodeInvalidCatalog {
 		t.Fatalf("incomplete profile must be rejected, got %v", err)
 	}
@@ -142,9 +139,6 @@ func TestBundleRejectsNilContextBeforeExecution(t *testing.T) {
 	options := Options{OutputDir: filepath.Join(t.TempDir(), "bundle")}
 	if _, err := bundler.BundleQualified(nil, demo, options, io.Discard, io.Discard); code(err) != nkderr.CodeUsage { //nolint:staticcheck // verifies the nil-context fail-closed contract
 		t.Fatalf("nil qualified-bundle context returned %v, want CodeUsage", err)
-	}
-	if _, err := bundler.Bundle(nil, demo, options, io.Discard, io.Discard); code(err) != nkderr.CodeUsage { //nolint:staticcheck // verifies the nil-context fail-closed contract
-		t.Fatalf("nil compatibility-bundle context returned %v, want CodeUsage", err)
 	}
 }
 
@@ -176,42 +170,14 @@ func TestQualifiedBundleCannotDisableOrRedirectVerification(t *testing.T) {
 		{"--output", "/tmp/other"}, {"--output=/tmp/other"}, {"-o", "/tmp/other"}, {"-o=/tmp/other"}, {"-o/tmp/other"},
 		{"--deployer", "flux"}, {"--deployer=flux"}, {"-dflux"}, {"--attest=false"}, {"--"},
 	} {
-		_, err := b.Bundle(context.Background(), demo, Options{OutputDir: filepath.Join(t.TempDir(), "bundle"), ExtraBundleArgs: args}, io.Discard, io.Discard)
+		_, err := b.BundleQualified(context.Background(), demo, Options{OutputDir: filepath.Join(t.TempDir(), "bundle"), ExtraBundleArgs: args}, io.Discard, io.Discard)
 		if code(err) != nkderr.CodeInvalidCatalog {
 			t.Fatalf("critical override %v must fail before invoking AICR, got %v", args, err)
 		}
 	}
 }
 
-// The unqualified bundler seam is implementable without importing AICR — an SDK-backed adapter
-// (or a test double) satisfies it, so it can be injected via the SDK facade.
-type fakeSDKBundler struct{ called bool }
-
-func (f *fakeSDKBundler) Available() bool { return true }
-func (f *fakeSDKBundler) Bundle(_ context.Context, p Profile, o Options, _, _ io.Writer) (Result, error) {
-	f.called = true
-	return Result{Profile: p, OutputDir: o.OutputDir, RecipeDigest: strings.TrimPrefix(p.Digest, "sha256:")}, nil
-}
-
-func TestBundlerSeamInjectable(t *testing.T) {
-	var b UnqualifiedBundler = &fakeSDKBundler{}
-	res, err := b.Bundle(context.Background(), demo, Options{OutputDir: "/tmp/x"}, io.Discard, io.Discard)
-	if err != nil || res.Profile.Identity != demo.Identity {
-		t.Fatalf("seam not injectable: %v %+v", err, res)
-	}
-	if !b.(*fakeSDKBundler).called {
-		t.Fatal("injected bundler not invoked")
-	}
-}
-
-type forgedBundler struct{ result Result }
-
-func (f forgedBundler) Available() bool { return true }
-func (f forgedBundler) Bundle(context.Context, Profile, Options, io.Writer, io.Writer) (Result, error) {
-	return f.result, nil
-}
-
-func TestUnqualifiedAdapterCannotForgeExecutionAuthority(t *testing.T) {
+func TestDescriptiveResultCannotForgeExecutionAuthority(t *testing.T) {
 	root := t.TempDir()
 	for name, content := range map[string]string{
 		"recipe.yaml": "caller: composed\n", "checksums.txt": "caller-composed\n",
@@ -220,7 +186,7 @@ func TestUnqualifiedAdapterCannotForgeExecutionAuthority(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	bundleDigest, err := digestBundle(context.Background(), root)
+	bundleDigest, err := descriptorBundleDigest(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,17 +196,12 @@ func TestUnqualifiedAdapterCannotForgeExecutionAuthority(t *testing.T) {
 		GeneratorDigest: demo.GeneratorDigest, BundleDigest: bundleDigest, OutputDir: root,
 		ChecksumsFile: filepath.Join(root, "checksums.txt"),
 	}
-	var adapter UnqualifiedBundler = forgedBundler{result: forged}
-	diagnostic, err := adapter.Bundle(context.Background(), demo, Options{}, io.Discard, io.Discard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := diagnostic.ValidateUnqualifiedForContext(context.Background(), demo); err != nil {
+	if err := forged.validateForContext(context.Background(), demo); err != nil {
 		t.Fatalf("forgery fixture should be structurally self-consistent: %v", err)
 	}
 	// Public Result fields can prove only structural consistency. A zero-value
 	// QualifiedResult has no private execution receipt, and there is no exported
-	// constructor that can attach one to the adapter's Result.
+	// constructor that can attach one to the caller's Result.
 	var attemptedForgery QualifiedResult
 	if _, err := attemptedForgery.ValidateFor(context.Background(), demo); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("caller-composed result gained execution authority: %v", err)
@@ -256,10 +217,11 @@ func TestBundleDigestIncludesEmptyDirectoriesAndNormalizedModes(t *testing.T) {
 		t.Skip("directory permission identity uses Unix mode semantics")
 	}
 	root := t.TempDir()
+	writeBundleMetadata(t, root)
 	if err := os.WriteFile(filepath.Join(root, "payload.yaml"), []byte("value: pinned\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	base, err := digestBundle(context.Background(), root)
+	base, err := descriptorBundleDigest(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +229,7 @@ func TestBundleDigestIncludesEmptyDirectoriesAndNormalizedModes(t *testing.T) {
 	if err := os.Mkdir(empty, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	withDirectory, err := digestBundle(context.Background(), root)
+	withDirectory, err := descriptorBundleDigest(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +239,7 @@ func TestBundleDigestIncludesEmptyDirectoriesAndNormalizedModes(t *testing.T) {
 	if err := os.Chmod(empty, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	withChangedMode, err := digestBundle(context.Background(), root)
+	withChangedMode, err := descriptorBundleDigest(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +249,7 @@ func TestBundleDigestIncludesEmptyDirectoriesAndNormalizedModes(t *testing.T) {
 	if err := os.Remove(empty); err != nil {
 		t.Fatal(err)
 	}
-	restored, err := digestBundle(context.Background(), root)
+	restored, err := descriptorBundleDigest(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +283,7 @@ func TestQualifiedBundlePinsSnapshotAndBundleTree(t *testing.T) {
 	if !canonical.IsDigest(result.BundleDigest) {
 		t.Fatalf("bundle tree receipt is not a digest: %q", result.BundleDigest)
 	}
-	recomputed, err := digestBundle(context.Background(), output)
+	recomputed, err := descriptorBundleDigest(context.Background(), output)
 	if err != nil || recomputed != result.BundleDigest {
 		t.Fatalf("published bundle did not reproduce receipt: got %q err=%v want %q", recomputed, err, result.BundleDigest)
 	}
@@ -337,7 +299,7 @@ func TestQualifiedBundlePinsSnapshotAndBundleTree(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(output, "payload", "values.yaml")); err != nil {
 		t.Fatalf("atomic output was not published: %v", err)
 	}
-	if err := result.ValidateUnqualifiedForContext(context.Background(), profile); err != nil {
+	if err := result.validateForContext(context.Background(), profile); err != nil {
 		t.Fatalf("qualified receipt did not revalidate: %v", err)
 	}
 	for name, mutate := range map[string]func(*Result){
@@ -354,7 +316,7 @@ func TestQualifiedBundlePinsSnapshotAndBundleTree(t *testing.T) {
 		t.Run("receipt-"+name, func(t *testing.T) {
 			changed := result
 			mutate(&changed)
-			if code(changed.ValidateUnqualifiedForContext(context.Background(), profile)) != nkderr.CodeVerifyFailed {
+			if code(changed.validateForContext(context.Background(), profile)) != nkderr.CodeVerifyFailed {
 				t.Fatalf("caller-composed %s receipt retained authority", name)
 			}
 		})
@@ -463,11 +425,12 @@ func TestCommitBundleRejectsStageRenameSubstitution(t *testing.T) {
 		if err := os.Mkdir(root, 0o700); err != nil {
 			t.Fatal(err)
 		}
+		writeBundleMetadata(t, root)
 		if err := os.WriteFile(filepath.Join(root, "payload.yaml"), []byte(payload), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	want, err := digestBundle(context.Background(), stage)
+	want, err := descriptorBundleDigest(context.Background(), stage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +453,7 @@ func TestCommitBundleRejectsStageRenameSubstitution(t *testing.T) {
 	if got != "" || code(err) != nkderr.CodeImmutableViolation {
 		t.Fatalf("stage rename substitution acquired a bundle receipt: digest=%q err=%v", got, err)
 	}
-	observed, digestErr := digestBundle(context.Background(), destination)
+	observed, digestErr := descriptorBundleDigest(context.Background(), destination)
 	if digestErr != nil {
 		t.Fatal(digestErr)
 	}
@@ -536,10 +499,11 @@ func TestCommitBundleCancellationLinearizesAtPublication(t *testing.T) {
 		if err := os.Mkdir(stage, 0o700); err != nil {
 			t.Fatal(err)
 		}
+		writeBundleMetadata(t, stage)
 		if err := os.WriteFile(filepath.Join(stage, "payload"), []byte("exact\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		want, err := digestBundle(context.Background(), stage)
+		want, err := descriptorBundleDigest(context.Background(), stage)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -598,7 +562,7 @@ func TestHeldBundleSnapshotPinsRecipeAndSurvivesStageReplacement(t *testing.T) {
 	}
 	defer recipe.Close()
 
-	wrongRecipe, err := heldfile.FromBytes([]byte("kind: Substituted\n"), heldfile.Options{
+	wrongRecipe, err := heldfile.FromBytesContext(t.Context(), []byte("kind: Substituted\n"), heldfile.Options{
 		Label: "wrong-recipe", MaxBytes: maxGeneratedRecipeBytes,
 	})
 	if err != nil {
@@ -641,7 +605,7 @@ func TestHeldBundleSnapshotPinsRecipeAndSurvivesStageReplacement(t *testing.T) {
 	if err := snapshot.materialize(context.Background(), commitTree); err != nil {
 		t.Fatal(err)
 	}
-	observed, err := digestBundle(context.Background(), commitTree)
+	observed, err := descriptorBundleDigest(context.Background(), commitTree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,7 +632,7 @@ func TestGeneratorDigestMismatchFailsBeforeExecution(t *testing.T) {
 	requireShell(t)
 	binary := writeFakeAICR(t, "normal")
 	output := filepath.Join(t.TempDir(), "published")
-	_, err := (CLIBundler{Binary: binary}).Bundle(
+	_, err := (CLIBundler{Binary: binary}).BundleQualified(
 		context.Background(), demo, Options{OutputDir: output}, io.Discard, io.Discard)
 	if code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("substituted generator must fail verification, got %v", err)
@@ -686,7 +650,7 @@ func TestBundleRejectsNonRegularEntriesAndDoesNotPublish(t *testing.T) {
 			profile := demo
 			profile.GeneratorDigest = digestFileBytes(t, binary)
 			output := filepath.Join(t.TempDir(), "published")
-			_, err := (CLIBundler{Binary: binary}).Bundle(
+			_, err := (CLIBundler{Binary: binary}).BundleQualified(
 				context.Background(), profile, Options{OutputDir: output}, io.Discard, io.Discard)
 			if code(err) != nkderr.CodeVerifyFailed {
 				t.Fatalf("%s bundle entry must fail verification, got %v", mode, err)
@@ -704,7 +668,7 @@ func TestBundleRequiresChecksumsContract(t *testing.T) {
 	profile := demo
 	profile.GeneratorDigest = digestFileBytes(t, binary)
 	output := filepath.Join(t.TempDir(), "published")
-	_, err := (CLIBundler{Binary: binary}).Bundle(
+	_, err := (CLIBundler{Binary: binary}).BundleQualified(
 		context.Background(), profile, Options{OutputDir: output}, io.Discard, io.Discard)
 	if code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("bundle without checksums contract must fail verification, got %v", err)
@@ -721,6 +685,7 @@ func TestBundleTreeDigestIsDeterministicAndMutationSensitive(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(root, "nested"), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		writeBundleMetadata(t, root)
 	}
 	if err := os.WriteFile(filepath.Join(first, "z"), []byte("z\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -735,11 +700,11 @@ func TestBundleTreeDigestIsDeterministicAndMutationSensitive(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(second, "z"), []byte("z\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	d1, err := digestBundle(context.Background(), first)
+	d1, err := descriptorBundleDigest(context.Background(), first)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d2, err := digestBundle(context.Background(), second)
+	d2, err := descriptorBundleDigest(context.Background(), second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -749,7 +714,7 @@ func TestBundleTreeDigestIsDeterministicAndMutationSensitive(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(second, "z"), []byte("mutated\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	d3, err := digestBundle(context.Background(), second)
+	d3, err := descriptorBundleDigest(context.Background(), second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -762,12 +727,21 @@ func TestBundleTreeDigestIsDeterministicAndMutationSensitive(t *testing.T) {
 	if err := os.Chmod(filepath.Join(second, "z"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d4, err := digestBundle(context.Background(), second)
+	d4, err := descriptorBundleDigest(context.Background(), second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d4 == d1 {
 		t.Fatal("executable-mode mutation did not change tree identity")
+	}
+}
+
+func writeBundleMetadata(t *testing.T, root string) {
+	t.Helper()
+	for _, name := range []string{"recipe.yaml", "checksums.txt"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("fixture\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -803,7 +777,7 @@ func TestBundleTreeRejectsPlatformAmbiguousPath(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, `ambiguous\name`), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := digestBundle(context.Background(), root); code(err) != nkderr.CodeVerifyFailed {
+	if _, err := descriptorBundleDigest(context.Background(), root); code(err) != nkderr.CodeVerifyFailed {
 		t.Fatalf("backslash-bearing bundle path must fail closed, got %v", err)
 	}
 }
@@ -818,7 +792,7 @@ func TestBundleRejectsStaleDestinationBeforeGeneratorWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := digestFileBytes(t, binary)
-	_, err := (CLIBundler{Binary: binary}).Bundle(
+	_, err := (CLIBundler{Binary: binary}).BundleQualified(
 		context.Background(), profile, Options{OutputDir: output}, io.Discard, io.Discard)
 	if code(err) != nkderr.CodeImmutableViolation {
 		t.Fatalf("stale destination must fail immutably, got %v", err)
@@ -837,7 +811,7 @@ func TestBundleCancellationCleansStagingAndDoesNotPublish(t *testing.T) {
 	output := filepath.Join(parent, "published")
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	_, err := (CLIBundler{Binary: binary}).Bundle(ctx, profile, Options{OutputDir: output}, io.Discard, io.Discard)
+	_, err := (CLIBundler{Binary: binary}).BundleQualified(ctx, profile, Options{OutputDir: output}, io.Discard, io.Discard)
 	if code(err) != nkderr.CodeTimeout {
 		t.Fatalf("canceled generator must return timeout, got %v", err)
 	}

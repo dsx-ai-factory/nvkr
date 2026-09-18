@@ -1,6 +1,6 @@
 # Repository cleanup and module disposition
 
-Disposition updated 2026-09-17 against Definition → Run → Release, ADR-17/18, and the NKE scope: local and GitHub;
+Disposition updated 2026-09-18 against Definition → Run → Release, ADR-17/18, and the NKE scope: local and GitHub;
 the NKE OS-image build owns all worker components. This review traces production imports and command
 registrations against current product value. Backward compatibility is not a retention requirement; dormant
 workflows and their contracts are removed when they do not serve the current product. The reconciliation remains the capability/evidence authority.
@@ -13,7 +13,7 @@ workflows and their contracts are removed when they do not serve the current pro
 | Root `recipes/` and implicit catalog | Removed from production; useful data is explicit test fixtures. Product Definitions select their own catalog |
 | Worker, multi-output, layered and operator examples | Moved to `testdata/examples/`; no longer advertised as product build instructions |
 | AICR dependency on the worker catalog | Removed; its catalog owns the exact AICR profile and pinned generator/evidence tools |
-| Checked-in GitLab pipeline and bundle | Removed, including the root entrypoint, demo, and Environment files; Go adapter contracts retained |
+| GitLab pipeline and bundle | Removed inputs, demo, generated files, Go renderer and validator; GitHub is the sole hosted adapter |
 | Bootstrap instructions and HTML/DOCX requirement exports | Removed as superseded duplicates; Git history and dated evidence retain traceability |
 | Historical plans, design drafts and SRD | Removed after review against current ADRs and milestone requirements; history retains the originals |
 | Unreferenced musl cross-build and QEMU smoke-test Dockerfiles | Removed; they belonged to the retired individual-worker/image demonstration |
@@ -21,12 +21,12 @@ workflows and their contracts are removed when they do not serve the current pro
 | Unwired `pipeline/portable.go` prototype | Removed with its renderer-only test; the real helper-launch contract test is retained |
 | Unregistered optional-signature verifier marker | Removed its dead command constructor, refusal helper and self-referential test; registered authenticated verification stays intact |
 | Cluster views, classifications and provisioning interface | Removed; Definitions declare artifact outputs and downstream consumers own deployment |
-| Old factory catalog/loaders and authoring CLI | Removed; lifecycle lowers into internal `CompileSpec` and `ExecutionSettings` |
-| Factory GitHub bundle aliases/wrappers | Removed; both providers use `GeneratedBundle` and the shared writer/checker |
-| Exported graph-format helpers | Internalized behind `RenderGraph` |
+| Old factory catalog/loaders and authoring CLI | Removed; the compiler accepts exact Definition/Environment inputs and returns a complete Plan |
+| Factory GitHub bundle aliases/wrappers | Removed; GitHub uses `GeneratedBundle` and its writer/checker |
+| Graph-format helpers and generic validator wrapper | Removed; no production consumer of the table/JSON/DOT/Mermaid renderer or forwarding validator |
 | Source-compatibility tombstones and aliases | Removed; callers use current context and authenticated-receipt APIs |
 | Unused rootfs tar constructor | Removed; OS-image construction belongs to NKE |
-| Unused vulnerability scanner/advisory prototypes | Removed; subject-bound report qualification remains for release gates |
+| Unused vulnerability scanner/advisory/report implementation | Removed with unreachable CLI helpers and qualified authorization; registered scanning requests fail before work |
 | Orphaned mirror, advisory and factory-catalog digest families | Removed from the canonical registry |
 | `pkg/nkd/purity` | Moved to `internal/architecture`; it is a repository test, not a domain module |
 
@@ -34,7 +34,8 @@ Catalog components supply reusable producer semantics. A Definition selects prod
 on named outputs, including explicit AICR rendering settings. Factory is an internal compiler/executor.
 Test fixtures remain only where they exercise current resolution, packaging or authority behavior. They are not
 migration guarantees. The old factory catalog, file loaders, authoring commands and frozen migration fixtures
-are removed. Internal factory types are compile specifications and execution settings, not public authored objects.
+are removed. The compiler no longer exposes duplicate compiler-input documents. `definition` owns authored inputs and
+`factory` derives complete executable dataflow directly from them.
 
 ## Every domain package
 
@@ -43,9 +44,10 @@ current lifecycle or its evidence and release gates; tests alone are not justifi
 
 | Package | Actual role and disposition |
 |---|---|
-| `lifecycle` | Keep: owns Definition/Environment compilation, Run preparation/execution and consumer Release views |
-| `factory` | Keep: lifecycle calls its graph compiler, packaging, generation and executor; remove redundant wrappers, not the executor |
-| `pipeline` | Keep: shared acquisition/execution, sandbox, observations, terminal receipts and node transport; also contains separate qualified emitters |
+| `definition` | Owns authored Definition/Environment loading, validation and identity |
+| `lifecycle` | Owns immutable Run preparation/persistence and policy-scoped consumer Release workflow |
+| `factory` | Owns complete compilation, whole-Run scheduling, output joins, packaging and provider generation |
+| `pipeline` | Keep: shared acquisition/execution, sandbox, observations, terminal receipts; unused qualified providers and bundle models are removed. Bounded archive transport is owned once in `internal/transportarchive` |
 | `catalog` | Keep: pinned catalog loading, stacking, validation and maintenance used by lifecycle/resolution |
 | `compose` | Removed: Recipe inheritance and mixins have no direct-output consumer |
 | `recipe`, `criteria` | Removed: direct output membership and concrete target admission replace authored groups and matching |
@@ -60,29 +62,39 @@ current lifecycle or its evidence and release gates; tests alone are not justifi
 | `assemble` | Keep: byte packaging called by factory/pipeline; disk measurement contracts do not implement an OS-image builder |
 | `delivery` | Keep: artifact layouts, APT/Helm/binary closure and OCI publication/consumption used by lifecycle |
 | `sign` | Keep: signer/tool authentication and publication verification used by factory and lifecycle |
-| `provenance` | Keep: subject-bound build evidence used by factory, attestation and release gates |
-| `sbom` | Keep: observed-output SBOM generation and evidence checks used by factory and release |
+| `provenance` | Keep: subject-bound build evidence used by factory and attestation |
+| `sbom` | Keep: observed-output SBOM generation and evidence checks used by factory, publication and diagnostics |
 | `trust` | Keep: authenticated documents and policy capabilities shared by signing, evidence, status and release |
 | `profile` | Keep: execution/reproduction-profile contracts used by pipeline and attestation; qualified capability remains separately admitted |
-| `attest` | Keep: qualified manifest/evidence and published-receipt contracts used by SDK and release; distinct from hosted provenance |
-| `release` | Keep: qualified membership, gates and authorization used by delivery and transport; not a duplicate of the public lifecycle Release view |
-| `status` | Keep: durable signed lifecycle/freshness contracts used by release authorization |
-| `transport` | Keep: SDK qualified publication seam consuming release authorization; distinct from OCI layout construction in delivery |
+| `attest` | Keep: qualified manifest/evidence and published-receipt checks used by registered diagnostics; distinct from hosted provenance |
+| `release` | Keep: Inventory/ReleaseSet/PromotionPolicy documents, completeness and document authentication used by diagnostics; closed test-only authorization, gate receipts and selection helpers removed |
+| `status` | Keep: signed declaration/checkpoint authentication and durable anti-rollback state used by status diagnostics; unused release-specific time and clearance integration removed |
+| `transport` | Removed: its only production importer was an unreachable helper, and its qualified commit path was unavailable |
 | `airgap` | Removed: disconnected mirror lifecycle outside current product scope |
 | `variant` | Removed: unused fallback classifier/approval API; necessary mismatch reporting stays with attestation |
-| `vuln` | Retain deferred evidence contract: release gates consume it; scanner integration is outside v1 and no live scan acceptance is claimed |
+| `vuln` | Removed: its authorization consumer and CLI helper were both unreachable; scanning remains unsupported |
 | `query` | Removed: standalone legacy selector/diff workflow |
 | `internal/heldfile` | Keep private authority utility: held executable/file identity for trust-sensitive operations |
 
-`vuln` remains because current release authorization consumes its subject-bound reports; it is not a standalone
-scanner product or a claim that scanning is exercised. `transport` remains because the SDK uses it to publish
-authorized artifact sets. Neither package is retained to preserve obsolete callers.
+An import is not sufficient evidence of use. The transport audit found its apparent diagnostic consumer was
+itself unreachable; the package and helper are removed. Following that chain also exposed a closed, test-only
+authorization subsystem and vulnerability-report library. Shared archive transport remains used by actual
+hosted Runs. Qualified release authorization/publication remain deferred contracts with no retained implementation.
 
-`factory` and `pipeline` overlap in provider adapters but not in authority: the former compiles multi-output
-lifecycle Runs; the latter owns output build execution and qualified receipts. Likewise, `delivery` creates
-and verifies artifact representations while `transport` requires qualified release authorization before
-publishing through injected backends. Merging those packages merely to reduce directory count would obscure
-those boundaries. ADR-17/18 and the SADD describe the distinction.
+`factory` compiles and renders multi-output Runs; `pipeline` executes producer instructions and owns runtime
+receipts. `delivery` creates and verifies artifact representations. The separate qualified provider-rendering
+chain, unused qualified publisher and caller-built clearance receipts no longer expand those interfaces. The
+[usage and age assessment](unused-code-assessment.md) records removals, protected recent additions and checks.
+
+## Operation navigation
+
+`client/v1` contains configuration, lifecycle operations and direct producer diagnostics. Unused qualified
+orchestration wrappers and authority injection options are removed. Tests sit beside those operation files.
+Factory execution files use the `execute_` prefix; `outputs_observed.go` owns the independent output join.
+Pipeline's unused qualified renderers and lowering are removed, together with the hidden `bundle` command and
+its exclusive models and transaction helpers. GitHub generation remains in factory; retired engines fail admission.
+Package comments identify the starting operations and owned invariants. See the
+[locality implementation record](codebase-locality-implementation.md) for the migration and its validation.
 
 ## Historical validation — 2026-09-09
 

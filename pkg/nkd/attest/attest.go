@@ -22,12 +22,6 @@ var (
 	canonicalIdentity = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 )
 
-// ValidationVector is the ADR-05 name for the one signed object binding a build +
-// builder profile to expected artifacts and evidence. NKD publishes ONE such object,
-// not a separate "manifest" and "vector" — Manifest is its Go type; this alias makes
-// the ADR-05 vocabulary usable directly.
-type ValidationVector = Manifest
-
 // BuilderProfileRef is the ADR-05 §1 structured profile binding (from-source subset
 // only): the label, the authoritative digest, and the host-control class. The digest
 // is what verify compares; id/hostControl are descriptive.
@@ -198,20 +192,6 @@ func (m *Manifest) SetBuilderProfile(id, digest, hostControl string) {
 		return
 	}
 	m.BuilderProfile = &BuilderProfileRef{ID: id, Digest: digest, HostControl: hostControl}
-}
-
-// AttachEvidence records the aggregate evidence digests (ADR-05 §1 evidence block) and
-// the evidence-bundle aggregate digest (§4). Idempotent; nil clears.
-func (m *Manifest) AttachEvidence(ev *EvidenceRef, evidenceDigest string) {
-	m.Evidence = ev
-	m.EvidenceDigest = evidenceDigest
-	// Caller-authored strings are useful in diagnostic records but can never retain
-	// publisher authority. A subsequent publication must attach a fresh opaque
-	// PublisherEvidence capability.
-	if m.qualification != nil {
-		m.qualification.publisherEvidence = nil
-		m.qualification.publicationBinding = ""
-	}
 }
 
 // AttachPublisherEvidence derives the complete publishable evidence fields from an
@@ -599,17 +579,6 @@ func (m *Manifest) MarshalQualified(ctx context.Context) ([]byte, error) {
 	return m.Marshal()
 }
 
-// MarshalQualifiedDiagnostic preserves the live report authority on an explicitly
-// non-publishable observation record. It is intended for bake-off diagnostics only;
-// authenticated ValidationVector consumers call Parse and reject these bytes until
-// evidence is linked.
-func (m *Manifest) MarshalQualifiedDiagnostic(ctx context.Context) ([]byte, error) {
-	if err := m.requireQualified(ctx); err != nil {
-		return nil, err
-	}
-	return m.Marshal()
-}
-
 // Parse loads a manifest from bytes.
 func Parse(b []byte) (*Manifest, error) {
 	m, err := parseDiagnostic(b)
@@ -682,41 +651,6 @@ func (want *Manifest) VerifyQualifiedAgainst(ctx context.Context, got *Manifest)
 		return err
 	}
 	return want.VerifyAgainst(got)
-}
-
-// Divergence is one component whose built digest differs from the expected digest.
-type Divergence struct {
-	Component  string
-	OutputType string
-	Expected   string
-	Built      string
-}
-
-// Check collects every divergence between the expected manifest and a freshly-built
-// one without failing. Build and profile mismatches are fatal. Component
-// digest mismatches are collected into Divergences; built components absent from the
-// expected manifest are collected into Missing.
-func (want *Manifest) Check(got *Manifest) (divs []Divergence, missing []string, err error) {
-	wantByName, built, err := comparisonInputs(want, got)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, g := range built {
-		w, ok := wantByName[g.Name]
-		if !ok {
-			missing = append(missing, g.Name)
-			continue
-		}
-		if err := compareComponentIdentity(w, g); err != nil {
-			return nil, nil, err
-		}
-		if w.SHA256 != g.SHA256 {
-			divs = append(divs, Divergence{
-				Component: g.Name, OutputType: g.OutputType, Expected: w.SHA256, Built: g.SHA256,
-			})
-		}
-	}
-	return divs, missing, nil
 }
 
 func comparisonInputs(want, got *Manifest) (map[string]ComponentDigest, []ComponentDigest, error) {

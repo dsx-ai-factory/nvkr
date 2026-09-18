@@ -21,7 +21,6 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"sigs.k8s.io/yaml"
 )
 
 // SchemaVersion identifies the builder-profile shape.
@@ -163,16 +162,6 @@ func (p BuilderProfile) Marshal() ([]byte, error) {
 	b, err := canonical.Marshal(p.canonical())
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "serializing canonical builder profile %q", p.Identity)
-	}
-	return b, nil
-}
-
-// MarshalDisplayYAML renders a deterministic author-facing YAML view. These bytes
-// are deliberately not the signing payload; use Marshal for authority output.
-func (p BuilderProfile) MarshalDisplayYAML() ([]byte, error) {
-	b, err := yaml.Marshal(p.canonical())
-	if err != nil {
-		return nil, e.Wrap(e.CodeInternal, err, "serializing builder profile display for %q", p.Identity)
 	}
 	return b, nil
 }

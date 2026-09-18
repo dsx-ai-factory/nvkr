@@ -2,6 +2,8 @@ package assemble
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -36,11 +38,7 @@ func fakeQemuImg(t *testing.T, infoJSON string) (string, string) {
 	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	digest, _, err := LogicalDiskDigestContext(context.Background(), path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return path, digest
+	return path, fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(script)))
 }
 
 func TestQualifiedCodecSnapshotsAndPinsExecutable(t *testing.T) {
@@ -82,7 +80,7 @@ func TestQualifiedCodecSnapshotsAndPinsExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, _, _ := LogicalDiskDigestContext(context.Background(), envelope)
+	want := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("hello world!")))
 	if got != want || size != 12 {
 		t.Fatalf("decoded identity = %s/%d, want %s/12", got, size, want)
 	}
@@ -95,7 +93,7 @@ func TestQualifiedCodecSnapshotsAndPinsExecutable(t *testing.T) {
 	if _, err := codec.executable.OSFile().WriteAt([]byte("X"), 0); err == nil {
 		t.Fatal("held qemu-img executable accepted a write")
 	}
-	if err := codec.executable.AssertUnchanged(); err != nil {
+	if err := codec.executable.AssertUnchangedContext(t.Context()); err != nil {
 		t.Fatalf("rejected write changed held executable: %v", err)
 	}
 }

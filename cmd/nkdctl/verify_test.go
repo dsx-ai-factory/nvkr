@@ -133,7 +133,7 @@ func prebuiltReport(t *testing.T, artifactDigest string) *pipeline.Report {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultsDir := pipeline.ResultDirectory(sourceRoot)
+	resultsDir := filepath.Join(filepath.Dir(sourceRoot), "results")
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -535,7 +535,8 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 			Toolchain: "sha256:" + strings.Repeat("6", 64),
 		}},
 	}
-	vector.AttachEvidence(&attest.EvidenceRef{SBOMDigest: verifyTestDigest('8'), ProvenanceDigest: verifyTestDigest('9')}, verifyTestDigest('7'))
+	vector.Evidence = &attest.EvidenceRef{SBOMDigest: verifyTestDigest('8'), ProvenanceDigest: verifyTestDigest('9')}
+	vector.EvidenceDigest = verifyTestDigest('7')
 	vectorPath := writeCLIFile(t, "vector.json", manifestBytes(t, vector))
 	profileCalls := 0
 	deps := qualifiedVerifyDependencies{
@@ -595,7 +596,7 @@ func TestVerifyCLIUsesAuthenticatedProfileObjectAfterPathMutation(t *testing.T) 
 			if err != nil {
 				return nil, err
 			}
-			resultsDir := pipeline.ResultDirectory(sourceRoot)
+			resultsDir := filepath.Join(filepath.Dir(sourceRoot), "results")
 			if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 				return nil, err
 			}
@@ -721,7 +722,8 @@ func TestVerifyCLITerminalResultsUseReceiptsWithoutSourceBuild(t *testing.T) {
 			EngineClass: ir.EngineOCIHermetic, SHA256: artifactDigest,
 		}},
 	}
-	vector.AttachEvidence(&attest.EvidenceRef{SBOMDigest: verifyTestDigest('8'), ProvenanceDigest: verifyTestDigest('9')}, verifyTestDigest('7'))
+	vector.Evidence = &attest.EvidenceRef{SBOMDigest: verifyTestDigest('8'), ProvenanceDigest: verifyTestDigest('9')}
+	vector.EvidenceDigest = verifyTestDigest('7')
 	vectorPath := writeCLIFile(t, "terminal-vector.json", manifestBytes(t, vector))
 	roles := map[trust.SignerRole]int{}
 	deps := qualifiedVerifyDependencies{

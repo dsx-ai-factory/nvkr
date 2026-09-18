@@ -15,16 +15,16 @@ import (
 
 const NodeAttestEvidence = "attest-sboms"
 
-// BindEvidenceAttestation lowers hosted production evidence into an explicit
+// bindEvidenceAttestation lowers hosted production evidence into an explicit
 // pre-publication stage. Private raw SBOMs never become published deliverables.
-func BindEvidenceAttestation(plan *Plan) error {
+func bindEvidenceAttestation(plan *Plan) error {
 	if plan == nil {
 		return e.New(e.CodeUsage, "evidence attestation requires a plan")
 	}
-	if len(plan.LifecycleOutputs) == 0 || plan.ExecutionSettings.Signing == nil || plan.ExecutionSettings.Signing.Mode != SigningModeCosign {
+	if len(plan.LifecycleOutputs) == 0 || plan.Environment.Signing == nil || plan.Environment.Signing.Mode != SigningModeCosign {
 		return nil
 	}
-	for _, route := range plan.ExecutionSettings.Routes {
+	for _, route := range plan.Routes {
 		index := -1
 		for i, a := range plan.Graph.Artifacts {
 			if a.ID == route.Input {
@@ -40,7 +40,7 @@ func BindEvidenceAttestation(plan *Plan) error {
 		prepared.ID = "prepared/" + route.Name
 		prepared.Path = filepath.ToSlash(filepath.Join(".nkd", "factory", "prepared", route.Name))
 		stage := Node{ID: NodeAttestEvidence + "/" + route.Name, Kind: NodeAttestEvidence, Target: route.Target,
-			Inputs: uniqueSorted([]string{prepared.ID, "tool/" + plan.ExecutionSettings.Signing.CosignTool}), Outputs: []string{final.ID}, Network: ir.NetworkDefault}
+			Inputs: uniqueSorted([]string{prepared.ID, "tool/" + plan.Definition.CosignTool}), Outputs: []string{final.ID}, Network: ir.NetworkDefault}
 		found := false
 		for i, node := range plan.Graph.Nodes {
 			if node.ID != final.Producer {
@@ -67,7 +67,7 @@ func BindEvidenceAttestation(plan *Plan) error {
 }
 
 func executeAttestEvidence(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, newSigner signerFor, stdout io.Writer) error {
-	if plan.ExecutionSettings.Signing == nil || plan.ExecutionSettings.Signing.Mode != SigningModeCosign {
+	if plan.Environment.Signing == nil || plan.Environment.Signing.Mode != SigningModeCosign {
 		return e.New(e.CodeEngineCapability, "SBOM attestations require production signing")
 	}
 	signer, err := newSigner(ctx, plan, node, artifacts)
@@ -95,11 +95,11 @@ func executeAttestEvidence(ctx context.Context, plan *Plan, node Node, artifacts
 }
 
 func (plan Plan) validateEvidenceAttestationGraph() error {
-	if len(plan.LifecycleOutputs) == 0 || plan.ExecutionSettings.Signing == nil || plan.ExecutionSettings.Signing.Mode != SigningModeCosign {
+	if len(plan.LifecycleOutputs) == 0 || plan.Environment.Signing == nil || plan.Environment.Signing.Mode != SigningModeCosign {
 		return nil
 	}
 	nodes, artifacts := planIndex(&plan)
-	for _, route := range plan.ExecutionSettings.Routes {
+	for _, route := range plan.Routes {
 		output, ok := artifacts[route.Input]
 		if !ok {
 			return e.New(e.CodePipelineDrift, "attested route has no output")
@@ -112,7 +112,7 @@ func (plan Plan) validateEvidenceAttestationGraph() error {
 		if err != nil {
 			return err
 		}
-		if nodes[prepared.Producer].Kind != NodePackage || !containsString(node.Inputs, "tool/"+plan.ExecutionSettings.Signing.CosignTool) {
+		if nodes[prepared.Producer].Kind != NodePackage || !containsString(node.Inputs, "tool/"+plan.Definition.CosignTool) {
 			return e.New(e.CodePipelineDrift, "SBOM attestation must consume preparation and the pinned signer")
 		}
 	}

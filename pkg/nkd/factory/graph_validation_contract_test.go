@@ -12,8 +12,8 @@ import (
 func validContractArtifactGraph() ArtifactGraph {
 	return ArtifactGraph{SchemaVersion: ArtifactGraphSchema,
 		Nodes: []Node{
-			{ID: "build/a", Kind: NodeBuild, IRNode: "a", RunsOn: DefaultRunsOn, Container: "golang@sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Network: ir.NetworkNone, Outputs: []string{"artifact/a", "artifact/b"}},
-			{ID: "build/b", Kind: NodeBuild, IRNode: "b", RunsOn: DefaultRunsOn, Container: "golang@sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Network: ir.NetworkNone, Inputs: []string{"artifact/a", "artifact/b"}, Outputs: []string{"artifact/c"}},
+			{ID: "build/a", Kind: NodePackage, RunsOn: DefaultRunsOn, Container: "golang@sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Network: ir.NetworkNone, Outputs: []string{"artifact/a", "artifact/b"}},
+			{ID: "build/b", Kind: NodePackage, RunsOn: DefaultRunsOn, Container: "golang@sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Network: ir.NetworkNone, Inputs: []string{"artifact/a", "artifact/b"}, Outputs: []string{"artifact/c"}},
 		},
 		Artifacts: []Artifact{
 			{ID: "artifact/a", Path: ".nkd/a", Producer: "build/a"},
@@ -41,15 +41,10 @@ func TestArtifactGraphValidatesExecutionAndDataflowBindings(t *testing.T) {
 			g.Nodes[0].Requirements = &execution.Requirements{TimeoutSeconds: 1}
 		}, e.CodeInvalidCatalog, "only on build"},
 		{"unknown network", func(g *ArtifactGraph) { g.Nodes[0].Network = "host" }, e.CodeInvalidCatalog, "network"},
-		{"missing execution identity", func(g *ArtifactGraph) { g.Nodes[0].IRNode = "" }, e.CodeEngineCapability, "execution inputs"},
+		{"missing execution identity", func(g *ArtifactGraph) { g.Nodes[0].Kind = NodeBuild }, e.CodeEngineCapability, "producer reference"},
 		{"unknown kind", func(g *ArtifactGraph) { g.Nodes[0].Kind = "unknown" }, e.CodeInvalidCatalog, "kind"},
 		{"networked isolated node", func(g *ArtifactGraph) { g.Nodes[0].Kind = NodePackage; g.Nodes[0].Network = ir.NetworkDefault }, e.CodeInvalidCatalog, "network none"},
-		{"offline fetch", func(g *ArtifactGraph) { g.Nodes[0].Kind = NodeFetch }, e.CodeInvalidCatalog, "default network"},
-		{"fetch without vendoring container", func(g *ArtifactGraph) {
-			g.Nodes[0].Kind = NodeFetch
-			g.Nodes[0].Network = ir.NetworkDefault
-			g.Nodes[0].Container = ""
-		}, e.CodeEngineCapability, "vendoring"},
+		{"unbound fetch", func(g *ArtifactGraph) { g.Nodes[0].Kind = NodeFetch }, e.CodeEngineCapability, "producer reference"},
 		{"missing utility container", func(g *ArtifactGraph) { g.Nodes[0].Kind = NodePackage; g.Nodes[0].Container = "" }, e.CodeEngineCapability, "utility"},
 		{"no output", func(g *ArtifactGraph) { g.Nodes[0].Outputs = nil }, e.CodeInvalidCatalog, "no named outputs"},
 		{"unsafe artifact path", func(g *ArtifactGraph) { g.Artifacts[0].Path = "../escape" }, e.CodeInvalidCatalog, "unsafe"},
@@ -81,6 +76,32 @@ func TestArtifactGraphValidatesExecutionAndDataflowBindings(t *testing.T) {
 			if !strings.Contains(err.Error(), tc.message) {
 				t.Fatalf("wrong rejection boundary: %v; want %q", err, tc.message)
 			}
+		})
+	}
+}
+
+func TestArtifactGraphProducerReferenceRejectsCopiedExecution(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*Node)
+	}{
+		{"runner", func(node *Node) { node.RunsOn = DefaultRunsOn }},
+		{"container", func(node *Node) { node.Container = "golang@sha256:" + strings.Repeat("a", 64) }},
+		{"platform", func(node *Node) { node.Platform = "linux/amd64" }},
+		{"network", func(node *Node) { node.Network = ir.NetworkNone }},
+		{"requirements", func(node *Node) { node.Requirements = &execution.Requirements{TimeoutSeconds: 1} }},
+		{"binding", func(node *Node) { node.ExecutionBinding = &execution.Binding{} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			graph := validContractArtifactGraph()
+			graph.Nodes[0] = Node{ID: "build/a", Kind: NodeBuild, BuildTarget: "build", IRNode: "a", Outputs: []string{"artifact/a", "artifact/b"}}
+			graph.Artifacts[0].BuildTarget = "build"
+			graph.Artifacts[1].BuildTarget = "build"
+			if err := graph.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			tc.edit(&graph.Nodes[0])
+			assertFactoryErrorCode(t, graph.Validate(), e.CodePipelineDrift)
 		})
 	}
 }

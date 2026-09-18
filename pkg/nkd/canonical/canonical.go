@@ -49,24 +49,24 @@ const (
 	KindPublisherEvidence       = "nkd.publisher-evidence"       // publisher SBOM/provenance core (ADR-05)
 	KindReproductionObservation = "nkd.reproduction-observation" // later operator comparison record (ADR-05)
 	KindPromotionPolicy         = "nkd.promotion-policy"         // authenticated release-governance policy (ADR-16)
-	KindReproductionResult      = "nkd.reproduction-result"      // exact member reproduction receipt (ADR-16)
-	KindCompatibilityResult     = "nkd.compatibility-result"     // exhaustive compatibility receipt (ADR-16)
-	KindConformanceResult       = "nkd.conformance-result"       // independent runtime-conformance receipt (ADR-16)
-	KindEvidenceWaiver          = "nkd.evidence-waiver"          // authenticated exact evidence-gap waiver (ADR-13/16)
+	KindReproductionResult      = "nkd.reproduction-result"      // retired release reproduction receipt, reserved
+	KindCompatibilityResult     = "nkd.compatibility-result"     // retired compatibility receipt, reserved
+	KindConformanceResult       = "nkd.conformance-result"       // retired conformance receipt, reserved
+	KindEvidenceWaiver          = "nkd.evidence-waiver"          // retired evidence-gap waiver, reserved
 	KindProvenance              = "nkd.provenance"               // the SLSA provenance index (ADR-09)
 	KindProvenanceStatement     = "nkd.provenance-statement"     // one artifact-scoped SLSA statement (ADR-09)
 	KindSBOM                    = "nkd.sbom"                     // a per-artifact / aggregate CycloneDX SBOM (ADR-13)
 	KindSBOMIndex               = "nkd.sbom-index"               // the per-artifact SBOM index (ADR-13 §1)
-	KindVulnReport              = "nkd.vuln-report"              // a deterministic vulnerability report (ADR-13 §3)
-	KindBundle                  = "nkd.bundle"                   // an emitted CI pipeline's bundleDigest (ADR-21)
+	KindVulnReport              = "nkd.vuln-report"              // retired vulnerability report, reserved
+	KindBundle                  = "nkd.bundle"                   // retired qualified CI bundle family, reserved
 	KindInventory               = "nkd.inventory"                // the release inventory (ADR-05 §2)
 	KindReleaseSet              = "nkd.release-set"              // the atomic release set (ADR-05/16)
-	KindClearance               = "nkd.clearance"                // the downstream clearance result (ADR-16 §4)
+	KindClearance               = "nkd.clearance"                // retired release clearance, reserved
 	KindStatus                  = "nkd.status"                   // a status declaration (ADR-06 §2)
 	KindStatusCheckpoint        = "nkd.status-checkpoint"        // authenticated lifecycle checkpoint (ADR-06 §3)
-	KindTrustedTime             = "nkd.status-trusted-time/v1"   // policy-owned release freshness observation (ADR-06)
-	KindPublication             = "nkd.publication"              // the immutable publication identity (ADR-06 §1)
-	KindPublicationManifest     = "nkd.publication-manifest"     // exact transport/referrer closure (ADR-20)
+	KindTrustedTime             = "nkd.status-trusted-time/v1"   // retired release freshness receipt, reserved
+	KindPublication             = "nkd.publication"              // retired qualified publication identity, reserved
+	KindPublicationManifest     = "nkd.publication-manifest"     // retired qualified transport closure, reserved
 	KindPublicationRoot         = "nkd.publication-root"         // OCI bootstrap object for one delivery closure
 	KindBinaryBundle            = "nkd.binary-bundle"            // exact installable loose-binary projection
 	KindAPTRepository           = "nkd.apt-repository"           // exact Debian repository projection
@@ -82,8 +82,8 @@ const (
 	KindCatalogSnapshot         = "nkd.catalog-snapshot/v1"      // one fully resolved catalog state
 	KindCatalogOverlay          = "nkd.catalog-overlay/v1"       // one ordered component-level catalog overlay
 	KindArtifactGraph           = "nkd.artifact-graph/v1"        // typed build/package/delivery dataflow
-	KindExecutionSettings       = "nkd.execution-settings/v1"    // lowered environment execution and publication settings
-	KindCompileSpec             = "nkd.compile-spec/v1"          // compiler-owned handoff derived from Definition
+	KindExecutionSettings       = "nkd.execution-settings/v1"    // retired copied execution settings, reserved
+	KindCompileSpec             = "nkd.compile-spec/v1"          // retired compiler handoff, reserved
 	KindRunPlan                 = "nkd.run-plan/v1"              // static lowered execution plan
 	KindFactoryObservation      = "nkd.factory-observation/v1"   // unqualified terminal byte observation
 	KindDefinition              = "nkd.definition"               // simplified authored product definition (ADR-17 §6)
@@ -91,7 +91,7 @@ const (
 	KindVerificationPolicy      = "nkd.verification-policy"      // consumer-selected release acceptance policy (ADR-04 §5)
 	KindReleaseContent          = "nkd.release-content/v1"       // internal exact artifact content subject (ADR-17 §6)
 	KindClusterRealization      = "nkd.cluster-realization/v1"   // retired cluster-realization family, reserved
-	KindLifecycleBinding        = "nkd.lifecycle-binding/v1"     // signed output publication binding (ADR-20 §7)
+	KindLifecycleBinding        = "nkd.lifecycle-binding/v1"     // retired redundant publication binding, reserved
 	// Internal capability bindings are registered too. They are not wire schemas,
 	// but their domain tags are just as security-sensitive as object identities:
 	// a typo must fail instead of silently minting a different receipt family.
@@ -360,7 +360,10 @@ func requireEOF(dec *json.Decoder) error {
 // sha256(kind ∥ 0x00 ∥ canonical-bytes) (ADR-01 §3).
 func Digest(kind string, v any) (string, error) {
 	switch kind {
-	case KindLegacyRecipe, KindClusterDefinition, KindClusterComposition, KindClusterRealization, KindStagingManifest:
+	case KindCompileSpec, KindExecutionSettings, KindLifecycleBinding, KindLegacyRecipe,
+		KindClusterDefinition, KindClusterComposition, KindClusterRealization, KindStagingManifest, KindBundle,
+		KindReproductionResult, KindCompatibilityResult, KindConformanceResult, KindEvidenceWaiver,
+		KindClearance, KindTrustedTime, KindPublication, KindPublicationManifest, KindVulnReport:
 		return "", e.New(e.CodeUnsupported,
 			"canonical: digest domain %q is retired and cannot mint identities", kind)
 	}
@@ -406,71 +409,6 @@ func IsDigest(s string) bool {
 	}
 	return true
 }
-
-// TypedDigest is a digest paired with the domain-separation Kind it was computed under.
-// Digest returns a bare string with the kind tag hashed in and unrecoverable, so nothing
-// stops a KindBuild digest being used where a KindReleaseSet is expected — cross-kind
-// confusion is a runtime, not a compile, concern. A TypedDigest carries the kind
-// alongside the value so boundary code can demand a specific family (Expect) and
-// re-derive-and-compare identity (Verify) instead of trusting a shape-checked string.
-type TypedDigest struct {
-	Kind  string
-	Value string
-}
-
-// DigestTyped computes v's domain-separated digest and returns it tagged with kind.
-func DigestTyped(kind string, v any) (TypedDigest, error) {
-	value, err := Digest(kind, v)
-	if err != nil {
-		return TypedDigest{}, err
-	}
-	return TypedDigest{Kind: kind, Value: value}, nil
-}
-
-// ParseTypedDigest tags an existing digest string as kind after checking its shape and
-// that kind is a registered domain. It authenticates nothing about the referent — only
-// that the string is a well-formed digest of a real domain.
-func ParseTypedDigest(kind, value string) (TypedDigest, error) {
-	if !registeredKind(kind) {
-		return TypedDigest{}, e.New(e.CodeInternal, "canonical: unregistered digest domain %q", kind)
-	}
-	if !IsDigest(value) {
-		return TypedDigest{}, e.New(e.CodeUnverifiedRef, "canonical: %q is not a sha256 digest", value)
-	}
-	return TypedDigest{Kind: kind, Value: value}, nil
-}
-
-// Expect returns the digest value only if it was produced under kind, converting a
-// silent cross-kind mixup into an explicit error at the seam.
-func (d TypedDigest) Expect(kind string) (string, error) {
-	if d.Kind != kind || !IsDigest(d.Value) {
-		return "", e.New(e.CodeUnverifiedRef,
-			"canonical: expected a %q digest, have kind %q value %q", kind, d.Kind, d.Value)
-	}
-	return d.Value, nil
-}
-
-// Verify recomputes v's identity under d.Kind and reports whether it equals d. This is
-// the recompute-and-compare that turns a "trusted description" — a digest carried across
-// a stage seam — into an authenticated identity: the bytes are re-derived, not believed.
-func (d TypedDigest) Verify(v any) error {
-	if !IsDigest(d.Value) {
-		return e.New(e.CodeUnverifiedRef, "canonical: digest %q is malformed", d.Value)
-	}
-	recomputed, err := Digest(d.Kind, v)
-	if err != nil {
-		return err
-	}
-	if recomputed != d.Value {
-		return e.New(e.CodeUnverifiedRef,
-			"canonical: %q identity mismatch: recomputed %s != declared %s", d.Kind, recomputed, d.Value)
-	}
-	return nil
-}
-
-// String returns the digest value, so a TypedDigest can be used where a display string
-// is expected.
-func (d TypedDigest) String() string { return d.Value }
 
 func writeValue(buf *bytes.Buffer, v any) error {
 	switch t := v.(type) {

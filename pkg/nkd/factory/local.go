@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
@@ -43,6 +44,7 @@ type LocalRunOptions struct {
 	DryRun       bool
 	Stdout       io.Writer
 	Stderr       io.Writer
+	producers    *pipeline.NodeSession
 }
 
 // LocalNodeResult is a deterministic, unqualified execution observation.
@@ -63,16 +65,13 @@ type LocalRunResult struct {
 }
 
 type localRunDeps struct {
-	runBuild      func(context.Context, BuildPlan, LocalRunOptions) (*pipeline.Report, error)
 	prepareRunner func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error)
 	executeNode   func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error
 }
 
-// RunLocal executes the artifact graph on this host. Build subgraphs are delegated
-// to pipeline.Local (the existing build oracle); factory-only nodes are executed in
-// their exact pinned utility container, except network acquisition/publication which
-// use their existing host adapters. This keeps the orchestration interface small and
-// avoids a second implementation of fetching, source closure verification, or builds.
+// RunLocal executes the Plan's artifact graph in dependency order. Every producer
+// uses the same exact-node execution operation as hosted Runs; utility work runs
+// in its pinned container. Source receipts remain reusable across local attempts.
 func RunLocal(ctx context.Context, plan *Plan, options LocalRunOptions) (*LocalRunResult, error) {
 	options = withLocalDefaults(options)
 	if err := AdmitLocal(ctx, plan, options); err != nil {
@@ -122,13 +121,6 @@ func withLocalDefaults(options LocalRunOptions) LocalRunOptions {
 
 func productionLocalRunDeps() localRunDeps {
 	return localRunDeps{
-		runBuild: func(ctx context.Context, build BuildPlan, options LocalRunOptions) (*pipeline.Report, error) {
-			return (pipeline.Local{}).Run(build.Graph, build.BuildDigest, pipeline.RunOptions{
-				Ctx: ctx, SourceRoot: filepath.Join(options.Workspace, build.Name, "src"),
-				Only: build.Components, Jobs: options.Jobs, Runtime: options.Runtime,
-				Stdout: options.Stdout, Stderr: options.Stderr,
-			})
-		},
 		prepareRunner: prepareLocalRunners,
 		executeNode:   executeLocalFactoryNode,
 	}
@@ -157,9 +149,14 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}
 		return result, nil
 	}
-	if deps.runBuild == nil || deps.prepareRunner == nil || deps.executeNode == nil {
+	if deps.prepareRunner == nil || deps.executeNode == nil {
 		return nil, e.New(e.CodeInternal, "factory local executor is incomplete")
 	}
+	options.producers, err = pipeline.NewNodeSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer options.producers.Close()
 	if err := ensureLocalWorkspace(ctx, options.Workspace, planDigest); err != nil {
 		return nil, err
 	}
@@ -169,69 +166,72 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		return nil, err
 	}
 
+	// One scheduling pass covers producers and utility work. A batch contains only
+	// ready operations; cancel and join the whole batch before returning failure.
 	status := make(map[string]string, len(ordered))
-	for _, build := range plan.Builds {
-		if len(build.Components) == 0 {
-			continue
-		}
-		fmt.Fprintf(options.Stdout, "\n=== factory build %s (%d components) ===\n", build.Name, len(build.Components))
-		report, runErr := deps.runBuild(ctx, build, options)
-		if runErr != nil {
-			if report != nil {
-				_ = report.Close()
-			}
-			return nil, e.Wrap(e.CodeBuildFailed, runErr, "factory build target %s", build.Name)
-		}
-		if report == nil {
-			return nil, e.New(e.CodeInternal, "factory build target %s returned no report", build.Name)
-		}
-		if err := persistBuildResults(ctx, plan, build, report, options.Workspace); err != nil {
-			_ = report.Close()
-			return nil, err
-		}
-		_ = report.Close()
+	var outputMu sync.Mutex
+	options.Stdout = lockedLocalWriter{mu: &outputMu, Writer: options.Stdout}
+	options.Stderr = lockedLocalWriter{mu: &outputMu, Writer: options.Stderr}
+	for len(status) < len(ordered) {
+		var ready []Node
 		for _, node := range ordered {
-			if node.BuildTarget == build.Name && node.IRNode != "" {
-				status[node.ID] = "ok"
-				result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "ok"})
+			if status[node.ID] != "" {
+				continue
 			}
+			if requiresPublication(node.Kind) && !options.Publish {
+				status[node.ID] = "skipped"
+				result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "skipped"})
+				continue
+			}
+			if failedLocalDependency(plan.Graph, node, status) == "" {
+				ready = append(ready, node)
+				if len(ready) == options.Jobs {
+					break
+				}
+			}
+		}
+		if len(ready) == 0 {
+			if len(status) == len(ordered) {
+				break
+			}
+			return nil, e.New(e.CodeBuildFailed, "local Run has no operation with complete dependencies")
+		}
+		batchCtx, cancel := context.WithCancel(ctx)
+		results := make([]LocalNodeResult, len(ready))
+		batchErrors := make([]error, len(ready))
+		var batch sync.WaitGroup
+		for index, node := range ready {
+			batch.Go(func() {
+				results[index], batchErrors[index] = runLocalNode(batchCtx, plan, node, options, runners, deps.executeNode)
+				if batchErrors[index] != nil {
+					cancel()
+				}
+			})
+		}
+		batch.Wait()
+		cancel()
+		if err := ctx.Err(); err != nil {
+			return nil, e.Wrap(e.CodeTimeout, err, "local Run canceled")
+		}
+		// A canceled sibling can sort before the operation that failed. Preserve
+		// the causal failure instead of reporting the cancellation it triggered.
+		for _, err := range batchErrors {
+			var coded *e.Error
+			if err != nil && (!errors.As(err, &coded) || coded.Code != e.CodeTimeout) {
+				return nil, err
+			}
+		}
+		for _, err := range batchErrors {
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, completed := range results {
+			status[completed.ID] = completed.Status
+			result.Nodes = append(result.Nodes, completed)
 		}
 	}
 
-	for _, node := range ordered {
-		if node.IRNode != "" {
-			continue
-		}
-		if requiresPublication(node.Kind) && !options.Publish {
-			status[node.ID] = "skipped"
-			result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "skipped"})
-			fmt.Fprintf(options.Stdout, "[skipped] %s (pass --publish to enable remote mutation)\n", node.ID)
-			continue
-		}
-		if dependency := failedLocalDependency(plan.Graph, node, status); dependency != "" {
-			return nil, e.New(e.CodeBuildFailed, "factory node %s is blocked by incomplete dependency %s", node.ID, dependency)
-		}
-		cached, err := reusableFactoryTool(ctx, plan, node, options.Workspace)
-		if err != nil {
-			return nil, err
-		}
-		if cached {
-			status[node.ID] = "cached"
-			result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "cached"})
-			fmt.Fprintf(options.Stdout, "[cached] %s\n", node.ID)
-			continue
-		}
-		if err := resetFactoryNodeOutputs(plan, node, options.Workspace); err != nil {
-			return nil, err
-		}
-		fmt.Fprintf(options.Stdout, "[start] %s (%s)\n", node.ID, node.Kind)
-		if err := deps.executeNode(ctx, plan, node, options, runners); err != nil {
-			return nil, e.Wrap(e.CodeBuildFailed, err, "factory node %s", node.ID)
-		}
-		status[node.ID] = "ok"
-		result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "ok"})
-		fmt.Fprintf(options.Stdout, "[done] %s\n", node.ID)
-	}
 	sort.Slice(result.Nodes, func(i, j int) bool { return result.Nodes[i].ID < result.Nodes[j].ID })
 	raw, err := canonical.Marshal(result)
 	if err != nil {
@@ -240,6 +240,55 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err := writeFactoryFile(ctx, filepath.Join(options.Workspace, "run.json"), raw, 0o644); err != nil {
 		return nil, err
 	}
+	return result, nil
+}
+
+// The same lock covers stdout and stderr because callers may share one writer.
+type lockedLocalWriter struct {
+	mu *sync.Mutex
+	io.Writer
+}
+
+func (w lockedLocalWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.Writer.Write(p)
+}
+
+func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string,
+	execute func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error) (LocalNodeResult, error) {
+	result := LocalNodeResult{ID: node.ID, Kind: node.Kind}
+	if err := ctx.Err(); err != nil {
+		return result, e.Wrap(e.CodeTimeout, err, "local node canceled")
+	}
+	cached, err := reusableFactoryTool(ctx, plan, node, options.Workspace)
+	if err != nil {
+		return result, err
+	}
+	if cached {
+		result.Status = "cached"
+		fmt.Fprintf(options.Stdout, "[cached] %s\n", node.ID)
+		return result, nil
+	}
+	// Producer operations own safe replacement and reusable source receipts.
+	if node.IRNode == "" {
+		if err := resetFactoryNodeOutputs(plan, node, options.Workspace); err != nil {
+			return result, err
+		}
+	}
+	fmt.Fprintf(options.Stdout, "[start] %s (%s)\n", node.ID, node.Kind)
+	if err := execute(ctx, plan, node, options, runners); err != nil {
+		code := e.CodeBuildFailed
+		var coded *e.Error
+		if errors.As(err, &coded) {
+			code = coded.Code
+		} else if ctx.Err() != nil {
+			code = e.CodeTimeout
+		}
+		return result, e.Wrap(code, err, "factory node %s", node.ID)
+	}
+	result.Status = "ok"
+	fmt.Fprintf(options.Stdout, "[done] %s\n", node.ID)
 	return result, nil
 }
 
@@ -259,7 +308,7 @@ func admitLocalPlan(ctx context.Context, plan *Plan, options LocalRunOptions) er
 	if err := rejectUnsupportedPlanRequirements(plan, "local factory execution"); err != nil {
 		return err
 	}
-	if len(plan.ExecutionSettings.SourceAccess) != 0 {
+	if len(plan.Environment.SourceAccess) != 0 {
 		return e.New(e.CodeEngineCapability,
 			"local execution does not support Environment.sourceAccess authentication")
 	}
@@ -375,6 +424,18 @@ func prepareLocalRunners(ctx context.Context, plan *Plan, options LocalRunOption
 }
 
 func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string) error {
+	if node.IRNode != "" {
+		relocated, err := relocateFactoryPlan(plan, options.Workspace)
+		if err != nil {
+			return err
+		}
+		run := (pipeline.Local{}).ExecNode
+		if options.producers != nil {
+			run = options.producers.ExecNode
+		}
+		return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, run)
+	}
+
 	if node.Network == ir.NetworkNone {
 		if _, ok := runners[node.Platform]; !ok {
 			return e.New(e.CodeEngineCapability, "factory node %s has no linux runner for %s", node.ID, node.Platform)
@@ -411,60 +472,6 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		return err
 	}
 	return ExecuteNode(ctx, relocated, node.ID, options.Stdout, options.Stderr)
-}
-
-func persistBuildResults(ctx context.Context, plan *Plan, build BuildPlan, report *pipeline.Report, workspace string) error {
-	if report == nil || report.BuildDigest != build.BuildDigest {
-		return e.New(e.CodeUnverifiedRef, "output %q producer report has the wrong build identity", build.Name)
-	}
-	artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
-	for _, artifact := range plan.Graph.Artifacts {
-		artifacts[artifact.ID] = artifact
-	}
-	seen := make(map[string]bool, len(report.Artifacts))
-	for _, result := range report.Artifacts {
-		if seen[result.Component] {
-			return e.New(e.CodeVerifyFailed, "output %q repeats producer result %q", build.Name, result.Component)
-		}
-		artifactID := "artifact/" + build.Name + "/" + result.Component
-		planned, ok := artifacts[artifactID]
-		if !ok {
-			return e.New(e.CodePipelineDrift, "build %s returned unplanned component %s", build.Name, result.Component)
-		}
-		actualPath := result.AbsPath
-		if result.TransportPath != "" {
-			actualPath = result.TransportPath
-		}
-		expectedPath, err := relocatedFactoryPath(planned.Path, workspace)
-		if err != nil {
-			return err
-		}
-		actualAbs, _ := filepath.Abs(actualPath)
-		expectedAbs, _ := filepath.Abs(expectedPath)
-		if actualAbs != expectedAbs {
-			return e.New(e.CodePipelineDrift, "build %s component %s materialized at %s, want %s",
-				build.Name, result.Component, actualPath, expectedPath)
-		}
-		resultArtifact := artifacts["result/"+build.Name+"/"+result.Component]
-		resultPath, err := relocatedFactoryPath(resultArtifact.Path, workspace)
-		if err != nil {
-			return err
-		}
-		raw, err := canonical.Marshal(result)
-		if err != nil {
-			return err
-		}
-		if err := writeFactoryFile(ctx, resultPath, raw, 0o644); err != nil {
-			return err
-		}
-		seen[result.Component] = true
-	}
-	for _, component := range build.Components {
-		if !seen[component] {
-			return e.New(e.CodeVerifyFailed, "build %s did not return selected component %s", build.Name, component)
-		}
-	}
-	return nil
 }
 
 func relocateFactoryPlan(plan *Plan, workspace string) (*Plan, error) {

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -32,17 +34,14 @@ func TestCompileDocumentsResolvesCatalogRelativeToDefinition(t *testing.T) {
 			if tc.absolute {
 				catalogPath = filepath.Join(repo, "testdata/catalogs/kubernetes-layered")
 			}
-			definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind, Metadata: Metadata{Name: "documents"}, Catalog: CatalogStack{Base: catalogPath},
-				UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161", UtilityPlatform: "linux/amd64",
-				Builds:   []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-				Packages: []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}}}
+			definition, environment := fixtureInputs("documents", "worker", "ubuntu-24.04")
+			definition.Catalog.Base = catalogPath
 			if tc.override {
-				definition.Builds[0].Catalog = &CatalogStack{Base: catalogPath}
+				definition.Outputs[0].Catalog = &authored.Catalog{Base: catalogPath}
 			}
 			if tc.missing {
-				definition.Builds[0].Catalog.Base = "missing"
+				definition.Outputs[0].Catalog.Base = "missing"
 			}
-			environment := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind, Metadata: Metadata{Name: "local"}, RunsOn: "ubuntu-24.04"}
 			definitionPath := filepath.Join("definitions", "fixture.yaml")
 			plan, err := CompileDocuments(t.Context(), definitionPath, definition, "environment.yaml", environment, "test")
 			if tc.missing {
@@ -124,7 +123,7 @@ func TestDocumentCatalogStackBindsOverlayInputAndOutput(t *testing.T) {
 			if tc.absolute {
 				selected = path
 			}
-			stack, err := loadFactoryCatalogStack(t.Context(), filepath.Join(root, "definition.yaml"), CatalogStack{Base: filepath.Join(repo, "testdata/catalogs/kubernetes-layered"), Overlays: []string{selected}})
+			stack, err := loadFactoryCatalogStack(t.Context(), filepath.Join(root, "definition.yaml"), authored.Catalog{Base: filepath.Join(repo, "testdata/catalogs/kubernetes-layered"), Overlays: []string{selected}})
 			if tc.missing || tc.wrongPin {
 				want := e.CodeInvalidCatalog
 				if tc.wrongPin {
@@ -145,6 +144,132 @@ func TestDocumentCatalogStackBindsOverlayInputAndOutput(t *testing.T) {
 			if stack.Catalog.Components["crictl"].Tag != "v99.0.0" {
 				t.Fatal("overlay replacement was not applied")
 			}
+		})
+	}
+}
+
+func TestCompilerOwnsAuthoredInputsAndReturnsCompleteBindings(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, environment := fixtureInputs("ownership", "worker", "")
+	environment.Runtime.Variables = map[string]string{"MODE": "original"}
+	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.LifecycleOutputs) != len(definition.Outputs) || plan.DefinitionDigest == "" || plan.EnvironmentDigest == "" {
+		t.Fatal("compiler returned an incomplete plan")
+	}
+	before, err := plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition.Outputs[0].Components[0] = "changed"
+	environment.Runtime.Variables["MODE"] = "changed"
+	after, err := plan.Digest()
+	if err != nil || after != before {
+		t.Fatalf("caller changed compiled input ownership: %s %v", after, err)
+	}
+}
+
+func TestPlanLoadRejectsRetiredCompilerDocuments(t *testing.T) {
+	plan := buildOnlyPlan(t, DefaultRunsOn)
+	raw, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(string) string
+		code   e.Code
+	}{
+		{"old plan schema", func(raw string) string { return strings.Replace(raw, PlanSchemaVersion, "nkd.dev/run-plan/v3", 1) }, e.CodeInvalidCatalog},
+		{"retired compile digest", func(raw string) string {
+			return strings.Replace(raw, `"definitionDigest":`, `"compileSpecDigest":"sha256:`+strings.Repeat("a", 64)+`","definitionDigest":`, 1)
+		}, e.CodePipelineDrift},
+		{"retired execution settings", func(raw string) string {
+			return strings.Replace(raw, `"environmentDigest":`, `"executionSettings":{},"environmentDigest":`, 1)
+		}, e.CodePipelineDrift},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "plan.json")
+			if err := os.WriteFile(path, []byte(tc.change(string(raw))), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			loaded, err := LoadPlanContext(t.Context(), path)
+			assertFactoryErrorCode(t, err, tc.code)
+			if loaded != nil {
+				t.Fatal("retired plan returned partial plan")
+			}
+		})
+	}
+}
+
+func TestCompilerAdmitsCapabilitiesBeforeCatalogIO(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*authored.Definition, *authored.Environment)
+		code e.Code
+	}{
+		{"disk execution", func(definition *authored.Definition, _ *authored.Environment) {
+			definition.Outputs[0].Format = authored.OutputDiskImage
+			definition.Outputs[0].Components = []string{"containerd"}
+		}, e.CodeEngineCapability},
+		{"unpinned signer", func(_ *authored.Definition, environment *authored.Environment) {
+			environment.Publication = &authored.Publication{RepositoryPrefix: "ghcr.io/example/nkd", Anonymous: true}
+			environment.Signing = &authored.Signing{Mode: SigningModeCosign, Identity: "^fixture$", Issuer: "https://issuer.example"}
+		}, e.CodeTrustPolicyMissing},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			definition, environment := fixtureInputs("admission", "worker", "")
+			definition.Catalog.Base = "missing-catalog"
+			tc.edit(&definition, &environment)
+			plan, err := CompileDocuments(t.Context(), "missing-definition.yaml", definition, "environment.yaml", environment, "test")
+			assertFactoryErrorCode(t, err, tc.code)
+			if plan != nil {
+				t.Fatal("rejected compilation returned partial plan")
+			}
+		})
+	}
+}
+
+func TestPlanRejectsStalePackageAfterDefinitionIdentityChanges(t *testing.T) {
+	for _, field := range []string{"distribution", "component"} {
+		t.Run(field, func(t *testing.T) {
+			base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			stack, err := catalog.ApplyStack(base)
+			if err != nil {
+				t.Fatal(err)
+			}
+			definition, environment := fixtureInputs("packaging", "worker", "")
+			output := &definition.Outputs[0]
+			output.Format = authored.OutputAPT
+			output.Components = []string{"containerd"}
+			output.APT = &authored.APTOutput{Distribution: "stable", Component: "main"}
+			plan, err := Compile(t.Context(), definition, environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if field == "distribution" {
+				plan.Definition.Outputs[0].APT.Distribution = "testing"
+			} else {
+				plan.Definition.Outputs[0].APT.Component = "extra"
+			}
+			digest, err := plan.Definition.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.DefinitionDigest = digest
+			assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
 		})
 	}
 }

@@ -1,11 +1,6 @@
-// Package status models immutable publication identity and the signed status-
-// declaration lifecycle (ADR-06). Immutability is a CONSEQUENCE of content-addressing
-// — a publication is its digest, so any byte change is a different publication; NKD
-// maintains no ledger. A publisher supersedes/deprecates/withdraws a release WITHOUT
-// touching the original, by publishing a signed StatusDeclaration (attached as an OCI
-// referrer, or mirrored out-of-band for air-gap). Consumption trust anchors to a
-// SIGNATURE from the pinned status-signer identity, so a dropped fake file does
-// nothing (withdraw-DoS defense, §4).
+// Package status authenticates signed status declarations and complete checkpoints.
+// Diagnostic evaluation uses an explicit epoch, pinned signer policy, and an exact
+// high-water mark. Registry discovery and release authorization are not implemented.
 package status
 
 import (
@@ -26,14 +21,6 @@ const (
 	ActionDeprecated = "deprecated"
 	ActionWithdrawn  = "withdrawn"
 )
-
-// PublicationIdentity is the immutable identity of a signed publication object (a
-// ValidationVector or ReleaseSet), DISTINCT from buildDigest (which covers only the
-// compiled graph). Two profiles/manifests over one build would otherwise collide, so
-// publication identity is its own domain (ADR-06 §1).
-func PublicationIdentity(signed any) (string, error) {
-	return canonical.Digest(canonical.KindPublication, signed)
-}
 
 // StatusDeclaration references its target ONLY by immutable identity and never opens
 // or rewrites the target (ADR-06 §2). Its own identity is its content digest.
@@ -121,9 +108,6 @@ func At(epoch int64) (AsOf, error) {
 	}
 	return AsOf{set: true, epoch: epoch}, nil
 }
-
-// WithoutAsOf makes the absence of an evaluation time explicit.
-func WithoutAsOf() AsOf { return AsOf{} }
 
 // Decision is the enforcement outcome of consuming the status declarations attached
 // to a release.

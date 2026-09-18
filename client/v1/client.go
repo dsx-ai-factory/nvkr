@@ -1,14 +1,10 @@
 // Package client is the context-first embeddable SDK facade described by ADR-17.
 //
 // Use LoadDefinition, LoadEnvironment, PrepareLifecycleRun/ExecuteLifecycleRun or
-// GenerateLifecycleRun, and VerifyRelease for the public lifecycle. Lower-level
-// graph, validation-vector, authorization, and transport methods expose the same
-// current authority modules for focused integrations.
-//
-// The facade owns orchestration, not policy or I/O implementations. Resolution,
-// execution, authenticated-document verification, release authorization, and
-// publication remain authoritative in their domain packages and are reached through
-// narrow injected seams, so embedders do not grow parallel domain implementations.
+// GenerateLifecycleRun, and VerifyRelease for the public lifecycle. ResolveBuild
+// and Run support exact component/platform diagnostics. Domain packages own
+// compilation, execution, publication, authentication and their authority checks;
+// the facade exposes no separate qualified-evidence or publication workflow.
 package client
 
 import (
@@ -17,16 +13,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/attest"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/transport"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 )
 
 // CatalogIO is the narrow context-aware read boundary used by catalog.LoadContext.
@@ -48,61 +38,16 @@ type AtomicOutput interface {
 	Commit(ctx context.Context, name string, canonicalBytes []byte) error
 }
 
-// ValidationVectorAuthority is the only accepted source of validation-vector
-// receipts. A zero-value trust.DocumentReceipt cannot pass facade checks.
-type ValidationVectorAuthority interface {
-	Authenticate(context.Context, ValidationVectorInput) (trust.DocumentReceipt, error)
-}
-
-// BuilderProfileAuthority is the only accepted source of builder-profile receipts.
-type BuilderProfileAuthority interface {
-	Authenticate(context.Context, BuilderProfileInput) (trust.DocumentReceipt, error)
-}
-
-// PublisherEvidenceAuthority is the only seam allowed to derive publisher SBOM
-// and provenance authority from a qualified build. It returns an opaque capability,
-// never caller-composed aggregate strings.
-type PublisherEvidenceAuthority interface {
-	Qualify(context.Context, PublisherEvidenceRequest) (*attest.PublisherEvidence, error)
-}
-
-// PublisherEvidenceRequest gives the authority both the full declaration/graph and
-// the exact terminally qualified (possibly selected-subset) report.
-type PublisherEvidenceRequest struct {
-	Resolved *buildgraph.Resolved
-	Graph    *ir.Graph
-	Report   *pipeline.Report
-}
-
-// HostObserver supplies current, observable host facts to profile.Preflight. It is an
-// injected I/O seam because observing a kernel/runtime may involve subprocesses.
-type HostObserver interface {
-	Observe(context.Context) (map[string]string, error)
-}
-
-// ReleaseAuthority evaluates opaque, verified release receipts. The default
-// delegates directly to release.Authorize.
-type ReleaseAuthority interface {
-	Authorize(context.Context, release.AuthorizationRequest) (*release.Authorization, error)
-}
-
 // Client is a small orchestration facade over the authoritative domain modules.
 // Construct it with New and supply catalog data with WithData, WithProvider, or
-// WithCatalogIO for producer resolution. Filesystem output and publication are opt-in seams.
+// WithCatalogIO for producer resolution. Graph export and Release consumption are opt-in.
 type Client struct {
 	catalogIO CatalogIO
 	runner    pipeline.Runner
 	runtime   string
 
 	output            AtomicOutput
-	vectorAuthority   ValidationVectorAuthority
-	publisherEvidence PublisherEvidenceAuthority
-	profileAuthority  BuilderProfileAuthority
-	hostObserver      HostObserver
-	executionObserver pipeline.ExecutionObserver
-	releaseAuthority  ReleaseAuthority
 	lifecycleConsumer *lifecycle.Consumer
-	publication       transport.Seams
 	configErr         error
 }
 
@@ -199,89 +144,12 @@ func WithAtomicOutput(output AtomicOutput) Option {
 	}
 }
 
-// WithValidationVectorAuthority configures authenticated validation-vector input.
-func WithValidationVectorAuthority(authority ValidationVectorAuthority) Option {
-	return func(c *Client) {
-		if authority == nil {
-			c.setConfigError("validation-vector authority is nil")
-			return
-		}
-		c.vectorAuthority = authority
-	}
-}
-
-// WithPublisherEvidenceAuthority configures exact publisher-evidence derivation for
-// authenticated verification and publishable vector creation.
-func WithPublisherEvidenceAuthority(authority PublisherEvidenceAuthority) Option {
-	return func(c *Client) {
-		if authority == nil {
-			c.setConfigError("publisher-evidence authority is nil")
-			return
-		}
-		c.publisherEvidence = authority
-	}
-}
-
-// WithBuilderProfileAuthority configures authenticated builder-profile input.
-func WithBuilderProfileAuthority(authority BuilderProfileAuthority) Option {
-	return func(c *Client) {
-		if authority == nil {
-			c.setConfigError("builder-profile authority is nil")
-			return
-		}
-		c.profileAuthority = authority
-	}
-}
-
-// WithHostObserver configures the context-aware facts used by profile.Preflight.
-func WithHostObserver(observer HostObserver) Option {
-	return func(c *Client) {
-		if observer == nil {
-			c.setConfigError("host observer is nil")
-			return
-		}
-		c.hostObserver = observer
-	}
-}
-
-// WithExecutionObserver configures ADR-07 stage-two measurement. The observer is
-// deliberately separate from HostObserver: it inspects the actual runner/runtime/
-// toolchains after host preflight, and it never receives expected profile values.
-func WithExecutionObserver(observer pipeline.ExecutionObserver) Option {
-	return func(c *Client) {
-		if observer == nil {
-			c.setConfigError("execution observer is nil")
-			return
-		}
-		c.executionObserver = observer
-	}
-}
-
-// WithReleaseAuthority overrides release authorization. Most callers should use the
-// default adapter, which delegates directly to release.Authorize.
-func WithReleaseAuthority(authority ReleaseAuthority) Option {
-	return func(c *Client) {
-		if authority == nil {
-			c.setConfigError("release authority is nil")
-			return
-		}
-		c.releaseAuthority = authority
-	}
-}
-
-// WithPublicationSeams injects publication I/O adapters. Publish refuses to fall
-// back to implicit filesystem adapters for any artifact kind in the request.
-func WithPublicationSeams(seams transport.Seams) Option {
-	return func(c *Client) { c.publication = seams }
-}
-
 // New constructs a client with authoritative default modules and no implicit output
 // destination.
 func New(options ...Option) *Client {
 	c := &Client{
-		runner:           pipeline.Local{},
-		runtime:          "docker",
-		releaseAuthority: authoritativeReleaseAuthority{},
+		runner:  pipeline.Local{},
+		runtime: "docker",
 	}
 	for _, option := range options {
 		if option == nil {
@@ -369,12 +237,6 @@ func (provider providerCatalogIO) ReadDir(ctx context.Context, name string) ([]s
 }
 
 func (provider providerCatalogIO) Name() string { return provider.provider.Name() }
-
-type authoritativeReleaseAuthority struct{}
-
-func (authoritativeReleaseAuthority) Authorize(ctx context.Context, request release.AuthorizationRequest) (*release.Authorization, error) {
-	return release.Authorize(ctx, request)
-}
 
 func (c *Client) setConfigError(message string) {
 	if c.configErr == nil {

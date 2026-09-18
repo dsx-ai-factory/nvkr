@@ -68,7 +68,7 @@ func TestSourceClosureReceiptVendorsOnceAndRejectsDrift(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "vendored"), []byte("changed dependencies"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureSourceClosure(node, dir, opts, vendor); transportCode(err) != e.CodeFetchFailed {
+	if err := ensureSourceClosure(node, dir, opts, vendor); code(err) != e.CodeFetchFailed {
 		t.Fatalf("drift accepted: %v", err)
 	}
 	if calls != 1 {
@@ -104,7 +104,7 @@ func TestSourceClosureRejectsUnreceiptedChangesAndVendorFailures(t *testing.T) {
 				if !errors.Is(err, expected) {
 					t.Fatalf("vendor failure lost: %v", err)
 				}
-			} else if transportCode(err) != e.CodeFetchFailed {
+			} else if code(err) != e.CodeFetchFailed {
 				t.Fatalf("dirty source accepted: %v", err)
 			}
 			path, err := sourceReceiptPath(opts.SourceRoot, node.Dest)

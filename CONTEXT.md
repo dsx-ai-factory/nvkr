@@ -76,11 +76,14 @@ selection must admit it explicitly, independently of the host on which a produce
 _Avoid_: Host platform, query criterion
 
 **Execution plan**:
-The generated closure of exact inputs, required outputs, environment settings, and executable dependencies for a Run.
+The complete generated closure of admitted Definition and Environment values, independently required outputs,
+packaging, routes and executable dependencies for a Run. Producer operations reference the single executable
+build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 _Avoid_: Authored definition, execution observation
 
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
+The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
 **Binary bundle**:
@@ -111,10 +114,12 @@ _Avoid_: Public Release synonym, output list, binary bundle
 
 **Reproduction, compatibility, and conformance evidence**:
 Distinct independently authenticated release claims covering exact reproduction, compatibility requirements, and runtime behavior for their bound subjects.
+Qualified release-gate acceptance is deferred; no retained clearance implementation consumes these claims.
 _Avoid_: Generic pass result, cluster qualification
 
 **Clearance**:
 Authenticated authorization for one exact qualified ReleaseSet after its required evidence, policy, and lifecycle checks pass.
+This is a deferred contract; the unused authorization implementation has been removed.
 _Avoid_: Release reference, publication root, approval flag
 
 **Publication root**:
@@ -158,8 +163,9 @@ _Avoid_: Output selection group, mixin, deployment topology
 
 **Execution requirements**:
 A deterministic per-step request for minimum CPU, memory, and ephemeral storage, eligible runner-host
-platforms, typed host capabilities, and an executor wall-time budget. It is carried in the full IR and Plan,
-does not enter Build identity, and is not proof that a runner satisfies it.
+platforms, typed host capabilities, and an executor wall-time budget. It is carried once in the full IR embedded
+in the Plan; scheduler operations reference that instruction. It does not enter Build identity, and is not
+proof that a runner satisfies it.
 _Avoid_: Runner observation, target/toolchain platform, build network, builder-specific settings, output size
 
 **Execution class**:

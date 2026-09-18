@@ -17,9 +17,7 @@ import (
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/transport"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/vuln"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
 )
@@ -693,75 +691,7 @@ func TestAuthorityFabricatingLegacyCommandsAreExplicitlyDisabled(t *testing.T) {
 	}
 }
 
-func TestVulnerabilityPathIssuesOnlyQualifiedReport(t *testing.T) {
-	artifactDigest := testArtifactDigest
-	resolved := &buildgraph.Resolved{
-		Platform: "linux/amd64",
-		Components: []catalog.NamedComponent{{Name: "artifact", Component: catalog.Component{Platforms: []string{"linux/amd64"},
-			Tag: "v1.0.0", OutputType: "raw", Prebuilt: &catalog.Prebuilt{
-				URL: "https://example.invalid/artifact", Digests: map[string]string{"amd64": artifactDigest},
-				Evidence: &catalog.ExternalEvidence{None: true},
-			},
-		}}},
-	}
-	graph, err := buildgraph.Compile(resolved)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buildDigest, err := graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	scannerDigest := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-	databaseDigest := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-	output := filepath.Join(t.TempDir(), "vuln.json")
-	var gotDigest string
-	command := &cli.Command{
-		Name: "scan",
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "vuln-artifact"}, &cli.StringFlag{Name: "vuln-scanner"},
-			&cli.StringFlag{Name: "vuln-scanner-digest"}, &cli.StringFlag{Name: "vuln-db"},
-			&cli.StringFlag{Name: "vuln-out"},
-		},
-		Action: func(c *cli.Context) error {
-			var scanErr error
-			gotDigest, scanErr = runVulnScanWithScanner(c, resolved, buildDigest,
-				map[string]string{"artifact": artifactDigest},
-				vulnerabilityScannerFunc(func(ctx context.Context, request vuln.QualifiedScanRequest) (vuln.ScanObservation, error) {
-					if ctx != c.Context {
-						t.Fatal("scanner did not receive command context")
-					}
-					return vuln.ScanObservation{ScannerDigest: request.ScannerDigest,
-						DatabaseDigest: request.DatabaseDigest, Result: []byte(`{"matches":[]}`)}, nil
-				}),
-			)
-			return scanErr
-		},
-	}
-	app := &cli.App{Commands: []*cli.Command{command}}
-	err = app.Run([]string{"nkdctl", "scan", "--vuln-artifact", "artifact", "--vuln-scanner", "grype",
-		"--vuln-scanner-digest", scannerDigest, "--vuln-db", databaseDigest, "--vuln-out", output,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotDigest == "" {
-		t.Fatal("qualified scan returned no report digest")
-	}
-	raw, err := os.ReadFile(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var report vuln.Report
-	if err := canonical.UnmarshalExact(raw, &report); err != nil {
-		t.Fatalf("report is not exact canonical JSON: %v", err)
-	}
-	if report.ScannerDigest != scannerDigest || report.DatabaseDigest != databaseDigest || report.Artifact != artifactDigest {
-		t.Fatalf("qualified report lost execution binding: %+v", report)
-	}
-}
-
-func TestCommandSBOMReaderIssuesExternalReceiptOnlyAfterRehash(t *testing.T) {
+func TestCommandSBOMReaderBindsExternalEvidenceOnlyAfterRehash(t *testing.T) {
 	evidence := []byte(`{"bomFormat":"CycloneDX","specVersion":"1.5","metadata":{"component":{"name":"artifact","hashes":[{"alg":"SHA-256","content":"` + strings.TrimPrefix(testArtifactDigest, "sha256:") + `"}]}}}`)
 	sum := sha256.Sum256(evidence)
 	evidenceDigest := "sha256:" + hex.EncodeToString(sum[:])
@@ -788,27 +718,24 @@ func TestCommandSBOMReaderIssuesExternalReceiptOnlyAfterRehash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receipts, err := set.ExternalReceipts()
+	documents, index, err := set.PerArtifact()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(receipts) != 1 || receipts[0].EvidenceDigest() != evidenceDigest || receipts[0].ArtifactDigest() != testArtifactDigest {
-		t.Fatalf("external evidence receipt lost exact bindings: %+v", receipts)
+	if len(index.Entries) != 1 || index.Entries[0].ArtifactSHA != testArtifactDigest {
+		t.Fatalf("verified SBOM lost artifact binding: %+v", index)
+	}
+	properties := map[string]string{}
+	for _, property := range documents["artifact"].Metadata.Component.Properties {
+		properties[property.Name] = property.Value
+	}
+	if properties["nkd:externalSbomDigest"] != evidenceDigest || properties["nkd:externalSbomRef"] != "file://"+evidencePath {
+		t.Fatalf("verified SBOM lost exact external evidence bindings: %+v", properties)
 	}
 	resolved.Components[0].Prebuilt.Evidence.SBOMDigest = testInputDigest
 	if _, err := buildVerifiedSBOM(context.Background(), resolved, buildDigest,
 		map[string]string{"artifact": testArtifactDigest}); cliErrorCode(err) == "" {
 		t.Fatalf("expected digest mismatch to fail closed, got %v", err)
-	}
-}
-
-func TestVulnerabilityPathRejectsMissingQualifiedScanner(t *testing.T) {
-	if _, err := runVulnScan(nil, nil, "", nil); cliErrorCode(err) != nkderr.CodeUnsupported {
-		t.Fatalf("stock CLI code = %q, want unsupported (%v)", cliErrorCode(err), err)
-	}
-	_, _, err := selectVulnerabilitySubject("", map[string]string{"a": testArtifactDigest, "b": testInputDigest})
-	if cliErrorCode(err) != nkderr.CodeUsage {
-		t.Fatalf("code = %q, want usage (%v)", cliErrorCode(err), err)
 	}
 }
 
@@ -826,12 +753,5 @@ func TestAttestRejectsUnavailableAuthorityOptionsBeforeBuild(t *testing.T) {
 		if err := app.Run(args); cliErrorCode(err) != nkderr.CodeUnsupported {
 			t.Fatalf("attest authority option did not fail closed before resolution/build: args=%v err=%v", args, err)
 		}
-	}
-}
-
-func TestPublishAuthorizedRejectsNilCapability(t *testing.T) {
-	err := publishAuthorized(context.Background(), nil, transport.Seams{}, transport.Targets{}, nil)
-	if cliErrorCode(err) == "" {
-		t.Fatalf("expected coded fail-closed error, got %v", err)
 	}
 }

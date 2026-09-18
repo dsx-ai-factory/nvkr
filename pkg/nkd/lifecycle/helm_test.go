@@ -1,7 +1,8 @@
 package lifecycle
 
 import (
-	"sort"
+	"path/filepath"
+	"slices"
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -9,40 +10,52 @@ import (
 )
 
 func TestHelmImageDependency(t *testing.T) {
-	definition := testDefinition(t)
-	definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: "charts", Platform: "linux/amd64", Format: OutputHelm, Components: []string{"charts"}, Helm: &HelmOutput{ImageOutput: "cli", Chart: "007-controller"}})
-	definition.Outputs[0].Format = OutputOCI
-	sort.Slice(definition.Outputs, func(i, j int) bool { return definition.Outputs[i].Name < definition.Outputs[j].Name })
-	if err := definition.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	spec, _, err := lower(definition, testEnvironment())
+	t.Chdir(filepath.Join("..", "..", ".."))
+	definitionPath := filepath.Join("definitions", "nke-v1", "definition.yaml")
+	definition, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pkg := spec.Packages[0]
-	if pkg.HelmImage == nil || pkg.HelmImage.Image != "package/cli" || len(pkg.Inputs) != 2 {
-		t.Fatalf("image dependency: %#v", pkg)
+	environment, err := LoadEnvironment(t.Context(), filepath.Join(filepath.Dir(definitionPath), "environment-local.yaml"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	definition.Outputs[0].Helm.ImageOutput = "missing"
+	plan, err := Compile(t.Context(), definitionPath, definition, "environment.yaml", environment, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var charts factory.Node
+	for _, node := range plan.Graph.Nodes {
+		if node.ID == "package/nke-helm" {
+			charts = node
+		}
+	}
+	if charts.HelmImage == nil || charts.HelmImage.Image != "package/cwe" || !slices.Contains(charts.Inputs, "package/cwe") || !slices.Contains(charts.Inputs, "artifact/nke-helm/nke-helm") {
+		t.Fatalf("image dependency: %#v", charts)
+	}
+	definition.Outputs[1].Helm.ImageOutput = "missing"
 	assertCode(t, definition.Validate(), e.CodeInvalidCatalog)
 }
 
 func TestSourceHelmSelection(t *testing.T) {
+	t.Chdir(filepath.Join("..", "..", ".."))
 	for _, tc := range []struct {
 		name       string
 		components []string
 		valid      bool
 	}{
-		{"one source archive", []string{"nkectl"}, true},
+		{"one source archive", []string{"nke-helm"}, true},
 		{"missing source archive", nil, false},
 		{"ambiguous source archives", []string{"first", "second"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			definition := testDefinition(t)
-			definition.Outputs[0].Format = OutputHelm
-			definition.Outputs[0].Components = tc.components
-			err := definition.Validate()
+			definitionPath := filepath.Join("definitions", "nke-v1", "definition.yaml")
+			definition, err := LoadDefinition(t.Context(), definitionPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			definition.Outputs = []DefinitionOutput{{Name: "charts", Format: OutputHelm, Platform: "linux/amd64", Components: tc.components}}
+			err = definition.Validate()
 			if !tc.valid {
 				assertCode(t, err, e.CodeInvalidCatalog)
 				return
@@ -50,13 +63,18 @@ func TestSourceHelmSelection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			spec, _, err := lower(definition, testEnvironment())
+			plan, err := Compile(t.Context(), definitionPath, definition, "environment.yaml", testEnvironment(), "test")
 			if err != nil {
 				t.Fatal(err)
 			}
-			pkg := spec.Packages[0]
-			if pkg.Kind != factory.PackageHelm || len(pkg.Inputs) != 1 || pkg.Inputs[0] != definition.Outputs[0].Name+"/nkectl" {
-				t.Fatalf("source Helm selection lost: %#v", pkg)
+			var charts factory.Node
+			for _, node := range plan.Graph.Nodes {
+				if node.ID == "package/charts" {
+					charts = node
+				}
+			}
+			if charts.PackageKind != factory.PackageHelm || charts.HelmImage != nil || !slices.Contains(charts.Inputs, "artifact/charts/nke-helm") {
+				t.Fatalf("source Helm selection lost: %#v", charts)
 			}
 		})
 	}

@@ -21,10 +21,6 @@ type regularFileCapability struct {
 	label string
 }
 
-func openRegularFileCapability(path, label string) (*regularFileCapability, error) {
-	return openRegularFileCapabilityContext(context.Background(), path, label)
-}
-
 func openRegularFileCapabilityContext(ctx context.Context, path, label string) (*regularFileCapability, error) {
 	if err := checkContext(ctx, "opening "+label); err != nil {
 		return nil, err
@@ -105,77 +101,6 @@ func (snapshot *regularFileCapability) rewindAndVerifyContext(ctx context.Contex
 		return e.Wrap(e.CodeInternal, err, "rewinding private %s snapshot", snapshot.label)
 	}
 	return checkContext(ctx, "verifying private "+snapshot.label+" snapshot")
-}
-
-func (snapshot *regularFileCapability) logicalDigest() (string, int64, error) {
-	return snapshot.logicalDigestContext(context.Background())
-}
-
-func (snapshot *regularFileCapability) logicalDigestContext(ctx context.Context) (string, int64, error) {
-	if err := snapshot.rewindAndVerifyContext(ctx); err != nil {
-		return "", 0, err
-	}
-	hash := sha256.New()
-	size, err := io.CopyBuffer(hash, assembleContextReader{ctx: ctx, source: snapshot.file}, make([]byte, 1<<20))
-	if err != nil {
-		if ctx != nil && ctx.Err() != nil {
-			return "", 0, e.Wrap(e.CodeTimeout, ctx.Err(), "hashing private %s snapshot", snapshot.label)
-		}
-		return "", 0, e.Wrap(e.CodeVerifyFailed, err, "hashing private %s snapshot", snapshot.label)
-	}
-	if err := snapshot.rewindAndVerifyContext(ctx); err != nil {
-		return "", 0, err
-	}
-	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), size, nil
-}
-
-func (snapshot *regularFileCapability) blockManifest(blockSize int) (BlockManifest, error) {
-	return snapshot.blockManifestContext(context.Background(), blockSize)
-}
-
-func (snapshot *regularFileCapability) blockManifestContext(ctx context.Context, blockSize int) (BlockManifest, error) {
-	if err := checkContext(ctx, "building a disk block manifest"); err != nil {
-		return BlockManifest{}, err
-	}
-	if snapshot == nil || snapshot.info == nil {
-		return BlockManifest{}, e.New(e.CodeInternal, "private regular-file snapshot is incomplete")
-	}
-	blockCount, err := boundedDiskBlockCount(snapshot.info.Size(), blockSize, e.CodeInvalidCatalog)
-	if err != nil {
-		return BlockManifest{}, err
-	}
-	if err := snapshot.rewindAndVerifyContext(ctx); err != nil {
-		return BlockManifest{}, err
-	}
-	aggregate := sha256.New()
-	manifest := BlockManifest{
-		BlockSizeBytes: blockSize,
-		Blocks:         make([]string, 0, blockCount),
-	}
-	buffer := make([]byte, blockSize)
-	for {
-		if err := checkContext(ctx, "building a disk block manifest"); err != nil {
-			return BlockManifest{}, err
-		}
-		n, err := io.ReadFull(snapshot.file, buffer)
-		if n > 0 {
-			sum := sha256.Sum256(buffer[:n])
-			manifest.Blocks = append(manifest.Blocks, "sha256:"+hex.EncodeToString(sum[:]))
-			_, _ = aggregate.Write(buffer[:n])
-		}
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			break
-		}
-		if err != nil {
-			return BlockManifest{}, e.Wrap(e.CodeVerifyFailed, err,
-				"reading private %s snapshot", snapshot.label)
-		}
-	}
-	if err := snapshot.rewindAndVerifyContext(ctx); err != nil {
-		return BlockManifest{}, err
-	}
-	manifest.Aggregate = "sha256:" + hex.EncodeToString(aggregate.Sum(nil))
-	return manifest, nil
 }
 
 // diskEvidence observes the encryption header, aggregate digest, size, and

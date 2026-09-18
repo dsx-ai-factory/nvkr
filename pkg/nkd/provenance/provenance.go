@@ -9,9 +9,8 @@
 // buildDefinition.buildType, buildDefinition.externalParameters, and
 // runDetails.builder.id — all present here — so omitting build times is spec-valid.
 //
-// A separate, non-reproducible SIGNED build-observations record (host facts, actual
-// build times, observed engineClass) is ADR-09 §2 / ADR-02 T3: signed but never part
-// of any identity or expected-evidence digest. It lives in BuildObservations here.
+// Production provenance records invocation times separately from reproducible
+// evidence. A signed host-observations attestation remains deferred in ADR-09 §2.
 package provenance
 
 import (
@@ -267,27 +266,6 @@ func validDependencyIdentity(dependency Dependency) bool {
 	}
 	return false
 }
-
-// BuildObservations is the SIGNED, NON-reproducible observations attestation (ADR-09
-// §2 / ADR-02 T3): host facts, actual build times, observed engineClass. It is never
-// part of any identity or expected-evidence digest — it exists for audit/diagnosis and
-// may be independently signed.
-type BuildObservations struct {
-	SchemaVersion string                `json:"schemaVersion"`
-	BuildDigest   string                `json:"buildDigest"`
-	Observations  []ArtifactObservation `json:"observations"`
-	Host          map[string]string     `json:"host,omitempty"`
-}
-
-// ArtifactObservation records the per-artifact observed substrate + timing.
-type ArtifactObservation struct {
-	Component   string `json:"component"`
-	EngineClass string `json:"engineClass,omitempty"`
-	StartedOn   string `json:"startedOn,omitempty"`
-	FinishedOn  string `json:"finishedOn,omitempty"`
-}
-
-const ObservationsSchemaVersion = "nkd.dev/build-observations/v2"
 
 func buildTypeFor(builderType string) string {
 	switch builderType {

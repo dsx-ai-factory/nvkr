@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -38,11 +39,28 @@ func SandboxExec(writeRoots, command []string) error {
 	if err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "resolving sandbox command %s", command[0])
 	}
-	// The unsupported-host implementation always refuses; Linux evaluates the
-	// active kernel's Landlock and seccomp capabilities.
-	//nolint:staticcheck
-	if err := applyExecutionSandbox(cleanRoots); err != nil {
-		return err
-	}
-	return replaceSandboxProcess(path, command, os.Environ())
+	return runOnSandboxThread(func() error {
+		// The unsupported-host implementation always refuses; Linux evaluates the
+		// active kernel's Landlock and seccomp capabilities.
+		//nolint:staticcheck
+		if err := applyExecutionSandbox(cleanRoots); err != nil {
+			return err
+		}
+		return replaceSandboxProcess(path, command, os.Environ())
+	})
+}
+
+func runOnSandboxThread(operation func() error) error {
+	done := make(chan struct{})
+	var err error
+	go func() {
+		runtime.LockOSThread()
+		// Landlock and seccomp restrict this OS thread. Keep policy application
+		// and exec together, and never unlock: failure may leave partial policy
+		// active, so this goroutine's exit must retire the thread.
+		defer close(done)
+		err = operation()
+	}()
+	<-done
+	return err
 }

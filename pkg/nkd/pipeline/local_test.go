@@ -190,7 +190,7 @@ func TestRunSchedulerConcurrentDeterministic(t *testing.T) {
 	}
 }
 
-func TestLocalRunAndLoweringRejectUnsafeCallerGraphBeforeWork(t *testing.T) {
+func TestLocalRunRejectsUnsafeCallerGraphBeforeWork(t *testing.T) {
 	for name, mutate := range map[string]func(*ir.Node){
 		"tagged toolchain": func(node *ir.Node) { node.Toolchain = "ubuntu:latest" },
 		"networked build":  func(node *ir.Node) { node.Network = ir.NetworkDefault },
@@ -205,9 +205,6 @@ func TestLocalRunAndLoweringRejectUnsafeCallerGraphBeforeWork(t *testing.T) {
 			report, err := (Local{}).Run(graph, "sha256:"+repeatHex("f"), RunOptions{Ctx: context.Background(), DryRun: true, Stdout: &output})
 			if err == nil || output.Len() != 0 || report.Qualified() || len(report.Nodes) != 0 {
 				t.Fatalf("unsafe graph crossed local execution seam: report=%+v output=%q err=%v", report, output.String(), err)
-			}
-			if jobs, err := LowerJobs(graph); err == nil || len(jobs) != 0 {
-				t.Fatalf("unsafe graph crossed lowering seam: jobs=%+v err=%v", jobs, err)
 			}
 		})
 	}

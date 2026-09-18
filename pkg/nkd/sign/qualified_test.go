@@ -23,6 +23,19 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/trust"
 )
 
+// newTestCosignVerifier injects a diagnostic runner. A stock ExecRunner still
+// requires a binary pin so tests cannot accidentally grant ambient authority.
+func newTestCosignVerifier(binary string, runner CommandRunner) *CosignVerifier {
+	if strings.TrimSpace(binary) == "" {
+		binary = DefaultBinary
+	}
+	if runner == nil {
+		runner = ExecRunner{}
+	}
+	return &CosignVerifier{binary: binary, runner: runner,
+		requiresBinaryPin: isExecRunner(runner)}
+}
+
 func signCode(err error) nkderr.Code {
 	if typed, ok := err.(*nkderr.Error); ok {
 		return typed.Code
@@ -129,7 +142,7 @@ func TestQualifiedCosignUsesPrivateMaterialAndCapturesCertificateClaims(t *testi
 		}
 		return nil
 	})
-	verifier := NewCosignVerifier("cosign-under-test", runner)
+	verifier := newTestCosignVerifier("cosign-under-test", runner)
 	evidence, err := verifier.VerifyDocument(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
@@ -237,7 +250,7 @@ func TestQualifiedCosignRejectsWrongBinaryPinBeforeRunner(t *testing.T) {
 
 func TestQualifiedCosignRejectsAmbientUnpinnedExecRunner(t *testing.T) {
 	req, _ := qualifiedRequest(t, "release@example.test", "https://issuer.example.test", true)
-	verifier := NewCosignVerifier("cosign", nil)
+	verifier := newTestCosignVerifier("cosign", nil)
 	if _, err := verifier.VerifyDocument(context.Background(), req); signCode(err) != nkderr.CodeUnpinnedInput {
 		t.Fatalf("ambient production verifier must require an exact binary pin: %v", err)
 	}
@@ -249,7 +262,7 @@ func TestQualifiedCosignDoesNotCopyExpectedIdentityIntoResult(t *testing.T) {
 	const issuer = "https://issuer.example.test"
 	req, _ := qualifiedRequest(t, actual, issuer, false)
 	req.AllowedIdentities = []string{expected}
-	verifier := NewCosignVerifier("cosign-under-test", RunnerFunc(func(context.Context, string, []string, io.Writer, io.Writer) error {
+	verifier := newTestCosignVerifier("cosign-under-test", RunnerFunc(func(context.Context, string, []string, io.Writer, io.Writer) error {
 		return nil // simulate a subprocess that failed to enforce its expected-identity flag
 	}))
 	_, err := verifier.VerifyDocument(context.Background(), req)
@@ -261,7 +274,7 @@ func TestQualifiedCosignDoesNotCopyExpectedIdentityIntoResult(t *testing.T) {
 func TestQualifiedCosignPreservesCancellationAsTimeout(t *testing.T) {
 	req, _ := qualifiedRequest(t, "release@example.test", "https://issuer.example.test", true)
 	ctx, cancel := context.WithCancel(context.Background())
-	verifier := NewCosignVerifier("cosign-under-test", RunnerFunc(func(ctx context.Context, _ string, _ []string, _, _ io.Writer) error {
+	verifier := newTestCosignVerifier("cosign-under-test", RunnerFunc(func(ctx context.Context, _ string, _ []string, _, _ io.Writer) error {
 		cancel()
 		<-ctx.Done()
 		return ctx.Err()
@@ -284,7 +297,7 @@ func TestQualifiedCosignRejectsVerificationMaterialMutation(t *testing.T) {
 		}
 		return nil
 	})
-	_, err := NewCosignVerifier("cosign-under-test", runner).VerifyDocument(context.Background(), req)
+	_, err := newTestCosignVerifier("cosign-under-test", runner).VerifyDocument(context.Background(), req)
 	if signCode(err) != nkderr.CodeSignatureInvalid {
 		t.Fatalf("mutated private bundle must fail closed: %v", err)
 	}
@@ -294,7 +307,7 @@ func TestQualifiedCosignRejectsMismatchedTrustedRootPinBeforeRunner(t *testing.T
 	req, _ := qualifiedRequest(t, "release@example.test", "https://issuer.example.test", true)
 	req.TrustedRootDigest = "sha256:" + strings.Repeat("0", 64)
 	called := false
-	verifier := NewCosignVerifier("cosign-under-test", RunnerFunc(func(context.Context, string, []string, io.Writer, io.Writer) error {
+	verifier := newTestCosignVerifier("cosign-under-test", RunnerFunc(func(context.Context, string, []string, io.Writer, io.Writer) error {
 		called = true
 		return nil
 	}))
@@ -316,7 +329,7 @@ func TestQualifiedCosignRejectsDetachedCertificateThatDiffersFromBundle(t *testi
 		t.Fatal(err)
 	}
 	called := false
-	verifier := NewCosignVerifier("cosign-under-test", RunnerFunc(func(context.Context, string, []string, io.Writer, io.Writer) error {
+	verifier := newTestCosignVerifier("cosign-under-test", RunnerFunc(func(context.Context, string, []string, io.Writer, io.Writer) error {
 		called = true
 		return nil
 	}))
@@ -349,7 +362,7 @@ func TestQualifiedCosignPreservesOnlineBundleProtocolSemantics(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			verifier := NewCosignVerifier("cosign-under-test", RunnerFunc(func(_ context.Context, _ string, args []string, _, _ io.Writer) error {
+			verifier := newTestCosignVerifier("cosign-under-test", RunnerFunc(func(_ context.Context, _ string, args []string, _, _ io.Writer) error {
 				for _, flag := range test.wantFlags {
 					if !containsArg(args, flag) {
 						t.Fatalf("online args missing %s: %v", flag, args)
@@ -378,16 +391,16 @@ func TestQualifiedVerifyArgsOfflineRequiresBundleAndRoot(t *testing.T) {
 		AllowedIdentities: []string{"release@example.test"},
 		OIDCIssuer:        "https://issuer.example.test",
 	}
-	if _, err := QualifiedVerifyBlobArgs(base); signCode(err) != nkderr.CodeSignatureInvalid {
+	if _, err := qualifiedVerifyBlobArgs(base, true); signCode(err) != nkderr.CodeSignatureInvalid {
 		t.Fatalf("missing offline bundle must fail signature gate: %v", err)
 	}
 	base.Signature.BundlePath = "/private/bundle"
-	if _, err := QualifiedVerifyBlobArgs(base); signCode(err) != nkderr.CodeUnpinnedInput {
+	if _, err := qualifiedVerifyBlobArgs(base, true); signCode(err) != nkderr.CodeUnpinnedInput {
 		t.Fatalf("missing offline root must fail unpinned-input: %v", err)
 	}
 	base.Signature.TrustedRootPath = "/private/root"
 	base.TrustedRootDigest = "sha256:" + strings.Repeat("a", 64)
-	args, err := QualifiedVerifyBlobArgs(base)
+	args, err := qualifiedVerifyBlobArgs(base, true)
 	if err != nil {
 		t.Fatal(err)
 	}

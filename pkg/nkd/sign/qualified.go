@@ -108,22 +108,6 @@ type CosignVerifier struct {
 	requiresBinaryPin    bool
 }
 
-// NewCosignVerifier builds an explicitly injected verifier adapter. A custom
-// runner is part of the caller's trusted computing base and is primarily useful
-// for tests. Selecting ExecRunner (including by passing nil) deliberately remains
-// unusable until a binary digest is supplied through NewPinnedCosignVerifier: an
-// ambient PATH executable cannot be signature-verification authority.
-func NewCosignVerifier(binary string, runner CommandRunner) *CosignVerifier {
-	if strings.TrimSpace(binary) == "" {
-		binary = DefaultBinary
-	}
-	if runner == nil {
-		runner = ExecRunner{}
-	}
-	return &CosignVerifier{binary: binary, runner: runner,
-		requiresBinaryPin: isExecRunner(runner)}
-}
-
 // NewPinnedCosignVerifier constructs the production adapter. It rejects platforms
 // without an exact descriptor-exec primitive immediately, before any
 // authentication request can be read. On Linux each verification resolves the
@@ -509,17 +493,8 @@ func untrustedCertificateError(role trust.SignerRole, format string, args ...any
 	return e.New(e.CodeUntrustedSigner, format, args...)
 }
 
-// QualifiedVerifyBlobArgs builds the cosign invocation used by CosignVerifier. The
-// qualified interface has no insecure-ignore-tlog option. Offline verification is
-// represented by a local Sigstore bundle plus an explicit trusted-root JSON; modern
-// cosign verifies those local materials without an --offline escape flag.
-func QualifiedVerifyBlobArgs(req trust.DocumentVerificationRequest) ([]string, error) {
-	// An explicit trusted root is supported by cosign only with the v0.3 bundle
-	// protocol. Production calls qualifiedVerifyBlobArgs with the format detected
-	// from the exact held bundle bytes, including for online v0.3 bundles.
-	return qualifiedVerifyBlobArgs(req, strings.TrimSpace(req.Signature.TrustedRootPath) != "")
-}
-
+// qualifiedVerifyBlobArgs receives the protocol detected from exact held bundle
+// bytes. It never offers an insecure-ignore-tlog or unsupported offline escape.
 func qualifiedVerifyBlobArgs(req trust.DocumentVerificationRequest, newBundle bool) ([]string, error) {
 	if strings.TrimSpace(req.SnapshotPath) == "" {
 		return nil, e.New(e.CodeSignatureInvalid, "qualified verification has no private document snapshot")

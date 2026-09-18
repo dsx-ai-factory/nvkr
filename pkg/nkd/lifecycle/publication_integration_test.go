@@ -10,7 +10,6 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func TestPublicationEmbedsAuthenticatedOutputsAndContent(t *testing.T) {
@@ -44,7 +43,7 @@ func TestPublicationEmbedsAuthenticatedOutputsAndContent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(resultArtifact.Path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	result := pipeline.ArtifactResult{Component: "kubectl", OutputType: "binary", SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))}
+	result := fixtureProducerResult(t, plan, component, component.Path)
 	raw, err := canonical.Marshal(result)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +69,7 @@ func TestPublicationEmbedsAuthenticatedOutputsAndContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gotArtifacts, subject, err := artifactsFromBinding(context.Background(), root, inspection)
+	gotArtifacts, subject, err := inspectTestPublication(t, context.Background(), root, inspection.RootDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,60 +80,6 @@ func TestPublicationEmbedsAuthenticatedOutputsAndContent(t *testing.T) {
 	if len(gotArtifacts) != 1 || gotArtifacts[0].Name != "cli" || gotArtifacts[0].Digest != descriptor.Digest ||
 		subject == "" {
 		t.Fatalf("artifacts=%+v subject=%s", gotArtifacts, subject)
-	}
-
-	for _, tc := range []struct {
-		name   string
-		mutate func(*delivery.Inspection)
-	}{
-		{"missing document", func(i *delivery.Inspection) {
-			for n, o := range i.Root.Objects {
-				if o.Kind == "sbom" {
-					i.Root.Objects = append(i.Root.Objects[:n], i.Root.Objects[n+1:]...)
-					return
-				}
-			}
-		}},
-		{"unbound evidence", func(i *delivery.Inspection) {
-			for n, o := range i.Root.Objects {
-				if o.Kind == "sbom" {
-					i.Root.Objects[n].Evidence = nil
-					return
-				}
-			}
-		}},
-		{"wrong evidence type", func(i *delivery.Inspection) {
-			for n, o := range i.Root.Objects {
-				if o.Kind == "sbom" {
-					i.Root.Objects[n].ArtifactType = "application/json"
-					return
-				}
-			}
-		}},
-		{"wrong semantic identity", func(i *delivery.Inspection) {
-			for n, o := range i.Root.Objects {
-				if o.Kind == "sbom" {
-					i.Root.Objects[n].SemanticDigest = "sha256:" + repeat("7", 64)
-					return
-				}
-			}
-		}},
-		{"duplicate document", func(i *delivery.Inspection) {
-			for _, o := range i.Root.Objects {
-				if o.Kind == "sbom" {
-					i.Root.Objects = append(i.Root.Objects, o)
-					return
-				}
-			}
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			changed := inspection
-			changed.Root.Objects = append([]delivery.PublishedObject(nil), inspection.Root.Objects...)
-			tc.mutate(&changed)
-			_, _, err := artifactsFromBinding(t.Context(), root, changed)
-			assertCode(t, err, nkderr.CodeVerifyFailed)
-		})
 	}
 
 	if err := os.RemoveAll(root); err != nil {

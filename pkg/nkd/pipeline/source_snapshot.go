@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -56,7 +57,8 @@ type preparedSourceEntry struct {
 // preparedSourceCache is a run-scoped single-flight cache. It deduplicates the
 // expensive checkout hash -> normalized copy -> copy hash -> patched-input hash
 // chain for build nodes that consume the exact same read-only source input. The
-// cache never crosses runs or persists authority; Local.Run owns and closes it.
+// cache never crosses runs or persists authority; Local.Run or NodeSession owns
+// and closes it. A NodeSession keeps separate caches for each source workspace.
 type preparedSourceCache struct {
 	mu      sync.Mutex
 	entries map[string]*preparedSourceEntry
@@ -219,8 +221,8 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 
 // materializeSource authenticates the fetch receipt, copies the exact closure to
 // a private directory, applies the ordered verified patch series, and computes the
-// resolved-input identity. Exact read-only consumers within one Local.Run share a
-// single-flight result; standalone/exec-node callers retain per-call ownership.
+// resolved-input identity. Exact read-only consumers in one execution session
+// share a single-flight result; standalone callers retain per-call ownership.
 func materializeSource(n ir.Node, opts RunOptions) (*materializedSource, error) {
 	if opts.sources != nil && n.SourceReadOnly && n.WriteDir != "" {
 		return opts.sources.materialize(n, opts)
@@ -404,7 +406,7 @@ func sourceTreeManifestContext(ctx context.Context, root string) (sourceClosureM
 	if err := ctx.Err(); err != nil {
 		return sourceClosureManifest{}, err
 	}
-	rootDir, _, err := openDirectoryNoFollow(root)
+	rootDir, _, err := securepath.OpenDirectory(root)
 	if err != nil {
 		return sourceClosureManifest{}, fmt.Errorf("source root %s is not a real directory: %w", root, err)
 	}
@@ -433,17 +435,17 @@ func sourceTreeManifestContext(ctx context.Context, root string) (sourceClosureM
 			if prefix != "" {
 				relative = filepath.Join(prefix, name)
 			}
-			entry, err := inspectSourceChild(directory, name, relative)
+			entry, err := securepath.InspectChild(directory, name, relative)
 			if err != nil {
 				return err
 			}
-			mode := fmt.Sprintf("%04o", entry.mode.Perm())
+			mode := fmt.Sprintf("%04o", entry.Mode.Perm())
 			slashPath := filepath.ToSlash(relative)
-			switch entry.kind {
+			switch entry.Kind {
 			case "directory":
-				entries = append(entries, sourceClosureEntry{Path: slashPath, Type: entry.kind, Mode: mode})
-				err = walk(entry.file, relative)
-				closeErr := entry.file.Close()
+				entries = append(entries, sourceClosureEntry{Path: slashPath, Type: entry.Kind, Mode: mode})
+				err = walk(entry.File, relative)
+				closeErr := entry.File.Close()
 				if err != nil {
 					return err
 				}
@@ -451,8 +453,8 @@ func sourceTreeManifestContext(ctx context.Context, root string) (sourceClosureM
 					return closeErr
 				}
 			case "file":
-				contentDigest, _, _, hashErr := hashOpenRegularContext(ctx, entry.file, entry.info)
-				closeErr := entry.file.Close()
+				contentDigest, _, _, hashErr := hashOpenRegularContext(ctx, entry.File, entry.Info)
+				closeErr := entry.File.Close()
 				if hashErr != nil {
 					return fmt.Errorf("hashing source file %s: %w", relative, hashErr)
 				}
@@ -460,11 +462,11 @@ func sourceTreeManifestContext(ctx context.Context, root string) (sourceClosureM
 					return closeErr
 				}
 				entries = append(entries, sourceClosureEntry{
-					Path: slashPath, Type: entry.kind, Mode: mode, ContentDigest: contentDigest,
+					Path: slashPath, Type: entry.Kind, Mode: mode, ContentDigest: contentDigest,
 				})
 			case "symlink":
 				entries = append(entries, sourceClosureEntry{
-					Path: slashPath, Type: entry.kind, Mode: mode, Target: entry.target,
+					Path: slashPath, Type: entry.Kind, Mode: mode, Target: entry.Target,
 				})
 			default:
 				return fmt.Errorf("unsupported source entry %s", relative)
@@ -478,14 +480,6 @@ func sourceTreeManifestContext(ctx context.Context, root string) (sourceClosureM
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
 	return sourceClosureManifest{SchemaVersion: sourceClosureSchema, Entries: entries}, nil
-}
-
-type inspectedSourceEntry struct {
-	kind   string
-	mode   fs.FileMode
-	target string
-	file   *os.File
-	info   os.FileInfo
 }
 
 func sourceChildNames(directory *os.File) ([]string, error) {
@@ -513,60 +507,6 @@ func sourceChildNames(directory *os.File) ([]string, error) {
 	return names, nil
 }
 
-func inspectSourceChild(parent *os.File, name, relative string) (inspectedSourceEntry, error) {
-	var stat unix.Stat_t
-	if err := unix.Fstatat(int(parent.Fd()), name, &stat, unix.AT_SYMLINK_NOFOLLOW); err != nil {
-		return inspectedSourceEntry{}, fmt.Errorf("inspecting source entry %s: %w", relative, err)
-	}
-	switch stat.Mode & unix.S_IFMT {
-	case unix.S_IFDIR:
-		file, info, err := openChildNoFollow(parent, name, true)
-		if err != nil {
-			return inspectedSourceEntry{}, fmt.Errorf("opening source directory %s: %w", relative, err)
-		}
-		return inspectedSourceEntry{kind: "directory", mode: info.Mode(), file: file, info: info}, nil
-	case unix.S_IFREG:
-		file, info, err := openChildNoFollow(parent, name, false)
-		if err != nil {
-			return inspectedSourceEntry{}, fmt.Errorf("opening source file %s: %w", relative, err)
-		}
-		return inspectedSourceEntry{kind: "file", mode: info.Mode(), file: file, info: info}, nil
-	case unix.S_IFLNK:
-		target, err := readSourceSymlink(parent, name, stat)
-		if err != nil {
-			return inspectedSourceEntry{}, fmt.Errorf("reading source symlink %s: %w", relative, err)
-		}
-		if !sourceSymlinkSafe(filepath.ToSlash(relative), target) {
-			return inspectedSourceEntry{}, fmt.Errorf("source symlink %s escapes the authenticated closure", relative)
-		}
-		return inspectedSourceEntry{kind: "symlink", mode: fs.FileMode(stat.Mode & 0o777), target: target}, nil
-	default:
-		return inspectedSourceEntry{}, fmt.Errorf("unsupported source entry %s (mode %#o)", relative, stat.Mode)
-	}
-}
-
-func readSourceSymlink(parent *os.File, name string, before unix.Stat_t) (string, error) {
-	buffer := make([]byte, 256)
-	for len(buffer) <= 1<<20 {
-		n, err := unix.Readlinkat(int(parent.Fd()), name, buffer)
-		if err != nil {
-			return "", err
-		}
-		if n < len(buffer) {
-			var after unix.Stat_t
-			if err := unix.Fstatat(int(parent.Fd()), name, &after, unix.AT_SYMLINK_NOFOLLOW); err != nil {
-				return "", err
-			}
-			if before.Dev != after.Dev || before.Ino != after.Ino || before.Mode != after.Mode || before.Size != after.Size {
-				return "", fmt.Errorf("source symlink changed while being inspected")
-			}
-			return string(buffer[:n]), nil
-		}
-		buffer = make([]byte, len(buffer)*2)
-	}
-	return "", fmt.Errorf("source symlink target is too long")
-}
-
 func copySourceTree(src, dst string, epoch int64) error {
 	return copySourceTreeContext(context.Background(), src, dst, epoch)
 }
@@ -578,12 +518,12 @@ func copySourceTreeContext(ctx context.Context, src, dst string, epoch int64) er
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	sourceRoot, _, err := openDirectoryNoFollow(src)
+	sourceRoot, _, err := securepath.OpenDirectory(src)
 	if err != nil {
 		return fmt.Errorf("source root %s is not a real directory: %w", src, err)
 	}
 	defer sourceRoot.Close()
-	destinationRoot, _, err := openDirectoryNoFollow(dst)
+	destinationRoot, _, err := securepath.OpenDirectory(dst)
 	if err != nil {
 		return fmt.Errorf("snapshot root %s is not a real directory: %w", dst, err)
 	}
@@ -622,29 +562,29 @@ func copySourceDirectoryContext(ctx context.Context, source, destination *os.Fil
 		if prefix != "" {
 			relative = filepath.Join(prefix, name)
 		}
-		entry, err := inspectSourceChild(source, name, relative)
+		entry, err := securepath.InspectChild(source, name, relative)
 		if err != nil {
 			return err
 		}
-		switch entry.kind {
+		switch entry.Kind {
 		case "directory":
 			if err := unix.Mkdirat(int(destination.Fd()), name, 0o700); err != nil {
-				entry.file.Close()
+				entry.File.Close()
 				return fmt.Errorf("creating snapshot directory %s: %w", relative, err)
 			}
-			to, _, err := openChildNoFollow(destination, name, true)
+			to, _, err := securepath.OpenChild(destination, name, true)
 			if err != nil {
-				entry.file.Close()
+				entry.File.Close()
 				return fmt.Errorf("opening snapshot directory %s: %w", relative, err)
 			}
-			copyErr := copySourceDirectoryContext(ctx, entry.file, to, relative, stamp, entries)
+			copyErr := copySourceDirectoryContext(ctx, entry.File, to, relative, stamp, entries)
 			if copyErr == nil {
-				copyErr = to.Chmod(entry.mode.Perm())
+				copyErr = to.Chmod(entry.Mode.Perm())
 			}
 			if copyErr == nil {
 				copyErr = setOpenFileTimes(to, stamp)
 			}
-			sourceCloseErr := entry.file.Close()
+			sourceCloseErr := entry.File.Close()
 			destCloseErr := to.Close()
 			if copyErr != nil {
 				return copyErr
@@ -657,14 +597,14 @@ func copySourceDirectoryContext(ctx context.Context, source, destination *os.Fil
 			}
 		case "file":
 			if err := copyOpenSourceFileContext(ctx, entry, destination, name, relative, stamp); err != nil {
-				entry.file.Close()
+				entry.File.Close()
 				return err
 			}
-			if err := entry.file.Close(); err != nil {
+			if err := entry.File.Close(); err != nil {
 				return err
 			}
 		case "symlink":
-			if err := unix.Symlinkat(entry.target, int(destination.Fd()), name); err != nil {
+			if err := unix.Symlinkat(entry.Target, int(destination.Fd()), name); err != nil {
 				return fmt.Errorf("creating snapshot symlink %s: %w", relative, err)
 			}
 			times := []unix.Timespec{unix.NsecToTimespec(stamp.UnixNano()), unix.NsecToTimespec(stamp.UnixNano())}
@@ -676,15 +616,7 @@ func copySourceDirectoryContext(ctx context.Context, source, destination *os.Fil
 	return nil
 }
 
-func sourceSymlinkSafe(relative, target string) bool {
-	if target == "" || filepath.IsAbs(target) || strings.ContainsRune(target, '\x00') {
-		return false
-	}
-	resolved := filepath.Clean(filepath.Join(filepath.Dir(filepath.FromSlash(relative)), target))
-	return resolved != ".." && !strings.HasPrefix(resolved, ".."+string(filepath.Separator)) && !filepath.IsAbs(resolved)
-}
-
-func copyOpenSourceFileContext(ctx context.Context, entry inspectedSourceEntry, destination *os.File, name, relative string, stamp time.Time) error {
+func copyOpenSourceFileContext(ctx context.Context, entry securepath.Entry, destination *os.File, name, relative string, stamp time.Time) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -698,15 +630,15 @@ func copyOpenSourceFileContext(ctx context.Context, entry inspectedSourceEntry, 
 		_ = unix.Close(fd)
 		return fmt.Errorf("opening snapshot file %s", relative)
 	}
-	size, copyErr := copyPipelineContext(ctx, out, entry.file)
-	after, statErr := entry.file.Stat()
+	size, copyErr := copyPipelineContext(ctx, out, entry.File)
+	after, statErr := entry.File.Stat()
 	if copyErr == nil && statErr == nil &&
-		(!os.SameFile(entry.info, after) || size != entry.info.Size() || after.Size() != entry.info.Size() ||
-			!after.ModTime().Equal(entry.info.ModTime()) || after.Mode() != entry.info.Mode()) {
+		(!os.SameFile(entry.Info, after) || size != entry.Info.Size() || after.Size() != entry.Info.Size() ||
+			!after.ModTime().Equal(entry.Info.ModTime()) || after.Mode() != entry.Info.Mode()) {
 		copyErr = fmt.Errorf("source file %s changed while being copied", relative)
 	}
 	if copyErr == nil {
-		copyErr = out.Chmod(entry.mode.Perm())
+		copyErr = out.Chmod(entry.Mode.Perm())
 	}
 	if copyErr == nil {
 		copyErr = setOpenFileTimes(out, stamp)
@@ -758,7 +690,7 @@ func copyCollectedArtifactContext(ctx context.Context, sourceRoot, sourceRelativ
 	}
 	written, copyErr := copyPipelineContext(ctx, tmp, in)
 	after, statErr := in.Stat()
-	if copyErr == nil && (statErr != nil || !sameFileMetadata(info, after) || written != info.Size()) {
+	if copyErr == nil && (statErr != nil || !securepath.SameMetadata(info, after) || written != info.Size()) {
 		copyErr = fmt.Errorf("collected artifact changed while being copied")
 	}
 	syncErr := tmp.Sync()

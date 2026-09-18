@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -57,22 +56,38 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 				t.Fatal(err)
 			}
 			workflow := string(bundle.Files[factory.GitHubWorkflowPath])
-			if !strings.Contains(workflow, "exec-node --launch --runtime docker --node build-cwe") {
-				t.Fatal("CWE launch does not select admitted Docker runtime")
+			if plan.Environment.RuntimeBinary() != "docker" || !strings.Contains(workflow,
+				"factory execute-node --plan "+bundle.PlanPath+" --node cwe/build-cwe") {
+				t.Fatal("CWE launch does not execute the plan carrying its admitted Docker runtime")
 			}
 		})
 	}
 }
 
-func TestLowerDerivesImageEnvelope(t *testing.T) {
-	definition := testDefinition(t)
-	definition.Outputs[0].Format = OutputOCI
-	spec, _, err := lower(definition, testEnvironment())
+func TestCompileDerivesImageEnvelope(t *testing.T) {
+	t.Chdir(filepath.Join("..", "..", ".."))
+	definitionPath := filepath.Join("definitions", "nke-v1", "definition.yaml")
+	definition, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(spec.Packages) != 2 || spec.Packages[0].Kind != factory.PackageImage || spec.Packages[1].Kind != factory.PackageOCI {
-		t.Fatalf("image packages: %#v", spec.Packages)
+	definition.Outputs = definition.Outputs[:1]
+	environment, err := LoadEnvironment(t.Context(), filepath.Join(filepath.Dir(definitionPath), "environment-local.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Compile(t.Context(), definitionPath, definition, "environment.yaml", environment, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages := map[string]string{}
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind == factory.NodePackage {
+			packages[node.ID] = node.PackageKind
+		}
+	}
+	if len(packages) != 2 || packages["package/cwe"] != factory.PackageImage || packages["package/release"] != factory.PackageOCI {
+		t.Fatalf("image packages: %#v", packages)
 	}
 	definition.Outputs[0].Components = []string{"first", "second"}
 	assertCode(t, definition.Validate(), e.CodeInvalidCatalog)
@@ -101,7 +116,7 @@ func TestConsumerImageBinding(t *testing.T) {
 				t.Fatal(err)
 			}
 			artifact := Artifact{Name: "cwe", Kind: OutputOCI, Digest: image.ManifestDigest, BuildDigest: "sha256:" + repeat("a", 64), Components: []string{"cwe"}}
-			content, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: []Artifact{artifact}})
+			content, err := delivery.ContentDigest([]Artifact{artifact})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -119,7 +134,7 @@ func TestConsumerImageBinding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			artifacts, subject, err := artifactsFromBinding(ctx, layout, inspection)
+			artifacts, subject, err := inspectTestPublication(t, ctx, layout, inspection.RootDigest)
 			if err != nil {
 				t.Fatal(err)
 			}

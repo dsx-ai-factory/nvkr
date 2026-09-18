@@ -11,7 +11,9 @@
   (air-gap / mirror).
 - **Satisfies:** SEC-16 (immutable publication), UC-11 (supersede / deprecate / withdraw).
 
-- **Scope:** Sections 1–5 govern qualified status; §6 governs the deferred v1 tag/revocation lifecycle.
+- **Scope:** Sections 1–5 specify the qualified status protocol; its publication and trusted-time integration
+  remain deferred. Signed-document diagnostics and checkpoint/high-water validation are implemented.
+  Section 6 governs the deferred v1 tag/revocation lifecycle.
 
 ## Context
 
@@ -29,6 +31,9 @@ status. The status path therefore needs its own authenticated freshness and anti
 ## Decision
 
 ### 1. Publication identity via content-addressing (no maintained ledger)
+
+This is a deferred qualified publication contract. The unused publication-identity constructor is removed;
+its canonical family remains reserved and cannot mint identities. Current pipeline publication uses ADR-20 §6.
 
 `publicationIdentity = Digest("nkd.publication", <exact canonical ValidationVector / ReleaseSet>)`, **distinct** from
 `buildDigest`, which covers only the compiled graph's logical projection — two profiles or manifests over one graph would
@@ -56,11 +61,11 @@ or rewrites** the target’s publication or evidence.
 
 ### 3. Storage & discovery: OCI referrers, mirrorable out-of-band
 
-A status declaration is **published as a signed OCI referrer attached to the publication artifact** in the
+The deferred discovery protocol publishes a status declaration as a signed OCI referrer attached to the publication artifact in the
 operator’s registry. A consumer holding a release digest **discovers** declarations by **querying that digest’s
 referrers** — no central service, no side-channel to poll. For **air-gap** there is no registry to query, so the
-same declarations are **mirrorable out-of-band** as a bundle. NKD **produces**, **publishes** (as a referrer),
-and **consumes** (checks referrers at resolve/verify) — it hosts nothing.
+same declarations must be mirrorable out-of-band as a bundle. Registry discovery, referrer publication and
+mirror-bundle integration are not implemented. Current commands authenticate explicitly supplied documents.
 
 ### 4. Signed status checkpoints: freshness and anti-rollback
 
@@ -93,13 +98,11 @@ observation epoch. A stateless or newly provisioned consumer must receive a mini
 and sequence in its trust policy or mirror bundle; without one it cannot make an anti-rollback claim and must
 fail closed in strict lifecycle mode.
 
-Release-grade freshness is selected only by a policy-owned **time authority**, never by a request scalar. The
-status policy pins a canonical `timeAuthority` identity. That authority snapshots its source once through a
-context-aware `Now` operation and issues an opaque `TrustedTime` capability binding `{timeAuthority, epoch}`
-under a distinct canonical family. Checkpoint verification requires the observation's authority to equal the one
-pinned by policy, and binds the authority, epoch, and observation digest into the resulting checkpoint receipt.
-Release Authorization (clearance) authenticates the same tuple. A raw `asOfEpoch`, including a correctly
-formatted historical value, may drive diagnostic status evaluation but cannot create a release status binding.
+The deferred release protocol requires freshness from a policy-owned time authority, never a request scalar.
+The policy must pin that authority, and the verifier must bind its authenticated epoch and observation identity
+to the accepted checkpoint and clearance. The unused time-authority capability and release-checkpoint adapter
+are removed; their canonical time family remains reserved and nonminting. Current checkpoint diagnostics use an
+explicit `asOfEpoch` and do not grant release authority. No production trusted-time adapter is implemented.
 
 The configured time source is part of local trust policy. It may be an authenticated wall-clock service, a
 hardware-backed clock, or a separately authenticated monotonic policy epoch, but the deployment must document
@@ -120,8 +123,8 @@ Trust anchors to a **signature**, not to file presence:
 - Only declarations named by the accepted current checkpoint participate in enforcement. A signed `withdrawn`
   from the pinned identity → **fail closed** (`withdrawn`); `deprecated` → warn + proceed; `superseded` → warn +
   name `replacedBy`.
-- A declaration whose `effectiveEpoch` is later than the trusted observation epoch is not yet enforced. Strict
-  lifecycle verification requires a `TrustedTime` from the policy-pinned authority; omitting it or supplying a
+- A declaration whose `effectiveEpoch` is later than the trusted observation epoch is not yet enforced. The deferred strict
+  lifecycle verifier must authenticate time from the policy-pinned authority; omitting it or supplying a
   caller-selected diagnostic epoch cannot turn an expired or pre-withdrawal checkpoint into a release-valid one.
 
 ### 6. Pipeline-attested release tags and revocation — deferred
@@ -179,11 +182,11 @@ mark, or freshness window. These v1 lifecycle operations remain unimplemented.
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/status/*_test.go` and `pkg/nkd/release/*_test.go` covers authenticated exact checkpoint/declaration bytes, signer policy,
-freshness, lower-sequence replay, same-sequence equivocation, predecessor and complete-declaration binding,
-withdrawal, caller-selected old-epoch bypass, time-authority substitution, release rollback, persistent
-high-water CAS. The removed mirror-generation tests no longer establish current implementation evidence. This is module evidence, not registry
-interoperability or trusted-time operations.
+Current contract evidence in `pkg/nkd/status/*_test.go` and `cmd/nkdctl/qualified_lifecycle_test.go` covers exact
+authenticated checkpoint/declaration bytes, signer policy, validity at an explicit diagnostic epoch,
+lower-sequence replay, same-sequence equivocation, predecessor and complete-declaration binding, withdrawal,
+and durable high-water locking, crash recovery and CAS. It does not establish trusted-time release authority,
+registry discovery, mirror interoperability or a qualified clearance path.
 
 End-to-end acceptance still requires publishing two successive checkpoints as OCI referrers, replaying the first
 through the registry discovery adapter, proving a consumer that observed the second fails closed,

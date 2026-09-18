@@ -75,7 +75,7 @@ func qualifiedAcquisitionReport(t *testing.T, fixtures []acquisitionFixture) *pi
 		result := pipeline.ArtifactResult{Component: fixture.component, OutputType: "raw",
 			Qualification: pipeline.ArtifactProfileFreeAcquisition, EngineClass: ir.EnginePrebuiltAcquire,
 			Path: fixture.component, SHA256: digest, Size: int64(len(fixture.contents))}
-		writePipelineResult(t, pipeline.ResultDirectory(options.SourceRoot), node.ID, result)
+		writePipelineResult(t, filepath.Join(filepath.Dir(options.SourceRoot), "results"), node.ID, result)
 	}
 	graph.Nodes = append(graph.Nodes, verify)
 	graph.Normalize()
@@ -84,7 +84,7 @@ func qualifiedAcquisitionReport(t *testing.T, fixtures []acquisitionFixture) *pi
 		t.Fatal(err)
 	}
 	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest,
-		pipeline.ResultDirectory(options.SourceRoot), options)
+		filepath.Join(filepath.Dir(options.SourceRoot), "results"), options)
 	if err != nil {
 		t.Fatalf("terminal acquisition verification failed: %v", err)
 	}
@@ -197,7 +197,7 @@ func qualifiedSourceEvidenceFixture(t *testing.T, repo, toolchain string) (*buil
 		ExecutionBinding: execution.ExecutionBinding(), Path: build.ArtifactPath,
 		SHA256: "sha256:" + hex.EncodeToString(sum[:]), Size: int64(len(payload)),
 	}
-	resultsDir := pipeline.ResultDirectory(options.SourceRoot)
+	resultsDir := filepath.Join(filepath.Dir(options.SourceRoot), "results")
 	writePipelineResult(t, resultsDir, build.ID, result)
 	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest, resultsDir, options)
 	if err != nil {
@@ -402,7 +402,7 @@ func publishedReceiptFixture(t *testing.T, manifest *Manifest) PublishedVectorRe
 		t.Fatal(err)
 	}
 	sum := sha256.Sum256(payload)
-	return PublishedVectorReceipt{valid: true, manifest: *manifest, identity: identity,
+	return PublishedVectorReceipt{valid: true, identity: identity,
 		blobDigest: "sha256:" + hex.EncodeToString(sum[:]), signer: "publisher@example.test",
 		canonicalPayload: string(payload)}
 }
@@ -448,9 +448,10 @@ func TestValidationVectorProjectionIsInvariantToToolchainTransport(t *testing.T)
 	offline := FromReport(&mirrored)
 	for _, manifest := range []*Manifest{online, offline} {
 		manifest.SetBuilderProfile("", attestDigest('5'), "")
-		manifest.AttachEvidence(&EvidenceRef{
+		manifest.Evidence = &EvidenceRef{
 			SBOMDigest: attestDigest('6'), ProvenanceDigest: attestDigest('7'),
-		}, attestDigest('8'))
+		}
+		manifest.EvidenceDigest = attestDigest('8')
 	}
 	if online.Components[0].Toolchain != attestDigest('2') ||
 		offline.Components[0].Toolchain != attestDigest('2') {
@@ -532,9 +533,6 @@ func TestVerifyResolvedInputIdentityIsMandatoryAndExact(t *testing.T) {
 		mutate(got)
 		if code(want.VerifyAgainst(got)) != nkderr.CodeVerifyFailed {
 			t.Fatalf("%s resolved-input identity must fail reproduction", name)
-		}
-		if _, _, err := want.Check(got); code(err) != nkderr.CodeVerifyFailed {
-			t.Fatalf("%s resolved-input identity mismatch must be rejected: %v", name, err)
 		}
 	}
 }
@@ -783,9 +781,6 @@ func TestComparisonRejectsCriticalIdentityDrift(t *testing.T) {
 		if code(want.VerifyAgainst(got)) != nkderr.CodeVerifyFailed {
 			t.Errorf("VerifyAgainst accepted %s drift", name)
 		}
-		if _, _, err := want.Check(got); code(err) != nkderr.CodeVerifyFailed {
-			t.Errorf("Check accepted %s drift: %v", name, err)
-		}
 	}
 }
 
@@ -809,9 +804,10 @@ func TestFromQualifiedReportAcceptsProfileFreeAcquisition(t *testing.T) {
 	if manifest.ProfileDigest != "" || manifest.BuilderProfile != nil {
 		t.Fatalf("byte-preserving acquisition unexpectedly gained a profile: %+v", manifest.BuilderProfile)
 	}
-	manifest.AttachEvidence(&EvidenceRef{SBOMDigest: attestDigest('6'), ProvenanceDigest: attestDigest('7')}, attestDigest('8'))
-	if _, err := manifest.MarshalQualifiedDiagnostic(ctx); err != nil {
-		t.Fatalf("qualified profile-free diagnostic bytes rejected: %v", err)
+	manifest.Evidence = &EvidenceRef{SBOMDigest: attestDigest('6'), ProvenanceDigest: attestDigest('7')}
+	manifest.EvidenceDigest = attestDigest('8')
+	if err := manifest.VerifyQualifiedAgainst(ctx, manifest); err != nil {
+		t.Fatalf("qualified profile-free observation rejected: %v", err)
 	}
 	if _, err := manifest.MarshalQualified(ctx); code(err) != nkderr.CodeProvenanceMissing {
 		t.Fatalf("caller-authored evidence acquired publisher authority: %v", err)
@@ -824,7 +820,8 @@ func TestPublishedManifestRejectsLegacyCallerAuthoredConformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest.AttachEvidence(&EvidenceRef{SBOMDigest: attestDigest('6'), ProvenanceDigest: attestDigest('7')}, attestDigest('8'))
+	manifest.Evidence = &EvidenceRef{SBOMDigest: attestDigest('6'), ProvenanceDigest: attestDigest('7')}
+	manifest.EvidenceDigest = attestDigest('8')
 
 	for name, mutate := range map[string]func(*Manifest){
 		"conformance claim":    func(candidate *Manifest) { candidate.ConformanceClaim = "conformant" },
@@ -850,7 +847,7 @@ func TestQualifiedManifestCloseReleasesReportAuthority(t *testing.T) {
 	if err := manifest.Close(); err != nil {
 		t.Fatalf("closing qualified manifest: %v", err)
 	}
-	if _, err := manifest.MarshalQualifiedDiagnostic(ctx); code(err) != nkderr.CodePreflightFailed {
+	if err := manifest.VerifyQualifiedAgainst(ctx, manifest); code(err) != nkderr.CodePreflightFailed {
 		t.Fatalf("closed manifest retained report authority: %v", err)
 	}
 	if err := manifest.Close(); err != nil {
@@ -867,9 +864,10 @@ func TestQualifiedObservationRejectsManifestAndReportMutation(t *testing.T) {
 		t.Fatalf("profile-free qualified vector unexpectedly gained a builder profile: %+v", got.BuilderProfile)
 	}
 	got.ConformanceClaim = "conformant"
-	got.AttachEvidence(&EvidenceRef{SBOMDigest: attestDigest('a'), ProvenanceDigest: attestDigest('c')}, attestDigest('b'))
-	if _, err := got.MarshalQualifiedDiagnostic(context.Background()); err != nil {
-		t.Fatalf("validated metadata enrichment must preserve diagnostic report-core qualification: %v", err)
+	got.Evidence = &EvidenceRef{SBOMDigest: attestDigest('a'), ProvenanceDigest: attestDigest('c')}
+	got.EvidenceDigest = attestDigest('b')
+	if err := want.VerifyQualifiedAgainst(context.Background(), got); err != nil {
+		t.Fatalf("validated metadata enrichment must preserve report-core qualification: %v", err)
 	}
 
 	got.Components[0].SHA256 = attestDigest('e')
@@ -904,7 +902,8 @@ func qualifiedSourceVector(t *testing.T) (want, got *Manifest, report *pipeline.
 	if err != nil {
 		t.Fatalf("qualified report projection failed: %v", err)
 	}
-	got.AttachEvidence(&EvidenceRef{SBOMDigest: attestDigest('6'), ProvenanceDigest: attestDigest('7')}, attestDigest('8'))
+	got.Evidence = &EvidenceRef{SBOMDigest: attestDigest('6'), ProvenanceDigest: attestDigest('7')}
+	got.EvidenceDigest = attestDigest('8')
 	raw, err := got.Marshal()
 	if err != nil {
 		t.Fatal(err)

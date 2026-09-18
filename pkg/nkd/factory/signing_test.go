@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -19,12 +21,12 @@ import (
 const testCosignArchiveDigest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 const testCosignExecutableDigest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
 
-func dryRunSigningProfile() *SigningProfile {
-	return &SigningProfile{Mode: SigningModeDryRun, Identity: "^local$", Issuer: "https://nkd.dev/local"}
+func dryRunSigningProfile() *authored.Signing {
+	return &authored.Signing{Mode: SigningModeDryRun, Identity: "^local$", Issuer: "https://nkd.dev/local"}
 }
 
-func cosignSigningProfile() *SigningProfile {
-	return &SigningProfile{Mode: SigningModeCosign, CosignTool: "cosign",
+func cosignSigningProfile() *authored.Signing {
+	return &authored.Signing{Mode: SigningModeCosign,
 		Identity: `^https://github\.com/example/nkd/\.github/workflows/nkd-factory\.yml@refs/heads/main$`,
 		Issuer:   "https://token.actions.githubusercontent.com"}
 }
@@ -32,7 +34,7 @@ func cosignSigningProfile() *SigningProfile {
 // signedTestPlan compiles a plan whose single OCI route publishes an oci-root
 // package, optionally under a signing profile. target lets a test point the route
 // at an in-process registry.
-func signedTestPlan(t *testing.T, signing *SigningProfile, target Target) *Plan {
+func signedTestPlan(t *testing.T, signing *authored.Signing, target Target) *Plan {
 	t.Helper()
 	base, err := catalog.LoadContext(context.Background(), testCatalogProvider(t))
 	if err != nil {
@@ -42,30 +44,24 @@ func signedTestPlan(t *testing.T, signing *SigningProfile, target Target) *Plan 
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
-		Metadata: Metadata{Name: "signed-factory"}, RunsOn: "ubuntu-24.04", Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
-		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
-		UtilityPlatform:  "linux/amd64",
-		Builds:           []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-		Packages: []PackageSpec{
-			{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}},
-			{Name: "publication", Kind: PackageOCI, Inputs: []string{"package/tools"}},
-		},
+	definition, delivery := fixtureInputs("signed-factory", "worker", "ubuntu-24.04")
+	delivery.Publication = &authored.Publication{RepositoryPrefix: strings.Split(target.Ref, ":latest")[0], CredentialRef: target.CredentialRef, Anonymous: target.Anonymous, PlainHTTP: target.PlainHTTP}
+	// Tests pass routes by name; public admission owns the single /releases route.
+	if i := strings.LastIndex(delivery.Publication.RepositoryPrefix, ":"); i > strings.LastIndex(delivery.Publication.RepositoryPrefix, "/") {
+		delivery.Publication.RepositoryPrefix = delivery.Publication.RepositoryPrefix[:i]
 	}
+	delivery.Signing = signing
 	if signing != nil && signing.Mode == SigningModeCosign {
-		definition.Tools = map[string]Tool{signing.CosignTool: {
-			Format:           ToolFormatTarGzip,
-			URL:              "https://example.invalid/cosign.tar.gz",
-			ArchiveDigest:    testCosignArchiveDigest,
-			ExecutablePath:   "cosign",
-			ExecutableDigest: testCosignExecutableDigest,
-		}}
+		definition.CosignTool = "cosign"
+		if base.Tools == nil {
+			base.Tools = map[string]catalog.ToolPin{}
+		}
+		base.Tools["cosign"] = catalog.ToolPin{Format: ToolFormatTarGzip, URL: "https://example.invalid/cosign.tar.gz", Platform: "linux/amd64", ArchiveDigest: testCosignArchiveDigest, ExecutablePath: "cosign", ExecutableDigest: testCosignExecutableDigest}
+		stack, err = catalog.ApplyStack(base)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "prod"},
-		Targets:  map[string]Target{"registry": target},
-		Routes:   []Route{{Name: "publication", Input: "package/publication", Target: "registry"}},
-		Signing:  signing}
 	plan, err := Compile(context.Background(), definition, delivery, stack, "v1.2.3 (deadbeef)")
 	if err != nil {
 		t.Fatalf("compiling signed plan: %v", err)
@@ -92,8 +88,8 @@ func TestCompileEmitsSigningLaneOnlyWhenTheDeliveryConfiguresIt(t *testing.T) {
 			t.Fatalf("unsigned delivery emitted signing artifact %q", artifact.ID)
 		}
 	}
-	if unsigned.CompileSpecDigest != "" {
-		t.Fatal("an unsigned plan must keep its exact legacy bytes, including no definition digest")
+	if !canonical.IsDigest(unsigned.DefinitionDigest) {
+		t.Fatal("every plan must bind its admitted Definition")
 	}
 
 	signed := signedTestPlan(t, dryRunSigningProfile(), ghcrTarget())
@@ -101,34 +97,34 @@ func TestCompileEmitsSigningLaneOnlyWhenTheDeliveryConfiguresIt(t *testing.T) {
 	for _, node := range signed.Graph.Nodes {
 		byID[node.ID] = node
 	}
-	sign, ok := byID["sign/publication"]
+	sign, ok := byID["sign/release"]
 	if !ok {
 		t.Fatalf("signed delivery emitted no sign node: %v", byID)
 	}
-	if !contains(sign.Inputs, "publication/publication") || !contains(sign.Inputs, "package/publication") {
+	if !contains(sign.Inputs, "publication/release") || !contains(sign.Inputs, "package/release") {
 		t.Fatalf("sign node does not consume the published reference AND the routed layout: %+v", sign)
 	}
-	if !contains(sign.Outputs, "signature/publication") || !contains(sign.Outputs, "predicate/publication") {
+	if !contains(sign.Outputs, "signature/release") || !contains(sign.Outputs, "predicate/release") {
 		t.Fatalf("sign node does not produce a record and a predicate: %+v", sign)
 	}
-	verify, ok := byID["verify-publication/publication"]
+	verify, ok := byID["verify-publication/release"]
 	if !ok {
 		t.Fatal("signed delivery emitted no verify-publication node")
 	}
-	if !contains(verify.Inputs, "publication/publication") || !contains(verify.Inputs, "signature/publication") ||
-		!contains(verify.Outputs, "verification/publication") {
+	if !contains(verify.Inputs, "publication/release") || !contains(verify.Inputs, "signature/release") ||
+		!contains(verify.Outputs, "verification/release") {
 		t.Fatalf("verify node dataflow is incomplete: %+v", verify)
 	}
-	if !canonical.IsDigest(signed.CompileSpecDigest) {
-		t.Fatalf("a signing plan must bind the compile-spec identity, got %q", signed.CompileSpecDigest)
+	if !canonical.IsDigest(signed.DefinitionDigest) {
+		t.Fatalf("a signing plan must bind the Definition identity, got %q", signed.DefinitionDigest)
 	}
 	// Dataflow, not authored order, must place signing after publication.
 	order := map[string]int{}
 	for index, node := range topologicalFactoryNodes(signed.Graph) {
 		order[node.ID] = index
 	}
-	if !(order["publish/publication"] < order["sign/publication"] &&
-		order["sign/publication"] < order["verify-publication/publication"]) {
+	if !(order["publish/release"] < order["sign/release"] &&
+		order["sign/release"] < order["verify-publication/release"]) {
 		t.Fatalf("signing lane is not ordered after publication: %v", order)
 	}
 }
@@ -141,14 +137,14 @@ func TestSignedPlanSurvivesTheCanonicalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if relocated.ExecutionSettings.Signing == nil {
+	if relocated.Environment.Signing == nil {
 		t.Fatal("the signing profile was dropped by the canonical round trip")
 	}
-	if *relocated.ExecutionSettings.Signing != *plan.ExecutionSettings.Signing {
-		t.Fatalf("signing settings round-tripped as %+v, want %+v", *relocated.ExecutionSettings.Signing, *plan.ExecutionSettings.Signing)
+	if *relocated.Environment.Signing != *plan.Environment.Signing {
+		t.Fatalf("signing settings round-tripped as %+v, want %+v", *relocated.Environment.Signing, *plan.Environment.Signing)
 	}
-	if relocated.Qualification != plan.Qualification || relocated.CompileSpecDigest != plan.CompileSpecDigest {
-		t.Fatalf("plan identity fields did not round-trip: %q/%q", relocated.Qualification, relocated.CompileSpecDigest)
+	if relocated.Qualification != plan.Qualification || relocated.DefinitionDigest != plan.DefinitionDigest {
+		t.Fatalf("plan identity fields did not round-trip: %q/%q", relocated.Qualification, relocated.DefinitionDigest)
 	}
 	before, err := plan.Digest()
 	if err != nil {
@@ -211,7 +207,7 @@ func TestRelocationPreservesAttestedPlanIdentity(t *testing.T) {
 
 	// The predicate is the thing that actually escapes the run, so assert on it too.
 	started := time.Unix(1787066575, 0).UTC()
-	raw, err := productionPredicateFor(first, first.ExecutionSettings.Signing, started, started)
+	raw, err := productionPredicateFor(first, first.Environment.Signing, started, started)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,56 +225,37 @@ func TestCompileRejectsCosignSigningWithoutAPinnedTool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
-		Metadata: Metadata{Name: "signed-factory"}, RunsOn: "ubuntu-24.04", Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
-		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
-		UtilityPlatform:  "linux/amd64",
-		Builds:           []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-		Packages:         []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
-	}
-	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "prod"},
-		Targets:  map[string]Target{"registry": ghcrTarget()},
-		Routes:   []Route{{Name: "tools", Input: "package/tools", Target: "registry"}},
-		Signing:  cosignSigningProfile()}
+	definition, delivery := fixtureInputs("signed-factory", "worker", "ubuntu-24.04")
+	definition.CosignTool = "absent"
+	delivery.Publication = &authored.Publication{RepositoryPrefix: "ghcr.io/example/nkd", Anonymous: true}
+	delivery.Signing = cosignSigningProfile()
 	if _, err := Compile(context.Background(), definition, delivery, stack, "v1.2.3 (deadbeef)"); err == nil {
 		t.Fatal("cosign signing was accepted without a pinned cosign tool")
 	}
 }
 
-func TestExecutionSettingsSigningValidation(t *testing.T) {
-	targets := map[string]Target{
-		"oci": {Kind: TargetOCI, Ref: "ghcr.io/example/x:v1", Anonymous: true},
-		"apt": {Kind: TargetAPT, Ref: "https://apt.example.invalid/nkd", Anonymous: true},
-	}
-	routes := []Route{{Name: "r", Input: "package/p", Target: "oci"}}
-	tests := []struct {
-		name    string
-		signing *SigningProfile
-		routes  []Route
+func TestEnvironmentSigningValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		signing     *authored.Signing
+		publication bool
 	}{
-		{name: "mode", signing: &SigningProfile{Mode: "keyless", Identity: "^x$", Issuer: "https://i"}, routes: routes},
-		{name: "identity", signing: &SigningProfile{Mode: SigningModeDryRun, Issuer: "https://i"}, routes: routes},
-		{name: "issuer", signing: &SigningProfile{Mode: SigningModeDryRun, Identity: "^x$"}, routes: routes},
-		{name: "identity-regexp", signing: &SigningProfile{Mode: SigningModeDryRun, Identity: "^([x$", Issuer: "https://i"}, routes: routes},
-		{name: "cosign-tool", signing: &SigningProfile{Mode: SigningModeCosign, Identity: "^x$", Issuer: "https://i"}, routes: routes},
-		{name: "no-routes", signing: &SigningProfile{Mode: SigningModeDryRun, Identity: "^x$", Issuer: "https://i"}},
-		{name: "non-oci-target", signing: &SigningProfile{Mode: SigningModeDryRun, Identity: "^x$", Issuer: "https://i"},
-			routes: []Route{{Name: "r", Input: "package/p", Target: "apt"}}},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if err := test.signing.Validate(targets, test.routes); err == nil {
-				t.Fatalf("invalid signing profile %+v was accepted", test.signing)
+		{"mode", &authored.Signing{Mode: "keyless", Identity: "^x$", Issuer: "https://i"}, true},
+		{"identity", &authored.Signing{Mode: SigningModeDryRun, Issuer: "https://i"}, true},
+		{"issuer", &authored.Signing{Mode: SigningModeDryRun, Identity: "^x$"}, true},
+		{"regexp", &authored.Signing{Mode: SigningModeDryRun, Identity: "^([x$", Issuer: "https://i"}, true},
+		{"no publication", &authored.Signing{Mode: SigningModeDryRun, Identity: "^x$", Issuer: "https://i"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, env := fixtureInputs("test", "worker", "")
+			env.Signing = tc.signing
+			if tc.publication {
+				env.Publication = &authored.Publication{RepositoryPrefix: "ghcr.io/example/nkd", Anonymous: true}
+			}
+			if err := env.Validate(); err == nil {
+				t.Fatal("invalid signing policy admitted")
 			}
 		})
-	}
-	valid := &SigningProfile{Mode: SigningModeDryRun, Identity: "^x$", Issuer: "https://i"}
-	if err := valid.Validate(targets, routes); err != nil {
-		t.Fatalf("valid signing profile rejected: %v", err)
-	}
-	if err := (*SigningProfile)(nil).Validate(targets, routes); err != nil {
-		t.Fatalf("absent signing profile rejected: %v", err)
 	}
 }
 
@@ -314,7 +291,7 @@ func TestPlanValidationRejectsAPublicationThatIsNotSigned(t *testing.T) {
 func TestRenderGitHubSigningJobsCarryModeScopedPermissions(t *testing.T) {
 	tests := []struct {
 		name    string
-		signing *SigningProfile
+		signing *authored.Signing
 		sign    map[string]string
 		verify  map[string]string
 	}{
@@ -337,8 +314,8 @@ func TestRenderGitHubSigningJobsCarryModeScopedPermissions(t *testing.T) {
 				t.Fatal(err)
 			}
 			for jobID, want := range map[string]map[string]string{
-				githubJobID("sign/publication"):               test.sign,
-				githubJobID("verify-publication/publication"): test.verify,
+				githubJobID("sign/release"):               test.sign,
+				githubJobID("verify-publication/release"): test.verify,
 			} {
 				job, ok := document.Jobs[jobID]
 				if !ok {
@@ -414,25 +391,6 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 	}
 }
 
-func TestRenderGitLabRefusesSigningBeforeEmittingAnything(t *testing.T) {
-	plan := signedTestPlan(t, dryRunSigningProfile(),
-		Target{Kind: TargetOCI, Ref: "registry.example.invalid/nkd/tools:dev", CredentialRef: "gitlab:NKD_TOKEN"})
-	bundle, err := RenderGitLab(context.Background(), plan)
-	if err == nil {
-		t.Fatal("GitLab silently rendered a signing plan")
-	}
-	if bundle != nil {
-		t.Fatal("GitLab returned bytes for an unsupported signing plan")
-	}
-	var coded *e.Error
-	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
-		t.Fatalf("GitLab refusal = %v, want %s", err, e.CodeEngineCapability)
-	}
-	if !strings.Contains(err.Error(), "signing") {
-		t.Fatalf("refusal does not name the missing capability: %v", err)
-	}
-}
-
 func TestRunLocalListsTheSigningLaneAndGatesItBehindPublish(t *testing.T) {
 	t.Chdir(t.TempDir())
 	plan := signedTestPlan(t, dryRunSigningProfile(), ghcrTarget())
@@ -453,7 +411,7 @@ func TestRunLocalListsTheSigningLaneAndGatesItBehindPublish(t *testing.T) {
 	for _, node := range result.Nodes {
 		listed[node.ID] = node.Status
 	}
-	for _, id := range []string{"sign/publication", "verify-publication/publication"} {
+	for _, id := range []string{"sign/release", "verify-publication/release"} {
 		if listed[id] != "skipped" {
 			t.Fatalf("without --publish, %s status = %q, want skipped", id, listed[id])
 		}

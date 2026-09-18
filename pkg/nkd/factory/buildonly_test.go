@@ -5,41 +5,58 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-// TestCommittedGraphDigestMatchesEmittedNodesDigest guards the trailing-newline drift: at
-// runtime `nkd-exec exec-node --nodes-digest` re-hashes the committed graph file it reads, so
-// the digest baked into the workflow MUST equal FileDigest of the exact committed file bytes.
-func TestCommittedGraphDigestMatchesEmittedNodesDigest(t *testing.T) {
+// The sole generated executable document is the complete Plan; its exact
+// canonical bytes and semantic digest must agree with every provider command.
+func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
-	for _, tc := range []struct {
-		render func() (*GeneratedBundle, error)
-		wfPath string
-		dir    string
-	}{
-		{func() (*GeneratedBundle, error) { return RenderGitLab(context.Background(), plan) }, GitLabWorkflowPath, GitLabGraphDir},
-		{func() (*GeneratedBundle, error) { return RenderGitHub(context.Background(), plan) }, GitHubWorkflowPath, FactoryGraphDir},
-	} {
-		b, err := tc.render()
-		if err != nil {
-			t.Fatal(err)
-		}
-		wf := string(b.Files[tc.wfPath])
-		graphs := 0
-		for path, raw := range b.Files {
-			if !strings.HasPrefix(path, tc.dir+"/") {
-				continue
+	for _, engine := range []string{EngineGitHub} {
+		t.Run(engine, func(t *testing.T) {
+			bundle, err := Render(t.Context(), plan, engine)
+			if err != nil {
+				t.Fatal(err)
 			}
-			graphs++
-			if d := pipeline.FileDigest(raw); !strings.Contains(wf, "--nodes-digest "+d) {
-				t.Fatalf("graph %s file-digest %s is not the emitted --nodes-digest (trailing-newline drift)", path, d)
+			if len(bundle.Files) != 2 {
+				t.Fatalf("expected only Plan and workflow, got %d members", len(bundle.Files))
 			}
-		}
-		if graphs == 0 {
-			t.Fatalf("expected graph files under %s", tc.dir)
-		}
+			var decoded Plan
+			if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &decoded); err != nil {
+				t.Fatal(err)
+			}
+			digest, err := decoded.Digest()
+			if err != nil || digest != bundle.PlanDigest {
+				t.Fatalf("committed Plan identity differs: %s %v", digest, err)
+			}
+			workflow := string(bundle.Files[bundle.WorkflowPath])
+			if !strings.Contains(workflow, "# planDigest: "+digest) || strings.Contains(workflow, "--nodes-digest") || strings.Contains(workflow, "/graphs/") {
+				t.Fatal("workflow uses a parallel producer graph")
+			}
+			for _, node := range plan.Graph.Nodes {
+				command := "factory execute-node --plan " + bundle.PlanPath + " --node " + shellQuote(node.ID)
+				if !strings.Contains(workflow, command) {
+					t.Fatalf("workflow omits exact Plan/node command: %s", command)
+				}
+			}
+			for _, mutation := range []string{"noncanonical Plan", "extra graph"} {
+				t.Run(mutation, func(t *testing.T) {
+					changed := *bundle
+					changed.Files = make(map[string][]byte, len(bundle.Files)+1)
+					for path, raw := range bundle.Files {
+						changed.Files[path] = append([]byte(nil), raw...)
+					}
+					if mutation == "noncanonical Plan" {
+						changed.Files[bundle.PlanPath] = append(changed.Files[bundle.PlanPath], '\n')
+					} else {
+						changed.Files[".github/nkd-run/graphs/unused.json"] = []byte("{}")
+					}
+					assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodePipelineDrift)
+				})
+			}
+		})
 	}
 }
 
@@ -55,15 +72,7 @@ func buildOnlyPlan(t *testing.T, deliveryRunsOn string) *Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
-		Metadata: Metadata{Name: "buildonly"}, Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
-		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
-		UtilityPlatform:  "linux/amd64",
-		Builds:           []BuildTarget{{Name: "worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-		Packages:         []PackageSpec{{Name: "tools", Kind: PackageBinaryBundle, Inputs: []string{"worker/*"}}},
-	}
-	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "build-only"}, RunsOn: deliveryRunsOn}
+	definition, delivery := fixtureInputs("buildonly", "worker", deliveryRunsOn)
 	plan, err := Compile(context.Background(), definition, delivery, stack, "v0.0.0 (test)")
 	if err != nil {
 		t.Fatalf("a build-only delivery (no routes) must compile: %v", err)
@@ -87,7 +96,6 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 		render func() (*GeneratedBundle, error)
 		path   string
 	}{
-		{"gitlab", func() (*GeneratedBundle, error) { return RenderGitLab(context.Background(), plan) }, GitLabWorkflowPath},
 		{"github", func() (*GeneratedBundle, error) { return RenderGitHub(context.Background(), plan) }, GitHubWorkflowPath},
 	} {
 		b, err := engine.render()
@@ -104,11 +112,11 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 }
 
 // TestCommittedCanonicalMembersHaveNoTrailingNewline guards every canonical bundle member
-// (plan and graphs) that is read back at runtime with canonical.UnmarshalExact,
+// (Plan) that is read back at runtime with canonical.UnmarshalExact,
 // which rejects a trailing newline. Only the workflow (.yml) may end with one.
 func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
-	b, err := RenderGitLab(context.Background(), plan)
+	b, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,9 +130,8 @@ func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 	}
 }
 
-// TestToolAcquireNodeIsNotIRProjected guards the routing bug: a tool-download acquire node has
-// no BuildTarget/IRNode, so it must run via the glue `factory execute-node` path, not the IR
-// exec-node branch (which would reference a nonexistent graphs/.json).
+// Tool acquisition is a Run operation; a catalog producer node carries an
+// explicit reference into its output's authoritative build graph.
 func TestToolAcquireNodeIsNotIRProjected(t *testing.T) {
 	if irProjectedNode(Node{ID: "tool/aicr", Kind: NodeAcquire}) {
 		t.Fatal("a tool acquire node (no BuildTarget/IRNode) must not be IR-projected")
@@ -133,36 +140,24 @@ func TestToolAcquireNodeIsNotIRProjected(t *testing.T) {
 		t.Fatal("a build-projected acquire node must be IR-projected")
 	}
 	if irProjectedNode(Node{ID: "package/tools", Kind: NodePackage}) {
-		t.Fatal("a package (glue) node must not be IR-projected")
+		t.Fatal("a package operation must not be IR-projected")
 	}
 }
 
-// TestDeliveryRuntimeConfigRendersOnBothEngines proves the delivery runtime environment config
-// (image, dind services, job variables, setup) is engine-AGNOSTIC: both emitters render it, each
-// in its own syntax. It must not be GitLab-only.
-func TestDeliveryRuntimeConfigRendersOnBothEngines(t *testing.T) {
+// TestDeliveryRuntimeConfigRendersOnGitHub covers the authored runtime image,
+// services, variables and setup on the supported hosted engine.
+func TestDeliveryRuntimeConfigRendersOnGitHub(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
-	plan.ExecutionSettings.Runtime.RuntimeImage = "docker:27@sha256:" + strings.Repeat("a", 64)
-	plan.ExecutionSettings.Runtime.Services = []string{"docker:dind@sha256:" + strings.Repeat("b", 64)}
-	plan.ExecutionSettings.Runtime.Variables = map[string]string{"DOCKER_HOST": "tcp://docker:2375"}
-	plan.ExecutionSettings.Runtime.Setup = []string{"docker login -u user -p pass registry.example"}
-	digest, err := plan.ExecutionSettings.Digest()
+	plan.Environment.Runtime.RuntimeImage = "docker:27@sha256:" + strings.Repeat("a", 64)
+	plan.Environment.Runtime.Services = []string{"docker:dind@sha256:" + strings.Repeat("b", 64)}
+	plan.Environment.Runtime.Variables = map[string]string{"DOCKER_HOST": "tcp://docker:2375"}
+	plan.Environment.Runtime.Setup = []string{"docker login -u user -p pass registry.example"}
+	digest, err := plan.Environment.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.ExecutionSettingsDigest = digest
+	plan.EnvironmentDigest = digest
 
-	gl, err := RenderGitLab(context.Background(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	glwf := string(gl.Files[GitLabWorkflowPath])
-	for _, want := range []string{"image: 'docker:27@sha256:", "services: ['docker:dind@sha256:",
-		"DOCKER_HOST: 'tcp://docker:2375'", "before_script:", "docker login -u user -p pass registry.example"} {
-		if !strings.Contains(glwf, want) {
-			t.Fatalf("gitlab runtime config missing %q", want)
-		}
-	}
 	gh, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
@@ -176,14 +171,18 @@ func TestDeliveryRuntimeConfigRendersOnBothEngines(t *testing.T) {
 	}
 }
 
-// TestDeliveryRunsOnOverridesCompileSpecRunner proves the runner is environment config: a
+// TestEnvironmentSelectsExecutionRunner proves the runner is environment config: a
 // delivery runsOn overrides the definition's default on every emitted node.
-func TestDeliveryRunsOnOverridesCompileSpecRunner(t *testing.T) {
+func TestEnvironmentSelectsExecutionRunner(t *testing.T) {
 	plan := buildOnlyPlan(t, "generic")
 	if len(plan.Graph.Nodes) == 0 {
 		t.Fatal("expected a non-empty graph")
 	}
 	for _, n := range plan.Graph.Nodes {
+		n, err := plan.ExecutionFor(n)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if n.RunsOn != "generic" {
 			t.Fatalf("delivery runsOn must override the definition default; node %q RunsOn=%q", n.ID, n.RunsOn)
 		}

@@ -10,14 +10,14 @@ import (
 func TestPackageOrderingUsesDependenciesAndRejectsCycles(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		specs []PackageSpec
+		specs []packageSpec
 		want  []string
 		fail  bool
 	}{
-		{"reverse dependency", []PackageSpec{{Name: "a-root", Inputs: []string{"package/z-leaf"}}, {Name: "z-leaf", Inputs: []string{"worker/*"}}}, []string{"z-leaf", "a-root"}, false},
-		{"independent lexical", []PackageSpec{{Name: "z"}, {Name: "a"}}, []string{"a", "z"}, false},
-		{"unknown package", []PackageSpec{{Name: "root", Inputs: []string{"package/missing"}}}, nil, true},
-		{"cycle", []PackageSpec{{Name: "a", Inputs: []string{"package/b"}}, {Name: "b", Inputs: []string{"package/a"}}}, nil, true},
+		{"reverse dependency", []packageSpec{{Name: "a-root", Inputs: []string{"package/z-leaf"}}, {Name: "z-leaf", Inputs: []string{"worker/*"}}}, []string{"z-leaf", "a-root"}, false},
+		{"independent lexical", []packageSpec{{Name: "z"}, {Name: "a"}}, []string{"a", "z"}, false},
+		{"unknown package", []packageSpec{{Name: "root", Inputs: []string{"package/missing"}}}, nil, true},
+		{"cycle", []packageSpec{{Name: "a", Inputs: []string{"package/b"}}, {Name: "b", Inputs: []string{"package/a"}}}, nil, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := orderPackageSpecs(tc.specs)
@@ -56,7 +56,7 @@ func TestCompilerPackageAndRouteAdmissionRejectsWrongRepresentations(t *testing.
 				inputs = append(inputs, "other")
 			}
 			artifacts := map[string]Artifact{"input": {Kind: tc.inputKind, BuildTarget: "worker"}, "other": {Kind: tc.inputKind, BuildTarget: "worker"}}
-			assertFactoryErrorCode(t, validatePackageInputs(PackageSpec{Name: "package", Kind: tc.kind}, inputs, artifacts), e.CodeInvalidCatalog)
+			assertFactoryErrorCode(t, validatePackageInputs(packageSpec{Name: "package", Kind: tc.kind}, inputs, artifacts), e.CodeInvalidCatalog)
 		})
 	}
 	for _, target := range []string{TargetAPT, TargetObject} {
@@ -95,17 +95,17 @@ func TestCompilerSelectorsKeepAICRExplicitAndDeduplicate(t *testing.T) {
 func TestCompilerHelmBindingRequiresExactImageAndBuildSource(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		change func(*PackageSpec, map[string]Artifact)
+		change func(*packageSpec, map[string]Artifact)
 	}{
 		{name: "valid"},
-		{name: "wrong image identity", change: func(s *PackageSpec, _ map[string]Artifact) { s.HelmImage.Image = "package/other" }},
-		{name: "raw OCI is not image package", change: func(_ *PackageSpec, a map[string]Artifact) { a["package/image"] = Artifact{Kind: "oci-image"} }},
-		{name: "unbound source", change: func(_ *PackageSpec, a map[string]Artifact) { a["artifact/source"] = Artifact{Kind: "tarball"} }},
-		{name: "invalid chart", change: func(s *PackageSpec, _ map[string]Artifact) { s.HelmImage.Chart = "../chart" }},
-		{name: "wrong package type", change: func(s *PackageSpec, _ map[string]Artifact) { s.Kind = PackageBinaryBundle }},
+		{name: "wrong image identity", change: func(s *packageSpec, _ map[string]Artifact) { s.HelmImage.Image = "package/other" }},
+		{name: "raw OCI is not image package", change: func(_ *packageSpec, a map[string]Artifact) { a["package/image"] = Artifact{Kind: "oci-image"} }},
+		{name: "unbound source", change: func(_ *packageSpec, a map[string]Artifact) { a["artifact/source"] = Artifact{Kind: "tarball"} }},
+		{name: "invalid chart", change: func(s *packageSpec, _ map[string]Artifact) { s.HelmImage.Chart = "../chart" }},
+		{name: "wrong package type", change: func(s *packageSpec, _ map[string]Artifact) { s.Kind = PackageBinaryBundle }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := PackageSpec{Name: "chart", Kind: PackageHelm, HelmImage: &HelmImageBinding{Image: "package/image", Chart: "controller"}}
+			spec := packageSpec{Name: "chart", Kind: PackageHelm, HelmImage: &HelmImageBinding{Image: "package/image", Chart: "controller"}}
 			artifacts := map[string]Artifact{"package/image": {Kind: PackageImage}, "artifact/source": {Kind: "tarball", BuildTarget: "source"}}
 			if tc.change != nil {
 				tc.change(&spec, artifacts)

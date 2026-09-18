@@ -167,35 +167,36 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstDefinition, firstEnvironment, err := lower(definition, environment)
+	firstPlan, err := factory.Compile(context.Background(), definition, environment, stack, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondDefinition, secondEnvironment, err := lower(definition, changed)
+	secondPlan, err := factory.Compile(context.Background(), definition, changed, stack, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstPlan, err := factory.Compile(context.Background(), firstDefinition, firstEnvironment, stack, "test")
+	if firstPlan.DefinitionDigest != definitionDigest || firstPlan.EnvironmentDigest != environmentDigest || secondPlan.EnvironmentDigest != changedDigest {
+		t.Fatal("complete plan lost the exact authored input identities")
+	}
+	if len(firstPlan.Builds) != len(secondPlan.Builds) {
+		t.Fatal("environment destination changed selected builds")
+	}
+	for i, build := range firstPlan.Builds {
+		if build.Name != secondPlan.Builds[i].Name || build.BuildDigest != secondPlan.Builds[i].BuildDigest {
+			t.Fatal("environment destination changed logical Build identity")
+		}
+	}
+	signedPlan, err := factory.Compile(context.Background(), definition, signingEnvironment, stack, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondPlan, err := factory.Compile(context.Background(), secondDefinition, secondEnvironment, stack, "test")
-	if err != nil {
-		t.Fatal(err)
+	if len(firstPlan.Builds) != len(signedPlan.Builds) {
+		t.Fatal("signing policy changed selected builds")
 	}
-	if firstPlan.Builds[0].BuildDigest != secondPlan.Builds[0].BuildDigest {
-		t.Fatal("environment destination changed logical Build identity")
-	}
-	signedDefinition, signedDelivery, err := lower(definition, signingEnvironment)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signedPlan, err := factory.Compile(context.Background(), signedDefinition, signedDelivery, stack, "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if firstPlan.Builds[0].BuildDigest != signedPlan.Builds[0].BuildDigest {
-		t.Fatal("Environment-owned signing tool changed logical Build identity")
+	for i, build := range firstPlan.Builds {
+		if build.Name != signedPlan.Builds[i].Name || build.BuildDigest != signedPlan.Builds[i].BuildDigest {
+			t.Fatal("Environment-owned signing tool changed logical Build identity")
+		}
 	}
 	firstPlanDigest, err := firstPlan.Digest()
 	if err != nil {
@@ -213,10 +214,6 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 
 func TestLifecyclePlanRejectsPartialPublicIdentityPair(t *testing.T) {
 	definition, environment := testDefinition(t), testEnvironment()
-	legacy, delivery, err := lower(definition, environment)
-	if err != nil {
-		t.Fatal(err)
-	}
 	base, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +222,7 @@ func TestLifecyclePlanRejectsPartialPublicIdentityPair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := factory.Compile(context.Background(), legacy, delivery, stack, "test")
+	plan, err := factory.Compile(context.Background(), definition, environment, stack, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,18 +235,25 @@ func TestLifecyclePlanRejectsPartialPublicIdentityPair(t *testing.T) {
 	}
 }
 
-func TestLowerDerivesExecutableEnvelopeAndRoute(t *testing.T) {
-	definition, delivery, err := lower(testDefinition(t), testEnvironment())
+func TestCompileDerivesExecutableEnvelopeAndRoute(t *testing.T) {
+	plan, err := Compile(t.Context(), "definition.yaml", testDefinition(t), "environment.yaml", testEnvironment(), "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(definition.Packages) != 2 || definition.Packages[0].Name != "cli" ||
-		definition.Packages[0].Kind != factory.PackageBinaryBundle || definition.Packages[1].Name != "release" ||
-		definition.Packages[1].Kind != factory.PackageOCI {
-		t.Fatalf("derived packages = %#v", definition.Packages)
+	packages := map[string]string{}
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind == factory.NodePackage {
+			packages[node.ID] = node.PackageKind
+		}
 	}
-	if len(delivery.Routes) != 1 || delivery.Routes[0] != (factory.Route{Name: "release", Input: "package/release", Target: "release"}) {
-		t.Fatalf("derived routes = %#v", delivery.Routes)
+	if len(packages) != 2 || packages["package/cli"] != factory.PackageBinaryBundle || packages["package/release"] != factory.PackageOCI {
+		t.Fatalf("derived packages = %#v", packages)
+	}
+	if len(plan.Routes) != 1 || plan.Routes[0] != (factory.Route{Name: "release", Input: "package/release", Target: "release"}) {
+		t.Fatalf("derived routes = %#v", plan.Routes)
+	}
+	if len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "cli" || plan.LifecycleOutputs[0].ArtifactID != "package/cli" {
+		t.Fatalf("complete plan lost its compiled output join: %#v", plan.LifecycleOutputs)
 	}
 }
 

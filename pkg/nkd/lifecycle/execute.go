@@ -145,14 +145,14 @@ func recordHostedFailure(ctx context.Context, outputPath string, run *Run, cause
 }
 
 func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *factory.Plan, artifacts map[string]factory.Artifact, observed []Artifact) error {
-	if plan.ExecutionSettings.Signing == nil || len(plan.ExecutionSettings.Routes) == 0 {
+	if plan.Environment.Signing == nil || len(plan.Routes) == 0 {
 		return e.New(e.CodeProvenanceMissing, "pipeline-attested Run has no planned signing and verification closure")
 	}
 	outputs := map[string]Artifact{}
 	for _, artifact := range observed {
 		outputs[artifact.Name] = artifact
 	}
-	for _, route := range plan.ExecutionSettings.Routes {
+	for _, route := range plan.Routes {
 		artifact, ok := artifacts["verification/"+route.Name]
 		if !ok {
 			return e.New(e.CodeReleaseIncomplete, "pipeline-attested Run omits verification result for %q", route.Name)
@@ -177,7 +177,7 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 		if err := record.Validate(); err != nil {
 			return err
 		}
-		target := plan.ExecutionSettings.Targets[route.Target]
+		target := plan.Targets[route.Target]
 		routed, routedFound := artifacts[route.Input]
 		if !routedFound || routed.Kind != factory.PackageOCI {
 			return e.New(e.CodeReleaseIncomplete, "pipeline route %q has no exact publication envelope", route.Name)
@@ -186,16 +186,20 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 		if pathErr != nil {
 			return pathErr
 		}
-		envelope, inspectErr := delivery.Inspect(ctx, routedPath)
-		if inspectErr != nil {
-			return inspectErr
+		if record.Ref != targetRepository(target.Ref)+"@"+record.Digest {
+			return e.New(e.CodeVerifyFailed, "publication verification for %q does not bind the routed repository", route.Name)
 		}
-		if record.Digest != envelope.RootDigest || record.Ref != targetRepository(target.Ref)+"@"+envelope.RootDigest {
-			return e.New(e.CodeVerifyFailed, "publication verification for %q does not bind the exact routed output", route.Name)
-		}
-		bound, _, err := artifactsFromBinding(ctx, routedPath, envelope)
+		publication, err := delivery.OpenPublication(ctx, routedPath, record.Digest)
 		if err != nil {
 			return err
+		}
+		bound, _, err := publication.Artifacts(record.Ref)
+		closeErr = publication.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return e.Wrap(e.CodeVerifyFailed, closeErr, "closing checked publication")
 		}
 		if len(bound) != len(outputs) {
 			return e.New(e.CodeVerifyFailed, "publication does not cover every observed output")
@@ -206,12 +210,12 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 				return e.New(e.CodeVerifyFailed, "publication substitutes observed output %q", member.Name)
 			}
 		}
-		identity, regexErr := regexp.Compile(plan.ExecutionSettings.Signing.Identity)
+		identity, regexErr := regexp.Compile(plan.Environment.Signing.Identity)
 		if regexErr != nil {
 			return e.Wrap(e.CodeTrustPolicyMissing, regexErr, "compiling planned signing identity")
 		}
-		if record.DryRun || !record.SignatureVerified || !record.AttestationVerified || record.Identity != plan.ExecutionSettings.Signing.Identity || record.Issuer != plan.ExecutionSettings.Signing.Issuer ||
-			!identity.MatchString(record.ObservedIdentity) || record.ObservedIssuer != plan.ExecutionSettings.Signing.Issuer {
+		if record.DryRun || !record.SignatureVerified || !record.AttestationVerified || record.Identity != plan.Environment.Signing.Identity || record.Issuer != plan.Environment.Signing.Issuer ||
+			!identity.MatchString(record.ObservedIdentity) || record.ObservedIssuer != plan.Environment.Signing.Issuer {
 			return e.New(e.CodeSignatureInvalid, "publication verification for %q does not prove the planned signer and provenance", route.Name)
 		}
 	}

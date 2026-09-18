@@ -102,7 +102,13 @@ compiler-derived logical build graph uses the new **`nkd.build`** family. **`nkd
 historical allocation**; active graph compilation never mints new identities under it. Removing authored
 Recipes does not rename, convert, or reauthenticate historical signed bytes. Cluster-definition,
 cluster-composition, cluster-realization and staging-manifest families are likewise reserved and cannot mint
-new identities. Deployment topology and classification have no current authored or executable schema.
+new identities. The removed compiler-handoff and copied execution-settings families are also reserved and
+reject new minting, as do the removed redundant lifecycle-binding and qualified CI bundle (`nkd.bundle`)
+families. The unused qualified clearance implementation is removed: reproduction-result,
+compatibility-result, conformance-result, evidence-waiver, clearance, status-trusted-time, publication,
+publication-manifest and vulnerability-report allocations likewise remain reserved and reject minting. Retained publication-root and
+release-content identities continue to serve the maintained publication path. Deployment topology and
+classification have no current authored or executable schema.
 
 The authored schemas use `apiVersion`; generated structured records use `schemaVersion`. The migration's
 changed shapes are:
@@ -113,14 +119,22 @@ changed shapes are:
 | Component catalog and snapshot | `nkd.dev/catalog/v3`, `nkd.dev/catalog-snapshot/v3` |
 | Component catalog overlay | `nkd.dev/catalog-overlay/v3` |
 | Executable and logical build graph | `nkd.dev/ir/v3` |
-| Internal compile specification, Run plan, artifact graph | `nkd.dev/compile-spec/v3`, `nkd.dev/run-plan/v3`, `nkd.dev/artifact-graph/v3` |
+| Run plan and artifact graph | `nkd.dev/run-plan/v4`, `nkd.dev/artifact-graph/v4` |
 | Run and Release views | `nkd.dev/run/v3`, `nkd.dev/release/v3` |
-| Internal lifecycle binding | `nkd.dev/lifecycle-binding/v3` |
-| Low-level execution bundle and manifest | `nkd.dev/execution-bundle/v2`, `nkd.dev/execution-bundle-manifest/v2` |
 
 Definition v4 removes cluster views. Catalog v3 removes delivery categories and node-role affinities. IR v3
 binds effective AICR bundle-rendering settings, including the explicit Helm default, into Build Digest. Old
 major versions fail closed; the migration does not reinterpret or repair existing signed records.
+
+Run plan v4 embeds the admitted Definition and Environment directly. The compiler owns complete output,
+package, route and evidence binding; there is no separately versioned compile specification or execution-settings
+document. Producer scheduling records reference the authoritative embedded IR instruction and cannot carry a
+second copy of its runner, network, container, platform, execution requirements or class binding. Artifact graph
+v4 makes that reference contract explicit. Required output slots remain separate from observations.
+
+Production SLSA build-type URIs use `/v2` for the replacement of compiler-handoff parameters by the original
+`definitionDigest` and `environmentDigest`. SLSA provenance/v1 and in-toto Statement/v1 remain unchanged.
+Historical production predicates are rejected rather than relabeled or re-signed under the current contract.
 
 Environment stays `nkd.dev/environment/v1`; the generated Run's unchanged exact-file commit manifest stays
 `nkd.dev/generated-run/v1`. Unchanged wire shapes keep their existing major. Evidence,

@@ -157,7 +157,7 @@ func TestEnvironmentStrictlyDecodesExecutionClasses(t *testing.T) {
 	}
 }
 
-func TestEnvironmentYAMLLowersToDeterministicPlanBinding(t *testing.T) {
+func TestEnvironmentYAMLCompilesDeterministicPlanBinding(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "environment.yaml")
 	document := `apiVersion: nkd.dev/environment/v1
 kind: Environment
@@ -194,14 +194,7 @@ executionClasses:
 	}
 	definition := testDefinition(t)
 	definition.Outputs[0].Components = []string{"kubelet"}
-	compileSpec, delivery, err := lower(definition, environment)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(delivery.ExecutionClasses) != 2 || delivery.ExecutionClasses[1].Name != "beta-kvm" {
-		t.Fatalf("lifecycle lowering lost execution classes: %#v", delivery.ExecutionClasses)
-	}
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir(compileSpec.Catalog.Base))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(definition.Catalog.Base))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +214,7 @@ executionClasses:
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := factory.Compile(t.Context(), compileSpec, delivery, stack, "test")
+	plan, err := factory.Compile(t.Context(), definition, environment, stack, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,18 +236,25 @@ executionClasses:
 			break
 		}
 	}
-	if planNode == nil || planNode.RunsOn != "linux-amd64-kvm" ||
-		!execution.EqualBinding(planNode.ExecutionBinding, buildNode.ExecutionBinding) {
-		t.Fatalf("Plan did not preserve deterministic binding: %#v", planNode)
+	if planNode == nil || planNode.ExecutionBinding != nil || planNode.Requirements != nil || planNode.RunsOn != "" {
+		t.Fatalf("Plan copied producer execution fields: %#v", planNode)
+	}
+	instruction, err := plan.ExecutionFor(*planNode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if instruction.RunsOn != "linux-amd64-kvm" || !execution.EqualBinding(instruction.ExecutionBinding, buildNode.ExecutionBinding) {
+		t.Fatalf("Plan did not resolve the deterministic binding: %#v", instruction)
+	}
+	if len(plan.Environment.ExecutionClasses) != 2 || plan.Environment.ExecutionClasses[1].Name != "beta-kvm" {
+		t.Fatalf("compilation lost authored execution classes: %#v", plan.Environment.ExecutionClasses)
 	}
 
 	alternative, err := execution.Match(buildNode.Requirements,
-		[]execution.Class{delivery.ExecutionClasses[0]}, execution.MatchOptions{})
+		[]execution.Class{environment.ExecutionClasses[0]}, execution.MatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	buildNode.ExecutionBinding = alternative
-	planNode.ExecutionBinding = execution.CloneBinding(alternative)
-	planNode.RunsOn = alternative.Class.RunsOn
 	assertCode(t, plan.Validate(), e.CodePipelineDrift)
 }

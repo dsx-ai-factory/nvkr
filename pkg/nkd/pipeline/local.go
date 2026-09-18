@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
@@ -290,9 +291,12 @@ func registerContainer(opts RunOptions, name string) error {
 	return e.New(e.CodeInternal, "container cleanup registry closed before %q could start", name)
 }
 
-// containerName is a per-run, per-node container name (execution-only, never identity).
+var containerSequence atomic.Uint64
+
+// Container names are execution-only. Identical producer IDs may execute for
+// different outputs concurrently, so neither ID nor PID alone establishes ownership.
 func containerName(n ir.Node) string {
-	return fmt.Sprintf("nkd-%d-%s", os.Getpid(), sanitizeName(n.ID))
+	return fmt.Sprintf("nkd-%d-%d-%s", os.Getpid(), containerSequence.Add(1), sanitizeName(n.ID))
 }
 
 func sanitizeName(s string) string {
@@ -839,7 +843,7 @@ func (l Local) fetch(n ir.Node, opts RunOptions) error {
 func (l Local) vendor(n ir.Node, dir string, opts RunOptions) error {
 	return ensureSourceClosure(n, dir, opts, func() error {
 		abs, _ := filepath.Abs(dir)
-		cname := "nkd-vendor-" + sanitizeName(n.Dest)
+		cname := containerName(ir.Node{ID: "vendor-" + n.Dest})
 		args := append([]string{"run", "--rm", "--name", cname, "--network=" + ir.NetworkDefault, "-v", abs + ":/src", "-w", "/src", n.VendorImage}, n.VendorCmd...)
 		fmt.Fprintf(opts.Stdout, "\n=== vendor %s (network, %s) ===\n", n.Dest, n.VendorImage)
 		opts.progress.printf("[container] vendor %s — launching %s with network access\n", n.Dest, n.VendorImage)

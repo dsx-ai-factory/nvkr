@@ -33,25 +33,6 @@ func (fn EvidenceReaderFunc) ReadEvidence(ctx context.Context, ref string) ([]by
 	return fn(ctx, ref)
 }
 
-// ExternalEvidenceReceipt is created only after the referenced bytes have been
-// read and re-hashed. Its critical binding is private; callers can inspect but not
-// construct a receipt that release code should trust.
-type ExternalEvidenceReceipt struct {
-	component      string
-	artifactDigest string
-	receiptType    string
-	ref            string
-	evidenceHash   string
-	evidenceSchema string
-}
-
-func (r ExternalEvidenceReceipt) Component() string      { return r.component }
-func (r ExternalEvidenceReceipt) ArtifactDigest() string { return r.artifactDigest }
-func (r ExternalEvidenceReceipt) ReceiptType() string    { return r.receiptType }
-func (r ExternalEvidenceReceipt) Ref() string            { return r.ref }
-func (r ExternalEvidenceReceipt) EvidenceDigest() string { return r.evidenceHash }
-func (r ExternalEvidenceReceipt) EvidenceSchema() string { return r.evidenceSchema }
-
 // LocalEvidenceReceipt is the artifact-scoped capability for an NKD-generated
 // CycloneDX document.  EvidenceDigest is its domain-separated semantic identity;
 // BlobDigest is the ordinary sha256 of the exact canonical bytes that may be
@@ -121,18 +102,8 @@ func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
 		BlobDigest: receipt.blobDigest, EvidenceSchema: receipt.evidenceSchema}, nil
 }
 
-// ExactBytes returns a defensive copy of the canonical SBOM document bound by the
-// receipt.  It is intended for publisher storage; release authorization consumes
-// only Binding.
-func (receipt LocalEvidenceReceipt) ExactBytes() ([]byte, error) {
-	if _, err := receipt.Binding(); err != nil {
-		return nil, err
-	}
-	return append([]byte(nil), receipt.canonicalPayload...), nil
-}
-
 // EvidenceGap is an explicit waiver-required signal. It has no accepted/passing
-// bit and cannot be converted into an ExternalEvidenceReceipt.
+// bit and cannot satisfy evidence requirements.
 type EvidenceGap struct {
 	Component      string   `json:"component"`
 	ArtifactDigest string   `json:"artifactDigest"`
@@ -140,21 +111,20 @@ type EvidenceGap struct {
 	Reason         string   `json:"reason"`
 }
 
-// VerifiedSet groups deterministic SBOMs with the external-evidence receipts and
-// explicit gaps used to construct them. The validity marker is package-private.
+// VerifiedSet groups deterministic SBOMs with verified external-evidence bindings
+// and explicit gaps. The validity marker is package-private.
 type VerifiedSet struct {
 	aggregate          *BOM
 	perArtifact        map[string]*BOM
 	index              *Index
-	receipts           []ExternalEvidenceReceipt
 	gaps               []EvidenceGap
 	valid              bool
 	publisherQualified bool
 }
 
 // BuildVerified verifies declared external evidence and emits deterministic SBOM
-// documents from caller-supplied artifact hashes. The external receipts are
-// authoritative because this function reads and re-hashes their exact bytes. The
+// documents from caller-supplied artifact hashes. External evidence properties
+// bind bytes that this function reads, re-hashes and checks against the subject. The
 // locally generated SBOMs are diagnostic only: caller hash strings do not prove a
 // producer observed those artifact bytes, so this path cannot issue LocalReceipts
 // or qualify publisher evidence. Use BuildVerifiedFromReport for publisher output.
@@ -495,7 +465,6 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 	publisherQualified bool,
 ) (*VerifiedSet, error) {
 	verifiedProps := make(map[string][]Property)
-	receipts := make([]ExternalEvidenceReceipt, 0)
 	gaps := make([]EvidenceGap, 0)
 	for _, component := range components {
 		if !component.FromSource && component.Prebuilt == nil {
@@ -505,12 +474,11 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 		if component.Prebuilt == nil {
 			continue
 		}
-		props, componentReceipts, componentGaps, err := verifyExternalEvidence(ctx, component, artifactDigest, reader)
+		props, componentGaps, err := verifyExternalEvidence(ctx, component, artifactDigest, reader)
 		if err != nil {
 			return nil, err
 		}
 		verifiedProps[component.Name] = props
-		receipts = append(receipts, componentReceipts...)
 		gaps = append(gaps, componentGaps...)
 	}
 
@@ -569,38 +537,37 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 		return nil, err
 	}
 	return &VerifiedSet{aggregate: aggregate, perArtifact: perArtifact, index: index,
-		receipts: receipts, gaps: gaps, valid: true,
+		gaps: gaps, valid: true,
 		publisherQualified: publisherQualified}, nil
 }
 
 func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponent, artifactDigest string,
 	reader EvidenceReader,
-) ([]Property, []ExternalEvidenceReceipt, []EvidenceGap, error) {
+) ([]Property, []EvidenceGap, error) {
 	ev := component.Prebuilt.Evidence
 	if ev == nil {
-		return nil, nil, nil, e.New(e.CodeProvenanceMissing,
+		return nil, nil, e.New(e.CodeProvenanceMissing,
 			"prebuilt component %q has no explicit external-evidence declaration", component.Name)
 	}
 	if ev.None {
 		if ev.SBOMRef != "" || ev.SBOMDigest != "" || ev.ProvenanceRef != "" || ev.ProvenanceDigest != "" {
-			return nil, nil, nil, e.New(e.CodeUnverifiedRef,
+			return nil, nil, e.New(e.CodeUnverifiedRef,
 				"prebuilt component %q mixes evidence:none with external references", component.Name)
 		}
-		return []Property{{Name: "nkd:externalEvidence", Value: "none"}}, nil,
+		return []Property{{Name: "nkd:externalEvidence", Value: "none"}},
 			[]EvidenceGap{{Component: component.Name, ArtifactDigest: artifactDigest,
 				MissingTypes: []string{"provenance", "sbom"}, Reason: "evidence:none"}}, nil
 	}
 	if ev.SBOMRef == "" && ev.ProvenanceRef == "" {
-		return nil, nil, nil, e.New(e.CodeProvenanceMissing,
+		return nil, nil, e.New(e.CodeProvenanceMissing,
 			"prebuilt component %q declares neither references nor evidence:none", component.Name)
 	}
 	if reader == nil {
-		return nil, nil, nil, e.New(e.CodeUnavailable,
+		return nil, nil, e.New(e.CodeUnavailable,
 			"external evidence for prebuilt component %q requires a reader adapter", component.Name)
 	}
 
 	props := []Property{{Name: "nkd:externalEvidence", Value: "verified"}}
-	receipts := make([]ExternalEvidenceReceipt, 0, 2)
 	gaps := make([]EvidenceGap, 0, 1)
 	missing := make([]string, 0, 2)
 	for _, item := range []struct {
@@ -615,55 +582,51 @@ func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponen
 	} {
 		if item.ref == "" {
 			if item.digest != "" {
-				return nil, nil, nil, e.New(e.CodeUnverifiedRef,
+				return nil, nil, e.New(e.CodeUnverifiedRef,
 					"prebuilt component %q has %s digest without a reference", component.Name, item.typeName)
 			}
 			missing = append(missing, item.typeName)
 			continue
 		}
 		if !canonicalText(item.ref) {
-			return nil, nil, nil, e.New(e.CodeUnverifiedRef,
+			return nil, nil, e.New(e.CodeUnverifiedRef,
 				"prebuilt component %q has a non-canonical external %s reference", component.Name, item.typeName)
 		}
 		if !canonical.IsDigest(item.digest) {
-			return nil, nil, nil, e.New(e.CodeUnpinnedInput,
+			return nil, nil, e.New(e.CodeUnpinnedInput,
 				"prebuilt component %q has unpinned external %s digest %q", component.Name, item.typeName, item.digest)
 		}
 		if err := ctx.Err(); err != nil {
-			return nil, nil, nil, e.Wrap(e.CodeTimeout, err,
+			return nil, nil, e.Wrap(e.CodeTimeout, err,
 				"reading external %s for %s", item.typeName, component.Name)
 		}
 		bytes, err := reader.ReadEvidence(ctx, item.ref)
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil, nil, nil, e.Wrap(e.CodeTimeout, ctx.Err(), "reading external %s for %s", item.typeName, component.Name)
+				return nil, nil, e.Wrap(e.CodeTimeout, ctx.Err(), "reading external %s for %s", item.typeName, component.Name)
 			}
-			return nil, nil, nil, e.Wrap(e.CodeUnavailable, err, "reading external %s for %s", item.typeName, component.Name)
+			return nil, nil, e.Wrap(e.CodeUnavailable, err, "reading external %s for %s", item.typeName, component.Name)
 		}
 		if err := ctx.Err(); err != nil {
-			return nil, nil, nil, e.Wrap(e.CodeTimeout, err,
+			return nil, nil, e.Wrap(e.CodeTimeout, err,
 				"reading external %s for %s", item.typeName, component.Name)
 		}
 		bytes = append([]byte(nil), bytes...)
 		if len(bytes) == 0 {
-			return nil, nil, nil, e.New(e.CodeProvenanceMissing,
+			return nil, nil, e.New(e.CodeProvenanceMissing,
 				"external %s for prebuilt component %q is empty", item.typeName, component.Name)
 		}
 		got := rawDigest(bytes)
 		if got != item.digest {
-			return nil, nil, nil, e.New(e.CodeUnverifiedRef,
+			return nil, nil, e.New(e.CodeUnverifiedRef,
 				"external %s for prebuilt component %q hashes to %s, not declared %s",
 				item.typeName, component.Name, got, item.digest)
 		}
-		evidenceSchema, err := validateExternalEvidence(item.typeName, bytes, component.Name, artifactDigest)
+		err = validateExternalEvidence(item.typeName, bytes, component.Name, artifactDigest)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		props = append(props, Property{Name: item.refProp, Value: item.ref}, Property{Name: item.digProp, Value: got})
-		receipts = append(receipts, ExternalEvidenceReceipt{
-			component: component.Name, artifactDigest: artifactDigest,
-			receiptType: item.typeName, ref: item.ref, evidenceHash: got, evidenceSchema: evidenceSchema,
-		})
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
@@ -672,7 +635,7 @@ func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponen
 			MissingTypes: missing, Reason: "not-declared"})
 	}
 	sort.Slice(props, func(i, j int) bool { return props[i].Name < props[j].Name })
-	return props, receipts, gaps, nil
+	return props, gaps, nil
 }
 
 type externalCycloneDX struct {
@@ -712,9 +675,9 @@ type externalSLSAStatement struct {
 	} `json:"predicate"`
 }
 
-func validateExternalEvidence(evidenceType string, raw []byte, component, artifactDigest string) (string, error) {
+func validateExternalEvidence(evidenceType string, raw []byte, component, artifactDigest string) error {
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return "", e.Wrap(e.CodeUnverifiedRef, err, "external %s for %s is not an unambiguous JSON document", evidenceType, component)
+		return e.Wrap(e.CodeUnverifiedRef, err, "external %s for %s is not an unambiguous JSON document", evidenceType, component)
 	}
 	switch evidenceType {
 	case "sbom":
@@ -722,18 +685,18 @@ func validateExternalEvidence(evidenceType string, raw []byte, component, artifa
 	case "provenance":
 		return validateExternalSLSA(raw, component, artifactDigest)
 	default:
-		return "", e.New(e.CodeUnverifiedRef, "unsupported external evidence type %q", evidenceType)
+		return e.New(e.CodeUnverifiedRef, "unsupported external evidence type %q", evidenceType)
 	}
 }
 
-func validateExternalCycloneDX(raw []byte, component, artifactDigest string) (string, error) {
+func validateExternalCycloneDX(raw []byte, component, artifactDigest string) error {
 	var document externalCycloneDX
 	if err := json.Unmarshal(raw, &document); err != nil {
-		return "", e.Wrap(e.CodeUnverifiedRef, err, "decoding external CycloneDX SBOM for %s", component)
+		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external CycloneDX SBOM for %s", component)
 	}
 	if document.BOMFormat != "CycloneDX" ||
 		(document.SpecVersion != "1.4" && document.SpecVersion != "1.5" && document.SpecVersion != "1.6") {
-		return "", e.New(e.CodeUnverifiedRef,
+		return e.New(e.CodeUnverifiedRef,
 			"external SBOM for %s is not a supported CycloneDX JSON document", component)
 	}
 	subjects := append([]externalCycloneDXComponent{document.Metadata.Component}, document.Components...)
@@ -751,35 +714,35 @@ func validateExternalCycloneDX(raw []byte, component, artifactDigest string) (st
 			sha256Rows++
 			candidate := "sha256:" + hash.Content
 			if !canonical.IsDigest(candidate) || candidate != artifactDigest {
-				return "", e.New(e.CodeUnverifiedRef,
+				return e.New(e.CodeUnverifiedRef,
 					"external CycloneDX subject %s contains a non-canonical or conflicting SHA-256 row",
 					component)
 			}
 		}
 		if sha256Rows != 1 {
-			return "", e.New(e.CodeUnverifiedRef,
+			return e.New(e.CodeUnverifiedRef,
 				"external CycloneDX subject %s must contain exactly one canonical SHA-256 row for artifact %s (got %d)",
 				component, artifactDigest, sha256Rows)
 		}
 	}
 	if matches != 1 {
-		return "", e.New(e.CodeUnverifiedRef,
+		return e.New(e.CodeUnverifiedRef,
 			"external CycloneDX SBOM must contain exactly one subject named %s (got %d)", component, matches)
 	}
-	return "cyclonedx-json/" + document.SpecVersion, nil
+	return nil
 }
 
-func validateExternalSLSA(raw []byte, component, artifactDigest string) (string, error) {
+func validateExternalSLSA(raw []byte, component, artifactDigest string) error {
 	var statement externalSLSAStatement
 	if err := json.Unmarshal(raw, &statement); err != nil {
-		return "", e.Wrap(e.CodeUnverifiedRef, err, "decoding external SLSA provenance for %s", component)
+		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external SLSA provenance for %s", component)
 	}
 	if statement.Type != "https://in-toto.io/Statement/v1" ||
 		statement.PredicateType != "https://slsa.dev/provenance/v1" ||
 		strings.TrimSpace(statement.Predicate.BuildDefinition.BuildType) == "" ||
 		len(statement.Predicate.BuildDefinition.ExternalParameters) == 0 ||
 		strings.TrimSpace(statement.Predicate.RunDetails.Builder.ID) == "" {
-		return "", e.New(e.CodeUnverifiedRef,
+		return e.New(e.CodeUnverifiedRef,
 			"external provenance for %s is not a complete in-toto/SLSA v1 statement", component)
 	}
 	matches := 0
@@ -789,15 +752,15 @@ func validateExternalSLSA(raw []byte, component, artifactDigest string) (string,
 		}
 		matches++
 		if "sha256:"+subject.Digest["sha256"] != artifactDigest {
-			return "", e.New(e.CodeUnverifiedRef,
+			return e.New(e.CodeUnverifiedRef,
 				"external provenance subject %s does not bind artifact %s", component, artifactDigest)
 		}
 	}
 	if matches != 1 {
-		return "", e.New(e.CodeUnverifiedRef,
+		return e.New(e.CodeUnverifiedRef,
 			"external provenance must contain exactly one subject named %s (got %d)", component, matches)
 	}
-	return "in-toto-slsa-provenance/v1", nil
+	return nil
 }
 
 // Aggregate returns a defensive copy of the aggregate SBOM.
@@ -870,15 +833,6 @@ func (set *VerifiedSet) LocalReceipts() ([]LocalEvidenceReceipt, error) {
 	return receipts, nil
 }
 
-// ExternalReceipts returns verified byte bindings. An evidence:none declaration
-// never produces a receipt.
-func (set *VerifiedSet) ExternalReceipts() ([]ExternalEvidenceReceipt, error) {
-	if set == nil || !set.valid {
-		return nil, e.New(e.CodeUnverifiedRef, "SBOM set was not built through verified evidence acquisition")
-	}
-	return append([]ExternalEvidenceReceipt(nil), set.receipts...), nil
-}
-
 // EvidenceGaps returns explicit missing-evidence signals. The returned values are
 // informational inputs to a waiver flow, never passing evidence.
 func (set *VerifiedSet) EvidenceGaps() ([]EvidenceGap, error) {
@@ -890,24 +844,6 @@ func (set *VerifiedSet) EvidenceGaps() ([]EvidenceGap, error) {
 		out[i].MissingTypes = append([]string(nil), set.gaps[i].MissingTypes...)
 	}
 	return out, nil
-}
-
-// RequireCompleteExternalEvidence fails when a distinct waiver receipt is needed.
-// It never interprets evidence:none as success.
-func (set *VerifiedSet) RequireCompleteExternalEvidence() error {
-	if set == nil || !set.valid {
-		return e.New(e.CodeUnverifiedRef, "SBOM set was not built through verified evidence acquisition")
-	}
-	if len(set.gaps) == 0 {
-		return nil
-	}
-	parts := make([]string, 0, len(set.gaps))
-	for _, gap := range set.gaps {
-		parts = append(parts, gap.Component+":"+strings.Join(gap.MissingTypes, ","))
-	}
-	sort.Strings(parts)
-	return e.New(e.CodeProvenanceMissing,
-		"external evidence is incomplete (%s); an exact authenticated waiver receipt is required", strings.Join(parts, "; "))
 }
 
 func rawDigest(bytes []byte) string {

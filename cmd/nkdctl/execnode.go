@@ -12,18 +12,14 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// cmdExecNode is the from-source node-execution HELPER mode (ADR-18 §2): `nkd-exec
-// exec-node <nodes.json>` executes ONE IR node. Two topologies share this one code path,
-// so byte-identity across engines is structural:
-//   - default (ADR-18 §3, "Model A"): run directly in the current environment — the engine
-//     has already placed the job inside the node's pinned toolchain container.
-//   - --launch (ADR-18 §8, "Model B"): the helper ORCHESTRATES the pinned toolchain container
-//     itself (--network=none for builds) on a GENERIC runner, so no engine-native container
-//     block and no bespoke network-none runner tag are needed.
+// cmdExecNode executes one instruction from an exact admitted IR bundle for
+// qualified graph diagnostics and low-level helper callers. --launch delegates
+// isolation to the shared container launcher. Maintained Runs use the complete
+// Plan dispatcher instead. Shared mechanics do not establish reproduction.
 func cmdExecNode() *cli.Command {
 	return &cli.Command{
 		Name:      "exec-node",
-		Hidden:    true, // retained for legacy compatibility
+		Hidden:    true, // internal graph helper; public Runs use factory execute-node
 		Usage:     "execute one IR node (the node-execution helper mode; --launch orchestrates the container itself)",
 		ArgsUsage: "<node.json | nodes.json>",
 		Flags: []cli.Flag{
@@ -39,7 +35,7 @@ func cmdExecNode() *cli.Command {
 			if c.NArg() != 1 {
 				return e.New(e.CodeUsage, "exec-node takes exactly one <node.json|nodes.json>")
 			}
-			raw, err := readExecutionBundleMember(c.Context, c.Args().First(), maxExecutionBundleMemberBytes)
+			raw, err := readBoundedRegularInput(c.Context, c.Args().First(), maxRegularInputBytes)
 			if err != nil {
 				return e.Wrap(e.CodeInvalidCatalog, err, "reading node file")
 			}

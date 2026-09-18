@@ -45,14 +45,7 @@ type imageConfig struct {
 	} `json:"rootfs"`
 }
 
-// InspectPublishedContainerImage verifies a publication and its selected native
-// image. The platform and exact nested index are rejoined to the publication
-// binding; no extraction, registry lookup or image execution occurs here.
-func InspectPublishedContainerImage(ctx context.Context, root, name string) (ImageInspection, error) {
-	publication, err := Inspect(ctx, root)
-	if err != nil {
-		return ImageInspection{}, err
-	}
+func inspectPublishedContainerImage(ctx context.Context, root string, publication Inspection, name string) (ImageInspection, error) {
 	var object PublishedObject
 	for _, candidate := range publication.Root.Objects {
 		if candidate.Name == name {
@@ -67,18 +60,6 @@ func InspectPublishedContainerImage(ctx context.Context, root, name string) (Ima
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "publication has no exact native image binding for %q", name)
 	}
 	descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size}
-	if publication.Root.Release == nil {
-		raw, err := readBlob(ctx, root, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
-		if err != nil {
-			return ImageInspection{}, err
-		}
-		var index ociIndex
-		if err := json.Unmarshal(raw, &index); err != nil || index.SchemaVersion != 2 || index.MediaType != MediaOCIIndex ||
-			index.ArtifactType != "" || len(index.Manifests) != 1 || index.Manifests[0].MediaType != MediaOCIManifest {
-			return ImageInspection{}, e.New(e.CodeVerifyFailed, "published image %q has an ambiguous index", name)
-		}
-		descriptor = index.Manifests[0]
-	}
 	manifestRaw, err := readBlob(ctx, root, descriptor, 8<<20)
 	if err != nil {
 		return ImageInspection{}, err

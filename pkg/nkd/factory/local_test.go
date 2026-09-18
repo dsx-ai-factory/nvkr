@@ -6,9 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestRunLocalDryRunIsCompleteAndPerformsNoIO(t *testing.T) {
@@ -24,8 +27,8 @@ func TestRunLocalDryRunIsCompleteAndPerformsNoIO(t *testing.T) {
 	if len(result.Nodes) != len(plan.Graph.Nodes) {
 		t.Fatalf("dry-run nodes = %d, want %d", len(result.Nodes), len(plan.Graph.Nodes))
 	}
-	if !strings.Contains(output.String(), "[skipped] publish/tools") ||
-		!strings.Contains(output.String(), "package/tools") {
+	if !strings.Contains(output.String(), "[skipped] publish/release") ||
+		!strings.Contains(output.String(), "package/worker") {
 		t.Fatalf("dry-run did not expose packaging and opt-in publication:\n%s", output.String())
 	}
 	if _, err := os.Lstat(".nkd/factory-dry-run"); !os.IsNotExist(err) {
@@ -49,33 +52,6 @@ func TestLocalRunnerIsRerunnableAndPreservesSourceCache(t *testing.T) {
 	deps := localRunDeps{
 		prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
 			return map[string]string{"linux/amd64": "fake"}, nil
-		},
-		runBuild: func(_ context.Context, build BuildPlan, options LocalRunOptions) (*pipeline.Report, error) {
-			report := &pipeline.Report{BuildDigest: build.BuildDigest}
-			for _, component := range build.Components {
-				var planned Artifact
-				for _, artifact := range plan.Graph.Artifacts {
-					if artifact.ID == "artifact/"+build.Name+"/"+component {
-						planned = artifact
-						break
-					}
-				}
-				path, err := relocatedFactoryPath(planned.Path, options.Workspace)
-				if err != nil {
-					return nil, err
-				}
-				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-					return nil, err
-				}
-				if err := os.WriteFile(path, []byte(component), 0o755); err != nil {
-					return nil, err
-				}
-				report.Artifacts = append(report.Artifacts, pipeline.ArtifactResult{
-					Component: component, OutputType: planned.Kind, Qualification: pipeline.ArtifactUnqualified,
-					AbsPath: path, SHA256: "sha256:" + strings.Repeat("a", 64), Size: int64(len(component)),
-				})
-			}
-			return report, nil
 		},
 		executeNode: func(_ context.Context, plan *Plan, node Node, options LocalRunOptions, _ map[string]string) error {
 			_, artifacts := planIndex(plan)
@@ -107,7 +83,7 @@ func TestLocalRunnerIsRerunnableAndPreservesSourceCache(t *testing.T) {
 			if err := os.WriteFile(canary, []byte("outside"), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			packagePath := filepath.Join(options.Workspace, "packages", "tools")
+			packagePath := filepath.Join(options.Workspace, "packages", "worker")
 			if err := os.Remove(packagePath); err != nil {
 				t.Fatal(err)
 			}
@@ -132,5 +108,113 @@ func TestLocalRunnerIsRerunnableAndPreservesSourceCache(t *testing.T) {
 	}
 	if raw, err := os.ReadFile(filepath.Join(root, "outside-canary")); err != nil || string(raw) != "outside" {
 		t.Fatalf("rerun followed a derived-output symlink: %q, %v", raw, err)
+	}
+}
+
+func TestLocalSchedulerOrdersNodesAndJoinsCancellation(t *testing.T) {
+	for _, mode := range []string{"success", "failure", "canceled"} {
+		t.Run(mode, func(t *testing.T) {
+			fail := mode != "success"
+			t.Chdir(t.TempDir())
+			base, err := catalog.LoadContext(context.Background(), testCatalogProvider(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			stack, err := catalog.ApplyStack(base)
+			if err != nil {
+				t.Fatal(err)
+			}
+			definition, environment := fixtureInputs("schedule", "first", "")
+			definition.Outputs[0].Components = []string{"kubectl"}
+			sibling := definition.Outputs[0]
+			sibling.Name = "second"
+			definition.Outputs = append(definition.Outputs, sibling)
+			plan, err := Compile(context.Background(), definition, environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var failureNode string
+			for _, node := range topologicalFactoryNodes(plan.Graph) {
+				if node.Kind == NodeFetch {
+					if failureNode != "" {
+						failureNode = node.ID
+						break
+					}
+					failureNode = node.ID
+				}
+			}
+			var mu sync.Mutex
+			completed := map[string]string{}
+			active, peak := 0, 0
+			both := make(chan struct{})
+			var readyOnce sync.Once
+			joined := 0
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			deps := localRunDeps{
+				prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) { return nil, nil },
+				executeNode: func(ctx context.Context, plan *Plan, node Node, _ LocalRunOptions, _ map[string]string) error {
+					mu.Lock()
+					if dependency := failedLocalDependency(plan.Graph, node, completed); dependency != "" {
+						t.Errorf("%s started before %s", node.ID, dependency)
+					}
+					active++
+					if active > peak {
+						peak = active
+					}
+					if node.Kind == NodeFetch && active == 2 {
+						readyOnce.Do(func() { close(both) })
+					}
+					mu.Unlock()
+					defer func() { mu.Lock(); active--; joined++; mu.Unlock() }()
+					if node.Kind == NodeFetch {
+						select {
+						case <-both:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+						if fail {
+							if node.ID == failureNode {
+								if mode == "canceled" {
+									cancel()
+									return ctx.Err()
+								}
+								return e.New(e.CodeVerifyFailed, "injected producer failure")
+							}
+							<-ctx.Done()
+							return ctx.Err()
+						}
+					}
+					mu.Lock()
+					completed[node.ID] = "ok"
+					mu.Unlock()
+					return nil
+				},
+			}
+			result, err := runLocal(ctx, plan, withLocalDefaults(LocalRunOptions{Workspace: ".nkd/schedule", Jobs: 2}), deps)
+			if fail {
+				want := e.CodeVerifyFailed
+				if mode == "canceled" {
+					want = e.CodeTimeout
+				}
+				assertFactoryErrorCode(t, err, want)
+				if joined != 2 || active != 0 {
+					t.Fatalf("returned before joining canceled producers: joined=%d active=%d", joined, active)
+				}
+				if _, err := os.Stat(".nkd/schedule/run.json"); !os.IsNotExist(err) {
+					t.Fatalf("failed Run persisted success: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(result.Nodes) != len(plan.Graph.Nodes) {
+					t.Fatal("scheduler omitted nodes")
+				}
+			}
+			if peak != 2 {
+				t.Fatalf("peak concurrency=%d, want 2", peak)
+			}
+		})
 	}
 }

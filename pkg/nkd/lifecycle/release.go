@@ -2,28 +2,18 @@ package lifecycle
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
-type materializedRelease struct {
-	inspection delivery.Inspection
-	path       string
-	cleanup    func()
-}
-
-type releaseMaterializer func(context.Context, string) (materializedRelease, error)
+type releaseMaterializer func(context.Context, string) (*delivery.Publication, error)
 
 // ConsumerOptions configures transport and signature verification once. Each
 // Verify call then accepts only the Release reference and Verification Policy.
@@ -44,10 +34,10 @@ type Consumer struct {
 // VerifiedRelease is an opaque, policy-bound live capability. Description is a
 // defensive public projection; Close releases its verified local closure.
 type VerifiedRelease struct {
-	mu      sync.RWMutex
-	valid   bool
-	release Release
-	cleanup func()
+	mu          sync.RWMutex
+	valid       bool
+	release     Release
+	publication *delivery.Publication
 }
 
 func NewConsumer(options ConsumerOptions) (*Consumer, error) {
@@ -58,21 +48,8 @@ func NewConsumer(options ConsumerOptions) (*Consumer, error) {
 	return &Consumer{verifierFor: func(policy VerificationPolicy) (sign.OCISigner, error) {
 		return sign.NewCosignOCISigner(sign.CosignOCIOptions{Binary: options.CosignBinary,
 			BinaryDigest: options.CosignDigest, Identity: policy.IdentityRegexp, Issuer: policy.Issuer, Credential: options.Credential})
-	}, materialize: func(ctx context.Context, reference string) (materializedRelease, error) {
-		if err := os.MkdirAll(root, 0o700); err != nil {
-			return materializedRelease{}, e.Wrap(e.CodeImmutableViolation, err, "creating release verification root")
-		}
-		stage, err := os.MkdirTemp(root, ".verify-*")
-		if err != nil {
-			return materializedRelease{}, e.Wrap(e.CodeImmutableViolation, err, "creating release verification workspace")
-		}
-		cleanup := func() { _ = os.RemoveAll(stage) }
-		inspection, err := delivery.Pull(ctx, reference, filepath.Join(stage, "layout"), options.Registry)
-		if err != nil {
-			cleanup()
-			return materializedRelease{}, err
-		}
-		return materializedRelease{inspection: inspection, path: filepath.Join(stage, "layout"), cleanup: cleanup}, nil
+	}, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {
+		return delivery.PullPublication(ctx, reference, root, options.Registry)
 	}}, nil
 }
 
@@ -100,10 +77,7 @@ func (verified *VerifiedRelease) Close() error {
 		return nil
 	}
 	verified.valid = false
-	if verified.cleanup != nil {
-		verified.cleanup()
-	}
-	return nil
+	return verified.publication.Close()
 }
 
 // Verify consumes one pinned reference under one explicit policy. The currently
@@ -160,28 +134,21 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 	if !identityPattern.MatchString(record.ObservedIdentity) || record.ObservedIssuer != policy.Issuer {
 		return nil, e.New(e.CodeUntrustedSigner, "observed release signer does not satisfy the requested identity and issuer policy")
 	}
-	materialized, err := consumer.materialize(ctx, reference)
+	publication, err := consumer.materialize(ctx, reference)
 	if err != nil {
 		return nil, err
 	}
-	inspection, cleanup := materialized.inspection, materialized.cleanup
 	failed := true
 	defer func() {
-		if failed && cleanup != nil {
-			cleanup()
+		if failed {
+			_ = publication.Close()
 		}
 	}()
-	if inspection.RootDigest != digest {
-		return nil, e.New(e.CodeVerifyFailed, "materialized publication root %s differs from requested subject %s", inspection.RootDigest, digest)
-	}
-	if err := delivery.RequireAttestedEvidence(inspection); err != nil {
-		return nil, err
-	}
-	artifacts, contentSubject, err := artifactsFromBinding(ctx, materialized.path, inspection)
+	artifacts, contentSubject, err := publication.Artifacts(reference)
 	if err != nil {
 		return nil, err
 	}
-	if err := bindArtifactReferences(reference, inspection, artifacts); err != nil {
+	if err := publication.RequireAttestedEvidence(); err != nil {
 		return nil, err
 	}
 	policyDigest, err := policy.Digest()
@@ -194,7 +161,7 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 		return nil, err
 	}
 	failed = false
-	return &VerifiedRelease{valid: true, release: description, cleanup: cleanup}, nil
+	return &VerifiedRelease{valid: true, release: description, publication: publication}, nil
 }
 
 // InspectReleaseLayout returns exact Artifact descriptions from an already
@@ -204,188 +171,13 @@ func InspectReleaseLayout(ctx context.Context, reference, layoutPath string) ([]
 	if err := (sign.Subject{Ref: reference, Digest: digest}).Validate(); err != nil {
 		return nil, err
 	}
-	inspection, err := delivery.Inspect(ctx, layoutPath)
+	publication, err := delivery.OpenPublication(ctx, layoutPath, digest)
 	if err != nil {
 		return nil, err
 	}
-	if inspection.RootDigest != digest {
-		return nil, e.New(e.CodeVerifyFailed, "publication layout does not match requested reference")
-	}
-	artifacts, _, err := artifactsFromBinding(ctx, layoutPath, inspection)
-	if err != nil {
-		return nil, err
-	}
-	if err := bindArtifactReferences(reference, inspection, artifacts); err != nil {
-		return nil, err
-	}
-	return artifacts, nil
-}
-
-func artifactsFromBinding(ctx context.Context, layoutPath string, inspection delivery.Inspection) ([]Artifact, string, error) {
-	if layoutPath == "" {
-		return nil, "", e.New(e.CodeVerifyFailed, "verified publication has no held layout path")
-	}
-	var binding factory.LifecycleBinding
-	if metadata := inspection.Root.Release; metadata != nil {
-		binding = factory.LifecycleBinding{SchemaVersion: factory.LifecycleBindingSchema, DefinitionDigest: metadata.DefinitionDigest, EnvironmentDigest: metadata.EnvironmentDigest, ContentSubject: metadata.ContentSubject}
-		for _, object := range inspection.Root.Objects {
-			if output := object.Output; output != nil {
-				digest := object.DescriptorDigest
-				if output.Format == OutputAPT {
-					digest = object.SemanticDigest
-				}
-				binding.Outputs = append(binding.Outputs, factory.LifecycleBoundOutput{Name: object.Name, Kind: output.Format, Digest: digest, BuildDigest: output.BuildDigest, Components: output.Components, TransportPath: output.TransportPath})
-			}
-		}
-	} else {
-		return nil, "", e.New(e.CodeVerifyFailed, "publication has no authoritative release metadata")
-	}
-
-	objects := make(map[string]delivery.PublishedObject, len(inspection.Root.Objects))
-	for _, candidate := range inspection.Root.Objects {
-		if _, exists := objects[candidate.Name]; exists {
-			return nil, "", e.New(e.CodeVerifyFailed, "publication repeats object name %q", candidate.Name)
-		}
-		objects[candidate.Name] = candidate
-	}
-	artifacts := make([]Artifact, 0, len(binding.Outputs))
-	for _, output := range binding.Outputs {
-		if !namePattern.MatchString(output.Name) || (output.Kind != OutputExecutable && output.Kind != OutputAPT && output.Kind != OutputHelm && output.Kind != OutputOCI) || !canonical.IsDigest(output.Digest) ||
-			!canonical.IsDigest(output.BuildDigest) || (output.Kind != OutputHelm && len(output.Components) == 0) {
-			return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output binding is malformed")
-		}
-		for _, component := range output.Components {
-			if !namePattern.MatchString(component) {
-				return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output %q has an unsafe component", output.Name)
-			}
-		}
-	}
-	for _, output := range binding.Outputs {
-		published, ok := objects[output.Name]
-		if !ok || published.Kind != lifecyclePublishedKind(output.Kind) ||
-			(output.Kind != OutputAPT && published.DescriptorDigest != output.Digest) || (output.Kind == OutputAPT && published.SemanticDigest != output.Digest) {
-			return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output %q does not match its publication object", output.Name)
-		}
-		extracted, err := os.MkdirTemp(filepath.Dir(layoutPath), ".inspect-*")
-		if err != nil {
-			return nil, "", e.Wrap(e.CodeImmutableViolation, err, "creating held bundle inspection workspace")
-		}
-		defer func() { _ = os.RemoveAll(extracted) }()
-		components := append([]string(nil), output.Components...)
-		switch output.Kind {
-		case OutputOCI:
-			if len(components) != 1 || output.TransportPath != "" {
-				return nil, "", e.New(e.CodeVerifyFailed, "OCI output %q has an invalid member or transport binding", output.Name)
-			}
-			image, err := delivery.InspectPublishedContainerImage(ctx, layoutPath, output.Name)
-			if err != nil {
-				return nil, "", err
-			}
-			if image.RootDigest != output.Digest {
-				return nil, "", e.New(e.CodeVerifyFailed, "OCI output %q differs from its image binding", output.Name)
-			}
-		case OutputExecutable:
-			destination := filepath.Join(extracted, "bundle")
-			bundle, err := delivery.ExtractBinaryBundle(ctx, layoutPath, output.Name, destination)
-			if err != nil {
-				return nil, "", err
-			}
-			components = components[:0]
-			for _, entry := range bundle.Entries {
-				components = append(components, entry.Name)
-			}
-		case OutputAPT:
-			expectedPath := filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", output.Name))
-			if output.TransportPath != expectedPath {
-				return nil, "", e.New(e.CodeVerifyFailed, "APT output %q has an unsafe transport binding", output.Name)
-			}
-			archive := filepath.Join(extracted, "repository.tar")
-			if _, err := delivery.ExtractObject(ctx, layoutPath, output.Name, archive); err != nil {
-				return nil, "", err
-			}
-			unpacked := filepath.Join(extracted, "unpacked")
-			if err := pipeline.UnpackTransport(ctx, archive, unpacked, []string{output.TransportPath}); err != nil {
-				return nil, "", err
-			}
-			repository, err := delivery.InspectAPTRepository(ctx, filepath.Join(unpacked, filepath.FromSlash(output.TransportPath)))
-			if err != nil || repository.Digest != output.Digest {
-				return nil, "", e.New(e.CodeVerifyFailed, "APT output %q differs from its binding", output.Name)
-			}
-			components = components[:0]
-			for _, pkg := range repository.Repository.Packages {
-				components = append(components, pkg.Name)
-			}
-			sort.Strings(components)
-		case OutputHelm:
-			if output.TransportPath != "" {
-				return nil, "", e.New(e.CodeVerifyFailed, "Helm output %q has an unexpected transport path", output.Name)
-			}
-		}
-		if !equalStrings(components, output.Components) {
-			return nil, "", e.New(e.CodeVerifyFailed, "lifecycle output %q component bytes differ from its binding", output.Name)
-		}
-		artifact := Artifact{Name: output.Name, Kind: output.Kind, Digest: output.Digest,
-			BuildDigest: output.BuildDigest, Components: append([]string(nil), output.Components...)}
-		if err := artifact.validate(); err != nil {
-			return nil, "", err
-		}
-		artifacts = append(artifacts, artifact)
-	}
-	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Name < artifacts[j].Name })
-	contentSubject, err := canonical.Digest(canonical.KindReleaseContent, releaseContent{Artifacts: cloneArtifacts(artifacts)})
-	if err != nil || contentSubject != binding.ContentSubject {
-		return nil, "", e.New(e.CodeVerifyFailed, "release content subject differs from authenticated output payloads")
-	}
-	expectedOutputs := make([]factory.LifecycleOutputPlan, 0, len(binding.Outputs))
-	boundOutputs := make([]factory.LifecycleBoundOutput, 0, len(binding.Outputs))
-	for _, output := range binding.Outputs {
-		expectedOutputs = append(expectedOutputs, factory.LifecycleOutputPlan{Name: output.Name, Kind: output.Kind,
-			BuildDigest: output.BuildDigest, Components: append([]string(nil), output.Components...)})
-		boundOutputs = append(boundOutputs, output)
-	}
-	if err := factory.ValidateLifecycleOutputs(expectedOutputs, boundOutputs); err != nil {
-		return nil, "", err
-	}
-	evidenceCount := 0
-	if inspection.Root.Release != nil {
-		actual, err := delivery.Inspect(ctx, layoutPath)
-		if err != nil {
-			return nil, "", err
-		}
-		expectedDigest, err := inspection.Root.Digest()
-		if err != nil {
-			return nil, "", err
-		}
-		actualDigest, err := actual.Root.Digest()
-		if err != nil || actualDigest != expectedDigest {
-			return nil, "", e.New(e.CodeVerifyFailed, "release metadata differs from held layout")
-		}
-		for _, o := range actual.Root.Objects {
-			if o.Evidence != nil {
-				evidenceCount++
-			}
-		}
-	}
-
-	if len(objects) != len(artifacts)+evidenceCount {
-		return nil, "", e.New(e.CodeVerifyFailed, "publication closure contains objects outside its lifecycle binding")
-	}
-	return artifacts, contentSubject, nil
-}
-
-func lifecyclePublishedKind(kind string) string {
-	switch kind {
-	case OutputExecutable:
-		return factory.PackageBinaryBundle
-	case OutputAPT:
-		return factory.PackageAPT
-	case OutputHelm:
-		return factory.PackageHelm
-	case OutputOCI:
-		return factory.PackageImage
-	default:
-		return ""
-	}
+	defer func() { _ = publication.Close() }()
+	artifacts, _, err := publication.Artifacts(reference)
+	return artifacts, err
 }
 
 func (release Release) validate() error {
@@ -399,7 +191,7 @@ func (release Release) validate() error {
 	}
 	previous := ""
 	for _, artifact := range release.Artifacts {
-		if err := artifact.validate(); err != nil {
+		if err := artifact.Validate(); err != nil {
 			return err
 		}
 		key := artifact.Name + "\x00" + artifact.Kind
@@ -416,21 +208,4 @@ func referenceDigest(reference string) string {
 		return ""
 	}
 	return reference[strings.LastIndexByte(reference, '@')+1:]
-}
-
-// References are transport projections; content identity was verified from the
-// exact payload membership before these locators are added to the public view.
-func bindArtifactReferences(reference string, inspection delivery.Inspection, artifacts []Artifact) error {
-	refs, err := delivery.OutputReferences(reference, inspection)
-	if err != nil {
-		return err
-	}
-	for i := range artifacts {
-		ref, ok := refs[artifacts[i].Name]
-		if !ok {
-			return e.New(e.CodeVerifyFailed, "artifact has no bound repository")
-		}
-		artifacts[i].Reference = ref
-	}
-	return nil
 }

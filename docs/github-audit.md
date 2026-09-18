@@ -1,6 +1,6 @@
 # GitHub configuration audit
 
-Reviewed 2026-09-09 against the current Definition → Run → Release lifecycle.
+Layout updated 2026-09-18 against the current Definition → Run → Release lifecycle.
 
 | File | Disposition |
 |---|---|
@@ -8,8 +8,8 @@ Reviewed 2026-09-09 against the current Definition → Run → Release lifecycle
 | `.github/dependabot.yml` | Retain Go and action updates; exclude the renamed generated workflow because its pins are owned by generator inputs. |
 | `.github/workflows/nkd-run.yml` | Regenerate from the NKE Definition and GitHub Environment. Replaces `nkd-factory.yml`. |
 | `.github/nkd-run/manifest.json` | Generated file membership and byte digests. Replaces the old factory manifest. |
-| `.github/nkd-run/plan.json` | Generated execution plan with current internal CompileSpec and ExecutionSettings terminology. |
-| `.github/nkd-run/graphs/nke-cli.json` | The sole graph selected by the maintained NKE Definition. |
+| `.github/nkd-run/plan.json` | Complete Run Plan v4, embedding original Definition/Environment and exact producer IR. |
+| Former `.github/nkd-run/graphs/*.json` | Retired through the prior ownership manifest; producer execution reads the single complete Plan. |
 | Former GPU/AICR graphs and GPU composition under `.github/nkd-factory/` | Remove. They were leftovers outside the manifest, including retired individual worker builds. AICR retains its separate Definition and demo. |
 
 The generated directory is now checked for unexpected files and directories, including symlinks. Previously,
@@ -39,7 +39,7 @@ permission. The corrected [signed Run](evidence/2026-09-10-github-signed-run.md)
 `pipeline-attested` Run. Independent local cosign and public Release consumption also passed; automatic
 default-branch publication remains deferred.
 
-## Validation
+## Historical validation — 2026-09-09
 
 The updated generator passed the complete local `make check` gate with golangci-lint 2.13.1 built using
 Go 1.27, the uncached unit suite, and Linux/arm64 race checks for signing, pipeline and provenance. Both
@@ -47,7 +47,7 @@ workflows pass Actionlint; the workflows and Dependabot config pass YAML linting
 allowed. NKE and AICR generation checks pass, including regression coverage for leftover payloads and changed
 execution guards. Changed-document relative links and `git diff --check` pass.
 
-The current NKE plan digest is
+The NKE plan digest recorded for that validation was
 `sha256:afbf72d8d16cb5c5e0a6346fa7d6638874e432b18dbc5535ff8cae25f889734a`.
 
 GitHub Actions is enabled. Commit `3c55dcf` promoted the implementation and generated workflow to `main`;

@@ -87,11 +87,19 @@ Helm default compile to the same complete activation. Lists are copied and sorte
 executable graph validation rejects missing effective defaults, duplicate entries and noncanonical order.
 The graph does not infer these settings from an external cluster declaration.
 
-A producer's execution requirements are carried in the full executable graph and compiled Plan, while the
-logical build projection cannot represent them. Changing resources, eligible host platforms, typed capability
+A producer's execution requirements and deterministic class binding have one executable representation: the
+full build graph embedded in the Run Plan. Scheduler records reference that exact instruction by output and
+node identity; they do not copy its execution settings. Utility operations retain their own instructions. The
+logical build projection cannot represent producer execution requirements or bindings. Changing resources, eligible host platforms, typed capability
 policy, or executor timeout changes catalog and Plan identities without changing what the selected producers build. The
 request is not capability proof: compilation deterministically binds an Environment execution class into Plan
 identity, while authenticated runtime observations remain a separate execution-admission record (ADR-18).
+
+The compiler accepts admitted Definition and Environment values and returns a complete Plan. It owns graph
+derivation, required output slots, packaging, routing and evidence edges together. The Plan stores independent
+copies of the authored inputs and validates their original typed digests on rehydration. No copied compiler-input
+document or separate execution-settings digest stands between those inputs and the resulting Plan. Lifecycle
+preparation freezes attempt state from that Plan without completing or repairing compiler output.
 
 ### 4. Enforceable purity guard
 
@@ -151,6 +159,10 @@ Current package-level evidence includes:
   independently relocated full execution graphs project to identical logical bytes and `buildDigest`; and
 - `pkg/nkd/ir/marshal_test.go::TestDigestHostInvariance` plus the static guard in
   `internal/architecture/purity_test.go` for host purity.
+
+Compiler tests additionally cover direct authored input binding, independent ownership after caller mutation,
+exact producer references, forbidden copied execution settings, and unchanged Build identity when execution
+requirements change. These are contract checks, not provider capability evidence.
 
 The focused IR migration tests also cover concrete targets, exact producer membership, AICR inputs, strict
 legacy-field rejection and the distinct `nkd.build` family. Repository checks are recorded in reconciliation;

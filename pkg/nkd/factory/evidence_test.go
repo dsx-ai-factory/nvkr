@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 )
 
 // evidenceTierDefinition is the ONE file allowed to spell the tier tokens. Every
@@ -64,11 +66,11 @@ func TestPlanTierIsAttestedOnlyForCosignSigning(t *testing.T) {
 	if got := planTier(nil); got != TierStaticUnqualified {
 		t.Fatalf("unsigned delivery tier = %q", got)
 	}
-	dryRun := &SigningProfile{Mode: SigningModeDryRun, Identity: "^local$", Issuer: "https://nkd.dev/local"}
+	dryRun := &authored.Signing{Mode: SigningModeDryRun, Identity: "^local$", Issuer: "https://nkd.dev/local"}
 	if got := planTier(dryRun); got != TierStaticUnqualified {
 		t.Fatalf("dry-run delivery tier = %q; a dry run signs nothing", got)
 	}
-	cosign := &SigningProfile{Mode: SigningModeCosign, Identity: "^local$", Issuer: "https://nkd.dev/local", CosignTool: "cosign"}
+	cosign := &authored.Signing{Mode: SigningModeCosign, Identity: "^local$", Issuer: "https://nkd.dev/local"}
 	if got := planTier(cosign); got != TierPipelineAttested {
 		t.Fatalf("cosign delivery tier = %q", got)
 	}

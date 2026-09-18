@@ -19,7 +19,7 @@ import (
 func dependencySubject(t *testing.T) *BOM {
 	t.Helper()
 	resolved, digest := resolveCP(t)
-	return FromComponent(resolved.Components[0], digest, "sha256:"+strings.Repeat("a", 64))
+	return fromComponentForArch(resolved.Components[0], digest, "sha256:"+strings.Repeat("a", 64), "")
 }
 
 func TestDependencyInventoryCanonicalVersionsAndEdges(t *testing.T) {

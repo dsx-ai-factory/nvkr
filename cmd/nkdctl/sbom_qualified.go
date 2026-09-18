@@ -21,8 +21,8 @@ const (
 )
 
 // commandEvidenceReader is a transport adapter only. It returns bytes; the SBOM
-// module verifies those bytes against the catalog's exact digest before issuing an
-// ExternalEvidenceReceipt. It cannot return a success assertion or a digest claim.
+// module verifies those bytes and their artifact subject against the catalog's
+// exact bindings. The reader cannot return a success assertion or a digest claim.
 type commandEvidenceReader struct {
 	client *http.Client
 }

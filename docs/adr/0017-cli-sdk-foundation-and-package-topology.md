@@ -47,16 +47,21 @@ AICR outputs may declare `aicr.bundle` renderer settings: deployer, storage clas
 tolerations and workload selectors. The compiler normalizes owned lists and records the effective settings,
 including explicit `deployer: helm` when omitted, in the generated AICR activation. These settings participate
 in Build identity and execution reads them directly from that activation. One output's settings cannot alter
-another output's rendering. Definition v4, Run/Release v3, and compiled graph/binding v3 records reject the
+another output's rendering. Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools such as the AICR generator stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
 
-`pkg/nkd/lifecycle` owns preparation, required/observed joins, Run persistence, generated release relationships,
-and consumer workflow. `factory` owns compilation/execution mechanics; existing domain modules retain their
-canonical, trust, evidence, status, release and transport invariants. `client/v1` is a context-first facade,
+`pkg/nkd/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
+accepts those exact inputs and owns the complete Plan, output joins and evidence requirements. It returns no
+partially completed plan and exposes no independently authored CompileSpec or ExecutionSettings handoff.
+`lifecycle` owns preparation, immutable attempt persistence and consumer workflow. Preparation retains an owned
+snapshot; subsequent caller mutation cannot change execution. `factory` owns Run scheduling/execution and
+provider generation. `delivery` owns checked publication membership and canonical release-content identity;
+Release consumers do not reconstruct compiler bindings. Existing domain modules retain their
+canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
 
@@ -67,10 +72,20 @@ is not required. Remove superseded authoring APIs and wire fixtures; retain inte
 current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
 policy (ADR-04), returning inspectable views plus a closeable capability. The reference selects the sole
-ADR-20 release index: delivery owns its one metadata/descriptor/evidence join; lifecycle projects named
-deliverables, exact sibling artifact references, and the release content subject. Transport locators are excluded from
+ADR-20 release index: delivery owns its metadata/descriptor/evidence join, checked named outputs, exact sibling
+artifact references, and release content projection. Lifecycle applies consumer policy and assembles the Release
+view. Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
+
+The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
+`ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic
+graph export. It does not expose a second publication workflow or qualified-evidence orchestration. The unused
+SDK validation-vector/profile authentication, qualified rebuild, vector creation, release authorization and
+publication methods and their injected authority options are removed. Existing diagnostic commands use the
+owning trust, profile, attest and release modules directly; their receipt checks and capability
+gates remain. The unreachable qualified transport package and publication helper are removed. Qualified
+publication remains unavailable until its authenticated commit protocol exists.
 
 ### 2. Context threading + subprocess cleanup-on-cancel
 
@@ -93,21 +108,21 @@ component without following symlinks, accepts regular files only, caps each file
 bounds recursive listing count and depth. `client/v1.WithProvider` rejects a legacy provider before invoking it.
 Catalog parsing and I/O use the same context-aware loading API.
 
-Finite generated workflows follow a value-returning interface: `pipeline.Emitter.Render(ctx, graph, digest)`
-returns the complete bytes after cancellation-aware rendering. It does not accept an arbitrary `io.Writer`,
+Finite generated workflows follow a value-returning interface: `factory.Render(ctx, plan, engine)`
+returns the complete bundle after cancellation-aware rendering. It does not accept an arbitrary `io.Writer`,
 because a callback that blocks inside `Write` makes cancellation unenforceable.
 
 ### 3. Standard, replaceable external-interface seams
 
-Operator-swappable seams — **`OCIRegistry` (push + referrers)**, **`PackageRepo` (publish)**, and **`ObjectStore`
-(put/get)** — are injected via facade options and used by the publish phase (ADR-20). No seam references a
-vendor-internal package. Diagnostic and read-only conveniences may have local defaults, but an absent
-authority-bearing verifier, evidence source, trusted-time source, or publisher **fails closed before I/O**. There
-is no permissive production default that can manufacture authority.
+The maintained SDK admits catalog I/O, diagnostic execution and a scoped Release consumer. The owning
+modules retain their external I/O seams and authenticated receipts. Missing authority-bearing verifiers,
+evidence sources and publishers fail closed before I/O. There is no permissive production default that can
+manufacture authority. Unused qualified transport adapters and their speculative injected backends are removed;
+future qualified publication needs an authenticated commit protocol before exposing orchestration or SDK options.
 
 ### 4. Package topology and single-owner rule
 
-- A documented **single-owner package map** — `canonical`, `catalog`, `buildgraph`, `target`,
+- A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `aicr`, `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, and `trust`.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
@@ -181,12 +196,11 @@ record; absence of a record proves neither success nor absence of remote effects
 
 Current contract evidence in `client/v1/*_test.go`, `cmd/nkdctl/*_test.go`, `pkg/nkd/pipeline/local_test.go`, and
 `pkg/nkd/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
-I/O/runner/publication seams, local cancellation propagation, an explicitly stopped and joined container-reaper
+catalog/runner/consumer seams, local cancellation propagation, an explicitly stopped and joined container-reaper
 waiter, bounded lock-free cleanup I/O, held-child SIGTERM→SIGKILL escalation, atomic output, exact-byte
-ValidationVector and profile receipts, rejection of unauthenticated inputs, and absence of implicit publication I/O. Public
-diagnostic values cannot be promoted into authority by the facade. Qualified report and ValidationVector result
-lifetimes are explicitly closeable, and tests prove that closing them invalidates their retained same-process
-authority. Direct runner entry points also reject a nil `RunOptions.Ctx` before inspecting their graph, node, or
+receipt checks in the owning modules, rejection of unauthenticated inputs, and absence of implicit publication I/O.
+Public diagnostic values cannot be promoted into authority by the facade. Qualified reports and evidence receipts
+retain explicit close lifetimes in their owning modules; they are not separate SDK workflows. Direct runner entry points also reject a nil `RunOptions.Ctx` before inspecting their graph, node, or
 results path. The stock measure-only verifier rejects a missing producer-results source before trust, profile, or
 catalog I/O; the independent disk-envelope decode lane does not require producer results. Catalog and SDK tests
 additionally prove pre-canceled/no-I/O admission, legacy-provider rejection, no-follow regular-file reads,
@@ -198,8 +212,8 @@ Linux race tests provide contract evidence; repository checks are recorded in re
 [2026-09-17 local NKE build](../evidence/2026-09-17-direct-output-local-build.md) separately exercised direct
 output selection, production, loopback publication and recovered CLI execution with dry-run signing.
 
-End-to-end acceptance requires a separate consumer module using only `client/v1` to perform the complete
-authenticated resolve/results/evidence/release/publication flow, plus cancellation tests against every real
-subprocess and network adapter proving no child, container, temp output, or partial publication remains. The
-remaining authenticated verify/attest/bundle/status/release command orchestration must also move behind facade
-use cases, or be justified as presentation-only, before the CLI can be called thin.
+End-to-end acceptance requires a separate consumer module using only `client/v1` to load inputs, prepare and
+execute a Run, and verify its published Release under explicit policy, plus cancellation tests against every
+real subprocess and network adapter proving no child, container, temporary output, or partial publication remains.
+Qualified diagnostic commands remain explicitly scoped consumers of their owning modules. They do not constitute
+an alternative supported publication workflow, and current command orchestration is not described as fully thin.

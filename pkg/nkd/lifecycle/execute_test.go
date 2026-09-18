@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -16,6 +17,17 @@ import (
 )
 
 func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing.T) {
+	plan, err := Compile(t.Context(), "definition.yaml", testDefinition(t), "environment.yaml", testEnvironment(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plannedProducer factory.Artifact
+	for _, artifact := range plan.Graph.Artifacts {
+		if artifact.ID == "result/cli/kubectl" {
+			plannedProducer = artifact
+			break
+		}
+	}
 	workspace := t.TempDir()
 	componentPath := filepath.Join(workspace, "component")
 	if err := os.WriteFile(componentPath, []byte("exact component bytes"), 0o755); err != nil {
@@ -36,11 +48,7 @@ func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing
 	if err := os.MkdirAll(filepath.Dir(producerPath), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(componentPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	producer := pipeline.ArtifactResult{Component: "kubectl", SHA256: pipeline.FileDigest([]byte("exact component bytes")), Size: info.Size()}
+	producer := fixtureProducerResult(t, plan, plannedProducer, componentPath)
 	raw, err := canonical.Marshal(producer)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +124,7 @@ func TestObserveAPTRejectsSubstitutedProducerBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	resultPath := artifacts["result/cli/kubectl"].Path
-	result := pipeline.ArtifactResult{Component: "kubectl", SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))}
+	result := fixtureProducerResult(t, plan, input, input.Path)
 	writeCanonicalTestFile(t, resultPath, result)
 	if err := factory.ExecuteNode(ctx, plan, "package/cli", nil, nil); err != nil {
 		t.Fatal(err)
@@ -240,6 +248,17 @@ func TestCompleteGPUPublicationClosureAcrossFormatsAndArchitectures(t *testing.T
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Keep the supplier acquisition in this synthetic closure, but pin its
+			// private test overlay to the bytes the fixture will materialize.
+			overlay, err := catalog.LoadOverlayContext(ctx, filepath.Join(filepath.Dir(definitionPath), "supplier-kubectl.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			pin := pipeline.FileDigest([]byte("synthetic GPU producer kubectl"))
+			overlay.Components["kubectl"].Prebuilt.Digests = map[string]string{"amd64": pin, "arm64": pin}
+			overlayPath := filepath.Join(t.TempDir(), "supplier-kubectl.json")
+			writeCanonicalTestFile(t, overlayPath, overlay)
+			definition.Catalog.Overlays = []string{overlayPath}
 			environment, err := LoadEnvironment(ctx, "testdata/examples/ai-factory/environment-local.yaml")
 			if err != nil {
 				t.Fatal(err)
@@ -255,8 +274,8 @@ func TestCompleteGPUPublicationClosureAcrossFormatsAndArchitectures(t *testing.T
 				payload := []byte("synthetic GPU producer " + artifact.Component)
 				switch {
 				case artifact.Kind == "producer-result":
-					writeCanonicalTestFile(t, artifact.Path, pipeline.ArtifactResult{Component: artifact.Component,
-						OutputType: "binary", Path: artifact.Component, SHA256: pipeline.FileDigest(payload), Size: int64(len(payload))})
+					input := artifacts["artifact/"+artifact.BuildTarget+"/"+artifact.Component]
+					writeCanonicalTestFile(t, artifact.Path, fixtureProducerResult(t, plan, artifact, input.Path))
 				case strings.HasSuffix(artifact.ID, "/aicr-bundle"):
 					if err := os.MkdirAll(artifact.Path, 0o700); err != nil {
 						t.Fatal(err)
@@ -304,7 +323,7 @@ func TestCompleteGPUPublicationClosureAcrossFormatsAndArchitectures(t *testing.T
 			if shared == 0 {
 				t.Fatal("shared build SBOMs were not deduplicated across APT and binary outputs")
 			}
-			outputs, subject, err := artifactsFromBinding(ctx, layout, inspection)
+			outputs, subject, err := inspectTestPublication(t, ctx, layout, inspection.RootDigest)
 			if err != nil {
 				t.Fatal(err)
 			}

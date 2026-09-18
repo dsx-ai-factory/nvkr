@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 )
 
 func TestUnsetRunsOnDefaultsToGenericRunner(t *testing.T) {
@@ -22,18 +23,8 @@ func TestUnsetRunsOnDefaultsToGenericRunner(t *testing.T) {
 	// No runsOn anywhere (definition or build target): ADR-18 §8 runs on a generic
 	// runner, so compilation must DEFAULT the label rather than fail, and every emitted node
 	// must carry the generic runner — no bespoke self-hosted label is ever required.
-	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
-		Metadata: Metadata{Name: "ai-factory"}, Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
-		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
-		UtilityPlatform:  "linux/amd64",
-		Builds:           []BuildTarget{{Name: "node-worker", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-		Packages:         []PackageSpec{{Name: "node-tools", Kind: PackageBinaryBundle, Inputs: []string{"node-worker/*"}}},
-	}
-	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "env"},
-		Targets:  map[string]Target{"oci": {Kind: TargetOCI, Ref: "localhost:5000/nkd/tools:dev", Anonymous: true, PlainHTTP: true}},
-		Routes:   []Route{{Name: "node-tools", Input: "package/node-tools", Target: "oci"}},
-	}
+	definition, delivery := fixtureInputs("ai-factory", "node-worker", "")
+	delivery.Publication = &authored.Publication{RepositoryPrefix: "localhost:5000/nkd", Anonymous: true, PlainHTTP: true}
 	plan, err := Compile(context.Background(), definition, delivery, stack, "test")
 	if err != nil {
 		t.Fatalf("a definition without runsOn must compile (generic default), got: %v", err)
@@ -42,6 +33,10 @@ func TestUnsetRunsOnDefaultsToGenericRunner(t *testing.T) {
 		t.Fatal("expected a non-empty graph")
 	}
 	for _, node := range plan.Graph.Nodes {
+		node, err = plan.ExecutionFor(node)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if node.RunsOn != DefaultRunsOn {
 			t.Fatalf("node %q RunsOn = %q, want default %q", node.ID, node.RunsOn, DefaultRunsOn)
 		}
@@ -67,25 +62,9 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition := CompileSpec{APIVersion: CompileSpecAPIVersion, Kind: CompileSpecKind,
-		Metadata: Metadata{Name: "ai-factory"}, RunsOn: "ubuntu-24.04", Catalog: CatalogStack{Base: "testdata/catalogs/kubernetes-layered"},
-		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
-		UtilityPlatform:  "linux/amd64",
-		Builds:           []BuildTarget{{Name: "node-worker", RunsOn: "ubuntu-24.04", Platform: "linux/amd64", Components: []string{"containerd", "crictl", "kubeadm", "kubectl", "kubelet", "runc"}}},
-		Packages: []PackageSpec{
-			{Name: "node-tools", Kind: PackageBinaryBundle, Inputs: []string{"node-worker/*"}},
-			{Name: "node-apt", Kind: PackageAPT, Inputs: []string{"node-worker/containerd"}, Distribution: "stable", Component: "main"},
-		},
-	}
-	delivery := ExecutionSettings{APIVersion: ExecutionSettingsAPIVersion, Kind: ExecutionSettingsKind,
-		Metadata: Metadata{Name: "laptop"},
-		Targets: map[string]Target{
-			"oci": {Kind: TargetOCI, Ref: "localhost:5000/nkd/tools:dev", Anonymous: true, PlainHTTP: true},
-		},
-		Routes: []Route{
-			{Name: "node-tools", Input: "package/node-tools", Target: "oci"},
-		},
-	}
+	definition, delivery := fixtureInputs("ai-factory", "node-worker", "ubuntu-24.04")
+	definition.Outputs = append([]authored.DefinitionOutput{{Name: "node-apt", Platform: "linux/amd64", Format: authored.OutputAPT, Components: []string{"containerd"}, APT: &authored.APTOutput{Distribution: "stable", Component: "main"}}}, definition.Outputs...)
+	delivery.Publication = &authored.Publication{RepositoryPrefix: "localhost:5000/nkd", Anonymous: true, PlainHTTP: true}
 	plan, err := Compile(context.Background(), definition, delivery, stack, "test")
 	if err != nil {
 		t.Fatal(err)
@@ -97,37 +76,39 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 	for _, node := range plan.Graph.Nodes {
 		byID[node.ID] = node
 	}
-	build := byID["node-worker/build-containerd"]
+	build, err := plan.ExecutionFor(byID["node-worker/build-containerd"])
+	if err != nil {
+		t.Fatal(err)
+	}
 	if build.Kind != NodeBuild || len(build.Inputs) != 2 || build.Network != "none" ||
 		!containsPrefix(build.Inputs, "source/node-worker/") || !containsPrefix(build.Inputs, "source-receipt/node-worker/") {
 		t.Fatalf("containerd build lacks explicit isolated source input: %#v", build)
 	}
-	bundle := byID["package/node-tools"]
+	bundle := byID["package/node-worker"]
 	if bundle.Kind != NodePackage || !contains(bundle.Inputs, "artifact/node-worker/containerd") || !contains(bundle.Inputs, "observation/node-worker") {
 		t.Fatalf("bundle dataflow is incomplete: %#v", bundle)
 	}
-	publish := byID["publish/node-tools"]
-	if publish.Kind != NodePublish || len(publish.Inputs) != 1 || publish.Inputs[0] != "package/node-tools" {
+	publish := byID["publish/release"]
+	if publish.Kind != NodePublish || len(publish.Inputs) != 1 || publish.Inputs[0] != "package/release" {
 		t.Fatalf("publication does not consume exact package output: %#v", publish)
 	}
 	if _, err := plan.Digest(); err != nil {
 		t.Fatal(err)
 	}
 	withOverride := definition
-	withOverride.Builds = append([]BuildTarget(nil), definition.Builds...)
-	withOverride.Builds[0].Catalog = &CatalogStack{Base: "another-catalog"}
+	withOverride.Outputs = append([]authored.DefinitionOutput(nil), definition.Outputs...)
+	withOverride.Outputs[0].Catalog = &authored.Catalog{Base: "another-catalog"}
 	if _, err := Compile(context.Background(), withOverride, delivery, stack, "test"); err == nil {
 		t.Fatal("direct compiler silently ignored a build-specific catalog override")
 	}
-	delivery.Targets["apt"] = Target{Kind: TargetAPT, Ref: "https://apt.example.invalid/nkd", Anonymous: true}
-	delivery.Routes = []Route{{Name: "node-apt", Input: "package/node-apt", Target: "apt"}}
-	if _, err := Compile(context.Background(), definition, delivery, stack, "test"); err == nil {
-		t.Fatal("factory accepted an APT route without an implemented remote publication adapter")
+	if err := validateRouteCompatibility(Route{Name: "apt"}, Target{Kind: TargetAPT}, Artifact{Kind: PackageAPT}); err == nil {
+		t.Fatal("accepted unavailable APT publisher")
 	}
+
 }
 
 func TestPackageSpecsUseArtifactTopologyNotAuthoredOrLexicalOrder(t *testing.T) {
-	ordered, err := orderPackageSpecs([]PackageSpec{
+	ordered, err := orderPackageSpecs([]packageSpec{
 		{Name: "aggregate", Inputs: []string{"package/z-bundle"}},
 		{Name: "z-bundle", Inputs: []string{"build/component"}},
 	})
@@ -137,7 +118,7 @@ func TestPackageSpecsUseArtifactTopologyNotAuthoredOrLexicalOrder(t *testing.T) 
 	if len(ordered) != 2 || ordered[0].Name != "z-bundle" || ordered[1].Name != "aggregate" {
 		t.Fatalf("package topology = %+v", ordered)
 	}
-	if _, err := orderPackageSpecs([]PackageSpec{
+	if _, err := orderPackageSpecs([]packageSpec{
 		{Name: "a", Inputs: []string{"package/b"}},
 		{Name: "b", Inputs: []string{"package/a"}},
 	}); err == nil {

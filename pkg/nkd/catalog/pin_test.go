@@ -28,7 +28,7 @@ func TestConstraintMatches(t *testing.T) {
 
 func TestSelectTagNewestStable(t *testing.T) {
 	tags := []string{"v1.31.9", "v1.32.0", "v1.32.4", "v1.32.10", "v1.32.11-rc.0", "v1.33.0"}
-	got, err := SelectTag(tags, "1.32.x")
+	got, err := SelectTagForSource(tags, Source{Constraint: "1.32.x"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestSelectTagNewestStable(t *testing.T) {
 	if got != "v1.32.10" {
 		t.Fatalf("selected %q, want v1.32.10", got)
 	}
-	if _, err := SelectTag(tags, "9.9.x"); err == nil {
+	if _, err := SelectTagForSource(tags, Source{Constraint: "9.9.x"}); err == nil {
 		t.Error("no match must error")
 	}
 }

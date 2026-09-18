@@ -131,7 +131,7 @@ pushes everything to OCI, and verifies it. Acceptance requires every signing and
 **Does not deliver.** Invocation of an upstream repository's reusable workflow: v1 runs pinned source
 entrypoints instead, as the decision records state; an upstream reusable workflow would need its own execution
 and evidence contract. Git-tag-triggered runs. Reproduction or byte-identity claims. Signing or publication on
-any CI engine other than GitHub Actions (the GitLab generator remains a build-and-package development lane).
+any CI engine other than GitHub Actions.
 
 **Acceptance criteria**
 1. A run of the generated workflow on a GitHub-hosted runner, triggered by a push to the default branch, is green end to end.

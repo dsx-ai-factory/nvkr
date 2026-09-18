@@ -66,5 +66,5 @@ source claim and must be visible in provenance and the acceptance record.
 
 Outside v1: non-OCI delivery, upstream from-source replacement builds, acquired upstream-signature verification,
 vulnerability scanning, deployment topology, cluster E2E qualification, air gap, builder-profile reproduction and byte-identity
-guarantees. The existing GitLab generator remains a build/package-only development lane; GitHub is the v1
-publication and signing provider. Per-built-artifact SBOM composition is included in the current graph.
+guarantees. GitHub is the sole hosted workflow, publication and signing provider. Per-built-artifact SBOM
+composition is included in the current graph.

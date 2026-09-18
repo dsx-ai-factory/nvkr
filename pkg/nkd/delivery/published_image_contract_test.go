@@ -11,14 +11,9 @@ import (
 )
 
 func TestPublishedImageRejoinsNativeIdentity(t *testing.T) {
-	image := imageFixture(t)
-	want, err := InspectContainerImage(t.Context(), image, "linux/amd64")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, tc := range []struct {
 		name, selection, os, arch, artifactType string
-		duplicate, corrupt                      bool
+		corrupt                                 bool
 		valid                                   bool
 	}{
 		{name: "exact image", selection: "worker", os: "linux", arch: "amd64", artifactType: MediaOCIManifest, valid: true},
@@ -32,19 +27,29 @@ func TestPublishedImageRejoinsNativeIdentity(t *testing.T) {
 		{name: "corrupt nested manifest", selection: "worker", os: "linux", arch: "amd64", artifactType: MediaOCIManifest, corrupt: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			root := filepath.Join(t.TempDir(), "publication")
-			objects := []ObjectInput{{Name: "worker", Kind: "oci-image", Path: image, Layout: true,
-				ArtifactType: tc.artifactType, SemanticDigest: want.ManifestDigest, BlobDigest: want.RootDigest, OS: tc.os, Arch: tc.arch}}
-			if _, err := BuildPublicationRoot(t.Context(), root, PublicationRequest{Objects: objects}); err != nil {
+			root := imageFixture(t)
+			want, err := InspectContainerImage(t.Context(), root, "linux/amd64")
+			if err != nil {
 				t.Fatal(err)
 			}
+			descriptor, err := PayloadDescriptor(t.Context(), root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Release outputs bind the native manifest, not a layout's local index.
+			want.RootDigest = want.ManifestDigest
+			publication := Inspection{Root: PublicationRoot{Objects: []PublishedObject{{
+				Name: "worker", Kind: "oci-image", ArtifactType: tc.artifactType,
+				DescriptorDigest: descriptor.Digest, BlobDigest: descriptor.Digest,
+				SemanticDigest: want.ManifestDigest, Size: descriptor.Size, OS: tc.os, Arch: tc.arch,
+			}}}}
 			if tc.corrupt {
 				path := filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(want.ManifestDigest, "sha256:"))
 				if err := os.WriteFile(path, []byte("corrupt"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
-			got, err := InspectPublishedContainerImage(t.Context(), root, tc.selection)
+			got, err := inspectPublishedContainerImage(t.Context(), root, publication, tc.selection)
 			if tc.valid {
 				if err != nil || !reflect.DeepEqual(got, want) {
 					t.Fatalf("published image = %+v, %v; want %+v", got, err, want)

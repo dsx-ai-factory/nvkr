@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
@@ -31,7 +32,7 @@ func publicationOutputSubjects(reference string, inspection delivery.Inspection)
 }
 
 func signPublicationOutputs(ctx context.Context, signer sign.OCISigner, reference string,
-	inspection delivery.Inspection, predicate []byte, signing *SigningProfile, stdout io.Writer) error {
+	inspection delivery.Inspection, predicate []byte, signing *definition.Signing, stdout io.Writer) error {
 	subjects, err := publicationOutputSubjects(reference, inspection)
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func signPublicationOutputs(ctx context.Context, signer sign.OCISigner, referenc
 }
 
 func verifyPublicationOutputs(ctx context.Context, signer sign.OCISigner, reference string,
-	inspection delivery.Inspection, signing *SigningProfile, stdout io.Writer) error {
+	inspection delivery.Inspection, signing *definition.Signing, stdout io.Writer) error {
 	subjects, err := publicationOutputSubjects(reference, inspection)
 	if err != nil {
 		return err

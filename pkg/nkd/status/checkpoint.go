@@ -96,7 +96,6 @@ type CheckpointPolicy struct {
 	authority         string
 	issuer            string
 	authorizedSigners []string
-	timeAuthority     string
 	binding           string
 }
 
@@ -104,25 +103,6 @@ type CheckpointPolicy struct {
 // has authenticated each signature. The signer list is policy, never a caller
 // assertion that verification succeeded.
 func NewCheckpointPolicy(target, authority, issuer string, authorizedSigners []string) (CheckpointPolicy, error) {
-	return newCheckpointPolicy(target, authority, issuer, authorizedSigners, "")
-}
-
-// NewReleaseCheckpointPolicy additionally pins the only trusted-time authority
-// whose observation may select freshness for release. The diagnostic constructor
-// intentionally omits this authority and therefore cannot cross the release gate.
-func NewReleaseCheckpointPolicy(target, authority, issuer string, authorizedSigners []string,
-	timeAuthority string,
-) (CheckpointPolicy, error) {
-	if strings.TrimSpace(timeAuthority) == "" || strings.TrimSpace(timeAuthority) != timeAuthority {
-		return CheckpointPolicy{}, e.New(e.CodeTrustPolicyMissing,
-			"release checkpoint policy requires a canonical trusted-time authority")
-	}
-	return newCheckpointPolicy(target, authority, issuer, authorizedSigners, timeAuthority)
-}
-
-func newCheckpointPolicy(target, authority, issuer string, authorizedSigners []string,
-	timeAuthority string,
-) (CheckpointPolicy, error) {
 	if !isDigest(target) {
 		return CheckpointPolicy{}, e.New(e.CodeUnverifiedRef, "status checkpoint policy target %q is not an exact digest", target)
 	}
@@ -146,18 +126,16 @@ func newCheckpointPolicy(target, authority, issuer string, authorizedSigners []s
 		}
 	}
 	binding, err := canonical.Digest(canonical.KindStatusCheckpointPolicy, struct {
-		Target        string   `json:"target"`
-		Authority     string   `json:"authority"`
-		Issuer        string   `json:"issuer"`
-		Signers       []string `json:"authorizedSigners"`
-		TimeAuthority string   `json:"timeAuthority,omitempty"`
-	}{Target: target, Authority: authority, Issuer: issuer, Signers: signers,
-		TimeAuthority: timeAuthority})
+		Target    string   `json:"target"`
+		Authority string   `json:"authority"`
+		Issuer    string   `json:"issuer"`
+		Signers   []string `json:"authorizedSigners"`
+	}{Target: target, Authority: authority, Issuer: issuer, Signers: signers})
 	if err != nil {
 		return CheckpointPolicy{}, err
 	}
 	return CheckpointPolicy{valid: true, target: target, authority: authority, issuer: issuer,
-		authorizedSigners: signers, timeAuthority: timeAuthority, binding: binding}, nil
+		authorizedSigners: signers, binding: binding}, nil
 }
 
 func (policy CheckpointPolicy) authorizes(signer, issuer string) bool {
@@ -200,51 +178,12 @@ func (mark HighWaterMark) validate() error {
 	return nil
 }
 
-func (mark HighWaterMark) Target() (string, error) {
-	if err := mark.validate(); err != nil {
-		return "", err
-	}
-	return mark.target, nil
-}
-
-func (mark HighWaterMark) Authority() (string, error) {
-	if err := mark.validate(); err != nil {
-		return "", err
-	}
-	return mark.authority, nil
-}
-
-func (mark HighWaterMark) Sequence() (uint64, error) {
-	if err := mark.validate(); err != nil {
-		return 0, err
-	}
-	return mark.sequence, nil
-}
-
-func (mark HighWaterMark) CheckpointDigest() (string, error) {
-	if err := mark.validate(); err != nil {
-		return "", err
-	}
-	return mark.checkpoint, nil
-}
-
 // CheckpointRequest contains only authenticated document receipts and opaque
 // policy state. No signature-success boolean or caller-provided signer claim exists.
 type CheckpointRequest struct {
 	Policy       CheckpointPolicy
 	HighWater    HighWaterMark
 	AsOf         AsOf
-	Checkpoint   trust.DocumentReceipt
-	Declarations []trust.DocumentReceipt
-}
-
-// ReleaseCheckpointRequest is the release-grade checkpoint input. Unlike the
-// diagnostic CheckpointRequest, it has no public as-of scalar: freshness is
-// selected by an opaque observation from a policy-owned TimeAuthority.
-type ReleaseCheckpointRequest struct {
-	Policy       CheckpointPolicy
-	HighWater    HighWaterMark
-	Time         TrustedTime
 	Checkpoint   trust.DocumentReceipt
 	Declarations []trust.DocumentReceipt
 }
@@ -262,10 +201,7 @@ type CheckpointReceipt struct {
 	checkpointCanonicalPayload string
 	policyBinding              string
 	asOfEpoch                  int64
-	trustedTimeAuthority       string
-	trustedTimeBinding         string
 	declarations               []VerifiedDeclaration
-	declarationSigners         []string
 }
 
 // VerifyCheckpoint consumes trust.DocumentReceipt capabilities for the checkpoint
@@ -327,7 +263,6 @@ func VerifyCheckpoint(ctx context.Context, request CheckpointRequest) (Checkpoin
 		expected[digest] = true
 	}
 	byDigest := make(map[string]VerifiedDeclaration, len(request.Declarations))
-	declarationSigners := make(map[string]bool)
 	for _, documentReceipt := range request.Declarations {
 		if err := statusContextErr(ctx); err != nil {
 			return CheckpointReceipt{}, err
@@ -349,7 +284,6 @@ func VerifyCheckpoint(ctx context.Context, request CheckpointRequest) (Checkpoin
 			return CheckpointReceipt{}, e.New(e.CodeStatusCheckpoint, "checkpoint input repeats authenticated declaration %s", declaration.digest)
 		}
 		byDigest[declaration.digest] = declaration
-		declarationSigners[declaration.signer] = true
 	}
 	accepted := make([]VerifiedDeclaration, 0, len(checkpoint.DeclarationDigests))
 	missing := make([]string, 0)
@@ -364,11 +298,6 @@ func VerifyCheckpoint(ctx context.Context, request CheckpointRequest) (Checkpoin
 	if len(missing) != 0 {
 		return CheckpointReceipt{}, e.New(e.CodeStatusCheckpoint, "checkpoint's complete declaration set is missing authenticated declaration(s) %s", strings.Join(missing, ", "))
 	}
-	signers := make([]string, 0, len(declarationSigners))
-	for signer := range declarationSigners {
-		signers = append(signers, signer)
-	}
-	sort.Strings(signers)
 	if err := statusContextErr(ctx); err != nil {
 		return CheckpointReceipt{}, err
 	}
@@ -378,40 +307,7 @@ func VerifyCheckpoint(ctx context.Context, request CheckpointRequest) (Checkpoin
 		checkpointCertificate:      authenticated.certificateDigest,
 		checkpointCanonicalPayload: authenticated.canonicalPayload, policyBinding: request.Policy.binding,
 		asOfEpoch: request.AsOf.epoch, declarations: append([]VerifiedDeclaration(nil), accepted...),
-		declarationSigners: signers,
 	}, nil
-}
-
-// VerifyCheckpointForRelease performs the same exact-set and anti-rollback
-// verification as VerifyCheckpoint, but derives freshness exclusively from an
-// opaque trusted-time observation. Only receipts from this path can cross the
-// release StatusBinding boundary.
-func VerifyCheckpointForRelease(ctx context.Context, request ReleaseCheckpointRequest) (CheckpointReceipt, error) {
-	if err := request.Time.validate(); err != nil {
-		return CheckpointReceipt{}, err
-	}
-	if request.Policy.timeAuthority == "" ||
-		request.Policy.timeAuthority != request.Time.authority {
-		return CheckpointReceipt{}, e.New(e.CodeTrustPolicyMissing,
-			"trusted-time authority %q does not match release checkpoint policy authority %q",
-			request.Time.authority, request.Policy.timeAuthority)
-	}
-	receipt, err := VerifyCheckpoint(ctx, CheckpointRequest{
-		Policy:       request.Policy,
-		HighWater:    request.HighWater,
-		AsOf:         AsOf{set: true, epoch: request.Time.epoch},
-		Checkpoint:   request.Checkpoint,
-		Declarations: append([]trust.DocumentReceipt(nil), request.Declarations...),
-	})
-	if err != nil {
-		return CheckpointReceipt{}, err
-	}
-	receipt.trustedTimeAuthority = request.Time.authority
-	receipt.trustedTimeBinding = request.Time.binding
-	if err := receipt.validate(); err != nil {
-		return CheckpointReceipt{}, err
-	}
-	return receipt, nil
 }
 
 type authenticatedCheckpoint struct {
@@ -549,17 +445,6 @@ func (receipt CheckpointReceipt) validate() error {
 	if receipt.asOfEpoch < receipt.checkpoint.IssuedEpoch || receipt.asOfEpoch > receipt.checkpoint.ValidUntilEpoch {
 		return e.New(e.CodeStatusCheckpoint, "status checkpoint receipt is not fresh at its recorded as-of epoch")
 	}
-	if (receipt.trustedTimeAuthority == "") != (receipt.trustedTimeBinding == "") {
-		return e.New(e.CodeStatusCheckpoint,
-			"status checkpoint receipt has a partial trusted-time binding")
-	}
-	if receipt.trustedTimeAuthority != "" {
-		trusted := TrustedTime{valid: true, authority: receipt.trustedTimeAuthority,
-			epoch: receipt.asOfEpoch, binding: receipt.trustedTimeBinding}
-		if err := trusted.validate(); err != nil {
-			return err
-		}
-	}
 	if len(receipt.declarations) != len(receipt.checkpoint.DeclarationDigests) {
 		return e.New(e.CodeStatusCheckpoint, "status checkpoint receipt lost its complete declaration set")
 	}
@@ -612,108 +497,6 @@ func (receipt CheckpointReceipt) CheckpointDigest() (string, error) {
 		return "", err
 	}
 	return receipt.checkpointDigest, nil
-}
-
-// PayloadSHA256 returns the ordinary sha256 of the exact canonical checkpoint
-// document bytes. This is deliberately distinct from CheckpointDigest, whose
-// domain-separated identity is used by the checkpoint predecessor chain. Blob
-// stores and mirror closures bind this value; lifecycle policy binds
-// CheckpointDigest.
-func (receipt CheckpointReceipt) PayloadSHA256() (string, error) {
-	if err := receipt.validate(); err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256([]byte(receipt.checkpointCanonicalPayload))
-	return "sha256:" + hex.EncodeToString(sum[:]), nil
-}
-
-func (receipt CheckpointReceipt) PreviousCheckpointDigest() (string, error) {
-	if err := receipt.validate(); err != nil {
-		return "", err
-	}
-	return receipt.checkpoint.PreviousCheckpoint, nil
-}
-
-func (receipt CheckpointReceipt) DeclarationDigests() ([]string, error) {
-	if err := receipt.validate(); err != nil {
-		return nil, err
-	}
-	digests := make([]string, len(receipt.checkpoint.DeclarationDigests))
-	copy(digests, receipt.checkpoint.DeclarationDigests)
-	return digests, nil
-}
-
-func (receipt CheckpointReceipt) CheckpointSigner() (string, error) {
-	if err := receipt.validate(); err != nil {
-		return "", err
-	}
-	return receipt.checkpointSigner, nil
-}
-
-// CheckpointIssuer returns the verified issuer bound by the checkpoint policy.
-func (receipt CheckpointReceipt) CheckpointIssuer() (string, error) {
-	if err := receipt.validate(); err != nil {
-		return "", err
-	}
-	return receipt.checkpointIssuer, nil
-}
-
-func (receipt CheckpointReceipt) DeclarationSigners() ([]string, error) {
-	if err := receipt.validate(); err != nil {
-		return nil, err
-	}
-	return append([]string(nil), receipt.declarationSigners...), nil
-}
-
-func (receipt CheckpointReceipt) PolicyBinding() (string, error) {
-	if err := receipt.validate(); err != nil {
-		return "", err
-	}
-	return receipt.policyBinding, nil
-}
-
-func (receipt CheckpointReceipt) AsOfEpoch() (int64, error) {
-	if err := receipt.validate(); err != nil {
-		return 0, err
-	}
-	return receipt.asOfEpoch, nil
-}
-
-// TrustedTimeAuthority returns the policy clock identity used for release-grade
-// freshness. Diagnostic receipts deliberately fail this accessor.
-func (receipt CheckpointReceipt) TrustedTimeAuthority() (string, error) {
-	if err := receipt.validate(); err != nil {
-		return "", err
-	}
-	if receipt.trustedTimeAuthority == "" {
-		return "", e.New(e.CodeStatusCheckpoint,
-			"diagnostic status checkpoint has no trusted-time authority")
-	}
-	return receipt.trustedTimeAuthority, nil
-}
-
-// TrustedTimeBinding returns the exact authority+epoch identity used for
-// release-grade freshness. Diagnostic receipts deliberately fail this accessor.
-func (receipt CheckpointReceipt) TrustedTimeBinding() (string, error) {
-	if err := receipt.validate(); err != nil {
-		return "", err
-	}
-	if receipt.trustedTimeBinding == "" {
-		return "", e.New(e.CodeStatusCheckpoint,
-			"diagnostic status checkpoint has no trusted-time binding")
-	}
-	return receipt.trustedTimeBinding, nil
-}
-
-// HighWater returns the exact monotonic trust state that may be atomically persisted
-// after the caller has accepted this checkpoint.
-func (receipt CheckpointReceipt) HighWater() (HighWaterMark, error) {
-	if err := receipt.validate(); err != nil {
-		return HighWaterMark{}, err
-	}
-	return HighWaterMark{valid: true, target: receipt.checkpoint.Target,
-		authority: receipt.checkpoint.Authority, sequence: receipt.checkpoint.Sequence,
-		checkpoint: receipt.checkpointDigest}, nil
 }
 
 // Decision evaluates only declarations in the authenticated complete checkpoint

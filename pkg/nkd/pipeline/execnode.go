@@ -11,16 +11,10 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-// ExecNode is the shared from-source RUNNER mode (ADR-18 §2): it executes ONE IR node
-// (fetch → build → collect) DIRECTLY in the current environment — no container launch.
-// In CI the engine has already placed the job inside the node's pinned toolchain
-// container (ADR-18 §3, no docker-in-docker); locally the orchestrator launches that
-// container and this runs inside it. Because every job runs this same code path,
-// byte-identity across engines is STRUCTURAL, not asserted across rendered strings.
-//
-// It is the execution counterpart to Local.Run's orchestration: Local launches the
-// container and delegates the in-container work to the same fetch/build/collect logic
-// exercised here.
+// ExecNode executes one validated producer instruction. Launch selects the same
+// pinned-container mechanics used by Local.Run; otherwise the instruction runs in
+// the current environment. Shared execution code does not establish qualification:
+// runtime observations and terminal artifact receipts remain separate gates.
 func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := requireRunContext(opts.Ctx, "exec-node"); err != nil {
 		return nil, err

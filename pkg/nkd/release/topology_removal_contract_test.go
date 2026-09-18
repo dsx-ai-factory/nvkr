@@ -15,11 +15,6 @@ func TestReleaseWireRejectsRemovedDeploymentRoles(t *testing.T) {
 	}{
 		{"inventory", map[string]any{"schemaVersion": InventorySchemaVersion, "components": []any{map[string]any{"name": "node", "role": "worker"}}}, new(Inventory)},
 		{"release set", map[string]any{"schemaVersion": ReleaseSetSchemaVersion, "members": []any{map[string]any{"component": "node", "role": "worker"}}}, new(ReleaseSet)},
-		{"reproduction", map[string]any{"schemaVersion": ReproductionSchemaVersion, "role": "worker"}, new(ReproductionResult)},
-		{"waiver", map[string]any{"schemaVersion": EvidenceWaiverSchemaVersion, "role": "worker"}, new(evidenceWaiverDocument)},
-		{"clearance member", map[string]any{"schemaVersion": AuthorizationSchemaVersion, "members": []any{map[string]any{"role": "worker"}}}, new(authorizationRecord)},
-		{"clearance evidence", map[string]any{"schemaVersion": AuthorizationSchemaVersion, "evidence": []any{map[string]any{"role": "worker"}}}, new(authorizationRecord)},
-		{"clearance waiver", map[string]any{"schemaVersion": AuthorizationSchemaVersion, "waivers": []any{map[string]any{"role": "worker"}}}, new(authorizationRecord)},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			raw, err := canonical.Marshal(test.value)
@@ -42,7 +37,6 @@ func TestReleaseWireRejectsEarlierTopologySchemas(t *testing.T) {
 	}{
 		{"inventory", func() error { old := *inv; old.SchemaVersion = "nkd.dev/inventory/v3"; return old.Validate() }},
 		{"release set", func() error { old := *set; old.SchemaVersion = "nkd.dev/release-set/v3"; return old.Validate() }},
-		{"reproduction", func() error { return (ReproductionResult{SchemaVersion: "nkd.dev/reproduction-result/v2"}).Validate() }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if err := test.check(); code(err) != e.CodeInvalidCatalog {

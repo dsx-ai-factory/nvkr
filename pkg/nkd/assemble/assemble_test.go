@@ -3,6 +3,8 @@ package assemble
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,28 +55,25 @@ func TestLogicalDiskDigestAndBlockManifest(t *testing.T) {
 	if err := os.WriteFile(raw, content, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	dg, size, err := LogicalDiskDigestContext(context.Background(), raw)
+	manifest, err := NewDiskManifestContext(t.Context(), DiskKindRAW, raw, MinDiskBlockSizeBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if size != int64(len(content)) {
-		t.Fatalf("size = %d, want %d", size, len(content))
+	if manifest.VirtualSizeBytes != int64(len(content)) {
+		t.Fatalf("size = %d, want %d", manifest.VirtualSizeBytes, len(content))
 	}
-	dg2, _, _ := LogicalDiskDigestContext(context.Background(), raw)
-	if dg != dg2 {
-		t.Fatal("logical-disk digest must be deterministic")
+	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(content))
+	if manifest.LogicalDigest != digest {
+		t.Fatalf("logical digest = %s, want %s", manifest.LogicalDigest, digest)
 	}
-	bm, err := BlockManifestOfContext(context.Background(), raw, MinDiskBlockSizeBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	bm := manifest.BlockManifest
 	if len(bm.Blocks) != 3 {
-		t.Fatalf("expected 3 blocks (4+4+2), got %d", len(bm.Blocks))
+		t.Fatalf("expected two full blocks and a tail, got %d", len(bm.Blocks))
 	}
-	if bm.Aggregate != dg {
-		t.Fatalf("block-manifest aggregate %s must equal the logical-disk digest %s", bm.Aggregate, dg)
+	if bm.Aggregate != digest {
+		t.Fatalf("block-manifest aggregate %s must equal the logical-disk digest %s", bm.Aggregate, digest)
 	}
-	if _, err := BlockManifestOfContext(context.Background(), raw, 0); err == nil {
+	if _, err := NewDiskManifestContext(t.Context(), DiskKindRAW, raw, 0); code(err) != nkderr.CodeInvalidCatalog {
 		t.Fatal("block size 0 must error")
 	}
 }

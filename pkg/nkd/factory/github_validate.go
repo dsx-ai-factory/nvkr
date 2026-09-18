@@ -11,7 +11,6 @@ import (
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"sigs.k8s.io/yaml"
 )
 
@@ -86,15 +85,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	graphDigests := make(map[string]string, len(plan.Builds))
-	for _, build := range plan.Builds {
-		raw, err := build.Graph.CanonicalJSON()
-		if err != nil {
-			return err
-		}
-		graphDigests[build.Name] = pipeline.FileDigest(raw)
+	stages, nodeJobs, err := githubStages(plan)
+	if err != nil {
+		return err
 	}
-	stages, nodeJobs := githubStages(plan)
 	byNode := make(map[string]githubStage, len(plan.Graph.Nodes))
 	for _, stage := range stages {
 		for _, node := range stage.Nodes {
@@ -103,6 +97,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	bootstrap := map[string]string{}
 	for _, node := range plan.Graph.Nodes {
+		node, err := plan.ExecutionFor(node)
+		if err != nil {
+			return err
+		}
 		bootstrap[node.RunsOn] = "build-runner-" + shortStableName(node.RunsOn)
 	}
 	expectedJobCount := len(stages) + len(bootstrap)
@@ -114,10 +112,18 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	sourceEnvironments := make(map[string]map[string]string)
 	for _, node := range plan.Graph.Nodes {
+		node, err := plan.ExecutionFor(node)
+		if err != nil {
+			return err
+		}
 		sourceEnvironments[nodeJobs[node.ID]] = githubSourceEnvironment(plan, node)
 	}
 	signJobs := make(map[string]bool, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
+		node, err := plan.ExecutionFor(node)
+		if err != nil {
+			return err
+		}
 		if node.Kind == NodeSign || node.Kind == NodeAttestEvidence {
 			signJobs[nodeJobs[node.ID]] = true
 		}
@@ -199,6 +205,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 	}
 	for _, node := range plan.Graph.Nodes {
+		node, err := plan.ExecutionFor(node)
+		if err != nil {
+			return err
+		}
 		stage := byNode[node.ID]
 		jobID := stage.ID
 		job, ok := document.Jobs[jobID]
@@ -229,23 +239,15 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeInvalidCatalog, "GitHub job %q uses unapproved or unpinned action %q", jobID, step.Uses)
 			}
 		}
-		if err := validateGitHubStageExecution(plan, stage, job.Steps, graphDigests); err != nil {
+		if err := validateGitHubStageExecution(plan, stage, job.Steps); err != nil {
 			return err
 		}
 		runs := joinRuns(job.Steps)
 		if !strings.Contains(runs, "factory execute-node") && !strings.Contains(runs, "exec-node") {
 			return e.New(e.CodeInvalidCatalog, "GitHub job %q does not execute an NKD plan node", jobID)
 		}
-		// ADR-18 §8: an IR-projected node with a pinned container (build toolchain / fetch
-		// vendor image) is isolated by nkd-exec ITSELF orchestrating that container (--launch),
-		// which reads the container, platform, and network-none posture from the committed
-		// per-build graph (re-checked by the buildDigest drift gate). Glue nodes still run
-		// through an inline `<runtime> run --network …` wrapper, so they keep the YAML checks.
-		if launchedExecNode(node) {
-			if !strings.Contains(runs, "exec-node --launch") {
-				return e.New(e.CodeEngineCapability, "GitHub isolated job %q does not orchestrate its pinned container via exec-node --launch", jobID)
-			}
-		} else {
+		// Producer isolation is owned by ExecuteNode; utility containers remain explicit.
+		if node.IRNode == "" {
 			if node.Network == ir.NetworkNone && !strings.Contains(runs, "--network none") {
 				return e.New(e.CodeEngineCapability, "GitHub isolated job %q does not enforce network none", jobID)
 			}
@@ -259,7 +261,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on the default branch", jobID)
 		}
 		if node.Kind == NodePublish {
-			target := plan.ExecutionSettings.Targets[node.Target]
+			target := plan.Targets[node.Target]
 			if strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
 				return e.New(e.CodeEngineCapability, "GitHub publish job %q lacks explicit packages:write", jobID)
 			}
@@ -271,18 +273,18 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			}
 		}
 		if signFamilyNode(node.Kind) {
-			if plan.ExecutionSettings.Signing == nil {
+			if plan.Environment.Signing == nil {
 				return e.New(e.CodeTrustPolicyMissing,
 					"GitHub signing job %q has no delivery signing profile", jobID)
 			}
 			if node.Kind == NodeAttestEvidence && (job.Env["NKD_CREDENTIAL"] != "" || job.Env["NKD_REGISTRY_USER"] != "") {
 				return e.New(e.CodeEngineCapability, "SBOM attestation job must not receive registry credentials")
 			}
-			expected := githubSigningPermissions(node.Kind, plan.ExecutionSettings.Signing.Mode)
+			expected := githubSigningPermissions(node.Kind, plan.Environment.Signing.Mode)
 			if len(job.Permissions) != len(expected) {
 				return e.New(e.CodeEngineCapability,
 					"GitHub signing job %q holds %d permissions; %s signing requires exactly %v",
-					jobID, len(job.Permissions), plan.ExecutionSettings.Signing.Mode, expected)
+					jobID, len(job.Permissions), plan.Environment.Signing.Mode, expected)
 			}
 			for name, value := range expected {
 				if job.Permissions[name] != value {
@@ -290,7 +292,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 						"GitHub signing job %q has %s: %q, want %q", jobID, name, job.Permissions[name], value)
 				}
 			}
-			target := plan.ExecutionSettings.Targets[node.Target]
+			target := plan.Targets[node.Target]
 			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence && job.Env["NKD_CREDENTIAL"] == "" {
 				return e.New(e.CodeEngineCapability, "GitHub signing job %q omits its credential reference", jobID)
 			}
@@ -417,7 +419,7 @@ func (document githubWorkflowDocument) String() string {
 // Every logical node retains one exact, unconditional execution step in graph
 // order even when scheduling shares a runner. Another node's command cannot
 // satisfy this node's isolation or identity checks.
-func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubStep, graphDigests map[string]string) error {
+func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubStep) error {
 	next := 0
 	for _, step := range steps {
 		if step.ID == "" {
@@ -427,7 +429,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 			return e.New(e.CodeEngineCapability, "GitHub stage %q has an unexpected execution step", stage.ID)
 		}
 		node := stage.Nodes[next]
-		commands := githubNodeCommands(node, plan, graphDigests)
+		commands := githubNodeCommands(node, plan)
 		if step.ID != githubJobID(node.ID) || step.Name != githubNodeLabel(plan, node) || step.ContinueOnError || step.If != "" || step.Uses != "" ||
 			strings.TrimSpace(step.Run) != strings.Join(commands, "\n") {
 			return e.New(e.CodeEngineCapability, "GitHub stage %q must execute exact node %q in graph order without skipping failures", stage.ID, node.ID)

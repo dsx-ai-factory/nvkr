@@ -29,7 +29,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if plan.ExecutionSettings.SBOMTool != "syft" {
+			if plan.Definition.SBOMTool != "syft" {
 				t.Fatal("maintained workflow does not request dependency inspection")
 			}
 			if tc.omit != "" {
@@ -75,7 +75,7 @@ func TestRealArtifactsThroughSBOMExecutor(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
 	_, artifacts := planIndex(plan)
-	scanner := artifacts["tool/"+plan.ExecutionSettings.SBOMTool]
+	scanner := artifacts["tool/"+plan.Definition.SBOMTool]
 	raw, err := os.ReadFile(os.Getenv("NKD_SBOM_SCANNER"))
 	if err != nil {
 		t.Fatal(err)
