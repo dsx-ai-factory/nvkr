@@ -136,9 +136,8 @@ authenticated producer receipt.
 
 `pkg/nkd/target`, `pkg/nkd/aicr/bundle_inputs_test.go`, `pkg/nkd/buildgraph/aicr_bundle_test.go` and `pkg/nkd/ir`
 cover concrete targets, exact pins, rendering-sensitive identity, canonical defaults, owned copies, strict
-legacy rejection and fail-before-output admission. Repository checks are recorded in reconciliation; the
-[earlier local NKE build](../evidence/2026-09-17-direct-output-local-build.md) exercises ordinary direct producer
-selection under its original schema, not an external qualified AICR run or this subsequent schema migration.
+legacy rejection and fail-before-output admission. Repository checks and external evidence limits are recorded
+in reconciliation.
 
 Existing AICR module contracts preserve rejection before execution for malformed/changed executable pins,
 held executable and generated-file identity across pathname replacement, cancellation around the no-replace

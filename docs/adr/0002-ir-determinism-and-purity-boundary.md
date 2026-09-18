@@ -165,9 +165,8 @@ exact producer references, forbidden copied execution settings, and unchanged Bu
 requirements change. These are contract checks, not provider capability evidence.
 
 The focused IR migration tests also cover concrete targets, exact producer membership, AICR inputs, strict
-legacy-field rejection and the distinct `nkd.build` family. Repository checks are recorded in reconciliation;
-the [2026-09-17 local NKE build](../evidence/2026-09-17-direct-output-local-build.md) exercised the direct-output
-model with dry-run signing. Remaining external acceptance requires:
+legacy-field rejection and the distinct `nkd.build` family. Repository checks are recorded in reconciliation.
+Remaining external acceptance requires:
 
 1. negative tests showing one-byte/tree/revision substitution through an authenticated mirror fails before build;
    and

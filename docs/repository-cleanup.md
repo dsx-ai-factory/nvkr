@@ -83,8 +83,7 @@ hosted Runs. Qualified release authorization/publication remain deferred contrac
 
 `factory` compiles and renders multi-output Runs; `pipeline` executes producer instructions and owns runtime
 receipts. `delivery` creates and verifies artifact representations. The separate qualified provider-rendering
-chain, unused qualified publisher and caller-built clearance receipts no longer expand those interfaces. The
-[usage and age assessment](unused-code-assessment.md) records removals, protected recent additions and checks.
+chain, unused qualified publisher and caller-built clearance receipts no longer expand those interfaces.
 
 ## Operation navigation
 
@@ -93,14 +92,13 @@ orchestration wrappers and authority injection options are removed. Tests sit be
 Factory execution files use the `execute_` prefix; `outputs_observed.go` owns the independent output join.
 Pipeline's unused qualified renderers and lowering are removed, together with the hidden `bundle` command and
 its exclusive models and transaction helpers. GitHub generation remains in factory; retired engines fail admission.
-Package comments identify the starting operations and owned invariants. See the
-[locality implementation record](codebase-locality-implementation.md) for the migration and its validation.
+Package comments identify the starting operations and owned invariants.
 
 ## Historical validation — 2026-09-09
 
 The following results apply to the cleanup and inputs exercised on that date. They do not validate the current
-Recipe-removal migration, its new wire schemas, or the current generated bundle. That migration's completion
-gate and maintained-input local build remain tracked separately in reconciliation.
+Recipe-removal migration, its new wire schemas, or the current generated bundle. Current repository validation
+is tracked separately in [reconciliation](adr/reconciliation.md).
 
 The final cleanup passed the full local gate (format, vet, lint, ShellCheck and race tests), uncached repository
 unit tests, and native Linux ARM64 race tests for signing and pipeline execution. Linux ran with a read-only

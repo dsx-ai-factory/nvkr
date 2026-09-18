@@ -208,9 +208,7 @@ file/aggregate byte ceilings, deterministic directory count/depth ceilings, and 
 snapshot/update behavior.
 
 The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and
-Linux race tests provide contract evidence; repository checks are recorded in reconciliation. The
-[2026-09-17 local NKE build](../evidence/2026-09-17-direct-output-local-build.md) separately exercised direct
-output selection, production, loopback publication and recovered CLI execution with dry-run signing.
+Linux race tests provide contract evidence; repository checks are recorded in reconciliation.
 
 End-to-end acceptance requires a separate consumer module using only `client/v1` to load inputs, prepare and
 execute a Run, and verify its published Release under explicit policy, plus cancellation tests against every

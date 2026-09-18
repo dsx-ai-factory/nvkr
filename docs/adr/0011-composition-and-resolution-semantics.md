@@ -111,7 +111,5 @@ admission, source deduplication within a graph, deterministic ordering, transpor
 Deleted matching/merge mechanisms need rejection coverage, not replacement golden inheritance fixtures.
 
 Focused IR vectors and producer-selection tests exercise these contracts. AICR bundle tests cover equivalent
-defaults, every rendering setting, owned input slices and malformed or caller-mutated descriptions. The earlier
-[2026-09-17 local NKE build](../evidence/2026-09-17-direct-output-local-build.md) separately exercised all three
-maintained outputs, loopback publication and recovered CLI execution with dry-run signing. The completion gate,
-generated-bundle checks and external evidence limits remain recorded in reconciliation.
+defaults, every rendering setting, owned input slices and malformed or caller-mutated descriptions. The completion
+gate, generated-bundle checks and external evidence limits remain recorded in reconciliation.

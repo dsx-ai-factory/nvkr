@@ -98,7 +98,7 @@ Historical signed bytes and dated evidence remain unchanged.
 Whole-producer catalog replacement remains separate from the removed recipe and deployment models. The
 generator retires obsolete members only when a prior manifest owns their unchanged bytes and mode; unknown or
 edited files fail before replacement. No lock pins, producer commands or NKE checkout changes are required by
-this simplification. See the [output-only implementation plan](../output-only-simplification-plan.md).
+this simplification.
 
 Focused catalog/buildgraph/AICR/IR, lifecycle/factory, and delivery/release/assemble/canonical contracts and
 race checks pass; their focused lint checks pass. Tests retain exact output/evidence substitution negatives
@@ -107,39 +107,23 @@ checks. Full uncached native tests and `make check` passed, including formatting
 race/coverage tests. Linux sign/pipeline race tests, both maintained generation checks, catalog/tamper demos
 and diff checks passed. A stale AICR test fixture was corrected before the successful full reruns.
 
-The [fresh output-only local Run](../evidence/2026-09-17-output-only-local-build.md) built CWE, Helm and CLI,
-generated dependency SBOMs, bound Helm to the observed image, published to the loopback registry and ran the
-recovered CLI. It completed with three required and observed outputs under Run v3. Signing was dry-run only;
-these results do not establish new signed hosted or authenticated-consumer acceptance.
-
-The preceding [Recipe-removal plan](../recipe-simplification-plan.md) recorded passing native checks,
-generation and Linux sign/pipeline race tests for its earlier schema set. Its
-[2026-09-17 local NKE run](../evidence/2026-09-17-direct-output-local-build.md) built all three outputs, generated
-dependency SBOMs, bound Helm to the produced image, published to the loopback registry and ran the pulled CLI.
-That complete `unqualified-local-execution` Run used Definition v3/catalog v2 and dry-run signing. It is
-historical evidence for those exact inputs and does not establish acceptance of the current output-only schemas.
-
 ## Code locality migration
 
-The [locality implementation record](../codebase-locality-implementation.md) records the completed compiler,
-execution, delivery and SDK ownership refactor. Run Plan/artifact graph v4 remove independent compiler handoffs
-and copied producer instructions; production predicates use v2 buildType URLs and original Definition/Environment
+Run Plan/artifact graph v4 remove independent compiler handoffs and copied producer instructions;
+production predicates use v2 buildType URLs and original Definition/Environment
 identities. Release-content canonical bytes are unchanged and now have one delivery owner. Required and observed
 output membership remain independent; shared result validation checks each exact planned producer and its bytes.
 
 Full uncached native unit tests and `make check` passed, including the full race/coverage suite. Affected Linux
-race tests, NKE/AICR generation checks, Actionlint, reference checks and diff checks passed. The
-[2026-09-18 local Run](../evidence/2026-09-18-code-locality-local-build.md) built CWE, Helm and CLI, generated
-dependency SBOMs, published and pulled the diagnostic closure, and ran the recovered CLI. Final-source
-re-observation matched its producer bytes, output records and content identity. Both held publication roots
-correctly rejected attested admission. Signing was dry-run only; this refactor has no new hosted or qualified
-execution evidence. Earlier operational records retain their exact schema, code and acceptance scope.
+race tests, NKE/AICR generation checks, Actionlint, reference checks and diff checks passed. This refactor has
+no new hosted or qualified execution evidence. Earlier operational records retain their exact schema, code
+and acceptance scope.
 
 ## Unused implementation removal
 
-The [usage and age assessment](../unused-code-assessment.md) covers all production packages, pipeline renderers,
-maintained inputs/scripts, SDK entry points and external dependencies. Unused pre-September-11 rendering and
-library surfaces are removed; additions from September 11 onward are protected. The removal includes the
+The usage audit covered production packages, pipeline renderers, maintained inputs/scripts, SDK entry points
+and external dependencies. Unused pre-September-11 rendering and library surfaces are removed; additions from
+September 11 onward are protected. The removal includes the
 GitLab and qualified renderers, hidden bundle workflow, uncalled graph formatter, unreachable qualified
 transport/root constructors, closed test-only qualified authorization and vulnerability-report subsystems,
 and test-only forwarding/description APIs. GitHub generation, shared execution, live diagnostic authentication
@@ -169,16 +153,12 @@ container init and network disabled. Tests cover:
 
 These tests use controlled producers and private verification seams. They do not establish real GPU builds,
 AICR execution, provider jobs, signing services, full-release qualification or qualified operational acceptance.
-The output-only migration has its own completion record above; earlier verification does not transfer
-by renaming or reinterpreting records.
+Earlier verification does not transfer by renaming or reinterpreting records.
 
 ## Recorded external evidence
 
 | Record | What actually ran | Limit |
 |---|---|---|
-| [Code locality, 2026-09-18](../evidence/2026-09-18-code-locality-local-build.md) | Complete Plan v4 and shared producer execution built all three NKE outputs; local publication/pull-back and recovered CLI passed; final-source producer/output and held-publication checks matched | Local/unqualified, dry-run signing; native/Linux/generation gates passed, no new hosted or qualified acceptance |
-| [Output-only model, 2026-09-17](../evidence/2026-09-17-output-only-local-build.md) | Definition v4 and catalog v3 built CWE, Helm and CLI without deployment metadata; dependency SBOMs, loopback publication, exact pull-back and recovered CLI execution passed | Local/unqualified, dry-run signing; current native/Linux/generation gates passed, no new signed hosted acceptance |
-| [Direct output producers, 2026-09-17](../evidence/2026-09-17-direct-output-local-build.md) | Definition v3 and catalog v2 directly selected CWE, Helm, and CLI producers; all three built and published locally with dependency SBOMs; pulled CLI executed successfully | Local/unqualified, dry-run signing; no new hosted or authenticated consumer acceptance |
 | [Cosign discovery failure, 2026-09-11](../evidence/2026-09-11-cosign-discovery-fix.md) | Run 34631274098 created SBOM bundles, published and signed the single-entry layout, then failed provenance verification; cosign 2.6.3 reproduced the exact error locally; cosign 3.1.3 passed standard bundle verification | Local-key interoperability and repository contracts; updated hosted keyless verification/finalization and independent GHCR acceptance remain unexercised |
 | [Separated repositories, 2026-09-10](../publication-architecture.md#local-validation) | Actual NVIDIA deliverables published once into distinct loopback repositories, metadata/evidence root published last, full cross-repository pull and exact artifact reference projection; absent copies in the release repository confirmed | Local and unsigned; GHCR permissions and hosted signing/finalization for the new locations remain unexercised |
 | [Combined NKE hosted Run, 2026-09-10](../evidence/2026-09-10-combined-run.md) | All 20 jobs passed: CLI/CWE/Helm builds, observed artifacts, image-bound charts, GHCR publication, real signing, verification and complete Run; all three independent consumers and downloaded payload checks passed | Pipeline-attested artifact-publication scope; no qualified reproduction or cluster/service deployment |
@@ -190,8 +170,7 @@ by renaming or reinterpreting records.
 | [M1 local mechanics, 2026-09-04](../evidence/2026-09-04-m1-local.md) | Pinned NKE CLI build, loopback OCI publication/pull-back, dry-run signing | LOCAL / UNQUALIFIED; `signatureVerified: false`; earlier input model |
 
 Dated evidence retains its original commands and identities. Earlier M1 demonstrations have their own recorded
-runs; the completed locality execution is recorded above. Historical success is never transferred by renaming inputs
-or inferred for other demos and providers.
+runs. Historical success is never transferred by renaming inputs or inferred for other demos and providers.
 
 ## Remaining decisions
 

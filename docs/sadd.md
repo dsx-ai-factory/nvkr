@@ -373,10 +373,8 @@ image and pinned quickstart Helm tree, then published, signed, verified and fina
 Independent consumers authenticated the same artifacts and content subject. Downloaded CLI/image smoke checks
 and all three local chart renders passed, including exact CWE digest binding and updated checksums. This is
 pipeline-attested artifact-publication evidence for its then-current authoring and publication layout. It does
-not validate the direct-output migration or the current single-entry publication layout. The
-[2026-09-17 local NKE build](evidence/2026-09-17-direct-output-local-build.md) separately exercised all three
-directly selected outputs, loopback publication and recovered CLI execution with dry-run signing. Repository
-checks are recorded in reconciliation. Full v1 release qualification, fused large-output
+not validate the direct-output migration or the current single-entry publication layout. Repository checks
+are recorded in reconciliation. Full v1 release qualification, fused large-output
 wrapped execution, derived pin sets, registration remains unimplemented; cluster qualification is outside NKD. Qualified
 release authorization, its receipt assembly and release-specific trusted time have no retained implementation.
 Authenticated document/status diagnostics remain, but do not supply clearance. Air-gap execution is outside

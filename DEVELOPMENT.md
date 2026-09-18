@@ -60,7 +60,6 @@ configuration belong to Environment. The complete generated Plan is the executab
 - `toolchains/`: development adapter toolchains and helper pins; maintained demos use their declared utility image.
 
 The [cleanup record](docs/repository-cleanup.md) explains current package responsibilities and removed material.
-The [locality record](docs/codebase-locality-implementation.md) describes the ownership changes and before/after traces.
 
 ## Find the owner
 

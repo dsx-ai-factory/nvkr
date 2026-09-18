@@ -74,6 +74,5 @@ placement intent; downstream consumers that need such descriptions own them expl
 
 Contract checks must reject removed topology fields before output or subprocess work; preserve required-output
 and consumer-substitution negatives; and bind each AICR output's effective rendering settings to its build
-identity and invocation. Repository validation and fresh local execution are tracked in reconciliation and the
-[implementation plan](../output-only-simplification-plan.md). Earlier cluster fixture tests are not retained as
-an unused product interface. No external provisioning or runtime qualification is claimed.
+identity and invocation. Repository validation is tracked in reconciliation. Earlier cluster fixture tests are
+not retained as an unused product interface. No external provisioning or runtime qualification is claimed.

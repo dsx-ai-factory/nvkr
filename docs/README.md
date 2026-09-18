@@ -10,13 +10,9 @@
 | Change an engineering contract | Current [ADRs](adr/); public lifecycle in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) |
 | Determine what works and what is deferred | [Implementation/evidence record](adr/reconciliation.md) |
 | Plan v1 delivery | [Milestones](milestones.md), [acceptance specification](epics-v1-spec.md) |
-| Review Recipe removal implementation | [Implementation plan](recipe-simplification-plan.md), [local build evidence](evidence/2026-09-17-direct-output-local-build.md) |
-| Review removal of deployment topology | [Output-only implementation plan](output-only-simplification-plan.md), [local build evidence](evidence/2026-09-17-output-only-local-build.md) |
 | Build and verify the combined CLI, CWE image and Helm outputs | [Combined pipeline](combined-nke-pipeline.md), [hosted acceptance](evidence/2026-09-10-combined-run.md) |
 | Reproduce the local NKE demonstration | [NKE demo](demo-m1.md) |
 | Inspect actual past execution | Dated [evidence](evidence/) |
-| Follow the code-locality refactor | [Assessment](codebase-locality-review.md), [implementation record](codebase-locality-implementation.md), [local build evidence](evidence/2026-09-18-code-locality-local-build.md) |
-| Review unused-code removal and protected recent additions | [Usage and age assessment](unused-code-assessment.md) |
 | Understand retained modules and cleanup decisions | [Repository cleanup](repository-cleanup.md) |
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
 | Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
