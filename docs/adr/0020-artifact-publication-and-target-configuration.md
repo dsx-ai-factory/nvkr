@@ -147,6 +147,10 @@ The target config names a registry or repository plus a **credential reference**
 secret mechanism, which is transport. **No secret** enters any artifact, manifest, SBOM, log, or the config
 itself (SEC-09); signatures remain detached (SEC-03).
 
+Publication verification admits a declared credential before registry resolution or pull. A missing username
+or secret returns `NKD-E-TRUST-POLICY-MISSING`, without consulting ambient Docker credentials or writing a
+verification record. Resolution and closure retrieval use the same admitted credential values.
+
 ### 6. Pipeline-attested publication
 
 NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI registry. ADR-04 owns keyless

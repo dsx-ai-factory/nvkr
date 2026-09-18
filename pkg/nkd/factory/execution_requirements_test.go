@@ -652,5 +652,16 @@ func syncTestCatalogComponents(t *testing.T, plan *Plan) {
 		}
 		build.CatalogDigest = digest
 		build.AppliedOverlays = nil
+		for _, output := range plan.Definition.Outputs {
+			if output.Name != build.Name || output.Catalog != nil {
+				continue
+			}
+			base, err := catalog.ApplyStack(build.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.CatalogSnapshot, plan.CatalogDigest = base.Catalog, base.Digest
+			plan.AppliedOverlays = nil
+		}
 	}
 }

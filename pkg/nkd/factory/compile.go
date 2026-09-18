@@ -149,7 +149,17 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 	if runsOn == "" {
 		runsOn = DefaultRunsOn
 	}
-	tools, err := selectedTools(definition, delivery, stack.Catalog)
+	snapshot, err := catalog.ApplyStack(stack.Catalog)
+	if err != nil {
+		return nil, err
+	}
+	outputCatalogs := make(map[string]*catalog.Catalog, len(targetStacks))
+	for name, selected := range targetStacks {
+		if selected != nil {
+			outputCatalogs[name] = selected.Catalog
+		}
+	}
+	tools, err := selectedTools(definition, delivery, stack.Catalog, outputCatalogs)
 	if err != nil {
 		return nil, err
 	}
@@ -161,21 +171,14 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		GeneratorVersion: generatorVersion, Qualification: planTier(delivery.Signing),
 		DefinitionDigest: definitionDigest, EnvironmentDigest: environmentDigest, Definition: definition, Environment: delivery,
 		DefinitionPath: definitionPath, EnvironmentPath: environmentPath,
-		CatalogDigest: stack.Digest, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),
+		CatalogDigest: stack.Digest, CatalogSnapshot: snapshot.Catalog, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),
 		Targets: targets, Routes: routes, Graph: ArtifactGraph{SchemaVersion: ArtifactGraphSchema}}
 	artifacts := map[string]Artifact{}
 	nodes := map[string]Node{}
 	for _, name := range sortedKeys(tools) {
-		tool := tools[name]
-		nodeID := "tool/" + name
-		artifactID := "tool/" + name
-		nodes[nodeID] = Node{ID: nodeID, Kind: NodeAcquire, RunsOn: runsOn,
-			Network: ir.NetworkDefault, URL: tool.URL, Digest: tool.ArchiveDigest,
-			Executable: tool.ExecutablePath, ExecutableDigest: tool.ExecutableDigest, ToolFormat: tool.Format,
-			Outputs: []string{artifactID}}
-		artifacts[artifactID] = Artifact{ID: artifactID, Name: name, Kind: "pipeline-tool",
-			MediaType: "application/vnd.nkd.pipeline-tool.v1", Producer: nodeID,
-			Path: filepath.ToSlash(filepath.Join(".nkd", "factory", "tools", name, tool.ExecutablePath))}
+		node, artifact := compileToolOperation(name, tools[name], runsOn)
+		nodes[node.ID] = node
+		artifacts[artifact.ID] = artifact
 	}
 	for _, target := range definition.Outputs {
 		if err := ctx.Err(); err != nil {

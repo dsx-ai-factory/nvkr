@@ -82,7 +82,7 @@ func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map
 
 // registryCredential reads the credential the target declares it needs from this
 // process's environment. A target that declares a credentialRef and finds no
-// credential fails closed rather than silently attempting anonymous access.
+// credential fails closed before anonymous or ambient-keychain access.
 func registryCredential(plan *Plan, node Node) (sign.Credential, error) {
 	target := plan.Targets[node.Target]
 	if target.CredentialRef == "" {
@@ -91,7 +91,7 @@ func registryCredential(plan *Plan, node Node) (sign.Credential, error) {
 	username, password := os.Getenv("NKD_REGISTRY_USER"), os.Getenv("NKD_CREDENTIAL")
 	if username == "" || password == "" {
 		return sign.Credential{}, e.New(e.CodeTrustPolicyMissing,
-			"factory signing target %q requires its configured username and credential", node.Target)
+			"factory registry target %q requires its configured username and credential", node.Target)
 	}
 	return sign.Credential{Registry: registryHost(target.Ref), Username: username, Password: password}, nil
 }
@@ -209,6 +209,15 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if signing == nil {
 		return e.New(e.CodeTrustPolicyMissing, "factory verification node %q has no delivery signing profile", node.ID)
 	}
+	credential, err := registryCredential(plan, node)
+	if err != nil {
+		return err
+	}
+	target := plan.Targets[node.Target]
+	registryOptions := delivery.RegistryOptions{
+		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,
+		Username: credential.Username, Password: credential.Password,
+	}
 	reference, err := signNodeInput(node, artifacts, "published-reference")
 	if err != nil {
 		return err
@@ -239,11 +248,7 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 			"factory verification node %q: signing record dryRun=%t contradicts delivery signing mode %q",
 			node.ID, signed.DryRun, signing.Mode)
 	}
-	target := plan.Targets[node.Target]
-	served, err := delivery.ResolveDigest(ctx, subject.Ref, delivery.RegistryOptions{
-		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,
-		Username: registryUsername(target), Password: registryPassword(target),
-	})
+	served, err := delivery.ResolveDigest(ctx, subject.Ref, registryOptions)
 	if err != nil {
 		return err
 	}
@@ -277,9 +282,7 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 		return e.Wrap(e.CodeInternal, err, "creating release verification workspace")
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
-	inspection, err := delivery.Pull(ctx, subject.Ref, filepath.Join(workspace, "closure"), delivery.RegistryOptions{
-		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous, Username: registryUsername(target), Password: registryPassword(target),
-	})
+	inspection, err := delivery.Pull(ctx, subject.Ref, filepath.Join(workspace, "closure"), registryOptions)
 	if err != nil {
 		return err
 	}
@@ -300,20 +303,6 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	}
 	fmt.Fprintf(stdout, "verified %s (mode %s, dryRun %t): %s\n", node.ID, signing.Mode, verification.DryRun, subject.Ref)
 	return nil
-}
-
-func registryUsername(target Target) string {
-	if target.CredentialRef == "" {
-		return ""
-	}
-	return os.Getenv("NKD_REGISTRY_USER")
-}
-
-func registryPassword(target Target) string {
-	if target.CredentialRef == "" {
-		return ""
-	}
-	return os.Getenv("NKD_CREDENTIAL")
 }
 
 // productionPredicateFor renders the exact SLSA v1 production predicate for this

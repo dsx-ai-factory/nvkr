@@ -123,6 +123,7 @@ type Plan struct {
 	EnvironmentPath   string                       `json:"environmentPath,omitempty"`
 	Qualification     EvidenceTier                 `json:"qualification"`
 	CatalogDigest     string                       `json:"catalogDigest"`
+	CatalogSnapshot   *catalog.Catalog             `json:"catalogSnapshot"`
 	AppliedOverlays   []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
 	EnvironmentDigest string                       `json:"environmentDigest,omitempty"`
 	Definition        definition.Definition        `json:"definition"`
@@ -144,6 +145,9 @@ type Plan struct {
 	// compiled identity, so the same release attests the same planDigest from any
 	// workspace and agrees with `factory validate` and the CI run.
 	identityDigest string
+	// toolWorkspace is set only by local relocation after validating the compiled
+	// plan. Serialized plans cannot use it to substitute acquired executable paths.
+	toolWorkspace string
 }
 
 type LifecycleOutputPlan struct {

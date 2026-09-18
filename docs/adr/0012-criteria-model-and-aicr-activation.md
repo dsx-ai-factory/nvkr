@@ -64,6 +64,10 @@ components. The compiler validates the selected generator tool against the profi
 an authored group or a renamed Recipe. Generic parameters, reserved axes, matching leaves and inheritance are
 removed; ambiguous or unknown input fields fail strict decoding.
 
+The profile and its generator tool both come from the output's selected catalog stack, including an explicit
+output override. Run-wide SBOM and signing tools come from the Definition's base stack. A shared tool name must
+select the same complete pin across all uses; conflicting pins fail selection before graph construction.
+
 A profile pins both the canonical upstream AICR recipe digest and the exact generator executable digest.
 The concrete generator inputs (`service`, `accelerator`, `os`, `intent`, optional `platform`) are validated by
 `aicr.ValidateValues`. They, the effective bundle settings and both pins enter `ir.AICRActivation` and logical

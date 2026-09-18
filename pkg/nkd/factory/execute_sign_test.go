@@ -3,14 +3,17 @@ package factory
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -366,6 +369,115 @@ func TestExecuteVerifyPublicationChecksTheRegistryAndFailsClosed(t *testing.T) {
 		}
 		assertNotWritten(t, verificationPath)
 	})
+}
+
+func TestExecuteVerifyPublicationAdmitsDeclaredCredentialsBeforeRegistryAccess(t *testing.T) {
+	const username, password = "fixture", "fixture-password"
+	for _, tc := range []struct {
+		name                   string
+		credentialRef          string
+		username, password     string
+		changeAfterAdmission   bool
+		wantMissingCredentials bool
+	}{
+		{name: "missing declared credential despite ambient access", credentialRef: "registry-secret", wantMissingCredentials: true},
+		{name: "missing declared password", credentialRef: "registry-secret", username: username, wantMissingCredentials: true},
+		{name: "missing declared username", credentialRef: "registry-secret", password: password, wantMissingCredentials: true},
+		{name: "complete declared credential retained for pull", credentialRef: "registry-secret", username: username, password: password, changeAfterAdmission: true},
+		{name: "ambient access without declared credential"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NKD_REGISTRY_USER", tc.username)
+			t.Setenv("NKD_CREDENTIAL", tc.password)
+			var requests atomic.Int64
+			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				user, secret, ok := r.BasicAuth()
+				if !ok || user != username || secret != password {
+					w.Header().Set("WWW-Authenticate", `Basic realm="test"`)
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				handler.ServeHTTP(w, r)
+			}))
+			defer server.Close()
+			host := strings.TrimPrefix(server.URL, "http://")
+			dockerConfig := t.TempDir()
+			t.Setenv("DOCKER_CONFIG", dockerConfig)
+			config, err := json.Marshal(map[string]any{"auths": map[string]any{
+				host: map[string]string{"auth": base64.StdEncoding.EncodeToString([]byte(username + ":" + password))},
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dockerConfig, "config.json"), config, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			layout := filepath.Join(root, "layout")
+			buildTestPublicationRoot(t, layout, "fixture publication")
+			target := Target{Kind: TargetOCI, Ref: host + "/fixture/release", CredentialRef: tc.credentialRef, PlainHTTP: true}
+			reference, err := delivery.Push(t.Context(), layout, target.Ref, delivery.RegistryOptions{
+				PlainHTTP: true, Username: username, Password: password,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan := &Plan{Targets: map[string]Target{"release": target}}
+			plan.Environment.Signing = dryRunSigningProfile()
+			node := Node{ID: "verify-publication/release", Kind: NodeVerifyPublication, Target: "release",
+				Inputs: []string{"publication", "signature"}, Outputs: []string{"verification"}}
+			artifacts := map[string]Artifact{
+				"publication":  {ID: "publication", Kind: "published-reference", Path: filepath.Join(root, "publication.ref")},
+				"signature":    {ID: "signature", Kind: ArtifactSigningRecord, Path: filepath.Join(root, "signature.json")},
+				"verification": {ID: "verification", Kind: ArtifactVerificationRecord, Path: filepath.Join(root, "verification.json")},
+			}
+			writeReferenceFile(t, artifacts["publication"].Path, reference)
+			signer := &fakeOCISigner{identity: "^local$", issuer: "https://nkd.dev/local"}
+			record, err := signer.SignAndAttest(t.Context(), sign.Subject{
+				Ref: reference, Digest: reference[strings.LastIndex(reference, "@")+1:],
+			}, []byte("{}"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := record.Canonical()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := writeFactoryFile(t.Context(), artifacts["signature"].Path, raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			requests.Store(0)
+			adapterCalled := false
+			newSigner := func(context.Context, *Plan, Node, map[string]Artifact) (sign.OCISigner, error) {
+				adapterCalled = true
+				if tc.changeAfterAdmission {
+					t.Setenv("NKD_REGISTRY_USER", "changed-fixture")
+					t.Setenv("NKD_CREDENTIAL", "changed-fixture-password")
+				}
+				return signer, nil
+			}
+			err = executeVerifyPublication(t.Context(), plan, node, artifacts, newSigner, io.Discard)
+			if tc.wantMissingCredentials {
+				if requests.Load() != 0 || adapterCalled {
+					t.Errorf("missing declared credentials reached registry or signer: requests=%d adapter=%t", requests.Load(), adapterCalled)
+				}
+				assertNotWritten(t, artifacts["verification"].Path)
+				assertFactoryErrorCode(t, err, e.CodeTrustPolicyMissing)
+				return
+			}
+			if err != nil {
+				t.Fatalf("admitted verification: %v", err)
+			}
+			if requests.Load() == 0 || !adapterCalled {
+				t.Fatal("admitted verification skipped registry or signer")
+			}
+			if _, err := os.Stat(artifacts["verification"].Path); err != nil {
+				t.Fatalf("admitted verification wrote no record: %v", err)
+			}
+		})
+	}
 }
 
 // A GitHub Actions job must attest as its workflow identity, not as an anonymous

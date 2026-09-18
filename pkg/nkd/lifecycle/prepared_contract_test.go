@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -93,6 +94,11 @@ func TestFinalizeRejectsForgedCatalogDescriptionWithRecomputedDescriptions(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
+	base, err := catalog.ApplyStack(build.CatalogSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.CatalogSnapshot, plan.CatalogDigest = base.Catalog, base.Digest
 	if _, err := plan.Digest(); err != nil {
 		t.Fatalf("forged description is not internally consistent: %v", err)
 	}

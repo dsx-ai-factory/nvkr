@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -32,6 +34,16 @@ func (plan Plan) Validate() error {
 	}
 	if !canonical.IsDigest(plan.CatalogDigest) {
 		return e.New(e.CodeUnpinnedSource, "run plan catalog identity is not digest-pinned")
+	}
+	if plan.CatalogSnapshot == nil {
+		return e.New(e.CodeUnverifiedRef, "run plan has no base catalog snapshot")
+	}
+	catalogDigest, err := plan.CatalogSnapshot.SnapshotDigest()
+	if err != nil {
+		return err
+	}
+	if catalogDigest != plan.CatalogDigest {
+		return e.New(e.CodeUnverifiedRef, "run plan base catalog snapshot differs from catalogDigest")
 	}
 	if err := admitInputs(plan.Definition, plan.Environment); err != nil {
 		return err
@@ -151,6 +163,9 @@ func (plan Plan) Validate() error {
 	if err := plan.Graph.Validate(); err != nil {
 		return err
 	}
+	if err := plan.validateToolOperations(); err != nil {
+		return err
+	}
 	if err := plan.validateSBOMGraph(); err != nil {
 		return err
 	}
@@ -253,6 +268,69 @@ func (plan Plan) Validate() error {
 		}
 	}
 	return plan.validateLifecyclePlans()
+}
+
+// validateToolOperations rederives the complete executable tool set from the
+// catalog snapshots already checked against their identities above. A digest on
+// an acquisition node alone cannot authorize a different executable.
+func (plan Plan) validateToolOperations() error {
+	outputCatalogs := make(map[string]*catalog.Catalog, len(plan.Builds))
+	for _, build := range plan.Builds {
+		outputCatalogs[build.Name] = build.CatalogSnapshot
+	}
+	for _, output := range plan.Definition.Outputs {
+		if output.Catalog == nil {
+			digest, err := outputCatalogs[output.Name].SnapshotDigest()
+			if err != nil {
+				return err
+			}
+			if digest != plan.CatalogDigest {
+				return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", output.Name)
+			}
+		}
+	}
+	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, outputCatalogs)
+	if err != nil {
+		return err
+	}
+	nodes, artifacts := planIndex(&plan)
+	runsOn := plan.Environment.RunsOn
+	if runsOn == "" {
+		runsOn = DefaultRunsOn
+	}
+	for _, name := range sortedKeys(tools) {
+		expectedNode, expectedArtifact := compileToolOperation(name, tools[name], runsOn)
+		if plan.toolWorkspace != "" {
+			path, err := relocatedFactoryPath(expectedArtifact.Path, plan.toolWorkspace)
+			if err != nil {
+				return err
+			}
+			expectedArtifact.Path = filepath.ToSlash(path)
+		}
+		actualNode := nodes[expectedNode.ID]
+		// Empty omitted inputs survive JSON round trips as nil slices.
+		if len(actualNode.Inputs) == 0 {
+			actualNode.Inputs = nil
+		}
+		if !reflect.DeepEqual(actualNode, expectedNode) || !reflect.DeepEqual(artifacts[expectedArtifact.ID], expectedArtifact) {
+			return e.New(e.CodePipelineDrift, "tool operation %q differs from its selected catalog pin", name)
+		}
+	}
+	for _, node := range plan.Graph.Nodes {
+		if (node.Kind == NodeAcquire && node.IRNode == "") || strings.HasPrefix(node.ID, "tool/") {
+			if _, ok := tools[strings.TrimPrefix(node.ID, "tool/")]; !ok || !strings.HasPrefix(node.ID, "tool/") {
+				return e.New(e.CodePipelineDrift, "unselected executable tool operation %q", node.ID)
+			}
+		}
+	}
+	for _, artifact := range plan.Graph.Artifacts {
+		if artifact.Kind == "pipeline-tool" || strings.HasPrefix(artifact.ID, "tool/") {
+			if _, ok := tools[strings.TrimPrefix(artifact.ID, "tool/")]; !ok || !strings.HasPrefix(artifact.ID, "tool/") {
+				return e.New(e.CodePipelineDrift, "unselected executable tool artifact %q", artifact.ID)
+			}
+		}
+	}
+	return nil
 }
 
 // validateCompiledOperations keeps derived packaging and utility execution bound

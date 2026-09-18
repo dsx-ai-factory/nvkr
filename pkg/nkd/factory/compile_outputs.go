@@ -1,10 +1,13 @@
 package factory
 
 import (
+	"path/filepath"
+
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func admitInputs(definition authored.Definition, environment authored.Environment) error {
@@ -44,7 +47,13 @@ func aicrBundle(output authored.DefinitionOutput) *aicr.BundleInputs {
 	return nil
 }
 
-func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog) (map[string]catalog.ToolPin, error) {
+// Run-wide tools use the Definition catalog; each generator uses its output's
+// catalog. One tool name identifies one acquisition, so all selected pins must agree.
+func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog,
+	outputCatalogs map[string]*catalog.Catalog) (map[string]catalog.ToolPin, error) {
+	if source == nil {
+		return nil, e.New(e.CodeInvalidCatalog, "tool selection requires a resolved catalog")
+	}
 	names := []string{}
 	if definition.SBOMTool != "" {
 		names = append(names, definition.SBOMTool)
@@ -52,23 +61,54 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 	if environment.Signing != nil && environment.Signing.Mode == SigningModeCosign {
 		names = append(names, definition.CosignTool)
 	}
-	for _, output := range definition.Outputs {
-		if output.AICR != nil {
-			names = append(names, output.AICR.Generator)
-		}
-	}
 	tools := make(map[string]catalog.ToolPin, len(names))
-	for _, name := range uniqueSorted(names) {
-		pin, ok := source.Tools[name]
+	selectTool := func(name string, selected *catalog.Catalog) error {
+		pin, ok := selected.Tools[name]
 		if !ok {
-			return nil, e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
+			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
 		}
 		if pin.Platform != environment.UtilityPlatform {
-			return nil, e.New(e.CodeEngineCapability, "tool %q platform %s does not match utility platform %s", name, pin.Platform, environment.UtilityPlatform)
+			return e.New(e.CodeEngineCapability, "tool %q platform %s does not match utility platform %s", name, pin.Platform, environment.UtilityPlatform)
+		}
+		if previous, exists := tools[name]; exists && previous != pin {
+			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has conflicting pins", name)
 		}
 		tools[name] = pin
+		return nil
+	}
+	for _, name := range uniqueSorted(names) {
+		if err := selectTool(name, source); err != nil {
+			return nil, err
+		}
+	}
+	for _, output := range definition.Outputs {
+		if output.AICR == nil {
+			continue
+		}
+		selected := source
+		if output.Catalog != nil {
+			selected = outputCatalogs[output.Name]
+			if selected == nil {
+				return nil, e.New(e.CodeInvalidCatalog, "output %q has no resolved catalog override", output.Name)
+			}
+		}
+		if err := selectTool(output.AICR.Generator, selected); err != nil {
+			return nil, err
+		}
 	}
 	return tools, nil
+}
+
+func compileToolOperation(name string, pin catalog.ToolPin, runsOn string) (Node, Artifact) {
+	id := "tool/" + name
+	node := Node{ID: id, Kind: NodeAcquire, RunsOn: runsOn,
+		Network: ir.NetworkDefault, URL: pin.URL, Digest: pin.ArchiveDigest,
+		Executable: pin.ExecutablePath, ExecutableDigest: pin.ExecutableDigest, ToolFormat: pin.Format,
+		Outputs: []string{id}}
+	artifact := Artifact{ID: id, Name: name, Kind: "pipeline-tool",
+		MediaType: "application/vnd.nkd.pipeline-tool.v1", Producer: id,
+		Path: filepath.ToSlash(filepath.Join(".nkd", "factory", "tools", name, pin.ExecutablePath))}
+	return node, artifact
 }
 
 // derivePublication creates package operations and one publication route from named

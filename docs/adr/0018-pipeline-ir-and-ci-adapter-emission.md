@@ -43,6 +43,13 @@ individual output and the generated IR v3 activation. The effective deployer and
 BuildDigest. Run-plan and artifact-graph v4 contain no cluster-composition nodes or records. Compiler handoff documents
 are removed; the complete Plan retains the exact authored Definition and Environment.
 
+The Plan retains its base catalog snapshot and each output's selected catalog snapshot, checked against their
+catalog identities before deriving executable tools. Validation rederives the complete tool acquisition set
+and compares every operation and artifact, including transport URL, format, archive and executable digests,
+executable member and output path. Missing, extra or substituted tools fail before execution or emission.
+Only the local runner may relocate admitted artifact paths into its selected workspace; a serialized path does
+not grant relocation authority.
+
 #### Required engine capability and transport contract
 
 A future qualified adapter must admit an explicit capability contract before lowering. At minimum the engine or its configuration

@@ -138,6 +138,14 @@ metadata:
     --component kubectl --platform linux/amd64`.
   name: layered-demo
 sources:
+  aicr:
+    constraint: 0.18.x
+    repo: https://github.com/NVIDIA/aicr
+    tool:
+      executablePath: aicr
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_amd64.tar.gz
   k8s:
     constraint: 1.32.x
     repo: https://github.com/kubernetes/kubernetes

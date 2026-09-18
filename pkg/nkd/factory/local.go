@@ -498,6 +498,7 @@ func relocateFactoryPlan(plan *Plan, workspace string) (*Plan, error) {
 		}
 		relocated.Graph.Artifacts[index].Path = filepath.ToSlash(path)
 	}
+	relocated.toolWorkspace = workspace
 	if err := relocated.Validate(); err != nil {
 		return nil, err
 	}
