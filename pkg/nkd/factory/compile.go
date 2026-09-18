@@ -177,7 +177,7 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		if selected := targetStacks[target.Name]; selected != nil {
 			targetStack = selected
 		}
-		resolved, err := buildgraph.Resolve(targetStack.Catalog, buildgraph.Selection{Components: target.Components, Platform: target.Platform, AICRProfile: aicrProfile(target), Bundle: aicrBundle(target)})
+		resolved, err := buildgraph.Resolve(targetStack.Catalog, buildgraph.Selection{Components: target.Components, Platform: target.Platform, OutputFormat: target.Format, AICRProfile: aicrProfile(target), Bundle: aicrBundle(target)})
 		if err != nil {
 			return nil, e.Wrap(e.CodeNoMatch, err, "factory build target %q", target.Name)
 		}

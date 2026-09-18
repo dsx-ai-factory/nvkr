@@ -54,7 +54,8 @@ same graph-bound values without a second cluster lookup or implicit settings sou
 
 A single producer may emit a disk containing several stack layers. Disk format, encryption and producer
 metadata govern its admission; a delivery category is unnecessary. Plain and FDE disks are separate components
-selected by separate single-component outputs. Disk and VM lowering remain unavailable.
+selected as separate roots. Each disk output also explicitly selects that root's complete transitive material
+closure. Disk and VM lowering remain unavailable.
 
 ### 3. Explicit AICR profiles
 

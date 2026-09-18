@@ -142,7 +142,14 @@ func (plan Plan) Validate() error {
 		if !sort.StringsAreSorted(buildPlan.Components) || hasAdjacentDuplicate(buildPlan.Components) {
 			return e.New(e.CodeInvalidCatalog, "factory build target %q components are not canonical", buildPlan.Name)
 		}
-		if err := validateBuildCatalog(buildPlan, plan.Environment); err != nil {
+		outputFormat := ""
+		for _, output := range plan.Definition.Outputs {
+			if output.Name == buildPlan.Name {
+				outputFormat = output.Format
+				break
+			}
+		}
+		if err := validateBuildCatalog(buildPlan, outputFormat, plan.Environment); err != nil {
 			return err
 		}
 		for _, node := range buildPlan.Graph.Nodes {
@@ -647,7 +654,7 @@ func safeGraphID(value string) bool {
 
 // validateBuildCatalog binds the complete executable graph to its catalog and
 // Environment. Logical identity alone excludes transport and execution metadata.
-func validateBuildCatalog(build BuildPlan, environment authored.Environment) error {
+func validateBuildCatalog(build BuildPlan, outputFormat string, environment authored.Environment) error {
 	if build.CatalogSnapshot == nil {
 		return e.New(e.CodeUnverifiedRef, "output %q has no catalog snapshot", build.Name)
 	}
@@ -658,7 +665,7 @@ func validateBuildCatalog(build BuildPlan, environment authored.Environment) err
 	if digest != build.CatalogDigest {
 		return e.New(e.CodeUnverifiedRef, "output %q catalog snapshot differs", build.Name)
 	}
-	selection := buildgraph.Selection{Components: build.Components, Platform: build.Platform, AICRProfile: build.AICRProfileName}
+	selection := buildgraph.Selection{Components: build.Components, Platform: build.Platform, OutputFormat: outputFormat, AICRProfile: build.AICRProfileName}
 	if build.Graph.AICR != nil {
 		selection.Bundle = &build.Graph.AICR.Bundle
 	}

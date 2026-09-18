@@ -110,6 +110,11 @@ output; it is not implied by `disk-image`, so another admitted builder or a futu
 can produce the same output type. The first schema admits only the from-source form; acquired disks remain
 unsupported. Conversely, `vm-image` is valid only for a from-source disk component.
 
+A disk Definition output selects the disk root and every component in its transitive material closure. Catalog
+resolution identifies the one root from `outputType: disk-image`; no second root field or implicit catalog
+selection exists. A missing or second root, a missing transitive material, and any unrelated selected component
+fail admission.
+
 A `vm-image` component selects exactly one producer form. The existing `buildCommand` field represents the
 command form; the presence of a `packer` object represents the direct-Packer form. A producer form is an
 invocation mechanism, not a builder type or an output semantic:

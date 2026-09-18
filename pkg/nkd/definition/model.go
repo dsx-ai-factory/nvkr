@@ -185,9 +185,6 @@ func (definition Definition) Validate() error {
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
 		}
-		if output.Format == OutputDiskImage && (len(output.Components) != 1) {
-			return e.New(e.CodeInvalidCatalog, "definition disk-image output %q requires exactly one component", output.Name)
-		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {
 				return e.New(e.CodeInvalidCatalog, "definition APT output %q requires canonical distribution and component", output.Name)

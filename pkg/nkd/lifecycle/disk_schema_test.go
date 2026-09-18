@@ -11,7 +11,7 @@ func diskDefinition(t *testing.T) Definition {
 	t.Helper()
 	definition := testDefinition(t)
 	definition.Outputs[0].Format = OutputDiskImage
-	definition.Outputs[0].Components = []string{"nke-node-non-fde"}
+	definition.Outputs[0].Components = []string{"kubernetes-packages", "nke-node-non-fde"}
 	return definition
 }
 
@@ -40,7 +40,8 @@ func TestDiskImageOutputSchemaAndIdentity(t *testing.T) {
 		edit func(*Definition)
 	}{
 		{"no component", func(d *Definition) { d.Outputs[0].Components = nil }},
-		{"two components", func(d *Definition) { d.Outputs[0].Components = []string{"a", "b"} }},
+		{"duplicate component", func(d *Definition) { d.Outputs[0].Components = []string{"a", "a"} }},
+		{"unsorted components", func(d *Definition) { d.Outputs[0].Components = []string{"b", "a"} }},
 		{"unsupported platform", func(d *Definition) { d.Outputs[0].Platform = "windows/amd64" }},
 	}
 	for _, tt := range tests {

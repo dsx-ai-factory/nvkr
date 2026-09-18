@@ -243,8 +243,10 @@ target. `nkd.build` identifies the logical projection of that validated graph, i
 settings. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
 
-A `disk-image` named output selects exactly one producer with validated disk-image metadata. Its output format is checked directly;
-no deployment classification is required. The catalog's `vm-image` builder capability binds the disk metadata, one selected producer form, its
+A `disk-image` named output explicitly selects one root producer with validated disk-image metadata and every
+component in that root's transitive material closure. Resolution rejects a missing or second disk root, an
+incomplete closure, or unrelated selected components. Its output format is checked directly; no deployment
+classification is required. The catalog's `vm-image` builder capability binds the disk metadata, the root producer form, its
 exact source-owned command or Packer project, build name, and variable bindings, the artifact path, and a complete
 generic build-runner request with resources, eligible host platform, KVM policy, and timeout. Required KVM needs
 an eligible host with the resolved guest architecture; VM toolchain pins follow

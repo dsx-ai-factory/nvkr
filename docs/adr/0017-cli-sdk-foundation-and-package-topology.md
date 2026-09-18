@@ -34,14 +34,17 @@ unsupported platforms and unsupported formats fail with coded errors before work
 Definitions are selected directly by file. There is no authored Recipe, reusable selection group, criteria
 matching, mixin, or recipe overlay; legacy fields and layouts are rejected rather than converted implicitly.
 
-`format: disk-image` is an authoring contract for exactly one selected catalog component. Disk producer
+`format: disk-image` is an authoring contract for exactly one selected disk root plus every explicitly selected
+component in that root's transitive material closure. Resolution derives the root from catalog output metadata
+and rejects a missing or second root, an incomplete closure, and unrelated selected components. Disk producer
 admission is based on the catalog component's output type, disk metadata and builder contract, never a category
 or node role.
 Plain and FDE outputs select different catalog components;
 Definition has no disk variant, encryption boolean, build command, or Packer field. Catalog owns disk metadata
-and production details. In this first contract, Definition and catalog validation are supported, while build
-lowering and `run plan|local|generate` fail with `engine-capability` before graph construction, source access, or
-output work.
+and production details. In this first contract, Definition schema validation and low-level catalog resolution
+are supported independently. Public lifecycle `run plan|local|generate` still fails with `engine-capability`
+before catalog resolution, graph construction, source access, or output work. Build lowering remains
+unavailable.
 
 AICR outputs may declare `aicr.bundle` renderer settings: deployer, storage class, node selectors, node
 tolerations and workload selectors. The compiler normalizes owned lists and records the effective settings,

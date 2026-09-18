@@ -11,6 +11,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
@@ -18,10 +19,11 @@ import (
 
 // Selection names exactly one output's ordinary producers or one AICR profile.
 type Selection struct {
-	Components  []string
-	Platform    string
-	AICRProfile string
-	Bundle      *aicr.BundleInputs
+	Components   []string
+	Platform     string
+	OutputFormat string
+	AICRProfile  string
+	Bundle       *aicr.BundleInputs
 }
 
 // Validate admits the explicit request shape before a caller reads catalog data.
@@ -29,6 +31,12 @@ type Selection struct {
 func (selection Selection) Validate() error {
 	if err := target.ValidatePlatform(selection.Platform); err != nil {
 		return err
+	}
+	switch selection.OutputFormat {
+	case "", definition.OutputExecutable, definition.OutputOCI, definition.OutputAPT,
+		definition.OutputHelm, definition.OutputDiskImage:
+	default:
+		return e.New(e.CodeInvalidCatalog, "output format %q is unsupported", selection.OutputFormat)
 	}
 	if (len(selection.Components) == 0) == (selection.AICRProfile == "") {
 		return e.New(e.CodeInvalidCatalog, "output must select components or one AICR profile, exclusively")
@@ -40,6 +48,10 @@ func (selection Selection) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "bundle settings require an AICR profile")
 	}
 	if selection.AICRProfile != "" {
+		if selection.OutputFormat != "" && selection.OutputFormat != definition.OutputHelm {
+			return e.New(e.CodeInvalidCatalog,
+				"AICR profile output requires Helm format, not %q", selection.OutputFormat)
+		}
 		if _, err := aicr.NormalizeBundleInputs(selection.Bundle); err != nil {
 			return err
 		}
@@ -104,7 +116,74 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 	if err := catalog.ValidateMaterialSet(resolved.Components); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "selected output has an incomplete material set")
 	}
+	if selection.OutputFormat == definition.OutputDiskImage || containsDiskRoot(resolved.Components) {
+		if err := validateDiskSelection(resolved.Components); err != nil {
+			return nil, err
+		}
+	}
 	return resolved, nil
+}
+
+func containsDiskRoot(components []catalog.NamedComponent) bool {
+	for _, component := range components {
+		if component.OutputType == definition.OutputDiskImage {
+			return true
+		}
+	}
+	return false
+}
+
+// validateDiskSelection identifies the disk root from catalog output metadata,
+// then requires the authored selection to equal that root's transitive material
+// closure. Definition authors select every producer explicitly; the catalog owns
+// the dependency edges and no second root selector is necessary.
+func validateDiskSelection(components []catalog.NamedComponent) error {
+	selected := make(map[string]catalog.Component, len(components))
+	root := ""
+	for _, component := range components {
+		selected[component.Name] = component.Component
+		if component.OutputType != definition.OutputDiskImage {
+			continue
+		}
+		if component.Disk == nil || component.Disk.Format != "qcow2" {
+			return e.New(e.CodeInvalidCatalog,
+				"disk-image output component %q is not a QCOW2 producer", component.Name)
+		}
+		if root != "" {
+			return e.New(e.CodeInvalidCatalog,
+				"disk-image output selects multiple disk roots %q and %q", root, component.Name)
+		}
+		root = component.Name
+	}
+	if root == "" {
+		return e.New(e.CodeInvalidCatalog, "disk-image output selects no QCOW2 root component")
+	}
+
+	required := make(map[string]bool, len(selected))
+	var include func(string)
+	include = func(name string) {
+		if required[name] {
+			return
+		}
+		required[name] = true
+		for _, dependency := range selected[name].Materials {
+			include(dependency)
+		}
+	}
+	include(root)
+	if len(required) == len(selected) {
+		return nil
+	}
+	extras := make([]string, 0, len(selected)-len(required))
+	for name := range selected {
+		if !required[name] {
+			extras = append(extras, name)
+		}
+	}
+	sort.Strings(extras)
+	return e.New(e.CodeInvalidCatalog,
+		"disk-image output selects components outside root %q material closure: %s",
+		root, strings.Join(extras, ", "))
 }
 
 // cloneComponent preserves exact strings, including malformed bytes that downstream

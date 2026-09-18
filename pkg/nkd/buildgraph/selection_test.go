@@ -23,7 +23,9 @@ func TestDirectSelectionRejectsInvalidRequestsWithoutPartialResult(t *testing.T)
 		{"unknown producer", Selection{Components: []string{"tool", "unknown"}, Platform: "linux/amd64"}, e.CodeInvalidCatalog},
 		{"duplicate producer", Selection{Components: []string{"tool", "tool"}, Platform: "linux/amd64"}, e.CodeInvalidCatalog},
 		{"padded producer", Selection{Components: []string{" tool "}, Platform: "linux/amd64"}, e.CodeInvalidCatalog},
+		{"unknown output format", Selection{Components: []string{"tool"}, Platform: "linux/amd64", OutputFormat: "disk-image "}, e.CodeInvalidCatalog},
 		{"unknown profile", Selection{AICRProfile: "missing", Platform: "linux/amd64"}, e.CodeInvalidCatalog},
+		{"AICR disk output", Selection{AICRProfile: "missing", Platform: "linux/amd64", OutputFormat: "disk-image"}, e.CodeInvalidCatalog},
 		{"ambiguous producer kinds", Selection{Components: []string{"tool"}, AICRProfile: "missing", Platform: "linux/amd64"}, e.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -123,6 +125,68 @@ func TestResolveRequiresDeclaredMaterials(t *testing.T) {
 			}
 			if err != nil || resolved == nil || len(resolved.Components) != len(test.components) {
 				t.Fatalf("Resolve = %+v, %v; want exactly the selected producers", resolved, err)
+			}
+		})
+	}
+}
+
+func TestResolveDiskSelectionRequiresOneRootAndItsExactMaterialClosure(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		mutate     func(*catalog.Catalog)
+		components []string
+		format     string
+		wantCode   e.Code
+		wantText   string
+	}{
+		{
+			name:       "complete closure",
+			components: []string{"image", "runtime", "tool"},
+		},
+		{
+			name:       "no disk root",
+			components: []string{"tool"},
+			format:     "disk-image",
+			wantCode:   e.CodeInvalidCatalog,
+			wantText:   "selects no QCOW2 root",
+		},
+		{
+			name: "multiple disk roots",
+			mutate: func(cat *catalog.Catalog) {
+				cat.Components["second-image"] = cat.Components["image"]
+			},
+			components: []string{"image", "runtime", "second-image", "tool"},
+			wantCode:   e.CodeInvalidCatalog,
+			wantText:   "selects multiple disk roots",
+		},
+		{
+			name: "unrelated component",
+			mutate: func(cat *catalog.Catalog) {
+				cat.Components["unrelated"] = cat.Components["tool"]
+			},
+			components: []string{"image", "runtime", "tool", "unrelated"},
+			wantCode:   e.CodeInvalidCatalog,
+			wantText:   "outside root \"image\" material closure: unrelated",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cat := materialSelectionCatalog()
+			if test.mutate != nil {
+				test.mutate(cat)
+			}
+			resolved, err := Resolve(cat, Selection{
+				Components:   test.components,
+				Platform:     "linux/amd64",
+				OutputFormat: test.format,
+			})
+			if test.wantCode == "" {
+				if err != nil || resolved == nil {
+					t.Fatalf("Resolve = %+v, %v; want a resolved disk selection", resolved, err)
+				}
+				return
+			}
+			if resolved != nil || code(err) != test.wantCode || !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("Resolve = %+v, %v; want no result, %s, and %q", resolved, err, test.wantCode, test.wantText)
 			}
 		})
 	}
