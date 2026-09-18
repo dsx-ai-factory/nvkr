@@ -14,13 +14,12 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 	"golang.org/x/sys/unix"
 )
 
@@ -100,8 +99,10 @@ type PackerToolchain struct {
 
 // OpenPackerToolchain snapshots the digest-pinned Packer executable, every
 // PATH-resolved host tool, and every digest-pinned plugin file into private
-// storage. executablePath and host-tool paths must be exact absolute paths
-// supplied by the authenticated toolchain resolver; this boundary never
+// storage. Executable inputs must be Linux ELF files; authenticating their
+// dynamic loader and shared-library closure remains an outer realized-runtime
+// responsibility. executablePath and host-tool paths must be exact absolute
+// paths supplied by the authenticated toolchain resolver; this boundary never
 // searches ambient PATH. pluginSourceRoot is ignored only when plugins is
 // empty; an empty manifest produces an explicit empty PACKER_PLUGIN_PATH rather
 // than falling back to ambient discovery.
@@ -117,7 +118,7 @@ func OpenPackerToolchain(ctx context.Context, executablePath, executableDigest s
 			"Packer requires an exact lowercase sha256 executable digest, got %q", executableDigest)
 	}
 	if !validCleanAbsolutePath(executablePath) {
-		return nil, e.New(e.CodeInvalidCatalog,
+		return nil, e.New(e.CodeEngineCapability,
 			"Packer executable must be an exact clean absolute path")
 	}
 	if len(plugins) > maxPackerPluginFiles {
@@ -150,7 +151,7 @@ func OpenPackerToolchain(ctx context.Context, executablePath, executableDigest s
 		}
 		return nil, e.Wrap(e.CodeUnverifiedRef, err, "capturing pinned Packer executable %q", executablePath)
 	}
-	if err := rejectShebangExecutable(executable, "Packer executable"); err != nil {
+	if err := requireELFExecutable(executable, "Packer executable"); err != nil {
 		_ = executable.Close()
 		return nil, err
 	}
@@ -174,8 +175,9 @@ func OpenPackerToolchain(ctx context.Context, executablePath, executableDigest s
 }
 
 // Close releases the held executable and host-tool closure and removes the
-// private plugin closure. It waits for active validate/build calls and is
-// idempotent.
+// private plugin closure. It waits for the complete validate/build/collect
+// lifetime of every active call; new calls remain context-cancelable while a
+// close is waiting. Close is idempotent.
 func (toolchain *PackerToolchain) Close() error {
 	if toolchain == nil {
 		return nil
@@ -326,9 +328,11 @@ func (artifact *PackerArtifact) Close() error {
 // fetch-receipt, source-copy, patch, and re-hash boundary succeeds. A raw project
 // pathname is intentionally not an authority-bearing entry point. The driver does
 // not run `packer init`, parse HCL, generate HCL, or consult ambient Packer state.
-// Actual network denial and VM host admission remain responsibilities of the
-// outer authenticated execution adapter; this driver is not connected to public
-// VM-image lowering until those gates exist.
+// Its private state, PATH, and environment are not a kernel sandbox: network
+// denial, local-exec and filesystem confinement, credential isolation, and VM
+// host admission remain responsibilities of the outer authenticated execution
+// adapter. OutputParent is therefore a runner-owned private directory. This
+// driver is not connected to public VM-image lowering until those gates exist.
 func runPacker(ctx context.Context, toolchain *PackerToolchain, source *materializedSource, request PackerBuildRequest) (result *PackerArtifact, returnErr error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "running Packer requires a non-nil context")
@@ -551,7 +555,7 @@ func validatePackerHostToolManifest(tools []PackerHostTool) ([]PackerHostTool, e
 				"Packer host-tool name %q is not one exact executable basename", tool.Name)
 		}
 		if !validCleanAbsolutePath(tool.Path) {
-			return nil, e.New(e.CodeInvalidCatalog,
+			return nil, e.New(e.CodeEngineCapability,
 				"Packer host-tool %q must have an exact clean absolute source path", tool.Name)
 		}
 		if !canonical.IsDigest(tool.SHA256) {
@@ -589,16 +593,17 @@ func holdPackerHostTools(ctx context.Context, pins []PackerHostTool) ([]packerHo
 			}
 			return cleanup(e.Wrap(e.CodeUnverifiedRef, err, "capturing pinned Packer host-tool %q", pin.Name))
 		}
-		if err := rejectShebangExecutable(tool, "Packer host-tool "+pin.Name); err != nil {
+		if err := requireELFExecutable(tool, "Packer host-tool "+pin.Name); err != nil {
 			_ = tool.Close()
 			return cleanup(err)
 		}
-		if total > maxPackerHostToolClosureBytes-tool.Size() {
+		nextTotal, ok := addPackerBoundedSize(total, tool.Size(), maxPackerHostToolBytes, maxPackerHostToolClosureBytes)
+		if !ok {
 			_ = tool.Close()
-			return cleanup(e.New(e.CodeUnpinnedInput,
+			return cleanup(e.New(e.CodeEngineCapability,
 				"Packer host-tool closure exceeds the %d-byte bound", maxPackerHostToolClosureBytes))
 		}
-		total += tool.Size()
+		total = nextTotal
 		tools = append(tools, packerHostTool{name: pin.Name, file: tool})
 	}
 	return tools, nil
@@ -614,17 +619,24 @@ func closePackerHostTools(tools []packerHostTool) error {
 	return errors.Join(errs...)
 }
 
-func rejectShebangExecutable(reader io.ReaderAt, label string) error {
-	var magic [2]byte
+func requireELFExecutable(reader io.ReaderAt, label string) error {
+	var magic [4]byte
 	read, err := reader.ReadAt(magic[:], 0)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return e.Wrap(e.CodeUnverifiedRef, err, "inspecting %s executable format", label)
 	}
-	if read == len(magic) && bytes.Equal(magic[:], []byte("#!")) {
-		return e.New(e.CodeEngineCapability,
-			"%s is a script whose interpreter is outside the admitted executable closure", label)
+	if read != len(magic) || !bytes.Equal(magic[:], []byte("\x7fELF")) {
+		return e.New(e.CodeEngineCapability, "%s is not an admitted Linux ELF executable", label)
 	}
 	return nil
+}
+
+func addPackerBoundedSize(total, size, maxFile, maxTotal int64) (int64, bool) {
+	if total < 0 || size < 0 || maxFile < 0 || maxTotal < 0 || size > maxFile || size > maxTotal ||
+		total > maxTotal-size {
+		return 0, false
+	}
+	return total + size, true
 }
 
 func validPackerHostToolName(name string) bool {
@@ -719,7 +731,8 @@ func validatePackerPluginManifest(plugins []PackerPluginFile) ([]PackerPluginFil
 		}
 		paths[plugin.Path] = true
 	}
-	for pluginPath := range paths {
+	for _, plugin := range pins {
+		pluginPath := plugin.Path
 		for parent := filepath.Dir(pluginPath); parent != "."; parent = filepath.Dir(parent) {
 			if paths[parent] {
 				return nil, e.New(e.CodeInvalidCatalog,
@@ -757,12 +770,13 @@ func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []Packer
 		if err != nil {
 			return cleanup(e.Wrap(e.CodeUnverifiedRef, err, "opening pinned Packer plugin file %q", pin.Path))
 		}
-		if before.Size() < 0 || before.Size() > maxPackerPluginBytes || total > maxPackerPluginClosureBytes-before.Size() {
+		nextTotal, ok := addPackerBoundedSize(total, before.Size(), maxPackerPluginBytes, maxPackerPluginClosureBytes)
+		if !ok {
 			_ = source.Close()
-			return cleanup(e.New(e.CodeUnpinnedInput,
+			return cleanup(e.New(e.CodeEngineCapability,
 				"Packer plugin file %q exceeds the authenticated closure size bound", pin.Path))
 		}
-		total += before.Size()
+		total = nextTotal
 		destination := filepath.Join(privateRoot, pin.Path)
 		if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
 			_ = source.Close()
@@ -799,7 +813,7 @@ func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []Packer
 				return cleanup(e.Wrap(e.CodeUnverifiedRef, openErr,
 					"opening captured Packer plugin executable %q", pin.Path))
 			}
-			formatErr := rejectShebangExecutable(captured, "Packer plugin "+pin.Path)
+			formatErr := requireELFExecutable(captured, "Packer plugin "+pin.Path)
 			closeErr := captured.Close()
 			if formatErr != nil {
 				return cleanup(formatErr)
@@ -967,6 +981,7 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 			"Packer build has %d materials, exceeding the %d-file bound", len(request.Materials), maxPackerMaterialFiles)
 	}
 	materialPaths := make(map[string]bool, len(request.Materials))
+	orderedMaterialPaths := make([]string, 0, len(request.Materials))
 	var materialBytes int64
 	for _, material := range request.Materials {
 		if !validPackerRelativePath(material.Path) || material.Path == "material-manifest.json" {
@@ -984,15 +999,18 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 			return e.New(e.CodeUnverifiedRef,
 				"Packer material %q lacks the exact authenticated held bytes", material.Path)
 		}
-		if material.Content.Size() < 0 || material.Content.Size() > maxPackerMaterialBytes ||
-			materialBytes > maxPackerMaterialTotalBytes-material.Content.Size() {
-			return e.New(e.CodeUnpinnedInput,
+		nextMaterialBytes, ok := addPackerBoundedSize(materialBytes, material.Content.Size(),
+			maxPackerMaterialBytes, maxPackerMaterialTotalBytes)
+		if !ok {
+			return e.New(e.CodeEngineCapability,
 				"Packer material %q exceeds the authenticated closure size bound", material.Path)
 		}
-		materialBytes += material.Content.Size()
+		materialBytes = nextMaterialBytes
 		materialPaths[material.Path] = true
+		orderedMaterialPaths = append(orderedMaterialPaths, material.Path)
 	}
-	for materialPath := range materialPaths {
+	sort.Strings(orderedMaterialPaths)
+	for _, materialPath := range orderedMaterialPaths {
 		for parent := filepath.Dir(materialPath); parent != "."; parent = filepath.Dir(parent) {
 			if materialPaths[parent] {
 				return e.New(e.CodeInvalidCatalog,
@@ -1015,8 +1033,7 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 }
 
 func validPackerTransport(value string, maxBytes int, allowEmpty bool) bool {
-	return (allowEmpty || value != "") && len(value) <= maxBytes && utf8.ValidString(value) &&
-		strings.IndexFunc(value, unicode.IsControl) == -1
+	return safetext.Valid(value, maxBytes, allowEmpty)
 }
 
 func validPackerRelativePath(path string) bool {
@@ -1042,11 +1059,11 @@ func validCleanAbsolutePath(path string) bool {
 
 func requireCleanAbsoluteDirectory(path, label string) (string, error) {
 	if !validCleanAbsolutePath(path) {
-		return "", e.New(e.CodeInvalidCatalog, "%s must be a clean absolute path", label)
+		return "", e.New(e.CodeEngineCapability, "%s must be a clean absolute path", label)
 	}
 	directory, _, err := openDirectoryNoFollow(path)
 	if err != nil {
-		return "", e.Wrap(e.CodeInvalidCatalog, err, "%s is not a real directory", label)
+		return "", e.Wrap(e.CodeEngineCapability, err, "%s is not a real directory", label)
 	}
 	if err := directory.Close(); err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "closing %s", label)

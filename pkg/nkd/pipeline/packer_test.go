@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,20 +20,53 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
 )
 
-const fakeMaterialManifest = `{"materials":[{"path":"materials/component","sha256":"sha256:c2aaf954104b212a6339d4f99a1f156e153868345a25a03e3d264ef2a533c1d9"}],"schema":"test"}`
+var (
+	packerTestHelperOnce sync.Once
+	packerTestHelperRoot string
+	packerTestHelperPath string
+	packerTestHelperErr  error
+)
 
 func TestMain(m *testing.M) {
-	if filepath.Base(os.Args[0]) == "nkd-test-helper" {
-		_, _ = fmt.Fprintln(os.Stdout, "held-host-tool")
-		os.Exit(0)
+	code := m.Run()
+	if packerTestHelperRoot != "" {
+		_ = os.RemoveAll(packerTestHelperRoot)
 	}
-	if len(os.Args) > 1 && (os.Args[1] == "validate" || os.Args[1] == "build") {
-		os.Exit(runFakePacker(os.Args[1:]))
-	}
-	os.Exit(m.Run())
+	os.Exit(code)
 }
 
-func runFakePacker(args []string) int {
+const packerTestHelperSource = `package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+const manifestBytes = "{\"materials\":[{\"path\":\"materials/component\",\"sha256\":\"sha256:c2aaf954104b212a6339d4f99a1f156e153868345a25a03e3d264ef2a533c1d9\"}],\"schema\":\"test\"}"
+
+func main() {
+	if filepath.Base(os.Args[0]) == "nkd-test-helper" {
+		fmt.Println("held-host-tool")
+		return
+	}
+	if os.Getenv("NKD_PACKER_GO_HOST_TOOL_HELPER") == "1" {
+		output, err := exec.Command("nkd-test-helper").Output()
+		if err != nil || string(output) != "held-host-tool\n" {
+			os.Exit(97)
+		}
+		return
+	}
+	if len(os.Args) < 2 || (os.Args[1] != "validate" && os.Args[1] != "build") {
+		os.Exit(96)
+	}
+	os.Exit(run(os.Args[1:]))
+}
+
+func run(args []string) int {
 	if os.Getenv("CHECKPOINT_DISABLE") != "1" || os.Getenv("PACKER_NO_COLOR") != "1" {
 		return 81
 	}
@@ -64,18 +98,33 @@ func runFakePacker(args []string) int {
 	}
 
 	command := args[0]
-	if command == "validate" && markerExists("fail-validate") {
+	if command == "validate" && marker("fail-validate") {
 		return 84
 	}
-	if command == "validate" && markerExists("no-match-validate") {
-		_, _ = fmt.Fprint(os.Stdout, "Warning: No matching builds found for the exact selector.\n\nThe configuration is valid.\n")
+	if command == "validate" && marker("no-match-validate") {
+		fmt.Print("Warning: No matching builds found for the exact selector.\n\nThe configuration is valid.\n")
 		return 0
 	}
-	if command == "build" && markerExists("fail-build") {
+	if command == "validate" && marker("stderr-validate") {
+		fmt.Fprintln(os.Stderr, "Warning: validation diagnostic on stderr")
+	}
+	if command == "build" && marker("fail-build") {
 		return 85
 	}
-	if command == "validate" && markerExists("sleep-validate") {
+	if command == "validate" && marker("sleep-validate") {
 		time.Sleep(30 * time.Second)
+	}
+	if command == "validate" && marker("block-validate") {
+		if err := os.WriteFile("validate-started", nil, 0o600); err != nil {
+			return 94
+		}
+		deadline := time.Now().Add(30 * time.Second)
+		for !marker("release-validate") {
+			if time.Now().After(deadline) {
+				return 95
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
 	}
 
 	bindings := make(map[string]string)
@@ -94,7 +143,7 @@ func runFakePacker(args []string) int {
 		return 86
 	}
 	manifest, err := os.ReadFile(materialManifest)
-	if err != nil || string(manifest) != fakeMaterialManifest {
+	if err != nil || string(manifest) != manifestBytes {
 		return 87
 	}
 	materialPath := filepath.Join(filepath.Dir(materialManifest), "materials", "component")
@@ -102,16 +151,16 @@ func runFakePacker(args []string) int {
 	if err != nil || string(material) != "component-bytes\n" {
 		return 89
 	}
-	if command == "validate" && markerExists("mutate-material") {
+	if command == "validate" && marker("mutate-material") {
 		if os.Chmod(materialPath, 0o600) != nil || os.WriteFile(materialPath, []byte("changed\n"), 0o600) != nil {
 			return 92
 		}
 	}
 	if command != "build" {
-		_, _ = fmt.Fprintln(os.Stdout, "The configuration is valid.")
+		fmt.Println("The configuration is valid.")
 		return 0
 	}
-	if markerExists("omit-artifact") {
+	if marker("omit-artifact") {
 		return 0
 	}
 
@@ -126,11 +175,11 @@ func runFakePacker(args []string) int {
 	}
 	external := filepath.Join(cwd, "external.qcow2")
 	switch {
-	case markerExists("symlink-artifact"):
+	case marker("symlink-artifact"):
 		if os.WriteFile(external, []byte("outside\n"), 0o600) != nil || os.Symlink(external, artifact) != nil {
 			return 93
 		}
-	case markerExists("symlink-artifact-parent"):
+	case marker("symlink-artifact-parent"):
 		if os.Remove(images) != nil || os.Symlink(cwd, images) != nil ||
 			os.WriteFile(external, []byte("outside\n"), 0o600) != nil {
 			return 93
@@ -143,9 +192,34 @@ func runFakePacker(args []string) int {
 	return 0
 }
 
-func markerExists(name string) bool {
+func marker(name string) bool {
 	_, err := os.Stat(name)
 	return err == nil
+}
+`
+
+func packerTestHelperExecutable(t *testing.T) string {
+	t.Helper()
+	packerTestHelperOnce.Do(func() {
+		packerTestHelperRoot, packerTestHelperErr = os.MkdirTemp("", "nkd-packer-test-helper-")
+		if packerTestHelperErr != nil {
+			return
+		}
+		sourcePath := filepath.Join(packerTestHelperRoot, "main.go")
+		if packerTestHelperErr = os.WriteFile(sourcePath, []byte(packerTestHelperSource), 0o600); packerTestHelperErr != nil {
+			return
+		}
+		packerTestHelperPath = filepath.Join(packerTestHelperRoot, "packer-helper")
+		command := exec.Command("go", "build", "-trimpath", "-o", packerTestHelperPath, sourcePath)
+		command.Env = append(os.Environ(), "GOTOOLCHAIN=local")
+		if output, err := command.CombinedOutput(); err != nil {
+			packerTestHelperErr = fmt.Errorf("building uninstrumented Packer test helper: %w: %s", err, output)
+		}
+	})
+	if packerTestHelperErr != nil {
+		t.Fatal(packerTestHelperErr)
+	}
+	return packerTestHelperPath
 }
 
 func packerErrorCode(err error) nkderr.Code {
@@ -163,19 +237,6 @@ func requireLinuxPackerExecution(t *testing.T) {
 	}
 }
 
-func TestPackerGoHostToolHelper(t *testing.T) {
-	if os.Getenv("NKD_PACKER_GO_HOST_TOOL_HELPER") != "1" {
-		return
-	}
-	output, err := exec.Command("nkd-test-helper").CombinedOutput()
-	if err != nil {
-		t.Fatalf("running inherited host tool: %v: %s", err, output)
-	}
-	if string(output) != "held-host-tool\n" {
-		t.Fatalf("host tool output = %q", output)
-	}
-}
-
 func writeFakePacker(t *testing.T) (string, string) {
 	t.Helper()
 	return copyTestExecutable(t, "packer")
@@ -188,10 +249,7 @@ func writeFakePackerHostTool(t *testing.T) (string, string) {
 
 func copyTestExecutable(t *testing.T, name string) (string, string) {
 	t.Helper()
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
+	executable := packerTestHelperExecutable(t)
 	raw, err := os.ReadFile(executable)
 	if err != nil {
 		t.Fatal(err)
@@ -417,22 +475,64 @@ func TestPackerDriverRejectsMaterialMutationBeforeBuild(t *testing.T) {
 
 func TestPackerDriverRejectsExitZeroValidationDiagnostics(t *testing.T) {
 	toolchain, _ := testPackerToolchain(t)
-	projectDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(projectDir, "no-match-validate"), nil, 0o600); err != nil {
-		t.Fatal(err)
+	for _, test := range []struct {
+		name       string
+		marker     string
+		wantOutput string
+	}{
+		{name: "stdout warning", marker: "no-match-validate", wantOutput: "No matching builds"},
+		{name: "stderr warning", marker: "stderr-validate", wantOutput: "diagnostic on stderr"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			projectDir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(projectDir, test.marker), nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			request := testPackerRequest(t, projectDir)
+			var output bytes.Buffer
+			request.Stdout = &output
+			request.Stderr = &output
+			artifact, err := runPacker(t.Context(), toolchain, testMaterializedPackerSource(projectDir), request)
+			if artifact != nil || packerErrorCode(err) != nkderr.CodeBuildFailed {
+				t.Fatalf("diagnostic validation result = %#v, %v", artifact, err)
+			}
+			if calls := readPackerCalls(t, projectDir); len(calls) != 1 || !strings.HasPrefix(calls[0], "CALL\tvalidate\t") {
+				t.Fatalf("diagnostic validation ran unexpected commands: %q", calls)
+			}
+			if !strings.Contains(output.String(), test.wantOutput) {
+				t.Fatalf("validation diagnostic was not preserved for the caller: %q", output.String())
+			}
+		})
 	}
-	request := testPackerRequest(t, projectDir)
-	var output bytes.Buffer
-	request.Stdout = &output
-	artifact, err := runPacker(t.Context(), toolchain, testMaterializedPackerSource(projectDir), request)
-	if artifact != nil || packerErrorCode(err) != nkderr.CodeBuildFailed {
-		t.Fatalf("diagnostic validation result = %#v, %v", artifact, err)
-	}
-	if calls := readPackerCalls(t, projectDir); len(calls) != 1 || !strings.HasPrefix(calls[0], "CALL\tvalidate\t") {
-		t.Fatalf("diagnostic validation ran unexpected commands: %q", calls)
-	}
-	if !strings.Contains(output.String(), "No matching builds") {
-		t.Fatalf("validation diagnostic was not preserved for the caller: %q", output.String())
+}
+
+func TestPackerValidationOutputAcceptsOnlyBoundedExactOutput(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		raw   []byte
+		want  string
+		exact bool
+		empty bool
+	}{
+		{name: "clean", raw: []byte("The configuration is valid.\n"), want: "The configuration is valid.", exact: true},
+		{name: "diagnostic", raw: []byte("Warning\nThe configuration is valid.\n"), want: "The configuration is valid."},
+		{name: "empty", want: "The configuration is valid.", empty: true},
+		{name: "overflow", raw: bytes.Repeat([]byte("x"), maxPackerValidationOutputBytes+1), want: strings.Repeat("x", maxPackerValidationOutputBytes)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var forwarded bytes.Buffer
+			output := newPackerValidationOutput(&forwarded)
+			written, err := output.Write(test.raw)
+			if err != nil || written != len(test.raw) || !bytes.Equal(forwarded.Bytes(), test.raw) {
+				t.Fatalf("forwarded %d bytes/%v = %d bytes", written, err, forwarded.Len())
+			}
+			if got := output.exact(test.want); got != test.exact {
+				t.Fatalf("exact(%q) = %v, want %v", test.want, got, test.exact)
+			}
+			if got := output.empty(); got != test.empty {
+				t.Fatalf("empty() = %v, want %v", got, test.empty)
+			}
+		})
 	}
 }
 
@@ -521,6 +621,8 @@ func TestPackerRequestValidationRejectsUnsafeTransport(t *testing.T) {
 		{name: "no timeout", edit: func(request *PackerBuildRequest) { request.Timeout = 0 }, code: nkderr.CodeInvalidCatalog},
 		{name: "project traversal", edit: func(request *PackerBuildRequest) { request.ProjectPath = "../packer" }, code: nkderr.CodeInvalidCatalog},
 		{name: "build list", edit: func(request *PackerBuildRequest) { request.BuildName = "qemu.a,qemu.b" }, code: nkderr.CodeInvalidCatalog},
+		{name: "build display control", edit: func(request *PackerBuildRequest) { request.BuildName = "qemu.\u202enode" }, code: nkderr.CodeInvalidCatalog},
+		{name: "architecture display control", edit: func(request *PackerBuildRequest) { request.Architecture = "arm\u200b64" }, code: nkderr.CodeInvalidCatalog},
 		{name: "artifact traversal", edit: func(request *PackerBuildRequest) { request.ArtifactPath = "../node.qcow2" }, code: nkderr.CodeInvalidCatalog},
 		{name: "manifest unpinned", edit: func(request *PackerBuildRequest) { request.MaterialManifestSHA256 = "latest" }, code: nkderr.CodeUnpinnedInput},
 		{name: "material traversal", edit: func(request *PackerBuildRequest) { request.Materials[0].Path = "../component.deb" }, code: nkderr.CodeInvalidCatalog},
@@ -571,6 +673,101 @@ func TestPackerToolchainCloseAcceptsZeroValue(t *testing.T) {
 	}
 }
 
+func TestPackerArtifactRejectsChangedAndClosedContent(t *testing.T) {
+	raw := []byte("artifact bytes\n")
+	path := filepath.Join(t.TempDir(), "artifact")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := &PackerArtifact{
+		file: file, digest: FileDigest([]byte("different bytes\n")), size: int64(len(raw)),
+	}
+	if _, err := artifact.WriteToContext(t.Context(), io.Discard); packerErrorCode(err) != nkderr.CodeVerifyFailed {
+		t.Fatalf("changed artifact error = %v", err)
+	}
+	if err := artifact.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := artifact.WriteToContext(t.Context(), io.Discard); packerErrorCode(err) != nkderr.CodeVerifyFailed {
+		t.Fatalf("closed artifact error = %v", err)
+	}
+}
+
+func TestPackerToolchainCloseWaitsForActiveRunAndBlocksNewRuns(t *testing.T) {
+	toolchain, _ := testPackerToolchain(t)
+	projectDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(projectDir, "block-validate"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	request := testPackerRequest(t, projectDir)
+	type runResult struct {
+		artifact *PackerArtifact
+		err      error
+	}
+	runDone := make(chan runResult, 1)
+	go func() {
+		artifact, err := runPacker(context.Background(), toolchain, testMaterializedPackerSource(projectDir), request)
+		runDone <- runResult{artifact: artifact, err: err}
+	}()
+	waitForPackerMarker(t, projectDir, "validate-started")
+
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- toolchain.Close() }()
+	select {
+	case err := <-closeDone:
+		t.Fatalf("Close returned before active run completed: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	blockedRequest := testPackerRequest(t, projectDir)
+	blockedRequest.Timeout = 100 * time.Millisecond
+	if artifact, err := runPacker(context.Background(), toolchain, testMaterializedPackerSource(projectDir), blockedRequest); artifact != nil || packerErrorCode(err) != nkderr.CodeTimeout {
+		t.Fatalf("run racing with Close = %#v, %v; want timeout", artifact, err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "release-validate"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case result := <-runDone:
+		if result.err != nil || result.artifact == nil {
+			t.Fatalf("active run = %#v, %v", result.artifact, result.err)
+		}
+		if err := result.artifact.Close(); err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("active Packer run did not finish")
+	}
+	select {
+	case err := <-closeDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close did not finish after active run")
+	}
+}
+
+func waitForPackerMarker(t *testing.T, projectDir, name string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, err := os.Stat(filepath.Join(projectDir, name)); err == nil {
+			return
+		} else if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Packer marker %q was not created", name)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestPackerDriverRequiresPreparedSourceAndRejectsPathSymlinks(t *testing.T) {
 	toolchain, _ := testPackerToolchain(t)
 	projectDir := t.TempDir()
@@ -605,7 +802,7 @@ func TestPackerDriverRequiresPreparedSourceAndRejectsPathSymlinks(t *testing.T) 
 		t.Fatal(err)
 	}
 	request.OutputParent = linkedParent
-	if code := packerErrorCode(validatePackerBuildRequest(request)); code != nkderr.CodeInvalidCatalog {
+	if code := packerErrorCode(validatePackerBuildRequest(request)); code != nkderr.CodeEngineCapability {
 		t.Fatalf("symlinked output parent code = %q", code)
 	}
 
@@ -646,7 +843,10 @@ func TestPackerToolchainPinsPluginClosureAndFailsClosed(t *testing.T) {
 	packerPath, packerDigest := writeFakePacker(t)
 	pluginRoot := t.TempDir()
 	pluginPath := filepath.Join("github.com", "hashicorp", "qemu", "packer-plugin-qemu")
-	pluginBytes := []byte("exact plugin bytes\n")
+	pluginBytes, err := os.ReadFile(packerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fullPluginPath := filepath.Join(pluginRoot, pluginPath)
 	if err := os.MkdirAll(filepath.Dir(fullPluginPath), 0o700); err != nil {
 		t.Fatal(err)
@@ -718,16 +918,9 @@ func TestPackerToolchainPinsHostToolClosureForPrivatePATH(t *testing.T) {
 
 func TestPackerHostToolDescriptorSurvivesGoSubprocessExec(t *testing.T) {
 	requireLinuxPackerExecution(t)
-	executablePath, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	executableBytes, err := os.ReadFile(executablePath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	executablePath, executableDigest := writeFakePacker(t)
 	hostToolPath, hostToolDigest := writeFakePackerHostTool(t)
-	toolchain, err := OpenPackerToolchain(t.Context(), executablePath, FileDigest(executableBytes), []PackerHostTool{{
+	toolchain, err := OpenPackerToolchain(t.Context(), executablePath, executableDigest, []PackerHostTool{{
 		Name: "nkd-test-helper", Path: hostToolPath, SHA256: hostToolDigest,
 	}}, "", nil)
 	if err != nil {
@@ -744,8 +937,78 @@ func TestPackerHostToolDescriptorSurvivesGoSubprocessExec(t *testing.T) {
 	if err := runPackerCommand(t.Context(), toolchain, t.TempDir(), []string{
 		"NKD_PACKER_GO_HOST_TOOL_HELPER=1",
 		"PATH=" + hostPath,
-	}, []string{"-test.run=^TestPackerGoHostToolHelper$"}, io.Discard, io.Discard, "testing Go host-tool inheritance"); err != nil {
+	}, []string{"host-tool-check"}, io.Discard, io.Discard, "testing Go host-tool inheritance"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPackerHostPathTamperingFailsClosed(t *testing.T) {
+	requireLinuxPackerExecution(t)
+	packerPath, packerDigest := writeFakePacker(t)
+	hostToolPath, hostToolDigest := writeFakePackerHostTool(t)
+	toolchain, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, []PackerHostTool{{
+		Name: "nkd-test-helper", Path: hostToolPath, SHA256: hostToolDigest,
+	}}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer toolchain.Close()
+
+	for _, test := range []struct {
+		name   string
+		tamper func(string) error
+	}{
+		{name: "writable root", tamper: func(root string) error { return os.Chmod(root, 0o700) }},
+		{name: "extra entry", tamper: func(root string) error {
+			if err := os.Chmod(root, 0o700); err != nil {
+				return err
+			}
+			if err := os.Symlink("/proc/self/fd/1", filepath.Join(root, "extra")); err != nil {
+				return err
+			}
+			return os.Chmod(root, 0o500)
+		}},
+		{name: "undeclared entry", tamper: func(root string) error {
+			if err := os.Chmod(root, 0o700); err != nil {
+				return err
+			}
+			if err := os.Remove(filepath.Join(root, "nkd-test-helper")); err != nil {
+				return err
+			}
+			if err := os.Symlink("/proc/self/fd/1", filepath.Join(root, "other")); err != nil {
+				return err
+			}
+			return os.Chmod(root, 0o500)
+		}},
+		{name: "changed target", tamper: func(root string) error {
+			if err := os.Chmod(root, 0o700); err != nil {
+				return err
+			}
+			entry := filepath.Join(root, "nkd-test-helper")
+			if err := os.Remove(entry); err != nil {
+				return err
+			}
+			if err := os.Symlink("/proc/self/fd/999999", entry); err != nil {
+				return err
+			}
+			return os.Chmod(root, 0o500)
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			hostPath := filepath.Join(t.TempDir(), "bin")
+			if err := os.Mkdir(hostPath, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := materializePackerHostPath(hostPath, toolchain.hostTools); err != nil {
+				t.Fatal(err)
+			}
+			if err := test.tamper(hostPath); err != nil {
+				t.Fatal(err)
+			}
+			if code := packerErrorCode(verifyPackerHostPath(hostPath, toolchain.hostTools)); code != nkderr.CodeUnverifiedRef {
+				t.Fatalf("tampered PATH code = %q", code)
+			}
+		})
 	}
 }
 
@@ -758,7 +1021,7 @@ func TestPackerToolchainRejectsInvalidHostToolPins(t *testing.T) {
 		code  nkderr.Code
 	}{
 		{name: "non-basename", tools: []PackerHostTool{{Name: "bin/qemu", Path: hostToolPath, SHA256: hostToolDigest}}, code: nkderr.CodeInvalidCatalog},
-		{name: "relative source", tools: []PackerHostTool{{Name: "qemu", Path: "qemu", SHA256: hostToolDigest}}, code: nkderr.CodeInvalidCatalog},
+		{name: "relative source", tools: []PackerHostTool{{Name: "qemu", Path: "qemu", SHA256: hostToolDigest}}, code: nkderr.CodeEngineCapability},
 		{name: "unpinned", tools: []PackerHostTool{{Name: "qemu", Path: hostToolPath, SHA256: "latest"}}, code: nkderr.CodeUnpinnedInput},
 		{name: "duplicate name", tools: []PackerHostTool{
 			{Name: "qemu", Path: hostToolPath, SHA256: hostToolDigest},
@@ -774,6 +1037,89 @@ func TestPackerToolchainRejectsInvalidHostToolPins(t *testing.T) {
 	}
 }
 
+func TestPackerClosureCountAndSizeBoundsFailClosed(t *testing.T) {
+	packerPath, packerDigest := writeFakePacker(t)
+	t.Run("host-tool count", func(t *testing.T) {
+		tools := make([]PackerHostTool, maxPackerHostTools+1)
+		if _, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, tools, "", nil); packerErrorCode(err) != nkderr.CodeInvalidCatalog {
+			t.Fatalf("host-tool count error = %v", err)
+		}
+	})
+	t.Run("plugin count", func(t *testing.T) {
+		plugins := make([]PackerPluginFile, maxPackerPluginFiles+1)
+		if _, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, nil, "", plugins); packerErrorCode(err) != nkderr.CodeInvalidCatalog {
+			t.Fatalf("plugin count error = %v", err)
+		}
+	})
+	t.Run("material count", func(t *testing.T) {
+		request := testPackerRequest(t, t.TempDir())
+		request.Materials = make([]PackerMaterialInput, maxPackerMaterialFiles+1)
+		if code := packerErrorCode(validatePackerBuildRequest(request)); code != nkderr.CodeInvalidCatalog {
+			t.Fatalf("material count code = %q", code)
+		}
+	})
+
+	maxInt64 := int64(^uint64(0) >> 1)
+	for _, test := range []struct {
+		name                   string
+		total, size, file, all int64
+		wantTotal              int64
+		wantOK                 bool
+	}{
+		{name: "within bounds", total: 4, size: 6, file: 6, all: 10, wantTotal: 10, wantOK: true},
+		{name: "individual bound", size: 7, file: 6, all: 10},
+		{name: "aggregate bound", total: 5, size: 6, file: 6, all: 10},
+		{name: "negative size", size: -1, file: 6, all: 10},
+		{name: "arithmetic overflow", total: maxInt64, size: 1, file: maxInt64, all: maxInt64},
+	} {
+		t.Run("size "+test.name, func(t *testing.T) {
+			got, ok := addPackerBoundedSize(test.total, test.size, test.file, test.all)
+			if got != test.wantTotal || ok != test.wantOK {
+				t.Fatalf("addPackerBoundedSize() = %d/%v, want %d/%v", got, ok, test.wantTotal, test.wantOK)
+			}
+		})
+	}
+}
+
+func TestPackerToolchainRejectsNonELFExecutableFormats(t *testing.T) {
+	requireLinuxPackerExecution(t)
+	packerPath, packerDigest := writeFakePacker(t)
+	nonELFRoot := t.TempDir()
+	nonELFBytes := []byte("MZ-not-an-elf-executable\n")
+	nonELFPath := filepath.Join(nonELFRoot, "not-elf")
+	if err := os.WriteFile(nonELFPath, nonELFBytes, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	nonELFDigest := FileDigest(nonELFBytes)
+	for _, test := range []struct {
+		name string
+		open func() error
+	}{
+		{name: "Packer", open: func() error {
+			_, err := OpenPackerToolchain(t.Context(), nonELFPath, nonELFDigest, nil, "", nil)
+			return err
+		}},
+		{name: "host tool", open: func() error {
+			_, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, []PackerHostTool{{
+				Name: "not-elf", Path: nonELFPath, SHA256: nonELFDigest,
+			}}, "", nil)
+			return err
+		}},
+		{name: "plugin", open: func() error {
+			_, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, nil, nonELFRoot, []PackerPluginFile{{
+				Path: "not-elf", SHA256: nonELFDigest, Executable: true,
+			}})
+			return err
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.open(); packerErrorCode(err) != nkderr.CodeEngineCapability {
+				t.Fatalf("non-ELF error = %v", err)
+			}
+		})
+	}
+}
+
 func TestPackerToolchainRejectsInvalidPinsAndPluginSymlinks(t *testing.T) {
 	packerPath, packerDigest := writeFakePacker(t)
 	if _, err := OpenPackerToolchain(nil, packerPath, packerDigest, nil, "", nil); packerErrorCode(err) != nkderr.CodeUsage { //nolint:staticcheck // nil-context contract
@@ -782,7 +1128,7 @@ func TestPackerToolchainRejectsInvalidPinsAndPluginSymlinks(t *testing.T) {
 	if _, err := OpenPackerToolchain(t.Context(), packerPath, "latest", nil, "", nil); packerErrorCode(err) != nkderr.CodeUnpinnedInput {
 		t.Fatalf("unpinned executable error = %v", err)
 	}
-	if _, err := OpenPackerToolchain(t.Context(), filepath.Base(packerPath), packerDigest, nil, "", nil); packerErrorCode(err) != nkderr.CodeInvalidCatalog {
+	if _, err := OpenPackerToolchain(t.Context(), filepath.Base(packerPath), packerDigest, nil, "", nil); packerErrorCode(err) != nkderr.CodeEngineCapability {
 		t.Fatalf("ambient executable name error = %v", err)
 	}
 	if _, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, nil, "", []PackerPluginFile{
