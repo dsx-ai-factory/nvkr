@@ -737,10 +737,15 @@ from the exact Environment inventory, so a substituted class, capability resolut
 These planning declarations affect Environment and Plan identity but remain outside Recipe identity.
 
 Execution classes are not runtime evidence. Current local and hosted adapters still reject selected builds
-carrying requirements before work or emitted output. Authenticated runtime observation and allocation, VM
-topology beyond the required-KVM same-architecture invariant, arbitrary devices, privilege, nested
-virtualization, NUMA, accelerators, and provider-specific lowering remain deferred. Produced-artifact size
-remains an artifact and transport budget.
+carrying requirements before work or emitted output. The execution owner has a process-local Linux diagnostic
+helper that observes CPU affinity, free host memory, available capacity relative to the executor's held workspace
+directory, and KVM exposure. Descriptor duplication is lifetime-protected, write and traversal access is checked,
+and every retained handle is closed before return. The helper accepts no execution request or selected binding,
+does not authenticate Environment membership or selection, and grants no execution authority. Authenticated
+runtime admission and provider allocation, deadline enforcement, adapter integration, and VM topology beyond the
+required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege, nested virtualization,
+NUMA, accelerators, and provider-specific lowering remain deferred.
+Produced-artifact size remains an artifact and transport budget.
 
 ### High Availability {#high-availability}
 

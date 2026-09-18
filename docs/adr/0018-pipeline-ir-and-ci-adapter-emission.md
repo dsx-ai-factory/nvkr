@@ -176,6 +176,19 @@ rejects a selected build with nonempty execution requirements before execution o
 adapter must authenticate the realized host platform, allocation, capability exposure, and enforced deadline
 before work; a provider's outer job timeout must permit the authored executor budget.
 
+The execution owner provides a narrower diagnostic local Linux observation helper. The caller supplies an
+already-open workspace-directory capability. The helper duplicates that descriptor while its lifetime is
+protected by the runtime, checks effective write and traversal access, observes process CPU affinity, free host
+memory, available workspace capacity and KVM API exposure, then closes every retained workspace and KVM handle
+before returning. It never resolves a replaceable workspace pathname. Non-Linux hosts reject the observation.
+
+This helper accepts neither an execution request nor a selected binding. It does not authenticate Environment
+membership or deterministic selection, own or enforce an execution deadline, reserve observed resources, prove a
+provider allocation, or authorize execution. No current local or hosted adapter consumes the observation, and
+all existing execution gates remain closed. A future adapter must first obtain the owning planning module's
+authenticated Environment/Plan selection, independently authenticate effective provider or cgroup allocation,
+and enforce the selected executor and outer-provider deadlines before it can admit work.
+
 Future `vm-image` lowering dispatches the typed producer driver owned by ADR-10. The `command` driver executes the
 exact authored argument vector and can therefore invoke Make. The `packer` driver invokes the pinned Packer
 executable against the selected source-owned HCL project without parsing or generating HCL. Both receive only
@@ -185,9 +198,9 @@ The shared runner owns this driver lowering. A CI adapter may transport its type
 not render an independent Make or Packer command.
 
 VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, privilege, nested
-virtualization, NUMA, accelerators, requirements on non-build nodes, runtime authentication, and provider-specific
-lowering remain deferred. Produced-artifact size remains an artifact and transport budget. An adapter may not
-reconstruct producer commands, invoke an upstream workflow, or weaken a
+virtualization, NUMA, accelerators, requirements on non-build nodes, adapter integration, qualified runtime
+authentication, and provider-specific lowering remain deferred. Produced-artifact size remains an artifact and
+transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or weaken a
 request; a grouped provider job must satisfy every member node.
 
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the

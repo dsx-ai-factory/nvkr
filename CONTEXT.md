@@ -172,6 +172,14 @@ The compiler-selected exact execution class and resolved preferred-capability ch
 Plan validation recomputes the selection from the Environment inventory; the binding remains outside Recipe identity.
 _Avoid_: Runtime proof, authored requirement, mutable runner label
 
+**Local host observation**:
+Point-in-time diagnostic Linux facts about process CPU affinity, free host memory, available workspace capacity,
+and KVM exposure. Observation is relative to the executor's already-open workspace-directory capability; the
+observer lifetime-protects its duplicate, checks write and traversal access, and closes every retained handle
+before returning. It does not accept execution requirements or a selected binding, authenticate Environment
+membership, own an execution deadline, reserve resources, or authorize work.
+_Avoid_: Execution admission, runtime proof, execution class, provider attestation, resource reservation
+
 **VM-image producer form**:
 The catalog-selected invocation contract within a VM-image component: either an exact command argument vector or
 a direct-Packer project, build name, and variable bindings.
