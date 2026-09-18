@@ -982,6 +982,7 @@ func TestPackerHostToolDescriptorSurvivesGoSubprocessExec(t *testing.T) {
 	if err := os.Mkdir(hostPath, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	restoreOwnerWriteForCleanup(t, hostPath)
 	if err := materializePackerHostPath(hostPath, toolchain.hostTools); err != nil {
 		t.Fatal(err)
 	}
@@ -1050,6 +1051,7 @@ func TestPackerHostPathTamperingFailsClosed(t *testing.T) {
 			if err := os.Mkdir(hostPath, 0o700); err != nil {
 				t.Fatal(err)
 			}
+			restoreOwnerWriteForCleanup(t, hostPath)
 			if err := materializePackerHostPath(hostPath, toolchain.hostTools); err != nil {
 				t.Fatal(err)
 			}
@@ -1061,6 +1063,15 @@ func TestPackerHostPathTamperingFailsClosed(t *testing.T) {
 			}
 		})
 	}
+}
+
+func restoreOwnerWriteForCleanup(t *testing.T, path string) {
+	t.Helper()
+	t.Cleanup(func() {
+		if err := os.Chmod(path, 0o700); err != nil && !os.IsNotExist(err) {
+			t.Errorf("restoring owner-write permission on %q for cleanup: %v", path, err)
+		}
+	})
 }
 
 func TestPackerToolchainRejectsInvalidHostToolPins(t *testing.T) {
