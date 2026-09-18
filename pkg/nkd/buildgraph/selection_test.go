@@ -144,6 +144,13 @@ func TestResolveDiskSelectionRequiresOneRootAndItsExactMaterialClosure(t *testin
 			components: []string{"image", "runtime", "tool"},
 		},
 		{
+			name:       "disk root with executable format",
+			components: []string{"image", "runtime", "tool"},
+			format:     "executable",
+			wantCode:   e.CodeInvalidCatalog,
+			wantText:   "cannot select a disk-image component",
+		},
+		{
 			name:       "no disk root",
 			components: []string{"tool"},
 			format:     "disk-image",

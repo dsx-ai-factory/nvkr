@@ -116,7 +116,12 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 	if err := catalog.ValidateMaterialSet(resolved.Components); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "selected output has an incomplete material set")
 	}
-	if selection.OutputFormat == definition.OutputDiskImage || containsDiskRoot(resolved.Components) {
+	hasDiskRoot := containsDiskRoot(resolved.Components)
+	if hasDiskRoot && selection.OutputFormat != "" && selection.OutputFormat != definition.OutputDiskImage {
+		return nil, e.New(e.CodeInvalidCatalog,
+			"output format %q cannot select a disk-image component", selection.OutputFormat)
+	}
+	if selection.OutputFormat == definition.OutputDiskImage || hasDiskRoot {
 		if err := validateDiskSelection(resolved.Components); err != nil {
 			return nil, err
 		}
