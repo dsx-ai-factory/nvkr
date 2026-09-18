@@ -52,12 +52,23 @@ func TestSandboxTransitionStaysOnOneThread(t *testing.T) {
 func TestFailedSandboxTransitionRetiresThread(t *testing.T) {
 	want := errors.New("partial sandbox failure")
 	var thread int
-	err := runOnSandboxThread(func() error {
-		thread = unix.Gettid()
-		return want
-	})
-	if !errors.Is(err, want) {
-		t.Fatalf("sandbox transition lost failure: %v", err)
+	// Go permanently parks its main OS thread instead of destroying it. If
+	// the first transition retires that thread, the next must use a worker
+	// whose exit can be observed through /proc.
+	for attempt := 0; attempt < 2; attempt++ {
+		err := runOnSandboxThread(func() error {
+			thread = unix.Gettid()
+			return want
+		})
+		if !errors.Is(err, want) {
+			t.Fatalf("sandbox transition lost failure: %v", err)
+		}
+		if thread != os.Getpid() {
+			break
+		}
+	}
+	if thread == os.Getpid() {
+		t.Fatal("retired main OS thread was reused for a sandbox transition")
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for {
@@ -69,7 +80,7 @@ func TestFailedSandboxTransitionRetiresThread(t *testing.T) {
 			t.Fatal(err)
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("failed sandbox thread %d was returned to the runtime", thread)
+			t.Fatalf("failed sandbox worker thread %d did not exit", thread)
 		}
 		time.Sleep(time.Millisecond)
 	}
