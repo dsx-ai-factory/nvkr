@@ -3,14 +3,62 @@ package factory
 import (
 	"bytes"
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-func TestGitHubActionPinsBindRenderingAndPlanIdentity(t *testing.T) {
+func TestPlanRejectsActionPinsOutsideCatalogSnapshot(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(map[string]catalog.ActionPin)
+	}{
+		{"missing action", func(pins map[string]catalog.ActionPin) { delete(pins, "checkout") }},
+		{"extra action", func(pins map[string]catalog.ActionPin) { pins["other"] = pins["checkout"] }},
+		{"renamed action", func(pins map[string]catalog.ActionPin) {
+			pins["other"] = pins["checkout"]
+			delete(pins, "checkout")
+		}},
+		{"repository", func(pins map[string]catalog.ActionPin) {
+			pin := pins["checkout"]
+			pin.Repo = "other/checkout"
+			pins["checkout"] = pin
+		}},
+		{"release", func(pins map[string]catalog.ActionPin) {
+			pin := pins["checkout"]
+			pin.Version = "v7.0.2"
+			pins["checkout"] = pin
+		}},
+		{"commit", func(pins map[string]catalog.ActionPin) {
+			pin := pins["checkout"]
+			pin.SHA = strings.Repeat("b", 40)
+			pins["checkout"] = pin
+		}},
+		{"empty actions", func(pins map[string]catalog.ActionPin) { clear(pins) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := githubTestPlan(t)
+			if err := plan.Validate(); err != nil {
+				t.Fatalf("invalid baseline: %v", err)
+			}
+			tc.edit(plan.Actions)
+			t.Run("validate", func(t *testing.T) {
+				assertFactoryErrorCode(t, plan.Validate(), e.CodePipelineDrift)
+			})
+			t.Run("render", func(t *testing.T) {
+				bundle, err := RenderGitHub(context.Background(), plan)
+				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+				if bundle != nil {
+					t.Fatal("modified action pins produced a workflow bundle")
+				}
+			})
+		})
+	}
+}
+
+func TestGitHubActionCatalogChangeRequiresRecompile(t *testing.T) {
 	plan := githubTestPlan(t)
 	before, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
@@ -20,7 +68,17 @@ func TestGitHubActionPinsBindRenderingAndPlanIdentity(t *testing.T) {
 	changed := original
 	changed.SHA = strings.Repeat("b", 40)
 	changed.Version = "v7.0.2"
-	plan.Actions["checkout"] = changed
+	plan.CatalogSnapshot.Actions["checkout"] = changed
+	stack, err := catalog.ApplyStack(plan.CatalogSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recompiled, err := Compile(context.Background(), plan.Definition, plan.Environment, stack, plan.GeneratorVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recompiled.DefinitionPath, recompiled.EnvironmentPath = plan.DefinitionPath, plan.EnvironmentPath
+	plan = recompiled
 	after, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
@@ -33,11 +91,5 @@ func TestGitHubActionPinsBindRenderingAndPlanIdentity(t *testing.T) {
 	}
 	if err := ValidateGitHubBundle(context.Background(), plan, before); err == nil {
 		t.Fatal("old workflow accepted under new action pins")
-	}
-	delete(plan.Actions, "checkout")
-	bundle, err := RenderGitHub(context.Background(), plan)
-	var coded *e.Error
-	if bundle != nil || !errors.As(err, &coded) || coded.Code != e.CodeUnpinnedSource {
-		t.Fatalf("missing action: %v, %v", bundle, err)
 	}
 }

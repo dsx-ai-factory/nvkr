@@ -44,8 +44,13 @@ BuildDigest. Run-plan and artifact-graph v4 contain no cluster-composition nodes
 are removed; the complete Plan retains the exact authored Definition and Environment.
 
 The Plan retains its base catalog snapshot and each output's selected catalog snapshot, checked against their
-catalog identities before deriving executable tools. Compilation and validation share one complete artifact
-graph derivation. Validation compares every node and artifact, including exact input/output sets, transport
+catalog identities before deriving executable tools. The Plan's action pins must exactly match the base
+snapshot. Each output's complete executable build graph is recompiled from its selected snapshot, with only
+Environment-authorized toolchain registry relocation and deterministic execution binding applied. Admission
+compares canonical full-graph bytes; the transport-independent Build Digest cannot authenticate repository,
+artifact or flake locators, image registry prefixes, or execution metadata.
+Compilation and validation also share one complete artifact graph derivation.
+Validation compares every node and artifact, including exact input/output sets, transport
 URL, format, archive and executable digests, executable member and output path. Producer source and receipt
 edges, package membership and terminal-observation gates, and publication/signing routes must match the
 admitted inputs. Missing, extra or substituted operations, artifacts or edges fail before execution or emission.

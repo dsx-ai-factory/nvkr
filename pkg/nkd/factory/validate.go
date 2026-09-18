@@ -1,6 +1,8 @@
 package factory
 
 import (
+	"bytes"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -44,6 +47,9 @@ func (plan Plan) Validate() error {
 	}
 	if catalogDigest != plan.CatalogDigest {
 		return e.New(e.CodeUnverifiedRef, "run plan base catalog snapshot differs from catalogDigest")
+	}
+	if !maps.Equal(plan.Actions, plan.CatalogSnapshot.Actions) {
+		return e.New(e.CodePipelineDrift, "run plan action pins differ from its base catalog snapshot")
 	}
 	if err := admitInputs(plan.Definition, plan.Environment); err != nil {
 		return err
@@ -136,7 +142,7 @@ func (plan Plan) Validate() error {
 		if !sort.StringsAreSorted(buildPlan.Components) || hasAdjacentDuplicate(buildPlan.Components) {
 			return e.New(e.CodeInvalidCatalog, "factory build target %q components are not canonical", buildPlan.Name)
 		}
-		if err := validateBuildCatalog(buildPlan); err != nil {
+		if err := validateBuildCatalog(buildPlan, plan.Environment); err != nil {
 			return err
 		}
 		for _, node := range buildPlan.Graph.Nodes {
@@ -639,9 +645,9 @@ func safeGraphID(value string) bool {
 	return true
 }
 
-// validateBuildCatalog binds producer and execution requirements to the
-// exact resolved snapshot. Logical graph identity deliberately excludes them.
-func validateBuildCatalog(build BuildPlan) error {
+// validateBuildCatalog binds the complete executable graph to its catalog and
+// Environment. Logical identity alone excludes transport and execution metadata.
+func validateBuildCatalog(build BuildPlan, environment authored.Environment) error {
 	if build.CatalogSnapshot == nil {
 		return e.New(e.CodeUnverifiedRef, "output %q has no catalog snapshot", build.Name)
 	}
@@ -670,7 +676,7 @@ func validateBuildCatalog(build BuildPlan) error {
 	if build.AICRProfileIdentity != profileIdentity {
 		return e.New(e.CodeUnverifiedRef, "output %q AICR profile identity differs from catalog", build.Name)
 	}
-	graph, err := buildgraph.Compile(selected)
+	graph, err := compileBuildGraph(selected, environment)
 	if err != nil {
 		return err
 	}
@@ -680,6 +686,17 @@ func validateBuildCatalog(build BuildPlan) error {
 	}
 	if graphDigest != build.BuildDigest {
 		return e.New(e.CodeUnverifiedRef, "output %q graph differs from catalog producers", build.Name)
+	}
+	expected, err := graph.CanonicalJSON()
+	if err != nil {
+		return err
+	}
+	actual, err := build.Graph.CanonicalJSON()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(actual, expected) {
+		return e.New(e.CodePipelineDrift, "output %q executable graph differs from its catalog and environment", build.Name)
 	}
 	return nil
 }

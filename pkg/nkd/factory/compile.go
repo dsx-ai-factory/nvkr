@@ -200,7 +200,7 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 			return nil, e.New(e.CodeInvalidCatalog,
 				"factory build target %q names aicrGenerator but resolves no AICR profile", target.Name)
 		}
-		graph, err := buildgraph.Compile(resolved)
+		graph, err := compileBuildGraph(resolved, delivery)
 		if err != nil {
 			return nil, err
 		}
@@ -208,23 +208,12 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		if err != nil {
 			return nil, err
 		}
-		// The catalog pins operator-materialized toolchains registry-agnostically
-		// (`nkd-toolchain-*@sha256:…`); resolve them into THIS environment's registry now. Only
-		// the registry prefix changes — the digest is preserved — so buildDigest (computed
-		// above, and which strips the prefix) is unaffected. Public toolchains are untouched.
-		relocateToolchainRegistry(graph, delivery.Runtime.ToolchainRegistry)
 		selected := resolved
 		selectedNames := make([]string, 0, len(selected.Components))
-		selectedSet := map[string]bool{}
 		for _, component := range selected.Components {
 			selectedNames = append(selectedNames, component.Name)
-			selectedSet[component.Name] = true
 		}
 		sort.Strings(selectedNames)
-		if err := bindBuildExecution(graph, selectedSet, delivery.ExecutionClasses); err != nil {
-			return nil, e.Wrap(e.CodeEngineCapability, err,
-				"factory build target %q cannot satisfy execution requirements", target.Name)
-		}
 		aicrIdentity := ""
 		if resolved.AICRProfile != nil {
 			aicrIdentity = resolved.AICRProfile.Identity
@@ -251,6 +240,25 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		return nil, err
 	}
 	return plan, nil
+}
+
+// compileBuildGraph owns the Environment transformations of a catalog-derived
+// producer graph. They change execution bytes without changing Build identity.
+// Validation uses the same derivation before comparing the complete graph.
+func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Environment) (*ir.Graph, error) {
+	graph, err := buildgraph.Compile(resolved)
+	if err != nil {
+		return nil, err
+	}
+	relocateToolchainRegistry(graph, environment.Runtime.ToolchainRegistry)
+	selected := make(map[string]bool, len(resolved.Components))
+	for _, component := range resolved.Components {
+		selected[component.Name] = true
+	}
+	if err := bindBuildExecution(graph, selected, environment.ExecutionClasses); err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "build cannot satisfy execution requirements")
+	}
+	return graph, nil
 }
 
 // compileArtifactGraph is the single derivation of executable scheduler nodes,
