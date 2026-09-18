@@ -699,48 +699,79 @@ func TestPackerArtifactRejectsChangedAndClosedContent(t *testing.T) {
 
 func TestPackerToolchainCloseWaitsForActiveRunAndBlocksNewRuns(t *testing.T) {
 	toolchain, _ := testPackerToolchain(t)
-	projectDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(projectDir, "block-validate"), nil, 0o600); err != nil {
-		t.Fatal(err)
+	const activeRuns = 4
+	type activeRun struct {
+		projectDir string
+		request    PackerBuildRequest
 	}
-	request := testPackerRequest(t, projectDir)
 	type runResult struct {
+		index    int
 		artifact *PackerArtifact
 		err      error
 	}
-	runDone := make(chan runResult, 1)
-	go func() {
-		artifact, err := runPacker(context.Background(), toolchain, testMaterializedPackerSource(projectDir), request)
-		runDone <- runResult{artifact: artifact, err: err}
+	runs := make([]activeRun, activeRuns)
+	runDone := make(chan runResult, activeRuns)
+	for index := range runs {
+		projectDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(projectDir, "block-validate"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		runs[index] = activeRun{projectDir: projectDir, request: testPackerRequest(t, projectDir)}
+		go func(index int) {
+			run := runs[index]
+			artifact, err := runPacker(context.Background(), toolchain,
+				testMaterializedPackerSource(run.projectDir), run.request)
+			runDone <- runResult{index: index, artifact: artifact, err: err}
+		}(index)
+	}
+	releaseActiveRuns := func() error {
+		var errs []error
+		for _, run := range runs {
+			errs = append(errs, os.WriteFile(filepath.Join(run.projectDir, "release-validate"), nil, 0o600))
+		}
+		return errors.Join(errs...)
+	}
+	released := false
+	defer func() {
+		if !released {
+			_ = releaseActiveRuns()
+		}
 	}()
-	waitForPackerMarker(t, projectDir, "validate-started")
+	for _, run := range runs {
+		waitForPackerMarker(t, run.projectDir, "validate-started")
+	}
 
 	closeDone := make(chan error, 1)
 	go func() { closeDone <- toolchain.Close() }()
+	waitForPackerCloseWriter(t, toolchain)
 	select {
 	case err := <-closeDone:
-		t.Fatalf("Close returned before active run completed: %v", err)
-	case <-time.After(50 * time.Millisecond):
+		t.Fatalf("Close returned before %d active runs completed: %v", activeRuns, err)
+	default:
 	}
 
-	blockedRequest := testPackerRequest(t, projectDir)
+	blockedProject := t.TempDir()
+	blockedRequest := testPackerRequest(t, blockedProject)
 	blockedRequest.Timeout = 100 * time.Millisecond
-	if artifact, err := runPacker(context.Background(), toolchain, testMaterializedPackerSource(projectDir), blockedRequest); artifact != nil || packerErrorCode(err) != nkderr.CodeTimeout {
+	if artifact, err := runPacker(context.Background(), toolchain, testMaterializedPackerSource(blockedProject), blockedRequest); artifact != nil || packerErrorCode(err) != nkderr.CodeTimeout {
 		t.Fatalf("run racing with Close = %#v, %v; want timeout", artifact, err)
 	}
-	if err := os.WriteFile(filepath.Join(projectDir, "release-validate"), nil, 0o600); err != nil {
+	if err := releaseActiveRuns(); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case result := <-runDone:
-		if result.err != nil || result.artifact == nil {
-			t.Fatalf("active run = %#v, %v", result.artifact, result.err)
+	released = true
+	for range runs {
+		select {
+		case result := <-runDone:
+			if result.err != nil || result.artifact == nil {
+				t.Fatalf("active run %d = %#v, %v", result.index, result.artifact, result.err)
+			}
+			if err := result.artifact.Close(); err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("active Packer runs did not finish")
 		}
-		if err := result.artifact.Close(); err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("active Packer run did not finish")
 	}
 	select {
 	case err := <-closeDone:
@@ -749,6 +780,26 @@ func TestPackerToolchainCloseWaitsForActiveRunAndBlocksNewRuns(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("Close did not finish after active run")
+	}
+	closedArtifact, closedErr := runPacker(context.Background(), toolchain,
+		testMaterializedPackerSource(blockedProject), blockedRequest)
+	if closedArtifact != nil || packerErrorCode(closedErr) != nkderr.CodeEngineCapability {
+		t.Fatalf("run after Close = %#v, %v; want %s", closedArtifact, closedErr, nkderr.CodeEngineCapability)
+	}
+}
+
+func waitForPackerCloseWriter(t *testing.T, toolchain *PackerToolchain) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if !toolchain.mu.TryRLock() {
+			return
+		}
+		toolchain.mu.RUnlock()
+		if time.Now().After(deadline) {
+			t.Fatal("Packer toolchain Close did not begin waiting for active runs")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 
