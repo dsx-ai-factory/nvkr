@@ -642,7 +642,7 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 			if !selected[irNode.Component] {
 				continue
 			}
-			inputs := make([]string, 0, len(irNode.Needs)*2)
+			inputs := make([]string, 0, len(irNode.Needs))
 			for _, dependency := range irNode.Needs {
 				upstream, ok := byID[dependency]
 				if !ok {
