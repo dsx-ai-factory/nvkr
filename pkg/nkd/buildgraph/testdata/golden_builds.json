@@ -18,7 +18,7 @@
       "pause",
       "runc"
     ],
-    "buildDigest": "sha256:7f27270034c31eceea4f24cf45694014e7dd6fae3fe1b51d530c7338d2b87cd5"
+    "buildDigest": "sha256:4975863639898fd00f89e9849184c637578fec5f4f743608131315555cfd46c8"
   },
   {
     "platform": "linux/arm64",
@@ -39,6 +39,6 @@
       "pause",
       "runc"
     ],
-    "buildDigest": "sha256:fbc2f02b16a3df19d76952260bd7166b6079d69400b954c946eef6775fd52c27"
+    "buildDigest": "sha256:e87af5c6d0463a50e281514fbf138efada11c6ac51200b1231fb9afd3219d159"
   }
 ]

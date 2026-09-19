@@ -39,7 +39,7 @@ producer group, recipe selection, criteria matcher, mixin or recipe layer partic
 identifies the selected executable producer closure and excludes the output name, packaging and transport.
 Two named outputs with equal BuildDigest retain independent executions, results and evidence obligations.
 Existing Helm image-output dependencies remain explicit packaging edges. AICR renderer settings belong to the
-individual output and the generated IR v3 activation. The effective deployer and selectors participate in its
+individual output and the generated IR v4 activation. The effective deployer and selectors participate in its
 BuildDigest. Run-plan and artifact-graph v4 contain no cluster-composition nodes or records. Compiler handoff documents
 are removed; the complete Plan retains the exact authored Definition and Environment.
 
@@ -174,8 +174,13 @@ Isolation and the fixed environment/mount contract are identical across all engi
 - `prebuilt` nodes lower to acquire-and-digest-verify.
 - `exclusion` emits no node.
 
-`vm-image` and `disk-image` do not lower in the first authoring contract. Admission fails with
-`CodeEngineCapability` before source, subprocess, or output work. Runner requirements are not VM-image-specific
+`vm-image` and `disk-image` have a compiler-only lowering contract. IR v4 records the disk contract, exactly one
+command or Packer producer form, public Packer variables, and typed material bindings backed by exact build or
+acquisition dependencies. The Plan selects an execution class, uses its host architecture to select the pinned VM
+toolchain, and projects the raw disk producer artifact into the named lifecycle output without ordinary binary
+packaging. A material-bearing command producer remains unsupported because it has no typed manifest handoff.
+Every local and hosted execution or generation adapter still fails with `CodeEngineCapability` before source,
+subprocess, or output work. Runner requirements are not VM-image-specific
 metadata. The generic `execution.Requirements` shape carries minimum CPU, memory and ephemeral-storage capacity,
 an optional sorted OR-set of eligible runner-host platforms, typed capability policies, and an exact
 executor-owned wall-time budget. `kvm` is the first admitted capability with `required`, `preferred`, and
@@ -191,7 +196,9 @@ one eligible host platform, an explicit KVM policy, and a positive timeout. Host
 sorted and duplicate-free. Unknown platforms, capability names, and policies fail closed.
 For a `vm-image` build, required KVM also requires an eligible host platform with the resolved guest
 architecture. Preferred or forbidden KVM may retain a cross-architecture TCG route. Per-architecture VM
-toolchain pins follow those eligible execution-host platforms, not the guest architecture.
+toolchain pins follow those eligible execution-host platforms, not the guest architecture. VM compilation
+requires an exact pin for the selected host and binds that host platform into Build identity; it does not use
+the scalar source toolchain as a cross-host fallback.
 
 An Environment may advertise a canonical, nonempty inventory of named execution classes. Each class binds one
 unique route label to a host platform, allocatable resources, exposed capabilities, and a maximum executor
@@ -225,7 +232,7 @@ all existing execution gates remain closed. A future adapter must first obtain t
 authenticated Environment/Plan selection, independently authenticate effective provider or cgroup allocation,
 and enforce the selected executor and outer-provider deadlines before it can admit work.
 
-Future `vm-image` lowering dispatches the typed producer driver owned by ADR-10. The `command` driver executes the
+Future `vm-image` execution dispatches the typed producer driver owned by ADR-10. The `command` driver executes the
 exact authored argument vector and can therefore invoke Make. The `packer` driver invokes the pinned Packer
 executable against the selected source-owned HCL project without parsing or generating HCL. Both receive only
 authenticated staged materials and declared variable bindings, use the same admitted execution class and network

@@ -1065,8 +1065,8 @@ func validateComponent(name string, c Component) error {
 	}
 	// VM-image toolchains execute on the runner host, while target selection names
 	// the guest/output architecture. Every eligible host platform needs an exact
-	// toolchain pin unless the scalar fallback covers all routes.
-	if c.BuilderType == BuilderVMImage && c.ToolchainImage == "" {
+	// per-host toolchain pin. The scalar source toolchain is never used as a VM route.
+	if c.BuilderType == BuilderVMImage {
 		for _, platform := range c.BuildRequirements.AllowedHostPlatforms {
 			hostArch := strings.TrimPrefix(string(platform), "linux/")
 			if c.ToolchainImages[hostArch] == "" {

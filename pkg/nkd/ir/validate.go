@@ -6,11 +6,16 @@ import (
 	"io/fs"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
@@ -145,17 +150,20 @@ func (g *Graph) Validate() error {
 		if node.Kind != KindBuild {
 			continue
 		}
-		fetch := byID[node.Needs[0]]
-		if fetch.Kind != KindFetch {
-			return e.New(e.CodeInvalidCatalog,
-				"build node %q must depend on exactly one fetch node, got %q (%s)",
-				node.ID, fetch.ID, fetch.Kind)
+		fetch, err := sourceDependency(node, byID)
+		if err != nil {
+			return err
 		}
 		fetchConsumers[fetch.ID]++
 		if node.SourceDest != fetch.Dest || node.SourceCommit != fetch.Commit ||
 			node.SourceTreeHash != fetch.TreeHash || node.VendorSpecDigest != fetch.VendorSpecDigest {
 			return e.New(e.CodeInvalidCatalog,
 				"build node %q source pins do not exactly match dependency %q", node.ID, fetch.ID)
+		}
+		if node.BuilderType == BuilderVMImage {
+			if err := validateVMMaterialDependencies(node, byID, fetch.ID); err != nil {
+				return err
+			}
 		}
 	}
 	for _, node := range g.Nodes {
@@ -299,6 +307,9 @@ func VendorSpecIdentity(command []string, image string) (string, error) {
 }
 
 func validateBuildNode(n Node) error {
+	if n.BuilderType == BuilderVMImage {
+		return validateVMImageNode(n)
+	}
 	if err := rejectUnexpectedNodeFields(n, allowFields(
 		"requirements", "executionBinding",
 		"component", "builderType", "flakeRef", "flakeOutput", "flakeLockDigest",
@@ -399,6 +410,224 @@ func validateBuildNode(n Node) error {
 	default:
 		return e.New(e.CodeInvalidCatalog,
 			"build node %q has unknown builderType %q", n.ID, n.BuilderType)
+	}
+	return nil
+}
+
+func validateVMImageNode(n Node) error {
+	if err := rejectUnexpectedNodeFields(n, allowFields(
+		"requirements", "executionBinding", "component", "builderType", "toolchain", "toolchainPlatform",
+		"platform", "network", "patches", "command", "workdir", "sourceDest",
+		"sourceCommit", "sourceTreeHash", "vendorSpecDigest", "disk", "packer",
+		"materials", "outputType", "artifactPath", "version")); err != nil {
+		return err
+	}
+	if n.ExecutionBinding != nil {
+		if err := n.ExecutionBinding.ValidateFor(n.Requirements); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"VM build node %q has invalid execution binding", n.ID)
+		}
+	}
+	if !canonicalNodeID.MatchString(n.Component) || n.ID != "build-"+n.Component {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q must be named build-<canonical component>", n.ID)
+	}
+	if len(n.Needs) == 0 {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q requires one pinned source dependency", n.ID)
+	}
+	if !exactOCIIdentity(n.Toolchain) {
+		return e.New(e.CodeTagToolchain,
+			"VM build node %q toolchain %q is not an exact OCI digest pin", n.ID, n.Toolchain)
+	}
+	if _, ok := platformArch(n.Platform); !ok {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q platform %q is not linux/amd64 or linux/arm64", n.ID, n.Platform)
+	}
+	if err := validateVMRequirements(n); err != nil {
+		return err
+	}
+	hostPlatform := execution.HostPlatform(n.ToolchainPlatform)
+	if !slices.Contains(n.Requirements.AllowedHostPlatforms, hostPlatform) {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q toolchain platform %q is not an allowed execution host", n.ID, n.ToolchainPlatform)
+	}
+	if n.ExecutionBinding != nil && n.ExecutionBinding.Class.HostPlatform != hostPlatform {
+		return e.New(e.CodeEngineCapability,
+			"VM build node %q toolchain platform %q differs from selected execution host %q",
+			n.ID, n.ToolchainPlatform, n.ExecutionBinding.Class.HostPlatform)
+	}
+	if n.Network != NetworkNone {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q network mode %q differs from admitted mode %q", n.ID, n.Network, NetworkNone)
+	}
+	if err := validatePatches(n); err != nil {
+		return err
+	}
+	if n.Workdir != "/src" || !safeRelativePath(n.SourceDest) || !safeRelativePath(n.ArtifactPath) {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q source and output paths are not bounded beneath their private roots", n.ID)
+	}
+	if !exactGitSHA.MatchString(n.SourceCommit) || !exactGitSHA.MatchString(n.SourceTreeHash) ||
+		!canonical.IsDigest(n.VendorSpecDigest) {
+		return e.New(e.CodeUnpinnedSource,
+			"VM build node %q does not carry exact source/tree/vendor pins", n.ID)
+	}
+	if n.OutputType != "disk-image" || n.Disk == nil || n.Disk.Format != "qcow2" ||
+		(n.Disk.Encryption != "none" && n.Disk.Encryption != "luks2") {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q requires a qcow2 disk-image with encryption none or luks2", n.ID)
+	}
+	if !safeVersion(n.Version) {
+		return e.New(e.CodeInvalidCatalog, "VM build node %q has no canonical component version", n.ID)
+	}
+	commandProducer := len(n.Command) != 0
+	packerProducer := n.Packer != nil
+	if commandProducer == packerProducer {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q requires exactly one command or Packer producer", n.ID)
+	}
+	if commandProducer {
+		if len(n.Materials) != 0 {
+			return e.New(e.CodeEngineCapability,
+				"VM command node %q has no typed material-manifest handoff", n.ID)
+		}
+		return validateCommand(n.ID+" VM build", n.Command)
+	}
+	if err := validateIRPackerConfig(n.ID, n.Packer); err != nil {
+		return err
+	}
+	return validateMaterialBindings(n.ID, n.Materials)
+}
+
+func validateVMRequirements(n Node) error {
+	requirements := n.Requirements
+	if requirements == nil || requirements.Resources == nil ||
+		requirements.Resources.CPUMillis == 0 || requirements.Resources.MemoryMiB == 0 ||
+		requirements.Resources.EphemeralStorageMiB == 0 || len(requirements.AllowedHostPlatforms) == 0 ||
+		len(requirements.Capabilities) != 1 ||
+		requirements.Capabilities[0].Name != execution.CapabilityKVM || requirements.TimeoutSeconds == 0 {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q requires complete resources, host platforms, KVM policy, and timeout", n.ID)
+	}
+	if requirements.Capabilities[0].Policy == execution.CapabilityRequired && n.ExecutionBinding != nil &&
+		string(n.ExecutionBinding.Class.HostPlatform) != n.Platform {
+		return e.New(e.CodeEngineCapability,
+			"VM build node %q requires KVM on guest-matching host platform %q", n.ID, n.Platform)
+	}
+	return nil
+}
+
+func validateIRPackerConfig(nodeID string, config *PackerConfig) error {
+	if config == nil || !safetext.Valid(config.ProjectPath, 4096, false) ||
+		!safeRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q has an unsafe Packer project path", nodeID)
+	}
+	if !safetext.Valid(config.BuildName, 256, false) || strings.ContainsAny(config.BuildName, ",*?[]\\") {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q has an unsafe or inexact Packer build name", nodeID)
+	}
+	public := make([]packertransport.Variable, len(config.Variables))
+	previous := ""
+	for index, variable := range config.Variables {
+		if index > 0 && variable.Name <= previous {
+			return e.New(e.CodeInvalidCatalog,
+				"VM build node %q Packer variables must be sorted by unique name", nodeID)
+		}
+		previous = variable.Name
+		public[index] = packertransport.Variable{Name: variable.Name, Value: variable.Value}
+	}
+	if err := packertransport.ValidateVariables([]string{
+		config.ArchitectureVariable,
+		config.MaterialManifestVariable,
+		config.OutputDirectoryVariable,
+	}, public); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err,
+			"VM build node %q has invalid Packer variable bindings", nodeID)
+	}
+	return nil
+}
+
+func validateMaterialBindings(nodeID string, bindings []MaterialBinding) error {
+	components := make(map[string]string, len(bindings))
+	producers := make(map[string]string, len(bindings))
+	previous := ""
+	for index, binding := range bindings {
+		if _, err := material.StagingPath(binding.Binding); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"VM build node %q material binding %d", nodeID, index)
+		}
+		if index > 0 && binding.Binding <= previous {
+			return e.New(e.CodeInvalidCatalog,
+				"VM build node %q material bindings must be sorted and unique", nodeID)
+		}
+		previous = binding.Binding
+		if !canonicalNodeID.MatchString(binding.Component) || !canonicalNodeID.MatchString(binding.Producer) {
+			return e.New(e.CodeInvalidCatalog,
+				"VM build node %q material %q has a non-canonical component or producer", nodeID, binding.Binding)
+		}
+		if prior, duplicate := components[binding.Component]; duplicate {
+			return e.New(e.CodeInvalidCatalog,
+				"VM build node %q bindings %q and %q select component %q",
+				nodeID, prior, binding.Binding, binding.Component)
+		}
+		if prior, duplicate := producers[binding.Producer]; duplicate {
+			return e.New(e.CodeInvalidCatalog,
+				"VM build node %q bindings %q and %q select producer %q",
+				nodeID, prior, binding.Binding, binding.Producer)
+		}
+		components[binding.Component] = binding.Binding
+		producers[binding.Producer] = binding.Binding
+	}
+	return nil
+}
+
+func sourceDependency(node Node, byID map[string]Node) (Node, error) {
+	var fetch Node
+	for _, dependency := range node.Needs {
+		candidate := byID[dependency]
+		if candidate.Kind != KindFetch {
+			continue
+		}
+		if fetch.ID != "" {
+			return Node{}, e.New(e.CodeInvalidCatalog,
+				"build node %q depends on more than one source fetch", node.ID)
+		}
+		fetch = candidate
+	}
+	if fetch.ID == "" {
+		return Node{}, e.New(e.CodeInvalidCatalog,
+			"build node %q has no pinned source fetch dependency", node.ID)
+	}
+	return fetch, nil
+}
+
+func validateVMMaterialDependencies(node Node, byID map[string]Node, fetchID string) error {
+	expected := make(map[string]MaterialBinding, len(node.Materials))
+	for _, binding := range node.Materials {
+		producer, ok := byID[binding.Producer]
+		if !ok || (producer.Kind != KindBuild && producer.Kind != KindPull) ||
+			producer.Component != binding.Component {
+			return e.New(e.CodeInvalidCatalog,
+				"VM build node %q material %q does not bind producer %q for component %q",
+				node.ID, binding.Binding, binding.Producer, binding.Component)
+		}
+		expected[binding.Producer] = binding
+	}
+	for _, dependency := range node.Needs {
+		if dependency == fetchID {
+			continue
+		}
+		if _, ok := expected[dependency]; !ok {
+			return e.New(e.CodeInvalidCatalog,
+				"VM build node %q has undeclared material producer dependency %q", node.ID, dependency)
+		}
+		delete(expected, dependency)
+	}
+	if len(expected) != 0 {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q omits one or more declared material producer dependencies", node.ID)
 	}
 	return nil
 }

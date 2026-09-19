@@ -10,7 +10,7 @@
 - **Relates to:** ADR-07 (reproduction identity & builder profile), ADR-08 (bake-off gate).
 
 - **Scope:** The numbered builder contract is for qualified execution; the later Decision sections define v1
-  source lanes and disk authoring. Nix, VM execution and fused large-output wrapped jobs remain capability-gated;
+  source lanes and disk compilation. Nix, VM execution and fused large-output wrapped jobs remain capability-gated;
   the admitted BuildKit wrapped lane has the narrower contract below.
 
 ## Context
@@ -53,7 +53,7 @@ constraint, and Nix can enter the reproducibility boundary only after its execut
 4. **Identity.** The builder type and its pins — the container-image digest and flake lock for `nix`, the
    toolchain digest for `oci-hermetic` — are **build-semantic inputs**, part of the IR and therefore of
    `buildDigest`. Switching a selected component's builder changes its generated graph's **Build Digest**;
-   no authored build object or variant classifier is involved. Once `vm-image` lowering is admitted,
+   no authored build object or variant classifier is involved. For a lowered `vm-image`,
    its selected producer form, exact source-owned entrypoint, declared variable and material bindings, pinned
    toolchain closure, and output contract are likewise build-semantic inputs.
 
@@ -134,7 +134,7 @@ invocation mechanism, not a builder type or an output semantic:
   outer realized-runtime adapter must additionally authenticate the ELF dynamic loader and shared-library
   closure; a future script lane must bind its interpreter in that same closure.
 
-The direct-Packer authoring form names only the stable boundary that future lowering must enforce:
+The direct-Packer authoring form names the stable boundary that compilation records and future execution must enforce:
 
 ```yaml
 builderType: vm-image
@@ -151,7 +151,7 @@ materials:
 artifactPath: nke-node.qcow2
 ```
 
-`projectPath` is relative to the pinned source root. `buildName` is the exact compiled build name future lowering
+`projectPath` is relative to the pinned source root. `buildName` is the exact compiled build name execution
 passes as one `-only=<buildName>` argument; Packer documents names such as
 `my_build.amazon-ebs.first-example`. NKD rejects Packer's list and glob selection syntax because one component
 produces one declared artifact. Catalog loading checks bounded UTF-8 argument transport that rejects control,
@@ -174,7 +174,7 @@ success line only after diagnostic handling returns zero, and its
 exactly `The configuration is valid.` plus a newline while demonstrating that warnings can precede that line on
 stdout with exit status zero. The dormant driver therefore accepts only that clean line (ignoring surrounding
 whitespace) with empty stderr; any other output fails closed. A real pinned Packer/NKE execution remains required
-before lowering is admitted. A local 2026-09-18 framing probe used the official Packer 1.14.2 Darwin ARM64 ZIP
+before driver execution is admitted. A local 2026-09-18 framing probe used the official Packer 1.14.2 Darwin ARM64 ZIP
 (`sha256:b053c01272f87fe669c642dfac167b0b48cfb5c119e2e946d90ef92c2407f746`, matching HashiCorp's published
 `SHA256SUMS`) and Packer-installed Docker plugin 1.1.2. The full compiled selector returned exit zero, the single
 28-byte success line on stdout, and empty stderr; a short selector returned exit zero, a 251-byte warning plus
@@ -188,7 +188,8 @@ resolution. The declaration does not create a second component graph or implicit
 typed edges between the existing selected component outputs. Source-owned HCL defaults do not authorize NKD to
 infer or fetch undeclared build materials.
 
-Before either driver may lower, required component outputs must be built or acquired, verified, and assembled
+Compilation lowers each declared binding to the exact selected build or acquisition producer and records both
+the typed binding and graph dependency. Before either driver may execute, required component outputs must be built or acquired, verified, and assembled
 into a deterministic build-material manifest. Each entry binds its source-owned binding name, observed component
 name, output kind, exact artifact digest, and a slash-relative path derived from the binding name beneath a private
 staging root. Binding, component and kind text use the same display-safe UTF-8 policy as producer transport.
@@ -208,8 +209,10 @@ Admitted lowering must bind only declared inputs and variables, provide a privat
 selected driver through the shared runner, collect the declared artifact, and recompute its exact bytes. A driver
 may not replace a staged material with an undeclared network fetch. The catalog entry owns the pinned source and
 toolchain, selected driver, exact entrypoint or Packer project and build name, artifact path, material edges, and
-public Packer-variable values. These fields affect resolved Catalog identity now and become logical graph inputs
-only after disk lowering is admitted; the schema-only contract mints no build identity for a disk.
+public Packer-variable values. These fields are logical IR v4 inputs and therefore affect Build identity.
+Compilation also projects the root disk artifact directly into the named lifecycle output; it does not package
+the QCOW2 as a binary bundle. This compiler result grants no execution, observation, evidence, or publication
+authority.
 
 The executable name grants no evidence lane. A Make-driven image may qualify when its exact command, staged
 materials, toolchain closure, enforced isolation, output collection, disk inspection, and reproduction evidence
@@ -224,12 +227,14 @@ complete profile: positive CPU, memory and ephemeral storage, at least one eligi
 explicit KVM policy, and a positive executor timeout. That request is reusable by every builder type, changes
 catalog and Plan identity, and never proves that the selected runner satisfies it. The request can constrain minimum CPU,
 memory and ephemeral storage, an OR-set of eligible runner-host platforms, typed host capabilities, and the
-executor wall-time budget. Runner-host platform is distinct from output target platform and the IR target/toolchain
+executor wall-time budget. Runner-host platform is distinct from output target platform and the IR guest/output
 platform. For `vm-image`, per-architecture toolchain pins name execution-host platforms rather than the guest
-architecture. Every allowed host route needs an exact toolchain pin or the scalar fallback. `kvm` is the first
+architecture. Every allowed host route needs an exact per-host toolchain pin; the scalar source fallback does
+not select VM execution bytes. Compilation binds the selected host platform into logical Build identity even
+when two host routes name the same OCI manifest digest. `kvm` is the first
 typed capability: `required` must be exposed and requires an allowed host platform matching the resolved guest
 architecture, `forbidden` must be withheld, and `preferred` retains the cross-architecture TCG route. A future
-Plan binds KVM or the fallback before work rather than choosing opportunistically at runtime. Build network
+Plan compilation binds KVM or the fallback before work rather than choosing opportunistically at runtime. Build network
 remains the existing IR semantic and is not duplicated here.
 
 NKE host CPU, memory, storage, platform, KVM policy, and timeout values remain unauthored until supported routes
@@ -251,9 +256,10 @@ The current NKE release matrix realizes plain amd64, FDE amd64, and plain arm64.
 FDE arm64. Definition output selection records that supported matrix without duplicating components per
 architecture. A maintained NKE component may instead select the `packer` driver after NKE exposes an authenticated
 staged-material input and private-output contract in its source-owned HCL. That catalog choice changes catalog
-snapshot identity now and, once disk lowering is admitted, changes build identity. It does not remove or
-invalidate the standalone Make entrypoint. These bindings are authoring data only; command and Packer graph
-lowering, VM execution, and disk collection remain capability-gated. An override that changes NKE's derived
+snapshot and Build identity. It does not remove or invalidate the standalone Make entrypoint. Compiler lowering
+supports a direct-Packer producer with typed materials and a command producer without materials. A
+material-bearing command/Make producer, VM execution, disk collection, and publication remain capability-gated.
+An override that changes NKE's derived
 output filename must also change the catalog artifact path; NKD never guesses it.
 
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined

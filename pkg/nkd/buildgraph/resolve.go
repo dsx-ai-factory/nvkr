@@ -277,6 +277,11 @@ func validateResolved(resolved *Resolved) error {
 			return err
 		}
 	}
+	if containsDiskRoot(resolved.Components) {
+		if err := validateDiskSelection(resolved.Components); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

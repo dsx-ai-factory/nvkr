@@ -217,10 +217,6 @@ func TestCompilerAdmitsCapabilitiesBeforeCatalogIO(t *testing.T) {
 		edit func(*authored.Definition, *authored.Environment)
 		code e.Code
 	}{
-		{"disk execution", func(definition *authored.Definition, _ *authored.Environment) {
-			definition.Outputs[0].Format = authored.OutputDiskImage
-			definition.Outputs[0].Components = []string{"containerd"}
-		}, e.CodeEngineCapability},
 		{"unpinned signer", func(_ *authored.Definition, environment *authored.Environment) {
 			environment.Publication = &authored.Publication{RepositoryPrefix: "ghcr.io/example/nkd", Anonymous: true}
 			environment.Signing = &authored.Signing{Mode: SigningModeCosign, Identity: "^fixture$", Issuer: "https://issuer.example"}

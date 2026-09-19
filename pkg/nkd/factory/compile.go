@@ -230,7 +230,14 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 			// ones with a producer-result carrying an observed digest (ADR-13).
 			ResolvedComponents: append([]catalog.NamedComponent(nil), selected.Components...),
 			AICRProfileName:    aicrProfile(target), AICRProfileIdentity: aicrIdentity, Graph: graph})
-		plan.LifecycleOutputs = append(plan.LifecycleOutputs, LifecycleOutputPlan{Name: target.Name, Kind: target.Format, ArtifactID: "package/" + target.Name, BuildDigest: buildDigest, Components: append([]string(nil), target.Components...)})
+		artifactID, err := lifecycleArtifactID(target, resolved.Components)
+		if err != nil {
+			return nil, err
+		}
+		plan.LifecycleOutputs = append(plan.LifecycleOutputs, LifecycleOutputPlan{
+			Name: target.Name, Kind: target.Format, ArtifactID: artifactID,
+			BuildDigest: buildDigest, Components: append([]string(nil), target.Components...),
+		})
 	}
 	plan.Graph, err = compileArtifactGraph(*plan, tools, packageSpecs)
 	if err != nil {
@@ -242,11 +249,39 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 	return plan, nil
 }
 
+func lifecycleArtifactID(output authored.DefinitionOutput, components []catalog.NamedComponent) (string, error) {
+	if output.Format != authored.OutputDiskImage {
+		return "package/" + output.Name, nil
+	}
+	root := ""
+	for _, component := range components {
+		if component.OutputType != authored.OutputDiskImage {
+			continue
+		}
+		if root != "" {
+			return "", e.New(e.CodeInvalidCatalog,
+				"disk-image output %q has more than one disk producer", output.Name)
+		}
+		root = component.Name
+	}
+	if root == "" {
+		return "", e.New(e.CodeInvalidCatalog,
+			"disk-image output %q has no disk producer", output.Name)
+	}
+	return "artifact/" + output.Name + "/" + root, nil
+}
+
 // compileBuildGraph owns the Environment transformations of a catalog-derived
-// producer graph. They change execution bytes without changing Build identity.
-// Validation uses the same derivation before comparing the complete graph.
+// producer graph. Execution metadata remains outside Build identity, but a VM
+// class selects a host-architecture-specific toolchain before the graph digest is
+// computed because those toolchain bytes can affect the output. Validation uses
+// this same derivation before comparing the complete graph.
 func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Environment) (*ir.Graph, error) {
-	graph, err := buildgraph.Compile(resolved)
+	vmHosts, err := selectVMHostPlatforms(resolved.Components, resolved.Platform, environment.ExecutionClasses)
+	if err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "VM build cannot select an execution host")
+	}
+	graph, err := buildgraph.CompileForHostPlatforms(resolved, vmHosts)
 	if err != nil {
 		return nil, err
 	}
@@ -570,8 +605,13 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 	selectedFetch := map[string]bool{}
 	for _, node := range graph.Nodes {
 		byID[node.ID] = node
-		if node.Kind == ir.KindBuild && selected[node.Component] {
-			for _, dependency := range node.Needs {
+	}
+	for _, node := range graph.Nodes {
+		if node.Kind != ir.KindBuild || !selected[node.Component] {
+			continue
+		}
+		for _, dependency := range node.Needs {
+			if byID[dependency].Kind == ir.KindFetch {
 				selectedFetch[dependency] = true
 			}
 		}
@@ -602,12 +642,24 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 			if !selected[irNode.Component] {
 				continue
 			}
-			inputs := make([]string, 0, len(irNode.Needs))
+			inputs := make([]string, 0, len(irNode.Needs)*2)
 			for _, dependency := range irNode.Needs {
-				if byID[dependency].Kind != ir.KindFetch {
-					return e.New(e.CodeInvalidCatalog, "build %q has unsupported non-fetch input %q", irNode.ID, dependency)
+				upstream, ok := byID[dependency]
+				if !ok {
+					return e.New(e.CodePipelineDrift,
+						"build %q references absent producer input %q", irNode.ID, dependency)
 				}
-				inputs = append(inputs, "source/"+target+"/"+dependency, "source-receipt/"+target+"/"+dependency)
+				switch upstream.Kind {
+				case ir.KindFetch:
+					inputs = append(inputs, "source/"+target+"/"+dependency, "source-receipt/"+target+"/"+dependency)
+				case ir.KindBuild, ir.KindPull:
+					inputs = append(inputs,
+						"artifact/"+target+"/"+upstream.Component,
+						"result/"+target+"/"+upstream.Component)
+				default:
+					return e.New(e.CodeInvalidCatalog,
+						"build %q has unsupported producer input %q", irNode.ID, dependency)
+				}
 			}
 			output := "artifact/" + target + "/" + irNode.Component
 			result := "result/" + target + "/" + irNode.Component
@@ -667,6 +719,12 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 	artifacts[observationID] = Artifact{ID: observationID, Name: target + "-terminal-observation",
 		Kind: string(TierTerminalObservation), Producer: verifyID, BuildTarget: target,
 		Path: filepath.ToSlash(filepath.Join(".nkd", "factory", target, "terminal-observation.json"))}
+	if targetSpec.Format == authored.OutputDiskImage {
+		// The ordinary per-component SBOM operation does not prove the disk
+		// inventory and material reconciliation required by ADR-13. Keep disk
+		// evidence absent until that typed observation contract is implemented.
+		return nil
+	}
 
 	// SBOM node (ADR-13 §1 / ADR-13): one per build target, gated on the
 	// terminal observation, binding a CycloneDX SBOM per built component to that

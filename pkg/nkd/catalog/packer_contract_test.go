@@ -16,6 +16,8 @@ sources:
   image-source:
     repo: https://github.com/example/node-image
     toolchainImage: ` + goodImage + `
+    toolchainImagesByArch:
+      amd64: ` + goodImage + `
 components:
   agent-package:
     platforms: [linux/amd64, linux/arm64]
@@ -167,6 +169,7 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 		OutputDirectoryVariable:  "output_directory",
 	}
 	valid.ArtifactPath = "output/node-{{.Arch}}.qcow2"
+	valid.ToolchainImages = map[string]string{"amd64": valid.ToolchainImage}
 	validate := func(component Component) error {
 		cat := base(component)
 		cat.Components["x"] = component
@@ -455,6 +458,7 @@ func TestVMImageCommandProducerRemainsValid(t *testing.T) {
 		TimeoutSeconds: 7200,
 	}
 	component.BuildCommand = []string{"make", "image"}
+	component.ToolchainImages = map[string]string{"amd64": component.ToolchainImage}
 	component.Packer = nil
 	cat := base(component)
 	cat.Components["x"] = component

@@ -41,10 +41,11 @@ admission is based on the catalog component's output type, disk metadata and bui
 or node role.
 Plain and FDE outputs select different catalog components;
 Definition has no disk variant, encryption boolean, build command, or Packer field. Catalog owns disk metadata
-and production details. In this first contract, Definition schema validation and low-level catalog resolution
-are supported independently. Public lifecycle `run plan|local|generate` still fails with `engine-capability`
-before catalog resolution, graph construction, source access, or output work. Build lowering remains
-unavailable.
+and production details. Definition schema validation, catalog resolution, and compiler-only Run Plan lowering
+are supported. The Plan points the lifecycle output at the root producer's exact disk artifact and carries typed
+command/Packer, disk, public-variable, material-edge, execution-class, and host-toolchain inputs. It does not
+wrap the QCOW2 as a binary bundle. Local or hosted execution, generated jobs, observation, evidence, and
+publication still fail with `engine-capability` before source, subprocess, or output work.
 
 AICR outputs may declare `aicr.bundle` renderer settings: deployer, storage class, node selectors, node
 tolerations and workload selectors. The compiler normalizes owned lists and records the effective settings,

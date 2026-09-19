@@ -249,9 +249,10 @@ incomplete closure, or unrelated selected components. Its output format is check
 classification is required. The catalog's `vm-image` builder capability binds the disk metadata, the root producer form, its
 exact source-owned command or Packer project, build name, and variable bindings, the artifact path, and a complete
 generic build-runner request with resources, eligible host platform, KVM policy, and timeout. Required KVM needs
-an eligible host with the resolved guest architecture; VM toolchain pins follow
-the eligible host platform. The NKE OS producer owns its embedded contents. Disk lowering and VM execution
-remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
+an eligible host with the resolved guest architecture; VM toolchain pins require an exact entry for the eligible
+host platform, whose selection is part of Build identity. The NKE OS producer owns its embedded contents. Compiler-only IR/Plan lowering binds
+the exact source and material producers and projects the root QCOW2 without binary-bundle packaging. VM
+execution and disk-specific observation remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
 disk delivery is admitted, ADR-13 also requires a full inventory reconciling traced materials with read-only
 inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
 
@@ -286,7 +287,7 @@ All structured identities use ADR-01's canonical codec and named digest families
 integer-only numeric profile; an arbitrary JSON serialization is not an identity implementation. Raw SHA-256
 remains appropriate for exact blob integrity. These distinctions explain why one build can produce different
 run evidence without changing Build Digest. The retired `nkd.recipe` family remains reserved for historical
-identities. Definition v4, catalog v3, IR v3 and Run plan/artifact graph v4 readers reject old shapes; signed bytes are not converted.
+identities. Definition v4, catalog v3, IR v4 and Run plan/artifact graph v4 readers reject old shapes; signed bytes are not converted.
 Compiler-handoff and execution-settings digest families remain reserved after removal. Production SLSA
 build-type `/v2` parameters bind the original Definition and Environment identities directly.
 

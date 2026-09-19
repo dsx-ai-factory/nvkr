@@ -46,6 +46,10 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 	for _, buildPlan := range plan.Builds {
 		builds[buildPlan.Name] = buildPlan
 	}
+	outputs := make(map[string]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
+	for _, output := range plan.LifecycleOutputs {
+		outputs[output.Name] = output
+	}
 	artifacts := make(map[string]factory.Artifact, len(plan.Graph.Artifacts))
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
@@ -55,8 +59,14 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 		if !ok {
 			return nil, e.New(e.CodeUnverifiedRef, "run plan omits output %q build %q", output.Name, output.Name)
 		}
-		artifactID := "package/" + output.Name
-		memberArtifactID := artifactID
+		compiledOutput, ok := outputs[output.Name]
+		if !ok || compiledOutput.Kind != output.Format || compiledOutput.BuildDigest != buildPlan.BuildDigest ||
+			!equalStrings(compiledOutput.Components, output.Components) {
+			return nil, e.New(e.CodeUnverifiedRef,
+				"run plan omits exact compiled lifecycle output %q", output.Name)
+		}
+		artifactID := compiledOutput.ArtifactID
+		memberArtifactID := compiledOutput.ArtifactID
 		if output.Format == OutputExecutable || output.Format == OutputOCI {
 			if environment.Publication != nil {
 				artifactID = "package/" + publicationPackageName

@@ -18,6 +18,9 @@ sources:
   image-source:
     repo: https://github.com/example/node-image
     toolchainImage: ` + vmToolchain + `
+    toolchainImagesByArch:
+      amd64: ` + vmToolchain + `
+      arm64: ` + vmToolchain + `
 components:
   node-fde:
     platforms: [linux/amd64, linux/arm64]
@@ -140,6 +143,7 @@ func TestDiskImageSchemaValidation(t *testing.T) {
 		}},
 		TimeoutSeconds: 7200,
 	}
+	valid.ToolchainImages = map[string]string{"amd64": valid.ToolchainImage}
 	validate := func(component Component) error {
 		cat := base(component)
 		cat.Components["x"] = component
@@ -225,6 +229,7 @@ func TestVMImageHostRouteAndToolchainValidation(t *testing.T) {
 		}},
 		TimeoutSeconds: 7200,
 	}
+	valid.ToolchainImages = map[string]string{"amd64": goodImage, "arm64": goodImage}
 	validate := func(component Component, guestArch string) error {
 		cat := base(component)
 		component.Platforms = []string{"linux/" + guestArch}
@@ -233,7 +238,6 @@ func TestVMImageHostRouteAndToolchainValidation(t *testing.T) {
 	}
 
 	missingHostToolchain := valid
-	missingHostToolchain.ToolchainImage = ""
 	missingHostToolchain.ToolchainImages = map[string]string{"amd64": goodImage}
 	if err := validate(missingHostToolchain, "amd64"); catalogErrorCode(err) != nkderr.CodeUnpinnedSource ||
 		!strings.Contains(err.Error(), `host platform "linux/arm64"`) {

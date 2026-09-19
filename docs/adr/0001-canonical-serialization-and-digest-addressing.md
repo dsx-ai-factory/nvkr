@@ -118,12 +118,13 @@ changed shapes are:
 | Definition | `nkd.dev/definition/v4` |
 | Component catalog and snapshot | `nkd.dev/catalog/v3`, `nkd.dev/catalog-snapshot/v3` |
 | Component catalog overlay | `nkd.dev/catalog-overlay/v3` |
-| Executable and logical build graph | `nkd.dev/ir/v3` |
+| Executable and logical build graph | `nkd.dev/ir/v4` |
 | Run plan and artifact graph | `nkd.dev/run-plan/v4`, `nkd.dev/artifact-graph/v4` |
 | Run and Release views | `nkd.dev/run/v3`, `nkd.dev/release/v3` |
 
-Definition v4 removes cluster views. Catalog v3 removes delivery categories and node-role affinities. IR v3
-binds effective AICR bundle-rendering settings, including the explicit Helm default, into Build Digest. Old
+Definition v4 removes cluster views. Catalog v3 removes delivery categories and node-role affinities. IR v4
+binds effective AICR bundle-rendering settings and typed VM disk, producer, selected toolchain-host platform,
+public-variable and material-edge inputs into Build Digest. Old
 major versions fail closed; the migration does not reinterpret or repair existing signed records.
 
 Run plan v4 embeds the admitted Definition and Environment directly. The compiler owns complete output,

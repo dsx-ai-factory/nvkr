@@ -205,8 +205,8 @@ type Component struct {
 	Patches        []Patch `json:"patches,omitempty"`
 	ToolchainImage string  `json:"toolchainImage,omitempty"` // must be @sha256: digest
 	// ToolchainImages is the resolved per-execution-arch toolchain set. Ordinary
-	// compilation selects the target arch. Future VM admission selects one eligible
-	// host platform independently from the guest/output arch.
+	// compilation selects the target arch. VM compilation requires and selects one
+	// exact eligible host-platform entry independently from the guest/output arch.
 	ToolchainImages map[string]string `json:"toolchainImages,omitempty"`
 	CGO             bool              `json:"cgo,omitempty"`
 	OutputType      string            `json:"outputType,omitempty"`
@@ -217,7 +217,7 @@ type Component struct {
 	BuildCommand []string      `json:"buildCommand,omitempty"`
 	// Materials binds source-owned input names to other component outputs in the
 	// same output's selected producer set. Each component may be bound exactly once.
-	// Future VM lowering turns these declarations into build-graph edges and stages
+	// VM lowering turns these declarations into build-graph edges and stages
 	// only the verified outputs named here.
 	Materials map[string]string `json:"materials,omitempty"`
 	// For direct Packer, ArtifactPath is relative to the private output directory.

@@ -1,6 +1,7 @@
 package buildgraph
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +21,18 @@ import (
 // artifact producers (NKD-FR-BLD-001, NKD-FR-BLD-006). Tier-4 exclusions are never
 // emitted as build nodes (NKD-FR-RC-026).
 func Compile(r *Resolved) (*ir.Graph, error) {
+	return compile(r, nil)
+}
+
+// CompileForHostPlatforms lowers a resolved graph after the factory has selected
+// one execution-host platform for every VM producer. The selected host decides
+// which digest-pinned VM toolchain enters Build identity; the guest/output
+// platform remains Graph.Platform and node.Platform.
+func CompileForHostPlatforms(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph, error) {
+	return compile(r, vmHosts)
+}
+
+func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph, error) {
 	if r == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "cannot compile a nil resolved output")
 	}
@@ -27,13 +40,34 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 		if !component.FromSource && component.Prebuilt == nil && component.ExclusionReason != "" {
 			continue
 		}
-		if component.OutputType == "disk-image" || component.BuilderType == catalog.BuilderVMImage {
+		if component.OutputType == "disk-image" && component.BuilderType != catalog.BuilderVMImage {
 			return nil, e.New(e.CodeEngineCapability,
-				"component %q declares disk-image build capability, which is not implemented", component.Name)
+				"component %q declares a disk-image producer other than vm-image, which is not implemented", component.Name)
+		}
+		if component.BuilderType == catalog.BuilderVMImage && component.Packer == nil && len(component.Materials) != 0 {
+			return nil, e.New(e.CodeEngineCapability,
+				"component %q uses a VM command producer without a typed material-manifest handoff", component.Name)
 		}
 	}
 	if err := validateResolved(r); err != nil {
 		return nil, err
+	}
+	vmComponents := make(map[string]struct{})
+	for _, component := range r.Components {
+		if component.BuilderType == catalog.BuilderVMImage {
+			vmComponents[component.Name] = struct{}{}
+		}
+	}
+	if len(vmHosts) != len(vmComponents) {
+		return nil, e.New(e.CodeEngineCapability,
+			"VM host selection has %d entries, want exactly %d selected VM components",
+			len(vmHosts), len(vmComponents))
+	}
+	for name := range vmHosts {
+		if _, ok := vmComponents[name]; !ok {
+			return nil, e.New(e.CodeEngineCapability,
+				"VM host selection names unknown or non-VM component %q", name)
+		}
 	}
 	g := &ir.Graph{SchemaVersion: ir.SchemaVersion, Platform: r.Platform}
 	if a := r.AICRProfile; a != nil {
@@ -50,6 +84,10 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 	}
 	fetchByKey := map[string]string{}
 	var verifyNeeds []string // build + pull node IDs the terminal verify waits on
+	components := make(map[string]catalog.NamedComponent, len(r.Components))
+	for _, component := range r.Components {
+		components[component.Name] = component
+	}
 
 	for _, nc := range r.Components {
 		// Prebuilt (no-compile) lane: one pull node acquires a pinned, content-addressed
@@ -84,9 +122,34 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 		arch := target.Arch(r.Platform)
 		// Select the same native image for vendoring and compilation. The fetch receipt
 		// binds this exact image+command declaration to the resulting dependency closure.
+		toolchainArch := arch
+		toolchainPlatform := ""
+		if nc.BuilderType == catalog.BuilderVMImage {
+			host, ok := vmHosts[nc.Name]
+			if !ok {
+				return nil, e.New(e.CodeEngineCapability,
+					"VM component %q has no selected execution-host platform", nc.Name)
+			}
+			if !slices.Contains(nc.BuildRequirements.AllowedHostPlatforms, host) {
+				return nil, e.New(e.CodeEngineCapability,
+					"VM component %q selected undeclared execution-host platform %q", nc.Name, host)
+			}
+			if vmRequiresKVM(nc.BuildRequirements) && string(host) != r.Platform {
+				return nil, e.New(e.CodeEngineCapability,
+					"VM component %q requires guest-matching KVM host platform %q", nc.Name, r.Platform)
+			}
+			toolchainArch = target.Arch(string(host))
+			toolchainPlatform = string(host)
+		}
 		vendorImage := nc.ToolchainImage
-		if t, ok := nc.ToolchainImages[arch]; ok {
+		if nc.BuilderType == catalog.BuilderVMImage {
+			vendorImage = nc.ToolchainImages[toolchainArch]
+		} else if t, ok := nc.ToolchainImages[toolchainArch]; ok {
 			vendorImage = t
+		}
+		if vendorImage == "" {
+			return nil, e.New(e.CodeUnpinnedSource,
+				"component %q has no toolchain pin for execution architecture %q", nc.Name, toolchainArch)
 		}
 		vendorSpecDigest, err := ir.VendorSpecIdentity(nc.VendorCommand, vendorImage)
 		if err != nil {
@@ -133,10 +196,9 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 		bid := "build-" + nc.Name
 		verifyNeeds = append(verifyNeeds, bid)
 		// Native per-arch toolchain (model B): the X-native toolchain image runs on an
-		// X platform, so the build is native to arch (no cross-compilation). A multi-arch
-		// toolchain (manifest list) needs the Platform below to select its native variant;
-		// a per-arch pin (ToolchainImages) already encodes the arch. Falls back to the
-		// single arch-agnostic ToolchainImage when no per-arch entry exists.
+		// X platform, so the build is native to arch (no cross-compilation). VM builds
+		// bind the independently selected execution-host platform and its exact per-host
+		// toolchain route into logical build identity.
 		toolchain := vendorImage
 		builderType := nc.BuilderType
 		if builderType == "" {
@@ -153,32 +215,52 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 				toolchain = nc.Flake.Image // the pinned nix container runs the build
 			}
 		}
+		needs := []string{fid}
+		materials := materialBindings(nc, components)
+		for _, binding := range materials {
+			needs = append(needs, binding.Producer)
+		}
+		env := buildEnv(nc, target.Arch(r.Platform))
+		command := renderArchAll(nc.BuildCommand, arch)
+		workdir, sourceReadOnly, writeDir := "/src", nc.WriteDir != "", nc.WriteDir
+		var disk *ir.DiskSpec
+		var packer *ir.PackerConfig
+		if builderType == catalog.BuilderVMImage {
+			env = nil
+			sourceReadOnly, writeDir = false, ""
+			disk = &ir.DiskSpec{Format: nc.Disk.Format, Encryption: nc.Disk.Encryption}
+			packer = packerConfig(nc.Packer)
+		}
 		g.Nodes = append(g.Nodes, ir.Node{
-			ID:               bid,
-			Kind:             ir.KindBuild,
-			Needs:            []string{fid},
-			Requirements:     execution.Clone(nc.BuildRequirements),
-			Component:        nc.Name,
-			BuilderType:      builderType,
-			FlakeRef:         flakeRef,
-			FlakeOutput:      flakeOutput,
-			FlakeLockDigest:  flakeLock,
-			Toolchain:        toolchain,
-			Platform:         "linux/" + arch,
-			Network:          buildNetwork,
-			Env:              buildEnv(nc, target.Arch(r.Platform)),
-			Patches:          patchRefs(nc.Patches),
-			Command:          renderArchAll(nc.BuildCommand, arch),
-			Workdir:          "/src",
-			SourceDest:       dest,
-			SourceCommit:     nc.Commit,
-			SourceTreeHash:   nc.TreeHash,
-			VendorSpecDigest: vendorSpecDigest,
-			SourceReadOnly:   nc.WriteDir != "", // RO source + isolated WriteDir => parallel-safe
-			WriteDir:         nc.WriteDir,
-			OutputType:       nc.OutputType,
-			ArtifactPath:     renderArch(nc.ArtifactPath, arch),
-			Version:          catalog.NormalizeVersion(nc.Tag),
+			ID:                bid,
+			Kind:              ir.KindBuild,
+			Needs:             needs,
+			Requirements:      execution.Clone(nc.BuildRequirements),
+			Component:         nc.Name,
+			BuilderType:       builderType,
+			FlakeRef:          flakeRef,
+			FlakeOutput:       flakeOutput,
+			FlakeLockDigest:   flakeLock,
+			Toolchain:         toolchain,
+			ToolchainPlatform: toolchainPlatform,
+			Platform:          "linux/" + arch,
+			Network:           buildNetwork,
+			Env:               env,
+			Patches:           patchRefs(nc.Patches),
+			Command:           command,
+			Workdir:           workdir,
+			SourceDest:        dest,
+			SourceCommit:      nc.Commit,
+			SourceTreeHash:    nc.TreeHash,
+			VendorSpecDigest:  vendorSpecDigest,
+			SourceReadOnly:    sourceReadOnly,
+			WriteDir:          writeDir,
+			Disk:              disk,
+			Packer:            packer,
+			Materials:         materials,
+			OutputType:        nc.OutputType,
+			ArtifactPath:      renderArch(nc.ArtifactPath, arch),
+			Version:           catalog.NormalizeVersion(nc.Tag),
 		})
 	}
 
@@ -189,6 +271,57 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "compiled build graph is invalid")
 	}
 	return g, nil
+}
+
+func vmRequiresKVM(requirements *execution.Requirements) bool {
+	if requirements == nil {
+		return false
+	}
+	for _, capability := range requirements.Capabilities {
+		if capability.Name == execution.CapabilityKVM && capability.Policy == execution.CapabilityRequired {
+			return true
+		}
+	}
+	return false
+}
+
+func materialBindings(component catalog.NamedComponent, components map[string]catalog.NamedComponent) []ir.MaterialBinding {
+	if len(component.Materials) == 0 {
+		return nil
+	}
+	bindings := make([]ir.MaterialBinding, 0, len(component.Materials))
+	for binding, name := range component.Materials {
+		bindings = append(bindings, ir.MaterialBinding{
+			Binding: binding, Component: name, Producer: producerNodeID(name, components),
+		})
+	}
+	sort.Slice(bindings, func(i, j int) bool { return bindings[i].Binding < bindings[j].Binding })
+	return bindings
+}
+
+func producerNodeID(name string, components map[string]catalog.NamedComponent) string {
+	if components[name].Prebuilt != nil {
+		return "pull-" + name
+	}
+	return "build-" + name
+}
+
+func packerConfig(config *catalog.PackerConfig) *ir.PackerConfig {
+	if config == nil {
+		return nil
+	}
+	variables := make([]ir.PackerVariable, 0, len(config.Variables))
+	for name, value := range config.Variables {
+		variables = append(variables, ir.PackerVariable{Name: name, Value: value})
+	}
+	sort.Slice(variables, func(i, j int) bool { return variables[i].Name < variables[j].Name })
+	return &ir.PackerConfig{
+		ProjectPath: config.ProjectPath, BuildName: config.BuildName,
+		ArchitectureVariable:     config.ArchitectureVariable,
+		MaterialManifestVariable: config.MaterialManifestVariable,
+		OutputDirectoryVariable:  config.OutputDirectoryVariable,
+		Variables:                variables,
+	}
 }
 
 // pullEnv carries the deterministic packaging epoch for a prebuilt component that is

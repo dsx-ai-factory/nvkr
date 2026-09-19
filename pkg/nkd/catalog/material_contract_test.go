@@ -26,6 +26,7 @@ func vmMaterialComponent(materials map[string]string) Component {
 		TimeoutSeconds: 7200,
 	}
 	component.BuildCommand = []string{"make", "image"}
+	component.ToolchainImages = map[string]string{"amd64": component.ToolchainImage}
 	component.ArtifactPath = "output/node.qcow2"
 	component.Materials = materials
 	return component

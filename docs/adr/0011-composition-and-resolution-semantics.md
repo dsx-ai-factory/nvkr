@@ -33,8 +33,9 @@ must not become ignored inputs.
 Admission checks the complete catalog, unique selected IDs, supported target declarations, exact source/artifact/
 tool pins, and the producer route before graph generation or external work. Unknown components and unsupported
 platforms are coded failures, never empty selections. Ordinary outputs cannot combine their component set with
-an AICR profile. Source-owned disk and VM metadata remain authored contracts whose lowering and execution are
-unavailable; they fail capability admission before source or output work.
+an AICR profile. For a disk output, resolution admits exactly one VM-image root and its complete selected material
+closure. Compilation lowers the root's typed command or Packer contract and exact producer edges. Execution,
+observation and publication remain unavailable and fail capability admission before source or output work.
 
 `pkg/nkd/buildgraph` owns selection and compilation. Its resolved value describes validated inputs and owns
 copies of them; it does not grant authority. Direct compilation revalidates that description. CLI and SDK callers
@@ -42,12 +43,12 @@ use this same owner rather than implementing another resolver.
 
 ### 2. Generated closure and identity
 
-The compiler selects exactly the requested producers and their pinned inputs. It lowers the existing supported
-fetch/build/acquire/terminal-verification relationships; it does not infer an arbitrary producer dependency
-language. Duplicate fetches of the same pinned source can be shared within one graph. Every selected producer
+The compiler selects exactly the requested producers and their pinned inputs. It lowers supported
+fetch/build/acquire/terminal-verification relationships plus declared VM material edges; it does not infer an
+arbitrary producer dependency language. Duplicate fetches of the same pinned source can be shared within one graph. Every selected producer
 must be covered by the terminal node, and the full graph is validated before identity or execution.
 
-The generated graph uses `nkd.dev/ir/v3`; its transport-independent logical projection is identified under
+The generated graph uses `nkd.dev/ir/v4`; its transport-independent logical projection is identified under
 `nkd.build` (ADR-01/02). An unrelated catalog producer cannot change the selected graph's identity. Changing
 selected membership, target, pins, AICR rendering settings or output-affecting instructions must change it.
 Output labels, packaging and Environment settings remain outside build identity and inside their owning records.

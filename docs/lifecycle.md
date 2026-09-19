@@ -181,6 +181,6 @@ normal product authors do not construct and join them manually.
 
 Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
-The direct-output model uses Definition v4, catalog v3 and generated IR v3. Run and Release use v3. Older recipe layouts and cluster/placement fields
+The direct-output model uses Definition v4, catalog v3 and generated IR v4. Run and Release use v3. Older recipe layouts and cluster/placement fields
 are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;
 historical Runs retain the authoring and wire contracts exercised at the time.

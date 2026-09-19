@@ -83,7 +83,11 @@ func (plan Plan) Validate() error {
 	}
 	for i, output := range plan.Definition.Outputs {
 		bound := plan.LifecycleOutputs[i]
-		if bound.Name != output.Name || bound.Kind != output.Format || bound.ArtifactID != "package/"+output.Name || !equalFactoryStrings(bound.Components, output.Components) {
+		artifactID, artifactErr := lifecycleArtifactID(output, plan.Builds[i].ResolvedComponents)
+		if artifactErr != nil {
+			return artifactErr
+		}
+		if bound.Name != output.Name || bound.Kind != output.Format || bound.ArtifactID != artifactID || !equalFactoryStrings(bound.Components, output.Components) {
 			return e.New(e.CodeUnverifiedRef, "run plan output %q differs from its definition", output.Name)
 		}
 	}
@@ -358,23 +362,37 @@ func (plan Plan) validateLifecyclePlans() error {
 		producer := nodes[artifact.Producer]
 		var actualComponents []string
 		actualBuild := ""
-		for _, inputID := range producer.Inputs {
-			input := artifacts[inputID]
-			if input.Kind == "producer-result" || input.BuildTarget == "" {
-				continue
+		if output.Kind == authored.OutputDiskImage {
+			// Plan.Validate has already re-resolved and recompiled this BuildPlan
+			// from the held Definition and catalog snapshot. Use that authenticated
+			// selected closure rather than reconstructing only the root's direct
+			// inputs from the artifact graph; material graphs are transitive.
+			actualComponents = make([]string, 0, len(build.ResolvedComponents))
+			for _, component := range build.ResolvedComponents {
+				actualComponents = append(actualComponents, component.Name)
 			}
-			if input.Component != "" && !(output.Kind == "helm-oci" && input.Kind == "aicr-bundle") {
-				actualComponents = append(actualComponents, input.Component)
-			}
-			if actualBuild == "" {
-				actualBuild = input.BuildTarget
-			} else if actualBuild != input.BuildTarget {
-				actualBuild = "!mixed"
+			actualBuild = artifact.BuildTarget
+		} else {
+			for _, inputID := range producer.Inputs {
+				input := artifacts[inputID]
+				if input.Kind == "producer-result" || input.BuildTarget == "" {
+					continue
+				}
+				if input.Component != "" && !(output.Kind == "helm-oci" && input.Kind == "aicr-bundle") {
+					actualComponents = append(actualComponents, input.Component)
+				}
+				if actualBuild == "" {
+					actualBuild = input.BuildTarget
+				} else if actualBuild != input.BuildTarget {
+					actualBuild = "!mixed"
+				}
 			}
 		}
 		actualComponents = uniqueSorted(actualComponents)
+		nameMatches := artifact.Name == output.Name ||
+			(output.Kind == authored.OutputDiskImage && artifact.Name == artifact.Component)
 		if !canonicalName.MatchString(output.Name) || output.Name <= previous || !ok || artifact.Kind != lifecyclePackageKind(output.Kind) ||
-			artifact.Name != output.Name || !buildOK || (output.Kind != "helm-oci" && len(output.Components) == 0) || !sort.StringsAreSorted(output.Components) ||
+			!nameMatches || !buildOK || (output.Kind != "helm-oci" && len(output.Components) == 0) || !sort.StringsAreSorted(output.Components) ||
 			build.BuildDigest != output.BuildDigest || build.Name != actualBuild || !equalFactoryStrings(actualComponents, output.Components) {
 			return e.New(e.CodeUnverifiedRef, "lifecycle output %q is malformed or not bound to its graph build", output.Name)
 		}
@@ -406,6 +424,8 @@ func lifecyclePackageKind(kind string) string {
 		return PackageHelm
 	case "oci":
 		return PackageImage
+	case authored.OutputDiskImage:
+		return authored.OutputDiskImage
 	default:
 		return ""
 	}

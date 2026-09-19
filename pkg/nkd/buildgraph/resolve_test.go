@@ -20,6 +20,10 @@ const (
 )
 
 func testVMImageComponent(hosts []execution.HostPlatform, policy execution.CapabilityPolicy) catalog.Component {
+	toolchains := make(map[string]string, len(hosts))
+	for _, host := range hosts {
+		toolchains[strings.TrimPrefix(string(host), "linux/")] = testVMToolchain
+	}
 	return catalog.Component{Platforms: []string{"linux/amd64", "linux/arm64"},
 		FromSource: true, BuilderType: catalog.BuilderVMImage, OutputType: "disk-image",
 		Disk: &catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
@@ -34,8 +38,8 @@ func testVMImageComponent(hosts []execution.HostPlatform, policy execution.Capab
 			TimeoutSeconds: 3600,
 		},
 		Repo: testVMRepo, Commit: testVMCommit, TreeHash: testVMTree,
-		ToolchainImage: testVMToolchain,
-		BuildCommand:   []string{"make", "image"}, ArtifactPath: "out/image.qcow2", SourceDate: 1733939955,
+		ToolchainImage: testVMToolchain, ToolchainImages: toolchains,
+		BuildCommand: []string{"make", "image"}, ArtifactPath: "out/image.qcow2", SourceDate: 1733939955,
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -145,6 +146,11 @@ func (plan *Plan) validateSBOMGraph() error {
 		if artifact.Kind != "producer-result" {
 			continue
 		}
+		if plan.hasCompiledDiskTarget(artifact.BuildTarget, artifacts) {
+			// Disk targets require ADR-13's future disk inspection and material
+			// reconciliation operation, not this ordinary per-component SBOM.
+			continue
+		}
 		node, ok := nodes[artifact.BuildTarget+"/sbom"]
 		if !ok || node.Kind != NodeSBOM || node.BuildTarget != artifact.BuildTarget || !containsString(node.Inputs, artifact.ID) {
 			return e.New(e.CodeProvenanceMissing, "dependency SBOM graph omits producer %q", artifact.ID)
@@ -178,6 +184,65 @@ func (plan *Plan) validateSBOMGraph() error {
 		}
 	}
 	return nil
+}
+
+// hasCompiledDiskTarget recognizes only the compiler-bound disk lifecycle shape.
+// Definition format alone is insufficient: the lifecycle binding, raw artifact,
+// resolved root, and typed VM IR producer must all name the same target/root.
+func (plan *Plan) hasCompiledDiskTarget(target string, artifacts map[string]Artifact) bool {
+	var outputName string
+	for _, output := range plan.Definition.Outputs {
+		if output.Name == target && output.Format == authored.OutputDiskImage {
+			outputName = output.Name
+			break
+		}
+	}
+	if outputName == "" {
+		return false
+	}
+	var binding LifecycleOutputPlan
+	for _, candidate := range plan.LifecycleOutputs {
+		if candidate.Name == outputName && candidate.Kind == authored.OutputDiskImage {
+			binding = candidate
+			break
+		}
+	}
+	payload, ok := artifacts[binding.ArtifactID]
+	if binding.ArtifactID == "" || !ok || payload.Kind != authored.OutputDiskImage ||
+		payload.BuildTarget != target || payload.Component == "" {
+		return false
+	}
+	var build *BuildPlan
+	for index := range plan.Builds {
+		if plan.Builds[index].Name == target {
+			build = &plan.Builds[index]
+			break
+		}
+	}
+	if build == nil || build.Graph == nil {
+		return false
+	}
+	rootCount := 0
+	for _, component := range build.ResolvedComponents {
+		if component.OutputType == authored.OutputDiskImage {
+			rootCount++
+			if component.Name != payload.Component {
+				return false
+			}
+		}
+	}
+	if rootCount != 1 {
+		return false
+	}
+	for _, node := range build.Graph.Nodes {
+		if node.Component == payload.Component && node.Kind == ir.KindBuild &&
+			node.BuilderType == ir.BuilderVMImage && node.OutputType == authored.OutputDiskImage &&
+			node.Disk != nil && node.Disk.Format == "qcow2" &&
+			payload.Producer == target+"/"+node.ID {
+			return true
+		}
+	}
+	return false
 }
 
 // readProducerResult admits the canonical pipeline.ArtifactResult that a build or

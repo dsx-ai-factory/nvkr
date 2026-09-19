@@ -2,9 +2,15 @@ package lifecycle
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 )
 
 func diskDefinition(t *testing.T) Definition {
@@ -53,10 +59,66 @@ func TestDiskImageOutputSchemaAndIdentity(t *testing.T) {
 	}
 }
 
-func TestDiskImageCompileFailsBeforeCatalogLowering(t *testing.T) {
+func TestDiskImageCompileAndPrepareFreezeRootArtifactButExecutionStaysClosed(t *testing.T) {
 	definition := diskDefinition(t)
-	definition.Catalog.Base = "missing-catalog"
-	_, err := Compile(context.Background(), "missing-definition.yaml", definition,
-		"environment.yaml", testEnvironment(), "test")
+	definition.Catalog.Base = "catalog"
+	definition.Outputs[0].Components = []string{"nke-node-non-fde"}
+	environment := testEnvironment()
+	environment.Publication = nil
+	environment.ExecutionClasses = []execution.Class{{
+		Name: "amd64-kvm", RunsOn: "linux-amd64-cpu16",
+		HostPlatform: execution.HostPlatformLinuxAMD64,
+		Resources: execution.ResourceCapacity{
+			CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536,
+		},
+		Capabilities:      []execution.CapabilityName{execution.CapabilityKVM},
+		MaxTimeoutSeconds: 10800,
+	}}
+	component := catalog.Component{
+		Platforms: []string{"linux/amd64"}, FromSource: true,
+		BuilderType: catalog.BuilderVMImage, OutputType: OutputDiskImage,
+		Disk: &catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
+		BuildRequirements: &execution.Requirements{
+			Resources: &execution.ResourceRequest{
+				CPUMillis: 4000, MemoryMiB: 8192, EphemeralStorageMiB: 32768,
+			},
+			AllowedHostPlatforms: []execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+			Capabilities: []execution.CapabilityRequirement{{
+				Name: execution.CapabilityKVM, Policy: execution.CapabilityRequired,
+			}},
+			TimeoutSeconds: 7200,
+		},
+		Repo: "https://example.test/nke", Tag: "v1.0.0",
+		Commit: strings.Repeat("a", 40), TreeHash: strings.Repeat("b", 40),
+		ToolchainImages: map[string]string{
+			"amd64": "example.test/vm@sha256:" + strings.Repeat("c", 64),
+		},
+		BuildCommand: []string{"make", "image", "ARCH={{.Arch}}"},
+		ArtifactPath: "out/node-amd64.qcow2", SourceDate: 1,
+	}
+	stack, err := catalog.ApplyStack(&catalog.Catalog{Components: map[string]catalog.Component{
+		"nke-node-non-fde": component,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := factory.Compile(context.Background(), definition, environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := PrepareRun(definition, environment, plan, "disk-plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantArtifact := "artifact/cli/nke-node-non-fde"
+	if len(prepared.Expected) != 1 || prepared.Expected[0].MemberArtifactID != wantArtifact ||
+		prepared.Expected[0].ArtifactID != wantArtifact {
+		t.Fatalf("prepared disk slot = %#v, want compiler-owned artifact %q", prepared.Expected, wantArtifact)
+	}
+	workspace := filepath.Join(t.TempDir(), "not-created")
+	err = factory.AdmitLocal(t.Context(), plan, factory.LocalRunOptions{Workspace: workspace})
 	assertCode(t, err, nkderr.CodeEngineCapability)
+	if _, statErr := os.Stat(workspace); !os.IsNotExist(statErr) {
+		t.Fatalf("failed VM admission touched workspace: %v", statErr)
+	}
 }

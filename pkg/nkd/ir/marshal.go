@@ -33,32 +33,36 @@ type LogicalNode struct {
 	Kind  string   `json:"kind"`
 	Needs []string `json:"needs,omitempty"`
 
-	Commit           string     `json:"commit,omitempty"`
-	TreeHash         string     `json:"treeHash,omitempty"`
-	Dest             string     `json:"dest,omitempty"`
-	VendorCmd        []string   `json:"vendorCmd,omitempty"`
-	VendorImage      string     `json:"vendorImage,omitempty"`
-	Digest           string     `json:"digest,omitempty"`
-	Component        string     `json:"component,omitempty"`
-	BuilderType      string     `json:"builderType,omitempty"`
-	FlakeOutput      string     `json:"flakeOutput,omitempty"`
-	FlakeLockDigest  string     `json:"flakeLockDigest,omitempty"`
-	Toolchain        string     `json:"toolchain,omitempty"`
-	Platform         string     `json:"platform,omitempty"`
-	Network          string     `json:"network,omitempty"`
-	Env              []EnvVar   `json:"env,omitempty"`
-	Patches          []PatchRef `json:"patches,omitempty"`
-	Command          []string   `json:"command,omitempty"`
-	Workdir          string     `json:"workdir,omitempty"`
-	SourceDest       string     `json:"sourceDest,omitempty"`
-	SourceCommit     string     `json:"sourceCommit,omitempty"`
-	SourceTreeHash   string     `json:"sourceTreeHash,omitempty"`
-	VendorSpecDigest string     `json:"vendorSpecDigest,omitempty"`
-	SourceReadOnly   bool       `json:"sourceReadOnly,omitempty"`
-	WriteDir         string     `json:"writeDir,omitempty"`
-	OutputType       string     `json:"outputType,omitempty"`
-	ArtifactPath     string     `json:"artifactPath,omitempty"`
-	Version          string     `json:"version,omitempty"`
+	Commit            string            `json:"commit,omitempty"`
+	TreeHash          string            `json:"treeHash,omitempty"`
+	Dest              string            `json:"dest,omitempty"`
+	VendorCmd         []string          `json:"vendorCmd,omitempty"`
+	VendorImage       string            `json:"vendorImage,omitempty"`
+	Digest            string            `json:"digest,omitempty"`
+	Component         string            `json:"component,omitempty"`
+	BuilderType       string            `json:"builderType,omitempty"`
+	FlakeOutput       string            `json:"flakeOutput,omitempty"`
+	FlakeLockDigest   string            `json:"flakeLockDigest,omitempty"`
+	Toolchain         string            `json:"toolchain,omitempty"`
+	ToolchainPlatform string            `json:"toolchainPlatform,omitempty"`
+	Platform          string            `json:"platform,omitempty"`
+	Network           string            `json:"network,omitempty"`
+	Env               []EnvVar          `json:"env,omitempty"`
+	Patches           []PatchRef        `json:"patches,omitempty"`
+	Command           []string          `json:"command,omitempty"`
+	Workdir           string            `json:"workdir,omitempty"`
+	SourceDest        string            `json:"sourceDest,omitempty"`
+	SourceCommit      string            `json:"sourceCommit,omitempty"`
+	SourceTreeHash    string            `json:"sourceTreeHash,omitempty"`
+	VendorSpecDigest  string            `json:"vendorSpecDigest,omitempty"`
+	SourceReadOnly    bool              `json:"sourceReadOnly,omitempty"`
+	WriteDir          string            `json:"writeDir,omitempty"`
+	Disk              *DiskSpec         `json:"disk,omitempty"`
+	Packer            *PackerConfig     `json:"packer,omitempty"`
+	Materials         []MaterialBinding `json:"materials,omitempty"`
+	OutputType        string            `json:"outputType,omitempty"`
+	ArtifactPath      string            `json:"artifactPath,omitempty"`
+	Version           string            `json:"version,omitempty"`
 }
 
 // LogicalGraph is the only shape accepted by build identity computation. The
@@ -84,40 +88,44 @@ const (
 // They make adding a field to a full graph type a deliberate Build-identity boundary
 // decision instead of silently inheriting a serializer's behavior.
 var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
-	"ID":               includeLogicalValueInBuildIdentity,
-	"Kind":             includeLogicalValueInBuildIdentity,
-	"Needs":            includeLogicalValueInBuildIdentity,
-	"Requirements":     excludeExecutionMetadataFromBuildIdentity,
-	"ExecutionBinding": excludeExecutionMetadataFromBuildIdentity,
-	"Repo":             excludeTransportFromBuildIdentity,
-	"Commit":           includeLogicalValueInBuildIdentity,
-	"TreeHash":         includeLogicalValueInBuildIdentity,
-	"Dest":             includeLogicalValueInBuildIdentity,
-	"VendorCmd":        includeLogicalValueInBuildIdentity,
-	"VendorImage":      includeContentReferenceInBuildIdentity,
-	"Artifact":         excludeTransportFromBuildIdentity,
-	"Digest":           includeLogicalValueInBuildIdentity,
-	"Component":        includeLogicalValueInBuildIdentity,
-	"BuilderType":      includeLogicalValueInBuildIdentity,
-	"FlakeRef":         excludeTransportFromBuildIdentity,
-	"FlakeOutput":      includeLogicalValueInBuildIdentity,
-	"FlakeLockDigest":  includeLogicalValueInBuildIdentity,
-	"Toolchain":        includeContentReferenceInBuildIdentity,
-	"Platform":         includeLogicalValueInBuildIdentity,
-	"Network":          includeLogicalValueInBuildIdentity,
-	"Env":              includeLogicalValueInBuildIdentity,
-	"Patches":          includeLogicalValueInBuildIdentity,
-	"Command":          includeLogicalValueInBuildIdentity,
-	"Workdir":          includeLogicalValueInBuildIdentity,
-	"SourceDest":       includeLogicalValueInBuildIdentity,
-	"SourceCommit":     includeLogicalValueInBuildIdentity,
-	"SourceTreeHash":   includeLogicalValueInBuildIdentity,
-	"VendorSpecDigest": includeLogicalValueInBuildIdentity,
-	"SourceReadOnly":   includeLogicalValueInBuildIdentity,
-	"WriteDir":         includeLogicalValueInBuildIdentity,
-	"OutputType":       includeLogicalValueInBuildIdentity,
-	"ArtifactPath":     includeLogicalValueInBuildIdentity,
-	"Version":          includeLogicalValueInBuildIdentity,
+	"ID":                includeLogicalValueInBuildIdentity,
+	"Kind":              includeLogicalValueInBuildIdentity,
+	"Needs":             includeLogicalValueInBuildIdentity,
+	"Requirements":      excludeExecutionMetadataFromBuildIdentity,
+	"ExecutionBinding":  excludeExecutionMetadataFromBuildIdentity,
+	"Repo":              excludeTransportFromBuildIdentity,
+	"Commit":            includeLogicalValueInBuildIdentity,
+	"TreeHash":          includeLogicalValueInBuildIdentity,
+	"Dest":              includeLogicalValueInBuildIdentity,
+	"VendorCmd":         includeLogicalValueInBuildIdentity,
+	"VendorImage":       includeContentReferenceInBuildIdentity,
+	"Artifact":          excludeTransportFromBuildIdentity,
+	"Digest":            includeLogicalValueInBuildIdentity,
+	"Component":         includeLogicalValueInBuildIdentity,
+	"BuilderType":       includeLogicalValueInBuildIdentity,
+	"FlakeRef":          excludeTransportFromBuildIdentity,
+	"FlakeOutput":       includeLogicalValueInBuildIdentity,
+	"FlakeLockDigest":   includeLogicalValueInBuildIdentity,
+	"Toolchain":         includeContentReferenceInBuildIdentity,
+	"ToolchainPlatform": includeLogicalValueInBuildIdentity,
+	"Platform":          includeLogicalValueInBuildIdentity,
+	"Network":           includeLogicalValueInBuildIdentity,
+	"Env":               includeLogicalValueInBuildIdentity,
+	"Patches":           includeLogicalValueInBuildIdentity,
+	"Command":           includeLogicalValueInBuildIdentity,
+	"Workdir":           includeLogicalValueInBuildIdentity,
+	"SourceDest":        includeLogicalValueInBuildIdentity,
+	"SourceCommit":      includeLogicalValueInBuildIdentity,
+	"SourceTreeHash":    includeLogicalValueInBuildIdentity,
+	"VendorSpecDigest":  includeLogicalValueInBuildIdentity,
+	"SourceReadOnly":    includeLogicalValueInBuildIdentity,
+	"WriteDir":          includeLogicalValueInBuildIdentity,
+	"Disk":              includeLogicalValueInBuildIdentity,
+	"Packer":            includeLogicalValueInBuildIdentity,
+	"Materials":         includeLogicalValueInBuildIdentity,
+	"OutputType":        includeLogicalValueInBuildIdentity,
+	"ArtifactPath":      includeLogicalValueInBuildIdentity,
+	"Version":           includeLogicalValueInBuildIdentity,
 }
 
 var graphBuildIdentityRules = map[string]buildIdentityFieldRule{
@@ -136,6 +144,12 @@ func (g *Graph) Normalize() {
 		n := &g.Nodes[i]
 		sort.Strings(n.Needs)
 		sort.Slice(n.Env, func(a, b int) bool { return n.Env[a].Name < n.Env[b].Name })
+		sort.Slice(n.Materials, func(a, b int) bool { return n.Materials[a].Binding < n.Materials[b].Binding })
+		if n.Packer != nil {
+			sort.Slice(n.Packer.Variables, func(a, b int) bool {
+				return n.Packer.Variables[a].Name < n.Packer.Variables[b].Name
+			})
+		}
 	}
 }
 
@@ -155,6 +169,16 @@ func (g Graph) normalizedCopy() Graph {
 		c.Nodes[i].Env = append([]EnvVar(nil), g.Nodes[i].Env...)
 		c.Nodes[i].Requirements = execution.Clone(g.Nodes[i].Requirements)
 		c.Nodes[i].ExecutionBinding = execution.CloneBinding(g.Nodes[i].ExecutionBinding)
+		if g.Nodes[i].Disk != nil {
+			disk := *g.Nodes[i].Disk
+			c.Nodes[i].Disk = &disk
+		}
+		if g.Nodes[i].Packer != nil {
+			packer := *g.Nodes[i].Packer
+			packer.Variables = append([]PackerVariable(nil), g.Nodes[i].Packer.Variables...)
+			c.Nodes[i].Packer = &packer
+		}
+		c.Nodes[i].Materials = append([]MaterialBinding(nil), g.Nodes[i].Materials...)
 	}
 	c.Normalize()
 	return c
@@ -206,17 +230,37 @@ func (g Graph) logicalGraph() LogicalGraph {
 			VendorImage: imageDigestID(node.VendorImage), Digest: node.Digest,
 			Component: node.Component, BuilderType: node.BuilderType,
 			FlakeOutput: node.FlakeOutput, FlakeLockDigest: node.FlakeLockDigest,
-			Toolchain: imageDigestID(node.Toolchain), Platform: node.Platform,
-			Network: node.Network, Env: append([]EnvVar(nil), node.Env...),
+			Toolchain: imageDigestID(node.Toolchain), ToolchainPlatform: node.ToolchainPlatform,
+			Platform: node.Platform,
+			Network:  node.Network, Env: append([]EnvVar(nil), node.Env...),
 			Patches: append([]PatchRef(nil), node.Patches...),
 			Command: append([]string(nil), node.Command...), Workdir: node.Workdir,
 			SourceDest: node.SourceDest, SourceCommit: node.SourceCommit,
 			SourceTreeHash: node.SourceTreeHash, VendorSpecDigest: node.VendorSpecDigest,
 			SourceReadOnly: node.SourceReadOnly, WriteDir: node.WriteDir,
+			Disk: cloneDiskSpec(node.Disk), Packer: clonePackerConfig(node.Packer),
+			Materials:  append([]MaterialBinding(nil), node.Materials...),
 			OutputType: node.OutputType, ArtifactPath: node.ArtifactPath, Version: node.Version,
 		})
 	}
 	return logical
+}
+
+func cloneDiskSpec(spec *DiskSpec) *DiskSpec {
+	if spec == nil {
+		return nil
+	}
+	clone := *spec
+	return &clone
+}
+
+func clonePackerConfig(config *PackerConfig) *PackerConfig {
+	if config == nil {
+		return nil
+	}
+	clone := *config
+	clone.Variables = append([]PackerVariable(nil), config.Variables...)
+	return &clone
 }
 
 // imageDigestID reduces an image ref to its content-address: the "sha256:…" suffix of

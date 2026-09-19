@@ -14,7 +14,7 @@ import (
 
 // SchemaVersion identifies the IR shape; it participates in the digest so a schema
 // change is a pin change.
-const SchemaVersion = "nkd.dev/ir/v3"
+const SchemaVersion = "nkd.dev/ir/v4"
 
 // Node kinds.
 const (
@@ -37,7 +37,44 @@ const (
 	BuilderOCIHermetic = "oci-hermetic"      // hermetic compile in a pinned toolchain container (the default)
 	BuilderNix         = "nix"               // produced from a locked flake in a pinned nix container
 	BuilderBuildKit    = "buildkit-rootless" // networked wrapped Dockerfile build; not qualified execution
+	BuilderVMImage     = "vm-image"          // source-owned command or Packer project producing one disk image
 )
+
+// DiskSpec is the exact disk payload contract carried by a VM build node.
+type DiskSpec struct {
+	Format     string `json:"format"`
+	Encryption string `json:"encryption"`
+}
+
+// PackerVariable is one public literal passed to a source-owned Packer project.
+// Variables are sorted by Name and are ordinary logical build inputs, never a
+// credential channel.
+type PackerVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// PackerConfig is the typed direct-Packer producer declaration. Runtime paths
+// are deliberately absent; the admitted executor derives those from held source,
+// material, toolchain, and workspace capabilities.
+type PackerConfig struct {
+	ProjectPath              string           `json:"projectPath"`
+	BuildName                string           `json:"buildName"`
+	ArchitectureVariable     string           `json:"architectureVariable"`
+	MaterialManifestVariable string           `json:"materialManifestVariable"`
+	OutputDirectoryVariable  string           `json:"outputDirectoryVariable"`
+	Variables                []PackerVariable `json:"variables,omitempty"`
+}
+
+// MaterialBinding ties one source-owned input name to one exact producer node.
+// Producer is redundant with the graph edge by design: Graph.Validate checks
+// both representations so a caller cannot relabel a dependency without changing
+// the producer it actually waits for.
+type MaterialBinding struct {
+	Binding   string `json:"binding"`
+	Component string `json:"component"`
+	Producer  string `json:"producer"`
+}
 
 // Engine classes (ADR-07 §1) are the OBSERVED build substrate a component was
 // actually built under — recorded in the detached build record and verified equal to
@@ -145,6 +182,9 @@ type Node struct {
 	FlakeOutput     string `json:"flakeOutput,omitempty"`
 	FlakeLockDigest string `json:"flakeLockDigest,omitempty"`
 	Toolchain       string `json:"toolchain,omitempty"` // OCI image pinned by @sha256: digest
+	// ToolchainPlatform is the identity-bearing host platform used to select a
+	// VM toolchain. It is distinct from Platform, which is the guest/output.
+	ToolchainPlatform string `json:"toolchainPlatform,omitempty"`
 	// Platform is the target run platform (linux/<arch>). It forces the container to
 	// run the toolchain image's NATIVE arch variant (of a multi-arch toolchain) — or,
 	// on a foreign host, under emulation — so GOARCH compilation is native, never a
@@ -170,9 +210,15 @@ type Node struct {
 	// builds never clobber each other's outputs (NKD-FR-BLD-011 hermeticity).
 	SourceReadOnly bool   `json:"sourceReadOnly,omitempty"`
 	WriteDir       string `json:"writeDir,omitempty"`
-	OutputType     string `json:"outputType,omitempty"`   // host-package | oci-image | ...
-	ArtifactPath   string `json:"artifactPath,omitempty"` // built artifact, relative to Workdir
-	Version        string `json:"version,omitempty"`      // component version (from the pin tag), for packaging
+	// Disk and Packer are present only for a vm-image build. Command selects the
+	// alternative exact-argv VM producer. Materials are sorted by Binding and each
+	// entry is also represented by an exact producer dependency in Needs.
+	Disk         *DiskSpec         `json:"disk,omitempty"`
+	Packer       *PackerConfig     `json:"packer,omitempty"`
+	Materials    []MaterialBinding `json:"materials,omitempty"`
+	OutputType   string            `json:"outputType,omitempty"`   // host-package | oci-image | ...
+	ArtifactPath string            `json:"artifactPath,omitempty"` // built artifact, relative to Workdir
+	Version      string            `json:"version,omitempty"`      // component version (from the pin tag), for packaging
 }
 
 // Graph is the whole resolved pipeline IR.

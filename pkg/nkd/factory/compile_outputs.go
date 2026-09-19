@@ -17,11 +17,6 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	if err := environment.Validate(); err != nil {
 		return err
 	}
-	for _, output := range definition.Outputs {
-		if output.Format == authored.OutputDiskImage {
-			return e.New(e.CodeEngineCapability, "disk-image output %q is declared but execution is not implemented", output.Name)
-		}
-	}
 	if environment.Signing != nil && environment.Signing.Mode == SigningModeCosign && definition.CosignTool == "" {
 		return e.New(e.CodeTrustPolicyMissing, "cosign signing requires Definition.cosignTool")
 	}
@@ -114,9 +109,22 @@ func compileToolOperation(name string, pin catalog.ToolPin, runsOn string) (Node
 // derivePublication creates package operations and one publication route from named
 // outputs. These are executable dataflow, never another authored document model.
 func derivePublication(definition authored.Definition, environment authored.Environment) ([]packageSpec, map[string]Target, []Route, error) {
+	if environment.Publication != nil {
+		for _, output := range definition.Outputs {
+			if output.Format == authored.OutputDiskImage {
+				return nil, nil, nil, e.New(e.CodeEngineCapability,
+					"disk-image output %q has no admitted publication adapter", output.Name)
+			}
+		}
+	}
 	packages := make([]packageSpec, 0, len(definition.Outputs)+1)
 	closureInputs := make([]string, 0, len(definition.Outputs))
 	for _, output := range definition.Outputs {
+		if output.Format == authored.OutputDiskImage {
+			// The produced QCOW2 is the lifecycle payload. It is not repackaged as
+			// an ordinary binary bundle; disk observation/publication remain gated.
+			continue
+		}
 		selectors := make([]string, 0, len(output.Components))
 		for _, component := range output.Components {
 			selectors = append(selectors, output.Name+"/"+component)

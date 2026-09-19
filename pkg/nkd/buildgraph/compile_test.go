@@ -1,6 +1,7 @@
 package buildgraph
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -62,7 +63,7 @@ func TestCompileCarriesGenericBuildRequirementsOutsideBuildIdentity(t *testing.T
 	}
 }
 
-func TestCompileRejectsUnimplementedDiskCapabilityBeforeGraphConstruction(t *testing.T) {
+func TestCompileLowersVMProducersOnlyAfterHostSelection(t *testing.T) {
 	validVM := catalog.Component{Platforms: []string{"linux/amd64", "linux/arm64"},
 		FromSource: true, BuilderType: catalog.BuilderVMImage, OutputType: "disk-image",
 		Disk: &catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
@@ -76,11 +77,14 @@ func TestCompileRejectsUnimplementedDiskCapabilityBeforeGraphConstruction(t *tes
 			}},
 			TimeoutSeconds: 7200,
 		},
-		Repo: "https://example.test/nke", Commit: strings.Repeat("a", 40), TreeHash: strings.Repeat("b", 40),
+		Repo: "https://example.test/nke", Tag: "v1.0.0", Commit: strings.Repeat("a", 40), TreeHash: strings.Repeat("b", 40),
 		ToolchainImage: "example.test/vm-builder@sha256:" + strings.Repeat("c", 64),
-		BuildCommand:   []string{"make", "-C", "os-image/packer", "os-image-non-fde", "ARCH={{.Arch}}"},
-		ArtifactPath:   "os-image/packer/output-non-fde/node-{{.Arch}}.qcow2",
-		SourceDate:     1,
+		ToolchainImages: map[string]string{
+			"amd64": "example.test/vm-builder@sha256:" + strings.Repeat("c", 64),
+		},
+		BuildCommand: []string{"make", "-C", "os-image/packer", "os-image-non-fde", "ARCH={{.Arch}}"},
+		ArtifactPath: "os-image/packer/output-non-fde/node-{{.Arch}}.qcow2",
+		SourceDate:   1,
 	}
 	validPacker := validVM
 	validPacker.BuildCommand = nil
@@ -92,25 +96,139 @@ func TestCompileRejectsUnimplementedDiskCapabilityBeforeGraphConstruction(t *tes
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
 	}
-	tests := []struct {
+	resolved := func(component catalog.Component) *Resolved {
+		return &Resolved{Platform: "linux/amd64", Components: []catalog.NamedComponent{{Name: "image", Component: component}}}
+	}
+	if graph, err := Compile(resolved(validVM)); graph != nil || code(err) != nkderr.CodeEngineCapability {
+		t.Fatalf("VM graph without selected host = %#v, %v; want %s", graph, err, nkderr.CodeEngineCapability)
+	}
+	if graph, err := CompileForHostPlatforms(resolved(validVM), map[string]execution.HostPlatform{
+		"image": execution.HostPlatformLinuxARM64,
+	}); graph != nil || code(err) != nkderr.CodeEngineCapability {
+		t.Fatalf("undeclared VM host = %#v, %v; want %s", graph, err, nkderr.CodeEngineCapability)
+	}
+	if graph, err := CompileForHostPlatforms(resolved(validVM), map[string]execution.HostPlatform{
+		"image": execution.HostPlatformLinuxAMD64, "unselected": execution.HostPlatformLinuxAMD64,
+	}); graph != nil || code(err) != nkderr.CodeEngineCapability {
+		t.Fatalf("extra VM host selection = %#v, %v; want %s", graph, err, nkderr.CodeEngineCapability)
+	}
+	scalarOnly := validVM
+	scalarOnly.ToolchainImages = nil
+	if graph, err := CompileForHostPlatforms(resolved(scalarOnly), map[string]execution.HostPlatform{
+		"image": execution.HostPlatformLinuxAMD64,
+	}); graph != nil || code(err) != nkderr.CodeUnpinnedSource {
+		t.Fatalf("scalar VM toolchain fallback = %#v, %v; want %s", graph, err, nkderr.CodeUnpinnedSource)
+	}
+	withUnrelated := resolved(validVM)
+	withUnrelated.Components = append(withUnrelated.Components, catalog.NamedComponent{
+		Name: "unrelated",
+		Component: catalog.Component{
+			Platforms: []string{"linux/amd64"}, FromSource: true,
+			Repo: "https://example.test/unrelated", Tag: "v1.0.0",
+			Commit: strings.Repeat("d", 40), TreeHash: strings.Repeat("e", 40),
+			ToolchainImage: "example.test/go@sha256:" + strings.Repeat("f", 64),
+			BuildCommand:   []string{"make"}, WriteDir: "out",
+			OutputType: "raw", ArtifactPath: "out/unrelated", SourceDate: 1,
+		},
+	})
+	if graph, err := CompileForHostPlatforms(withUnrelated, map[string]execution.HostPlatform{
+		"image": execution.HostPlatformLinuxAMD64,
+	}); graph != nil || code(err) != nkderr.CodeInvalidCatalog {
+		t.Fatalf("disk graph with unrelated producer = %#v, %v; want %s", graph, err, nkderr.CodeInvalidCatalog)
+	}
+	for _, test := range []struct {
 		name      string
 		component catalog.Component
 	}{
-		{name: "disk output", component: catalog.Component{Platforms: []string{"linux/amd64", "linux/arm64"}, FromSource: true, OutputType: "disk-image"}},
-		{name: "VM builder", component: catalog.Component{Platforms: []string{"linux/amd64", "linux/arm64"}, FromSource: true, BuilderType: catalog.BuilderVMImage}},
-		{name: "complete command VM disk producer", component: validVM},
-		{name: "complete Packer VM disk producer", component: validPacker},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			graph, err := Compile(&Resolved{Platform: "linux/amd64", Components: []catalog.NamedComponent{{Name: "image", Component: tt.component}}})
-			if coded, ok := err.(*nkderr.Error); !ok || coded.Code != nkderr.CodeEngineCapability {
-				t.Fatalf("error = %v, want %s", err, nkderr.CodeEngineCapability)
+		{name: "command", component: validVM},
+		{name: "Packer", component: validPacker},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			graph, err := CompileForHostPlatforms(resolved(test.component), map[string]execution.HostPlatform{
+				"image": execution.HostPlatformLinuxAMD64,
+			})
+			if err != nil {
+				t.Fatal(err)
 			}
-			if graph != nil {
-				t.Fatalf("unsupported disk capability produced an executable graph: %#v", graph)
+			if len(graph.Nodes) != 3 || graph.Nodes[0].BuilderType != ir.BuilderVMImage ||
+				graph.Nodes[0].Disk == nil || graph.Nodes[0].Disk.Format != "qcow2" {
+				t.Fatalf("VM graph did not retain typed disk producer: %#v", graph.Nodes)
 			}
 		})
+	}
+}
+
+func TestCompileVMSelectsHostToolchainAndMaterialProducers(t *testing.T) {
+	root := testVMImageComponent([]execution.HostPlatform{
+		execution.HostPlatformLinuxAMD64, execution.HostPlatformLinuxARM64,
+	}, execution.CapabilityPreferred)
+	root.Tag = "v1.0.0"
+	root.BuildCommand = nil
+	root.ToolchainImage = ""
+	root.ToolchainImages = map[string]string{
+		"amd64": "example.test/vm-amd64@sha256:" + strings.Repeat("1", 64),
+		"arm64": "example.test/vm-arm64@sha256:" + strings.Repeat("2", 64),
+	}
+	root.Packer = &catalog.PackerConfig{
+		ProjectPath: "os-image/packer", BuildName: "image.qemu.node",
+		ArchitectureVariable: "architecture", MaterialManifestVariable: "material_manifest",
+		OutputDirectoryVariable: "output_directory",
+	}
+	root.Materials = map[string]string{"agent-package": "agent"}
+	material := catalog.Component{
+		Platforms: []string{"linux/amd64", "linux/arm64"}, FromSource: true,
+		Repo: "https://example.test/agent", Tag: "v1.0.0", Commit: strings.Repeat("3", 40),
+		TreeHash: strings.Repeat("4", 40), ToolchainImage: "example.test/go@sha256:" + strings.Repeat("5", 64),
+		OutputType: "raw", BuildCommand: []string{"make"}, WriteDir: "out",
+		ArtifactPath: "out/agent", SourceDate: 1,
+	}
+	resolved := &Resolved{Platform: "linux/arm64", Components: []catalog.NamedComponent{
+		{Name: "agent", Component: material}, {Name: "image", Component: root},
+	}}
+	graph, err := CompileForHostPlatforms(resolved, map[string]execution.HostPlatform{
+		"image": execution.HostPlatformLinuxAMD64,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var image ir.Node
+	for _, node := range graph.Nodes {
+		if node.Component == "image" {
+			image = node
+		}
+	}
+	if image.Toolchain != root.ToolchainImages["amd64"] || image.ToolchainPlatform != "linux/amd64" ||
+		len(image.Materials) != 1 || image.Materials[0] != (ir.MaterialBinding{
+		Binding: "agent-package", Component: "agent", Producer: "build-agent",
+	}) || !slices.Contains(image.Needs, "build-agent") {
+		t.Fatalf("VM host toolchain/material lowering = %#v", image)
+	}
+
+	sharedToolchain := "example.test/vm@sha256:" + strings.Repeat("6", 64)
+	root.ToolchainImages = map[string]string{"amd64": sharedToolchain, "arm64": sharedToolchain}
+	resolved.Components[1].Component = root
+	amd64Graph, err := CompileForHostPlatforms(resolved, map[string]execution.HostPlatform{
+		"image": execution.HostPlatformLinuxAMD64,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	arm64Graph, err := CompileForHostPlatforms(resolved, map[string]execution.HostPlatform{
+		"image": execution.HostPlatformLinuxARM64,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	amd64Digest, err := amd64Graph.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	arm64Digest, err := arm64Graph.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if amd64Digest == arm64Digest {
+		t.Fatal("distinct VM execution-host platforms produced the same logical build identity")
 	}
 }
 

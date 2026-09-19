@@ -43,14 +43,15 @@ must produce. Each named output is an independent required use, even when two ou
 _Avoid_: Observed artifact, delivery route
 
 **Disk-image output**:
-A named output containing exactly one disk-producing catalog component. The disk format and encryption
-metadata describe the delivered bytes independently of the builder that produces them.
+A named output containing exactly one disk-producing catalog root plus every explicitly selected component in
+that root's material closure. The disk format and encryption metadata describe the delivered bytes independently
+of the builder that produces them.
 _Avoid_: Container image, builder type, running node
 
 **Aggregate OS producer**:
 A catalog producer that emits one baked disk containing several stack layers. Embedded components retain
 their own material identities and evidence relationships; one disk does not establish independent production
-or verification of those layers. Disk-image lowering and execution require an explicitly admitted capability.
+or verification of those layers. Compiler-only disk lowering grants no execution or evidence capability.
 _Avoid_: Independent layer outputs, qualified release evidence
 
 **Required output slot**:
@@ -189,8 +190,9 @@ _Avoid_: Execution admission, runtime proof, execution class, provider attestati
 **VM-image producer form**:
 The catalog-selected invocation contract within a VM-image component: either an exact command argument vector or
 a direct-Packer project, build name, and public variable bindings. Material bindings are shared authoring data,
-but only direct Packer currently names an explicit manifest handoff; command/Make lowering remains unavailable
-until it gains a typed handoff instead of an inferred argument or environment variable.
+but only direct Packer currently names an explicit manifest handoff. A command producer without materials lowers;
+a material-bearing command/Make producer remains unavailable until it gains a typed handoff instead of an
+inferred argument or environment variable.
 _Avoid_: Builder type, output format, evidence lane
 
 **Build-material manifest**:
@@ -201,6 +203,6 @@ _Avoid_: Node-SKU staging manifest, producer receipt, absolute staging path
 
 **VM-image builder**:
 A from-source builder capability for a disk-image output. The catalog binds one VM-image producer form and its
-artifact path. Generic build requirements use the shared execution contract; typed VM lowering and execution
-remain separately admitted capabilities.
+artifact path. Generic build requirements use the shared execution contract. Typed IR/Plan lowering is admitted;
+VM execution remains a separately admitted capability.
 _Avoid_: Disk format, public output format, virtual machine artifact
