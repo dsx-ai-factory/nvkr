@@ -69,9 +69,12 @@ canonical, trust, evidence, status and release invariants. `client/v1` is a cont
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
 
+`status.AcceptDiagnosticCheckpoint` owns protected minimum reads, exact document authentication, checkpoint
+verification and receipt-derived byte-CAS persistence before interpreting withdrawal. Its caller-supplied epoch
+and returned decision remain diagnostic; this operation adds no trusted-time or release authority.
 `catalog.UpdateSourcePins` and `UpdateArtifactPins` own selection, resolution, change detection and the existing
 lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
-not reconstruct pin-update transactions.
+not own the persisted status schema or reconstruct pin-update transactions.
 
 Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
@@ -220,7 +223,8 @@ additionally prove pre-canceled/no-I/O admission, legacy-provider rejection, no-
 file/aggregate byte ceilings, deterministic directory count/depth ceilings, and context-aware lock
 snapshot/update behavior.
 
-Catalog maintenance contracts cover no-op bytes, source check mode,
+Status operation and state contracts cover commit-before-withdrawal, authentication and CAS failures, replay,
+protected reads and kernel-released locks. Catalog maintenance contracts cover no-op bytes, source check mode,
 whole-update CAS and artifact selection before upstream calls.
 
 The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and

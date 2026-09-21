@@ -1,6 +1,8 @@
 // Package status authenticates signed status declarations and complete checkpoints.
-// Diagnostic evaluation uses an explicit epoch, pinned signer policy, and an exact
-// high-water mark. Registry discovery and release authorization are not implemented.
+// AcceptDiagnosticCheckpoint owns protected high-water storage, signature and
+// complete-set verification, and commit-before-decision ordering. Diagnostic
+// evaluation uses an explicit epoch and pinned signer policy; registry discovery
+// and release authorization are not implemented.
 package status
 
 import (

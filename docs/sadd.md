@@ -314,7 +314,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
-| Release authority and durable status | `release`, `status` | Authorization, freshness, durable publication/activation contracts |
+| Release authority and durable status | `release`, `status` | Status owns diagnostic checkpoint acceptance and high-water persistence; qualified release authorization, trusted time and publication remain deferred |
 | External rendering | `aicr` | Typed output settings and exact pinned external AICR execution |
 | Public adaptation | `errors`; `client/v1` and `cmd/nkdctl` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
 

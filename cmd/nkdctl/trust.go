@@ -38,7 +38,7 @@ func trustStorePath(c *cli.Context) string {
 
 func loadTrustStoreFile(ctx context.Context, path string) (trustStoreFile, error) {
 	var s trustStoreFile
-	if err := statusContextError(ctx, "reading trust store"); err != nil {
+	if err := inputContextError(ctx, "reading trust store"); err != nil {
 		return s, err
 	}
 	err := readCanonicalJSONContext(ctx, path, &s)
