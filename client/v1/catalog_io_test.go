@@ -125,6 +125,7 @@ func TestInvalidProducerSelectionPrecedesCatalogIO(t *testing.T) {
 		{Platform: "linux/amd64"},
 		{Components: []string{"kubectl", "kubectl"}, Platform: "linux/amd64"},
 		{Components: []string{"kubectl"}, Platform: "linux/amd64", AICRProfile: "profile"},
+		{Components: []string{"kubectl"}, Platform: "linux/amd64", OutputFormat: "archive"},
 	} {
 		catalogIO := &countingCatalogIO{}
 		resolution, err := client.New(client.WithCatalogIO(catalogIO)).ResolveBuild(context.Background(), request)

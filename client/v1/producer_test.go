@@ -61,6 +61,17 @@ func TestResolveBuildEqualsAuthoritativeModules(t *testing.T) {
 
 }
 
+func TestResolveBuildCarriesOutputFormatToResolution(t *testing.T) {
+	data := filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")
+	resolution, err := client.New(client.WithData(data)).ResolveBuild(context.Background(), client.ResolveRequest{
+		Components: sdkFixtureComponents(), Platform: "linux/amd64", OutputFormat: "disk-image",
+	})
+	if resolution != nil || errorCode(err) != nkderr.CodeInvalidCatalog ||
+		!strings.Contains(err.Error(), "selects no QCOW2 root") {
+		t.Fatalf("disk output format was not enforced during SDK resolution: resolution=%+v err=%v", resolution, err)
+	}
+}
+
 func TestResolveBuildRequiresExplicitCatalog(t *testing.T) {
 	_, err := client.New().ResolveBuild(context.Background(), client.ResolveRequest{})
 	if errorCode(err) != nkderr.CodeUsage || !strings.Contains(err.Error(), "requires catalog I/O") {

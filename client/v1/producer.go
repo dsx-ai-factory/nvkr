@@ -14,10 +14,11 @@ import (
 // ResolveRequest selects exact catalog producers for one output. OutputName optionally
 // asks the injected AtomicOutput to commit the canonical full execution graph.
 type ResolveRequest struct {
-	Components  []string
-	Platform    string
-	AICRProfile string
-	OutputName  string
+	Components   []string
+	Platform     string
+	OutputFormat string
+	AICRProfile  string
+	OutputName   string
 }
 
 // Resolution is the resolved declaration and its one compiled authoritative graph.
@@ -39,7 +40,8 @@ func (c *Client) ResolveBuild(ctx context.Context, request ResolveRequest) (*Res
 	if c.catalogIO == nil {
 		return nil, e.New(e.CodeUsage, "build resolution requires catalog I/O")
 	}
-	selection := buildgraph.Selection{Components: request.Components, Platform: request.Platform, AICRProfile: request.AICRProfile}
+	selection := buildgraph.Selection{Components: request.Components, Platform: request.Platform,
+		OutputFormat: request.OutputFormat, AICRProfile: request.AICRProfile}
 	if err := selection.Validate(); err != nil {
 		return nil, err
 	}

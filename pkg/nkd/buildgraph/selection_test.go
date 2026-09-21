@@ -144,6 +144,31 @@ func TestResolveDiskSelectionRequiresOneRootAndItsExactMaterialClosure(t *testin
 			components: []string{"image", "runtime", "tool"},
 		},
 		{
+			name: "multi-level diamond closure",
+			mutate: func(cat *catalog.Catalog) {
+				runtime := testVMImageComponent([]execution.HostPlatform{execution.HostPlatformLinuxAMD64}, execution.CapabilityPreferred)
+				runtime.Materials = map[string]string{"grandchild-package": "grandchild"}
+				cat.Components["runtime"] = runtime
+				cat.Components["grandchild"] = cat.Components["tool"]
+				image := cat.Components["image"]
+				image.Materials["grandchild-package"] = "grandchild"
+				cat.Components["image"] = image
+			},
+			components: []string{"grandchild", "image", "runtime", "tool"},
+		},
+		{
+			name: "missing transitive grandchild",
+			mutate: func(cat *catalog.Catalog) {
+				runtime := testVMImageComponent([]execution.HostPlatform{execution.HostPlatformLinuxAMD64}, execution.CapabilityPreferred)
+				runtime.Materials = map[string]string{"grandchild-package": "grandchild"}
+				cat.Components["runtime"] = runtime
+				cat.Components["grandchild"] = cat.Components["tool"]
+			},
+			components: []string{"image", "runtime", "tool"},
+			wantCode:   e.CodeInvalidCatalog,
+			wantText:   "incomplete material set",
+		},
+		{
 			name:       "disk root with executable format",
 			components: []string{"image", "runtime", "tool"},
 			format:     "executable",
@@ -174,6 +199,16 @@ func TestResolveDiskSelectionRequiresOneRootAndItsExactMaterialClosure(t *testin
 			components: []string{"image", "runtime", "tool", "unrelated"},
 			wantCode:   e.CodeInvalidCatalog,
 			wantText:   "outside root \"image\" material closure: unrelated",
+		},
+		{
+			name: "multiple unrelated components are reported canonically",
+			mutate: func(cat *catalog.Catalog) {
+				cat.Components["zeta"] = cat.Components["tool"]
+				cat.Components["alpha"] = cat.Components["tool"]
+			},
+			components: []string{"zeta", "tool", "runtime", "image", "alpha"},
+			wantCode:   e.CodeInvalidCatalog,
+			wantText:   "outside root \"image\" material closure: alpha, zeta",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
