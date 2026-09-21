@@ -2,6 +2,8 @@ package factory
 
 import (
 	"context"
+	"fmt"
+	"io"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -31,4 +33,19 @@ func inspectFactoryImage(ctx context.Context, plan *Plan, artifact Artifact) (de
 		return delivery.ImageInspection{}, e.New(e.CodeVerifyFailed, "image output %q has no unique build platform", artifact.Name)
 	}
 	return delivery.InspectContainerImage(ctx, artifact.Path, platform)
+}
+
+func executeImagePackage(ctx context.Context, plan *Plan, node Node, output Artifact, inputs []Artifact, stdout io.Writer) error {
+	if len(inputs) != 1 || inputs[0].Kind != "oci-image" {
+		return e.New(e.CodeInvalidCatalog, "container image package %q requires one OCI export", node.ID)
+	}
+	digest, err := digestFactoryPath(ctx, inputs[0].Path)
+	if err != nil {
+		return err
+	}
+	image, err := delivery.ImportContainerImage(ctx, inputs[0].Path, digest, "linux/"+packageArch(plan, inputs), output.Path)
+	if err == nil {
+		fmt.Fprintf(stdout, "Packaged container image %q: manifest %s\n", output.Name, image.ManifestDigest)
+	}
+	return err
 }
