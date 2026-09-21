@@ -5,6 +5,7 @@ package execution
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -142,7 +143,7 @@ func TestLinuxLocalObserverRechecksWorkspaceAccess(t *testing.T) {
 	}
 }
 
-func TestLinuxLocalObservationExercisesSystemProbesOnce(t *testing.T) {
+func TestLinuxLocalObservationExercisesSystemProbesOnceOrFailsClosed(t *testing.T) {
 	kvm := systemKVMOperations
 	kvm.open = func(string, int, uint32) (int, error) { return -1, unix.ENOENT }
 	lease, err := openLinuxLocalObservation(context.Background(), openLocalWorkspace(t), unix.Faccessat, kvm)
@@ -156,7 +157,20 @@ func TestLinuxLocalObservationExercisesSystemProbesOnce(t *testing.T) {
 	})
 	facts, err := lease.Observe(context.Background())
 	if err != nil {
-		t.Fatal(err)
+		var pathErr *os.PathError
+		if errorCode(err) != nkderr.CodeEngineCapability || !errors.Is(err, fs.ErrNotExist) ||
+			!errors.As(err, &pathErr) {
+			t.Fatalf("system observation error = %v, want successful facts or a missing cgroup control", err)
+		}
+		switch filepath.Base(pathErr.Path) {
+		case "cpu.max", "memory.max", "memory.current":
+		default:
+			t.Fatalf("system observation unexpectedly lacked %q: %v", pathErr.Path, err)
+		}
+		if _, err := lease.Observe(context.Background()); errorCode(err) != nkderr.CodeInternal {
+			t.Fatalf("second observation error = %v, want %s", err, nkderr.CodeInternal)
+		}
+		return
 	}
 	wantPlatform, err := hostPlatformForMachine(runtime.GOARCH)
 	if err != nil {
@@ -190,8 +204,8 @@ func TestLinuxLocalObservationDuplicatesHeldVMCapabilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("lease type = %T, want *linuxLocalObservation", lease)
 	}
-	if _, err := observation.Observe(context.Background()); err != nil {
-		t.Fatal(err)
+	if available, err := observation.observeKVM(); err != nil || !available {
+		t.Fatalf("injected KVM observation = %t, %v; want available", available, err)
 	}
 	workspace, err := observation.holdWorkspace()
 	if err != nil {
