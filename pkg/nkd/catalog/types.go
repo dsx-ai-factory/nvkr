@@ -4,6 +4,10 @@
 // sources + components, and a machine-managed lockfile that pins each source, so
 // version bumps churn only the lock (ADR-22). Callers supply the catalog explicitly;
 // maintained product inputs live with their owning Definition.
+//
+// LoadContext owns bounded loading; resolution and declaration/producer admission
+// stay private to this package. UpdateSourcePins and UpdateArtifactPins own pin
+// maintenance through the same protected lock snapshot and compare-and-swap writer.
 package catalog
 
 import (

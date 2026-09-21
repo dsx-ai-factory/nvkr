@@ -69,6 +69,10 @@ canonical, trust, evidence, status and release invariants. `client/v1` is a cont
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
 
+`catalog.UpdateSourcePins` and `UpdateArtifactPins` own selection, resolution, change detection and the existing
+lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
+not reconstruct pin-update transactions.
+
 Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
@@ -215,6 +219,9 @@ catalog I/O; the independent disk-envelope decode lane does not require producer
 additionally prove pre-canceled/no-I/O admission, legacy-provider rejection, no-follow regular-file reads,
 file/aggregate byte ceilings, deterministic directory count/depth ceilings, and context-aware lock
 snapshot/update behavior.
+
+Catalog maintenance contracts cover no-op bytes, source check mode,
+whole-update CAS and artifact selection before upstream calls.
 
 The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and
 Linux race tests provide contract evidence; repository checks are recorded in reconciliation.

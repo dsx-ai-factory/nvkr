@@ -305,7 +305,7 @@ in reconciliation; a facade alone does not discharge that debt.
 
 | Responsibility | Owning modules under `pkg/nkd` | Boundary |
 |---|---|---|
-| Canonical identity and resolution | `canonical`, `ir`, `target`, `catalog`, `buildgraph` | Authenticate and normalize inputs into deterministic logical identities |
+| Canonical identity and resolution | `canonical`, `ir`, `target`, `catalog`, `buildgraph` | Authenticate and normalize inputs into deterministic logical identities; catalog owns source/artifact pin maintenance and its lock transaction |
 | Execution requirements | `execution` | Own reusable per-step runner request shape; grant no runner capability |
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |

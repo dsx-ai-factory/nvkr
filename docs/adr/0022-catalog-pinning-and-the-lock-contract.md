@@ -104,6 +104,13 @@ lack the deep context interface remain usable only through the synchronous diagn
 
 ### 4. `catalog pin` / `bump` machine-manage the lock; `--check` is the dry-run
 
+`catalog.UpdateSourcePins` and `catalog.UpdateArtifactPins` own selection, resolution, change detection and
+commit. They accept typed maintenance requests and return descriptive change summaries; the lock's original
+snapshot remains private. Source selections retain request order, so an earlier source may resolve before a
+later unknown source fails, but no partial update commits. Artifact selections and complete architecture sets
+are admitted before upstream calls. No-op updates preserve existing lock bytes. Source check mode returns
+`CodeDiff` when changes are available without writing; artifact pinning does not acquire a new check mode.
+
 - `catalog pin <source> --tag vX.Y.Z` — resolve that tag → `{tag, commit, treeHash, sourceDateEpoch}` → write
   the lock entry.
 - `catalog bump [--pins|--artifacts|--all]` — for each source, find the newest tag matching its `constraint`
@@ -286,7 +293,8 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
 ## Acceptance evidence
 
 Current contract evidence in `pkg/nkd/catalog/load_test.go`, `provider_context_test.go`, `pin_context_test.go`,
-`prebuilt_test.go`, `lock_contract_test.go`, and `client/v1/catalog_io*_test.go` covers strict schema/unknown
+`prebuilt_test.go`, `lock_contract_test.go`, `pin_update_test.go`, `pin_artifact*_test.go`, and
+`client/v1/catalog_io*_test.go` covers strict schema/unknown
 fields, exact source/artifact key-set completeness, orphan and architecture rejection, deep-context admission,
 pre-canceled/no-I/O behavior, no-follow regular files, byte/count/depth limits, deterministic listings and
 canonical bytes, registry+lock snapshot CAS, one-winner concurrent writes, atomic replacement, and preservation
