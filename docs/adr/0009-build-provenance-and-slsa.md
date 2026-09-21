@@ -89,6 +89,12 @@ reproducible identity and cannot replace §1's reproduction predicate.
 | `internalParameters` | Exactly generator version and signing mode; an authenticated helper-execution identity remains a distinct qualified-lane requirement |
 | `resolvedDependencies` | Source commits/trees, toolchains, plan, and declared embedded components |
 
+The plan-level `buildType` is deliberately the weakest applicable production lane: one wrapped or
+network-enabled producer keeps the complete plan `wrapped-build`. Stronger evidence for an exact component may
+remain independently inspectable, but it cannot promote the aggregate production predicate. Likewise, a list of
+matching resolved dependencies records what the producer consumed; it does not assert that the produced subject
+was byte-reproduced.
+
 The Definition and Environment parameters identify the admitted authored inputs directly. Run plan v4 carries
 those exact values and revalidates their identities before execution or attestation. The retired compile-spec
 and execution-settings objects are not provenance dependencies. Their replacement changes the NKD build-type

@@ -68,8 +68,8 @@ Every resolved input has two different representations:
   that logical input. Transport bindings are execution configuration, not build semantics.
 
 Changing source mirrors or registry transport MUST preserve the selected logical input. Before an input
-crosses into an offline build node, execution verifies that bytes fetched through the binding reproduce its
-pinned source tree/content identity. A binding that resolves to different bytes fails closed. The full executable
+crosses into an offline build node, execution verifies that bytes fetched through the binding match its pinned
+source tree/content identity. A binding that resolves to different bytes fails closed. The full executable
 graph and Plan retain transport settings and their exact byte identities. Excluding locators from `buildDigest`
 does not authorize unchecked relocation. A general air-gap lifecycle remains outside the current scope.
 

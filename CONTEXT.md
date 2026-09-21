@@ -51,7 +51,8 @@ _Avoid_: Container image, builder type, running node
 **Aggregate OS producer**:
 A catalog producer that emits one baked disk containing several stack layers. Embedded components retain
 their own material identities and evidence relationships; one disk does not establish independent production
-or verification of those layers. Compiler-only disk lowering grants no execution or evidence capability.
+or verification of those layers. Reproduced or digest-verified inputs do not make the aggregate disk
+byte-reproduced. Compiler-only disk lowering grants no execution or evidence capability.
 _Avoid_: Independent layer outputs, qualified release evidence
 
 **Required output slot**:
@@ -104,6 +105,21 @@ _Avoid_: Parsed document, caller-set verified flag, digest string
 **Reproduction expectations**:
 Publisher-owned signed expected artifact identities against which an independent reproduction is compared; the legacy wire record is the ValidationVector.
 _Avoid_: Reproduction observation, generic validation result
+
+**Producer evidence scope**:
+The evidence-supported statement for one exact producer output. A from-source output may be independently
+byte-reproduced; a byte-preserving acquisition may be checked against its pinned digest without making an
+upstream build claim; and a non-reproducible producer may be rebuilt with authenticated dependencies and have
+its resulting contents inspected. The last case is content validation, not a `Reproduced` verdict. These are
+claim scopes, not a new public object or caller-selected wire enum.
+_Avoid_: Source lane, aggregate release verdict, caller assertion
+
+**Aggregate evidence floor**:
+The rule that an aggregate artifact cannot inherit a stronger claim from its inputs. Component evidence remains
+individually inspectable, but a wrapped or merely content-validated root keeps the aggregate output in the
+pipeline-attested lane. Exact delivery identity, material equality, SBOM agreement, and content validation do
+not substitute for an independent exact-byte reproduction of the aggregate claim subject.
+_Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.

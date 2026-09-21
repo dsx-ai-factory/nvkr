@@ -18,10 +18,12 @@
 
 ## Context
 
-The IR must become a **concrete, realized pipeline** on whichever CI engine an operator runs, and every engine
-must build **byte-identically** and **hermetically**. The open question is what executes each build node, and how
-that stays identical across engines without a fragile parallel implementation of rendered strings that must be
-kept in sync.
+The IR must become a **concrete, realized pipeline** on whichever maintained execution target an operator runs.
+For an exact subject in the qualified lane, each admitted environment must build hermetically and the independent
+outputs must compare byte-identically. Pipeline-attested producers instead retain their stated evidence contract;
+matching their inputs or content does not turn their output into a reproduction. The open question is what
+executes each build node, and how execution semantics stay aligned across environments without a fragile parallel
+implementation of rendered strings that must be kept in sync.
 
 ## Decision
 
@@ -405,8 +407,9 @@ the finalizer itself from starting; inspect provider status when no Run record e
 ## De-risking spikes
 
 1. **Helper isolation** — exercise the same local and hosted launch path with real pinned containers, network-egress probes, read-only inputs, UID ownership, cancellation and nested-runtime capability failures.
-2. **Runner provenance** — prove both allowed origins: a self-hosted runner builds reproducibly and binds its
-   actual bootstrap toolchain, while a preexisting runner binds its exact bytes and no bootstrap identity.
+2. **Runner provenance** — prove both allowed origins: a self-hosted runner is reproduced as its own exact
+   qualified subject and binds its actual bootstrap toolchain, while a preexisting runner binds its exact bytes
+   and no bootstrap identity. Neither statement reproduces the producer output that the runner later executes.
 3. **Transport/failure matrix** — for every engine, prove the runner, inputs, outputs, node receipts, and the
    ValidationVector reach their consumers, and that an intentionally omitted or corrupted item fails closed.
 

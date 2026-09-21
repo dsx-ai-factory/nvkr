@@ -12,7 +12,7 @@
 
 ## Context
 
-NKD turns verified artifacts into deterministic delivery artifacts: packages, images, and bootable node disks.
+NKD turns verified inputs into digest-identified delivery artifacts: packages, images, and bootable node disks.
 The disk story has a load-bearing boundary — RAW is the only canonical disk artifact. Delivery is packages-first
 and BYO-OS as the target model, while the current NKE compatibility path ships a source-owned aggregate image.
 Each named output selects its exact producers and delivery format. This ADR fixes the canonical disk model,
@@ -34,6 +34,21 @@ Exact delivery identity is separate from qualified reproduction identity. The SH
 exact delivered container bytes and the full-disk SBOM subject. An OCI manifest that carries those bytes has a
 different digest. A future qualified claim names the decoded canonical RAW identity as well; none of these
 digests may be substituted for another.
+
+Disk evidence therefore has three non-interchangeable scopes:
+
+- **Delivery identity:** hash, sign, attest, and consume the exact QCOW2 bytes produced by one Run.
+- **Content validation:** authenticate the material closure, inspect the final disk read-only, and reconcile its
+  packages and selected files with those materials. A second validated build with a different QCOW2 digest is a
+  different Artifact, not a reproduced variant.
+- **Qualified reproduction:** independently rebuild and exact-match the ADR-07/08 expectation for the decoded
+  canonical RAW subject. Matching materials or filesystem inventory cannot replace this comparison.
+
+Installer-generated timestamps, filesystem identifiers, journal state, machine identity, generated keys, and
+network-resolved packages can change logical disk bytes. Pre-staging and pinning dependencies improves
+hermeticity and auditability but does not by itself normalize those outputs. An installer-built Ubuntu disk is
+therefore pipeline-attested until recorded evidence demonstrates the qualified RAW comparison; the architecture
+must not convert content validation into a weaker `Reproduced` verdict.
 
 At NKE commit `6df693a`, the [Make target](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
 produces a QCOW2 and the [hosted workflow](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)
@@ -75,6 +90,10 @@ A **pre-encryption boundary marker** is part of the `DiskManifest`. A request to
 encrypted or LUKS bytes **fails closed** with a distinct coded error: ciphertext is never hashed and mistaken for
 a reproduction. **FDE is an explicit transformation** applied *after* the canonical pre-encryption RAW digest is
 computed and attested, and the encrypted output gets its own **non-reproduction** identity.
+
+Reproduced or digest-verified plaintext inputs remain independently visible evidence, but they do not make the
+encrypted delivery bytes reproducible. Inspection of an authenticated unlocked view can establish composition;
+the ciphertext still has only its exact per-artifact delivery identity.
 
 The authoring schema can represent the current NKE `luks2` component without asserting that qualified boundary.
 The [current FDE design](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/docs/full-disk-encryption.md#L14-L34)
@@ -121,6 +140,8 @@ deployment. No provisioning bundle or node-SKU interface is retained without a s
   identity and the SBOM subject.
 - **Treat ISO as a derived envelope decoded to RAW.** Rejected — an ISO is not a block image of the RAW, so there
   is no meaningful decode-to-RAW.
+- **Treat matching package/file inventories as disk reproduction.** Rejected — semantic agreement is valuable
+  content validation but permits different bytes and cannot satisfy an exact-byte qualified claim.
 - **Make aggregate baked images the primary delivery model.** Rejected — packages-first, thin-base, BYO-OS is
   the target delivery. The current NKE aggregate disk remains an explicit compatibility output while its
   embedded components are separated into independent layers.

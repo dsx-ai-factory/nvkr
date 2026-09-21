@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-09-18. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
+Reviewed 2026-09-21. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
 Each ADR contains its current lane-specific decision; no amendment chain is needed. Code/tests establish
 implementation. Contract tests, recorded external runs, and organizational acceptance are separate facts.
 
@@ -16,6 +16,10 @@ neither binary-bundle packaging nor an ordinary per-component SBOM for the disk.
 producer metadata is accepted. VM execution, disk observation and full-disk SBOM generation, OCI or object-store publication, and
 artifact-level disk compatibility are unimplemented. Deployment topology and cluster runtime qualification
 belong to downstream owners. No existing NKE OS build or publication is claimed.
+The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
+producer evidence verdict, performs content validation, or claims qualified disk reproduction. Reproduced or
+digest-verified materials cannot upgrade a future wrapped aggregate disk; its exact QCOW2 digest would identify
+one delivered Artifact until ADR-14's canonical disk comparison is independently demonstrated.
 Generic from-source `buildRequirements` are schema-validated, bound catalog → build IR → Plan, and excluded from
 build identity. Other node kinds reject the field until they have an explicit compiler projection. Environment
 execution classes now declare routes, host platforms, resource capacity, capabilities, and timeout ceilings.

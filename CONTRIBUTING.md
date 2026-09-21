@@ -1,7 +1,8 @@
 # Contributing to NKE Recipes
 
-Thanks for your interest. NKE Recipes is an Apache-2.0 implementation of a pinned, reproducible
-Definition → Run → Release architecture. This guide covers the dev loop, the
+Thanks for your interest. NKE Recipes is an Apache-2.0 implementation of a pinned, verifiable
+Definition → Run → Release architecture. Exact-byte reproduction is a separate qualified claim for an exact
+subject; it is not inherited by every pipeline or aggregate artifact. This guide covers the dev loop, the
 contribution mechanics, and the invariants a change must respect. See **[DEVELOPMENT.md](DEVELOPMENT.md)**
 for a deeper environment walkthrough and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)**. The
 **[ADR reconciliation](docs/adr/reconciliation.md)** is the authority for current support and evidence claims.

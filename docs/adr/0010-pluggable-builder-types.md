@@ -15,9 +15,11 @@
 
 ## Context
 
-NKD builds a Kubernetes substrate from upstream source, reproducibly. It will use **Nix** both to provide
-repeatable build environments and to build certain components (notably Kubernetes upstream), so the architecture
-must **orchestrate more than one builder**.
+NKD builds a Kubernetes substrate from pinned upstream inputs and preserves the evidence appropriate to each
+producer. Qualified components may be reproduced exactly; wrapped aggregate artifacts remain pipeline-attested
+until their own qualified subjects reproduce. NKD will use **Nix** both to provide repeatable build environments
+and to build certain components (notably Kubernetes upstream), so the architecture must **orchestrate more than
+one builder**.
 
 The SRD is **neutral on build substrate**. It imposes two relevant constraints: the core must be releasable under
 **Apache-2.0** with no *incompatible dependency linked into* it, and only a **qualified** substrate falls inside
@@ -57,9 +59,10 @@ constraint, and Nix can enter the reproducibility boundary only after its execut
    its selected producer form, exact source-owned entrypoint, declared variable and material bindings, pinned
    toolchain closure, and output contract are likewise build-semantic inputs.
 
-5. **Verification is builder-agnostic.** Verify recomputes and compares **artifact digests** and is indifferent to
-   how an artifact was produced. The trust, attestation, and verification model is therefore unchanged; a builder
-   type is only a new way to *populate* a build step.
+5. **Verification is builder-agnostic and subject-scoped.** Verify recomputes and compares the exact **artifact
+   digests** covered by the requested claim and is indifferent to how each artifact was produced. A dependency's
+   reproduced digest cannot satisfy its consumer's subject. The trust, attestation, and verification model is
+   therefore unchanged; a builder type is only a new way to *populate* a build step.
 
 6. **Uniform invocation.** All builders are invoked through the **same lowering path**, so the local runner and
    every CI backend emit an identical, byte-comparable invocation. `nix` runs inside a **pinned, digest-addressed
@@ -220,6 +223,13 @@ satisfy the same contracts as a direct Packer build. A direct Packer invocation 
 no qualification merely because NKD recognizes its driver. Networked or opaque acquisition inside either driver
 remains pipeline-attested or fails qualified admission, according to the selected lane. Make also remains a valid
 command entrypoint for non-VM builders under their existing contracts.
+
+Material producers retain their own evidence scope. A package rebuilt byte-identically may carry qualified
+reproduction evidence, and a byte-preserving acquisition may carry exact digest verification without an upstream
+build claim. The VM-image root does not inherit either claim. Rebuilding that root from the same authenticated
+closure and reconciling read-only disk inspection establishes controlled production and composition; it does not
+establish disk reproduction. The root remains pipeline-attested unless ADR-07/08/14 independently admit and
+compare its exact qualified disk subject.
 
 Runner capacity is not part of `vm-image`. A from-source component may declare generic `buildRequirements`
 using ADR-18's per-step execution contract. A `vm-image` producer must use that same generic type to declare a

@@ -138,6 +138,13 @@ A catalog declaration may validate without those tools, but it is not a disk SBO
 Disk Plan lowering, material tracing, inspection, reconciliation, and evidence publication are not implemented
 by the authoring schema.
 
+This reconciliation proves the composition observed in one exact disk; it is not a reproduction comparison.
+Matching dependency digests, installed-package sets, selected file hashes, or SBOM documents across two Runs can
+support content validation and diagnose drift, but cannot mint `Reproduced` when the qualified artifact subject
+differs. Each different QCOW2 digest remains a new Artifact identity with its own SBOM subject and production
+provenance. Independently reproduced or acquired materials keep their own evidence relationships without
+upgrading the disk that consumed them.
+
 For binaries and OCI image exports, the SBOM owner invokes the pinned scanner as an owned, bounded subprocess
 inside the offline utility container. Inputs are held and checked against producer digests. Syft's file resolver
 requires a pathname, so binary inspection uses a private read-only copy of held bytes and checks it again before

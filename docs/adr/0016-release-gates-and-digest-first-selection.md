@@ -157,6 +157,12 @@ dry-run stays static-unqualified. Pipeline-attested never satisfies qualified re
 Inventory, ReleaseSet, clearance, or stage-two receipt. The hosted design targets SLSA Build L2; that is an
 acceptance target, not a certification established by local tests.
 
+Evidence strength is subject-scoped. A Release may expose independently reproduced or digest-verified component
+evidence beside a pipeline-attested aggregate artifact, but the stronger component evidence cannot upgrade that
+aggregate or the Release lane. A content-validated rebuild proves neither exact-byte reproduction nor upstream
+construction. Qualified promotion under §1–§4 remains all-or-nothing for its exact required release members;
+there is no mixed-evidence shortcut around a missing reproduction receipt.
+
 V1 full-release acceptance is a **deferred** build/evidence qualification gate and versioned release manifest.
 Qualification checks schema, pins (including embedded-component consistency), signatures, production attestations,
 and a tooling smoke test in a network-disabled container. Every subject receives one pass/fail/waived verdict;

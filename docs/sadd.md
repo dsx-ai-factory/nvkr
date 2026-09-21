@@ -2,7 +2,7 @@
 
 ## PLC-L1: Basic PLC: Software Architecture and Design Document
 
-- **Revision:** 2026-09-18 — consolidated compilation and publication ownership
+- **Revision:** 2026-09-21 — subject-scoped reproduction and aggregate disk evidence
 - **Status:** Draft; ADR-01 through ADR-22 pending named-decider ratification
 - **Review scope:** shared definition architecture, v1 artifact delivery, and the separate qualified release contract
 
@@ -35,7 +35,7 @@ separate acceptance decisions:
 | Concern | v1 delivery — `pipeline-attested` | Qualified release — `qualified` |
 |---|---|---|
 | Producer and consumer | NVIDIA's hosted workflow produces artifacts; consumers verify the published digest | Publisher provides signed expected identities; an operator reproduces and verifies in its own environment |
-| Claim | Production by a named workflow with signed SLSA v1 production provenance; ADR-16 §5 targets SLSA Build L2 | Exact-byte reproduction within a signed builder profile, supported by authenticated execution observations |
+| Claim | Production by a named workflow with signed SLSA v1 production provenance; ADR-16 §5 targets SLSA Build L2 | Exact-byte reproduction of each named claim subject within a signed builder profile, supported by authenticated execution observations |
 | Execution | GitHub-hosted amd64 runners; declared hermetic, wrapped, or acquired source lane | Profile-bounded execution with authenticated runtime and terminal receipts; unsupported providers fail closed |
 | Publication | Signed artifact bytes in OCI; planned build/evidence qualification and release manifest | Operator-owned publication of a complete cleared release through the Publication Root protocol |
 | Consumer policy | Keyless build identity and issuer; separate qualification identity for the planned M3 gate | Trusted roles, reproduction, compatibility, conformance, evidence, policy, and fresh status |
@@ -126,6 +126,9 @@ These remain typed and inspectable. Normal callers do not construct and connect 
 
 Source lane describes how bytes were obtained: `hermetic-build`, `wrapped-build`, or `acquired`. Evidence tier
 describes the claim attached to those bytes. Neither is a synonym for artifact format or release status.
+Evidence is subject-scoped: an independently reproduced component, an exact digest-verified acquisition, and a
+content-validated aggregate may coexist in one build graph without collapsing into one verdict. Stronger input
+evidence remains visible but never upgrades the aggregate that consumed it.
 
 ## References {#references}
 
@@ -255,6 +258,9 @@ the exact source and material producers and projects the root QCOW2 without bina
 execution and disk-specific observation remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
 disk delivery is admitted, ADR-13 also requires a full inventory reconciling traced materials with read-only
 inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
+It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
+material identities and inspected contents establish a controlled, content-validated rebuild. Only an
+independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
 
 Each AICR output selects its own typed bundle settings. The compiler normalizes effective defaults, binds them
 to build identity, and passes those exact settings to the renderer. Removing deployment topology cannot silently
@@ -515,6 +521,9 @@ can authenticate their retained documents and status checkpoints without authori
 The publisher creates a signed ValidationVector of expected identities. The operator admits the signed builder
 profile, materializes exact inputs, executes through authenticated runtime boundaries, and independently compares
 outputs. Reproduction provenance is deterministic and remains separate from v1 production provenance.
+The comparison is per exact subject. A reproduced package remains useful evidence when consumed by a wrapped
+disk build, but it cannot reproduce the disk by transitivity. A disk rebuilt from the same authenticated closure
+with a matching package/file inventory is content-validated, not byte-reproduced.
 
 ```mermaid
 flowchart TB
@@ -538,6 +547,9 @@ logical bytes define qualified-reproduction identity. These digests are separate
 another; authenticated evidence binds the delivery envelope to its decoded representation. Encryption creates a
 distinct identity outside pre-encryption reproduction (ADR-14). Variance classification cannot currently
 authorize release. Nix is a selected qualified builder design, but its execution capability is unavailable.
+Installer-generated filesystem state and network-resolved inputs keep an Ubuntu aggregate in the
+pipeline-attested lane unless a recorded bake-off proves the canonical RAW comparison. Hermetic inputs alone do
+not prove deterministic output.
 
 Accepted artifact references can be consumed by a downstream deployer. NKD does not generate a cluster
 realization or define a cluster qualification protocol. Deployment descriptions and runtime validation belong

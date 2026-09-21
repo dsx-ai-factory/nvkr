@@ -36,6 +36,11 @@ resolved-input-manifest }`**. Build Digest identifies the logical graph derived 
 target and pinned content inputs. Builder-profile identity, observed engine class and later runtime
 observations are separate bindings and never inputs to that digest (IR-purity).
 
+The claim is scoped to the exact artifact subjects named by the authenticated expectation and observation. It
+does not flow transitively from a reproduced dependency into the artifact that consumes it. Equal dependency
+bytes prove only that the rebuild used the expected dependency; the consuming output receives a `Reproduced`
+verdict only when its own required bytes also exact-match the authenticated expectation.
+
 - **`engineClass`** is the **observed** build substrate a component was actually built under — one of
   `{ oci-hermetic, nix, prebuilt-acquire }` — **per component**, recorded in the **detached build record** and
   **verified equal** to the builder declared by the selected catalog producer. A mismatch — for example a producer that declares `nix`
@@ -134,6 +139,9 @@ pinning operators to a specific profile identity.
 
 A build may mix from-source (`oci-hermetic`/`nix`, profile-bound) and `prebuilt` (host-independent) components.
 
+- Evidence remains attributable to each exact producer output. A component may retain qualified reproduction
+  evidence even when a downstream aggregate is only pipeline-attested. Conversely, that component evidence
+  cannot upgrade the downstream aggregate or substitute for comparing its bytes.
 - There is **one** builder profile per build environment, covering **all** from-source components — it provides
   every builder they need. The **profile identity binds only the from-source subset** of the expected-digests
   manifest.
@@ -152,6 +160,10 @@ build (ADR-10) records declared runtime, network, and privilege without builder-
 reproduction claim. Neither a helper-image pin nor self-reported isolation may mint the missing stage-two
 receipt. Qualified helper-image admission remains unavailable until exact executable and runtime observations
 satisfy this protocol; delivery by image is not proof that the helper reproduced.
+
+A rebuild may still authenticate its dependency closure and validate the resulting artifact's contents. That is
+useful production and composition evidence, but it is not a weaker form of `Reproduced` and cannot satisfy a
+qualified reproduction gate. A nonmatching output is a new Artifact identity even when content policy accepts it.
 
 ## Consequences
 
