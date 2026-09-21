@@ -4,6 +4,7 @@ package execution
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"math"
 	"math/bits"
@@ -176,9 +177,13 @@ func effectiveCgroupCPUMillis(cgroupDir, cgroupRoot string, affinityMillis uint6
 		return 0, err
 	}
 	effective := affinityMillis
+	root := filepath.Clean(cgroupRoot)
 	for _, directory := range ancestry {
 		raw, err := readBoundedKernelText(filepath.Join(directory, "cpu.max"), 128)
 		if err != nil {
+			if directory == root && errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return 0, e.Wrap(e.CodeEngineCapability, err,
 				"reading cgroup CPU quota at %s", directory)
 		}
@@ -239,11 +244,19 @@ func effectiveCgroupMemoryMiB(cgroupDir, cgroupRoot string, hostAvailable uint64
 		return 0, err
 	}
 	effective := hostAvailable
+	root := filepath.Clean(cgroupRoot)
 	for _, directory := range ancestry {
 		maximumRaw, err := readBoundedKernelText(filepath.Join(directory, "memory.max"), 128)
 		if err != nil {
+			if directory == root && errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return 0, e.Wrap(e.CodeEngineCapability, err,
 				"reading cgroup memory limit at %s", directory)
+		}
+		maximum := strings.TrimSpace(maximumRaw)
+		if maximum == "max" {
+			continue
 		}
 		currentRaw, err := readBoundedKernelText(filepath.Join(directory, "memory.current"), 128)
 		if err != nil {
@@ -254,10 +267,6 @@ func effectiveCgroupMemoryMiB(cgroupDir, cgroupRoot string, hostAvailable uint64
 		if err != nil {
 			return 0, e.New(e.CodeEngineCapability,
 				"cgroup memory use at %s is malformed", directory)
-		}
-		maximum := strings.TrimSpace(maximumRaw)
-		if maximum == "max" {
-			continue
 		}
 		limit, err := strconv.ParseUint(maximum, 10, 64)
 		if err != nil || limit == 0 {

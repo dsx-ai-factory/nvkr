@@ -206,7 +206,11 @@ func (admission *LocalVMAdmission) Execute(
 	}
 	workErr := work(deadlineCtx, runtime)
 	if deadlineErr := deadlineCtx.Err(); deadlineErr != nil {
-		return e.Wrap(e.CodeTimeout, deadlineErr, "local VM execution exceeded its deadline")
+		cause := deadlineErr
+		if workErr != nil {
+			cause = errors.Join(workErr, deadlineErr)
+		}
+		return e.Wrap(e.CodeTimeout, cause, "local VM execution exceeded its deadline")
 	}
 	if workErr != nil {
 		var coded *e.Error

@@ -203,10 +203,27 @@ func TestEffectiveCgroupCapacityFailsClosedOnMissingControls(t *testing.T) {
 		t.Fatalf("missing ancestor CPU control error = %v, want %s", err, nkderr.CodeEngineCapability)
 	}
 	writeCgroupMemory(t, leaf, 0, 0)
-	writeCgroupMemory(t, parent, 0, 0)
-	writeCgroupValue(t, root, "memory.max", "max")
+	writeCgroupValue(t, parent, "memory.max", strconv.FormatUint(1024*1024*1024, 10))
 	if _, err := effectiveCgroupMemoryMiB(leaf, root, 2048); errorCode(err) != nkderr.CodeEngineCapability {
 		t.Fatalf("missing ancestor memory control error = %v, want %s", err, nkderr.CodeEngineCapability)
+	}
+}
+
+func TestEffectiveCgroupCapacityAllowsRootWithoutControllerLimits(t *testing.T) {
+	const mib = uint64(1024 * 1024)
+	root, parent, leaf := cgroupCapacityFixture(t)
+	writeCgroupValue(t, parent, "cpu.max", "150000 100000")
+	writeCgroupValue(t, leaf, "cpu.max", "200000 100000")
+	writeCgroupMemory(t, parent, 512*mib, 128*mib)
+	writeCgroupMemory(t, leaf, 800*mib, 100*mib)
+
+	cpu, err := effectiveCgroupCPUMillis(leaf, root, 4000)
+	if err != nil || cpu != 1500 {
+		t.Fatalf("effective CPU = %d, %v; want 1500 with no root controller file", cpu, err)
+	}
+	memory, err := effectiveCgroupMemoryMiB(leaf, root, 2048)
+	if err != nil || memory != 384 {
+		t.Fatalf("effective memory = %d, %v; want 384 with no root controller file", memory, err)
 	}
 }
 

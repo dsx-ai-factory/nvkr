@@ -320,13 +320,15 @@ func TestLocalVMAdmissionReturnsAuthoredTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	workFailure := nkderr.New(nkderr.CodeBuildFailed, "driver stopped at deadline")
 	started := time.Now()
 	err = admission.Execute(t.Context(), request, func(ctx context.Context, _ *LocalVMRuntime) error {
 		<-ctx.Done()
-		return ctx.Err()
+		return workFailure
 	})
-	if errorCode(err) != nkderr.CodeTimeout {
-		t.Fatalf("deadline error = %v, want %s", err, nkderr.CodeTimeout)
+	if errorCode(err) != nkderr.CodeTimeout || !errors.Is(err, context.DeadlineExceeded) ||
+		!errors.Is(err, workFailure) {
+		t.Fatalf("deadline error = %v, want %s wrapping deadline and work failure", err, nkderr.CodeTimeout)
 	}
 	if elapsed := time.Since(started); elapsed < 900*time.Millisecond || elapsed > 2*time.Second {
 		t.Fatalf("authored one-second timeout elapsed in %s", elapsed)
