@@ -101,7 +101,7 @@ func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	}
 	observed := make([]Artifact, 0, len(run.Expected))
 	for _, slot := range run.Expected {
-		artifact, observeErr := observeOutput(ctx, workspace, slot, artifacts, plan)
+		artifact, observeErr := observeOutput(ctx, workspace, slot, artifacts, plan, nil)
 		if observeErr != nil {
 			return recordHostedFailure(ctx, outputPath, run, observeErr)
 		}
@@ -288,6 +288,7 @@ func ExecuteLocal(ctx context.Context, prepared *PreparedRun, options LocalOptio
 	if result == nil {
 		return recordFailedAttempt(ctx, workspace, prepared.run, e.New(e.CodeInternal, "local executor returned no run record"))
 	}
+	defer func() { _ = result.Close() }()
 	runForObservation := prepared.Description()
 	runForObservation.Lane = result.Qualification.String()
 	observed := make([]Artifact, 0, len(prepared.run.Expected))
@@ -296,18 +297,24 @@ func ExecuteLocal(ctx context.Context, prepared *PreparedRun, options LocalOptio
 		artifacts[artifact.ID] = artifact
 	}
 	for _, slot := range prepared.run.Expected {
-		artifact, observeErr := observeOutput(ctx, workspace, slot, artifacts, prepared.plan)
+		artifact, observeErr := observeOutput(ctx, workspace, slot, artifacts, prepared.plan, result)
 		if observeErr != nil {
-			return recordFailedAttempt(ctx, workspace, &runForObservation, observeErr)
+			return recordFailedAttempt(ctx, workspace, &runForObservation,
+				closeLocalExecutionResult(result, observeErr))
 		}
 		observed = append(observed, artifact)
 	}
 	bound, err := bindObserved(&runForObservation, observed)
 	if err != nil {
-		return recordFailedAttempt(ctx, workspace, &runForObservation, err)
+		return recordFailedAttempt(ctx, workspace, &runForObservation,
+			closeLocalExecutionResult(result, err))
 	}
 	bound, err = bindReleaseContent(prepared.plan, bound)
 	if err != nil {
+		return recordFailedAttempt(ctx, workspace, &runForObservation,
+			closeLocalExecutionResult(result, err))
+	}
+	if err := result.Close(); err != nil {
 		return recordFailedAttempt(ctx, workspace, &runForObservation, err)
 	}
 	if err := writeRunRecord(ctx, filepath.Join(workspace, "lifecycle.json"), bound); err != nil {
@@ -316,7 +323,44 @@ func ExecuteLocal(ctx context.Context, prepared *PreparedRun, options LocalOptio
 	return bound, nil
 }
 
-func observeOutput(ctx context.Context, workspace string, slot requiredOutput, artifacts map[string]factory.Artifact, plan *factory.Plan) (Artifact, error) {
+func closeLocalExecutionResult(result *factory.LocalRunResult, cause error) error {
+	closeErr := result.Close()
+	if closeErr == nil {
+		return cause
+	}
+	if cause == nil {
+		return closeErr
+	}
+	code := e.CodeInternal
+	var coded *e.Error
+	if errors.As(cause, &coded) {
+		code = coded.Code
+	}
+	return e.Wrap(code, errors.Join(cause, closeErr),
+		"local Run failed and closing disk results also failed")
+}
+
+func observeOutput(ctx context.Context, workspace string, slot requiredOutput, artifacts map[string]factory.Artifact,
+	plan *factory.Plan, execution *factory.LocalRunResult,
+) (Artifact, error) {
+	if slot.Kind == OutputDiskImage {
+		if execution == nil {
+			return Artifact{}, e.New(e.CodeEngineCapability,
+				"disk output %q requires an in-process held producer result", slot.Name)
+		}
+		expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind,
+			ArtifactID: slot.MemberArtifactID, BuildDigest: slot.BuildDigest,
+			Components: append([]string(nil), slot.Components...)}
+		observation, err := execution.ObserveDiskLifecyclePayload(ctx, plan, expected)
+		if err != nil {
+			return Artifact{}, err
+		}
+		return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest,
+			BuildDigest: observation.BuildDigest, Components: append([]string(nil), observation.Components...),
+			Disk: &delivery.DiskOutput{Producer: observation.Producer, Component: observation.Component,
+				Format: observation.Format, Encryption: observation.Encryption, Size: observation.Size,
+				PlanDigest: observation.PlanDigest, Outcome: observation.Outcome}}, nil
+	}
 	member, ok := artifacts[slot.MemberArtifactID]
 	if !ok {
 		return Artifact{}, e.New(e.CodeReleaseIncomplete, "run plan has no typed member for frozen output %q", slot.Name)
@@ -517,8 +561,17 @@ func recordFailedAttempt(ctx context.Context, workspace string, run *Run, cause 
 func cloneArtifacts(source []Artifact) []Artifact {
 	clone := make([]Artifact, len(source))
 	for index, artifact := range source {
-		clone[index] = artifact
-		clone[index].Components = append([]string(nil), artifact.Components...)
+		clone[index] = cloneArtifact(artifact)
+	}
+	return clone
+}
+
+func cloneArtifact(artifact Artifact) Artifact {
+	clone := artifact
+	clone.Components = append([]string(nil), artifact.Components...)
+	if artifact.Disk != nil {
+		disk := *artifact.Disk
+		clone.Disk = &disk
 	}
 	return clone
 }

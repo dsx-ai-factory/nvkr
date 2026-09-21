@@ -51,6 +51,26 @@ hermeticity and auditability but does not by itself normalize those outputs. An 
 therefore pipeline-attested until recorded evidence demonstrates the qualified RAW comparison; the architecture
 must not convert content validation into a weaker `Reproduced` verdict.
 
+The public lifecycle may record that exact QCOW2 delivery identity before the qualified reproduction and
+full-disk evidence adapters exist. The process-local observer accepts only a producer-owned held regular-file
+capability, never a caller pathname or digest. It revalidates the complete Plan, resolves the unique disk root
+and successful producer outcome, checks the producer's unqualified result against the compiled instruction,
+then independently streams the held bytes to recompute exact SHA-256 and size and checks a bounded QCOW2 v2/v3
+header: signature, version, cluster-bit range, positive virtual size, absence of QCOW-layer encryption, and the
+v3 header length. The `qcow2` format remains the compiler/producer declaration; this framing check is not a full
+decoder or compatibility verdict. The result binds the logical Build and Plan identities, producer, component,
+format, `none` or `luks2` declaration, and successful outcome. The execution result owns and closes the held
+capability; observation and close are serialized. This record is exact delivery-byte observation only. It does
+not decode RAW, inspect encrypted content, establish compatibility or qualification, construct an SBOM, or
+authorize publication.
+
+The observer and private scheduler population seam have controlled contract coverage, including held-file
+no-follow regular-file capture, pathname replacement, byte substitution, cancellation, duplicate-result and
+close races. The production population callback is deliberately absent until the VM driver returns its
+package-issued held result through that seam. Consequently a real direct-Packer lifecycle Run still fails
+capability admission before workspace or subprocess work; a serialized local result or caller-composed path,
+digest, or result cannot restore the in-process capability.
+
 At NKE commit `6df693a`, the [Make target](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
 produces a QCOW2 and the [hosted workflow](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)
 later creates the published QCOW2 with another `qemu-img convert -c`. Source inspection alone does not establish
@@ -169,7 +189,9 @@ capture, platform fail-closed behavior, bounded block-manifest allocations, and 
 negatives. CLI and local-runner admission tests prove unsupported producer, boot, encryption, qualified-package,
 and removed staging interfaces fail before catalog, graph, input, output, or subprocess I/O, while
 existing-byte `DiskManifest` emission and ordinary unqualified development packaging remain available. Masked
-regions deliberately remain unsupported.
+regions deliberately remain unsupported. Factory/lifecycle/delivery contracts additionally cover the
+process-local exact-QCOW2 observation described above. They use a controlled producer callback and do not
+establish production VM execution, NKE disk production, full-disk evidence, compatibility, or publication.
 
 End-to-end acceptance requires real pinned `qemu` versions decoding `qcow2`, `vmdk`, and `vhd` fixtures to the
 same logical stream, a post-attestation encryption handoff, reproducible ISO and package fixtures, and a delivery

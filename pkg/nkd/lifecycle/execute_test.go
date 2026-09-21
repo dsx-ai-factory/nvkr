@@ -73,7 +73,7 @@ func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing
 	}
 	slot := requiredOutput{Name: "cli", Kind: OutputExecutable, ArtifactID: "package/cli", MemberArtifactID: "package/cli-bundle",
 		BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}, ComponentResults: []string{"result/cli/kubectl"}}
-	observed, err := observeOutput(context.Background(), workspace, slot, artifacts, nil)
+	observed, err := observeOutput(context.Background(), workspace, slot, artifacts, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,9 +91,22 @@ func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing
 		if writeErr := os.WriteFile(producerPath, raw, 0o600); writeErr != nil {
 			t.Fatal(writeErr)
 		}
-		_, observeErr := observeOutput(context.Background(), workspace, slot, artifacts, nil)
+		_, observeErr := observeOutput(context.Background(), workspace, slot, artifacts, nil, nil)
 		assertCode(t, observeErr, nkderr.CodeVerifyFailed)
 	})
+}
+
+func TestObserveDiskOutputRejectsPathDescriptionWithoutHeldExecutionResult(t *testing.T) {
+	slot := requiredOutput{Name: "node-image", Kind: OutputDiskImage,
+		ArtifactID: "artifact/node-image/image", MemberArtifactID: "artifact/node-image/image",
+		BuildDigest: "sha256:" + strings.Repeat("b", 64), Components: []string{"image"},
+		ComponentResults: []string{"result/node-image/image"}}
+	artifacts := map[string]factory.Artifact{
+		slot.ArtifactID: {ID: slot.ArtifactID, Name: "image", Kind: OutputDiskImage,
+			BuildTarget: slot.Name, Component: "image", Path: ".nkd/factory/caller-supplied.qcow2"},
+	}
+	_, err := observeOutput(t.Context(), ".nkd/factory", slot, artifacts, nil, nil)
+	assertCode(t, err, nkderr.CodeEngineCapability)
 }
 
 func TestObserveAPTRejectsSubstitutedProducerBytes(t *testing.T) {
@@ -129,12 +142,12 @@ func TestObserveAPTRejectsSubstitutedProducerBytes(t *testing.T) {
 	if err := factory.ExecuteNode(ctx, plan, "package/cli", nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := observeOutput(ctx, ".nkd/factory", run.Expected[0], artifacts, plan); err != nil {
+	if _, err := observeOutput(ctx, ".nkd/factory", run.Expected[0], artifacts, plan, nil); err != nil {
 		t.Fatalf("positive APT fixture failed: %v", err)
 	}
 	result.SHA256 = "sha256:" + repeat("9", 64)
 	writeCanonicalTestFile(t, resultPath, result)
-	if _, err := observeOutput(ctx, ".nkd/factory", run.Expected[0], artifacts, plan); err == nil {
+	if _, err := observeOutput(ctx, ".nkd/factory", run.Expected[0], artifacts, plan, nil); err == nil {
 		t.Fatal("APT payload accepted against substituted producer digest")
 	} else {
 		assertCode(t, err, nkderr.CodeVerifyFailed)
@@ -147,7 +160,7 @@ func TestObserveAPTRejectsSubstitutedProducerBytes(t *testing.T) {
 	result.SHA256 = pipeline.FileDigest(changedPayload)
 	result.Size = int64(len(changedPayload))
 	writeCanonicalTestFile(t, resultPath, result)
-	if _, err := observeOutput(ctx, ".nkd/factory", run.Expected[0], artifacts, plan); err == nil {
+	if _, err := observeOutput(ctx, ".nkd/factory", run.Expected[0], artifacts, plan, nil); err == nil {
 		t.Fatal("stale APT repository accepted after producer bytes and result changed together")
 	} else {
 		assertCode(t, err, nkderr.CodeVerifyFailed)
@@ -203,7 +216,7 @@ func TestObserveHelmReproducesPayloadAcrossWorkspaceRelocation(t *testing.T) {
 	if err := factory.ExecuteNode(ctx, plan, "package/gpu-runtime", nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	before, err := observeOutput(ctx, ".nkd/factory", slot, artifacts, plan)
+	before, err := observeOutput(ctx, ".nkd/factory", slot, artifacts, plan, nil)
 	if err != nil {
 		t.Fatalf("canonical workspace observation: %v", err)
 	}
@@ -213,7 +226,7 @@ func TestObserveHelmReproducesPayloadAcrossWorkspaceRelocation(t *testing.T) {
 	if err := os.Rename(".nkd/factory", ".nkd/runs/attempt"); err != nil {
 		t.Fatal(err)
 	}
-	after, err := observeOutput(ctx, ".nkd/runs/attempt", slot, artifacts, plan)
+	after, err := observeOutput(ctx, ".nkd/runs/attempt", slot, artifacts, plan, nil)
 	if err != nil {
 		t.Fatalf("relocated workspace observation: %v", err)
 	}
@@ -224,7 +237,7 @@ func TestObserveHelmReproducesPayloadAcrossWorkspaceRelocation(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(relocatedInput, "Chart.yaml"), []byte("changed\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := observeOutput(ctx, ".nkd/runs/attempt", slot, artifacts, plan); err == nil {
+	if _, err := observeOutput(ctx, ".nkd/runs/attempt", slot, artifacts, plan, nil); err == nil {
 		t.Fatal("stale Helm payload accepted after AICR input changed")
 	} else {
 		assertCode(t, err, nkderr.CodeVerifyFailed)
@@ -336,7 +349,7 @@ func TestCompleteGPUPublicationClosureAcrossFormatsAndArchitectures(t *testing.T
 			}
 			observed := make([]Artifact, 0, len(prepared.Expected))
 			for _, slot := range prepared.Expected {
-				artifact, err := observeOutput(ctx, ".nkd/factory", slot, artifacts, plan)
+				artifact, err := observeOutput(ctx, ".nkd/factory", slot, artifacts, plan, nil)
 				if err != nil {
 					t.Fatal(err)
 				}

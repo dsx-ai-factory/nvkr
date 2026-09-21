@@ -63,3 +63,87 @@ func TestContentDigestRejectsAmbiguousOutputs(t *testing.T) {
 	_, err := ContentDigest(nil)
 	assertRegistryCode(t, err, e.CodeReleaseIncomplete)
 }
+
+func TestDiskOutputBindingIsExactAndExcludedFromReleaseContentIdentity(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	buildDigest := "sha256:" + strings.Repeat("b", 64)
+	planDigest := "sha256:" + strings.Repeat("c", 64)
+	valid := Output{
+		Name: "node-image", Kind: "disk-image", Digest: digest, BuildDigest: buildDigest,
+		Components: []string{"agent", "image"},
+		Disk: &DiskOutput{
+			Producer: "build-image", Component: "image", Format: "qcow2",
+			Encryption: "none", Size: 4096, PlanDigest: planDigest, Outcome: "succeeded",
+		},
+	}
+	plainIdentity, err := ContentDigest([]Output{valid})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []func(*Output){
+		func(output *Output) { output.Disk.Producer = "other-producer" },
+		func(output *Output) { output.Disk.Encryption = "luks2" },
+		func(output *Output) { output.Disk.Size++ },
+		func(output *Output) { output.Disk.PlanDigest = "sha256:" + strings.Repeat("d", 64) },
+	} {
+		candidate := valid
+		candidate.Components = append([]string(nil), valid.Components...)
+		candidate.Disk = cloneDiskOutput(valid.Disk)
+		change(&candidate)
+		identity, err := ContentDigest([]Output{candidate})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if identity != plainIdentity {
+			t.Fatalf("disk execution metadata changed release-content identity: got %s, want %s", identity, plainIdentity)
+		}
+	}
+	failed := valid
+	failed.Disk = cloneDiskOutput(valid.Disk)
+	failed.Disk.Outcome = "failed"
+	if got, want := projectReleaseContentOutput(failed), projectReleaseContentOutput(valid); got.Name != want.Name ||
+		got.Kind != want.Kind || got.Digest != want.Digest || got.BuildDigest != want.BuildDigest ||
+		strings.Join(got.Components, "\x00") != strings.Join(want.Components, "\x00") {
+		t.Fatal("disk outcome leaked into the frozen release-content projection")
+	}
+
+	changedBytes := valid
+	changedBytes.Digest = "sha256:" + strings.Repeat("e", 64)
+	changedIdentity, err := ContentDigest([]Output{changedBytes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changedIdentity == plainIdentity {
+		t.Fatal("changed disk bytes retained release-content identity")
+	}
+	cloned := cloneOutputs([]Output{valid})
+	cloned[0].Components[0] = "changed"
+	cloned[0].Disk.Size++
+	if valid.Components[0] != "agent" || valid.Disk.Size != 4096 {
+		t.Fatal("disk output cloning retained caller-mutable state")
+	}
+
+	for _, tc := range []struct {
+		name   string
+		change func(*Output)
+	}{
+		{name: "missing disk binding", change: func(output *Output) { output.Disk = nil }},
+		{name: "ordinary output with disk binding", change: func(output *Output) { output.Kind = "executable" }},
+		{name: "wrong producer", change: func(output *Output) { output.Disk.Producer = "../build" }},
+		{name: "wrong component", change: func(output *Output) { output.Disk.Component = "missing" }},
+		{name: "wrong format", change: func(output *Output) { output.Disk.Format = "raw" }},
+		{name: "wrong encryption", change: func(output *Output) { output.Disk.Encryption = "aes" }},
+		{name: "missing size", change: func(output *Output) { output.Disk.Size = 0 }},
+		{name: "wrong plan", change: func(output *Output) { output.Disk.PlanDigest = "mutable" }},
+		{name: "wrong outcome", change: func(output *Output) { output.Disk.Outcome = "failed" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := valid
+			candidate.Components = append([]string(nil), valid.Components...)
+			candidate.Disk = cloneDiskOutput(valid.Disk)
+			tc.change(&candidate)
+			_, err := ContentDigest([]Output{candidate})
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+		})
+	}
+}

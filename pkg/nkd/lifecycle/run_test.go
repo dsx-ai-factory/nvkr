@@ -1,8 +1,10 @@
 package lifecycle
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -58,6 +60,43 @@ func TestBindObservedFailsClosedOnIncompleteOrSubstitutedOutput(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBindObservedDiskRequiresExactPlanBoundObservation(t *testing.T) {
+	run := testRun()
+	run.Expected[0].Kind = OutputDiskImage
+	run.Expected[0].Components = []string{"agent", "image"}
+	run.Expected[0].ComponentResults = []string{"result/node-image/agent", "result/node-image/image"}
+	artifact := Artifact{
+		Name: "cli", Kind: OutputDiskImage, Digest: "sha256:" + strings.Repeat("4", 64),
+		BuildDigest: run.Expected[0].BuildDigest, Components: append([]string(nil), run.Expected[0].Components...),
+		Disk: &delivery.DiskOutput{
+			Producer: "build-image", Component: "image", Format: "qcow2", Encryption: "none",
+			Size: 4096, PlanDigest: run.PlanDigest, Outcome: "succeeded",
+		},
+	}
+	bound, err := bindObserved(run, []Artifact{artifact})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bound.Status != RunComplete || bound.Observed[0].Disk == nil || bound.Observed[0].Disk.PlanDigest != run.PlanDigest {
+		t.Fatalf("bound disk observation = %+v", bound)
+	}
+	artifact.Disk.Size++
+	if bound.Observed[0].Disk.Size != 4096 {
+		t.Fatal("bound disk observation retained caller-mutable metadata")
+	}
+
+	changed := artifact
+	changed.Disk = &delivery.DiskOutput{}
+	*changed.Disk = *artifact.Disk
+	changed.Disk.PlanDigest = "sha256:" + strings.Repeat("9", 64)
+	assertCode(t, bindObservedError(run, changed), nkderr.CodeVerifyFailed)
+}
+
+func bindObservedError(run *Run, artifact Artifact) error {
+	_, err := bindObserved(run, []Artifact{artifact})
+	return err
 }
 
 func testRun() *Run {

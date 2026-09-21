@@ -55,23 +55,31 @@ type LocalNodeResult struct {
 }
 
 // LocalRunResult records what this process completed. It is deliberately not a
-// producer, validation-vector, release, or clearance receipt.
+// producer, validation-vector, release, or clearance receipt. Callers must Close
+// it after consuming any held disk observation.
 type LocalRunResult struct {
 	SchemaVersion string            `json:"schemaVersion"`
 	Qualification EvidenceTier      `json:"qualification"`
 	PlanDigest    string            `json:"planDigest"`
 	Workspace     string            `json:"workspace"`
 	Nodes         []LocalNodeResult `json:"nodes"`
+
+	diskMu          sync.Mutex
+	diskPermit      chan struct{}
+	diskClosed      bool
+	diskCompletions []diskProducerCompletion
 }
 
 type localRunDeps struct {
 	prepareRunner func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error)
 	executeNode   func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error
+	executeDisk   diskProducerCallback
 }
 
 // RunLocal executes the Plan's artifact graph in dependency order. Every producer
 // uses the same exact-node execution operation as hosted Runs; utility work runs
 // in its pinned container. Source receipts remain reusable across local attempts.
+// The caller owns the returned result and must Close it after observation.
 func RunLocal(ctx context.Context, plan *Plan, options LocalRunOptions) (*LocalRunResult, error) {
 	options = withLocalDefaults(options)
 	if err := AdmitLocal(ctx, plan, options); err != nil {
@@ -123,12 +131,20 @@ func productionLocalRunDeps() localRunDeps {
 	return localRunDeps{
 		prepareRunner: prepareLocalRunners,
 		executeNode:   executeLocalFactoryNode,
+		// The direct-Packer adapter remains deliberately absent until its owner
+		// returns a package-issued held payload. runLocal rejects that Plan before
+		// workspace or subprocess work instead of accepting a path-based result.
+		executeDisk: nil,
 	}
 }
 
-func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps localRunDeps) (*LocalRunResult, error) {
+func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps localRunDeps) (runResult *LocalRunResult, returnErr error) {
 	if err := admitLocalPlan(ctx, plan, options); err != nil {
 		return nil, err
+	}
+	if !options.DryRun && requiresDirectPackerDiskAdapter(plan) && deps.executeDisk == nil {
+		return nil, e.New(e.CodeEngineCapability,
+			"local factory execution has no held-output direct-Packer adapter")
 	}
 	ordered := topologicalFactoryNodes(plan.Graph)
 	planDigest, err := plan.Digest()
@@ -138,6 +154,20 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	result := &LocalRunResult{SchemaVersion: LocalRunSchemaVersion,
 		Qualification: TierLocalExecution, PlanDigest: planDigest,
 		Workspace: filepath.ToSlash(options.Workspace)}
+	completed := false
+	defer func() {
+		if !completed {
+			if closeErr := result.Close(); closeErr != nil {
+				code := e.CodeInternal
+				var coded *e.Error
+				if errors.As(returnErr, &coded) {
+					code = coded.Code
+				}
+				returnErr = e.Wrap(code, errors.Join(returnErr, closeErr),
+					"local Run failed and closing disk results also failed")
+			}
+		}
+	}()
 	if options.DryRun {
 		for _, node := range ordered {
 			status := "dry-run"
@@ -147,6 +177,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 			result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: status})
 			fmt.Fprintf(options.Stdout, "[%s] %s (%s)\n", status, node.ID, node.Kind)
 		}
+		completed = true
 		return result, nil
 	}
 	if deps.prepareRunner == nil || deps.executeNode == nil {
@@ -202,7 +233,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		var batch sync.WaitGroup
 		for index, node := range ready {
 			batch.Go(func() {
-				results[index], batchErrors[index] = runLocalNode(batchCtx, plan, node, options, runners, deps.executeNode)
+				results[index], batchErrors[index] = runLocalNode(batchCtx, plan, node, options, runners, result, deps)
 				if batchErrors[index] != nil {
 					cancel()
 				}
@@ -240,6 +271,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err := writeFactoryFile(ctx, filepath.Join(options.Workspace, "run.json"), raw, 0o644); err != nil {
 		return nil, err
 	}
+	completed = true
 	return result, nil
 }
 
@@ -256,12 +288,23 @@ func (w lockedLocalWriter) Write(p []byte) (int, error) {
 }
 
 func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string,
-	execute func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error) (LocalNodeResult, error) {
+	owner *LocalRunResult, deps localRunDeps,
+) (LocalNodeResult, error) {
 	result := LocalNodeResult{ID: node.ID, Kind: node.Kind}
 	if err := ctx.Err(); err != nil {
 		return result, e.Wrap(e.CodeTimeout, err, "local node canceled")
 	}
-	cached, err := reusableFactoryTool(ctx, plan, node, options.Workspace)
+	directPacker, err := isDirectPackerDiskNode(plan, node)
+	if err != nil {
+		return result, err
+	}
+	// A pathname cache cannot recreate the held capability needed by terminal
+	// disk observation. The direct-Packer owner must return a fresh authenticated
+	// result even when it internally reuses immutable work.
+	cached := false
+	if !directPacker {
+		cached, err = reusableFactoryTool(ctx, plan, node, options.Workspace)
+	}
 	if err != nil {
 		return result, err
 	}
@@ -277,7 +320,14 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 		}
 	}
 	fmt.Fprintf(options.Stdout, "[start] %s (%s)\n", node.ID, node.Kind)
-	if err := execute(ctx, plan, node, options, runners); err != nil {
+	if directPacker {
+		err = populateDiskProducerCompletion(ctx, plan, node.ID, owner, deps.executeDisk)
+	} else if deps.executeNode == nil {
+		err = e.New(e.CodeInternal, "factory local node executor is incomplete")
+	} else {
+		err = deps.executeNode(ctx, plan, node, options, runners)
+	}
+	if err != nil {
 		code := e.CodeBuildFailed
 		var coded *e.Error
 		if errors.As(err, &coded) {
@@ -290,6 +340,34 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 	result.Status = "ok"
 	fmt.Fprintf(options.Stdout, "[done] %s\n", node.ID)
 	return result, nil
+}
+
+func requiresDirectPackerDiskAdapter(plan *Plan) bool {
+	if plan == nil {
+		return false
+	}
+	for _, build := range plan.Builds {
+		if build.Graph == nil {
+			continue
+		}
+		for _, instruction := range build.Graph.Nodes {
+			if instruction.Packer != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isDirectPackerDiskNode(plan *Plan, node Node) (bool, error) {
+	if plan == nil || node.IRNode == "" {
+		return false, nil
+	}
+	_, instruction, err := plan.producerInstruction(node)
+	if err != nil {
+		return false, err
+	}
+	return instruction.Packer != nil, nil
 }
 
 func admitLocalPlan(ctx context.Context, plan *Plan, options LocalRunOptions) error {
