@@ -1,8 +1,10 @@
 // Package ownedcmd runs short-lived external tools as owned process groups.
 //
-// Callers retain domain-specific error classification. This package guarantees
-// context-first admission, SIGTERM-to-SIGKILL cancellation, and a best-effort
-// bounded cleanup of descendants even when the direct child exits first.
+// Callers retain domain-specific error classification. Run, Output, and
+// CombinedOutput provide context-first admission, SIGTERM-to-SIGKILL cancellation,
+// and bounded best-effort cleanup even when the direct child exits first.
+// ConfigureCancellation and KillDescendants share only the platform mechanics
+// with callers that must own Start/Wait, such as descriptor-held execution.
 package ownedcmd
 
 import (
@@ -79,7 +81,7 @@ func run(ctx context.Context, combined bool, name string, args ...string) ([]byt
 }
 
 func runCommand(ctx context.Context, cmd *exec.Cmd) error {
-	if err := configureCommand(cmd, DefaultTerminationGrace); err != nil {
+	if err := ConfigureCancellation(cmd, DefaultTerminationGrace); err != nil {
 		return err
 	}
 	if err := cmd.Start(); err != nil {

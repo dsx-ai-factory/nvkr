@@ -3,13 +3,18 @@
 package ownedcmd
 
 import (
+	"os"
 	"os/exec"
 	"time"
 )
 
-func configureCommand(_ *exec.Cmd, _ time.Duration) error {
+// ConfigureCancellation fails when owned process groups are unavailable.
+func ConfigureCancellation(_ *exec.Cmd, _ time.Duration) error {
 	return ErrUnsupported
 }
+
+// KillDescendants cannot signal a process group on an unsupported host.
+func KillDescendants(*exec.Cmd) error { return os.ErrProcessDone }
 
 func cleanupCommandGroup(_ int, _ time.Duration) error {
 	return nil
