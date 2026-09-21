@@ -87,6 +87,37 @@ type rawComponent struct {
 	ExclusionReason string             `json:"exclusionReason,omitempty"`
 
 	BuildRequirements *execution.Requirements `json:"buildRequirements,omitempty"` // generic build-step runner request
+	Helm              *HelmConfig             `json:"helm,omitempty"`              // Helm-chart-specific packaging config
+}
+
+// HelmConfig declares Helm-chart-specific packaging config (PackageHelm).
+type HelmConfig struct {
+	Values *ValuesConfig `json:"values,omitempty"`
+}
+
+// ValuesConfig declares Helm chart values.yaml overrides applied at compile time,
+// before the chart is packaged (PackageHelm). Each override is resolved from
+// exactly one source: a static literal, the Environment, or another component's
+// resolved build context (e.g. its Git tag).
+type ValuesConfig struct {
+	Overrides []ValueOverride `json:"overrides,omitempty"`
+}
+
+// ValueOverride names one values.yaml JSONPath target and its value source.
+// JSONPath is a dotted path from the document root (e.g. ".image.tag"); it
+// addresses nested map fields only, not list elements.
+type ValueOverride struct {
+	JSONPath             string             `json:"jsonpath"`
+	Value                string             `json:"value,omitempty"`
+	ValueFromEnvironment string             `json:"valueFromEnvironment,omitempty"`
+	ValueFromComponent   *ComponentValueRef `json:"valueFromComponent,omitempty"`
+}
+
+// ComponentValueRef renders Template (a Go text/template) against Component's
+// resolved build context (Tag, ModuleTag, Version, Commit, TreeHash).
+type ComponentValueRef struct {
+	Component string `json:"component"`
+	Template  string `json:"template"`
 }
 
 // patchDeclaration is the authored patch shape. It intentionally has no content
@@ -323,6 +354,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		ExclusionReason: raw.ExclusionReason,
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
+		Helm:              cloneHelmConfig(raw.Helm),
 	}
 	// Default the from-source builder to oci-hermetic so existing catalogs need no
 	// edit; nix is opt-in per component (ADR-10 §3).
@@ -735,6 +767,27 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 	return nil
 }
 
+func cloneHelmConfig(config *HelmConfig) *HelmConfig {
+	if config == nil {
+		return nil
+	}
+	return &HelmConfig{Values: cloneValuesConfig(config.Values)}
+}
+
+func cloneValuesConfig(config *ValuesConfig) *ValuesConfig {
+	if config == nil {
+		return nil
+	}
+	cloned := ValuesConfig{Overrides: append([]ValueOverride(nil), config.Overrides...)}
+	for i, override := range cloned.Overrides {
+		if override.ValueFromComponent != nil {
+			ref := *override.ValueFromComponent
+			cloned.Overrides[i].ValueFromComponent = &ref
+		}
+	}
+	return &cloned
+}
+
 func clonePackerConfig(config *PackerConfig) *PackerConfig {
 	if config == nil {
 		return nil
@@ -749,6 +802,39 @@ func clonePackerConfig(config *PackerConfig) *PackerConfig {
 // variable semantics; catalog loading deliberately does not reimplement HCL.
 func validPackerTransportValue(value string, maxBytes int) bool {
 	return safetext.Valid(value, maxBytes, false)
+}
+
+// validateValuesConfig requires each override to name a JSONPath and exactly one
+// value source, so a package-time resolver never has to guess authorial intent
+// or silently prefer one source over another.
+func validateValuesConfig(name string, config *ValuesConfig) error {
+	if len(config.Overrides) == 0 {
+		return e.New(e.CodeInvalidCatalog, "component %q: values requires at least one override", name)
+	}
+	for i, override := range config.Overrides {
+		if !strings.HasPrefix(override.JSONPath, ".") || len(override.JSONPath) < 2 {
+			return e.New(e.CodeInvalidCatalog, "component %q: values override[%d] has an invalid jsonpath %q", name, i, override.JSONPath)
+		}
+		sources := 0
+		if override.Value != "" {
+			sources++
+		}
+		if override.ValueFromEnvironment != "" {
+			sources++
+		}
+		if override.ValueFromComponent != nil {
+			sources++
+			if override.ValueFromComponent.Component == "" || override.ValueFromComponent.Template == "" {
+				return e.New(e.CodeInvalidCatalog,
+					"component %q: values override[%d] valueFromComponent requires a component and template", name, i)
+			}
+		}
+		if sources != 1 {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q: values override[%d] requires exactly one of value, valueFromEnvironment, or valueFromComponent", name, i)
+		}
+	}
+	return nil
 }
 
 func validateMaterialBindings(name string, component Component) error {
@@ -919,6 +1005,17 @@ func validateComponent(name string, c Component) error {
 		if err := c.BuildRequirements.Validate(); err != nil {
 			return e.Wrap(e.CodeInvalidCatalog, err,
 				"component %q has invalid buildRequirements", name)
+		}
+	}
+	if c.Helm != nil {
+		if !c.FromSource {
+			return e.New(e.CodeInvalidCatalog, "component %q: helm config requires a from-source component", name)
+		}
+		if c.Helm.Values == nil {
+			return e.New(e.CodeInvalidCatalog, "component %q: helm config requires values", name)
+		}
+		if err := validateValuesConfig(name, c.Helm.Values); err != nil {
+			return err
 		}
 	}
 	if c.OutputType == "disk-image" {

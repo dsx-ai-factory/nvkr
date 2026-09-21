@@ -235,6 +235,10 @@ type Component struct {
 
 	// exclusion (required when neither FromSource nor Prebuilt)
 	ExclusionReason string `json:"exclusionReason,omitempty"`
+
+	// Helm declares Helm-chart-specific packaging config (PackageHelm), such as
+	// values.yaml overrides applied before packaging.
+	Helm *HelmConfig `json:"helm,omitempty"`
 }
 
 // AICRProfile pins the exact upstream profile and generator inputs for an

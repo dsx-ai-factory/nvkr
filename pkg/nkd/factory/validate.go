@@ -244,6 +244,18 @@ func (plan Plan) Validate() error {
 		}
 	}
 	for _, node := range plan.Graph.Nodes {
+		if len(node.HelmValues) > 0 {
+			if node.Kind != NodePackage || node.PackageKind != PackageHelm {
+				return e.New(e.CodePipelineDrift, "Helm values overrides on a non-Helm node")
+			}
+			previous := ""
+			for _, override := range node.HelmValues {
+				if !strings.HasPrefix(override.JSONPath, ".") || len(override.JSONPath) < 2 || override.JSONPath <= previous {
+					return e.New(e.CodePipelineDrift, "Helm values overrides must have sorted, unique, canonical jsonpaths")
+				}
+				previous = override.JSONPath
+			}
+		}
 		if node.HelmImage != nil {
 			if node.Kind != NodePackage || node.PackageKind != PackageHelm {
 				return e.New(e.CodePipelineDrift, "Helm binding on a non-Helm node")

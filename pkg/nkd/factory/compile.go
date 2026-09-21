@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
@@ -359,6 +360,13 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		if spec.Kind == PackageImage && nodes[artifacts[inputs[0]].Producer].Kind != NodeBuild {
 			return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q currently requires a built OCI export; acquired layouts need a separate adapter", spec.Name)
 		}
+		var helmValues []HelmValueOverride
+		if spec.Kind == PackageHelm {
+			helmValues, err = resolveHelmValueOverrides(plan, artifacts, delivery, inputs)
+			if err != nil {
+				return ArtifactGraph{}, err
+			}
+		}
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.
 		inputs = append(inputs, observationInputs(inputs, artifacts)...)
@@ -370,7 +378,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
-			HelmImage:    spec.HelmImage,
+			HelmImage: spec.HelmImage, HelmValues: helmValues,
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
 			Inputs: inputs, Outputs: []string{artifactID}, Network: ir.NetworkNone, RunsOn: runsOn,
 			Container: delivery.UtilityContainer, Platform: delivery.UtilityPlatform}
@@ -804,6 +812,113 @@ func observationInputs(inputs []string, artifacts map[string]Artifact) []string 
 		}
 	}
 	return sortedKeys(seen)
+}
+
+// helmComponentTemplateData is the valueFromComponent template context: a named
+// component's resolved build identity, mirroring catalog's own stampData/refData
+// field set (pkg/nkd/catalog/load.go) so authors can rely on the same {{.Tag}}-style
+// tokens they already use in versionStamp/prebuilt templates.
+type helmComponentTemplateData struct {
+	Tag, ModuleTag, Version, Commit, TreeHash string
+}
+
+// resolveHelmValueOverrides renders a Helm package's owning catalog component's
+// ValuesConfig into a fully-resolved, sorted override list, once, at compile time.
+// A nil/no-values component yields nil (no packaging-time mutation). Rendering
+// happens here — not at execute time — so the isolated executor never needs
+// catalog access or a template engine, mirroring how buildCommand/artifactPath
+// are resolved at compile time from the same ResolvedComponents.
+func resolveHelmValueOverrides(plan Plan, artifacts map[string]Artifact, delivery authored.Environment, inputs []string) ([]HelmValueOverride, error) {
+	var owner Artifact
+	for _, id := range inputs {
+		if artifact := artifacts[id]; artifact.Kind == "tarball" && artifact.BuildTarget != "" {
+			owner = artifact
+			break
+		}
+	}
+	if owner.ID == "" {
+		return nil, nil
+	}
+	var buildComponents []catalog.NamedComponent
+	for _, build := range plan.Builds {
+		if build.Name == owner.BuildTarget {
+			buildComponents = build.ResolvedComponents
+			break
+		}
+	}
+	component := findNamedComponent(buildComponents, owner.Component)
+	if component == nil || component.Helm == nil || component.Helm.Values == nil {
+		return nil, nil
+	}
+	overrides := make([]HelmValueOverride, 0, len(component.Helm.Values.Overrides))
+	for _, override := range component.Helm.Values.Overrides {
+		value := override.Value
+		switch {
+		case override.ValueFromEnvironment != "":
+			rendered, err := renderHelmEnvironmentTemplate(owner.Component, override.ValueFromEnvironment, delivery.Publication)
+			if err != nil {
+				return nil, err
+			}
+			value = rendered
+		case override.ValueFromComponent != nil:
+			source := findNamedComponent(buildComponents, override.ValueFromComponent.Component)
+			if source == nil {
+				return nil, e.New(e.CodeInvalidCatalog,
+					"component %q values override references unknown or unbuilt component %q", owner.Component, override.ValueFromComponent.Component)
+			}
+			rendered, err := renderHelmComponentTemplate(owner.Component, override.ValueFromComponent.Template, *source)
+			if err != nil {
+				return nil, err
+			}
+			value = rendered
+		}
+		overrides = append(overrides, HelmValueOverride{JSONPath: override.JSONPath, Value: value})
+	}
+	sort.Slice(overrides, func(i, j int) bool { return overrides[i].JSONPath < overrides[j].JSONPath })
+	for i := 1; i < len(overrides); i++ {
+		if overrides[i].JSONPath == overrides[i-1].JSONPath {
+			return nil, e.New(e.CodeInvalidCatalog, "component %q declares values override %q more than once", owner.Component, overrides[i].JSONPath)
+		}
+	}
+	return overrides, nil
+}
+
+func findNamedComponent(components []catalog.NamedComponent, name string) *catalog.NamedComponent {
+	for i := range components {
+		if components[i].Name == name {
+			return &components[i]
+		}
+	}
+	return nil
+}
+
+func renderHelmComponentTemplate(component, tmpl string, source catalog.NamedComponent) (string, error) {
+	data := helmComponentTemplateData{
+		Tag: source.Tag, ModuleTag: catalog.StripTagPrefix(source.Tag),
+		Version: catalog.NormalizeVersion(source.Tag), Commit: source.Commit, TreeHash: source.TreeHash,
+	}
+	return renderHelmValueTemplate(component, tmpl, data)
+}
+
+func renderHelmEnvironmentTemplate(component, tmpl string, publication *authored.Publication) (string, error) {
+	if publication == nil {
+		return "", e.New(e.CodeInvalidCatalog,
+			"component %q values override references the environment, but this delivery declares no publication", component)
+	}
+	context := map[string]any{"publication": map[string]any{"repositoryPrefix": publication.RepositoryPrefix}}
+	return renderHelmValueTemplate(component, tmpl, context)
+}
+
+func renderHelmValueTemplate(component, tmpl string, data any) (string, error) {
+	t, err := template.New(component).Option("missingkey=error").Parse(tmpl)
+	if err != nil {
+		return "", e.Wrap(e.CodeInvalidCatalog, err, "component %q values override template", component)
+	}
+	var b strings.Builder
+	if err := t.Execute(&b, data); err != nil {
+		return "", e.Wrap(e.CodeInvalidCatalog, err, "component %q values override template", component)
+	}
+	return b.String(), nil
 }
 
 func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[string]Artifact) error {

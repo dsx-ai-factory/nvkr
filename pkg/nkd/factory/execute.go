@@ -469,6 +469,9 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			fmt.Fprintf(stdout, "Bound Helm chart %q to image %q at %s; checksums refreshed\n", node.HelmImage.Chart, artifacts[node.HelmImage.Image].Name, imageDigest)
 			chartPrefix = filepath.Join(relative, node.HelmImage.Chart)
 		}
+		if err := applyHelmValueOverrides(ctx, filepath.Join(root, relative), filepath.Join(root, chartPrefix), node.HelmValues); err != nil {
+			return err
+		}
 		chartName, err := readHelmChartName(filepath.Join(root, chartPrefix, "Chart.yaml"))
 		if err != nil {
 			return err
