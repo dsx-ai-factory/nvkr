@@ -55,6 +55,32 @@ func TestResolveHelmValueOverridesNoValuesIsANoop(t *testing.T) {
 	}
 }
 
+func TestResolveHelmRepositoryOverride(t *testing.T) {
+	artifacts := map[string]Artifact{"artifact/postgres": {ID: "artifact/postgres", Kind: "tarball", BuildTarget: "helm-test", Component: "postgres"}}
+	inputs := []string{"artifact/postgres"}
+
+	t.Run("no helm config", func(t *testing.T) {
+		plan := helmValuesTestPlan(catalog.Component{FromSource: true})
+		if got := resolveHelmRepositoryOverride(plan, artifacts, inputs); got != "" {
+			t.Fatalf("got %q, want empty", got)
+		}
+	})
+	t.Run("values only, no repository override", func(t *testing.T) {
+		plan := helmValuesTestPlan(catalog.Component{FromSource: true, Helm: &catalog.HelmConfig{Values: &catalog.ValuesConfig{
+			Overrides: []catalog.ValueOverride{{JSONPath: ".image.tag", Value: "x"}},
+		}}})
+		if got := resolveHelmRepositoryOverride(plan, artifacts, inputs); got != "" {
+			t.Fatalf("got %q, want empty", got)
+		}
+	})
+	t.Run("repository override set", func(t *testing.T) {
+		plan := helmValuesTestPlan(catalog.Component{FromSource: true, Helm: &catalog.HelmConfig{Repository: &catalog.RepositoryConfig{Name: "postgresql"}}})
+		if got := resolveHelmRepositoryOverride(plan, artifacts, inputs); got != "postgresql" {
+			t.Fatalf("got %q, want %q", got, "postgresql")
+		}
+	})
+}
+
 func TestResolveHelmValueOverridesFailsClosed(t *testing.T) {
 	for _, test := range []struct {
 		name     string

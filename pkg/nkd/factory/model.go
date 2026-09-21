@@ -197,6 +197,7 @@ type ArtifactGraph struct {
 type Node struct {
 	HelmImage        *HelmImageBinding   `json:"helmImage,omitempty"`
 	HelmValues       []HelmValueOverride `json:"helmValues,omitempty"`
+	HelmRepository   string              `json:"helmRepository,omitempty"`
 	ID               string              `json:"id"`
 	Kind             string              `json:"kind"`
 	BuildTarget      string              `json:"buildTarget,omitempty"`

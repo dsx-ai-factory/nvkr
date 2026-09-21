@@ -116,3 +116,20 @@ func TestHelmConfigRequiresValues(t *testing.T) {
 		t.Fatalf("error = %v, want helm-requires-values", err)
 	}
 }
+
+func TestHelmConfigAllowsRepositoryAloneWithoutValues(t *testing.T) {
+	component := goodComponent()
+	component.Helm = &HelmConfig{Repository: &RepositoryConfig{Name: "postgresql"}}
+	if err := base(component).Validate(); err != nil {
+		t.Fatalf("expected a repository-only helm config to validate: %v", err)
+	}
+}
+
+func TestHelmConfigRejectsEmptyRepositoryName(t *testing.T) {
+	component := goodComponent()
+	component.Helm = &HelmConfig{Repository: &RepositoryConfig{Name: "  "}}
+	err := base(component).Validate()
+	if err == nil || !strings.Contains(err.Error(), "helm repository override requires a name") {
+		t.Fatalf("error = %v, want repository-name requirement", err)
+	}
+}

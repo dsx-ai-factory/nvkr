@@ -196,6 +196,34 @@ func helmChartVersionTag(ref name.Reference, img v1.Image) (name.Tag, error) {
 	return tag, nil
 }
 
+// HelmChartName reads the chart's own name from an already-packaged local
+// Helm-OCI layout's config blob (application/vnd.cncf.helm.config.v1+json), for
+// callers that need the chart's published identity after packaging — e.g.
+// defaulting its publication repository name to match a real `helm pull
+// oci://<registry>/<chart-name>` consumer's expectation.
+func HelmChartName(ctx context.Context, root string) (string, error) {
+	descriptor, err := PayloadDescriptor(ctx, root)
+	if err != nil {
+		return "", err
+	}
+	manifest, err := flatManifest(ctx, root, PublishedObject{DescriptorDigest: descriptor.Digest, Size: descriptor.Size})
+	if err != nil {
+		return "", err
+	}
+	if manifest.Config.MediaType != MediaHelmConfig {
+		return "", e.New(e.CodeVerifyFailed, "artifact is not a Helm chart")
+	}
+	raw, err := readBlob(ctx, root, manifest.Config, 8<<20)
+	if err != nil {
+		return "", err
+	}
+	var config helmChartConfig
+	if err := json.Unmarshal(raw, &config); err != nil || config.Name == "" {
+		return "", e.New(e.CodeVerifyFailed, "Helm chart config has no name")
+	}
+	return config.Name, nil
+}
+
 // removeEmptyLayoutDir removes an empty scaffolding directory the OCI store
 // writer leaves in the staged layout, failing closed if it unexpectedly holds
 // content rather than silently dropping it.

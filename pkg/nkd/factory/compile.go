@@ -361,11 +361,13 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q currently requires a built OCI export; acquired layouts need a separate adapter", spec.Name)
 		}
 		var helmValues []HelmValueOverride
+		var helmRepository string
 		if spec.Kind == PackageHelm {
 			helmValues, err = resolveHelmValueOverrides(plan, artifacts, delivery, inputs)
 			if err != nil {
 				return ArtifactGraph{}, err
 			}
+			helmRepository = resolveHelmRepositoryOverride(plan, artifacts, inputs)
 		}
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.
@@ -378,7 +380,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
-			HelmImage: spec.HelmImage, HelmValues: helmValues,
+			HelmImage: spec.HelmImage, HelmValues: helmValues, HelmRepository: helmRepository,
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
 			Inputs: inputs, Outputs: []string{artifactID}, Network: ir.NetworkNone, RunsOn: runsOn,
 			Container: delivery.UtilityContainer, Platform: delivery.UtilityPlatform}
@@ -829,24 +831,7 @@ type helmComponentTemplateData struct {
 // catalog access or a template engine, mirroring how buildCommand/artifactPath
 // are resolved at compile time from the same ResolvedComponents.
 func resolveHelmValueOverrides(plan Plan, artifacts map[string]Artifact, delivery authored.Environment, inputs []string) ([]HelmValueOverride, error) {
-	var owner Artifact
-	for _, id := range inputs {
-		if artifact := artifacts[id]; artifact.Kind == "tarball" && artifact.BuildTarget != "" {
-			owner = artifact
-			break
-		}
-	}
-	if owner.ID == "" {
-		return nil, nil
-	}
-	var buildComponents []catalog.NamedComponent
-	for _, build := range plan.Builds {
-		if build.Name == owner.BuildTarget {
-			buildComponents = build.ResolvedComponents
-			break
-		}
-	}
-	component := findNamedComponent(buildComponents, owner.Component)
+	owner, buildComponents, component := findOwningHelmComponent(plan, artifacts, inputs)
 	if component == nil || component.Helm == nil || component.Helm.Values == nil {
 		return nil, nil
 	}
@@ -881,6 +866,42 @@ func resolveHelmValueOverrides(plan Plan, artifacts map[string]Artifact, deliver
 		}
 	}
 	return overrides, nil
+}
+
+// findOwningHelmComponent locates the source-archive artifact feeding a Helm
+// package and its owning catalog component (with its build target's other
+// resolved components, for valueFromComponent cross-references). A component
+// with no Helm config (nil result) means the caller applies no override/default.
+func findOwningHelmComponent(plan Plan, artifacts map[string]Artifact, inputs []string) (Artifact, []catalog.NamedComponent, *catalog.NamedComponent) {
+	var owner Artifact
+	for _, id := range inputs {
+		if artifact := artifacts[id]; artifact.Kind == "tarball" && artifact.BuildTarget != "" {
+			owner = artifact
+			break
+		}
+	}
+	if owner.ID == "" {
+		return Artifact{}, nil, nil
+	}
+	var buildComponents []catalog.NamedComponent
+	for _, build := range plan.Builds {
+		if build.Name == owner.BuildTarget {
+			buildComponents = build.ResolvedComponents
+			break
+		}
+	}
+	return owner, buildComponents, findNamedComponent(buildComponents, owner.Component)
+}
+
+// resolveHelmRepositoryOverride returns the owning catalog component's
+// `.helm.repository.name` override, or "" when unset — the caller then
+// defaults to the chart's own Chart.yaml name at execute time.
+func resolveHelmRepositoryOverride(plan Plan, artifacts map[string]Artifact, inputs []string) string {
+	_, _, component := findOwningHelmComponent(plan, artifacts, inputs)
+	if component == nil || component.Helm == nil || component.Helm.Repository == nil {
+		return ""
+	}
+	return component.Helm.Repository.Name
 }
 
 func findNamedComponent(components []catalog.NamedComponent, name string) *catalog.NamedComponent {

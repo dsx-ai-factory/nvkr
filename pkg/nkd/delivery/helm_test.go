@@ -39,6 +39,34 @@ func helmChartArchiveFixture(t *testing.T, files map[string]string) []byte {
 	return buf.Bytes()
 }
 
+func TestHelmChartNameReadsTheChartsOwnName(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	chartData := helmChartArchiveFixture(t, map[string]string{
+		"postgresql/Chart.yaml": "apiVersion: v2\nname: postgresql\nversion: 17.1.2\n",
+	})
+	out := filepath.Join(t.TempDir(), "packaged")
+	if _, err := BuildHelmChartArtifact(ctx, out, "application/vnd.nkd.helm-chart.v1", chartData); err != nil {
+		t.Fatal(err)
+	}
+	got, err := HelmChartName(ctx, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "postgresql" {
+		t.Fatalf("got %q, want %q", got, "postgresql")
+	}
+}
+
+func TestHelmChartNameRejectsNonHelmArtifact(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	image := imageFixture(t)
+	if _, err := HelmChartName(ctx, image); e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+		t.Fatalf("expected a fail-closed error, got %v", err)
+	}
+}
+
 func TestBuildHelmChartArtifactProducesConformantChart(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

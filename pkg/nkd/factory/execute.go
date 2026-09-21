@@ -627,7 +627,24 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 				if err != nil {
 					return err
 				}
-				objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind,
+				repository := output.Name
+				if output.Kind == PackageHelm {
+					// Helm outputs publish under the chart's own Chart.yaml name by
+					// default, matching what a real `helm pull oci://<registry>/<chart>`
+					// consumer expects; the owning catalog component may override it
+					// via .helm.repository.name (resolved at compile time onto the
+					// producing package node).
+					if producer := planNode(plan, "package/"+output.Name); producer.HelmRepository != "" {
+						repository = producer.HelmRepository
+					} else {
+						chartName, err := delivery.HelmChartName(ctx, objects[i].Path)
+						if err != nil {
+							return err
+						}
+						repository = chartName
+					}
+				}
+				objects[i].Output = &delivery.OutputBinding{Repository: repository, Format: output.Kind,
 					BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects}
 				if output.Kind == PackageAPT {
 					objects[i].Output.TransportPath = transportPaths[output.Name]

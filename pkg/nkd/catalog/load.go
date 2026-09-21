@@ -92,7 +92,14 @@ type rawComponent struct {
 
 // HelmConfig declares Helm-chart-specific packaging config (PackageHelm).
 type HelmConfig struct {
-	Values *ValuesConfig `json:"values,omitempty"`
+	Values     *ValuesConfig     `json:"values,omitempty"`
+	Repository *RepositoryConfig `json:"repository,omitempty"`
+}
+
+// RepositoryConfig overrides the OCI sibling repository name a packaged Helm
+// chart publishes under. Left unset, the chart's own Chart.yaml name is used.
+type RepositoryConfig struct {
+	Name string `json:"name,omitempty"`
 }
 
 // ValuesConfig declares Helm chart values.yaml overrides applied at compile time,
@@ -771,7 +778,12 @@ func cloneHelmConfig(config *HelmConfig) *HelmConfig {
 	if config == nil {
 		return nil
 	}
-	return &HelmConfig{Values: cloneValuesConfig(config.Values)}
+	cloned := &HelmConfig{Values: cloneValuesConfig(config.Values)}
+	if config.Repository != nil {
+		repository := *config.Repository
+		cloned.Repository = &repository
+	}
+	return cloned
 }
 
 func cloneValuesConfig(config *ValuesConfig) *ValuesConfig {
@@ -1011,11 +1023,16 @@ func validateComponent(name string, c Component) error {
 		if !c.FromSource {
 			return e.New(e.CodeInvalidCatalog, "component %q: helm config requires a from-source component", name)
 		}
-		if c.Helm.Values == nil {
-			return e.New(e.CodeInvalidCatalog, "component %q: helm config requires values", name)
+		if c.Helm.Values == nil && c.Helm.Repository == nil {
+			return e.New(e.CodeInvalidCatalog, "component %q: helm config requires values or repository", name)
 		}
-		if err := validateValuesConfig(name, c.Helm.Values); err != nil {
-			return err
+		if c.Helm.Values != nil {
+			if err := validateValuesConfig(name, c.Helm.Values); err != nil {
+				return err
+			}
+		}
+		if c.Helm.Repository != nil && strings.TrimSpace(c.Helm.Repository.Name) == "" {
+			return e.New(e.CodeInvalidCatalog, "component %q: helm repository override requires a name", name)
 		}
 	}
 	if c.OutputType == "disk-image" {
