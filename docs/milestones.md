@@ -20,10 +20,11 @@ M3 qualification does not establish cluster conformance or byte-identical reprod
 belongs to the v1 evidence contract; it does not grant qualified-lane clearance. Current artifact-publication
 verification is narrower than M3/M4 acceptance.
 
-Evidence remains scoped to exact producer outputs. An independently byte-reproduced package or digest-verified
-acquisition may feed the wrapped NKE OS build without making the aggregate disk reproducible. M2 accepts the
-disk's exact delivered digest, source-lane provenance, traced materials, and reconciled read-only inventory. A
-later build with different QCOW2 bytes is a different Artifact even if the same content checks pass.
+Evidence remains scoped to exact producer outputs. A package with independently demonstrated exact-byte
+reproduction evidence or a digest-verified acquisition may feed the wrapped NKE OS build without making the
+aggregate disk reproducible. M2 accepts the disk's exact delivered digest, source-lane provenance, traced
+materials, and reconciled read-only inventory. A later build with different QCOW2 bytes is a different Artifact
+even if the same content checks pass.
 
 ## Artifact scope
 

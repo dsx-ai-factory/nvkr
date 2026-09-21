@@ -94,7 +94,7 @@ network-enabled `KindBuild` node keeps the complete plan `wrapped-build`. Networ
 `KindPull` acquisition nodes is not a network-enabled build; a pull-only plan remains `acquired`. Stronger
 evidence for an exact component may remain independently inspectable, but it cannot promote the aggregate
 production predicate. Likewise, a list of matching resolved dependencies records what the producer consumed;
-it does not assert that the produced subject was byte-reproduced.
+it does not assert exact-byte reproduction of the produced subject.
 
 The Definition and Environment parameters identify the admitted authored inputs directly. Run plan v4 carries
 those exact values and revalidates their identities before execution or attestation. The retired compile-spec

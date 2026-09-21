@@ -25,8 +25,8 @@ workflows; consumers verify the results with standard tooling and no NKD softwar
   carries an SLSA v1 provenance attestation describing how the bytes were produced. No reproduction or
   byte-identity claim is made anywhere in v1, and the earlier builder-profile preflight and bake-off requirements
   are relaxed for these milestones: a wrapped build's declared network and privilege are recorded, not forbidden.
-- V1 evidence remains scoped to its exact producer output. Digest-verified dependencies retain their own
-  evidence, but do not make an aggregate OS image reproducible. V1 does not consume qualified reproduction
+- v1 evidence remains scoped to its exact producer output. Digest-verified dependencies retain their own
+  evidence, but do not make an aggregate OS image reproducible. v1 does not consume qualified reproduction
   evidence. A rebuilt disk with matching traced materials and inspected contents is content-validated; its exact
   QCOW2 digest is still a new Artifact identity.
 - Verification by a consumer means `cosign verify` and `cosign verify-attestation` (provenance and, from M3,

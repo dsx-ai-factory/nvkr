@@ -523,7 +523,7 @@ profile, materializes exact inputs, executes through authenticated runtime bound
 outputs. Reproduction provenance is deterministic and remains separate from v1 production provenance.
 The comparison is per exact subject. A reproduced package remains useful evidence when consumed by a wrapped
 disk build, but it cannot reproduce the disk by transitivity. A disk rebuilt from the same authenticated closure
-with a matching package/file inventory is content-validated, not byte-reproduced.
+with a matching package/file inventory is content-validated, not evidence of exact-byte reproduction.
 
 ```mermaid
 flowchart TB
