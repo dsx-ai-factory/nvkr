@@ -76,8 +76,12 @@ func (handle *NodeSession) ExecNode(node ir.Node, options RunOptions) (*Artifact
 	session.active.Add(1)
 	session.mu.Unlock()
 	defer session.active.Done()
-	ctx, cancel := context.WithCancel(options.Ctx)
-	stop := context.AfterFunc(session.ctx, cancel)
+	// Derive directly from the session so Close cancels admitted work before it
+	// waits for the producer. Forward caller cancellation into the same child.
+	// Reversing these parents leaves a scheduling window where Close has canceled
+	// the session but the AfterFunc callback has not canceled the producer yet.
+	ctx, cancel := context.WithCancel(session.ctx)
+	stop := context.AfterFunc(options.Ctx, cancel)
 	defer func() { stop(); cancel() }()
 	options.Ctx = ctx
 	return (Local{}).ExecNode(node, options)
