@@ -202,7 +202,8 @@ record; absence of a record proves neither success nor absence of remote effects
 
 ## Acceptance evidence
 
-Current contract evidence in `client/v1/*_test.go`, `cmd/nkdctl/*_test.go`, `pkg/nkd/pipeline/local_test.go`, and
+Current contract evidence in `client/v1/*_test.go`, `cmd/nkdctl/*_test.go`, `pkg/nkd/pipeline/local*_test.go`,
+`pkg/nkd/pipeline/container_lifecycle_test.go`, and
 `pkg/nkd/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
 catalog/runner/consumer seams, local cancellation propagation, an explicitly stopped and joined container-reaper
 waiter, bounded lock-free cleanup I/O, held-child SIGTERM→SIGKILL escalation, atomic output, exact-byte
