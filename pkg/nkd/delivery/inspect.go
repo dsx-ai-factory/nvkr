@@ -1,19 +1,14 @@
 package delivery
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -314,89 +309,6 @@ func holdBlob(ctx context.Context, root string, descriptor Descriptor, max int64
 	return held, nil
 }
 
-// ExtractBinaryBundle verifies a publication root, selects one binary-bundle
-// child by name, validates its canonical config against its tar layer, and
-// atomically materializes only regular files under out.
-func ExtractBinaryBundle(ctx context.Context, layoutRoot, name, out string) (BinaryBundle, error) {
-	inspection, err := Inspect(ctx, layoutRoot)
-	if err != nil {
-		return BinaryBundle{}, err
-	}
-	return extractBinaryBundle(ctx, layoutRoot, inspection, name, out)
-}
-
-// Only the owner of an independently checked closure may reuse its inspection.
-func extractBinaryBundle(ctx context.Context, layoutRoot string, inspection Inspection, name, out string) (BinaryBundle, error) {
-	var err error
-	var object PublishedObject
-	for _, candidate := range inspection.Root.Objects {
-		if candidate.Name == name && candidate.ArtifactType == MediaBinaryBundle {
-			object = candidate
-			break
-		}
-	}
-	if object.Name == "" {
-		return BinaryBundle{}, e.New(e.CodeUnverifiedRef, "publication root has no binary bundle named %q", name)
-	}
-	var manifestRaw []byte
-	if inspection.Root.Release != nil {
-		manifestRaw, err = readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
-	} else {
-		indexRaw, readErr := readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
-		if readErr != nil {
-			return BinaryBundle{}, readErr
-		}
-		var index ociIndex
-		if err := json.Unmarshal(indexRaw, &index); err != nil || len(index.Manifests) != 1 {
-			return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary layout must contain one manifest")
-		}
-		manifestRaw, err = readBlob(ctx, layoutRoot, index.Manifests[0], 8<<20)
-	}
-	if err != nil {
-		return BinaryBundle{}, err
-	}
-	var manifest ociManifest
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || manifest.ArtifactType != MediaBinaryBundle || len(manifest.Layers) != 1 {
-		return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle manifest has an invalid shape")
-	}
-	configRaw, err := readBlob(ctx, layoutRoot, manifest.Config, 8<<20)
-	if err != nil {
-		return BinaryBundle{}, err
-	}
-	var bundle BinaryBundle
-	if err := canonical.UnmarshalExact(configRaw, &bundle); err != nil {
-		return BinaryBundle{}, err
-	}
-	if err := bundle.Validate(); err != nil {
-		return BinaryBundle{}, err
-	}
-	semantic, _ := bundle.Digest()
-	if semantic != object.SemanticDigest {
-		return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle semantic identity does not match publication root")
-	}
-	layerPath := filepath.Join(layoutRoot, "blobs", "sha256", strings.TrimPrefix(manifest.Layers[0].Digest, "sha256:"))
-	held, err := heldfile.OpenContext(ctx, layerPath, heldfile.Options{Label: "binary-bundle layer", MaxBytes: maxDeliveryFileBytes})
-	if err != nil {
-		return BinaryBundle{}, err
-	}
-	defer func() { _ = held.Close() }()
-	if held.Digest() != manifest.Layers[0].Digest || held.Size() != manifest.Layers[0].Size {
-		return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle layer does not match its descriptor")
-	}
-	stage, commit, cleanup, err := stageLayout(out)
-	if err != nil {
-		return BinaryBundle{}, err
-	}
-	defer cleanup()
-	if err := extractBundleLayer(ctx, held, stage, bundle); err != nil {
-		return BinaryBundle{}, err
-	}
-	if err := commit(); err != nil {
-		return BinaryBundle{}, err
-	}
-	return bundle, nil
-}
-
 // ExtractObject verifies the entire publication root and materializes the exact
 // payload of one non-layout delivery object. The object config is rejoined to the
 // root's name, kind, media type, semantic digest, byte digest, and size before the
@@ -507,109 +419,9 @@ func writeExtractedObject(ctx context.Context, destination string, payload []byt
 	return closeErr
 }
 
-func extractBundleLayer(ctx context.Context, held *heldfile.File, out string, bundle BinaryBundle) error {
-	gzipReader, err := gzip.NewReader(io.NewSectionReader(held, 0, held.Size()))
-	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening binary-bundle gzip layer")
-	}
-	defer func() { _ = gzipReader.Close() }()
-	tarReader := tar.NewReader(gzipReader)
-	want := make(map[string]BinaryEntry, len(bundle.Entries))
-	for _, entry := range bundle.Entries {
-		want["files/"+entry.Name] = entry
-	}
-	seen := map[string]bool{}
-	for {
-		if err := deliveryContext(ctx); err != nil {
-			return err
-		}
-		header, err := tarReader.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return e.Wrap(e.CodeVerifyFailed, err, "reading binary-bundle tar layer")
-		}
-		entry, ok := want[header.Name]
-		if !ok || seen[header.Name] || header.Typeflag != tar.TypeReg || header.Size != entry.Size || uint32(header.Mode) != entry.Mode {
-			return e.New(e.CodeVerifyFailed, "binary-bundle tar contains an undeclared or mismatched entry %q", header.Name)
-		}
-		seen[header.Name] = true
-		destination := filepath.Join(out, entry.Name)
-		file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, fs.FileMode(entry.Mode))
-		if err != nil {
-			return e.Wrap(e.CodeInternal, err, "creating extracted binary %q", entry.Name)
-		}
-		hash := sha256.New()
-		written, copyErr := io.CopyN(io.MultiWriter(file, hash), contextReader{ctx: ctx, reader: tarReader}, entry.Size)
-		if copyErr == nil {
-			copyErr = file.Sync()
-		}
-		closeErr := file.Close()
-		got := "sha256:" + hex.EncodeToString(hash.Sum(nil))
-		if copyErr != nil || closeErr != nil || written != entry.Size || got != entry.SHA256 {
-			return e.New(e.CodeVerifyFailed, "extracted binary %q does not match its config", entry.Name)
-		}
-	}
-	if len(seen) != len(want) {
-		missing := make([]string, 0)
-		for name := range want {
-			if !seen[name] {
-				missing = append(missing, name)
-			}
-		}
-		sort.Strings(missing)
-		return e.New(e.CodeReleaseIncomplete, "binary-bundle layer omits entries: %s", strings.Join(missing, ", "))
-	}
-	return nil
-}
-
 type contextReader struct {
 	ctx    context.Context
 	reader io.Reader
-}
-
-// InspectBinaryBundle verifies a standalone binary-bundle layout and returns its
-// canonical config plus both the OCI bootstrap and semantic digests.
-func InspectBinaryBundle(ctx context.Context, root string) (BinaryBundle, Result, error) {
-	index, raw, err := readIndex(ctx, root)
-	if err != nil {
-		return BinaryBundle{}, Result{}, err
-	}
-	if index.ArtifactType != MediaBinaryBundle || len(index.Manifests) != 1 {
-		return BinaryBundle{}, Result{}, e.New(e.CodeVerifyFailed, "OCI layout is not a single NKD binary bundle")
-	}
-	visited := map[string]bool{}
-	if err := verifyDescriptor(ctx, root, index.Manifests[0], visited); err != nil {
-		return BinaryBundle{}, Result{}, err
-	}
-	if err := verifyBlobInventory(root, visited); err != nil {
-		return BinaryBundle{}, Result{}, err
-	}
-	manifestRaw, err := readBlob(ctx, root, index.Manifests[0], 8<<20)
-	if err != nil {
-		return BinaryBundle{}, Result{}, err
-	}
-	var manifest ociManifest
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || manifest.ArtifactType != MediaBinaryBundle || len(manifest.Layers) != 1 {
-		return BinaryBundle{}, Result{}, e.New(e.CodeVerifyFailed, "binary-bundle manifest has an invalid shape")
-	}
-	configRaw, err := readBlob(ctx, root, manifest.Config, 8<<20)
-	if err != nil {
-		return BinaryBundle{}, Result{}, err
-	}
-	var bundle BinaryBundle
-	if err := canonical.UnmarshalExact(configRaw, &bundle); err != nil {
-		return BinaryBundle{}, Result{}, err
-	}
-	semantic, err := bundle.Digest()
-	if err != nil {
-		return BinaryBundle{}, Result{}, err
-	}
-	if index.Annotations["dev.nkd.semantic.digest"] != semantic || index.Manifests[0].Annotations["dev.nkd.semantic.digest"] != semantic {
-		return BinaryBundle{}, Result{}, e.New(e.CodeVerifyFailed, "binary-bundle OCI descriptors do not bind its semantic identity")
-	}
-	return bundle, Result{LayoutPath: root, RootDigest: digestBytes(raw), SemanticDigest: semantic}, nil
 }
 
 func (reader contextReader) Read(buffer []byte) (int, error) {
