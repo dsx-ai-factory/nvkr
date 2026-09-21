@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -547,5 +548,61 @@ func writeTestTarGz(t *testing.T, path string, headers []*tar.Header) {
 	}
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A compressed carrier only passes its on-disk size through the caller's size
+// precondition, so the decompressed stream carries its own aggregate budget.
+// The budget is exercised at a small size here; production uses
+// maxTransportBytes.
+func TestTransportLimitReaderFailsClosedPastItsBudget(t *testing.T) {
+	t.Parallel()
+	reader := &transportLimitReader{reader: bytes.NewReader(bytes.Repeat([]byte{'x'}, 16)), remaining: 8}
+	consumed, err := io.Copy(io.Discard, reader)
+	if err == nil {
+		t.Fatalf("expected the budget to fail closed, got %d bytes and no error", consumed)
+	}
+	if consumed != 8 {
+		t.Fatalf("consumed = %d, want the budget of 8", consumed)
+	}
+	if !strings.Contains(err.Error(), "decompressed bound") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// Both DetectTransportChartRoot and Unpack read through openTransportTarSource,
+// so wiring the budget there covers discovery and extraction alike, including
+// bytes tar.Reader.Next skips between entries.
+func TestOpenTransportTarSourceBoundsBothCarrierShapes(t *testing.T) {
+	t.Parallel()
+	for name, path := range map[string]string{
+		"plain": filepath.Join(t.TempDir(), "carrier.tar"),
+		"gzip":  filepath.Join(t.TempDir(), "carrier.tgz"),
+	} {
+		headers := []*tar.Header{{Name: "demo/", Typeflag: tar.TypeDir, Mode: 0o755}}
+		if name == "gzip" {
+			writeTestTarGz(t, path, headers)
+		} else {
+			writeTestTar(t, path, headers)
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		source, closeSource, err := openTransportTarSource(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		limited, ok := source.(*transportLimitReader)
+		if !ok {
+			t.Fatalf("%s carrier is unbounded: %T", name, source)
+		}
+		if limited.remaining != maxTransportBytes {
+			t.Fatalf("%s carrier budget = %d, want %d", name, limited.remaining, maxTransportBytes)
+		}
+		closeSource()
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

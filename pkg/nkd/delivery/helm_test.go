@@ -175,13 +175,32 @@ func TestHelmChartVersionTagDerivesFromChartConfig(t *testing.T) {
 	}
 }
 
-func TestHelmChartVersionTagRejectsAnUntaggableVersion(t *testing.T) {
+// A SemVer build-metadata suffix is legal in Chart.yaml but illegal in an OCI
+// tag; Helm's own OCI client substitutes "_" for "+", so the derived discovery
+// tag follows that spelling rather than failing closed on a valid chart.
+func TestHelmChartVersionTagSubstitutesBuildMetadata(t *testing.T) {
 	t.Parallel()
 	ref, img := helmChartImage(t, helmChartArchiveFixture(t, map[string]string{
-		"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: 1.2.3+build\n",
+		"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: 1.2.3+build.5\n",
 	}))
-	if _, err := helmChartVersionTag(ref, img); e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
-		t.Fatalf("expected a fail-closed error, got %v", err)
+	tag, err := helmChartVersionTag(ref, img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tag.TagStr() != "1.2.3_build.5" || tag.Context().Name() != ref.Context().Name() {
+		t.Fatalf("tag = %s", tag.Name())
+	}
+}
+
+func TestHelmChartVersionTagRejectsAnUntaggableVersion(t *testing.T) {
+	t.Parallel()
+	for _, version := range []string{"1.2.3 dev", "1.2.3/4"} {
+		ref, img := helmChartImage(t, helmChartArchiveFixture(t, map[string]string{
+			"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: " + version + "\n",
+		}))
+		if _, err := helmChartVersionTag(ref, img); e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+			t.Fatalf("version %q: expected a fail-closed error, got %v", version, err)
+		}
 	}
 }
 

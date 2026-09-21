@@ -471,6 +471,12 @@ func validateTransportEntryUnchanged(expected transportEntry, observed securepat
 // uncompressed carrier is read as plain tar. Detection only consumes from the
 // returned buffered reader, so the caller sees the complete stream from the
 // beginning regardless of which branch is taken.
+//
+// The returned reader carries a single aggregate maxTransportBytes budget over
+// the decompressed stream. A compressed carrier passes only its on-disk size
+// through the caller's size precondition, so without this budget a small
+// decompression bomb could expand without bound; the budget is charged for every
+// decompressed byte, including data tar.Reader.Next skips between entries.
 func openTransportTarSource(source io.Reader) (io.Reader, func(), error) {
 	buffered := bufio.NewReader(source)
 	magic, err := buffered.Peek(2)
@@ -482,9 +488,29 @@ func openTransportTarSource(source io.Reader) (io.Reader, func(), error) {
 		if err != nil {
 			return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed transport archive")
 		}
-		return gz, func() { _ = gz.Close() }, nil
+		return &transportLimitReader{reader: gz, remaining: maxTransportBytes}, func() { _ = gz.Close() }, nil
 	}
-	return buffered, func() {}, nil
+	return &transportLimitReader{reader: buffered, remaining: maxTransportBytes}, func() {}, nil
+}
+
+// transportLimitReader fails closed once an untrusted stream has yielded more
+// than its aggregate byte budget, rather than truncating at the bound the way
+// io.LimitedReader would.
+type transportLimitReader struct {
+	reader    io.Reader
+	remaining int64
+}
+
+func (reader *transportLimitReader) Read(p []byte) (int, error) {
+	if reader.remaining <= 0 {
+		return 0, fmt.Errorf("transport archive exceeds its %d-byte decompressed bound", maxTransportBytes)
+	}
+	if int64(len(p)) > reader.remaining {
+		p = p[:reader.remaining]
+	}
+	n, err := reader.reader.Read(p)
+	reader.remaining -= int64(n)
+	return n, err
 }
 
 // DetectTransportChartRoot inspects an untrusted carrier and returns the name of

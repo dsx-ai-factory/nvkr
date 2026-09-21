@@ -36,6 +36,11 @@ func applyHelmValueOverrides(ctx context.Context, checksumRoot, chartDir string,
 	if err := yaml.UnmarshalStrict(raw, &values); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "decoding Helm values")
 	}
+	if values == nil {
+		// An empty or comments-only values.yaml decodes to a nil map, which is a
+		// legal chart. Assigning into it would panic, so start from an empty map.
+		values = map[string]any{}
+	}
 	for _, override := range overrides {
 		segments := strings.Split(strings.TrimPrefix(override.JSONPath, "."), ".")
 		node := values

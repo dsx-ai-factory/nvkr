@@ -142,6 +142,51 @@ func TestApplyHelmValueOverridesRegeneratesExistingChecksums(t *testing.T) {
 	}
 }
 
+// An empty or comments-only values.yaml is a legal chart and decodes to a nil
+// map; overriding into it must populate the file rather than panic.
+func TestApplyHelmValueOverridesSeedsAnEmptyValuesFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "values.yaml"), []byte("# nothing here\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyHelmValueOverrides(context.Background(), dir, dir,
+		[]HelmValueOverride{{JSONPath: ".tag", Value: "17.1.2"}}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "values.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var values map[string]any
+	if err := yaml.Unmarshal(raw, &values); err != nil {
+		t.Fatal(err)
+	}
+	if values["tag"] != "17.1.2" {
+		t.Fatalf("values = %#v", values)
+	}
+}
+
+func TestValidHelmValuesJSONPathRejectsEmptySegments(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		path string
+		want bool
+	}{
+		{".image.tag", true},
+		{".tag", true},
+		{"image.tag", false},
+		{"", false},
+		{".", false},
+		{"..", false},
+		{".image..tag", false},
+		{".image.", false},
+	} {
+		if got := validHelmValuesJSONPath(test.path); got != test.want {
+			t.Errorf("validHelmValuesJSONPath(%q) = %v, want %v", test.path, got, test.want)
+		}
+	}
+}
+
 func TestApplyHelmValueOverridesFailsClosedOnNonMappingSegment(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "values.yaml"), []byte("image: not-a-mapping\n"), 0o644); err != nil {

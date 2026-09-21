@@ -189,7 +189,12 @@ func helmChartVersionTag(ref name.Reference, img v1.Image) (name.Tag, error) {
 	if err := json.Unmarshal(raw, &config); err != nil || config.Version == "" {
 		return name.Tag{}, e.New(e.CodeVerifyFailed, "Helm chart config has no version")
 	}
-	tag, err := name.NewTag(ref.Context().Name()+":"+config.Version, name.StrictValidation)
+	// A SemVer build-metadata suffix ("1.2.3+build.5") is legal in Chart.yaml but
+	// illegal in an OCI tag. Helm's own OCI client substitutes "_" for "+" when it
+	// derives the tag, so mirror that spelling here; config.Version itself stays
+	// exact for the Helm config blob and every published identity.
+	tagVersion := strings.ReplaceAll(config.Version, "+", "_")
+	tag, err := name.NewTag(ref.Context().Name()+":"+tagVersion, name.StrictValidation)
 	if err != nil {
 		return name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "Helm chart version %q is not a valid registry tag", config.Version)
 	}

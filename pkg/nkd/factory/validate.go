@@ -250,7 +250,7 @@ func (plan Plan) Validate() error {
 			}
 			previous := ""
 			for _, override := range node.HelmValues {
-				if !strings.HasPrefix(override.JSONPath, ".") || len(override.JSONPath) < 2 || override.JSONPath <= previous {
+				if !validHelmValuesJSONPath(override.JSONPath) || override.JSONPath <= previous {
 					return e.New(e.CodePipelineDrift, "Helm values overrides must have sorted, unique, canonical jsonpaths")
 				}
 				previous = override.JSONPath
@@ -670,6 +670,21 @@ func hasAdjacentDuplicate(values []string) bool {
 		}
 	}
 	return false
+}
+
+// validHelmValuesJSONPath admits only a leading-dot path whose dotted segments
+// are all non-empty, so an empty leading, intermediate, or trailing segment
+// cannot reach applyHelmValueOverrides and address an empty values.yaml key.
+func validHelmValuesJSONPath(path string) bool {
+	if !strings.HasPrefix(path, ".") {
+		return false
+	}
+	for _, segment := range strings.Split(strings.TrimPrefix(path, "."), ".") {
+		if segment == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func safeGraphID(value string) bool {
