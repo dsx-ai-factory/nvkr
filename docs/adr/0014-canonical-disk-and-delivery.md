@@ -40,7 +40,8 @@ Disk evidence therefore has three non-interchangeable scopes:
 - **Delivery identity:** hash, sign, attest, and consume the exact QCOW2 bytes produced by one Run.
 - **Content validation:** authenticate the material closure, inspect the final disk read-only, and reconcile its
   packages and selected files with those materials. A second validated build with a different QCOW2 digest is a
-  different Artifact, not a reproduced variant.
+  different delivery Artifact. Content validation alone does not establish qualified reproduction; that verdict
+  requires the exact decoded canonical RAW comparison.
 - **Qualified reproduction:** independently rebuild and exact-match the ADR-07/08 expectation for the decoded
   canonical RAW subject. Matching materials or filesystem inventory cannot replace this comparison.
 
