@@ -227,6 +227,17 @@ func TestEffectiveCgroupCapacityAllowsRootWithoutControllerLimits(t *testing.T) 
 	}
 }
 
+func TestEffectiveCgroupMemorySkipsUsageForUnlimitedAncestors(t *testing.T) {
+	root, parent, leaf := cgroupCapacityFixture(t)
+	writeCgroupValue(t, parent, "memory.max", "max")
+	writeCgroupValue(t, leaf, "memory.max", "max")
+
+	memory, err := effectiveCgroupMemoryMiB(leaf, root, 2048)
+	if err != nil || memory != 2048 {
+		t.Fatalf("effective memory = %d, %v; want host capacity without memory.current", memory, err)
+	}
+}
+
 func cgroupCapacityFixture(t *testing.T) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()

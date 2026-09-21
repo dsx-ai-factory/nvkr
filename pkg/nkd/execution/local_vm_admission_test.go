@@ -125,6 +125,25 @@ func cloneLocalVMRequest(request LocalVMRequest) LocalVMRequest {
 	}
 }
 
+func TestValidateLocalVMRequestRejectsControlCharacters(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		subject string
+	}{
+		{name: "tab", subject: "plan/\tnode"},
+		{name: "escape", subject: "plan/\x1bnode"},
+		{name: "unicode control", subject: "plan/\u0085node"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := testLocalVMRequest(t, CapabilityPreferred, false)
+			request.Subject = test.subject
+			if _, err := validateLocalVMRequest(request); errorCode(err) != nkderr.CodeEngineCapability {
+				t.Fatalf("subject validation error = %v, want %s", err, nkderr.CodeEngineCapability)
+			}
+		})
+	}
+}
+
 func TestLocalVMAdmissionRejectsUnsatisfiedHost(t *testing.T) {
 	base := testLocalVMRequest(t, CapabilityRequired, true)
 	for _, test := range []struct {

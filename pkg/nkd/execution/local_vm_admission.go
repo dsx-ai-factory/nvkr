@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
@@ -317,7 +318,7 @@ func (runtime *LocalVMRuntime) close() error {
 
 func validateLocalVMRequest(request LocalVMRequest) (LocalVMRequest, error) {
 	if strings.TrimSpace(request.Subject) == "" || request.Subject != strings.TrimSpace(request.Subject) ||
-		strings.ContainsAny(request.Subject, "\r\n\x00") {
+		strings.IndexFunc(request.Subject, unicode.IsControl) >= 0 {
 		return LocalVMRequest{}, e.New(e.CodeEngineCapability,
 			"local VM runtime admission requires a safe exact subject")
 	}
