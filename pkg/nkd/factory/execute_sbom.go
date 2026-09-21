@@ -222,16 +222,8 @@ func (plan *Plan) hasCompiledDiskTarget(target string, artifacts map[string]Arti
 	if build == nil || build.Graph == nil {
 		return false
 	}
-	rootCount := 0
-	for _, component := range build.ResolvedComponents {
-		if component.OutputType == authored.OutputDiskImage {
-			rootCount++
-			if component.Name != payload.Component {
-				return false
-			}
-		}
-	}
-	if rootCount != 1 {
+	root, err := buildgraph.DiskRootName(build.ResolvedComponents)
+	if err != nil || root != payload.Component {
 		return false
 	}
 	for _, node := range build.Graph.Nodes {

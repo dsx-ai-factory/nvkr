@@ -253,20 +253,10 @@ func lifecycleArtifactID(output authored.DefinitionOutput, components []catalog.
 	if output.Format != authored.OutputDiskImage {
 		return "package/" + output.Name, nil
 	}
-	root := ""
-	for _, component := range components {
-		if component.OutputType != authored.OutputDiskImage {
-			continue
-		}
-		if root != "" {
-			return "", e.New(e.CodeInvalidCatalog,
-				"disk-image output %q has more than one disk producer", output.Name)
-		}
-		root = component.Name
-	}
-	if root == "" {
-		return "", e.New(e.CodeInvalidCatalog,
-			"disk-image output %q has no disk producer", output.Name)
+	root, err := buildgraph.DiskRootName(components)
+	if err != nil {
+		return "", e.Wrap(e.CodeInvalidCatalog, err,
+			"disk-image output %q cannot derive its root producer", output.Name)
 	}
 	return "artifact/" + output.Name + "/" + root, nil
 }
@@ -723,6 +713,8 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 		// The ordinary per-component SBOM operation does not prove the disk
 		// inventory and material reconciliation required by ADR-13. Keep disk
 		// evidence absent until that typed observation contract is implemented.
+		// Plan validation mirrors this temporary exemption through
+		// hasCompiledDiskTarget; change both boundaries together.
 		return nil
 	}
 

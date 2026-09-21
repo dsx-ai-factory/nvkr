@@ -107,6 +107,21 @@ func TestCompileProjectsDiskRootWithoutBinaryBundle(t *testing.T) {
 	}
 }
 
+func TestValidateBuildCatalogBindsDiskOutputFormat(t *testing.T) {
+	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
+	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateBuildCatalog(plan.Builds[0], authored.OutputDiskImage, plan.Environment); err != nil {
+		t.Fatalf("valid disk catalog binding failed: %v", err)
+	}
+	err = validateBuildCatalog(plan.Builds[0], authored.OutputExecutable, plan.Environment)
+	if factoryErrorCode(err) != e.CodeInvalidCatalog || !strings.Contains(err.Error(), "cannot select a disk-image component") {
+		t.Fatalf("mismatched disk output format error = %v, want %s", err, e.CodeInvalidCatalog)
+	}
+}
+
 func TestCompileDiskWithPinnedSBOMToolRoundTripsWithoutOrdinarySBOM(t *testing.T) {
 	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
 	definition.SBOMTool = "syft"
@@ -154,6 +169,65 @@ func TestCompileDiskWithPinnedSBOMToolRoundTripsWithoutOrdinarySBOM(t *testing.T
 	}
 	if loaded.LifecycleOutputs[0].ArtifactID != plan.LifecycleOutputs[0].ArtifactID {
 		t.Fatalf("round trip changed disk lifecycle artifact: %#v", loaded.LifecycleOutputs)
+	}
+}
+
+func TestCompiledDiskTargetRecognizerRejectsNearMisses(t *testing.T) {
+	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
+	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, baselineArtifacts := planIndex(plan)
+	if !plan.hasCompiledDiskTarget("node-image", baselineArtifacts) {
+		t.Fatal("valid compiled disk target was not recognized")
+	}
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*Plan, map[string]Artifact)
+	}{
+		{name: "wrong payload producer", mutate: func(_ *Plan, artifacts map[string]Artifact) {
+			payload := artifacts["artifact/node-image/image"]
+			payload.Producer = "node-image/build-other"
+			artifacts[payload.ID] = payload
+		}},
+		{name: "wrong payload kind", mutate: func(_ *Plan, artifacts map[string]Artifact) {
+			payload := artifacts["artifact/node-image/image"]
+			payload.Kind = authored.OutputExecutable
+			artifacts[payload.ID] = payload
+		}},
+		{name: "extra disk root", mutate: func(changed *Plan, _ map[string]Artifact) {
+			changed.Builds = append([]BuildPlan(nil), changed.Builds...)
+			changed.Builds[0].ResolvedComponents = append(
+				[]catalog.NamedComponent(nil), changed.Builds[0].ResolvedComponents...)
+			extra := changed.Builds[0].ResolvedComponents[0]
+			extra.Name = "other-image"
+			changed.Builds[0].ResolvedComponents = append(changed.Builds[0].ResolvedComponents, extra)
+		}},
+		{name: "non VM root producer", mutate: func(changed *Plan, _ map[string]Artifact) {
+			changed.Builds = append([]BuildPlan(nil), changed.Builds...)
+			graph := *changed.Builds[0].Graph
+			graph.Nodes = append([]ir.Node(nil), graph.Nodes...)
+			for index := range graph.Nodes {
+				if graph.Nodes[index].Component == "image" {
+					graph.Nodes[index].BuilderType = ir.BuilderOCIHermetic
+				}
+			}
+			changed.Builds[0].Graph = &graph
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changed := *plan
+			artifacts := make(map[string]Artifact, len(baselineArtifacts))
+			for id, artifact := range baselineArtifacts {
+				artifacts[id] = artifact
+			}
+			test.mutate(&changed, artifacts)
+			if changed.hasCompiledDiskTarget("node-image", artifacts) {
+				t.Fatal("near-miss disk shape received the SBOM exemption")
+			}
+		})
 	}
 }
 

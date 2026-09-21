@@ -174,10 +174,9 @@ func projectQualifiedArtifacts(report *pipeline.Report, graph *ir.Graph) ([]Arti
 					"qualified build artifact %q does not match its exact builder/input/toolchain authority",
 					node.Component)
 			}
-			fetch, ok := byID[node.Needs[0]]
-			if !ok || fetch.Kind != ir.KindFetch {
-				return nil, e.New(e.CodeInvalidCatalog,
-					"build artifact %q lost its pinned source dependency", node.Component)
+			fetch, err := qualifiedSourceDependency(node, byID)
+			if err != nil {
+				return nil, err
 			}
 			artifact.InputDigest = result.InputDigest
 			artifact.BuilderType = result.BuilderType
@@ -209,6 +208,26 @@ func projectQualifiedArtifacts(report *pipeline.Report, graph *ir.Graph) ([]Arti
 			"qualified report contains no selected artifact provenance subjects")
 	}
 	return artifacts, nil
+}
+
+func qualifiedSourceDependency(node ir.Node, byID map[string]ir.Node) (ir.Node, error) {
+	var fetch ir.Node
+	for _, dependency := range node.Needs {
+		candidate, ok := byID[dependency]
+		if !ok || candidate.Kind != ir.KindFetch {
+			continue
+		}
+		if fetch.ID != "" {
+			return ir.Node{}, e.New(e.CodeInvalidCatalog,
+				"build artifact %q has more than one pinned source dependency", node.Component)
+		}
+		fetch = candidate
+	}
+	if fetch.ID == "" {
+		return ir.Node{}, e.New(e.CodeInvalidCatalog,
+			"build artifact %q lost its pinned source dependency", node.Component)
+	}
+	return fetch, nil
 }
 
 func qualifiedBuildDependencies(result pipeline.ArtifactResult, build, fetch ir.Node) []Dependency {

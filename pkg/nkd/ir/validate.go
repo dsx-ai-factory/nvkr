@@ -510,10 +510,15 @@ func validateVMRequirements(n Node) error {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q requires complete resources, host platforms, KVM policy, and timeout", n.ID)
 	}
-	if requirements.Capabilities[0].Policy == execution.CapabilityRequired && n.ExecutionBinding != nil &&
-		string(n.ExecutionBinding.Class.HostPlatform) != n.Platform {
-		return e.New(e.CodeEngineCapability,
-			"VM build node %q requires KVM on guest-matching host platform %q", n.ID, n.Platform)
+	if requirements.Capabilities[0].Policy == execution.CapabilityRequired {
+		if n.ToolchainPlatform != n.Platform {
+			return e.New(e.CodeEngineCapability,
+				"VM build node %q requires KVM on guest-matching host platform %q", n.ID, n.Platform)
+		}
+		if n.ExecutionBinding != nil && string(n.ExecutionBinding.Class.HostPlatform) != n.Platform {
+			return e.New(e.CodeEngineCapability,
+				"VM build node %q requires KVM on guest-matching host platform %q", n.ID, n.Platform)
+		}
 	}
 	return nil
 }

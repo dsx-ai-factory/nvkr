@@ -144,39 +144,13 @@ func containsDiskRoot(components []catalog.NamedComponent) bool {
 // the dependency edges and no second root selector is necessary.
 func validateDiskSelection(components []catalog.NamedComponent) error {
 	selected := make(map[string]catalog.Component, len(components))
-	referenced := make(map[string]bool, len(components))
 	for _, component := range components {
 		selected[component.Name] = component.Component
-		for _, dependency := range component.Materials {
-			referenced[dependency] = true
-		}
 	}
-
-	var roots []string
-	for _, component := range components {
-		if component.OutputType != definition.OutputDiskImage {
-			continue
-		}
-		// Defensive: Resolve validates the complete catalog before entering this
-		// helper. Keep the root check local so future internal callers cannot
-		// classify malformed disk metadata as an output root.
-		if component.Disk == nil || component.Disk.Format != "qcow2" {
-			return e.New(e.CodeInvalidCatalog,
-				"disk-image output component %q is not a QCOW2 producer", component.Name)
-		}
-		if !referenced[component.Name] {
-			roots = append(roots, component.Name)
-		}
+	root, err := DiskRootName(components)
+	if err != nil {
+		return err
 	}
-	sort.Strings(roots)
-	if len(roots) == 0 {
-		return e.New(e.CodeInvalidCatalog, "disk-image output selects no QCOW2 root component")
-	}
-	if len(roots) > 1 {
-		return e.New(e.CodeInvalidCatalog,
-			"disk-image output selects multiple disk roots %q and %q", roots[0], roots[1])
-	}
-	root := roots[0]
 
 	required := make(map[string]bool, len(selected))
 	var include func(string)
@@ -203,6 +177,44 @@ func validateDiskSelection(components []catalog.NamedComponent) error {
 	return e.New(e.CodeInvalidCatalog,
 		"disk-image output selects components outside root %q material closure: %s",
 		root, strings.Join(extras, ", "))
+}
+
+// DiskRootName derives the one top-level QCOW2 producer from an already validated
+// selected component set. A disk component consumed by another disk component is
+// a material, not a second output root.
+func DiskRootName(components []catalog.NamedComponent) (string, error) {
+	referenced := make(map[string]bool, len(components))
+	for _, component := range components {
+		for _, dependency := range component.Materials {
+			referenced[dependency] = true
+		}
+	}
+
+	var roots []string
+	for _, component := range components {
+		if component.OutputType != definition.OutputDiskImage {
+			continue
+		}
+		// Defensive: Resolve validates the complete catalog before entering this
+		// helper. Keep the root check local so future internal callers cannot
+		// classify malformed disk metadata as an output root.
+		if component.Disk == nil || component.Disk.Format != "qcow2" {
+			return "", e.New(e.CodeInvalidCatalog,
+				"disk-image output component %q is not a QCOW2 producer", component.Name)
+		}
+		if !referenced[component.Name] {
+			roots = append(roots, component.Name)
+		}
+	}
+	sort.Strings(roots)
+	if len(roots) == 0 {
+		return "", e.New(e.CodeInvalidCatalog, "disk-image output selects no QCOW2 root component")
+	}
+	if len(roots) > 1 {
+		return "", e.New(e.CodeInvalidCatalog,
+			"disk-image output selects multiple disk roots %q and %q", roots[0], roots[1])
+	}
+	return roots[0], nil
 }
 
 // cloneComponent preserves exact strings, including malformed bytes that downstream

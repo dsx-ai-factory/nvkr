@@ -128,6 +128,35 @@ func TestQualifiedDependencyProjectionSupportsBareToolchainIdentity(t *testing.T
 	}
 }
 
+func TestQualifiedSourceDependencyDoesNotAssumeNeedsOrder(t *testing.T) {
+	fetch := ir.Node{ID: "fetch-image", Kind: ir.KindFetch}
+	material := ir.Node{ID: "build-agent", Kind: ir.KindBuild}
+	byID := map[string]ir.Node{fetch.ID: fetch, material.ID: material}
+	got, err := qualifiedSourceDependency(ir.Node{
+		Component: "image", Needs: []string{material.ID, fetch.ID},
+	}, byID)
+	if err != nil || got.ID != fetch.ID {
+		t.Fatalf("qualified source dependency = %#v, %v; want %q", got, err, fetch.ID)
+	}
+	for _, test := range []struct {
+		name  string
+		needs []string
+		code  nkderr.Code
+	}{
+		{name: "missing fetch", needs: []string{material.ID}, code: nkderr.CodeInvalidCatalog},
+		{name: "multiple fetches", needs: []string{fetch.ID, "fetch-other"}, code: nkderr.CodeInvalidCatalog},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := qualifiedSourceDependency(ir.Node{Component: "image", Needs: test.needs}, map[string]ir.Node{
+				fetch.ID: fetch, "fetch-other": {ID: "fetch-other", Kind: ir.KindFetch}, material.ID: material,
+			})
+			if errorCode(err) != test.code {
+				t.Fatalf("qualified source dependency error = %v, want %s", err, test.code)
+			}
+		})
+	}
+}
+
 func TestQualifiedDependencyProjectionIsMirrorInvariant(t *testing.T) {
 	component := "agent"
 	input := provenanceDigest('4')

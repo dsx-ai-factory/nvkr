@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -79,6 +80,7 @@ func TestVMGraphBindsExactPackerAndMaterialInputs(t *testing.T) {
 	}{
 		{name: "disk encryption", mutate: func(node *Node) { node.Disk.Encryption = "luks2" }},
 		{name: "Packer variable", mutate: func(node *Node) { node.Packer.Variables[0].Value = "minimal" }},
+		{name: "Packer build name", mutate: func(node *Node) { node.Packer.BuildName = "image.qemu.other" }},
 		{name: "material binding", mutate: func(node *Node) { node.Materials[0].Binding = "agent-deb" }},
 		{name: "toolchain platform", mutate: func(node *Node) { node.ToolchainPlatform = "linux/arm64" }},
 	} {
@@ -93,6 +95,29 @@ func TestVMGraphBindsExactPackerAndMaterialInputs(t *testing.T) {
 				t.Fatalf("%s did not change VM build identity", test.name)
 			}
 		})
+	}
+}
+
+func TestVMGraphMaterialProducerAffectsBuildIdentity(t *testing.T) {
+	base := vmGraph(t)
+	want, err := base.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := vmGraph(t)
+	changed.Nodes[0].Materials[0].Component = "agent-v2"
+	changed.Nodes[0].Materials[0].Producer = "pull-agent-v2"
+	changed.Nodes[0].Needs[1] = "pull-agent-v2"
+	changed.Nodes[2].ID = "pull-agent-v2"
+	changed.Nodes[2].Component = "agent-v2"
+	changed.Nodes[3].Needs[1] = "pull-agent-v2"
+	changed.Normalize()
+	got, err := changed.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == want {
+		t.Fatal("changed material producer retained VM build identity")
 	}
 }
 
@@ -127,6 +152,11 @@ func TestVMGraphRejectsMaterialEdgeSubstitution(t *testing.T) {
 func TestVMRequiredKVMRejectsCrossArchitectureBinding(t *testing.T) {
 	graph := vmGraph(t)
 	graph.Nodes[0].Requirements = vmRequirements(execution.CapabilityRequired)
+	assertIRCode(t, graph.Validate(), e.CodeEngineCapability)
+
+	graph = vmGraph(t)
+	graph.Nodes[0].Requirements = vmRequirements(execution.CapabilityRequired)
+	graph.Nodes[0].ToolchainPlatform = "linux/arm64"
 	binding, err := execution.Match(graph.Nodes[0].Requirements, []execution.Class{{
 		Name: "amd64-kvm", RunsOn: "linux-amd64-cpu16", HostPlatform: execution.HostPlatformLinuxAMD64,
 		Resources:    execution.ResourceCapacity{CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536},
@@ -137,4 +167,120 @@ func TestVMRequiredKVMRejectsCrossArchitectureBinding(t *testing.T) {
 	}
 	graph.Nodes[0].ExecutionBinding = binding
 	assertIRCode(t, graph.Validate(), e.CodeEngineCapability)
+}
+
+func TestVMGraphRejectsInvalidVMContracts(t *testing.T) {
+	armBinding := func(t *testing.T, requirements *execution.Requirements) *execution.Binding {
+		t.Helper()
+		binding, err := execution.Match(requirements, []execution.Class{{
+			Name: "arm64-kvm", RunsOn: "linux-arm64-cpu16", HostPlatform: execution.HostPlatformLinuxARM64,
+			Resources:    execution.ResourceCapacity{CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536},
+			Capabilities: []execution.CapabilityName{execution.CapabilityKVM}, MaxTimeoutSeconds: 10800,
+		}}, execution.MatchOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return binding
+	}
+	for _, test := range []struct {
+		name   string
+		code   e.Code
+		mutate func(*Graph)
+	}{
+		{name: "unexpected field", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
+			graph.Nodes[0].Env = []EnvVar{{Name: "UNEXPECTED", Value: "value"}}
+		}},
+		{name: "toolchain host not allowed", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
+			graph.Nodes[0].Requirements.AllowedHostPlatforms = []execution.HostPlatform{execution.HostPlatformLinuxARM64}
+		}},
+		{name: "binding differs from toolchain host", code: e.CodeEngineCapability, mutate: func(graph *Graph) {
+			graph.Nodes[0].ExecutionBinding = armBinding(t, graph.Nodes[0].Requirements)
+		}},
+		{name: "invalid encryption", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
+			graph.Nodes[0].Disk.Encryption = "aes"
+		}},
+		{name: "network enabled", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
+			graph.Nodes[0].Network = NetworkDefault
+		}},
+		{name: "both command and Packer", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
+			graph.Nodes[0].Command = []string{"make", "image"}
+		}},
+		{name: "no producer", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
+			graph.Nodes[0].Packer = nil
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			graph := vmGraph(t)
+			test.mutate(&graph)
+			assertIRCode(t, graph.Validate(), test.code)
+		})
+	}
+}
+
+func TestVMGraphRejectsInvalidPackerAndMaterialBindings(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*Node)
+	}{
+		{name: "unsafe Packer project", mutate: func(node *Node) { node.Packer.ProjectPath = "../packer" }},
+		{name: "glob Packer build", mutate: func(node *Node) { node.Packer.BuildName = "image.*" }},
+		{name: "unsorted Packer variables", mutate: func(node *Node) {
+			node.Packer.Variables = append(node.Packer.Variables, PackerVariable{Name: "alpha", Value: "value"})
+		}},
+		{name: "unsafe material binding", mutate: func(node *Node) { node.Materials[0].Binding = "bad\nname" }},
+		{name: "unsorted material bindings", mutate: func(node *Node) {
+			node.Materials = []MaterialBinding{
+				{Binding: "zeta", Component: "zeta", Producer: "pull-zeta"},
+				{Binding: "alpha", Component: "alpha", Producer: "pull-alpha"},
+			}
+		}},
+		{name: "duplicate material component", mutate: func(node *Node) {
+			node.Materials = append(node.Materials,
+				MaterialBinding{Binding: "zeta", Component: "agent", Producer: "pull-zeta"})
+		}},
+		{name: "duplicate material producer", mutate: func(node *Node) {
+			node.Materials = append(node.Materials,
+				MaterialBinding{Binding: "zeta", Component: "zeta", Producer: "pull-agent"})
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			graph := vmGraph(t)
+			test.mutate(&graph.Nodes[0])
+			assertIRCode(t, graph.Validate(), e.CodeInvalidCatalog)
+		})
+	}
+}
+
+func TestVMGraphNormalizeSortsPackerAndMaterialInputsDeterministically(t *testing.T) {
+	makeGraph := func(reverse bool) Graph {
+		graph := vmGraph(t)
+		graph.Nodes[0].Materials = append(graph.Nodes[0].Materials,
+			MaterialBinding{Binding: "tool-package", Component: "tool", Producer: "pull-tool"})
+		graph.Nodes[0].Packer.Variables = append(graph.Nodes[0].Packer.Variables,
+			PackerVariable{Name: "release_channel", Value: "stable"})
+		graph.Nodes[0].Needs = append(graph.Nodes[0].Needs, "pull-tool")
+		graph.Nodes = append(graph.Nodes, Node{ID: "pull-tool", Kind: KindPull, Component: "tool",
+			Artifact: "https://example.test/tool", Digest: "sha256:" + strings.Repeat("e", 64),
+			Platform: "linux/arm64", Network: NetworkDefault, OutputType: "raw",
+			ArtifactPath: "tool", Version: "1.0.0"})
+		graph.Nodes[3].Needs = append(graph.Nodes[3].Needs, "pull-tool")
+		if reverse {
+			slices.Reverse(graph.Nodes[0].Materials)
+			slices.Reverse(graph.Nodes[0].Packer.Variables)
+		}
+		graph.Normalize()
+		return graph
+	}
+	left, right := makeGraph(false), makeGraph(true)
+	leftDigest, err := left.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rightDigest, err := right.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leftDigest != rightDigest {
+		t.Fatalf("normalized input order changed VM build identity: %s != %s", leftDigest, rightDigest)
+	}
 }
