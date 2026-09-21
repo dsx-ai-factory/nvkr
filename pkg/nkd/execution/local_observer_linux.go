@@ -32,6 +32,34 @@ type linuxLocalObservation struct {
 	observed    atomic.Bool
 }
 
+func (observation *linuxLocalObservation) holdWorkspace() (*os.File, error) {
+	return observation.holdFD(observation.workspaceFD, "local VM workspace")
+}
+
+func (observation *linuxLocalObservation) holdKVM() (*os.File, error) {
+	if observation.kvmFD < 0 {
+		return nil, e.New(e.CodeEngineCapability,
+			"local VM admission has no held KVM device")
+	}
+	return observation.holdFD(observation.kvmFD, "local KVM device")
+}
+
+func (observation *linuxLocalObservation) holdFD(fd int, name string) (*os.File, error) {
+	if fd < 0 {
+		return nil, e.New(e.CodeEngineCapability, "%s capability is closed", name)
+	}
+	held, err := unix.FcntlInt(uintptr(fd), unix.F_DUPFD_CLOEXEC, 0)
+	if err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "duplicating held %s capability", name)
+	}
+	file := os.NewFile(uintptr(held), name)
+	if file == nil {
+		_ = unix.Close(held)
+		return nil, e.New(e.CodeInternal, "constructing held %s capability", name)
+	}
+	return file, nil
+}
+
 func (systemLocalObserver) Open(ctx context.Context, workspace *os.File) (localObservationLease, error) {
 	return openLinuxLocalObservation(ctx, workspace, unix.Faccessat, systemKVMOperations)
 }
@@ -132,6 +160,18 @@ func (observation *linuxLocalObservation) Observe(ctx context.Context) (Observed
 		return ObservedHostFacts{}, e.New(e.CodeInternal,
 			"local Linux observation lease has already been used")
 	}
+	return observation.observeCurrent(ctx)
+}
+
+func (observation *linuxLocalObservation) reobserve(ctx context.Context) (ObservedHostFacts, error) {
+	if !observation.observed.Load() {
+		return ObservedHostFacts{}, e.New(e.CodeInternal,
+			"local Linux observation lease has not completed initial observation")
+	}
+	return observation.observeCurrent(ctx)
+}
+
+func (observation *linuxLocalObservation) observeCurrent(ctx context.Context) (ObservedHostFacts, error) {
 	if err := localObservationContextError(ctx, "observing local Linux execution host"); err != nil {
 		return ObservedHostFacts{}, err
 	}
@@ -225,9 +265,9 @@ func hostPlatformForMachine(machine string) (HostPlatform, error) {
 	}
 }
 
-// availableCPUMillis is deliberately a local affinity observation, not a
-// provider allocation or a cgroup CPU-quota claim. A future allocation adapter
-// must authenticate its own effective quota before using provider authority.
+// availableCPUMillis returns the smaller of the process CPU affinity and every
+// CPU quota in its cgroup-v2 ancestry. It observes current local capacity but
+// neither reserves that capacity nor grants provider allocation authority.
 func availableCPUMillis() (uint64, error) {
 	var affinity unix.CPUSet
 	if err := unix.SchedGetaffinity(0, &affinity); err != nil {
@@ -237,25 +277,26 @@ func availableCPUMillis() (uint64, error) {
 	if count <= 0 {
 		return 0, e.New(e.CodeEngineCapability, "local CPU affinity exposes no processors")
 	}
-	return uint64(count) * 1000, nil
+	affinityMillis := uint64(count) * 1000
+	cgroupDir, cgroupRoot, err := currentCgroupV2Location()
+	if err != nil {
+		return 0, err
+	}
+	return effectiveCgroupCPUMillis(cgroupDir, cgroupRoot, affinityMillis)
 }
 
-// availableMemoryMiB is a point-in-time free-host-memory observation. It does
-// not claim a cgroup limit or reserve the returned capacity.
+// availableMemoryMiB returns the smaller of host-available memory and effective
+// headroom across the process's complete cgroup-v2 ancestry. It reserves neither.
 func availableMemoryMiB() (uint64, error) {
-	var info unix.Sysinfo_t
-	if err := unix.Sysinfo(&info); err != nil {
-		return 0, e.Wrap(e.CodeEngineCapability, err, "reading local memory availability")
+	hostAvailable, err := readHostAvailableMemoryMiB()
+	if err != nil {
+		return 0, err
 	}
-	unit := uint64(info.Unit)
-	if unit == 0 {
-		unit = 1
+	cgroupDir, cgroupRoot, err := currentCgroupV2Location()
+	if err != nil {
+		return 0, err
 	}
-	free := info.Freeram
-	if free > math.MaxUint64/unit {
-		return 0, e.New(e.CodeEngineCapability, "local memory availability exceeds the supported range")
-	}
-	return free * unit / bytesPerMiB, nil
+	return effectiveCgroupMemoryMiB(cgroupDir, cgroupRoot, hostAvailable)
 }
 
 func availableScratchMiB(fd int) (uint64, error) {
@@ -288,8 +329,12 @@ func availableScratchMiBWith(fd int, statfs localStatfs) (uint64, error) {
 
 func (observation *linuxLocalObservation) observeKVM() (bool, error) {
 	if observation.kvmFD < 0 {
+		// KVM_GET_API_VERSION alone works with a read-only observation on some
+		// kernels, but runtime admission retains this exact descriptor as a VM
+		// capability. Open read-write so an enabled resolution never authenticates
+		// a descriptor that could not create a VM.
 		fd, err := observation.kvm.open(kvmDevicePath,
-			unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+			unix.O_RDWR|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 		if err != nil {
 			if errors.Is(err, unix.ENOENT) || errors.Is(err, unix.ENODEV) ||
 				errors.Is(err, unix.ENXIO) || errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM) {

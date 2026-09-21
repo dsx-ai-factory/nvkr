@@ -180,12 +180,20 @@ Plan validation recomputes the selection from the Environment inventory; the bin
 _Avoid_: Runtime proof, authored requirement, mutable runner label
 
 **Local host observation**:
-Point-in-time diagnostic Linux facts about host platform, process CPU affinity, free host memory, available
-workspace capacity, and KVM exposure. Observation is relative to the executor's already-open workspace-directory
+Point-in-time diagnostic Linux facts about host platform, cgroup-v2-capped CPU and memory, available workspace
+capacity, and KVM exposure. Observation is relative to the executor's already-open workspace-directory
 capability; the observer lifetime-protects its duplicate, checks write and traversal access, and closes every
 retained handle before returning. It does not accept execution requirements or a selected binding, authenticate
 Environment membership, own an execution deadline, reserve resources, or authorize work.
 _Avoid_: Execution admission, runtime proof, execution class, provider attestation, resource reservation
+
+**Local VM admission**:
+An opaque, single-use, same-process capability binding the exact current Plan bytes and one selected VM build,
+its execution request and binding, cgroup-capped Linux host observations, and retained workspace/KVM handles.
+Capacity is re-observed inside the authored callback deadline immediately before work. It is current-availability
+authority for the local VM adapter only, not provider allocation, resource reservation, qualification evidence,
+or proof that a subprocess consumed the held KVM descriptor.
+_Avoid_: Serialized receipt, hosted-runner attestation, resource reservation, KVM-consumption evidence
 
 **VM-image producer form**:
 The catalog-selected invocation contract within a VM-image component: either an exact command argument vector or

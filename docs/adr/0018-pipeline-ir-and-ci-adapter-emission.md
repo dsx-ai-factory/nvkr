@@ -213,24 +213,50 @@ architecture. Plan admission recomputes the deterministic selection from the exa
 rejects a substituted class, route, request, or binding. The class inventory affects Environment and Plan identities; the selected binding affects full-IR bytes and Plan identity. Neither
 enters logical build identity.
 
-Execution-class declarations are planning input, not runtime proof. Every current local or hosted adapter still
-rejects a selected build with nonempty execution requirements before execution or emitted output. A future runtime
-adapter must authenticate the realized host platform, allocation, capability exposure, and enforced deadline
-before work; a provider's outer job timeout must permit the authored executor budget.
+Execution-class declarations are planning input, not runtime proof. Every current local or hosted execution
+adapter still rejects a selected build with nonempty execution requirements before execution or emitted output.
+A runtime adapter must authenticate the realized host platform, capacity, capability exposure, and enforced
+deadline before work; a provider's outer job timeout must permit the authored executor budget.
 
 The execution owner provides a narrower diagnostic local Linux observation helper. The caller supplies an
 already-open workspace-directory capability. The helper duplicates that descriptor while its lifetime is
 protected by the runtime, checks effective write and traversal access, observes host platform, process CPU
-affinity, free host memory, available workspace capacity and KVM API exposure, then closes every retained
+affinity capped by the complete cgroup-v2 quota ancestry, host-available memory capped by complete cgroup-v2
+headroom, available workspace capacity and KVM API exposure, then closes every retained
 workspace and KVM handle before returning. It never resolves a replaceable workspace pathname. Non-Linux hosts
 reject the observation.
 
 This helper accepts neither an execution request nor a selected binding. It does not authenticate Environment
 membership or deterministic selection, own or enforce an execution deadline, reserve observed resources, prove a
-provider allocation, or authorize execution. No current local or hosted adapter consumes the observation, and
-all existing execution gates remain closed. A future adapter must first obtain the owning planning module's
-authenticated Environment/Plan selection, independently authenticate effective provider or cgroup allocation,
-and enforce the selected executor and outer-provider deadlines before it can admit work.
+provider allocation, or authorize execution.
+
+The local VM admission primitive builds on the same observer without promoting diagnostic values into durable
+evidence. The factory owner validates the complete Plan and identifies one exact `vm-image` build. An opaque,
+same-process capability then binds both logical identity and the exact current Plan bytes, the selected node,
+compiler-selected request and binding, and a current Linux observation. CPU capacity is the smaller of process
+affinity and every cgroup-v2 ancestor quota. Memory capacity is the smaller of host-available memory and headroom
+under every cgroup-v2 ancestor limit. The observer resolves a unique cgroup2 mount root and mountpoint from the
+process mount table, maps the process membership beneath that root, and rejects absent, ambiguous, or escaping
+mappings. Admission fails closed where that effective capacity cannot be established.
+It rejects a host-platform mismatch, insufficient CPU, memory or held-workspace capacity, and an enabled KVM
+resolution when KVM is unavailable. The capability retains its duplicated workspace directory and any selected,
+opened, API-validated KVM device until one callback completes or the unused capability is closed. A disabled
+preferred or forbidden resolution exposes no KVM handle to the callback even when the host has KVM; driver
+isolation must withhold the device from the subprocess.
+
+The callback is single-use and receives the authored executor deadline plus descriptor capabilities, never the
+caller workspace or KVM pathname. CPU, memory, held-workspace capacity and KVM availability are re-observed inside
+that deadline immediately before work. Request, binding, any current Plan-byte mutation, or node substitution
+fails before the callback. Every retained and callback-borrowed handle closes on return. This primitive performs
+no source, subprocess, output, or workspace mutation during admission, and no execution driver consumes it yet,
+so existing adapter gates remain closed.
+
+This is current-availability authority for a future local VM adapter, not a resource reservation, authenticated
+provider allocation, cross-process receipt, or qualification evidence. Holding the validated KVM descriptor
+proves availability through the callback lifetime; it does not prove Packer or QEMU consumed that exact
+descriptor. Driver dispatch must enforce the selected device mode and use the supplied deadline context. A hosted
+or qualified adapter must independently authenticate its effective provider or cgroup allocation and outer
+deadline before it can admit work.
 
 Future `vm-image` execution dispatches the typed producer driver owned by ADR-10. The `command` driver executes the
 exact authored argument vector and can therefore invoke Make. The `packer` driver invokes the pinned Packer

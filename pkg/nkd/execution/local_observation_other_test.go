@@ -15,3 +15,11 @@ func TestLocalHostObservationFailsClosedOutsideLinux(t *testing.T) {
 		t.Fatalf("facts = %#v, error = %v; want %s", facts, err, nkderr.CodeEngineCapability)
 	}
 }
+
+func TestLocalVMAdmissionFailsClosedOutsideLinux(t *testing.T) {
+	request := testLocalVMRequest(t, CapabilityPreferred, false)
+	admission, err := AdmitLocalVM(context.Background(), request, openLocalWorkspace(t))
+	if admission != nil || errorCode(err) != nkderr.CodeEngineCapability {
+		t.Fatalf("admission = %#v, error = %v; want %s", admission, err, nkderr.CodeEngineCapability)
+	}
+}

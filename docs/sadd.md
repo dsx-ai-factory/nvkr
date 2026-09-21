@@ -765,15 +765,24 @@ name, and records the complete selected binding in the full IR and Plan. Plan va
 from the exact Environment inventory, so a substituted class, capability resolution, or route is pipeline drift.
 These planning declarations affect Environment and Plan identity but remain outside build identity.
 
-Execution classes are not runtime evidence. Current local and hosted adapters still reject selected builds
-carrying requirements before work or emitted output. The execution owner has a process-local Linux diagnostic
-helper that observes host platform, CPU affinity, free host memory, available capacity relative to the executor's
-held workspace directory, and KVM exposure. Descriptor duplication is lifetime-protected, write and traversal
-access is checked, and every retained handle is closed before return. The helper accepts no execution request or
-selected binding, does not authenticate Environment membership or selection, and grants no execution authority.
-Authenticated runtime admission and provider allocation, deadline enforcement, adapter integration, and VM
-topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege,
-nested virtualization, NUMA, accelerators, and provider-specific lowering remain deferred.
+Execution classes are not runtime evidence. Current execution adapters still reject selected builds carrying
+requirements before work or emitted output. The execution owner has both a process-local Linux diagnostic helper
+and a narrower local VM admission primitive. The diagnostic helper observes host platform, cgroup-v2-capped CPU
+and memory, available capacity relative to the executor's held workspace directory, and KVM exposure without
+accepting a request or granting authority. Local VM admission additionally binds the exact current Plan bytes and
+one VM node, its compiler-selected request and execution binding, and the current observation. CPU capacity is
+capped by process affinity and complete cgroup-v2 ancestry; memory is capped by host availability and complete
+cgroup-v2 headroom. It retains the workspace directory and any selected KVM device for one deadline-scoped
+callback, re-observes mutable capacity immediately before work, rejects class, resource, platform, or KVM
+availability mismatch, withholds the KVM handle for a disabled resolution, and closes every retained or borrowed
+handle on completion. No driver consumes this capability yet, so adapter gates remain closed.
+
+The local capability is current-availability authority, not authenticated provider allocation, reservation, or
+qualification evidence. Holding a validated KVM descriptor proves availability through the callback lifetime;
+it does not prove that Packer or QEMU consumed that exact descriptor. Driver integration must enforce the selected
+device mode rather than infer consumption from admission. Hosted admission, provider proof, and VM topology beyond
+the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege, nested virtualization,
+NUMA, accelerators, and provider-specific lowering remain deferred.
 Produced-artifact size remains an artifact and transport budget.
 
 ### High Availability {#high-availability}
