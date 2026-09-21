@@ -213,6 +213,88 @@ func TestNodeSessionCloseCancelsJoinsAndRevokesCopies(t *testing.T) {
 	}
 }
 
+type sessionContextTransport struct {
+	started chan context.Context
+	release chan struct{}
+}
+
+func (transport *sessionContextTransport) Acquire(ctx context.Context, _, _ string) (string, int64, error) {
+	transport.started <- ctx
+	<-transport.release
+	return "", 0, ctx.Err()
+}
+
+func (*sessionContextTransport) Verify(context.Context, string, string) error {
+	return fmt.Errorf("canceled acquisition must not reach verification")
+}
+
+func TestNodeSessionPreservesCallerContextAndCancellation(t *testing.T) {
+	for _, cause := range []string{"close", "caller", "owner"} {
+		t.Run(cause, func(t *testing.T) {
+			owner, cancelOwner := context.WithCancel(t.Context())
+			defer cancelOwner()
+			session, err := NewNodeSession(owner)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(session.Close)
+			type contextKey struct{}
+			deadline := time.Now().Add(time.Minute)
+			caller, cancelCaller := context.WithDeadline(context.WithValue(t.Context(), contextKey{}, "caller-value"), deadline)
+			defer cancelCaller()
+			transport := &sessionContextTransport{started: make(chan context.Context, 1), release: make(chan struct{})}
+			var release sync.Once
+			unblock := func() { release.Do(func() { close(transport.release) }) }
+			t.Cleanup(unblock)
+			node := ir.Node{ID: "pull-image", Kind: ir.KindPull, Component: "image", OutputType: "oci-image",
+				Network: ir.NetworkDefault, Platform: "linux/amd64", Artifact: "registry.example/image",
+				Digest: sha256Of([]byte("image")), Version: "1.0.0"}
+			runDone := make(chan error, 1)
+			go func() {
+				_, err := session.ExecNode(node, RunOptions{Ctx: caller, Launch: true,
+					SourceRoot: filepath.Join(t.TempDir(), "src"), OCI: transport})
+				runDone <- err
+			}()
+			var observed context.Context
+			select {
+			case observed = <-transport.started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for producer context")
+			}
+			if value := observed.Value(contextKey{}); value != "caller-value" {
+				t.Fatalf("producer lost caller context value: %v", value)
+			}
+			if got, ok := observed.Deadline(); !ok || !got.Equal(deadline) {
+				t.Fatalf("producer deadline = %v, %t; want %v", got, ok, deadline)
+			}
+			switch cause {
+			case "close":
+				go session.Close()
+				awaitSession(t, session.state.ctx.Done(), "session cancellation")
+			case "caller":
+				cancelCaller()
+			case "owner":
+				cancelOwner()
+				awaitSession(t, observed.Done(), "owner cancellation propagation")
+			}
+			// Close and caller cancellation must already be visible here, before
+			// a blocked producer resumes, regardless of AfterFunc scheduling.
+			if err := observed.Err(); err != context.Canceled {
+				t.Fatalf("producer context after %s = %v, want canceled", cause, err)
+			}
+			unblock()
+			select {
+			case err := <-runDone:
+				if code(err) != e.CodeTimeout {
+					t.Fatalf("producer error after %s = %v, want %s", cause, err, e.CodeTimeout)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for canceled producer")
+			}
+		})
+	}
+}
+
 func TestNodeSessionRejectsUnavailableExecutionBeforeWork(t *testing.T) {
 	for _, test := range []struct {
 		name   string

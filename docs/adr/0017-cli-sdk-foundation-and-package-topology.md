@@ -144,6 +144,10 @@ Ownership transfers are stated on the returning method. Facade results either cl
 one clear close obligation to their caller. Garbage-collector cleanup may be defense in depth, never the
 correctness or resource-reclamation mechanism.
 
+The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
+session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's
+context values and deadline. An asynchronous cancellation callback alone cannot enforce this close ordering.
+
 ### 6. One Run is one immutable attempt
 
 Preparation freezes admitted Definition/Environment inputs and required slots before execution or reservation
