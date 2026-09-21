@@ -159,7 +159,7 @@ func authenticateCgroupV2Directory(directory string, device cgroupV2Device) erro
 		return e.Wrap(e.CodeEngineCapability, err,
 			"authenticating resolved cgroup-v2 device")
 	}
-	if unix.Major(uint64(stat.Dev)) != device.major || unix.Minor(uint64(stat.Dev)) != device.minor {
+	if unix.Major(stat.Dev) != device.major || unix.Minor(stat.Dev) != device.minor {
 		return e.New(e.CodeEngineCapability,
 			"resolved local cgroup directory differs from its mount-table device")
 	}
