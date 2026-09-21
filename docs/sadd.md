@@ -253,9 +253,11 @@ classification is required. The catalog's `vm-image` builder capability binds th
 exact source-owned command or Packer project, build name, and variable bindings, the artifact path, and a complete
 generic build-runner request with resources, eligible host platform, KVM policy, and timeout. Required KVM needs
 an eligible host with the resolved guest architecture; VM toolchain pins require an exact entry for the eligible
-host platform, whose selection is part of Build identity. The NKE OS producer owns its embedded contents. Compiler-only IR/Plan lowering binds
-the exact source and material producers and projects the root QCOW2 without binary-bundle packaging. VM
-execution and disk-specific observation remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
+host platform, whose selection is part of Build identity. The NKE OS producer owns its embedded contents. IR/Plan lowering binds
+the exact source and material producers and projects the root QCOW2 without binary-bundle packaging.
+A process-local held-QCOW2 observer has contract coverage for exact delivery bytes and producer/Plan bindings;
+it grants no execution authority or qualified reproduction verdict. Production VM execution and held-result
+population remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
 disk delivery is admitted, ADR-13 also requires a full inventory reconciling traced materials with read-only
 inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
@@ -309,7 +311,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Execution requirements | `execution` | Own reusable per-step runner request shape; grant no runner capability |
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
-| Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction |
+| Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
 | Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |

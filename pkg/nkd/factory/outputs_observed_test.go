@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -124,6 +125,40 @@ func TestLifecyclePublicationRequiresDeclaredEvidence(t *testing.T) {
 			node.Inputs = []string{"raw", "package"}
 			_, err = lifecyclePublicationOutputs(ctx, plan, node, artifacts)
 			assertFactoryErrorCode(t, err, e.CodeReleaseIncomplete)
+		})
+	}
+}
+
+func TestLifecyclePayloadObservationPreservesDigestMeanings(t *testing.T) {
+	for _, kind := range []string{"executable", "apt-repository"} {
+		t.Run(kind, func(t *testing.T) {
+			plan, artifacts := lifecyclePackageFixture(t, kind)
+			observed, err := ObserveLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], artifacts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := artifacts["package"].Path
+			if kind == "executable" {
+				_, inspected, err := delivery.InspectBinaryBundle(t.Context(), path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				descriptor, err := delivery.PayloadDescriptor(t.Context(), path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if observed.Digest != descriptor.Digest || observed.SemanticDigest != inspected.SemanticDigest || observed.Digest == observed.SemanticDigest {
+					t.Fatalf("binary observation conflates transport and semantic identity: %+v", observed)
+				}
+				return
+			}
+			repository, err := delivery.InspectAPTRepository(t.Context(), path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if observed.Digest != repository.Digest || observed.SemanticDigest != repository.Digest {
+				t.Fatalf("APT observation changes repository identity: %+v", observed)
+			}
 		})
 	}
 }

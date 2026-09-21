@@ -63,7 +63,12 @@ accepts those exact inputs and owns the complete Plan, output joins and evidence
 partially completed plan and exposes no independently authored CompileSpec or ExecutionSettings handoff.
 `lifecycle` owns preparation, immutable attempt persistence and consumer workflow. Preparation retains an owned
 snapshot; subsequent caller mutation cannot change execution. `factory` owns Run scheduling/execution and
-provider generation. `delivery` owns checked publication membership and canonical release-content identity;
+provider generation. Its typed payload observer rechecks binary, APT, Helm and image outputs against their
+exact planned producer inputs; lifecycle retains frozen requirements and outer publication membership.
+Disk outputs use factory's concrete in-process `LocalRunResult` and held-QCOW2 observer. Lifecycle closes that
+result before committing a successful or failed observation record; serialized descriptions cannot restore
+the held capability. This observation contract does not enable production VM execution or disk publication.
+`delivery` owns checked publication membership and canonical release-content identity;
 Release consumers do not reconstruct compiler bindings. Existing domain modules retain their
 canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
@@ -225,7 +230,9 @@ snapshot/update behavior.
 
 Status operation and state contracts cover commit-before-withdrawal, authentication and CAS failures, replay,
 protected reads and kernel-released locks. Catalog maintenance contracts cover no-op bytes, source check mode,
-whole-update CAS and artifact selection before upstream calls.
+whole-update CAS and artifact selection before upstream calls. Lifecycle binary observation now requires its
+complete Plan and retained raw producer bytes, including exact IR/result metadata; packaged bytes alone are
+insufficient. The organization audit records these ownership changes and their validation scope.
 
 The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and
 Linux race tests provide contract evidence; repository checks are recorded in reconciliation.

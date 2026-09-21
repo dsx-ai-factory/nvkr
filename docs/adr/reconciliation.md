@@ -166,6 +166,35 @@ race tests, NKE/AICR generation checks, Actionlint, reference checks and diff ch
 no new hosted or qualified execution evidence. Earlier operational records retain their exact schema, code
 and acceptance scope.
 
+## Code organization
+
+The [organization audit](../codebase-organization-audit.md) records nine implemented changes: factory-owned
+typed payload observation, status-owned diagnostic acceptance and persistence, catalog-owned pin transactions,
+and focused files for catalog admission, package formats, compiler contracts, local scheduling and binary
+bundles. Shared process-group primitives retain the caller's cleanup policy and held-input lifetime. The CLI
+keeps argument/policy mapping and presentation for the extracted status and catalog operations.
+
+Binary lifecycle observation now requires the compiled Plan and retained raw producer bytes, including exact
+producer metadata; package/result agreement alone is insufficient. Frozen requirements, outer publication
+membership and immutable attempt records remain lifecycle-owned. Status remains diagnostic at a caller epoch,
+and pin maintenance retains the same lock schema, no-op/check behavior and CAS. The organization refactor
+preserves its base's wire versions, logical identities and generated NKE/AICR bundles. The report maps each finding to its implementation
+and contract tests and records final validation separately from historical operational evidence.
+
+The refreshed stack retains the process-local held-QCOW2 observation contract. Disk outputs require factory's
+concrete execution result before any pathname projection; binary, APT, Helm and image outputs retain the shared
+package observer. Lifecycle closes held execution results before committing observations and deep-copies disk
+metadata in public Run descriptions. Production disk-result population and VM execution remain unavailable.
+
+The broader Linux race gate exposed a preexisting `NodeSession.Close` cancellation propagation race: an
+asynchronous callback could let a resumed producer reach runtime lookup after session cancellation. Close now
+cancels registered call contexts synchronously before exposing cancellation, then joins producers before
+releasing snapshots. Caller values/deadlines and parent cancellation remain intact; repeated node-session
+contracts cover the correction. Final uncached native and Linux race suites, native static gates,
+NKE/AICR byte-exact generation, the binary-bundle byte comparison and documentation checks passed. Linux
+validation used an init process to reap terminated descendants; external integration fixtures retained their
+explicit skips. No new hosted, registry or qualified acceptance is claimed.
+
 ## Unused implementation removal
 
 The usage audit covered production packages, pipeline renderers, maintained inputs/scripts, SDK entry points

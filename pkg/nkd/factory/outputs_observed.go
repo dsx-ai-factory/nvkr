@@ -18,8 +18,9 @@ import (
 // lifecycle package. It is descriptive only; callers still bind it to a Run
 // or signed publication through the owning lifecycle module.
 type LifecyclePayloadObservation struct {
-	Digest     string
-	Components []string
+	Digest         string
+	SemanticDigest string
+	Components     []string
 }
 
 // observeProducerPayload owns the same-output join. Pipeline owns decoding the
@@ -130,12 +131,12 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		if expectedDigest != image.ManifestDigest {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "image output %q differs from its observed producer archive", expected.Name)
 		}
-		return LifecyclePayloadObservation{Digest: image.ManifestDigest, Components: components}, nil
+		return LifecyclePayloadObservation{Digest: image.ManifestDigest, SemanticDigest: image.ManifestDigest, Components: components}, nil
 	case PackageBinaryBundle:
 		if err := verifyRawResults(); err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
-		bundle, _, err := delivery.InspectBinaryBundle(ctx, artifact.Path)
+		bundle, inspection, err := delivery.InspectBinaryBundle(ctx, artifact.Path)
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
@@ -154,7 +155,7 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
-		return LifecyclePayloadObservation{Digest: descriptor.Digest, Components: components}, nil
+		return LifecyclePayloadObservation{Digest: descriptor.Digest, SemanticDigest: inspection.SemanticDigest, Components: components}, nil
 	case PackageAPT:
 		repository, err := delivery.InspectAPTRepository(ctx, artifact.Path)
 		if err != nil {
@@ -167,7 +168,7 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		if err != nil || expectedDigest != repository.Digest {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle APT output %q differs from independently reproduced package bytes", expected.Name)
 		}
-		return LifecyclePayloadObservation{Digest: repository.Digest, Components: components}, nil
+		return LifecyclePayloadObservation{Digest: repository.Digest, SemanticDigest: repository.Digest, Components: components}, nil
 	case PackageHelm:
 		if len(expected.Components) != 0 {
 			if err := verifyRawResults(); err != nil {
@@ -182,7 +183,7 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		if err != nil || expectedDigest != descriptor.Digest {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced package (%s != %s)", expected.Name, descriptor.Digest, expectedDigest)
 		}
-		return LifecyclePayloadObservation{Digest: descriptor.Digest, Components: components}, nil
+		return LifecyclePayloadObservation{Digest: descriptor.Digest, SemanticDigest: descriptor.Digest, Components: components}, nil
 	default:
 		return LifecyclePayloadObservation{}, e.New(e.CodeEngineCapability, "package kind %q cannot be observed for lifecycle output", artifact.Kind)
 	}

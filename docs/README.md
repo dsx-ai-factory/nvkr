@@ -14,6 +14,7 @@
 | Reproduce the local NKE demonstration | [NKE demo](demo-m1.md) |
 | Inspect actual past execution | Dated [evidence](evidence/) |
 | Understand retained modules and cleanup decisions | [Repository cleanup](repository-cleanup.md) |
+| Understand code organization findings and their implementation | [Codebase organization audit](codebase-organization-audit.md) |
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
 | Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
 | Build or contribute | [Development](../DEVELOPMENT.md), [contribution guide](../CONTRIBUTING.md) |
