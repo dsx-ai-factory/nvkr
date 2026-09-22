@@ -134,7 +134,11 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 			object.Path, object.LayerMediaType = archive, "application/vnd.nkd.apt-repository.v1.tar"
 			object.SemanticDigest, object.BlobDigest = repository.Digest, digest
 		default:
-			object.SemanticDigest, _ = digestFactoryPath(ctx, input.Path)
+			semantic, err := digestFactoryPath(ctx, input.Path)
+			if err != nil {
+				return nil, nil, err
+			}
+			object.SemanticDigest = semantic
 		}
 		objects = append(objects, object)
 	}
