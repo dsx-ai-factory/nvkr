@@ -9,6 +9,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
@@ -274,6 +275,10 @@ func validateComponent(name string, c Component) error {
 		if packerProducer {
 			if err := validatePackerConfig(name, c.Packer); err != nil {
 				return err
+			}
+			if err := material.ValidateProjection(c.Packer.MaterialManifest, sortedStringKeys(c.Materials)); err != nil {
+				return e.Wrap(e.CodeInvalidCatalog, err,
+					"component %q has invalid Packer material manifest projection", name)
 			}
 		}
 	default:

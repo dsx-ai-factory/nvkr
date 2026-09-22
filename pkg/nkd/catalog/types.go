@@ -13,6 +13,7 @@ package catalog
 import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
 
 // From-source builder types (ADR-10). Executable builders mirror ir.Builder*;
@@ -43,15 +44,19 @@ type PackerConfig struct {
 	PackerVersion string `json:"packerVersion"`
 	// BuildName is the exact compiled build name future lowering passes through
 	// Packer's -only option. Wildcards and build-name lists are not accepted.
-	BuildName                 string `json:"buildName"`
-	ArchitectureVariable      string `json:"architectureVariable"`
-	AcceleratorVariable       string `json:"acceleratorVariable"`
-	MaterialManifestVariable  string `json:"materialManifestVariable"`
-	OutputDirectoryVariable   string `json:"outputDirectoryVariable"`
-	SSHPrivateKeyVariable     string `json:"sshPrivateKeyVariable,omitempty"`
-	SSHPublicKeyVariable      string `json:"sshPublicKeyVariable,omitempty"`
-	BuildLogDirectoryVariable string `json:"buildLogDirectoryVariable,omitempty"`
-	HTTPDirectoryVariable     string `json:"httpDirectoryVariable,omitempty"`
+	BuildName                string `json:"buildName"`
+	ArchitectureVariable     string `json:"architectureVariable"`
+	AcceleratorVariable      string `json:"acceleratorVariable"`
+	MaterialManifestVariable string `json:"materialManifestVariable"`
+	// MaterialManifest optionally projects the authenticated NKD material
+	// observations into the source-owned schema and kind vocabulary consumed by
+	// this Packer project. Nil preserves NKD's native v2 manifest.
+	MaterialManifest          *material.Projection `json:"materialManifest,omitempty"`
+	OutputDirectoryVariable   string               `json:"outputDirectoryVariable"`
+	SSHPrivateKeyVariable     string               `json:"sshPrivateKeyVariable,omitempty"`
+	SSHPublicKeyVariable      string               `json:"sshPublicKeyVariable,omitempty"`
+	BuildLogDirectoryVariable string               `json:"buildLogDirectoryVariable,omitempty"`
+	HTTPDirectoryVariable     string               `json:"httpDirectoryVariable,omitempty"`
 	// Variables are public, literal string values passed to source-owned Packer
 	// variables. They are build inputs, not a secret channel; future lowering must
 	// expose them in the invocation record and let the pinned Packer executable

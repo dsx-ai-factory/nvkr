@@ -11,6 +11,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
@@ -320,6 +321,7 @@ func packerConfig(config *catalog.PackerConfig) *ir.PackerConfig {
 		ArchitectureVariable:      config.ArchitectureVariable,
 		AcceleratorVariable:       config.AcceleratorVariable,
 		MaterialManifestVariable:  config.MaterialManifestVariable,
+		MaterialManifest:          material.CloneProjection(config.MaterialManifest),
 		OutputDirectoryVariable:   config.OutputDirectoryVariable,
 		SSHPrivateKeyVariable:     config.SSHPrivateKeyVariable,
 		SSHPublicKeyVariable:      config.SSHPublicKeyVariable,

@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
 
 // SchemaVersion identifies the IR shape; it participates in the digest so a schema
@@ -58,18 +59,19 @@ type PackerVariable struct {
 // are deliberately absent; the admitted executor derives those from held source,
 // material, toolchain, and workspace capabilities.
 type PackerConfig struct {
-	ProjectPath               string           `json:"projectPath"`
-	PackerVersion             string           `json:"packerVersion"`
-	BuildName                 string           `json:"buildName"`
-	ArchitectureVariable      string           `json:"architectureVariable"`
-	AcceleratorVariable       string           `json:"acceleratorVariable"`
-	MaterialManifestVariable  string           `json:"materialManifestVariable"`
-	OutputDirectoryVariable   string           `json:"outputDirectoryVariable"`
-	SSHPrivateKeyVariable     string           `json:"sshPrivateKeyVariable,omitempty"`
-	SSHPublicKeyVariable      string           `json:"sshPublicKeyVariable,omitempty"`
-	BuildLogDirectoryVariable string           `json:"buildLogDirectoryVariable,omitempty"`
-	HTTPDirectoryVariable     string           `json:"httpDirectoryVariable,omitempty"`
-	Variables                 []PackerVariable `json:"variables,omitempty"`
+	ProjectPath               string               `json:"projectPath"`
+	PackerVersion             string               `json:"packerVersion"`
+	BuildName                 string               `json:"buildName"`
+	ArchitectureVariable      string               `json:"architectureVariable"`
+	AcceleratorVariable       string               `json:"acceleratorVariable"`
+	MaterialManifestVariable  string               `json:"materialManifestVariable"`
+	MaterialManifest          *material.Projection `json:"materialManifest,omitempty"`
+	OutputDirectoryVariable   string               `json:"outputDirectoryVariable"`
+	SSHPrivateKeyVariable     string               `json:"sshPrivateKeyVariable,omitempty"`
+	SSHPublicKeyVariable      string               `json:"sshPublicKeyVariable,omitempty"`
+	BuildLogDirectoryVariable string               `json:"buildLogDirectoryVariable,omitempty"`
+	HTTPDirectoryVariable     string               `json:"httpDirectoryVariable,omitempty"`
+	Variables                 []PackerVariable     `json:"variables,omitempty"`
 }
 
 // MaterialBinding ties one source-owned input name to one exact producer node.

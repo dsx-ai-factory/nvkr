@@ -9,6 +9,7 @@ import (
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
 
 func mustCompile(t testing.TB, resolved *Resolved) *ir.Graph {
@@ -175,6 +176,9 @@ func TestCompileVMSelectsHostToolchainAndMaterialProducers(t *testing.T) {
 		ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
 		ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable: "output_directory",
+		MaterialManifest: &material.Projection{
+			SchemaVersion: "nke.dev/os-image-materials/v1", Kinds: map[string]string{"agent-package": "archive"},
+		},
 	}
 	root.Materials = map[string]string{"agent-package": "agent"}
 	material := catalog.Component{
@@ -200,6 +204,9 @@ func TestCompileVMSelectsHostToolchainAndMaterialProducers(t *testing.T) {
 		}
 	}
 	if image.Toolchain != root.ToolchainImages["amd64"] || image.ToolchainPlatform != "linux/amd64" ||
+		image.Packer == nil || image.Packer.MaterialManifest == nil ||
+		image.Packer.MaterialManifest.SchemaVersion != "nke.dev/os-image-materials/v1" ||
+		image.Packer.MaterialManifest.Kinds["agent-package"] != "archive" ||
 		len(image.Materials) != 1 || image.Materials[0] != (ir.MaterialBinding{
 		Binding: "agent-package", Component: "agent", Producer: "build-agent",
 	}) || !slices.Contains(image.Needs, "build-agent") {

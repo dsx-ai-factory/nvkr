@@ -8,6 +8,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	"sigs.k8s.io/yaml"
 )
 
@@ -173,11 +174,7 @@ func (g Graph) normalizedCopy() Graph {
 			disk := *g.Nodes[i].Disk
 			c.Nodes[i].Disk = &disk
 		}
-		if g.Nodes[i].Packer != nil {
-			packer := *g.Nodes[i].Packer
-			packer.Variables = append([]PackerVariable(nil), g.Nodes[i].Packer.Variables...)
-			c.Nodes[i].Packer = &packer
-		}
+		c.Nodes[i].Packer = clonePackerConfig(g.Nodes[i].Packer)
 		c.Nodes[i].Materials = append([]MaterialBinding(nil), g.Nodes[i].Materials...)
 	}
 	c.Normalize()
@@ -260,6 +257,7 @@ func clonePackerConfig(config *PackerConfig) *PackerConfig {
 	}
 	clone := *config
 	clone.Variables = append([]PackerVariable(nil), config.Variables...)
+	clone.MaterialManifest = material.CloneProjection(config.MaterialManifest)
 	return &clone
 }
 

@@ -7,6 +7,7 @@ import (
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
 
 func TestDirectPackerProducerLoadsStrictlyAndAffectsCatalogIdentity(t *testing.T) {
@@ -60,6 +61,10 @@ components:
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
+      materialManifest:
+        schemaVersion: nke.dev/os-image-materials/v1
+        kinds:
+          agent-package: archive
       outputDirectoryVariable: output_directory
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
@@ -99,6 +104,9 @@ pins:
 		component.Packer.ArchitectureVariable != "architecture" ||
 		component.Packer.AcceleratorVariable != "accelerator" ||
 		component.Packer.MaterialManifestVariable != "material_manifest" ||
+		component.Packer.MaterialManifest == nil ||
+		component.Packer.MaterialManifest.SchemaVersion != "nke.dev/os-image-materials/v1" ||
+		component.Packer.MaterialManifest.Kinds["agent-package"] != "archive" ||
 		component.Packer.OutputDirectoryVariable != "output_directory" ||
 		component.Packer.SSHPrivateKeyVariable != "ssh_private_key_file" ||
 		component.Packer.SSHPublicKeyVariable != "ssh_public_key_file" ||
@@ -127,6 +135,13 @@ pins:
 	}); catalogErrorCode(err) != nkderr.CodeInvalidCatalog {
 		t.Fatalf("duplicate material binding was not rejected strictly: %v", err)
 	}
+	duplicateProjectionKind := strings.Replace(registry, "agent-package: archive",
+		"agent-package: archive\n          agent-package: package", 1)
+	if _, err := LoadContext(context.Background(), bytesProvider{
+		RegistryFile: []byte(duplicateProjectionKind), LockFile: []byte(lock),
+	}); catalogErrorCode(err) != nkderr.CodeInvalidCatalog {
+		t.Fatalf("duplicate projected material kind was not rejected strictly: %v", err)
+	}
 	before, err := cat.SnapshotDigest()
 	if err != nil {
 		t.Fatal(err)
@@ -140,12 +155,13 @@ pins:
 		{name: "architecture variable", old: "architectureVariable: architecture", replacement: "architectureVariable: target_arch"},
 		{name: "accelerator variable", old: "acceleratorVariable: accelerator", replacement: "acceleratorVariable: vm_accelerator"},
 		{name: "material manifest variable", old: "materialManifestVariable: material_manifest", replacement: "materialManifestVariable: inputs_manifest"},
+		{name: "material manifest schema", old: "schemaVersion: nke.dev/os-image-materials/v1", replacement: "schemaVersion: example.dev/materials/v2"},
+		{name: "producer-visible material kind", old: "agent-package: archive", replacement: "agent-package: debian-package"},
 		{name: "output directory variable", old: "outputDirectoryVariable: output_directory", replacement: "outputDirectoryVariable: build_output"},
 		{name: "SSH private-key variable", old: "sshPrivateKeyVariable: ssh_private_key_file", replacement: "sshPrivateKeyVariable: supplied_private_key"},
 		{name: "SSH public-key variable", old: "sshPublicKeyVariable: ssh_public_key_file", replacement: "sshPublicKeyVariable: supplied_public_key"},
 		{name: "build-log directory variable", old: "buildLogDirectoryVariable: build_log_directory", replacement: "buildLogDirectoryVariable: packer_log_directory"},
 		{name: "HTTP directory variable", old: "httpDirectoryVariable: http_directory", replacement: "httpDirectoryVariable: packer_http_directory"},
-		{name: "material binding name", old: "agent-package: agent-package", replacement: "host-agent-package: agent-package"},
 		{name: "material component", old: "agent-package: agent-package", replacement: "agent-package: runtime-package"},
 		{name: "Packer variable name", old: "image_variant: standard", replacement: "node_variant: standard"},
 		{name: "Packer variable value", old: "image_variant: standard", replacement: "image_variant: minimal"},
@@ -158,6 +174,56 @@ pins:
 			}
 			if before == after {
 				t.Fatalf("%s did not affect catalog snapshot identity", test.name)
+			}
+		})
+	}
+}
+
+func TestPackerMaterialManifestProjectionRequiresExactBindingSet(t *testing.T) {
+	valid := goodComponent()
+	valid.BuilderType = BuilderVMImage
+	valid.OutputType = "disk-image"
+	valid.Disk = &DiskSpec{Format: "qcow2", Encryption: "none"}
+	valid.BuildRequirements = &execution.Requirements{
+		Resources: &execution.ResourceRequest{
+			CPUMillis: 2000, MemoryMiB: 4096, EphemeralStorageMiB: 8192,
+		},
+		AllowedHostPlatforms: []execution.HostPlatform{execution.HostPlatformLinuxAMD64},
+		Capabilities: []execution.CapabilityRequirement{{
+			Name: execution.CapabilityKVM, Policy: execution.CapabilityPreferred,
+		}},
+		TimeoutSeconds: 7200,
+	}
+	valid.BuildCommand = nil
+	valid.Packer = &PackerConfig{
+		ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
+		ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator",
+		MaterialManifestVariable: "material_manifest", OutputDirectoryVariable: "output_directory",
+		MaterialManifest: &material.Projection{SchemaVersion: "nke.dev/os-image-materials/v1", Kinds: map[string]string{
+			"image-inputs": "archive", "installer-iso": "disk-image",
+		}},
+	}
+	valid.Materials = map[string]string{"image-inputs": "inputs", "installer-iso": "iso"}
+	valid.ArtifactPath = "node.qcow2"
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*Component)
+	}{
+		{name: "missing schema", mutate: func(component *Component) { component.Packer.MaterialManifest.SchemaVersion = "" }},
+		{name: "missing kind", mutate: func(component *Component) { delete(component.Packer.MaterialManifest.Kinds, "image-inputs") }},
+		{name: "unknown kind binding", mutate: func(component *Component) { component.Packer.MaterialManifest.Kinds["other"] = "raw" }},
+		{name: "missing materials binding", mutate: func(component *Component) { delete(component.Materials, "installer-iso") }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			component := valid
+			config := *valid.Packer
+			config.MaterialManifest = material.CloneProjection(valid.Packer.MaterialManifest)
+			component.Packer = &config
+			component.Materials = cloneStringMap(valid.Materials)
+			test.mutate(&component)
+			if err := validateComponent("image", component); catalogErrorCode(err) != nkderr.CodeInvalidCatalog {
+				t.Fatalf("validation error = %v, want %s", err, nkderr.CodeInvalidCatalog)
 			}
 		})
 	}

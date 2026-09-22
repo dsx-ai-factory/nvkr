@@ -498,7 +498,18 @@ func validateVMImageNode(n Node) error {
 	if err := validateIRPackerConfig(n.ID, n.Packer); err != nil {
 		return err
 	}
-	return validateMaterialBindings(n.ID, n.Materials)
+	if err := validateMaterialBindings(n.ID, n.Materials); err != nil {
+		return err
+	}
+	bindings := make([]string, 0, len(n.Materials))
+	for _, binding := range n.Materials {
+		bindings = append(bindings, binding.Binding)
+	}
+	if err := material.ValidateProjection(n.Packer.MaterialManifest, bindings); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err,
+			"VM build node %q has invalid Packer material manifest projection", n.ID)
+	}
+	return nil
 }
 
 func validateVMRequirements(n Node) error {

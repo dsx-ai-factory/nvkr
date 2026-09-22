@@ -253,11 +253,14 @@ classification is required. The catalog's `vm-image` builder capability binds th
 exact source-owned command or Packer project, build name, and variable bindings, the artifact path, and a complete
 generic build-runner request with resources, eligible host platform, KVM policy, and timeout. Required KVM needs
 an eligible host with the resolved guest architecture; VM toolchain pins require an exact entry for the eligible
-host platform, whose selection is part of Build identity. The NKE OS producer owns its embedded contents. IR/Plan lowering binds
-the exact source and material producers and projects the root QCOW2 without binary-bundle packaging.
-A process-local held-QCOW2 observer has contract coverage for exact delivery bytes and producer/Plan bindings;
-it grants no execution authority or qualified reproduction verdict. Production VM execution and held-result
-population remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
+host platform, whose selection is part of Build identity. A Packer producer may bind a source-owned material-manifest
+schema and one producer-visible kind for every declared input. That exact projection is part of Build identity and
+cannot alter the authenticated material bytes, component, architecture, digest or deterministic staged path. The
+NKE OS producer owns its embedded contents. IR/Plan lowering binds the exact source and material producers and
+projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
+for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
+verdict. Production VM execution and held-result population remain capability-gated; direct producer selection
+does not introduce independently built OS layers. Before
 disk delivery is admitted, ADR-13 also requires a full inventory reconciling traced materials with read-only
 inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
@@ -796,7 +799,9 @@ before workspace mutation. Inside the admitted callback it authenticates one bou
 named volumes, mounts consumer inputs read-only, fixes environment/hostname/user, disables network, image pulls and
 `packer init`, validates the exact selector, builds it once and returns one held QCOW2. A one-shot root container
 with only `CAP_CHOWN` bootstraps the two fresh attempt volumes to the host UID/GID; every consumer operation runs as
-that host identity. Bounded in-process cleanup owns ordinary completion and cancellation; authenticated
+that host identity. The material manifest is derived from authenticated producer observations; an authored
+projection can change only its schema and per-binding kind vocabulary. Bounded in-process cleanup owns ordinary
+completion and cancellation; authenticated
 cross-process orphan recovery after a hard process or host failure remains deferred. Command/Make, encrypted-disk,
 hosted and qualified VM adapters remain closed.
 

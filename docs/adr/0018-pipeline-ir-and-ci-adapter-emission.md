@@ -178,7 +178,10 @@ Isolation and the fixed environment/mount contract are identical across all engi
 
 `vm-image` and `disk-image` have a compiler-only lowering contract. IR v4 records the disk contract, exactly one
 command or Packer producer form, public Packer variables, and typed material bindings backed by exact build or
-acquisition dependencies. The Plan selects an execution class, uses its host architecture to select the pinned VM
+acquisition dependencies. An optional producer-owned material-manifest projection records its exact schema and
+per-binding kind vocabulary in the Packer contract and logical Build identity; it cannot change the authenticated
+material bytes, digest, component, architecture or deterministic staging path. The Plan selects an execution
+class, uses its host architecture to select the pinned VM
 toolchain, and projects the raw disk producer artifact into the named lifecycle output without ordinary binary
 packaging. A material-bearing command producer remains unsupported because it has no typed manifest handoff.
 Every local and hosted execution or generation adapter still fails with `CodeEngineCapability` before source,
@@ -268,7 +271,10 @@ Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, d
 root, no network, no new privileges and all capabilities dropped. Source, configuration, manifest and material inputs are packed into one
 deterministic bounded tar preserving directories, modes and symlink targets. Docker transports only a one-file
 outer carrier. The pinned toolchain verifies the held inner-tar digest before extracting that same opened inode;
-Packer then sees the input volume read-only. The work volume remains private to the attempt.
+Packer then sees the input volume read-only. Before transport, the runner derives the material manifest only from
+the authenticated Plan-selected observations. A producer-owned projection may relabel its schema and per-binding
+kind, but the runner retains the observed component, architecture, digest and canonical staged path. The work
+volume remains private to the attempt.
 
 The local unqualified adapter does not configure a subordinate container UID or Docker user-namespace remap.
 An escape from its Packer/QEMU consumer would therefore act as the invoking host user against resources already

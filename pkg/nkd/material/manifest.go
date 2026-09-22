@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -15,12 +16,98 @@ import (
 )
 
 const (
-	ManifestSchemaVersion = "nkd.dev/build-material-manifest/v2"
-	maxMaterialNameBytes  = 256
-	maxMaterialKindBytes  = 128
-	maxPathSegmentBytes   = 255
-	materialPathPrefix    = "materials/"
+	ManifestSchemaVersion  = "nkd.dev/build-material-manifest/v2"
+	maxMaterialNameBytes   = 256
+	maxMaterialKindBytes   = 128
+	maxPathSegmentBytes    = 255
+	materialPathPrefix     = "materials/"
+	maxManifestSchemaBytes = 256
 )
+
+// Projection is the source-owned wire contract for a material manifest. Nil at
+// the Packer boundary selects NKD's native v2 document. A non-nil projection may
+// relabel only the envelope schema and the producer-visible kind for each binding;
+// it cannot change the authenticated component, architecture, digest, or staged
+// path carried by an observation.
+type Projection struct {
+	SchemaVersion string            `json:"schemaVersion"`
+	Kinds         map[string]string `json:"kinds"`
+}
+
+// CloneProjection returns a deep copy suitable for crossing catalog and IR
+// ownership boundaries.
+func CloneProjection(projection *Projection) *Projection {
+	if projection == nil {
+		return nil
+	}
+	clone := &Projection{SchemaVersion: projection.SchemaVersion}
+	if projection.Kinds != nil {
+		clone.Kinds = make(map[string]string, len(projection.Kinds))
+		for binding, kind := range projection.Kinds {
+			clone.Kinds[binding] = kind
+		}
+	}
+	return clone
+}
+
+// ValidateProjection requires an explicit producer-visible kind for every
+// declared binding and rejects mappings for undeclared inputs. Binding order is
+// irrelevant here; the resulting manifest is sorted independently.
+func ValidateProjection(projection *Projection, bindings []string) error {
+	if projection == nil {
+		return nil
+	}
+	if !canonicalToken(projection.SchemaVersion, maxManifestSchemaBytes) {
+		return e.New(e.CodeInvalidCatalog,
+			"build material manifest projection has an invalid schemaVersion %q", projection.SchemaVersion)
+	}
+	if projection.Kinds == nil {
+		return e.New(e.CodeInvalidCatalog,
+			"build material manifest projection kinds must be an explicit map")
+	}
+	expected := make(map[string]struct{}, len(bindings))
+	for _, binding := range bindings {
+		if _, err := StagingPath(binding); err != nil {
+			return err
+		}
+		if _, duplicate := expected[binding]; duplicate {
+			return e.New(e.CodeInvalidCatalog,
+				"build material manifest projection repeats binding %q", binding)
+		}
+		expected[binding] = struct{}{}
+	}
+	projectedBindings := make([]string, 0, len(projection.Kinds))
+	for binding := range projection.Kinds {
+		projectedBindings = append(projectedBindings, binding)
+	}
+	sort.Strings(projectedBindings)
+	for _, binding := range projectedBindings {
+		kind := projection.Kinds[binding]
+		if _, err := StagingPath(binding); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err,
+				"build material manifest projection has an invalid binding")
+		}
+		if !canonicalToken(kind, maxMaterialKindBytes) {
+			return e.New(e.CodeInvalidCatalog,
+				"build material manifest projection binding %q has an invalid kind %q", binding, kind)
+		}
+		if _, ok := expected[binding]; !ok {
+			return e.New(e.CodeInvalidCatalog,
+				"build material manifest projection maps undeclared binding %q", binding)
+		}
+		delete(expected, binding)
+	}
+	if len(expected) != 0 {
+		missing := make([]string, 0, len(expected))
+		for binding := range expected {
+			missing = append(missing, binding)
+		}
+		sort.Strings(missing)
+		return e.New(e.CodeInvalidCatalog,
+			"build material manifest projection omits binding %q", missing[0])
+	}
+	return nil
+}
 
 // Observation is a description of one producer output selected by a catalog
 // material binding. Digest identifies the observed bytes. This value is not an
@@ -60,22 +147,9 @@ type Manifest struct {
 // NewManifest sorts observations by binding and derives stable relative paths.
 // One component output may satisfy exactly one binding in a manifest.
 func NewManifest(observations []Observation) (*Manifest, error) {
-	ordered := append([]Observation(nil), observations...)
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Binding < ordered[j].Binding })
-	manifest := &Manifest{SchemaVersion: ManifestSchemaVersion, Materials: make([]Entry, 0, len(ordered))}
-	for _, observation := range ordered {
-		path, err := StagingPath(observation.Binding)
-		if err != nil {
-			return nil, err
-		}
-		manifest.Materials = append(manifest.Materials, Entry{
-			Binding:      observation.Binding,
-			Component:    observation.Component,
-			Kind:         observation.Kind,
-			Architecture: observation.Architecture,
-			Digest:       observation.Digest,
-			Path:         path,
-		})
+	manifest, err := newManifest(observations, nil)
+	if err != nil {
+		return nil, err
 	}
 	if err := manifest.Validate(); err != nil {
 		return nil, err
@@ -83,13 +157,69 @@ func NewManifest(observations []Observation) (*Manifest, error) {
 	return manifest, nil
 }
 
+// MarshalProjected returns canonical bytes under a source-owned projection. A
+// nil projection preserves the native v2 schema and observed producer kinds.
+func MarshalProjected(observations []Observation, projection *Projection) ([]byte, error) {
+	manifest, err := newManifest(observations, projection)
+	if err != nil {
+		return nil, err
+	}
+	if projection == nil {
+		return manifest.Marshal()
+	}
+	if err := manifest.validate(projection.SchemaVersion); err != nil {
+		return nil, err
+	}
+	return canonical.Marshal(manifest)
+}
+
+func newManifest(observations []Observation, projection *Projection) (*Manifest, error) {
+	bindings := make([]string, 0, len(observations))
+	for _, observation := range observations {
+		bindings = append(bindings, observation.Binding)
+	}
+	if err := ValidateProjection(projection, bindings); err != nil {
+		return nil, err
+	}
+	ordered := append([]Observation(nil), observations...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Binding < ordered[j].Binding })
+	schemaVersion := ManifestSchemaVersion
+	if projection != nil {
+		schemaVersion = projection.SchemaVersion
+	}
+	manifest := &Manifest{SchemaVersion: schemaVersion, Materials: make([]Entry, 0, len(ordered))}
+	for _, observation := range ordered {
+		path, err := StagingPath(observation.Binding)
+		if err != nil {
+			return nil, err
+		}
+		kind := observation.Kind
+		if projection != nil {
+			kind = projection.Kinds[observation.Binding]
+		}
+		manifest.Materials = append(manifest.Materials, Entry{
+			Binding:      observation.Binding,
+			Component:    observation.Component,
+			Kind:         kind,
+			Architecture: observation.Architecture,
+			Digest:       observation.Digest,
+			Path:         path,
+		})
+	}
+	return manifest, nil
+}
+
 // Validate rejects incomplete, ambiguous, reordered, or path-substituted material
 // descriptions before they can be serialized or acquire a typed identity.
 func (manifest *Manifest) Validate() error {
+	return manifest.validate(ManifestSchemaVersion)
+}
+
+func (manifest *Manifest) validate(schemaVersion string) error {
 	if manifest == nil {
 		return e.New(e.CodeInvalidCatalog, "build material manifest is required")
 	}
-	if manifest.SchemaVersion != ManifestSchemaVersion {
+	if manifest.SchemaVersion != schemaVersion {
 		return e.New(e.CodeInvalidCatalog,
 			"build material manifest schemaVersion %q is unsupported", manifest.SchemaVersion)
 	}
@@ -204,4 +334,8 @@ func StagingPath(binding string) (string, error) {
 
 func canonicalText(value string, maxBytes int) bool {
 	return safetext.Valid(value, maxBytes, false) && value == strings.TrimSpace(value)
+}
+
+func canonicalToken(value string, maxBytes int) bool {
+	return canonicalText(value, maxBytes) && strings.IndexFunc(value, unicode.IsSpace) == -1
 }

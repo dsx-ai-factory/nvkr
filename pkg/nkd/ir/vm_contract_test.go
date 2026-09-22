@@ -7,6 +7,7 @@ import (
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
 
 func vmGraph(t *testing.T) Graph {
@@ -83,6 +84,16 @@ func TestVMGraphBindsExactPackerAndMaterialInputs(t *testing.T) {
 		{name: "Packer version", mutate: func(node *Node) { node.Packer.PackerVersion = "1.14.3" }},
 		{name: "Packer build name", mutate: func(node *Node) { node.Packer.BuildName = "image.qemu.other" }},
 		{name: "accelerator variable", mutate: func(node *Node) { node.Packer.AcceleratorVariable = "vm_accelerator" }},
+		{name: "material manifest schema", mutate: func(node *Node) {
+			node.Packer.MaterialManifest = &material.Projection{
+				SchemaVersion: "example.dev/materials/v1", Kinds: map[string]string{"agent-package": "raw"},
+			}
+		}},
+		{name: "producer-visible material kind", mutate: func(node *Node) {
+			node.Packer.MaterialManifest = &material.Projection{
+				SchemaVersion: "nke.dev/os-image-materials/v1", Kinds: map[string]string{"agent-package": "archive"},
+			}
+		}},
 		{name: "SSH variable pair", mutate: func(node *Node) {
 			node.Packer.SSHPrivateKeyVariable = "ssh_private_key_file"
 			node.Packer.SSHPublicKeyVariable = "ssh_public_key_file"

@@ -189,11 +189,7 @@ func observeVMPackerMaterialsWithLimits(
 			Architecture: architecture, Digest: held.Digest(),
 		})
 	}
-	manifest, err := material.NewManifest(observations)
-	if err != nil {
-		return nil, err
-	}
-	raw, err := manifest.Marshal()
+	raw, err := material.MarshalProjected(observations, instruction.Packer.MaterialManifest)
 	if err != nil {
 		return nil, err
 	}

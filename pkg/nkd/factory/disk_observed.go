@@ -15,6 +15,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
@@ -209,6 +210,7 @@ func cloneDiskProducerInstruction(source ir.Node) ir.Node {
 	if source.Packer != nil {
 		packer := *source.Packer
 		packer.Variables = append([]ir.PackerVariable(nil), source.Packer.Variables...)
+		packer.MaterialManifest = material.CloneProjection(source.Packer.MaterialManifest)
 		clone.Packer = &packer
 	}
 	return clone

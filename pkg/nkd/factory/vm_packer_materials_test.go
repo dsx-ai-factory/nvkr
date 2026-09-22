@@ -23,6 +23,14 @@ type vmPackerMaterialFixture struct {
 }
 
 func newVMPackerMaterialFixture(t *testing.T) vmPackerMaterialFixture {
+	return newVMPackerMaterialFixtureWithContract(t, nil, map[string]string{"a-agent": "agent", "z-runtime": "runtime"})
+}
+
+func newVMPackerMaterialFixtureWithContract(
+	t *testing.T,
+	projection *material.Projection,
+	bindings map[string]string,
+) vmPackerMaterialFixture {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
@@ -37,8 +45,9 @@ func newVMPackerMaterialFixture(t *testing.T) vmPackerMaterialFixture {
 		ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
 		ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator",
 		MaterialManifestVariable: "material_manifest", OutputDirectoryVariable: "output_directory",
+		MaterialManifest: material.CloneProjection(projection),
 	}
-	image.Materials = map[string]string{"a-agent": "agent", "z-runtime": "runtime"}
+	image.Materials = bindings
 	catalogCopy.Components["image"] = image
 
 	rawByComponent := map[string][]byte{
@@ -111,6 +120,42 @@ func newVMPackerMaterialFixture(t *testing.T) vmPackerMaterialFixture {
 		fixture.results[component] = record.Path
 	}
 	return fixture
+}
+
+func TestObserveVMPackerMaterialsEmitsNKEProducerContract(t *testing.T) {
+	projection := &material.Projection{
+		SchemaVersion: "nke.dev/os-image-materials/v1",
+		Kinds: map[string]string{
+			"image-inputs":  "archive",
+			"installer-iso": "disk-image",
+		},
+	}
+	fixture := newVMPackerMaterialFixtureWithContract(t, projection, map[string]string{
+		"image-inputs": "agent", "installer-iso": "runtime",
+	})
+	observed, err := observeVMPackerMaterials(t.Context(), fixture.plan, fixture.node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer observed.Close()
+	raw, err := observed.manifest.ReadAllContext(t.Context(), maxVMPackerManifestBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest material.Manifest
+	if err := canonical.UnmarshalExact(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.SchemaVersion != "nke.dev/os-image-materials/v1" || len(manifest.Materials) != 2 {
+		t.Fatalf("NKE material manifest = %#v", manifest)
+	}
+	wantKinds := map[string]string{"image-inputs": "archive", "installer-iso": "disk-image"}
+	for _, entry := range manifest.Materials {
+		if entry.Kind != wantKinds[entry.Binding] || entry.Architecture != "amd64" ||
+			entry.Path != "materials/"+entry.Binding || !canonical.IsDigest(entry.Digest) {
+			t.Fatalf("NKE material entry = %#v", entry)
+		}
+	}
 }
 
 func (fixture vmPackerMaterialFixture) producer(t *testing.T, component string) ir.Node {

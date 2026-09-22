@@ -8,6 +8,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
 
 func validateVMImageBuildRequirements(name string, requirements *execution.Requirements) error {
@@ -113,6 +114,7 @@ func clonePackerConfig(config *PackerConfig) *PackerConfig {
 	}
 	cloned := *config
 	cloned.Variables = cloneStringMap(config.Variables)
+	cloned.MaterialManifest = material.CloneProjection(config.MaterialManifest)
 	return &cloned
 }
 
