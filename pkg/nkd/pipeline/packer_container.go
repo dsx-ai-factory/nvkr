@@ -211,6 +211,7 @@ func packerArchitecture(platform string) string {
 }
 
 type packerImageInspection struct {
+	ID           string   `json:"Id"`
 	RepoDigests  []string `json:"RepoDigests"`
 	OS           string   `json:"Os"`
 	Architecture string   `json:"Architecture"`
@@ -221,9 +222,16 @@ type packerImageInspection struct {
 }
 
 func observeLocalPackerImage(ctx context.Context, runtime packerContainerRuntime, node ir.Node) error {
-	wantDigest, err := imageManifestDigest(node.Toolchain)
-	if err != nil {
-		return e.Wrap(e.CodeInvalidCatalog, err, "node %q toolchain", node.ID)
+	wantImageID := ""
+	wantManifestDigest := ""
+	if canonical.IsDigest(node.Toolchain) {
+		wantImageID = node.Toolchain
+	} else {
+		var err error
+		wantManifestDigest, err = imageManifestDigest(node.Toolchain)
+		if err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "node %q toolchain", node.ID)
+		}
 	}
 	var stdout, stderr bytes.Buffer
 	if err := runtime.Run(ctx, nil, &stdout, &stderr,
@@ -262,13 +270,21 @@ func observeLocalPackerImage(ctx context.Context, runtime packerContainerRuntime
 		return e.New(e.CodePreflightFailed,
 			"local Packer toolchain declares PATH more than once")
 	}
+	if wantImageID != "" {
+		if inspection.ID != wantImageID {
+			return e.New(e.CodePreflightFailed,
+				"runtime selected local Packer toolchain image ID %q for node %q, want %q",
+				inspection.ID, node.ID, wantImageID)
+		}
+		return nil
+	}
 	for _, reference := range inspection.RepoDigests {
-		if _, digest, ok := strings.Cut(reference, "@"); ok && digest == wantDigest {
+		if _, digest, ok := strings.Cut(reference, "@"); ok && digest == wantManifestDigest {
 			return nil
 		}
 	}
 	return e.New(e.CodePreflightFailed,
-		"runtime did not report selected Packer toolchain manifest %s for node %q", wantDigest, node.ID)
+		"runtime did not report selected Packer toolchain manifest %s for node %q", wantManifestDigest, node.ID)
 }
 
 func validatePackerContainerManifest(manifest []byte, digest string) error {

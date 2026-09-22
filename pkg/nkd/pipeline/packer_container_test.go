@@ -365,22 +365,39 @@ func TestCreatePackerVolumeUsesPositionalNameAndLabels(t *testing.T) {
 
 func TestObserveLocalPackerImageUsesExactHostPlatformWithoutPull(t *testing.T) {
 	digest := "sha256:" + repeatHex("a")
-	runtime := &recordingPackerRuntime{run: func(_ io.Reader, stdout, _ io.Writer, args []string) error {
-		_, _ = fmt.Fprintf(stdout, `{"RepoDigests":["registry.example/packer@%s"],"Os":"linux","Architecture":"arm64","Config":{"Env":["PATH=/ignored"]}}`, digest)
-		return nil
-	}}
-	node := ir.Node{ID: "build-node", Toolchain: "registry.example/packer@" + digest, ToolchainPlatform: "linux/arm64"}
-	if err := observeLocalPackerImage(t.Context(), runtime, node); err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"image", "inspect", "--platform", "linux/arm64", "--format", "{{json .}}", node.Toolchain}
-	if !reflect.DeepEqual(runtime.calls, [][]string{want}) {
-		t.Fatalf("image calls = %#v, want %#v", runtime.calls, [][]string{want})
-	}
-	for _, call := range runtime.calls {
-		if slices.Contains(call, "pull") {
-			t.Fatalf("image observation attempted a pull: %#v", call)
-		}
+	for _, test := range []struct {
+		name       string
+		toolchain  string
+		inspection string
+	}{
+		{
+			name:       "repository manifest digest",
+			toolchain:  "registry.example/packer@" + digest,
+			inspection: fmt.Sprintf(`{"Id":"sha256:%s","RepoDigests":["registry.example/packer@%s"],"Os":"linux","Architecture":"arm64","Config":{"Env":["PATH=/ignored"]}}`, repeatHex("b"), digest),
+		},
+		{
+			name:       "bare image ID",
+			toolchain:  digest,
+			inspection: fmt.Sprintf(`{"Id":"%s","RepoDigests":[],"Os":"linux","Architecture":"arm64","Config":{"Env":["PATH=/ignored"]}}`, digest),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &recordingPackerRuntime{run: func(_ io.Reader, stdout, _ io.Writer, _ []string) error {
+				_, _ = io.WriteString(stdout, test.inspection)
+				return nil
+			}}
+			node := ir.Node{ID: "build-node", Toolchain: test.toolchain, ToolchainPlatform: "linux/arm64"}
+			if err := observeLocalPackerImage(t.Context(), runtime, node); err != nil {
+				t.Fatal(err)
+			}
+			want := []string{"image", "inspect", "--platform", "linux/arm64", "--format", "{{json .}}", node.Toolchain}
+			if !reflect.DeepEqual(runtime.calls, [][]string{want}) {
+				t.Fatalf("image calls = %#v, want %#v", runtime.calls, [][]string{want})
+			}
+			if slices.Contains(runtime.calls[0], "pull") {
+				t.Fatalf("image observation attempted a pull: %#v", runtime.calls[0])
+			}
+		})
 	}
 }
 
@@ -412,24 +429,31 @@ func TestObserveLocalPackerImageRejectsInheritedMutableConfig(t *testing.T) {
 
 func TestObserveLocalPackerImageRejectsIdentityMismatch(t *testing.T) {
 	digest := "sha256:" + repeatHex("a")
-	node := ir.Node{ID: "build-node", Toolchain: "registry.example/packer@" + digest, ToolchainPlatform: "linux/amd64"}
 	for _, test := range []struct {
 		name       string
+		toolchain  string
+		imageID    string
 		repoDigest string
 		os         string
 		arch       string
 	}{
-		{name: "manifest digest", repoDigest: "sha256:" + repeatHex("b"), os: "linux", arch: "amd64"},
-		{name: "operating system", repoDigest: digest, os: "windows", arch: "amd64"},
-		{name: "architecture", repoDigest: digest, os: "linux", arch: "arm64"},
+		{name: "manifest digest", toolchain: "registry.example/packer@" + digest, repoDigest: "sha256:" + repeatHex("b"), os: "linux", arch: "amd64"},
+		{name: "bare image ID", toolchain: digest, imageID: "sha256:" + repeatHex("b"), os: "linux", arch: "amd64"},
+		{name: "operating system", toolchain: "registry.example/packer@" + digest, repoDigest: digest, os: "windows", arch: "amd64"},
+		{name: "architecture", toolchain: "registry.example/packer@" + digest, repoDigest: digest, os: "linux", arch: "arm64"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			repoDigests := "[]"
+			if test.repoDigest != "" {
+				repoDigests = fmt.Sprintf("[%q]", "registry.example/packer@"+test.repoDigest)
+			}
 			runtime := &recordingPackerRuntime{run: func(_ io.Reader, stdout, _ io.Writer, _ []string) error {
 				_, _ = fmt.Fprintf(stdout,
-					`{"RepoDigests":["registry.example/packer@%s"],"Os":%q,"Architecture":%q,"Config":{"Env":["PATH=/ignored"]}}`,
-					test.repoDigest, test.os, test.arch)
+					`{"Id":%q,"RepoDigests":%s,"Os":%q,"Architecture":%q,"Config":{"Env":["PATH=/ignored"]}}`,
+					test.imageID, repoDigests, test.os, test.arch)
 				return nil
 			}}
+			node := ir.Node{ID: "build-node", Toolchain: test.toolchain, ToolchainPlatform: "linux/amd64"}
 			if err := observeLocalPackerImage(t.Context(), runtime, node); code(err) != e.CodePreflightFailed {
 				t.Fatalf("image identity error = %v, want %s", err, e.CodePreflightFailed)
 			}
