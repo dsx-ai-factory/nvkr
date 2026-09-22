@@ -20,6 +20,12 @@ M3 qualification does not establish cluster conformance or byte-identical reprod
 belongs to the v1 evidence contract; it does not grant qualified-lane clearance. Current artifact-publication
 verification is narrower than M3/M4 acceptance.
 
+Evidence remains scoped to exact producer outputs. A package with independently demonstrated exact-byte
+reproduction evidence or a digest-verified acquisition may feed the wrapped NKE OS build without making the
+aggregate disk reproducible. M2 accepts the disk's exact delivered digest, source-lane provenance, traced
+materials, and reconciled read-only inventory. A later build with different QCOW2 bytes is a different Artifact
+even if the same content checks pass.
+
 ## Artifact scope
 
 V1 targets one amd64 variant per delivered artifact, including one OS image and one AICR package. Source lanes are `hermetic-build`, `wrapped-build`, or `acquired`; production provenance
@@ -49,6 +55,8 @@ The NKE OS build team owns embedded-software correctness and runtime validation.
 requires an inventory reconciling traced materials with read-only inspection of the exact disk. Embedded components retain matrix rows for
 traceability, but do not imply separate NKD builds or delivery. A deferred member stays explicit in authored
 requirements and planned qualification waivers; it must never disappear because a build failed.
+That inventory proves composition for the exact disk subject. It does not establish qualified reproduction of
+the QCOW2, decoded RAW stream, or FDE ciphertext.
 
 ## Dependencies and limits
 

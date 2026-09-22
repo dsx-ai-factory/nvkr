@@ -241,8 +241,8 @@ func TestResolvedVMInputsOwnTheirMemory(t *testing.T) {
 			image := cat.Components["image"]
 			image.BuildCommand = nil
 			image.Packer = &catalog.PackerConfig{
-				ProjectPath: "packer", BuildName: "qemu.image",
-				ArchitectureVariable: "architecture", MaterialManifestVariable: "material_manifest",
+				ProjectPath: "packer", PackerVersion: "1.14.2", BuildName: "qemu.image",
+				ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest",
 				OutputDirectoryVariable: "output_directory", Variables: map[string]string{"image_variant": "standard"},
 			}
 			cat.Components["image"] = image

@@ -4,6 +4,10 @@
 // sources + components, and a machine-managed lockfile that pins each source, so
 // version bumps churn only the lock (ADR-22). Callers supply the catalog explicitly;
 // maintained product inputs live with their owning Definition.
+//
+// LoadContext owns bounded loading; resolution and declaration/producer admission
+// stay private to this package. UpdateSourcePins and UpdateArtifactPins own pin
+// maintenance through the same protected lock snapshot and compare-and-swap writer.
 package catalog
 
 import (
@@ -34,12 +38,20 @@ type DiskSpec struct {
 // directory. NKD does not synthesize or interpret HCL.
 type PackerConfig struct {
 	ProjectPath string `json:"projectPath"`
+	// PackerVersion is the exact version reported by the authenticated Packer
+	// executable inside the selected OCI toolchain closure.
+	PackerVersion string `json:"packerVersion"`
 	// BuildName is the exact compiled build name future lowering passes through
 	// Packer's -only option. Wildcards and build-name lists are not accepted.
-	BuildName                string `json:"buildName"`
-	ArchitectureVariable     string `json:"architectureVariable"`
-	MaterialManifestVariable string `json:"materialManifestVariable"`
-	OutputDirectoryVariable  string `json:"outputDirectoryVariable"`
+	BuildName                 string `json:"buildName"`
+	ArchitectureVariable      string `json:"architectureVariable"`
+	AcceleratorVariable       string `json:"acceleratorVariable"`
+	MaterialManifestVariable  string `json:"materialManifestVariable"`
+	OutputDirectoryVariable   string `json:"outputDirectoryVariable"`
+	SSHPrivateKeyVariable     string `json:"sshPrivateKeyVariable,omitempty"`
+	SSHPublicKeyVariable      string `json:"sshPublicKeyVariable,omitempty"`
+	BuildLogDirectoryVariable string `json:"buildLogDirectoryVariable,omitempty"`
+	HTTPDirectoryVariable     string `json:"httpDirectoryVariable,omitempty"`
 	// Variables are public, literal string values passed to source-owned Packer
 	// variables. They are build inputs, not a secret channel; future lowering must
 	// expose them in the invocation record and let the pinned Packer executable

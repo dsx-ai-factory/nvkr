@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	// MaxPublicVariables bounds authored public variables. The three
-	// NKD-owned architecture, material-manifest, and output-directory bindings
-	// are reserved bindings and are not included in this count.
+	// MaxPublicVariables bounds authored public variables. NKD-owned
+	// architecture, accelerator, material-manifest, output-directory, and optional attempt
+	// directory bindings are reserved and are not included in this count.
 	MaxPublicVariables = 256
 	// MaxPublicVariableArgBytes bounds the aggregate bytes in public
 	// name=value arguments. It deliberately excludes reserved bindings whose

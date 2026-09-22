@@ -55,10 +55,16 @@ components:
       timeoutSeconds: 10800
     packer:
       projectPath: os-image/packer
+      packerVersion: 1.14.2
       buildName: nke-node-non-fde.qemu.nke-non-fde
       architectureVariable: architecture
+      acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
+      sshPrivateKeyVariable: ssh_private_key_file
+      sshPublicKeyVariable: ssh_public_key_file
+      buildLogDirectoryVariable: build_log_directory
+      httpDirectoryVariable: http_directory
       variables:
         image_variant: standard
     materials:
@@ -88,10 +94,16 @@ pins:
 	cat := load(t, registry)
 	component := cat.Components["node-image"]
 	if component.Packer == nil || component.Packer.ProjectPath != "os-image/packer" ||
+		component.Packer.PackerVersion != "1.14.2" ||
 		component.Packer.BuildName != "nke-node-non-fde.qemu.nke-non-fde" ||
 		component.Packer.ArchitectureVariable != "architecture" ||
+		component.Packer.AcceleratorVariable != "accelerator" ||
 		component.Packer.MaterialManifestVariable != "material_manifest" ||
-		component.Packer.OutputDirectoryVariable != "output_directory" {
+		component.Packer.OutputDirectoryVariable != "output_directory" ||
+		component.Packer.SSHPrivateKeyVariable != "ssh_private_key_file" ||
+		component.Packer.SSHPublicKeyVariable != "ssh_public_key_file" ||
+		component.Packer.BuildLogDirectoryVariable != "build_log_directory" ||
+		component.Packer.HTTPDirectoryVariable != "http_directory" {
 		t.Fatalf("loaded component lost its direct Packer contract: %#v", component)
 	}
 	if len(component.BuildCommand) != 0 {
@@ -123,10 +135,16 @@ pins:
 		name, old, replacement string
 	}{
 		{name: "project path", old: "projectPath: os-image/packer", replacement: "projectPath: image/packer"},
+		{name: "Packer version", old: "packerVersion: 1.14.2", replacement: "packerVersion: 1.14.3"},
 		{name: "build name", old: "buildName: nke-node-non-fde.qemu.nke-non-fde", replacement: "buildName: nke-node-fde.qemu.nke-fde"},
 		{name: "architecture variable", old: "architectureVariable: architecture", replacement: "architectureVariable: target_arch"},
+		{name: "accelerator variable", old: "acceleratorVariable: accelerator", replacement: "acceleratorVariable: vm_accelerator"},
 		{name: "material manifest variable", old: "materialManifestVariable: material_manifest", replacement: "materialManifestVariable: inputs_manifest"},
 		{name: "output directory variable", old: "outputDirectoryVariable: output_directory", replacement: "outputDirectoryVariable: build_output"},
+		{name: "SSH private-key variable", old: "sshPrivateKeyVariable: ssh_private_key_file", replacement: "sshPrivateKeyVariable: supplied_private_key"},
+		{name: "SSH public-key variable", old: "sshPublicKeyVariable: ssh_public_key_file", replacement: "sshPublicKeyVariable: supplied_public_key"},
+		{name: "build-log directory variable", old: "buildLogDirectoryVariable: build_log_directory", replacement: "buildLogDirectoryVariable: packer_log_directory"},
+		{name: "HTTP directory variable", old: "httpDirectoryVariable: http_directory", replacement: "httpDirectoryVariable: packer_http_directory"},
 		{name: "material binding name", old: "agent-package: agent-package", replacement: "host-agent-package: agent-package"},
 		{name: "material component", old: "agent-package: agent-package", replacement: "agent-package: runtime-package"},
 		{name: "Packer variable name", old: "image_variant: standard", replacement: "node_variant: standard"},
@@ -163,8 +181,10 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 	valid.BuildCommand = nil
 	valid.Packer = &PackerConfig{
 		ProjectPath:              "os-image/packer",
+		PackerVersion:            "1.14.2",
 		BuildName:                "nke-node-non-fde.qemu.nke-non-fde",
 		ArchitectureVariable:     "architecture",
+		AcceleratorVariable:      "accelerator",
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
 	}
@@ -205,6 +225,27 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 				component.BuildCommand = []string{"make", "image"}
 			},
 			wantText: "exactly one producer",
+		},
+		{
+			name: "missing Packer version",
+			edit: func(component *Component) {
+				component.Packer.PackerVersion = ""
+			},
+			wantText: "exact bounded version",
+		},
+		{
+			name: "Packer version with whitespace",
+			edit: func(component *Component) {
+				component.Packer.PackerVersion = " 1.14.2"
+			},
+			wantText: "exact bounded version",
+		},
+		{
+			name: "Packer version with interior whitespace",
+			edit: func(component *Component) {
+				component.Packer.PackerVersion = "1.14.2 rc1"
+			},
+			wantText: "exact bounded version",
 		},
 		{
 			name: "missing producer",
@@ -342,6 +383,20 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			wantText: "reserved variable name",
 		},
 		{
+			name: "empty accelerator variable",
+			edit: func(component *Component) {
+				component.Packer.AcceleratorVariable = ""
+			},
+			wantText: "reserved variable name",
+		},
+		{
+			name: "delimiter in accelerator variable",
+			edit: func(component *Component) {
+				component.Packer.AcceleratorVariable = "accelerator=other"
+			},
+			wantText: "reserved variable name",
+		},
+		{
 			name: "control character in material manifest variable",
 			edit: func(component *Component) {
 				component.Packer.MaterialManifestVariable = "material\nmanifest"
@@ -384,9 +439,45 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			wantText: "is duplicated",
 		},
 		{
+			name: "duplicate architecture and accelerator variables",
+			edit: func(component *Component) {
+				component.Packer.AcceleratorVariable = component.Packer.ArchitectureVariable
+			},
+			wantText: "is duplicated",
+		},
+		{
 			name: "duplicate material and output variables",
 			edit: func(component *Component) {
 				component.Packer.OutputDirectoryVariable = component.Packer.MaterialManifestVariable
+			},
+			wantText: "is duplicated",
+		},
+		{
+			name: "partial SSH variable pair",
+			edit: func(component *Component) {
+				component.Packer.SSHPrivateKeyVariable = "ssh_private_key_file"
+			},
+			wantText: "both Packer SSH key variables or neither",
+		},
+		{
+			name: "duplicate SSH and architecture variables",
+			edit: func(component *Component) {
+				component.Packer.SSHPrivateKeyVariable = component.Packer.ArchitectureVariable
+				component.Packer.SSHPublicKeyVariable = "ssh_public_key_file"
+			},
+			wantText: "is duplicated",
+		},
+		{
+			name: "duplicate build-log and output variables",
+			edit: func(component *Component) {
+				component.Packer.BuildLogDirectoryVariable = component.Packer.OutputDirectoryVariable
+			},
+			wantText: "is duplicated",
+		},
+		{
+			name: "duplicate HTTP and manifest variables",
+			edit: func(component *Component) {
+				component.Packer.HTTPDirectoryVariable = component.Packer.MaterialManifestVariable
 			},
 			wantText: "is duplicated",
 		},

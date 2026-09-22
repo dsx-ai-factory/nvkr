@@ -1,8 +1,10 @@
 // Package lifecycle owns the Definition-to-Run-to-Release workflow.
 // PrepareFiles freezes a Run attempt for ExecuteLocal; GenerateFiles prepares
 // hosted execution, and Consumer.Verify authenticates a published Release under
-// consumer policy. This package owns attempt state and public projections while
-// definition, factory, and delivery own admission, compilation, and publication bytes.
+// consumer policy. This package owns frozen output requirements, attempt state,
+// outer publication membership and public projections. Definition owns authored
+// admission, factory owns compilation and typed payload observation, and delivery
+// owns publication bytes.
 package lifecycle
 
 import (

@@ -15,9 +15,11 @@
 
 ## Context
 
-NKD builds a Kubernetes substrate from upstream source, reproducibly. It will use **Nix** both to provide
-repeatable build environments and to build certain components (notably Kubernetes upstream), so the architecture
-must **orchestrate more than one builder**.
+NKD builds a Kubernetes substrate from pinned upstream inputs and preserves the evidence appropriate to each
+producer. Qualified components may be reproduced exactly; wrapped aggregate artifacts remain pipeline-attested
+until their own qualified subjects reproduce. NKD will use **Nix** both to provide repeatable build environments
+and to build certain components (notably Kubernetes upstream), so the architecture must **orchestrate more than
+one builder**.
 
 The SRD is **neutral on build substrate**. It imposes two relevant constraints: the core must be releasable under
 **Apache-2.0** with no *incompatible dependency linked into* it, and only a **qualified** substrate falls inside
@@ -57,9 +59,10 @@ constraint, and Nix can enter the reproducibility boundary only after its execut
    its selected producer form, exact source-owned entrypoint, declared variable and material bindings, pinned
    toolchain closure, and output contract are likewise build-semantic inputs.
 
-5. **Verification is builder-agnostic.** Verify recomputes and compares **artifact digests** and is indifferent to
-   how an artifact was produced. The trust, attestation, and verification model is therefore unchanged; a builder
-   type is only a new way to *populate* a build step.
+5. **Verification is builder-agnostic and subject-scoped.** Verify recomputes and compares the exact **artifact
+   digests** covered by the requested claim and is indifferent to how each artifact was produced. A dependency's
+   reproduced digest cannot satisfy its consumer's subject. The trust, attestation, and verification model is
+   therefore unchanged; a builder type is only a new way to *populate* a build step.
 
 6. **Uniform invocation.** All builders are invoked through the **same lowering path**, so the local runner and
    every CI backend emit an identical, byte-comparable invocation. `nix` runs inside a **pinned, digest-addressed
@@ -140,10 +143,16 @@ The direct-Packer authoring form names the stable boundary that compilation reco
 builderType: vm-image
 packer:
   projectPath: os-image/packer
+  packerVersion: 1.14.2
   buildName: nke-node-non-fde.qemu.nke-non-fde
   architectureVariable: architecture
+  acceleratorVariable: accelerator
   materialManifestVariable: material_manifest
   outputDirectoryVariable: output_directory
+  sshPrivateKeyVariable: ssh_private_key_file # optional as a pair
+  sshPublicKeyVariable: ssh_public_key_file   # optional as a pair
+  buildLogDirectoryVariable: build_log_directory # optional source contract
+  httpDirectoryVariable: http_directory           # optional source contract
   variables:
     image_variant: standard
 materials:
@@ -162,8 +171,19 @@ must invoke the pinned Packer executable's `validate` command against the pinned
 and the declared variable bindings, and fail closed on any diagnostic, including a warning returned with exit
 status zero when `-only` matches no build. For a named HCL build block, the selector is the complete compiled
 name (for example `nke-node-non-fde.qemu.nke-non-fde`), not only the source type and source name. `artifactPath` is relative to the private
-output directory bound through `outputDirectoryVariable`. The three variable names are explicit and distinct, so
-NKD never guesses source-owned HCL names. `packer.variables` contains only public literal strings. It is not a
+output directory bound through `outputDirectoryVariable`. `architectureVariable` always carries the selected
+target architecture. `acceleratorVariable` always carries the admitted `kvm` or `tcg` route; a source-owned
+default cannot override that decision. The required variable names and any source-exposed log or HTTP directory
+mapping are explicit and distinct, so NKD never guesses HCL names. Cache, temporary, configuration and home
+directories remain runtime-owned standard paths rather than authored HCL-variable mappings.
+The optional SSH private/public variable-name pair, when declared, receives paths to an attempt-local keypair
+created inside the private execution root. That handoff remains reserved and unrealized until the authenticated
+OCI executor supplies the attempt-local keypair. The variable names affect Build identity; generated key bytes and
+paths affect only the Run and never enter the catalog, logical Build identity, logs or evidence.
+`packerVersion` is an exact logical input. The admitted runtime compares it with the Packer executable inside the
+digest-pinned OCI toolchain before validation. The source-owned HCL constrains required plugins; the same OCI
+digest authenticates their preinstalled bytes, and execution exposes only its fixed read-only plugin directory.
+`packer.variables` contains only public literal strings. It is not a
 credential channel, and future invocation records expose these values. The pinned Packer subprocess remains
 authoritative for checking their names and values against source-owned HCL declarations.
 
@@ -172,9 +192,11 @@ Packer v1.14.2's
 success line only after diagnostic handling returns zero, and its
 [`validate` tests](https://github.com/hashicorp/packer/blob/v1.14.2/command/validate_test.go) fix clean stdout to
 exactly `The configuration is valid.` plus a newline while demonstrating that warnings can precede that line on
-stdout with exit status zero. The dormant driver therefore accepts only that clean line (ignoring surrounding
-whitespace) with empty stderr; any other output fails closed. A real pinned Packer/NKE execution remains required
-before driver execution is admitted. A local 2026-09-18 framing probe used the official Packer 1.14.2 Darwin ARM64 ZIP
+stdout with exit status zero. The connected local OCI driver therefore accepts only that clean line (ignoring
+surrounding whitespace) with empty stderr; any other output fails closed. Driver admission and lifecycle are
+contract-tested, but a recorded real pinned Docker/Packer/NKE execution remains required before maintained NKE
+support, product acceptance, or any pipeline-attested or qualified production claim; until then the local result
+stays unqualified. A local 2026-09-18 framing probe used the official Packer 1.14.2 Darwin ARM64 ZIP
 (`sha256:b053c01272f87fe669c642dfac167b0b48cfb5c119e2e946d90ef92c2407f746`, matching HashiCorp's published
 `SHA256SUMS`) and Packer-installed Docker plugin 1.1.2. The full compiled selector returned exit zero, the single
 28-byte success line on stdout, and empty stderr; a short selector returned exit zero, a 251-byte warning plus
@@ -190,13 +212,14 @@ infer or fetch undeclared build materials.
 
 Compilation lowers each declared binding to the exact selected build or acquisition producer and records both
 the typed binding and graph dependency. Before either driver may execute, required component outputs must be built or acquired, verified, and assembled
-into a deterministic build-material manifest. Each entry binds its source-owned binding name, observed component
-name, output kind, exact artifact digest, and a slash-relative path derived from the binding name beneath a private
+into a deterministic build-material manifest. Each v2 entry binds its source-owned binding name, observed component
+name, output kind, selected target architecture, exact artifact digest, and a slash-relative path derived from the binding name beneath a private
 staging root. Binding, component and kind text use the same display-safe UTF-8 policy as producer transport.
 Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
 deterministic description, not an authenticated receipt; admitted execution must derive it from authenticated
 producer observations and bind the exact serialized file bytes before invoking a subprocess. Direct Packer will
-receive the private absolute manifest path through its declared `materialManifestVariable`. The command/Make form
+receive the private absolute manifest path through its declared `materialManifestVariable`; the source must
+cross-check every entry's architecture against the separately supplied architecture variable. The command/Make form
 has no equivalent executable handoff in the current schema and therefore cannot lower a material-bearing command.
 Adding one requires a typed authored field and identity/lowering contract; an adapter may not invent a conventional
 path, append an argument, or inject an undeclared environment variable.
@@ -205,8 +228,11 @@ Malformed manifest schema or fields, including an absent explicit materials arra
 as `invalid-catalog`. They are description-shape failures, not missing provenance or a failed authenticated
 reference verification.
 
-Admitted lowering must bind only declared inputs and variables, provide a private output location, invoke the
-selected driver through the shared runner, collect the declared artifact, and recompute its exact bytes. A driver
+Admitted direct-Packer lowering must bind only declared inputs and variables, expose the authenticated source
+read-only, provide private output, log and HTTP locations, invoke `validate` and then the exact selected build,
+collect the declared artifact, and recompute its exact bytes. It does not run `packer init`, fetch plugins, or
+acquire source or product materials. Build execution remains network-none; all required bytes must already be in
+the authenticated source and material closure. A driver
 may not replace a staged material with an undeclared network fetch. The catalog entry owns the pinned source and
 toolchain, selected driver, exact entrypoint or Packer project and build name, artifact path, material edges, and
 public Packer-variable values. These fields are logical IR v4 inputs and therefore affect Build identity.
@@ -220,6 +246,18 @@ satisfy the same contracts as a direct Packer build. A direct Packer invocation 
 no qualification merely because NKD recognizes its driver. Networked or opaque acquisition inside either driver
 remains pipeline-attested or fails qualified admission, according to the selected lane. Make also remains a valid
 command entrypoint for non-VM builders under their existing contracts.
+
+Material producers retain their own evidence scope. A package rebuilt byte-identically may carry qualified
+reproduction evidence, and a byte-preserving acquisition may carry exact digest verification without an upstream
+build claim. The VM-image root does not inherit either claim. Rebuilding that root from the same authenticated
+closure and reconciling read-only disk inspection establishes controlled production and composition; it does not
+establish disk reproduction. The root remains pipeline-attested unless ADR-07/08/14 independently admit and
+compare its exact qualified disk subject.
+
+Secret-valued Packer inputs are not public variables and may not be transported in process arguments, environment
+variables, manifests, logs or evidence. The plain-image direct contract needs no such input. FDE remains closed
+until its source-owned contract provides an authenticated file-path secret handoff or generates and removes an
+attempt-local bootstrap secret without exposing it through NKD's public variable transport.
 
 Runner capacity is not part of `vm-image`. A from-source component may declare generic `buildRequirements`
 using ADR-18's per-step execution contract. A `vm-image` producer must use that same generic type to declare a

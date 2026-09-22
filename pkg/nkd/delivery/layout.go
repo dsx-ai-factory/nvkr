@@ -1,21 +1,17 @@
 package delivery
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -63,29 +59,6 @@ type objectConfig struct {
 	Size           int64  `json:"size"`
 }
 
-// BinaryFileInput names one regular file to capture into a bundle.
-type BinaryFileInput struct {
-	Name        string
-	Path        string
-	InstallPath string
-	Mode        uint32
-}
-
-type BinaryBundleRequest struct {
-	OS               string
-	Arch             string
-	Purpose          string
-	ReleaseSetDigest string
-	InventoryDigest  string
-	Epoch            int64
-	Files            []BinaryFileInput
-}
-
-type capturedBinary struct {
-	input BinaryFileInput
-	file  *heldfile.File
-}
-
 // ObjectInput is either a regular blob or a complete OCI layout. Layout inputs
 // are nested by descriptor and copied as an exact closure; regular files become
 // one-layer OCI artifacts.
@@ -131,102 +104,6 @@ type Inspection struct {
 type layoutWriter struct {
 	root  string
 	plain bool
-}
-
-// BuildBinaryBundle creates a deterministic OCI layout containing one typed
-// binary-bundle artifact. It captures every source through an immutable held-file
-// capability before the output directory becomes visible.
-func BuildBinaryBundle(ctx context.Context, out string, request BinaryBundleRequest) (Result, error) {
-	if err := deliveryContext(ctx); err != nil {
-		return Result{}, err
-	}
-	if len(request.Files) == 0 || len(request.Files) > maxDeliveryObjects {
-		return Result{}, e.New(e.CodeUsage, "binary bundle requires 1..%d files", maxDeliveryObjects)
-	}
-	files := append([]BinaryFileInput(nil), request.Files...)
-	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
-	captures := make([]capturedBinary, 0, len(files))
-	cleanup := func() {
-		for i := len(captures) - 1; i >= 0; i-- {
-			_ = captures[i].file.Close()
-		}
-	}
-	defer cleanup()
-	bundle := BinaryBundle{SchemaVersion: BinaryBundleSchemaVersion, OS: request.OS,
-		Arch: request.Arch, Purpose: request.Purpose, ReleaseSetDigest: request.ReleaseSetDigest,
-		InventoryDigest: request.InventoryDigest, Entries: make([]BinaryEntry, 0, len(files))}
-	for index, input := range files {
-		if index > 0 && files[index-1].Name == input.Name {
-			return Result{}, e.New(e.CodeInvalidCatalog, "binary bundle repeats name %q", input.Name)
-		}
-		if input.Mode == 0 {
-			input.Mode = 0o755
-		}
-		held, err := heldfile.OpenContext(ctx, input.Path, heldfile.Options{
-			Label: "binary-bundle:" + input.Name, MaxBytes: maxDeliveryFileBytes,
-		})
-		if err != nil {
-			return Result{}, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "capturing binary bundle file %q", input.Name))
-		}
-		captures = append(captures, capturedBinary{input: input, file: held})
-		bundle.Entries = append(bundle.Entries, BinaryEntry{Name: input.Name, InstallPath: input.InstallPath,
-			Mode: input.Mode, SHA256: held.Digest(), Size: held.Size()})
-	}
-	if err := bundle.Validate(); err != nil {
-		return Result{}, err
-	}
-	semantic, err := bundle.Digest()
-	if err != nil {
-		return Result{}, err
-	}
-	stage, commit, cleanupStage, err := stageLayout(out)
-	if err != nil {
-		return Result{}, err
-	}
-	defer cleanupStage()
-	writer := layoutWriter{root: stage}
-	configBytes, err := canonical.Marshal(bundle)
-	if err != nil {
-		return Result{}, err
-	}
-	config, err := writer.addBlobBytes(configBytes, MediaBinaryBundleConfig)
-	if err != nil {
-		return Result{}, err
-	}
-	layer, err := writer.addBundleLayer(ctx, captures, request.Epoch)
-	if err != nil {
-		return Result{}, err
-	}
-	layer.Annotations = map[string]string{"org.opencontainers.image.title": "bundle.tar.gz"}
-	manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: MediaBinaryBundle,
-		Config: config, Layers: []Descriptor{layer}}
-	manifestDescriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
-	if err != nil {
-		return Result{}, err
-	}
-	manifestDescriptor.ArtifactType = MediaBinaryBundle
-	manifestDescriptor.Annotations = map[string]string{
-		"org.opencontainers.image.title":        request.Purpose,
-		"org.opencontainers.image.os":           request.OS,
-		"org.opencontainers.image.architecture": request.Arch,
-		"dev.nkd.semantic.digest":               semantic,
-	}
-	index := ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, ArtifactType: MediaBinaryBundle,
-		Manifests: []Descriptor{manifestDescriptor}, Annotations: map[string]string{"dev.nkd.semantic.digest": semantic}}
-	rootDigest, err := writer.writeIndex(index)
-	if err != nil {
-		return Result{}, err
-	}
-	if _, verified, err := InspectBinaryBundle(ctx, stage); err != nil || verified.RootDigest != rootDigest || verified.SemanticDigest != semantic {
-		if err != nil {
-			return Result{}, err
-		}
-		return Result{}, e.New(e.CodeVerifyFailed, "staged binary-bundle layout changed before commit")
-	}
-	if err := commit(); err != nil {
-		return Result{}, err
-	}
-	return Result{LayoutPath: out, RootDigest: rootDigest, SemanticDigest: semantic}, nil
 }
 
 // BuildPublicationRoot creates a diagnostic release-root layout. It intentionally
@@ -457,83 +334,6 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 	}
 	descriptor.ArtifactType = input.ArtifactType
 	return descriptor, held.Digest(), held.AssertUnchangedContext(ctx)
-}
-
-func (writer layoutWriter) addBundleLayer(ctx context.Context, captures []capturedBinary, epoch int64) (Descriptor, error) {
-	tmp, err := os.CreateTemp(writer.root, ".nkd-bundle-layer-*.tmp")
-	if err != nil {
-		return Descriptor{}, e.Wrap(e.CodeInternal, err, "creating binary bundle layer")
-	}
-	tmpPath := tmp.Name()
-	defer func() { _ = os.Remove(tmpPath) }()
-	hash := sha256.New()
-	gzipWriter, err := gzip.NewWriterLevel(io.MultiWriter(tmp, hash), gzip.BestCompression)
-	if err != nil {
-		_ = tmp.Close()
-		return Descriptor{}, err
-	}
-	gzipWriter.ModTime = time.Time{}
-	gzipWriter.OS = 255
-	tarWriter := tar.NewWriter(gzipWriter)
-	mtime := time.Unix(epoch, 0).UTC()
-	for _, capture := range captures {
-		if err := deliveryContext(ctx); err != nil {
-			_ = tarWriter.Close()
-			_ = gzipWriter.Close()
-			_ = tmp.Close()
-			return Descriptor{}, err
-		}
-		header := &tar.Header{Name: "files/" + capture.input.Name, Mode: int64(capture.input.Mode),
-			Size: capture.file.Size(), ModTime: mtime, Uid: 0, Gid: 0,
-			Uname: "", Gname: "", Typeflag: tar.TypeReg, Format: tar.FormatPAX}
-		if err := tarWriter.WriteHeader(header); err != nil {
-			_ = gzipWriter.Close()
-			_ = tmp.Close()
-			return Descriptor{}, err
-		}
-		if _, err := capture.file.WriteToContext(ctx, tarWriter); err != nil {
-			_ = tarWriter.Close()
-			_ = gzipWriter.Close()
-			_ = tmp.Close()
-			return Descriptor{}, classifyContext(ctx, err)
-		}
-		if err := capture.file.AssertUnchangedContext(ctx); err != nil {
-			_ = tarWriter.Close()
-			_ = gzipWriter.Close()
-			_ = tmp.Close()
-			return Descriptor{}, err
-		}
-	}
-	if err := tarWriter.Close(); err != nil {
-		_ = gzipWriter.Close()
-		_ = tmp.Close()
-		return Descriptor{}, err
-	}
-	if err := gzipWriter.Close(); err != nil {
-		_ = tmp.Close()
-		return Descriptor{}, err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return Descriptor{}, err
-	}
-	info, err := tmp.Stat()
-	if err != nil {
-		_ = tmp.Close()
-		return Descriptor{}, err
-	}
-	if err := tmp.Close(); err != nil {
-		return Descriptor{}, err
-	}
-	digest := "sha256:" + hex.EncodeToString(hash.Sum(nil))
-	destination := filepath.Join(writer.root, "blobs", "sha256", strings.TrimPrefix(digest, "sha256:"))
-	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-		return Descriptor{}, err
-	}
-	if err := os.Rename(tmpPath, destination); err != nil {
-		return Descriptor{}, err
-	}
-	return Descriptor{MediaType: MediaBinaryBundleLayer, Digest: digest, Size: info.Size()}, nil
 }
 
 func (writer layoutWriter) writeIndex(index ociIndex) (string, error) {

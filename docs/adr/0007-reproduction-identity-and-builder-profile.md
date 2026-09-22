@@ -14,7 +14,7 @@
 
 ## Context
 
-NKD’s value rests on a precise, defensible meaning for **“Reproduced.”** The SRD scopes byte-for-byte
+NKD’s value rests on a precise, defensible meaning for **`Reproduced`**. The SRD scopes byte-for-byte
 reproducibility to a single tuple — the same build, build engine, input manifest, and **builder profile** — and
 requires the builder profile to be **immutable, identified by a signed digest**, with a **fail-closed preflight**
 that aborts *before inputs resolve* when the environment does not satisfy output-affecting profile requirements.
@@ -35,6 +35,11 @@ A reproduction claim is anchored to the tuple **`{ build identity, builder-profi
 resolved-input-manifest }`**. Build Digest identifies the logical graph derived from the selected producers,
 target and pinned content inputs. Builder-profile identity, observed engine class and later runtime
 observations are separate bindings and never inputs to that digest (IR-purity).
+
+The claim is scoped to the exact artifact subjects named by the authenticated expectation and observation. It
+does not flow transitively from a reproduced dependency into the artifact that consumes it. Equal dependency
+bytes prove only that the rebuild used the expected dependency; the consuming output receives a `Reproduced`
+verdict only when its own required bytes also exact-match the authenticated expectation.
 
 - **`engineClass`** is the **observed** build substrate a component was actually built under — one of
   `{ oci-hermetic, nix, prebuilt-acquire }` — **per component**, recorded in the **detached build record** and
@@ -94,7 +99,7 @@ Preflight has two explicit stages and no ambiguous “missing observation” fal
 
 The split preserves early rejection for locally observable incompatibilities without pretending that the digest
 of a not-yet-built runner or a not-yet-pulled toolchain is a host fact. Both stages are mandatory for a
-“Reproduced” verdict.
+`Reproduced` verdict.
 
 Stage two returns an **opaque `ExecutionReceipt`**, not a boolean or a bag of caller-provided strings. The receipt
 binds the authenticated profile digest, the stage-one host-observation binding, the exact selected build-node
@@ -117,7 +122,7 @@ an executable digest alone does not identify that whole closure.
 
 The builder profile is **detached-signed**. Under the signature-required verification mode, verify authenticates
 the profile’s digest against a **pinned trusted identity**; an **unsigned, untrusted, or mismatched profile
-cannot back a “Reproduced” verdict**, and fails with a distinct code. The profile’s signer need not be the
+cannot back a `Reproduced` verdict**, and fails with a distinct code. The profile’s signer need not be the
 release signer — a distinct “builder-profile” identity is permitted and resolves through the same trust store as
 any other signer (operator policy).
 
@@ -134,6 +139,9 @@ pinning operators to a specific profile identity.
 
 A build may mix from-source (`oci-hermetic`/`nix`, profile-bound) and `prebuilt` (host-independent) components.
 
+- Evidence remains attributable to each exact producer output. A component may retain qualified reproduction
+  evidence even when a downstream aggregate is only pipeline-attested. Conversely, that component evidence
+  cannot upgrade the downstream aggregate or substitute for comparing its bytes.
 - There is **one** builder profile per build environment, covering **all** from-source components — it provides
   every builder they need. The **profile identity binds only the from-source subset** of the expected-digests
   manifest.
@@ -153,10 +161,14 @@ reproduction claim. Neither a helper-image pin nor self-reported isolation may m
 receipt. Qualified helper-image admission remains unavailable until exact executable and runtime observations
 satisfy this protocol; delivery by image is not proof that the helper reproduced.
 
+A rebuild may still authenticate its dependency closure and validate the resulting artifact's contents. That is
+useful production and composition evidence, but it is not a weaker form of `Reproduced` and cannot satisfy a
+qualified reproduction gate. A nonmatching output is a new Artifact identity even when content policy accepts it.
+
 ## Consequences
 
 **Positive**
-- “Reproduced” has an exact, verifiable meaning bound to a signed profile; a substrate mismatch is caught as a
+- `Reproduced` has an exact, verifiable meaning bound to a signed profile; a substrate mismatch is caught as a
   different build rather than silently accepted.
 - Capability-based matching keeps operators in control while preserving a single publisher reference profile.
 - The model absorbs new builder types without schema churn — a new builder is a new entry in “provided builders”

@@ -176,6 +176,50 @@ func TestLinuxLocalObservationExercisesSystemProbesOnce(t *testing.T) {
 	}
 }
 
+func TestLinuxLocalObservationDuplicatesHeldVMCapabilities(t *testing.T) {
+	kvm := systemKVMOperations
+	kvm.open = func(string, int, uint32) (int, error) {
+		return unix.Open("/dev/null", unix.O_RDWR|unix.O_CLOEXEC, 0)
+	}
+	kvm.ioctl = func(int, uint) (int, error) { return kvmExpectedVersion, nil }
+	lease, err := openLinuxLocalObservation(context.Background(), openLocalWorkspace(t), unix.Faccessat, kvm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation, ok := lease.(*linuxLocalObservation)
+	if !ok {
+		t.Fatalf("lease type = %T, want *linuxLocalObservation", lease)
+	}
+	if available, err := observation.observeKVM(); err != nil || !available {
+		t.Fatalf("injected KVM observation = %t, %v; want available", available, err)
+	}
+	workspace, err := observation.holdWorkspace()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer workspace.Close()
+	kvmDevice, err := observation.holdKVM()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer kvmDevice.Close()
+	if err := observation.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := workspace.Stat(); err != nil || !info.IsDir() {
+		t.Fatalf("duplicated workspace = %#v, error = %v", info, err)
+	}
+	if info, err := kvmDevice.Stat(); err != nil || info.Mode()&os.ModeDevice == 0 {
+		t.Fatalf("duplicated KVM capability = %#v, error = %v", info, err)
+	}
+	if _, err := observation.holdWorkspace(); errorCode(err) != nkderr.CodeEngineCapability {
+		t.Fatalf("closed workspace hold error = %v, want %s", err, nkderr.CodeEngineCapability)
+	}
+	if _, err := observation.holdKVM(); errorCode(err) != nkderr.CodeEngineCapability {
+		t.Fatalf("closed KVM hold error = %v, want %s", err, nkderr.CodeEngineCapability)
+	}
+}
+
 func TestLinuxLocalObservationFailedAttemptConsumesLease(t *testing.T) {
 	observation := linuxLocalObservation{}
 	canceled, cancel := context.WithCancel(context.Background())
@@ -340,7 +384,7 @@ func TestObserveKVMDetection(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			closed := false
-			wantFlags := unix.O_RDONLY | unix.O_CLOEXEC | unix.O_NOFOLLOW | unix.O_NONBLOCK
+			wantFlags := unix.O_RDWR | unix.O_CLOEXEC | unix.O_NOFOLLOW | unix.O_NONBLOCK
 			observation := linuxLocalObservation{
 				workspaceFD: -1, kvmFD: -1,
 				kvm: localKVMOperations{

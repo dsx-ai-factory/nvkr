@@ -63,11 +63,23 @@ accepts those exact inputs and owns the complete Plan, output joins and evidence
 partially completed plan and exposes no independently authored CompileSpec or ExecutionSettings handoff.
 `lifecycle` owns preparation, immutable attempt persistence and consumer workflow. Preparation retains an owned
 snapshot; subsequent caller mutation cannot change execution. `factory` owns Run scheduling/execution and
-provider generation. `delivery` owns checked publication membership and canonical release-content identity;
+provider generation. Its typed payload observer rechecks binary, APT, Helm and image outputs against their
+exact planned producer inputs; lifecycle retains frozen requirements and outer publication membership.
+Disk outputs use factory's concrete in-process `LocalRunResult` and held-QCOW2 observer. Lifecycle closes that
+result before committing a successful or failed observation record; serialized descriptions cannot restore
+the held capability. This observation contract does not enable production VM execution or disk publication.
+`delivery` owns checked publication membership and canonical release-content identity;
 Release consumers do not reconstruct compiler bindings. Existing domain modules retain their
 canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
+
+`status.AcceptDiagnosticCheckpoint` owns protected minimum reads, exact document authentication, checkpoint
+verification and receipt-derived byte-CAS persistence before interpreting withdrawal. Its caller-supplied epoch
+and returned decision remain diagnostic; this operation adds no trusted-time or release authority.
+`catalog.UpdateSourcePins` and `UpdateArtifactPins` own selection, resolution, change detection and the existing
+lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
+not own the persisted status schema or reconstruct pin-update transactions.
 
 Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
@@ -144,6 +156,10 @@ Ownership transfers are stated on the returning method. Facade results either cl
 one clear close obligation to their caller. Garbage-collector cleanup may be defense in depth, never the
 correctness or resource-reclamation mechanism.
 
+The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
+session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's
+context values and deadline. An asynchronous cancellation callback alone cannot enforce this close ordering.
+
 ### 6. One Run is one immutable attempt
 
 Preparation freezes admitted Definition/Environment inputs and required slots before execution or reservation
@@ -198,7 +214,8 @@ record; absence of a record proves neither success nor absence of remote effects
 
 ## Acceptance evidence
 
-Current contract evidence in `client/v1/*_test.go`, `cmd/nkdctl/*_test.go`, `pkg/nkd/pipeline/local_test.go`, and
+Current contract evidence in `client/v1/*_test.go`, `cmd/nkdctl/*_test.go`, `pkg/nkd/pipeline/local*_test.go`,
+`pkg/nkd/pipeline/container_lifecycle_test.go`, and
 `pkg/nkd/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
 catalog/runner/consumer seams, local cancellation propagation, an explicitly stopped and joined container-reaper
 waiter, bounded lock-free cleanup I/O, held-child SIGTERM→SIGKILL escalation, atomic output, exact-byte
@@ -210,6 +227,12 @@ catalog I/O; the independent disk-envelope decode lane does not require producer
 additionally prove pre-canceled/no-I/O admission, legacy-provider rejection, no-follow regular-file reads,
 file/aggregate byte ceilings, deterministic directory count/depth ceilings, and context-aware lock
 snapshot/update behavior.
+
+Status operation and state contracts cover commit-before-withdrawal, authentication and CAS failures, replay,
+protected reads and kernel-released locks. Catalog maintenance contracts cover no-op bytes, source check mode,
+whole-update CAS and artifact selection before upstream calls. Lifecycle binary observation now requires its
+complete Plan and retained raw producer bytes, including exact IR/result metadata; packaged bytes alone are
+insufficient. The organization audit records these ownership changes and their validation scope.
 
 The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and
 Linux race tests provide contract evidence; repository checks are recorded in reconciliation.

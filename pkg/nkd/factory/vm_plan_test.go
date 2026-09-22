@@ -256,8 +256,8 @@ func TestCompileProjectsPackerMaterialsAsExactProducerInputs(t *testing.T) {
 			"arm64": "example.test/vm-arm64@sha256:" + strings.Repeat("d", 64),
 		},
 		Packer: &catalog.PackerConfig{
-			ProjectPath: "os-image/packer", BuildName: "image.qemu.node",
-			ArchitectureVariable: "architecture", MaterialManifestVariable: "material_manifest",
+			ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
+			ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest",
 			OutputDirectoryVariable: "output_directory",
 			Variables:               map[string]string{"image_variant": "standard"},
 		},

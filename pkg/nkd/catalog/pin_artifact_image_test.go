@@ -1,4 +1,4 @@
-package main
+package catalog
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func TestImagePinResolutionSelectsRequestedLinuxManifests(t *testing.T) {
 			}
 			got, err := resolveImageDigests(ctx, binary, "example.invalid/image:v1", tc.arches)
 			if tc.code != "" {
-				assertLifecycleCommandCode(t, err, tc.code)
+				assertCatalogContractCode(t, err, tc.code)
 				if got != nil {
 					t.Fatalf("failed resolution exposed partial pins: %v", got)
 				}

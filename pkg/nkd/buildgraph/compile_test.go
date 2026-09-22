@@ -91,8 +91,10 @@ func TestCompileLowersVMProducersOnlyAfterHostSelection(t *testing.T) {
 	validPacker.ArtifactPath = "node-{{.Arch}}.qcow2"
 	validPacker.Packer = &catalog.PackerConfig{
 		ProjectPath:              "os-image/packer",
+		PackerVersion:            "1.14.2",
 		BuildName:                "nke-node-non-fde.qemu.nke-non-fde",
 		ArchitectureVariable:     "architecture",
+		AcceleratorVariable:      "accelerator",
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
 	}
@@ -170,8 +172,8 @@ func TestCompileVMSelectsHostToolchainAndMaterialProducers(t *testing.T) {
 		"arm64": "example.test/vm-arm64@sha256:" + strings.Repeat("2", 64),
 	}
 	root.Packer = &catalog.PackerConfig{
-		ProjectPath: "os-image/packer", BuildName: "image.qemu.node",
-		ArchitectureVariable: "architecture", MaterialManifestVariable: "material_manifest",
+		ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
+		ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable: "output_directory",
 	}
 	root.Materials = map[string]string{"agent-package": "agent"}
@@ -240,8 +242,10 @@ func TestDirectPackerProducerRequiresVMImageBuilderCapability(t *testing.T) {
 			BuilderType: catalog.BuilderVMImage,
 			Packer: &catalog.PackerConfig{
 				ProjectPath:              "os-image/packer",
+				PackerVersion:            "1.14.2",
 				BuildName:                "nke-node-non-fde.qemu.nke-non-fde",
 				ArchitectureVariable:     "architecture",
+				AcceleratorVariable:      "accelerator",
 				MaterialManifestVariable: "material_manifest",
 				OutputDirectoryVariable:  "output_directory",
 			},

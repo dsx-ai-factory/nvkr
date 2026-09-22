@@ -119,8 +119,12 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 		if artifact.Kind != slot.Kind || artifact.BuildDigest != slot.BuildDigest || !equalStrings(artifact.Components, slot.Components) {
 			return nil, e.New(e.CodeVerifyFailed, "run artifact %q does not satisfy its frozen kind/build/component slot", artifact.Name)
 		}
+		if artifact.Kind == OutputDiskImage && (artifact.Disk == nil || artifact.Disk.PlanDigest != run.PlanDigest) {
+			return nil, e.New(e.CodeVerifyFailed,
+				"run disk artifact %q does not bind its frozen Plan identity", artifact.Name)
+		}
 		seen[artifact.Name] = true
-		copyRun.Observed = append(copyRun.Observed, artifact)
+		copyRun.Observed = append(copyRun.Observed, cloneArtifact(artifact))
 	}
 	sort.Slice(copyRun.Observed, func(i, j int) bool { return copyRun.Observed[i].Name < copyRun.Observed[j].Name })
 	if len(seen) == len(required) {

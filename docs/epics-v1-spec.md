@@ -25,6 +25,10 @@ workflows; consumers verify the results with standard tooling and no NKD softwar
   carries an SLSA v1 provenance attestation describing how the bytes were produced. No reproduction or
   byte-identity claim is made anywhere in v1, and the earlier builder-profile preflight and bake-off requirements
   are relaxed for these milestones: a wrapped build's declared network and privilege are recorded, not forbidden.
+- v1 evidence remains scoped to its exact producer output. Digest-verified dependencies retain their own
+  evidence, but do not make an aggregate OS image reproducible. v1 does not consume qualified reproduction
+  evidence. A rebuilt disk with matching traced materials and inspected contents is content-validated; its exact
+  QCOW2 digest is still a new Artifact identity.
 - Verification by a consumer means `cosign verify` and `cosign verify-attestation` (provenance and, from M3,
   qualification evidence) succeed on a machine with only cosign installed, using the published signer identities
   and issuer. A Verification Policy names its acceptance scope explicitly: *artifact publication* (exact
@@ -192,6 +196,7 @@ these named outputs to the exact delivered artifacts.
   Sep 10 checkpoint), otherwise chunked, with the whole-image digest in the run record and provenance. What is
   inside the image must be inventoried against its exact delivered bytes. NKE owns the correctness and runtime
   validation of embedded software; NKD attests production and composition under the admitted evidence contract.
+  Matching dependency or inventory evidence never promotes this wrapped disk to a reproduction claim.
 - **Embedded-component declaration.** The OS image producer declares the components it embeds and NKD neither
   builds nor separately delivers (node-agent, node-side Kubernetes, control-plane images, CNI, and spire-agent
   if so decided), each with name, version and known source pin. The declaration flows into the provenance's

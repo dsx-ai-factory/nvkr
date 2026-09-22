@@ -12,7 +12,7 @@
 
 ## Context
 
-NKD turns verified artifacts into deterministic delivery artifacts: packages, images, and bootable node disks.
+NKD turns verified inputs into digest-identified delivery artifacts: packages, images, and bootable node disks.
 The disk story has a load-bearing boundary — RAW is the only canonical disk artifact. Delivery is packages-first
 and BYO-OS as the target model, while the current NKE compatibility path ships a source-owned aggregate image.
 Each named output selects its exact producers and delivery format. This ADR fixes the canonical disk model,
@@ -34,6 +34,44 @@ Exact delivery identity is separate from qualified reproduction identity. The SH
 exact delivered container bytes and the full-disk SBOM subject. An OCI manifest that carries those bytes has a
 different digest. A future qualified claim names the decoded canonical RAW identity as well; none of these
 digests may be substituted for another.
+
+Disk evidence therefore has three non-interchangeable scopes:
+
+- **Delivery identity:** hash, sign, attest, and consume the exact QCOW2 bytes produced by one Run.
+- **Content validation:** authenticate the material closure, inspect the final disk read-only, and reconcile its
+  packages and selected files with those materials. A second validated build with a different QCOW2 digest is a
+  different delivery artifact. Content validation alone does not establish qualified reproduction; that verdict
+  requires the exact decoded canonical RAW comparison.
+- **Qualified reproduction:** independently rebuild and exact-match the ADR-07/08 expectation for the decoded
+  canonical RAW subject. Matching materials or filesystem inventory cannot replace this comparison.
+
+Installer-generated timestamps, filesystem identifiers, journal state, machine identity, generated keys, and
+network-resolved packages can change logical disk bytes. Pre-staging and pinning dependencies improves
+hermeticity and auditability but does not by itself normalize those outputs. An installer-built Ubuntu disk is
+therefore pipeline-attested until recorded evidence demonstrates the qualified RAW comparison; the architecture
+must not convert content validation into a weaker `Reproduced` verdict.
+
+The public lifecycle may record that exact QCOW2 delivery identity before the qualified reproduction and
+full-disk evidence adapters exist. The process-local observer accepts only a producer-owned held regular-file
+capability, never a caller pathname or digest. It revalidates the complete Plan, resolves the unique disk root
+and successful producer outcome, checks the producer's unqualified result against the compiled instruction,
+then independently streams the held bytes to recompute exact SHA-256 and size and checks a bounded QCOW2 v2/v3
+header: signature, version, absence of backing-file references, cluster-bit range, positive virtual size,
+absence of QCOW-layer encryption, and the v3 header length. The `qcow2` format remains the compiler/producer
+declaration; this framing check is not a full decoder or compatibility verdict. The result binds the logical
+Build and Plan identities, producer, component, format, producer-declared `none` or `luks2` content encryption,
+and successful outcome. That `Encryption` field does not assert QCOW container encryption; a nonzero QCOW
+encryption method is rejected. The execution result owns and closes the held capability; observation and close
+are serialized. A held payload's streaming operation must stop and return on context cancellation before its
+lifetime permit can be released. This record is exact delivery-byte observation only. It does not decode RAW,
+inspect encrypted content, establish compatibility or qualification, construct an SBOM, or authorize publication.
+
+The observer and private scheduler population seam have controlled contract coverage, including held-file
+no-follow regular-file capture, pathname replacement, byte substitution, cancellation, duplicate-result and
+close races. The local unencrypted direct-Packer callback is connected and passes the VM driver's package-issued
+held result through that seam after capability admission. A serialized local result or caller-composed path,
+digest, or result cannot replace the in-process capability. This path has contract coverage only; no real
+Docker/Packer/NKE bake is claimed.
 
 At NKE commit `6df693a`, the [Make target](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
 produces a QCOW2 and the [hosted workflow](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)
@@ -75,6 +113,10 @@ A **pre-encryption boundary marker** is part of the `DiskManifest`. A request to
 encrypted or LUKS bytes **fails closed** with a distinct coded error: ciphertext is never hashed and mistaken for
 a reproduction. **FDE is an explicit transformation** applied *after* the canonical pre-encryption RAW digest is
 computed and attested, and the encrypted output gets its own **non-reproduction** identity.
+
+Reproduced or digest-verified plaintext inputs remain independently visible evidence, but they do not make the
+encrypted delivery bytes reproducible. Inspection of an authenticated unlocked view can establish composition;
+the ciphertext still has only its exact per-artifact delivery identity.
 
 The authoring schema can represent the current NKE `luks2` component without asserting that qualified boundary.
 The [current FDE design](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/docs/full-disk-encryption.md#L14-L34)
@@ -121,6 +163,8 @@ deployment. No provisioning bundle or node-SKU interface is retained without a s
   identity and the SBOM subject.
 - **Treat ISO as a derived envelope decoded to RAW.** Rejected — an ISO is not a block image of the RAW, so there
   is no meaningful decode-to-RAW.
+- **Treat matching package/file inventories as disk reproduction.** Rejected — semantic agreement is valuable
+  content validation but permits different bytes and cannot satisfy an exact-byte qualified claim.
 - **Make aggregate baked images the primary delivery model.** Rejected — packages-first, thin-base, BYO-OS is
   the target delivery. The current NKE aggregate disk remains an explicit compatibility output while its
   embedded components are separated into independent layers.
@@ -147,7 +191,9 @@ capture, platform fail-closed behavior, bounded block-manifest allocations, and 
 negatives. CLI and local-runner admission tests prove unsupported producer, boot, encryption, qualified-package,
 and removed staging interfaces fail before catalog, graph, input, output, or subprocess I/O, while
 existing-byte `DiskManifest` emission and ordinary unqualified development packaging remain available. Masked
-regions deliberately remain unsupported.
+regions deliberately remain unsupported. Factory/lifecycle/delivery contracts additionally cover the
+process-local exact-QCOW2 observation described above. They use a controlled producer callback and do not
+establish production VM execution, NKE disk production, full-disk evidence, compatibility, or publication.
 
 End-to-end acceptance requires real pinned `qemu` versions decoding `qcow2`, `vmdk`, and `vhd` fixtures to the
 same logical stream, a post-attestation encryption handoff, reproducible ISO and package fixtures, and a delivery

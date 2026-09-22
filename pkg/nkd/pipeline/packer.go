@@ -26,6 +26,18 @@ import (
 )
 
 const (
+	// MaxVMImagePackerInputBytes bounds the complete authenticated input carrier
+	// consumed by direct-Packer execution. The exact carrier includes source,
+	// materials, manifest, runtime configuration, and archive overhead and is
+	// measured before Docker creates a volume or container.
+	MaxVMImagePackerInputBytes int64 = transportarchive.MaxArchiveBytes
+	// packerInputCarrierReserveBytes leaves room for the outer Docker-copy tar's
+	// one regular-file header, block padding, end markers, and future standard
+	// library tar metadata. Both the authenticated inner closure and its outer
+	// carrier are still measured before Docker creates mutable state.
+	packerInputCarrierReserveBytes int64 = 1 << 20
+	maxPackerInputClosureBytes           = MaxVMImagePackerInputBytes - packerInputCarrierReserveBytes
+
 	maxPackerExecutableBytes       int64 = 512 << 20
 	maxPackerHostToolBytes         int64 = 512 << 20
 	maxPackerHostToolClosureBytes  int64 = 4 << 30
@@ -34,8 +46,8 @@ const (
 	maxPackerPluginClosureBytes    int64 = 4 << 30
 	maxPackerPluginFiles                 = 256
 	maxPackerManifestBytes         int64 = 64 << 20
-	maxPackerMaterialBytes         int64 = 64 << 30
-	maxPackerMaterialTotalBytes    int64 = 128 << 30
+	maxPackerMaterialBytes               = MaxVMImagePackerInputBytes
+	maxPackerMaterialTotalBytes          = MaxVMImagePackerInputBytes
 	maxPackerMaterialFiles               = 256
 	maxPackerBuildNameBytes              = 256
 	maxPackerPathBytes                   = 4096
@@ -76,8 +88,9 @@ type packerFileSnapshot struct {
 // material bytes made visible to Packer. Callers cannot construct it from paths
 // or digest strings.
 type stagedPackerInputs struct {
-	root  string
-	files []packerFileSnapshot
+	root               string
+	files              []packerFileSnapshot
+	inputArchiveDigest string
 }
 
 func (inputs *stagedPackerInputs) verify(ctx context.Context) error {
@@ -228,20 +241,63 @@ type PackerBuildRequest struct {
 
 	ArchitectureVariable string
 	Architecture         string
+	AcceleratorVariable  string
+	Accelerator          string
 
 	MaterialManifestVariable string
 	MaterialManifestPath     string
 	MaterialManifestSHA256   string
 	Materials                []PackerMaterialInput
 
-	OutputDirectoryVariable string
-	OutputParent            string
+	OutputDirectoryVariable   string
+	OutputParent              string
+	BuildLogDirectoryVariable string
+	HTTPDirectoryVariable     string
+	SSHPrivateKeyVariable     string
+	SSHPublicKeyVariable      string
 
 	Variables    []PackerVariable
 	ArtifactPath string
 	Timeout      time.Duration
 	Stdout       io.Writer
 	Stderr       io.Writer
+}
+
+// packerBuildContract is the driver-independent invocation shape shared by
+// held-host and containerized Packer. Runtime-only fields such as host output
+// directories and deadlines stay with the driver that owns them.
+type packerBuildContract struct {
+	projectPath               string
+	buildName                 string
+	architectureVariable      string
+	architecture              string
+	acceleratorVariable       string
+	accelerator               string
+	materialManifestVariable  string
+	materialManifestPath      string
+	materialManifestSHA256    string
+	materials                 []PackerMaterialInput
+	outputDirectoryVariable   string
+	buildLogDirectoryVariable string
+	httpDirectoryVariable     string
+	sshPrivateKeyVariable     string
+	sshPublicKeyVariable      string
+	variables                 []PackerVariable
+	artifactPath              string
+}
+
+func packerContractFromBuildRequest(request PackerBuildRequest) packerBuildContract {
+	return packerBuildContract{
+		projectPath: request.ProjectPath, buildName: request.BuildName,
+		architectureVariable: request.ArchitectureVariable, architecture: request.Architecture,
+		acceleratorVariable: request.AcceleratorVariable, accelerator: request.Accelerator,
+		materialManifestVariable: request.MaterialManifestVariable,
+		materialManifestPath:     request.MaterialManifestPath, materialManifestSHA256: request.MaterialManifestSHA256,
+		materials: request.Materials, outputDirectoryVariable: request.OutputDirectoryVariable,
+		buildLogDirectoryVariable: request.BuildLogDirectoryVariable, httpDirectoryVariable: request.HTTPDirectoryVariable,
+		sshPrivateKeyVariable: request.SSHPrivateKeyVariable, sshPublicKeyVariable: request.SSHPublicKeyVariable,
+		variables: request.Variables, artifactPath: request.ArtifactPath,
+	}
 }
 
 // PackerArtifact owns the exact regular-file inode collected from the private
@@ -445,13 +501,30 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	if err := os.WriteFile(configPath, []byte("{}\n"), 0o400); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "creating empty private Packer configuration")
 	}
-
 	bindings := append([]PackerVariable(nil), request.Variables...)
 	bindings = append(bindings,
-		PackerVariable{Name: request.ArchitectureVariable, Value: request.Architecture},
 		PackerVariable{Name: request.MaterialManifestVariable, Value: manifestPath},
 		PackerVariable{Name: request.OutputDirectoryVariable, Value: outputDir},
 	)
+	attemptDirectories := []struct {
+		name string
+		path string
+	}{
+		{request.BuildLogDirectoryVariable, filepath.Join(runRoot, "logs")},
+		{request.HTTPDirectoryVariable, filepath.Join(runRoot, "http")},
+	}
+	for _, directory := range attemptDirectories {
+		if directory.name == "" {
+			continue
+		}
+		if err := os.MkdirAll(directory.path, 0o700); err != nil {
+			return nil, e.Wrap(e.CodeBuildFailed, err, "creating private Packer attempt directory")
+		}
+		bindings = append(bindings, PackerVariable{Name: directory.name, Value: directory.path})
+	}
+	bindings = append(bindings,
+		PackerVariable{Name: request.ArchitectureVariable, Value: request.Architecture},
+		PackerVariable{Name: request.AcceleratorVariable, Value: request.Accelerator})
 	sort.Slice(bindings, func(i, j int) bool { return bindings[i].Name < bindings[j].Name })
 	variableArgs := make([]string, 0, len(bindings)*2)
 	for _, binding := range bindings {
@@ -962,30 +1035,45 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 	if _, err := requireCleanAbsoluteDirectory(request.OutputParent, "Packer output parent"); err != nil {
 		return err
 	}
-	if !validPackerProjectPath(request.ProjectPath) {
+	return validatePackerBuildContract(packerContractFromBuildRequest(request), false)
+}
+
+func validatePackerBuildContract(contract packerBuildContract, allowSSHKeyPaths bool) error {
+	if !validPackerProjectPath(contract.projectPath) {
 		return e.New(e.CodeInvalidCatalog, "Packer project path must be clean and relative to authenticated source")
 	}
-	if !validPackerTransport(request.BuildName, maxPackerBuildNameBytes, false) ||
-		strings.ContainsAny(request.BuildName, ",*?[]\\") {
+	if !validPackerTransport(contract.buildName, maxPackerBuildNameBytes, false) ||
+		strings.ContainsAny(contract.buildName, ",*?[]\\") {
 		return e.New(e.CodeInvalidCatalog, "Packer build name must select one exact build")
 	}
-	if !validPackerTransport(request.Architecture, packertransport.MaxVariableValueBytes, false) {
+	if !validPackerTransport(contract.architecture, packertransport.MaxVariableValueBytes, false) {
 		return e.New(e.CodeInvalidCatalog, "Packer architecture value is not transport-safe")
 	}
-	if !canonical.IsDigest(request.MaterialManifestSHA256) {
+	if (contract.sshPrivateKeyVariable == "") != (contract.sshPublicKeyVariable == "") {
+		return e.New(e.CodeInvalidCatalog,
+			"Packer requires both SSH key variable names or neither")
+	}
+	if contract.sshPrivateKeyVariable != "" && !allowSSHKeyPaths {
+		return e.New(e.CodeEngineCapability,
+			"host Packer cannot realize attempt-local SSH key path variables")
+	}
+	if contract.accelerator != "kvm" && contract.accelerator != "tcg" {
+		return e.New(e.CodeInvalidCatalog, "Packer accelerator must be selected by VM runtime admission")
+	}
+	if !canonical.IsDigest(contract.materialManifestSHA256) {
 		return e.New(e.CodeUnpinnedInput, "Packer material manifest requires an exact lowercase sha256 digest")
 	}
-	if !validCleanAbsolutePath(request.MaterialManifestPath) {
+	if !validCleanAbsolutePath(contract.materialManifestPath) {
 		return e.New(e.CodeInvalidCatalog, "Packer material manifest path must be clean and absolute")
 	}
-	if len(request.Materials) > maxPackerMaterialFiles {
+	if len(contract.materials) > maxPackerMaterialFiles {
 		return e.New(e.CodeInvalidCatalog,
-			"Packer build has %d materials, exceeding the %d-file bound", len(request.Materials), maxPackerMaterialFiles)
+			"Packer build has %d materials, exceeding the %d-file bound", len(contract.materials), maxPackerMaterialFiles)
 	}
-	materialPaths := make(map[string]bool, len(request.Materials))
-	orderedMaterialPaths := make([]string, 0, len(request.Materials))
+	materialPaths := make(map[string]bool, len(contract.materials))
+	orderedMaterialPaths := make([]string, 0, len(contract.materials))
 	var materialBytes int64
-	for _, material := range request.Materials {
+	for _, material := range contract.materials {
 		if !validPackerRelativePath(material.Path) || material.Path == "material-manifest.json" {
 			return e.New(e.CodeInvalidCatalog,
 				"Packer material path %q is not a usable manifest-relative path", material.Path)
@@ -1020,15 +1108,26 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 			}
 		}
 	}
-	if !validPackerRelativePath(request.ArtifactPath) {
+	if !validPackerRelativePath(contract.artifactPath) {
 		return e.New(e.CodeInvalidCatalog, "Packer artifact path must be clean and relative to its private output directory")
 	}
 	reserved := []string{
-		request.ArchitectureVariable,
-		request.MaterialManifestVariable,
-		request.OutputDirectoryVariable,
+		contract.architectureVariable,
+		contract.acceleratorVariable,
+		contract.materialManifestVariable,
+		contract.outputDirectoryVariable,
 	}
-	if err := packertransport.ValidateVariables(reserved, request.Variables); err != nil {
+	for _, optional := range []string{
+		contract.buildLogDirectoryVariable,
+		contract.httpDirectoryVariable,
+		contract.sshPrivateKeyVariable,
+		contract.sshPublicKeyVariable,
+	} {
+		if optional != "" {
+			reserved = append(reserved, optional)
+		}
+	}
+	if err := packertransport.ValidateVariables(reserved, contract.variables); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "validating Packer variable transport")
 	}
 	return nil

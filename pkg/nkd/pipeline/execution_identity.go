@@ -66,14 +66,19 @@ type heldRuntimeExecutable struct {
 	capability  *heldfile.File
 	endpoint    string
 	environment []string
+	identity    string
 }
 
 func (runtime *heldRuntimeExecutable) run(ctx context.Context, stdout, stderr io.Writer, args ...string) error {
+	return runtime.runIO(ctx, nil, stdout, stderr, args...)
+}
+
+func (runtime *heldRuntimeExecutable) runIO(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
 	if runtime == nil || runtime.capability == nil || runtime.capability.OSFile() == nil {
 		return e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
 	}
 	return heldfile.RunContext(ctx, runtime.capability, args, heldfile.RunOptions{
-		Stdout: stdout, Stderr: stderr,
+		Stdin: stdin, Stdout: stdout, Stderr: stderr,
 		Env: append([]string(nil), runtime.environment...),
 	})
 }
@@ -412,6 +417,9 @@ func qualifySelectedExecution(ctx context.Context, request *QualifiedExecution, 
 	if err := receipt.RequireFor(ctx, profileSnapshot, nodeSnapshot); err != nil {
 		cleanup()
 		return nil, runtimeBinary, err
+	}
+	if runtimeSnapshot != nil {
+		runtimeSnapshot.identity = observed.RuntimeIdentity
 	}
 	return &verifiedExecution{
 		profile: profileSnapshot, receipt: receipt, nodes: nodeSnapshot,

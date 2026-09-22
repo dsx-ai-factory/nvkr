@@ -75,7 +75,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 		artifacts[artifact.ID] = artifact
 	}
 	member, outer, result := artifacts["package/nkectl"], artifacts["package/release"], artifacts["result/nkectl/nkectl"]
-	payloadPath := filepath.Join(caseRoot, "nkectl")
+	payloadPath := local(artifacts["artifact/nkectl/nkectl"].Path)
 	payload := []byte("synthetic hosted output")
 	if err := os.MkdirAll(filepath.Dir(payloadPath), 0o700); err != nil {
 		t.Fatal(err)

@@ -146,9 +146,9 @@ func (policy CheckpointPolicy) authorizes(signer, issuer string) bool {
 	return index < len(policy.authorizedSigners) && policy.authorizedSigners[index] == signer
 }
 
-// HighWaterMark is the authenticated local trust-state minimum for one target and
-// authority. The module validates structure and monotonic use; authenticating the
-// persisted local policy that supplies this value remains the root adapter's job.
+// HighWaterMark is the local trust-policy minimum for one target and authority.
+// NewHighWaterMark admits policy-pinned values for in-memory verification;
+// AcceptDiagnosticCheckpoint owns protected storage and durable monotonic updates.
 type HighWaterMark struct {
 	valid      bool
 	target     string
@@ -211,9 +211,8 @@ func VerifyCheckpoint(ctx context.Context, request CheckpointRequest) (Checkpoin
 	if err := statusContextErr(ctx); err != nil {
 		return CheckpointReceipt{}, err
 	}
-	if !request.Policy.valid || !isDigest(request.Policy.target) || request.Policy.authority == "" || request.Policy.issuer == "" ||
-		len(request.Policy.authorizedSigners) == 0 || !isDigest(request.Policy.binding) {
-		return CheckpointReceipt{}, e.New(e.CodeTrustPolicyMissing, "status checkpoint policy is absent or invalid")
+	if err := request.Policy.validate(); err != nil {
+		return CheckpointReceipt{}, err
 	}
 	if err := request.HighWater.validate(); err != nil {
 		return CheckpointReceipt{}, err
@@ -308,6 +307,14 @@ func VerifyCheckpoint(ctx context.Context, request CheckpointRequest) (Checkpoin
 		checkpointCanonicalPayload: authenticated.canonicalPayload, policyBinding: request.Policy.binding,
 		asOfEpoch: request.AsOf.epoch, declarations: append([]VerifiedDeclaration(nil), accepted...),
 	}, nil
+}
+
+func (policy CheckpointPolicy) validate() error {
+	if !policy.valid || !isDigest(policy.target) || policy.authority == "" || policy.issuer == "" ||
+		len(policy.authorizedSigners) == 0 || !isDigest(policy.binding) {
+		return e.New(e.CodeTrustPolicyMissing, "status checkpoint policy is absent or invalid")
+	}
+	return nil
 }
 
 type authenticatedCheckpoint struct {

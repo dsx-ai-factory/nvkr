@@ -14,7 +14,8 @@
 
 ## Context
 
-Reproducibility is NKD’s load-bearing claim, so it must be **demonstrated, not asserted**. The SRD calls for a
+Qualified reproducibility is an NKD load-bearing claim, so it must be **demonstrated, not asserted** for each
+subject that receives it. The SRD calls for a
 two-environment bit-identity gate. This ADR settles *whose* gate that is and *what it proves*, defines the
 protocol, specifies how empirical evidence graduates a builder-profile attribute from advisory to fail-closed
 (the hook ADR-07 depends on), and confirms the discipline is builder-agnostic — it covers `nix` as well as
@@ -35,7 +36,8 @@ low without weakening the guarantee.
 
 - **Emit / compare split.** Each environment independently produces an expected-digests record; a separate
   compare step asserts bit-identity and, on divergence, **names the first divergent component** with per-block
-  and per-path granularity from the evidence bundle.
+  and per-path granularity from the evidence bundle. The compared subject set is explicit. Reproducing a subset
+  does not reproduce an aggregate or an omitted output that consumes that subset.
 - **Environment isolation.** Per-build environment settings are scoped to that build. Nothing mutates the process
   environment globally during a bake-off, so parallel builds cannot interfere and the varied host facts are the
   only intended difference.
@@ -82,6 +84,11 @@ Reproducibility across environments requires the *inputs* to be byte-identical, 
 The v1 lane makes no byte-identity claim and does not require a two-machine bake-off. In particular, wrapped
 builds use the ADR-10 production contract without this emit/compare gate. The absence of a bake-off can never
 be presented as a qualified result or as evidence for graduating profile attributes.
+
+For an installer-built OS image, authenticating the same inputs and reconciling a read-only disk inspection with
+those inputs is a **content-validated rebuild**. It remains pipeline-attested unless the exact qualified disk
+subject defined by ADR-14 independently passes this bake-off. Content equivalence, package-set equality, SBOM
+agreement, boot success, and dependency identity are not alternate reproduction verdicts.
 
 ## Consequences
 

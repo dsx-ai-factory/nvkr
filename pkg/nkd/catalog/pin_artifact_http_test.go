@@ -1,4 +1,4 @@
-package main
+package catalog
 
 import (
 	"context"
@@ -9,12 +9,11 @@ import (
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 func TestBinaryPinningSidecarAndFallback(t *testing.T) {
 	const payload = "downloaded binary fixture"
-	want := pipeline.FileDigest([]byte(payload))
+	want := pinFixtureDigest(payload)
 	for _, tc := range []struct {
 		name, sidecar string
 		status        int
@@ -84,14 +83,14 @@ func TestCatalogHTTPReadsAreBoundedAndFailClosed(t *testing.T) {
 			body, bodyErr := httpGetBody(context.Background(), server.URL, 4)
 			digest, digestErr := httpSHA256(context.Background(), server.URL, 4)
 			if tc.code != "" {
-				assertLifecycleCommandCode(t, bodyErr, tc.code)
-				assertLifecycleCommandCode(t, digestErr, tc.code)
+				assertCatalogContractCode(t, bodyErr, tc.code)
+				assertCatalogContractCode(t, digestErr, tc.code)
 				if len(body) != 0 || digest != "" {
 					t.Fatal("failed read exposed partial data")
 				}
 				return
 			}
-			if bodyErr != nil || digestErr != nil || string(body) != tc.body || digest != pipeline.FileDigest([]byte(tc.body)) {
+			if bodyErr != nil || digestErr != nil || string(body) != tc.body || digest != pinFixtureDigest(tc.body) {
 				t.Fatalf("body %q (%v), digest %q (%v)", body, bodyErr, digest, digestErr)
 			}
 		})
@@ -99,7 +98,7 @@ func TestCatalogHTTPReadsAreBoundedAndFailClosed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := resolveBinaryDigest(ctx, "http://must-not-be-contacted.invalid/binary")
-	assertLifecycleCommandCode(t, err, e.CodeTimeout)
+	assertCatalogContractCode(t, err, e.CodeTimeout)
 	_, err = httpGetBody(context.Background(), ":bad url", 4)
-	assertLifecycleCommandCode(t, err, e.CodeFetchFailed)
+	assertCatalogContractCode(t, err, e.CodeFetchFailed)
 }

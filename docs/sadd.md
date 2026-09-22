@@ -2,7 +2,7 @@
 
 ## PLC-L1: Basic PLC: Software Architecture and Design Document
 
-- **Revision:** 2026-09-18 — consolidated compilation and publication ownership
+- **Revision:** 2026-09-21 — subject-scoped reproduction and aggregate disk evidence
 - **Status:** Draft; ADR-01 through ADR-22 pending named-decider ratification
 - **Review scope:** shared definition architecture, v1 artifact delivery, and the separate qualified release contract
 
@@ -35,7 +35,7 @@ separate acceptance decisions:
 | Concern | v1 delivery — `pipeline-attested` | Qualified release — `qualified` |
 |---|---|---|
 | Producer and consumer | NVIDIA's hosted workflow produces artifacts; consumers verify the published digest | Publisher provides signed expected identities; an operator reproduces and verifies in its own environment |
-| Claim | Production by a named workflow with signed SLSA v1 production provenance; ADR-16 §5 targets SLSA Build L2 | Exact-byte reproduction within a signed builder profile, supported by authenticated execution observations |
+| Claim | Production by a named workflow with signed SLSA v1 production provenance; ADR-16 §5 targets SLSA Build L2 | Exact-byte reproduction of each named claim subject within a signed builder profile, supported by authenticated execution observations |
 | Execution | GitHub-hosted amd64 runners; declared hermetic, wrapped, or acquired source lane | Profile-bounded execution with authenticated runtime and terminal receipts; unsupported providers fail closed |
 | Publication | Signed artifact bytes in OCI; planned build/evidence qualification and release manifest | Operator-owned publication of a complete cleared release through the Publication Root protocol |
 | Consumer policy | Keyless build identity and issuer; separate qualification identity for the planned M3 gate | Trusted roles, reproduction, compatibility, conformance, evidence, policy, and fresh status |
@@ -126,6 +126,9 @@ These remain typed and inspectable. Normal callers do not construct and connect 
 
 Source lane describes how bytes were obtained: `hermetic-build`, `wrapped-build`, or `acquired`. Evidence tier
 describes the claim attached to those bytes. Neither is a synonym for artifact format or release status.
+Evidence is subject-scoped: an independently reproduced component, an exact digest-verified acquisition, and a
+content-validated aggregate may coexist in one build graph without collapsing into one verdict. Stronger input
+evidence remains visible but never upgrades the aggregate that consumed it.
 
 ## References {#references}
 
@@ -250,11 +253,16 @@ classification is required. The catalog's `vm-image` builder capability binds th
 exact source-owned command or Packer project, build name, and variable bindings, the artifact path, and a complete
 generic build-runner request with resources, eligible host platform, KVM policy, and timeout. Required KVM needs
 an eligible host with the resolved guest architecture; VM toolchain pins require an exact entry for the eligible
-host platform, whose selection is part of Build identity. The NKE OS producer owns its embedded contents. Compiler-only IR/Plan lowering binds
-the exact source and material producers and projects the root QCOW2 without binary-bundle packaging. VM
-execution and disk-specific observation remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
+host platform, whose selection is part of Build identity. The NKE OS producer owns its embedded contents. IR/Plan lowering binds
+the exact source and material producers and projects the root QCOW2 without binary-bundle packaging.
+A process-local held-QCOW2 observer has contract coverage for exact delivery bytes and producer/Plan bindings;
+it grants no execution authority or qualified reproduction verdict. Production VM execution and held-result
+population remain capability-gated; direct producer selection does not introduce independently built OS layers. Before
 disk delivery is admitted, ADR-13 also requires a full inventory reconciling traced materials with read-only
 inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
+It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
+material identities and inspected contents establish a controlled, content-validated rebuild. Only an
+independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
 
 Each AICR output selects its own typed bundle settings. The compiler normalizes effective defaults, binds them
 to build identity, and passes those exact settings to the renderer. Removing deployment topology cannot silently
@@ -299,16 +307,16 @@ in reconciliation; a facade alone does not discharge that debt.
 
 | Responsibility | Owning modules under `pkg/nkd` | Boundary |
 |---|---|---|
-| Canonical identity and resolution | `canonical`, `ir`, `target`, `catalog`, `buildgraph` | Authenticate and normalize inputs into deterministic logical identities |
+| Canonical identity and resolution | `canonical`, `ir`, `target`, `catalog`, `buildgraph` | Authenticate and normalize inputs into deterministic logical identities; catalog owns source/artifact pin maintenance and its lock transaction |
 | Execution requirements | `execution` | Own reusable per-step runner request shape; grant no runner capability |
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
-| Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction |
+| Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
 | Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
-| Release authority and durable status | `release`, `status` | Authorization, freshness, durable publication/activation contracts |
+| Release authority and durable status | `release`, `status` | Status owns diagnostic checkpoint acceptance and high-water persistence; qualified release authorization, trusted time and publication remain deferred |
 | External rendering | `aicr` | Typed output settings and exact pinned external AICR execution |
 | Public adaptation | `errors`; `client/v1` and `cmd/nkdctl` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
 
@@ -515,6 +523,9 @@ can authenticate their retained documents and status checkpoints without authori
 The publisher creates a signed ValidationVector of expected identities. The operator admits the signed builder
 profile, materializes exact inputs, executes through authenticated runtime boundaries, and independently compares
 outputs. Reproduction provenance is deterministic and remains separate from v1 production provenance.
+The comparison is per exact subject. A reproduced package remains useful evidence when consumed by a wrapped
+disk build, but it cannot reproduce the disk by transitivity. A disk rebuilt from the same authenticated closure
+with a matching package/file inventory is content-validated, not evidence of exact-byte reproduction.
 
 ```mermaid
 flowchart TB
@@ -538,6 +549,9 @@ logical bytes define qualified-reproduction identity. These digests are separate
 another; authenticated evidence binds the delivery envelope to its decoded representation. Encryption creates a
 distinct identity outside pre-encryption reproduction (ADR-14). Variance classification cannot currently
 authorize release. Nix is a selected qualified builder design, but its execution capability is unavailable.
+Installer-generated filesystem state and network-resolved inputs keep an Ubuntu aggregate in the
+pipeline-attested lane unless a recorded bake-off proves the canonical RAW comparison. Hermetic inputs alone do
+not prove deterministic output.
 
 Accepted artifact references can be consumed by a downstream deployer. NKD does not generate a cluster
 realization or define a cluster qualification protocol. Deployment descriptions and runtime validation belong
@@ -765,15 +779,41 @@ name, and records the complete selected binding in the full IR and Plan. Plan va
 from the exact Environment inventory, so a substituted class, capability resolution, or route is pipeline drift.
 These planning declarations affect Environment and Plan identity but remain outside build identity.
 
-Execution classes are not runtime evidence. Current local and hosted adapters still reject selected builds
-carrying requirements before work or emitted output. The execution owner has a process-local Linux diagnostic
-helper that observes host platform, CPU affinity, free host memory, available capacity relative to the executor's
-held workspace directory, and KVM exposure. Descriptor duplication is lifetime-protected, write and traversal
-access is checked, and every retained handle is closed before return. The helper accepts no execution request or
-selected binding, does not authenticate Environment membership or selection, and grants no execution authority.
-Authenticated runtime admission and provider allocation, deadline enforcement, adapter integration, and VM
-topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege,
-nested virtualization, NUMA, accelerators, and provider-specific lowering remain deferred.
+Execution classes are not runtime evidence. The execution owner has both a process-local Linux diagnostic helper
+and a narrower local VM admission primitive. The diagnostic helper observes host platform, cgroup-v2-capped CPU
+and memory, available capacity relative to the executor's held workspace directory, and KVM exposure without
+accepting a request or granting authority. Local VM admission additionally binds the exact current Plan bytes and
+one VM node, its compiler-selected request and execution binding, and the current observation. CPU capacity is
+capped by process affinity and complete cgroup-v2 ancestry; memory is capped by host availability and complete
+cgroup-v2 headroom. It retains the workspace directory and any selected KVM device for one deadline-scoped
+callback, re-observes mutable capacity immediately before work, rejects class, resource, platform, or KVM
+availability mismatch, withholds the KVM handle for a disabled resolution, and closes every retained or borrowed
+handle on completion.
+
+The local direct-Packer driver consumes that capability for unencrypted VM-image producers. Its run-owned resolver
+binds the full Plan subject, producer session, local runtime/daemon and already-local digest-pinned OCI toolchain
+before workspace mutation. Inside the admitted callback it authenticates one bounded input tar, uses only Docker
+named volumes, mounts consumer inputs read-only, fixes environment/hostname/user, disables network, image pulls and
+`packer init`, validates the exact selector, builds it once and returns one held QCOW2. A one-shot root container
+with only `CAP_CHOWN` bootstraps the two fresh attempt volumes to the host UID/GID; every consumer operation runs as
+that host identity. Bounded in-process cleanup owns ordinary completion and cancellation; authenticated
+cross-process orphan recovery after a hard process or host failure remains deferred. Command/Make, encrypted-disk,
+hosted and qualified VM adapters remain closed.
+
+The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
+Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,
+network-none mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
+hosted or qualified identity boundary. Those lanes require an authenticated subordinate identity, user namespace
+or stronger provider sandbox plus recorded interoperability evidence.
+
+The local capability and driver result are unqualified current-availability evidence, not authenticated provider
+allocation, reservation, pipeline attestation or qualification evidence. Holding a validated KVM descriptor proves
+availability through the callback lifetime; it does not prove that Packer or QEMU consumed that exact descriptor.
+The driver enforces whether the selected device is exposed but does not promote that into consumption proof. No
+real Docker/Packer/NKE bake has yet established external interoperability. Hosted admission, provider proof, and VM
+topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
+the scoped ownership bootstrap, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
+deferred.
 Produced-artifact size remains an artifact and transport budget.
 
 ### High Availability {#high-availability}

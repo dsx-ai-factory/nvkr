@@ -51,7 +51,8 @@ _Avoid_: Container image, builder type, running node
 **Aggregate OS producer**:
 A catalog producer that emits one baked disk containing several stack layers. Embedded components retain
 their own material identities and evidence relationships; one disk does not establish independent production
-or verification of those layers. Compiler-only disk lowering grants no execution or evidence capability.
+or verification of those layers. Reproduced or digest-verified inputs do not establish exact-byte reproduction
+for the aggregate disk. Compiler-only disk lowering grants no execution or evidence capability.
 _Avoid_: Independent layer outputs, qualified release evidence
 
 **Required output slot**:
@@ -104,6 +105,21 @@ _Avoid_: Parsed document, caller-set verified flag, digest string
 **Reproduction expectations**:
 Publisher-owned signed expected artifact identities against which an independent reproduction is compared; the legacy wire record is the ValidationVector.
 _Avoid_: Reproduction observation, generic validation result
+
+**Producer evidence scope**:
+The evidence-supported statement for one exact producer output. A from-source output may carry independently
+demonstrated exact-byte reproduction evidence; a byte-preserving acquisition may be checked against its pinned
+digest without making an upstream build claim; and a non-reproducible producer may be rebuilt with authenticated
+dependencies and have its resulting contents inspected. The last case is content validation, not a `Reproduced`
+verdict. These are claim scopes, not a new public object or caller-selected wire enum.
+_Avoid_: Source lane, aggregate release verdict, caller assertion
+
+**Aggregate evidence floor**:
+The rule that an aggregate artifact cannot inherit a stronger claim from its inputs. Component evidence remains
+individually inspectable, but a wrapped or merely content-validated root keeps the aggregate output in the
+pipeline-attested lane. Exact delivery identity, material equality, SBOM agreement, and content validation do
+not substitute for an independent exact-byte reproduction of the aggregate claim subject.
+_Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
@@ -180,12 +196,20 @@ Plan validation recomputes the selection from the Environment inventory; the bin
 _Avoid_: Runtime proof, authored requirement, mutable runner label
 
 **Local host observation**:
-Point-in-time diagnostic Linux facts about host platform, process CPU affinity, free host memory, available
-workspace capacity, and KVM exposure. Observation is relative to the executor's already-open workspace-directory
+Point-in-time diagnostic Linux facts about host platform, cgroup-v2-capped CPU and memory, available workspace
+capacity, and KVM exposure. Observation is relative to the executor's already-open workspace-directory
 capability; the observer lifetime-protects its duplicate, checks write and traversal access, and closes every
 retained handle before returning. It does not accept execution requirements or a selected binding, authenticate
 Environment membership, own an execution deadline, reserve resources, or authorize work.
 _Avoid_: Execution admission, runtime proof, execution class, provider attestation, resource reservation
+
+**Local VM admission**:
+An opaque, single-use, same-process capability binding the exact current Plan bytes and one selected VM build,
+its execution request and binding, cgroup-capped Linux host observations, and retained workspace/KVM handles.
+Capacity is re-observed inside the authored callback deadline immediately before work. It is current-availability
+authority for the local VM adapter only, not provider allocation, resource reservation, qualification evidence,
+or proof that a subprocess consumed the held KVM descriptor.
+_Avoid_: Serialized receipt, hosted-runner attestation, resource reservation, KVM-consumption evidence
 
 **VM-image producer form**:
 The catalog-selected invocation contract within a VM-image component: either an exact command argument vector or

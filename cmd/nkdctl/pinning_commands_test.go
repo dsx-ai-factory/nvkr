@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,7 +15,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
-func TestCatalogPinAndBumpPreserveExactLockState(t *testing.T) {
+func TestCatalogSourcePinCommandOutput(t *testing.T) {
 	repo, data := t.TempDir(), t.TempDir()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
@@ -41,7 +39,6 @@ func TestCatalogPinAndBumpPreserveExactLockState(t *testing.T) {
 	git("-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "fixture")
 	git("tag", "v1.0.0")
 	git("tag", "v1.1.0")
-	commit := git("rev-parse", "HEAD")
 	registry := "apiVersion: nkd.dev/catalog/v3\nkind: SourceBuildRegistry\nsources:\n  source: {repo: https://example.invalid/pin-source, constraint: 1.x}\ncomponents:\n  excluded: {platforms: [linux/amd64], fromSource: false, exclusionReason: fixture}\n"
 	if err := os.WriteFile(filepath.Join(data, catalog.RegistryFile), []byte(registry), 0o600); err != nil {
 		t.Fatal(err)
@@ -61,13 +58,6 @@ func TestCatalogPinAndBumpPreserveExactLockState(t *testing.T) {
 	if _, err := invoke("pin", "--dir", data, "--tag", "v1.0.0", "source"); err != nil {
 		t.Fatal(err)
 	}
-	lock, err := catalog.LoadLockContext(context.Background(), data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lock.Pins["source"].Commit != commit || lock.Pins["source"].Tag != "v1.0.0" {
-		t.Fatalf("lock = %+v", lock.Pins)
-	}
 	before := readLock()
 	out, err := invoke("bump", "--dir", data, "--all", "--check")
 	assertLifecycleCommandCode(t, err, e.CodeDiff)
@@ -77,36 +67,14 @@ func TestCatalogPinAndBumpPreserveExactLockState(t *testing.T) {
 	if _, err := invoke("bump", "--dir", data, "source"); err != nil {
 		t.Fatal(err)
 	}
-	lock, err = catalog.LoadLockContext(context.Background(), data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lock.Pins["source"].Tag != "v1.1.0" {
-		t.Fatalf("bump selected %q", lock.Pins["source"].Tag)
-	}
 	before = readLock()
 	out, err = invoke("pin", "--dir", data, "source")
 	if err != nil || !strings.Contains(string(out), "no changes") || !bytes.Equal(before, readLock()) {
 		t.Fatalf("unchanged pin: %s, %v", out, err)
 	}
-	for _, tc := range []struct {
-		args []string
-		code e.Code
-	}{
-		{[]string{"pin", "--dir", data}, e.CodeUnsupported},
-		{[]string{"bump", "--dir", data}, e.CodeUnsupported},
-		{[]string{"pin", "--dir", data, "absent"}, e.CodeInvalidCatalog},
-		{[]string{"pin", "--dir", data, "--tag", "missing", "source"}, e.CodeFetchFailed},
-	} {
-		_, err := invoke(tc.args...)
-		assertLifecycleCommandCode(t, err, tc.code)
-		if !bytes.Equal(before, readLock()) {
-			t.Fatal("rejected pin changed lock")
-		}
-	}
 }
 
-func TestCatalogPinArtifactsUpdatesAndPreservesUnchangedDigests(t *testing.T) {
+func TestCatalogArtifactPinCommandOutput(t *testing.T) {
 	const payload = "new binary payload"
 	want := pipeline.FileDigest([]byte(payload))
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -126,14 +94,6 @@ func TestCatalogPinArtifactsUpdatesAndPreservesUnchangedDigests(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		lock, err := catalog.LoadLockContext(t.Context(), data)
-		if err != nil {
-			t.Fatal(err)
-		}
-		pin := lock.Artifacts["tool"]
-		if pin.Tag != "v1.2.3" || len(pin.Digests) != 2 || pin.Digests["amd64"] != want || pin.Digests["arm64"] != want {
-			t.Fatalf("artifact pin = %+v", pin)
-		}
 		if selection[0] == "tool" && !strings.Contains(string(out), "no changes") {
 			t.Fatalf("unchanged pin: %s", out)
 		}
@@ -142,43 +102,19 @@ func TestCatalogPinArtifactsUpdatesAndPreservesUnchangedDigests(t *testing.T) {
 	assertLifecycleCommandCode(t, err, e.CodeUnsupported)
 }
 
-func TestCatalogPinArtifactsRejectsSelectionBeforeNetwork(t *testing.T) {
-	for _, test := range []struct {
-		name string
-		args []string
-		code e.Code
-	}{
-		{"architecture subset", []string{"--arch", "amd64", "tool"}, e.CodeUsage},
-		{"duplicate architecture", []string{"--arch", "amd64,arm64,arm64", "tool"}, e.CodeUsage},
-		{"unsupported architecture", []string{"--arch", "amd64,s390x", "tool"}, e.CodeUsage},
-		{"unknown producer", []string{"tool", "absent"}, e.CodeInvalidCatalog},
-		{"unknown with all", []string{"--all", "absent"}, e.CodeInvalidCatalog},
-		{"duplicate producer", []string{"tool", "tool"}, e.CodeUsage},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			data := acquisitionCatalogFixture(t, "https://must-not-be-contacted.invalid/tool-{{.Arch}}", "sha256:"+strings.Repeat("a", 64))
-			lockPath := filepath.Join(data, catalog.LockFile)
-			before, err := os.ReadFile(lockPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			calls := 0
-			original := http.DefaultTransport
-			http.DefaultTransport = roundTripFunc(func(*http.Request) (*http.Response, error) {
-				calls++
-				return nil, fmt.Errorf("network must not be reached")
-			})
-			t.Cleanup(func() { http.DefaultTransport = original })
-			args := append([]string{"nkdctl", "catalog", "pin-artifacts", "--dir", data}, test.args...)
-			output, err := runCLIWithCapturedStdout(t, newApp(), args...)
-			assertLifecycleCommandCode(t, err, test.code)
-			after, err := os.ReadFile(lockPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if calls != 0 || len(output) != 0 || !bytes.Equal(before, after) {
-				t.Fatalf("rejected pin selection caused work: requests=%d, output=%q, lock changed=%v", calls, output, !bytes.Equal(before, after))
-			}
-		})
+func TestCatalogArtifactPinCommandRejectsArchitectureSubset(t *testing.T) {
+	data := acquisitionCatalogFixture(t, "https://must-not-be-contacted.invalid/tool-{{.Arch}}", "sha256:"+strings.Repeat("a", 64))
+	before, err := os.ReadFile(filepath.Join(data, catalog.LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := runCLIWithCapturedStdout(t, newApp(), "nkdctl", "catalog", "pin-artifacts", "--dir", data, "--arch", "amd64", "tool")
+	assertLifecycleCommandCode(t, err, e.CodeUsage)
+	after, err := os.ReadFile(filepath.Join(data, catalog.LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(output) != 0 || !bytes.Equal(before, after) {
+		t.Fatal("invalid command produced output or changed lock")
 	}
 }

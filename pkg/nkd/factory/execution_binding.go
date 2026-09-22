@@ -71,3 +71,61 @@ func bindBuildExecution(graph *ir.Graph, selected map[string]bool, classes []exe
 	}
 	return nil
 }
+
+// validateExecutionBindings recomputes selection from exact catalog requirements
+// and the admitted Environment before scheduler nodes consume producer references.
+func (plan Plan) validateExecutionBindings() (map[string]ir.Node, error) {
+	builds := map[string]ir.Node{}
+	for _, build := range plan.Builds {
+		selected := make(map[string]struct{}, len(build.Components))
+		for _, name := range build.Components {
+			selected[name] = struct{}{}
+		}
+		components := make(map[string]*execution.Requirements, len(build.ResolvedComponents))
+		for _, component := range build.ResolvedComponents {
+			if _, selectedComponent := selected[component.Name]; !selectedComponent {
+				return nil, e.New(e.CodePipelineDrift,
+					"build %q retains unselected resolved component %q", build.Name, component.Name)
+			}
+			if _, duplicate := components[component.Name]; duplicate {
+				return nil, e.New(e.CodePipelineDrift,
+					"build %q repeats resolved component %q", build.Name, component.Name)
+			}
+			components[component.Name] = component.BuildRequirements
+		}
+		for name := range selected {
+			if _, ok := components[name]; !ok {
+				return nil, e.New(e.CodePipelineDrift,
+					"build %q has no resolved component %q", build.Name, name)
+			}
+		}
+		for _, node := range build.Graph.Nodes {
+			if node.Kind == ir.KindBuild {
+				if _, selectedComponent := selected[node.Component]; !selectedComponent {
+					if node.ExecutionBinding != nil {
+						return nil, e.New(e.CodePipelineDrift,
+							"build %q unselected build node %q has an execution-class binding", build.Name, node.ID)
+					}
+					continue
+				}
+				requirements := components[node.Component]
+				if !execution.Equal(node.Requirements, requirements) {
+					return nil, e.New(e.CodePipelineDrift,
+						"build %q build node %q changes its catalog execution requirements", build.Name, node.ID)
+				}
+				expectedBinding, matchErr := execution.Match(
+					node.Requirements, plan.Environment.ExecutionClasses, matchOptionsForBuildNode(node))
+				if matchErr != nil {
+					return nil, e.Wrap(e.CodeEngineCapability, matchErr,
+						"build %q build node %q has no admitted execution class", build.Name, node.ID)
+				}
+				if !execution.EqualBinding(node.ExecutionBinding, expectedBinding) {
+					return nil, e.New(e.CodePipelineDrift,
+						"build %q build node %q changes its deterministic execution-class binding", build.Name, node.ID)
+				}
+				builds[build.Name+"/"+node.ID] = node
+			}
+		}
+	}
+	return builds, nil
+}

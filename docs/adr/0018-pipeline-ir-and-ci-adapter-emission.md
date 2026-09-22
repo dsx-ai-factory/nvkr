@@ -18,10 +18,12 @@
 
 ## Context
 
-The IR must become a **concrete, realized pipeline** on whichever CI engine an operator runs, and every engine
-must build **byte-identically** and **hermetically**. The open question is what executes each build node, and how
-that stays identical across engines without a fragile parallel implementation of rendered strings that must be
-kept in sync.
+The IR must become a **concrete, realized pipeline** on whichever maintained execution target an operator runs.
+For an exact subject in the qualified lane, each admitted environment must build hermetically and the independent
+outputs must compare byte-identically. Pipeline-attested producers instead retain their stated evidence contract;
+matching their inputs or content does not turn their output into a reproduction. The open question is what
+executes each build node, and how execution semantics stay aligned across environments without a fragile parallel
+implementation of rendered strings that must be kept in sync.
 
 ## Decision
 
@@ -213,43 +215,113 @@ architecture. Plan admission recomputes the deterministic selection from the exa
 rejects a substituted class, route, request, or binding. The class inventory affects Environment and Plan identities; the selected binding affects full-IR bytes and Plan identity. Neither
 enters logical build identity.
 
-Execution-class declarations are planning input, not runtime proof. Every current local or hosted adapter still
-rejects a selected build with nonempty execution requirements before execution or emitted output. A future runtime
-adapter must authenticate the realized host platform, allocation, capability exposure, and enforced deadline
-before work; a provider's outer job timeout must permit the authored executor budget.
+Execution-class declarations are planning input, not runtime proof. Every current local or hosted execution
+adapter still rejects a selected build with nonempty execution requirements before execution or emitted output.
+A runtime adapter must authenticate the realized host platform, capacity, capability exposure, and enforced
+deadline before work; a provider's outer job timeout must permit the authored executor budget.
 
 The execution owner provides a narrower diagnostic local Linux observation helper. The caller supplies an
 already-open workspace-directory capability. The helper duplicates that descriptor while its lifetime is
 protected by the runtime, checks effective write and traversal access, observes host platform, process CPU
-affinity, free host memory, available workspace capacity and KVM API exposure, then closes every retained
+affinity capped by the complete cgroup-v2 quota ancestry, host-available memory capped by complete cgroup-v2
+headroom, available workspace capacity and KVM API exposure, then closes every retained
 workspace and KVM handle before returning. It never resolves a replaceable workspace pathname. Non-Linux hosts
 reject the observation.
 
 This helper accepts neither an execution request nor a selected binding. It does not authenticate Environment
 membership or deterministic selection, own or enforce an execution deadline, reserve observed resources, prove a
-provider allocation, or authorize execution. No current local or hosted adapter consumes the observation, and
-all existing execution gates remain closed. A future adapter must first obtain the owning planning module's
-authenticated Environment/Plan selection, independently authenticate effective provider or cgroup allocation,
-and enforce the selected executor and outer-provider deadlines before it can admit work.
+provider allocation, or authorize execution.
 
-Future `vm-image` execution dispatches the typed producer driver owned by ADR-10. The `command` driver executes the
-exact authored argument vector and can therefore invoke Make. The `packer` driver invokes the pinned Packer
-executable against the selected source-owned HCL project without parsing or generating HCL. Both receive only
-authenticated staged materials and declared variable bindings, use the same admitted execution class and network
-policy, write into a private output location, and return the declared disk through the same collection boundary.
-The shared runner owns this driver lowering. A CI adapter may transport its typed inputs and outputs, but it may
-not render an independent Make or Packer command.
+The local VM admission primitive builds on the same observer without promoting diagnostic values into durable
+evidence. The factory owner validates the complete Plan and identifies one exact `vm-image` build. An opaque,
+same-process capability then binds both logical identity and the exact current Plan bytes, the selected node,
+compiler-selected request and binding, and a current Linux observation. CPU capacity is the smaller of process
+affinity and every cgroup-v2 ancestor quota. Memory capacity is the smaller of host-available memory and headroom
+under every cgroup-v2 ancestor limit. The observer resolves a unique cgroup2 mount root and mountpoint from the
+process mount table, maps the process membership beneath that root, and rejects absent, ambiguous, or escaping
+mappings. Admission fails closed where that effective capacity cannot be established.
+It rejects a host-platform mismatch, insufficient CPU, memory or held-workspace capacity, and an enabled KVM
+resolution when KVM is unavailable. The capability retains its duplicated workspace directory and any selected,
+opened, API-validated KVM device until one callback completes or the unused capability is closed. A disabled
+preferred or forbidden resolution exposes no KVM handle to the callback even when the host has KVM; driver
+isolation must withhold the device from the subprocess.
 
-VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, privilege, nested
-virtualization, NUMA, accelerators, requirements on non-build nodes, adapter integration, qualified runtime
-authentication, and provider-specific lowering remain deferred. Produced-artifact size remains an artifact and
-transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or weaken a
-request; a grouped provider job must satisfy every member node.
+The callback is single-use and receives the authored executor deadline plus descriptor capabilities, never the
+caller workspace or KVM pathname. CPU, memory, held-workspace capacity and KVM availability are re-observed inside
+that deadline immediately before work. Request, binding, any current Plan-byte mutation, or node substitution
+fails before the callback. Every retained and callback-borrowed handle closes on return. This primitive performs
+no source, subprocess, output, or workspace mutation during admission. The local runner has a private typed
+direct-Packer dispatch boundary that requires this exact admission before Packer selection. A separate run-owned
+resolver contract binds the exact Plan, producer session, runtime, daemon and digest-pinned OCI toolchain images
+after pure Plan/workspace-shape validation but before workspace mutation. The resulting executor may perform source,
+material and output work only inside the single-use VM callback. The local production resolver is connected for
+the direct-Packer, unencrypted form only. The exact full-Plan subject is checked independently by resolver
+admission, local VM admission and dispatch; a valid Plan-only change with unchanged producer IR fails before the
+driver. Command/Make `vm-image` authoring still lowers into the Plan, but local execution rejects it before resolver
+or workspace mutation until a held-output adapter exists. Every encrypted form is rejected before source,
+material, toolchain or VM work until a typed non-public secret channel exists.
 
-Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the
-local runner's ownership contract. Private package layouts must remain reopenable by later host transport
-steps. Rootless Podman's existing user mapping is retained; the rootless BuildKit build container keeps its
-separate fixed UID and private output-promotion contract.
+Direct-Packer execution authenticates one already-local digest-pinned OCI toolchain for the selected host platform;
+it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NKD
+overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
+Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, disabled health check, read-only
+root, no network, no new privileges and all capabilities dropped. Source, configuration, manifest and material inputs are packed into one
+deterministic bounded tar preserving directories, modes and symlink targets. Docker transports only a one-file
+outer carrier. The pinned toolchain verifies the held inner-tar digest before extracting that same opened inode;
+Packer then sees the input volume read-only. The work volume remains private to the attempt.
+
+The local unqualified adapter does not configure a subordinate container UID or Docker user-namespace remap.
+An escape from its Packer/QEMU consumer would therefore act as the invoking host user against resources already
+available to that user, despite the container's network, filesystem, capability and privilege restrictions. This
+is an explicit limitation of the unqualified local lane, not an accepted hosted or qualified isolation boundary.
+A hosted or qualified adapter must authenticate and enforce a subordinate identity, user namespace or stronger
+provider sandbox and record real interoperability evidence before it may admit this producer.
+
+Fresh Docker volumes and `docker cp` content are root-owned. One fixed ownership-bootstrap container therefore runs
+as root with only `CAP_CHOWN`, mounts only the attempt's input and work volumes, changes their ownership to the
+observed host UID/GID, and is removed before consumer execution. It performs no input
+authentication, extraction, Packer operation or network access. Extraction, version checking, SSH-key generation,
+validation and build all run as the host UID/GID. Only the build receives the admitted KVM device and its observed
+supplemental group when the exact binding enables KVM.
+
+The runtime sets a fixed `PACKER_PLUGIN_PATH`, requires the exact Plan-authored Packer version, generates and checks
+an attempt-local SSH key pair when the source contract declares its variables, runs `packer validate` with the exact
+selector and clean-output rule, then runs `packer build -on-error=cleanup` with that same selector. Validation is the
+authoritative compatibility check for the exact source-declared plugin constraint against the authenticated
+toolchain closure. Exactly one declared QCOW2 is collected into a held inode and re-hashed. All containers, volumes,
+held inputs and private workspace state are reaped on success, returned failure or context cancellation. This
+in-process cleanup cannot run after `SIGKILL`, a process crash or host loss. Cross-process orphan recovery remains
+deferred until NKD has an authenticated owner-liveness protocol; a label-only startup sweep must not delete volumes
+that may belong to another live attempt.
+
+This is current-availability authority for the current local direct-Packer VM adapter, not a resource reservation, authenticated
+provider allocation, cross-process receipt, or qualification evidence. Holding the validated KVM descriptor
+proves availability through the callback lifetime; it does not prove Packer or QEMU consumed that exact
+descriptor. Driver dispatch must enforce the selected device mode and use the supplied deadline context. A hosted
+or qualified adapter must independently authenticate its effective provider or cgroup allocation and outer
+deadline before it can admit work.
+
+`vm-image` execution dispatches the typed producer driver owned by ADR-10. The connected `packer` driver invokes the
+authenticated containerized Packer against the selected source-owned HCL project without parsing or generating
+HCL. A future `command` driver will execute the exact authored argument vector and can therefore invoke Make after
+it gains an equivalent held-output adapter. Both forms must receive only authenticated staged materials and
+declared variable bindings, use the same admitted execution class and network policy, write into a private output
+location, and return the declared disk through the same collection boundary. The shared runner owns driver
+lowering. A CI adapter may transport typed inputs and outputs, but it may not render an independent Make or Packer
+command.
+
+VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, nested virtualization, NUMA,
+accelerators, requirements on non-build nodes, hosted adapter integration, qualified runtime authentication, and
+provider-specific lowering remain deferred. The narrowly scoped volume-ownership bootstrap above is the only local
+direct-Packer root exception; it grants no general privileged producer lane. Produced-artifact size remains an
+artifact and transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or
+weaken a request; a grouped provider job must satisfy every member node.
+
+Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the local
+runner's ownership contract. The direct-Packer ownership bootstrap is the sole exception and is constrained as
+specified above. Private package layouts must remain reopenable by later host transport steps. Rootless Podman's
+existing user mapping is retained; the rootless BuildKit build container keeps its separate fixed UID and private
+output-promotion contract.
 
 Each fetched source transports its exact receipt file, using the pipeline module's destination-to-receipt
 path mapping. A receipt carrier must not include the shared receipt directory: independent fetch jobs can
@@ -379,8 +451,9 @@ the finalizer itself from starting; inspect provider status when no Run record e
 ## De-risking spikes
 
 1. **Helper isolation** — exercise the same local and hosted launch path with real pinned containers, network-egress probes, read-only inputs, UID ownership, cancellation and nested-runtime capability failures.
-2. **Runner provenance** — prove both allowed origins: a self-hosted runner builds reproducibly and binds its
-   actual bootstrap toolchain, while a preexisting runner binds its exact bytes and no bootstrap identity.
+2. **Runner provenance** — prove both allowed origins: a self-hosted runner is reproduced as its own exact
+   qualified subject and binds its actual bootstrap toolchain, while a preexisting runner binds its exact bytes
+   and no bootstrap identity. Neither statement reproduces the producer output that the runner later executes.
 3. **Transport/failure matrix** — for every engine, prove the runner, inputs, outputs, node receipts, and the
    ValidationVector reach their consumers, and that an intentionally omitted or corrupted item fails closed.
 

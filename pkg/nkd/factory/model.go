@@ -2,7 +2,7 @@
 // CompileDocuments resolves catalogs and derives a Plan from Definition and
 // Environment; Compile accepts an already resolved catalog. RunLocal executes the
 // same artifact graph that Render schedules for hosted execution. This package
-// owns producer references, output completeness, packaging, and evidence joins;
+// owns producer references, typed payload observation, packaging, and evidence joins;
 // a compiled Plan describes required work and carries no runtime authority.
 package factory
 

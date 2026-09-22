@@ -1,12 +1,81 @@
 package factory
 
 import (
+	"encoding/json"
+	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
+
+func TestCompiledHelmOverridesSurviveRehydrationAndRejectDrift(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	component := base.Components["runc"]
+	component.OutputType = "tarball"
+	component.ArtifactPath = filepath.ToSlash(filepath.Join(component.WriteDir, "chart.tar"))
+	component.Helm = &catalog.HelmConfig{
+		Repository: &catalog.RepositoryConfig{Name: "published-chart"},
+		Values: &catalog.ValuesConfig{Overrides: []catalog.ValueOverride{
+			{JSONPath: ".image.tag", ValueFromComponent: &catalog.ComponentValueRef{Component: "runc", Template: "{{.Tag}}"}},
+			{JSONPath: ".image.registry", ValueFromEnvironment: "{{.publication.repositoryPrefix}}"},
+		}},
+	}
+	base.Components["runc"] = component
+	stack, err := catalog.ApplyStack(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, environment := fixtureInputs("helm-overrides", "chart", "ubuntu-24.04")
+	definition.Outputs[0].Format = authored.OutputHelm
+	definition.Outputs[0].Components = []string{"runc"}
+	environment.Publication = &authored.Publication{RepositoryPrefix: "ghcr.io/example", Anonymous: true}
+	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled := routeContractNode(t, plan, "package/chart")
+	wantValues := []HelmValueOverride{
+		{JSONPath: ".image.registry", Value: "ghcr.io/example"},
+		{JSONPath: ".image.tag", Value: component.Tag},
+	}
+	if compiled.HelmRepository != "published-chart" || !reflect.DeepEqual(compiled.HelmValues, wantValues) {
+		t.Fatalf("compiled Helm configuration = %#v", compiled)
+	}
+	raw, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(*Node)
+	}{
+		{name: "unchanged"},
+		{name: "changed value", mutate: func(node *Node) { node.HelmValues[0].Value = "ghcr.io/other" }},
+		{name: "removed values", mutate: func(node *Node) { node.HelmValues = nil }},
+		{name: "changed repository", mutate: func(node *Node) { node.HelmRepository = "other-chart" }},
+		{name: "removed repository", mutate: func(node *Node) { node.HelmRepository = "" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var restored Plan
+			if err := json.Unmarshal(raw, &restored); err != nil {
+				t.Fatal(err)
+			}
+			if test.mutate != nil {
+				test.mutate(routeContractNode(t, &restored, "package/chart"))
+				assertFactoryErrorCode(t, restored.Validate(), e.CodePipelineDrift)
+			} else if err := restored.Validate(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
 
 func helmValuesTestPlan(postgres catalog.Component) Plan {
 	return Plan{Builds: []BuildPlan{{Name: "helm-test", ResolvedComponents: []catalog.NamedComponent{

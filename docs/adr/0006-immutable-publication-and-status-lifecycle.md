@@ -104,6 +104,12 @@ to the accepted checkpoint and clearance. The unused time-authority capability a
 are removed; their canonical time family remains reserved and nonminting. Current checkpoint diagnostics use an
 explicit `asOfEpoch` and do not grant release authority. No production trusted-time adapter is implemented.
 
+The implemented diagnostic operation is owned by `status.AcceptDiagnosticCheckpoint`. Status owns the private
+high-water schema, protected reads, kernel-released locking, byte-CAS and directory fsync. It authenticates the
+complete checkpoint and commits state derived from the verified receipt before interpreting withdrawal, so
+`CodeWithdrawn` cannot leave the previous minimum available for replay. The CLI supplies document locations,
+policy and the explicit diagnostic epoch, then presents the decision; it does not construct accepted state.
+
 The configured time source is part of local trust policy. It may be an authenticated wall-clock service, a
 hardware-backed clock, or a separately authenticated monotonic policy epoch, but the deployment must document
 its epoch mapping, maximum allowed skew, rollback recovery, and offline behavior. It must not be a CLI flag,

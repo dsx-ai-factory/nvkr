@@ -65,7 +65,12 @@ func TestHeldGrandchildHelper(t *testing.T) {
 	}
 	signal.Ignore(syscall.SIGTERM)
 	pidPath := os.Getenv("NKD_HELDFILE_GRANDCHILD_PID")
-	if err := os.WriteFile(pidPath, []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+	// Both parent tests use the PID path as a readiness signal. Publish it only
+	// after the complete PID is written, so neither can observe an empty file.
+	if err := os.WriteFile(pidPath+".tmp", []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(pidPath+".tmp", pidPath); err != nil {
 		t.Fatal(err)
 	}
 	for {
@@ -188,7 +193,17 @@ func TestRunContextCancellationReapsDescendantProcessGroup(t *testing.T) {
 	pidPath := filepath.Join(root, "grandchild.pid")
 	ctx, cancel := context.WithCancel(context.Background())
 	result := make(chan error, 1)
+	done := make(chan struct{})
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Error("held descendant command did not stop during cleanup")
+		}
+	}()
 	go func() {
+		defer close(done)
 		result <- RunContext(ctx, executable,
 			[]string{"-test.run=^TestHeldTerminationHelper$"},
 			RunOptions{Env: append(os.Environ(),
@@ -199,17 +214,14 @@ func TestRunContextCancellationReapsDescendantProcessGroup(t *testing.T) {
 			), TerminationGrace: 100 * time.Millisecond})
 	}()
 	if !waitForPath(ready, 2*time.Second) || !waitForPath(pidPath, 2*time.Second) {
-		cancel()
 		t.Fatal("held descendant process did not become ready")
 	}
 	rawPID, err := os.ReadFile(pidPath)
 	if err != nil {
-		cancel()
 		t.Fatal(err)
 	}
 	pid, err := strconv.Atoi(string(rawPID))
 	if err != nil {
-		cancel()
 		t.Fatal(err)
 	}
 	defer syscall.Kill(pid, syscall.SIGKILL)

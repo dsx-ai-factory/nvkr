@@ -15,10 +15,10 @@ func TestManifestIsDeterministicAndDerivesRelativePaths(t *testing.T) {
 	digestA := "sha256:" + strings.Repeat("a", 64)
 	digestB := "sha256:" + strings.Repeat("b", 64)
 	forward := []Observation{
-		{Binding: ".", Component: "dot-configuration", Kind: "raw", Digest: "sha256:" + strings.Repeat("d", 64)},
-		{Binding: "..", Component: "configuration", Kind: "raw", Digest: "sha256:" + strings.Repeat("c", 64)},
-		{Binding: "runtime package/arm64", Component: "runtime", Kind: "host-package", Digest: digestB},
-		{Binding: "agent-package", Component: "agent", Kind: "host-package", Digest: digestA},
+		{Binding: ".", Component: "dot-configuration", Kind: "raw", Architecture: "arm64", Digest: "sha256:" + strings.Repeat("d", 64)},
+		{Binding: "..", Component: "configuration", Kind: "raw", Architecture: "arm64", Digest: "sha256:" + strings.Repeat("c", 64)},
+		{Binding: "runtime package/arm64", Component: "runtime", Kind: "host-package", Architecture: "arm64", Digest: digestB},
+		{Binding: "agent-package", Component: "agent", Kind: "host-package", Architecture: "arm64", Digest: digestA},
 	}
 	reverse := []Observation{forward[3], forward[2], forward[1], forward[0]}
 
@@ -87,8 +87,8 @@ func TestManifestValidationFailsClosed(t *testing.T) {
 	}
 
 	valid, err := NewManifest([]Observation{
-		{Binding: "agent", Component: "agent-component", Kind: "host-package", Digest: "sha256:" + strings.Repeat("a", 64)},
-		{Binding: "runtime", Component: "runtime-component", Kind: "raw", Digest: "sha256:" + strings.Repeat("b", 64)},
+		{Binding: "agent", Component: "agent-component", Kind: "host-package", Architecture: "arm64", Digest: "sha256:" + strings.Repeat("a", 64)},
+		{Binding: "runtime", Component: "runtime-component", Kind: "raw", Architecture: "arm64", Digest: "sha256:" + strings.Repeat("b", 64)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -106,6 +106,9 @@ func TestManifestValidationFailsClosed(t *testing.T) {
 		{name: "component metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Component = "agent\ncomponent" }, want: e.CodeInvalidCatalog},
 		{name: "component display control", mutate: func(manifest *Manifest) { manifest.Materials[0].Component = "agent\u202ecomponent" }, want: e.CodeInvalidCatalog},
 		{name: "kind metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Kind = "" }, want: e.CodeInvalidCatalog},
+		{name: "missing architecture", mutate: func(manifest *Manifest) { manifest.Materials[0].Architecture = "" }, want: e.CodeInvalidCatalog},
+		{name: "unsupported architecture", mutate: func(manifest *Manifest) { manifest.Materials[0].Architecture = "riscv64" }, want: e.CodeInvalidCatalog},
+		{name: "mixed architecture", mutate: func(manifest *Manifest) { manifest.Materials[0].Architecture = "amd64" }, want: e.CodeInvalidCatalog},
 		{name: "digest", mutate: func(manifest *Manifest) { manifest.Materials[0].Digest = "sha256:not-exact" }, want: e.CodeInvalidCatalog},
 		{name: "order", mutate: func(manifest *Manifest) {
 			manifest.Materials[0], manifest.Materials[1] = manifest.Materials[1], manifest.Materials[0]
@@ -154,15 +157,15 @@ func TestNewManifestAcceptsEmptyAndRejectsAmbiguousObservations(t *testing.T) {
 		want         e.Code
 	}{
 		{name: "duplicate binding", observations: []Observation{
-			{Binding: "package", Component: "one", Kind: "raw", Digest: digest},
-			{Binding: "package", Component: "two", Kind: "raw", Digest: digest},
+			{Binding: "package", Component: "one", Kind: "raw", Architecture: "arm64", Digest: digest},
+			{Binding: "package", Component: "two", Kind: "raw", Architecture: "arm64", Digest: digest},
 		}, want: e.CodeInvalidCatalog},
 		{name: "duplicate component", observations: []Observation{
-			{Binding: "one", Component: "component", Kind: "raw", Digest: digest},
-			{Binding: "two", Component: "component", Kind: "raw", Digest: digest},
+			{Binding: "one", Component: "component", Kind: "raw", Architecture: "arm64", Digest: digest},
+			{Binding: "two", Component: "component", Kind: "raw", Architecture: "arm64", Digest: digest},
 		}, want: e.CodeInvalidCatalog},
 		{name: "binding exceeds encoded path segment", observations: []Observation{
-			{Binding: strings.Repeat("é", 100), Component: "component", Kind: "raw", Digest: digest},
+			{Binding: strings.Repeat("é", 100), Component: "component", Kind: "raw", Architecture: "arm64", Digest: digest},
 		}, want: e.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {

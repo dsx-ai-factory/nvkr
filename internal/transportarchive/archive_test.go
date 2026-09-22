@@ -77,6 +77,90 @@ func TestTransportArchiveRoundTripIsDeterministicAndExact(t *testing.T) {
 	}
 }
 
+func TestUnpackOpenUsesHeldArchiveAfterPathReplacement(t *testing.T) {
+	producer := t.TempDir()
+	if err := os.WriteFile(filepath.Join(producer, "artifact"), []byte("held bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(producer, "carrier.tar")
+	if err := Pack(t.Context(), archive, producer, []string{"artifact"}); err != nil {
+		t.Fatal(err)
+	}
+	held, err := os.Open(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Close()
+	if err := os.Rename(archive, filepath.Join(producer, "moved.tar")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archive, []byte("replacement"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	destination := t.TempDir()
+	if err := UnpackOpen(t.Context(), held, destination, []string{"artifact"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(destination, "artifact"))
+	if err != nil || string(got) != "held bytes" {
+		t.Fatalf("held archive output = %q, %v", got, err)
+	}
+}
+
+func TestUnpackOpenRejectsInvalidHeldArchives(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		open        func(*testing.T) *os.File
+		wantMessage string
+	}{
+		{name: "absent", open: func(*testing.T) *os.File { return nil }, wantMessage: "is absent"},
+		{name: "directory", open: func(t *testing.T) *os.File {
+			file, err := os.Open(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return file
+		}, wantMessage: "not a regular file"},
+		{name: "fifo", open: func(t *testing.T) *os.File {
+			path := filepath.Join(t.TempDir(), "archive.fifo")
+			if err := unix.Mkfifo(path, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			fd, err := unix.Open(path, unix.O_RDWR|unix.O_NONBLOCK, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return os.NewFile(uintptr(fd), path)
+		}, wantMessage: "not a regular file"},
+		{name: "oversized", open: func(t *testing.T) *os.File {
+			path := filepath.Join(t.TempDir(), "oversized.tar")
+			file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := file.Truncate(maxTransportBytes + 1); err != nil {
+				_ = file.Close()
+				t.Fatal(err)
+			}
+			return file
+		}, wantMessage: fmt.Sprint(maxTransportBytes)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			archive := test.open(t)
+			if archive != nil {
+				defer archive.Close()
+			}
+			err := UnpackOpen(t.Context(), archive, t.TempDir(), []string{"artifact"})
+			if transportCode(err) != nkderr.CodeVerifyFailed {
+				t.Fatalf("invalid held archive returned %v, want verify-failed", err)
+			}
+			if !strings.Contains(err.Error(), test.wantMessage) {
+				t.Fatalf("invalid held archive error %q does not contain %q", err, test.wantMessage)
+			}
+		})
+	}
+}
+
 func TestTransportArchiveRejectsUntrustedTarStructures(t *testing.T) {
 	tests := []struct {
 		name    string

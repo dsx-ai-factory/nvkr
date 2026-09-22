@@ -6,13 +6,32 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
+
+func TestCommandStartFailurePreservesPathError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		run  func(context.Context, string) error
+	}{
+		{"run", func(ctx context.Context, path string) error { return Run(ctx, exec.CommandContext(ctx, path)) }},
+		{"output", func(ctx context.Context, path string) error { _, err := Output(ctx, path); return err }},
+		{"combined output", func(ctx context.Context, path string) error { _, err := CombinedOutput(ctx, path); return err }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.run(t.Context(), filepath.Join(t.TempDir(), "missing-command")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("start failure lost its path error: %v", err)
+			}
+		})
+	}
+}
 
 func TestRunStreamsConfiguredCommandOutput(t *testing.T) {
 	var output bytes.Buffer

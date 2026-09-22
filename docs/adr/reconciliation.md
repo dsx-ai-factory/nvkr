@@ -1,69 +1,109 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-09-18. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
+Reviewed 2026-09-21. ADR-01–22 are the current engineering proposals, pending named-decider ratification.
 Each ADR contains its current lane-specific decision; no amendment chain is needed. Code/tests establish
 implementation. Contract tests, recorded external runs, and organizational acceptance are separate facts.
 
 ## Current boundary
 
-Public lifecycle disk-output support now includes compiler-only Plan lowering. A public `disk-image`
+Public lifecycle disk-output support now includes Plan lowering and a process-local exact-QCOW2 observation
+contract. A public `disk-image`
 output explicitly names one QCOW2 root plus its complete transitive material closure. The build-graph resolver
 has contract coverage rejecting missing or multiple roots, incomplete material closures and unrelated selected
 components. IR v4 binds the root's disk and command/direct-Packer form, public variables, and exact source and
 material producer dependencies into Build identity. Plan compilation selects the execution class and matching
 host-architecture VM toolchain, projects the raw QCOW2 artifact as the lifecycle output, and deliberately emits
 neither binary-bundle packaging nor an ordinary per-component SBOM for the disk. Catalog disk/`vm-image`
-producer metadata is accepted. VM execution, disk observation and full-disk SBOM generation, OCI or object-store publication, and
-artifact-level disk compatibility are unimplemented. Deployment topology and cluster runtime qualification
-belong to downstream owners. No existing NKE OS build or publication is claimed.
+producer metadata is accepted. The observer consumes one producer-owned held regular-file capability, rechecks
+the exact successful producer result against the revalidated Plan, independently streams SHA-256 and size,
+checks a bounded QCOW2 v2/v3 header, and records Build/Plan, producer, component, declared format and encryption
+bindings in the Run's delivery observation. The header check is not a full decoder or compatibility verdict. It
+neither decodes RAW nor grants evidence, compatibility, publication or qualification.
+Local unencrypted direct-Packer execution and population of its held result are connected and contract-tested.
+No real Docker/Packer/NKE bake has exercised that path. Full-disk SBOM generation, OCI or object-store
+publication, and artifact-level disk compatibility are unimplemented. Deployment topology and cluster runtime
+qualification belong to downstream owners. No existing NKE OS build or publication is claimed.
+Bounded in-process cleanup covers success, returned failure and context cancellation. Cross-process recovery of
+labeled Docker resources after `SIGKILL`, process crash or host loss remains deferred because no authenticated
+owner-liveness protocol exists; the runtime does not perform an unsafe label-only sweep across concurrent attempts.
+The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
+producer evidence verdict, performs content validation, or claims qualified disk reproduction. Reproduced or
+digest-verified materials cannot upgrade a future wrapped aggregate disk; its exact QCOW2 digest would identify
+one delivered Artifact until ADR-14's canonical disk comparison is independently demonstrated.
 Generic from-source `buildRequirements` are schema-validated, bound catalog → build IR → Plan, and excluded from
 build identity. Other node kinds reject the field until they have an explicit compiler projection. Environment
 execution classes now declare routes, host platforms, resource capacity, capabilities, and timeout ceilings.
 Compilation deterministically matches each selected requested build, records the exact binding and route in the
 full IR and Plan, and Plan validation recomputes the match to reject substitution. These declarations are not
-runtime proof. A process-local Linux diagnostic helper now observes CPU affinity, free host memory, available
+runtime proof. A process-local Linux diagnostic helper now observes cgroup-v2-capped CPU and memory, available
 workspace capacity, host platform and KVM exposure relative to the executor's held workspace-directory
 capability. Descriptor duplication is protected against concurrent close/reuse, write and traversal access is
 checked, and every duplicate workspace or KVM handle is closed before return. The helper accepts no request or
 binding and therefore does not authenticate Environment membership or deterministic selection, own an execution
-deadline, reserve resources, prove a provider allocation, or authorize execution. Every current
-adapter still rejects selected builds carrying requirements before execution or generated output. The generic
+deadline, reserve resources, prove a provider allocation, or authorize execution. A separate local VM admission
+primitive validates and binds the exact current Plan bytes plus one VM node/request/execution binding to current
+Linux facts capped by process affinity and complete cgroup-v2 CPU/memory limits. Cgroup membership is mapped
+through one authenticated mount root and mountpoint; missing, ambiguous, or escaping mappings fail closed. It retains the held workspace and
+selected KVM device and grants one deadline-scoped callback through an opaque process-local capability, with a
+fresh capacity/KVM observation immediately before work. It rejects substitution, resource/platform mismatch, an
+unavailable selected KVM mode, closure and reuse; a disabled resolution yields no KVM handle even on a KVM-capable host.
+It remains unqualified current-availability authority: it reserves nothing, proves no provider allocation, and a
+held KVM descriptor does not prove Packer/QEMU consumption. The local runner now has a private, contract-tested
+direct-Packer dispatch boundary that requires the exact single-use capability before selection. Its run-owned
+resolver binds the exact full-Plan subject, producer session, held local Docker executable, daemon identity and
+already-local digest-pinned OCI toolchain after pure validation and before workspace mutation. The production local
+path is connected only for unencrypted direct-Packer VM producers. It transports one authenticated bounded inner
+tar through a one-file Docker carrier, verifies that tar inside the pinned toolchain before extraction, mounts inputs
+read-only, fixes hostname/environment/user, denies network and image pulls, and never invokes `packer init`. A
+narrow root-plus-`CAP_CHOWN` bootstrap changes only the two attempt-volume ownerships to the observed host UID/GID;
+every authentication, extraction, version, SSH, validation and build operation then runs as that UID/GID. Other
+current adapters still reject selected builds carrying requirements before execution or generated output. The generic
 request covers resources, eligible host platforms, typed KVM policy, and executor timeout. VM-image authoring
 requires all of those constraint classes. Required KVM is resolution-checked against a same-architecture eligible
 host, while preferred and forbidden policies retain TCG routes. VM toolchain pins follow eligible host platforms,
 require exact per-host entries, and bind the selected host platform into Build identity.
 The repository does not yet supply production NKE numeric values.
 ADR-10 permits exact-command, including Make, and direct-Packer producer drivers behind the same generic
-`vm-image` contract. A dormant runner-owned Packer driver now holds an exactly pinned Linux ELF executable, snapshots an
+`vm-image` contract. A dormant host-executable Packer boundary holds an exactly pinned Linux ELF executable, snapshots an
 exact plugin-file closure, consumes an authenticated materialized source, stages only receipt-derived held
 component bytes at their manifest-relative paths, runs Packer validation before one exact build selection, and
 safely collects only the declared relative artifact. Its subprocess contract is tested with a fake executable
 on Linux only. Its private state and environment are not a kernel sandbox; network denial, local-exec/filesystem
 confinement, credentials, the dynamic-loader/library closure, and VM host admission remain outer-adapter gates.
-No execution adapter dispatches it, and no real Packer or NKE disk build has exercised it. A command producer
-without materials and a direct-Packer producer lower into IR/Plan; a material-bearing command producer remains
-unsupported because the schema has no typed manifest handoff. All execution adapters remain fail-closed.
+Production instead uses the connected OCI runtime described above. It requires the exact Plan-authored Packer
+version, sets a fixed plugin path, relies on source HCL plus `packer validate` to reject a missing or incompatible
+preinstalled plugin before QEMU, then builds one exact selector and holds one declared QCOW2. No real Docker/Packer
+or NKE disk build has exercised this path; its resolver, transport, isolation, cleanup, exact factory-owned material
+selection and post-admission dispatch have contract tests only. Encrypted direct-Packer execution
+and every encrypted command form fail before resolver admission until a typed non-public secret channel exists.
+A consumer currently runs as the invoking host UID/GID without subordinate-ID or user-namespace remapping. The
+other container restrictions reduce exposure but do not prevent an escape from acting with that user's host
+access. Hosted and qualified admission therefore remain closed until a stronger provider identity boundary is
+authenticated and exercised.
+A command producer without materials and a direct-Packer producer lower into IR/Plan, but command/Make VM execution
+also remains disconnected until it has a held-output adapter. A material-bearing command producer remains unsupported
+because the schema has no typed manifest handoff. Hosted and qualified VM execution remain fail-closed.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 01–03 Identity and errors | Canonical integer-only codec, frozen families, strict decoding, transport-free build identity, explicit execution-metadata exclusion, whole-graph admission, stable coded errors | Independent-language corpus for every signed family; external failures need continuing contract coverage |
 | 04 Signing and consumption | Linux held-executable exact-byte signing/offline verification; OCI keyless adapter; scoped Release consumer with mandatory signature and production attestation, exact closure, identity/issuer and close lifecycle | Hosted keyless signature/attestation production and verification exercised; independent cosign-only and public Release consumption exercised; root rotation remains unexercised. Full v1 release and qualified consumer scopes fail before adapters |
 | 05 Trust/membership | Subject-bound vectors, publisher evidence, required Inventory versus realized ReleaseSet; lifecycle freezes required slots before observation | Signed cross-process publication of all authority records; governed coverage profile is deferred |
-| 06 Status | Exact authenticated checkpoints/declarations and diagnostic anti-rollback high-water/CAS contracts | Unused release-specific trusted-time/clearance integration removed; production discovery/time adapters, rotation, v1 manifest tags, revocation and channel concurrency are unimplemented |
+| 06 Status | Status-owned diagnostic acceptance authenticates exact checkpoints/declarations, commits receipt-derived high-water state through protected reads and CAS, then interprets withdrawal | Unused release-specific trusted-time/clearance integration removed; production discovery/time adapters, rotation, v1 manifest tags, revocation and channel concurrency are unimplemented |
 | 07–08 Reproduction | Linux stage-two receipts bind actual helper/runtime/image and terminal bytes; deterministic comparisons and profile matching | Other-platform authority, provider receipts, qualified helper-image admission, independent two-machine bake-off and causal profile graduation |
 | 09 Provenance | Deterministic reproduction and distinct SLSA production predicates; exact plan/dependency/subject checks during hosted finalization | Real signed hosted provenance and independent consumption exercised; ongoing provider/service acceptance remains operational |
-| 10 Builders | OCI source execution, digest-pinned acquisition and rootless BuildKit wrapped OCI exports; complete upstream CWE Dockerfile builds and offline payload checks passed locally and from the generated hosted Run; `vm-image` command/direct-Packer structural validation and compiler-only IR/Plan lowering; one-to-one component-material bindings, exact producer edges, public literal Packer variables, deterministic build-material manifest model, host-selected VM toolchain pins, and generic producer runner-requirement authoring; dormant held-ELF Packer validate/build driver with an exact held host-tool `PATH`, exact plugin-file snapshots, receipt-derived held-material staging, private state and declared-output collection, contract-tested on Linux with a fake ELF executable | Kernel sandbox and authenticated dynamic-loader/library closure; real pinned Packer/NKE project execution and evidence; adapter dispatch into the dormant driver; material-bearing command/Make handoff and driver; VM lifecycle collection, disk inspection/SBOM and measured NKE host requirements; qualified Nix closure observation, other wrapped adapters, fused large-output credential phases and `embeds` remain |
+| 10 Builders | OCI source execution, digest-pinned acquisition and rootless BuildKit wrapped OCI exports; complete upstream CWE Dockerfile builds and offline payload checks passed locally and from the generated hosted Run; `vm-image` command/direct-Packer structural validation and IR/Plan lowering; one-to-one component-material bindings, exact producer edges, public literal Packer variables, deterministic build-material manifest model, host-selected VM toolchain pins, and generic producer runner-requirement authoring; connected unqualified local direct-Packer OCI driver with exact full-Plan admission, authenticated source/material carrier, fixed Packer/plugin environment, validate-before-build and declared held-QCOW2 collection; dormant held-ELF Packer boundary remains contract-tested with a fake executable | Recorded real pinned Docker/Packer/NKE execution before maintained NKE support or any pipeline-attested/qualified production claim; material-bearing command/Make handoff and driver; disk inspection/SBOM and measured NKE host requirements; qualified Nix closure observation, other wrapped adapters, fused large-output credential phases and `embeds` remain |
 | 11–12 Resolution/AICR | Direct output-selected producers and concrete platforms; no Recipe authoring, matching, inheritance, mixins or deployment classification; concrete target admission; exact AICR profile/generator selection and per-output effective bundle settings bound into Build identity; Linux held generator/render-tree contract | Embedded-version finite-set compatibility; no cross-process qualified render-to-vector publisher; loader/library closure and real downstream activation remain |
 | 13 Evidence | Per-observed-artifact CycloneDX SBOM and per-build index; pinned offline Syft dependency discovery for binaries/images and Helm/AICR chart metadata discovery; exact payload/scanner inputs and shared packaging/finalization checks; one release index referencing required stage-bound CycloneDX attestation bundles beside their outputs and signed sibling output repository/digest bindings; internal indexes are not published; [all three real NKE artifacts inspected offline](../dependency-sboms.md); typed evidence and mirror-invariant qualified publisher evidence | Full-disk material tracing, inspection, reconciliation and CycloneDX evidence are unimplemented. NVIDIA Run 34540582090 independently verified signatures and provenance, but its SBOMs were outside the signed root. Run 34631274098 published and signed the new layout but failed verification when cosign selected an SBOM bundle instead of legacy SLSA provenance. Cosign 3.1.3 with consistently published Sigstore bundles has pinned-binary local interoperability coverage; a successful new hosted Run remains required. Qualified signed evidence-receipt publication, vulnerability scanner execution and advisory generation remain outside v1; acquired upstream signatures/provenance are not verified |
-| 14 Delivery | Typed executable/APT/Helm layouts, including observed source Helm archives with exact producer checks and explicit image-package dependencies; resource-bounded RAW/ISO measurement; Linux held-qemu existing-envelope verification | Source quickstart archive, produced-image binding, checksums and all three local chart renders exercised from independently verified hosted publications. Disk/rootfs production, boot, encryption and qualified packaging fail admission; role-scoped staging and deployment-role disk fields are removed; no masked-region support |
+| 14 Delivery | Typed executable/APT/Helm layouts, including observed source Helm archives with exact producer checks and explicit image-package dependencies; resource-bounded RAW/ISO measurement; Linux held-qemu existing-envelope verification; process-local held-QCOW2 exact-byte lifecycle observation bound to the revalidated Build/Plan, root producer and successful outcome; local direct-Packer result population feeds that observation under the same full-Plan subject | Source quickstart archive, produced-image binding, checksums and all three local chart renders exercised from independently verified hosted publications. Direct-Packer disk production/result population is contract-tested only; a real bake, RAW reproduction, disk evidence, compatibility and publication remain gated. Boot, encryption and qualified packaging fail admission; role-scoped staging and deployment-role disk fields are removed; no masked-region support |
 | 15 Air gap | Outside current scope; former package, CLI and tests removed | No mirror or zero-egress lifecycle implementation |
 | 16 Release gates | Strict Inventory/ReleaseSet/PromotionPolicy documents, required membership completeness and authenticated ReleaseSet/policy diagnostics | Unused qualified authorization, gate receipts, waivers and publication clearance implementation removed; qualified release acceptance and reuse are deferred. V1 M3 qualification/M4 manifests are unimplemented |
-| 17 Public lifecycle | Six objects; compiler-owned output joins, immutable attempts, failed requirements retained; context-first SDK; descriptions cannot restore executable/verification authority; disk output selection admits exactly one root and its complete explicit material closure without category/role labels; compiler projects the root's raw disk artifact as the required lifecycle output | Disk execution, disk-specific observation/evidence and publication; superseded authoring and diagnostic APIs are removed; no backward-compatibility requirement or general resume protocol |
-| 18 CI/execution | Shared helper launch; generic resource, host-platform, typed KVM-policy, and timeout requests propagated through full IR and Plan; Environment execution-class validation, deterministic hard-filter/preferred-capability matching, exact full-Plan binding and route, substitution/drift rejection, and fail-before-output adapter gates; compiler-only VM Plan with typed command/Packer inputs and material producer edges; point-in-time process-local Linux diagnostic observation of CPU, memory, held-workspace capacity and KVM exposure, with lifetime-protected descriptor duplication and no execution authority; dormant runner-owned Packer subprocess boundary with validate-before-build, bounded cancellation, private state/environment and fail-closed artifact collection; hosted GitHub Run generation with separate Merge Gate PR drift checks, manual-only triggers and default-branch execution, bounded timeouts, non-canceling concurrency, main-restricted deployment environment, named operations with failure-preserving progress logs, grouped offline processing and exact batched restores; GitHub is the sole hosted renderer; unused GitLab/qualified renderers and their hidden bundle workflow are removed. Finalization checks job/restore success, terminal/SBOM/payload closure and production predicate | No Packer kernel sandbox, authenticated loader/library closure, or authenticated local runtime-admission primitive; no adapter consumes the diagnostic observation; no provider allocation proof, qualified runtime attestation, VM driver dispatch, disk execution, or disk-specific observation/SBOM. The dormant Packer boundary has Linux fake-executable contract coverage only. Authenticated GitHub fork fetch, combined CLI/CWE/Helm builds, SBOM, packaging, GHCR publication, real keyless signing/verification and complete pipeline-attested Run finalization exercised. Qualified provider emission has no retained implementation; GitLab/Tekton/Argo generation and non-GitHub signing fail before output. Provider outage can prevent any Run record |
+| 17 Public lifecycle | Six objects; compiler-owned output joins, immutable attempts, failed requirements retained; context-first SDK; descriptions cannot restore executable/verification authority; disk output selection admits exactly one root and its complete explicit material closure without category/role labels; compiler projects the root's raw disk artifact as the required lifecycle output; exact held QCOW2 observation contract and local direct-Packer population path are implemented and contract-tested with producer, component, declared format, encryption, byte digest/size, Build/Plan identities and outcome | Real disk execution evidence, disk SBOM and publication; encrypted disks remain closed; superseded authoring and diagnostic APIs are removed; no backward-compatibility requirement or general resume protocol |
+| 18 CI/execution | Shared helper launch; generic resource, host-platform, typed KVM-policy, and timeout requests propagated through full IR and Plan; Environment execution-class validation, deterministic hard-filter/preferred-capability matching, exact full-Plan binding and route, substitution/drift rejection, and fail-before-output adapter gates; compiler-only VM Plan with typed command/Packer inputs and material producer edges; point-in-time process-local Linux diagnostic observation plus exact-Plan local VM admission with current CPU, memory, held-workspace capacity and resolved KVM checks, retained descriptor capabilities, single-use semantics and the authored callback deadline; connected local direct-Packer OCI resolver bound to the full Plan subject, held runtime/daemon and already-local digest-pinned toolchain; authenticated bounded tar transport, read-only inputs, private work volume, fixed environment/hostname/host user, narrowly scoped volume-ownership bootstrap, fixed plugin path, exact Packer-version preflight, validate-before-build, no init/pull/network and held QCOW2 collection; private run-owned Packer dispatch and local-scheduler disk-result population; hosted GitHub Run generation with separate Merge Gate PR drift checks, manual-only triggers and default-branch execution, bounded timeouts, non-canceling concurrency, main-restricted deployment environment, named operations with failure-preserving progress logs, grouped offline processing and exact batched restores; GitHub is the sole hosted renderer; unused GitLab/qualified renderers and their hidden bundle workflow are removed. Finalization checks job/restore success, terminal/SBOM/payload closure and production predicate | Local direct-Packer execution is contract-tested only; its consumers use the invoking host UID/GID without subordinate-ID or user-namespace remapping. No real Docker/Packer/NKE bake, stronger hosted identity boundary, provider allocation proof, qualified runtime attestation, command/Make held-output adapter, encrypted-disk secret channel, hosted VM adapter or disk-specific SBOM/publication proof exists. Held KVM availability is not consumption proof. Authenticated GitHub fork fetch, combined CLI/CWE/Helm builds, SBOM, packaging, GHCR publication, real keyless signing/verification and complete pipeline-attested Run finalization exercised. Qualified provider emission has no retained implementation; GitLab/Tekton/Argo generation and non-GitHub signing fail before output. Provider outage can prevent any Run record |
 | 19 Artifact membership and deployment boundary | Exact required/observed output membership, build/component evidence joins and canonical release content subject; no authored cluster views, generated compositions/realizations, node roles, categories or provisioning interface | Downstream systems own deployment topology, placement, provisioning and runtime qualification; historical topology-bearing records grant no current authority |
 | 20 Publication | Environment publication prefix; one compiler-derived release signing route and distinct output repositories; catalog-owned tools; digest-only recursive OCI push/pull; binary/APT/Helm and native-image consumer binding; held OCI-export import and unchanged payload identity from Run to Release | No disk OCI control root, object-store/CDN schema, publisher, read-back proof or consumer. Local registry and combined CLI/CWE/Helm GHCR publication exercised; independent private-package cosign and public consumer acceptance passed for all three published references. Unused qualified transport/root constructors removed; direct package/object-store publishers and qualified commit adapters unavailable; segment registration is deferred |
 | 21 Generation | Exact Definition/Environment inputs recorded; deterministic manifest-last writes and byte-exact check rejecting unexpected generated files; SDK/CLI share generation owner; current lifecycle regeneration tests | Scheduled bump/release automation, supported-provider transactions and complete same-checkout crash matrix remain |
-| 22 Catalog pins | Strict catalog v3/lock v1, component target-derived artifact pin sets, per-module `tagPrefix`, bounded no-follow reads, cancel/CAS-safe pin writes, chained whole-producer catalog overlays v3; retired Recipe layouts rejected | `pinSet`, `pinnedBy`, extractor/re-derivation, `derivedFrom` and `curatedBy` are unimplemented |
+| 22 Catalog pins | Strict catalog v3/lock v1, component target-derived artifact pin sets, per-module `tagPrefix`, bounded no-follow reads, catalog-owned source/artifact maintenance with no-op/check semantics and cancel/CAS-safe pin writes, chained whole-producer catalog overlays v3; retired Recipe layouts rejected | `pinSet`, `pinnedBy`, extractor/re-derivation, `derivedFrom` and `curatedBy` are unimplemented |
 
 The common positive consumer scope is `pipeline-attested` / `artifact-publication`. It establishes exact
 published bytes and build evidence, not M3/M4 full-release acceptance. A stronger unavailable scope never falls
@@ -125,6 +165,35 @@ Full uncached native unit tests and `make check` passed, including the full race
 race tests, NKE/AICR generation checks, Actionlint, reference checks and diff checks passed. This refactor has
 no new hosted or qualified execution evidence. Earlier operational records retain their exact schema, code
 and acceptance scope.
+
+## Code organization
+
+The [organization audit](../codebase-organization-audit.md) records nine implemented changes: factory-owned
+typed payload observation, status-owned diagnostic acceptance and persistence, catalog-owned pin transactions,
+and focused files for catalog admission, package formats, compiler contracts, local scheduling and binary
+bundles. Shared process-group primitives retain the caller's cleanup policy and held-input lifetime. The CLI
+keeps argument/policy mapping and presentation for the extracted status and catalog operations.
+
+Binary lifecycle observation now requires the compiled Plan and retained raw producer bytes, including exact
+producer metadata; package/result agreement alone is insufficient. Frozen requirements, outer publication
+membership and immutable attempt records remain lifecycle-owned. Status remains diagnostic at a caller epoch,
+and pin maintenance retains the same lock schema, no-op/check behavior and CAS. The organization refactor
+preserves its base's wire versions, logical identities and generated NKE/AICR bundles. The report maps each finding to its implementation
+and contract tests and records final validation separately from historical operational evidence.
+
+The refreshed stack retains the process-local held-QCOW2 observation contract. Disk outputs require factory's
+concrete execution result before any pathname projection; binary, APT, Helm and image outputs retain the shared
+package observer. Lifecycle closes held execution results before committing observations and deep-copies disk
+metadata in public Run descriptions. Production disk-result population and VM execution remain unavailable.
+
+The broader Linux race gate exposed a preexisting `NodeSession.Close` cancellation propagation race: an
+asynchronous callback could let a resumed producer reach runtime lookup after session cancellation. Close now
+cancels registered call contexts synchronously before exposing cancellation, then joins producers before
+releasing snapshots. Caller values/deadlines and parent cancellation remain intact; repeated node-session
+contracts cover the correction. Final uncached native and Linux race suites, native static gates,
+NKE/AICR byte-exact generation, the binary-bundle byte comparison and documentation checks passed. Linux
+validation used an init process to reap terminated descendants; external integration fixtures retained their
+explicit skips. No new hosted, registry or qualified acceptance is claimed.
 
 ## Unused implementation removal
 

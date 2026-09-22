@@ -1,0 +1,131 @@
+package pipeline
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+)
+
+// fetch acquires pinned source into SourceRoot/Dest and verifies the commit and
+// tree hash, failing closed on any mismatch (NKD-FR-BLD-022, NKD-FR-RC-023). An
+// already-checked-out matching source closure is reused only through a re-hashed
+// source receipt; HEAD alone is never sufficient.
+func (l Local) fetch(n ir.Node, opts RunOptions) error {
+	dir, err := pathWithin(opts.SourceRoot, n.Dest)
+	if err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "resolving fetch destination %q", n.Dest)
+	}
+	abs, _ := filepath.Abs(dir)
+
+	if opts.DryRun {
+		fmt.Fprintf(opts.Stdout, "[fetch] %s @ %s -> %s (verify tree %s)\n", n.Repo, abbrev(n.Commit), abs, abbrev(n.TreeHash))
+		return nil
+	}
+
+	if head, err := gitOut(opts.ctx(), dir, "rev-parse", "HEAD"); err == nil && head == n.Commit {
+		if err := l.verifyTree(dir, n, opts); err != nil {
+			return err
+		}
+		return l.vendor(n, dir, opts)
+	}
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "creating source dir %s", dir)
+	}
+	// Fetch exactly the pinned commit (shallow). GitHub serves reachable SHAs.
+	steps := [][]string{
+		{"init", "-q"},
+		{"remote", "add", "origin", n.Repo},
+		{"fetch", "-q", "--depth", "1", "origin", n.Commit},
+		{"checkout", "-q", "--detach", "FETCH_HEAD"},
+	}
+	for _, s := range steps {
+		if _, err := gitOut(opts.ctx(), dir, s...); err != nil {
+			if opts.ctx().Err() != nil {
+				return err
+			}
+			// `remote add` fails if origin exists on a reused dir; tolerate.
+			if s[0] == "remote" {
+				continue
+			}
+			return e.Wrap(e.CodeFetchFailed, err, "git %s in %s", strings.Join(s, " "), dir)
+		}
+	}
+	if err := l.verifyTree(dir, n, opts); err != nil {
+		return err
+	}
+	return l.vendor(n, dir, opts)
+}
+
+// vendor completes the fetch closure. The optional vendor command runs in the
+// toolchain container with network, after which ensureSourceClosure records and
+// verifies the exact bytes consumed by the offline build.
+func (l Local) vendor(n ir.Node, dir string, opts RunOptions) error {
+	return ensureSourceClosure(n, dir, opts, func() error {
+		abs, _ := filepath.Abs(dir)
+		cname := containerName(ir.Node{ID: "vendor-" + n.Dest})
+		args := append([]string{"run", "--rm", "--name", cname, "--network=" + ir.NetworkDefault, "-v", abs + ":/src", "-w", "/src", n.VendorImage}, n.VendorCmd...)
+		fmt.Fprintf(opts.Stdout, "\n=== vendor %s (network, %s) ===\n", n.Dest, n.VendorImage)
+		opts.progress.printf("[container] vendor %s — launching %s with network access\n", n.Dest, n.VendorImage)
+		if err := registerContainer(opts, cname); err != nil {
+			return err
+		}
+		if err := runContainerRuntime(opts, args...); err != nil {
+			return e.Wrap(e.CodeFetchFailed, err, "vendoring %s", n.Dest)
+		}
+		opts.reap.forget(cname)
+		return nil
+	})
+}
+
+func (l Local) verifyTree(dir string, n ir.Node, opts RunOptions) error {
+	head, err := gitOut(opts.ctx(), dir, "rev-parse", "HEAD")
+	if err != nil {
+		if opts.ctx().Err() != nil {
+			return err
+		}
+		return e.Wrap(e.CodeFetchFailed, err, "resolving HEAD in %s", dir)
+	}
+	if head != n.Commit {
+		return e.New(e.CodeFetchFailed, "commit mismatch in %s: got %s want %s", dir, head, n.Commit)
+	}
+	tree, err := gitOut(opts.ctx(), dir, "rev-parse", "HEAD^{tree}")
+	if err != nil {
+		if opts.ctx().Err() != nil {
+			return err
+		}
+		return e.Wrap(e.CodeFetchFailed, err, "resolving tree in %s", dir)
+	}
+	if tree != n.TreeHash {
+		return e.New(e.CodeFetchFailed, "tree-hash mismatch in %s: got %s want %s", dir, tree, n.TreeHash)
+	}
+	return nil
+}
+
+// abbrev shortens a hash for display without assuming a minimum length.
+func abbrev(s string) string {
+	if len(s) > 12 {
+		return s[:12]
+	}
+	return s
+}
+
+func gitOut(ctx context.Context, dir string, args ...string) (string, error) {
+	if ctx == nil {
+		return "", e.New(e.CodeUsage, "git execution requires a non-nil context")
+	}
+	cmd := execCmd(RunOptions{Ctx: ctx}, "git", append([]string{"-C", dir}, args...)...)
+	out, err := outputOwnedCommand(ctx, cmd)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", e.Wrap(e.CodeTimeout, ctx.Err(), "git execution canceled")
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
