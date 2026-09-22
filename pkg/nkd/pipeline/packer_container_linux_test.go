@@ -538,7 +538,7 @@ func TestRunPackerContainerCancellationJoinsTransportWork(t *testing.T) {
 				}
 				return fallback(stdin, stdout, stderr, args)
 			}
-			ctx, cancel := context.WithCancel(t.Context())
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			done := make(chan error, 1)
 			go func() {
 				_, err := runPackerContainer(ctx, request)
@@ -546,6 +546,8 @@ func TestRunPackerContainerCancellationJoinsTransportWork(t *testing.T) {
 			}()
 			select {
 			case <-blocked:
+			case err := <-done:
+				t.Fatalf("Packer run ended before the selected transport stage: %v", err)
 			case <-time.After(20 * time.Second):
 				t.Fatal("Packer run did not reach the selected transport stage")
 			}
