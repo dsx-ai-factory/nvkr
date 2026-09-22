@@ -458,7 +458,7 @@ func validateVMImageNode(n Node) error {
 			"VM build node %q toolchain platform %q differs from selected execution host %q",
 			n.ID, n.ToolchainPlatform, n.ExecutionBinding.Class.HostPlatform)
 	}
-	if n.Network != NetworkNone && n.Network != NetworkDefault {
+	if n.Network != NetworkNone && (n.Network != NetworkDefault || n.Packer == nil) {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q has unsupported network mode %q", n.ID, n.Network)
 	}
