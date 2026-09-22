@@ -33,8 +33,8 @@ func vmGraph(t *testing.T) Graph {
 				SourceTreeHash: tree, VendorSpecDigest: vendorSpec,
 				Disk: &DiskSpec{Format: "qcow2", Encryption: "none"},
 				Packer: &PackerConfig{
-					ProjectPath: "os-image/packer", BuildName: "image.qemu.node",
-					ArchitectureVariable: "architecture", MaterialManifestVariable: "material_manifest",
+					ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
+					ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest",
 					OutputDirectoryVariable: "output_directory",
 					Variables:               []PackerVariable{{Name: "image_variant", Value: "standard"}},
 				},
@@ -80,7 +80,15 @@ func TestVMGraphBindsExactPackerAndMaterialInputs(t *testing.T) {
 	}{
 		{name: "disk encryption", mutate: func(node *Node) { node.Disk.Encryption = "luks2" }},
 		{name: "Packer variable", mutate: func(node *Node) { node.Packer.Variables[0].Value = "minimal" }},
+		{name: "Packer version", mutate: func(node *Node) { node.Packer.PackerVersion = "1.14.3" }},
 		{name: "Packer build name", mutate: func(node *Node) { node.Packer.BuildName = "image.qemu.other" }},
+		{name: "accelerator variable", mutate: func(node *Node) { node.Packer.AcceleratorVariable = "vm_accelerator" }},
+		{name: "SSH variable pair", mutate: func(node *Node) {
+			node.Packer.SSHPrivateKeyVariable = "ssh_private_key_file"
+			node.Packer.SSHPublicKeyVariable = "ssh_public_key_file"
+		}},
+		{name: "build-log directory variable", mutate: func(node *Node) { node.Packer.BuildLogDirectoryVariable = "build_log_directory" }},
+		{name: "HTTP directory variable", mutate: func(node *Node) { node.Packer.HTTPDirectoryVariable = "http_directory" }},
 		{name: "material binding", mutate: func(node *Node) { node.Materials[0].Binding = "agent-deb" }},
 		{name: "toolchain platform", mutate: func(node *Node) { node.ToolchainPlatform = "linux/arm64" }},
 	} {

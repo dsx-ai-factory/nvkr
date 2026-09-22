@@ -168,8 +168,10 @@ func TestPackerPublicVariableValidation(t *testing.T) {
 	packerImage.BuildCommand = nil
 	packerImage.Packer = &PackerConfig{
 		ProjectPath:              "packer",
+		PackerVersion:            "1.14.2",
 		BuildName:                "qemu.image",
 		ArchitectureVariable:     "architecture",
+		AcceleratorVariable:      "accelerator",
 		MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable:  "output_directory",
 		Variables:                map[string]string{"image_variant": "standard"},

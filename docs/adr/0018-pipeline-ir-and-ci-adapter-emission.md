@@ -250,8 +250,15 @@ The callback is single-use and receives the authored executor deadline plus desc
 caller workspace or KVM pathname. CPU, memory, held-workspace capacity and KVM availability are re-observed inside
 that deadline immediately before work. Request, binding, any current Plan-byte mutation, or node substitution
 fails before the callback. Every retained and callback-borrowed handle closes on return. This primitive performs
-no source, subprocess, output, or workspace mutation during admission, and no execution driver consumes it yet,
-so existing adapter gates remain closed.
+no source, subprocess, output, or workspace mutation during admission. The local runner has a private typed
+direct-Packer dispatch boundary that requires this exact admission before Packer selection. A separate run-owned
+resolver contract binds the exact Plan, producer session, runtime, daemon and digest-pinned OCI toolchain images
+after pure Plan/workspace-shape validation but before workspace mutation. The resulting executor may perform source,
+material and output work only inside the single-use VM callback. The production OCI resolver is not connected yet,
+so current local execution fails at that resolver boundary before workspace or graph work. Contract tests exercise
+the resolver ordering and post-admission selection boundary. Command/Make `vm-image` authoring still lowers into
+the Plan, but local execution rejects it before resolver or workspace mutation until a held-output adapter exists.
+No VM producer executes yet, and the remaining adapter gates stay closed.
 
 This is current-availability authority for a future local VM adapter, not a resource reservation, authenticated
 provider allocation, cross-process receipt, or qualification evidence. Holding the validated KVM descriptor

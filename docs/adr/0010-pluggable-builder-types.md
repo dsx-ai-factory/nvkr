@@ -143,10 +143,16 @@ The direct-Packer authoring form names the stable boundary that compilation reco
 builderType: vm-image
 packer:
   projectPath: os-image/packer
+  packerVersion: 1.14.2
   buildName: nke-node-non-fde.qemu.nke-non-fde
   architectureVariable: architecture
+  acceleratorVariable: accelerator
   materialManifestVariable: material_manifest
   outputDirectoryVariable: output_directory
+  sshPrivateKeyVariable: ssh_private_key_file # optional as a pair
+  sshPublicKeyVariable: ssh_public_key_file   # optional as a pair
+  buildLogDirectoryVariable: build_log_directory # optional source contract
+  httpDirectoryVariable: http_directory           # optional source contract
   variables:
     image_variant: standard
 materials:
@@ -165,8 +171,18 @@ must invoke the pinned Packer executable's `validate` command against the pinned
 and the declared variable bindings, and fail closed on any diagnostic, including a warning returned with exit
 status zero when `-only` matches no build. For a named HCL build block, the selector is the complete compiled
 name (for example `nke-node-non-fde.qemu.nke-non-fde`), not only the source type and source name. `artifactPath` is relative to the private
-output directory bound through `outputDirectoryVariable`. The three variable names are explicit and distinct, so
-NKD never guesses source-owned HCL names. `packer.variables` contains only public literal strings. It is not a
+output directory bound through `outputDirectoryVariable`. `architectureVariable` always carries the selected
+target architecture. `acceleratorVariable` always carries the admitted `kvm` or `tcg` route; a source-owned
+default cannot override that decision. The required variable names and any source-exposed log or HTTP directory
+mapping are explicit and distinct, so NKD never guesses HCL names. Cache, temporary, configuration and home
+directories remain runtime-owned standard paths rather than authored HCL-variable mappings.
+The optional SSH private/public variable-name pair, when declared, receives paths to an attempt-local keypair
+created inside the private execution root. The variable names affect Build identity; generated key bytes and
+paths affect only the Run and never enter the catalog, logical Build identity, logs or evidence.
+`packerVersion` is an exact logical input. The admitted runtime compares it with the Packer executable inside the
+digest-pinned OCI toolchain before validation. The source-owned HCL constrains required plugins; the same OCI
+digest authenticates their preinstalled bytes, and execution exposes only its fixed read-only plugin directory.
+`packer.variables` contains only public literal strings. It is not a
 credential channel, and future invocation records expose these values. The pinned Packer subprocess remains
 authoritative for checking their names and values against source-owned HCL declarations.
 
@@ -193,13 +209,14 @@ infer or fetch undeclared build materials.
 
 Compilation lowers each declared binding to the exact selected build or acquisition producer and records both
 the typed binding and graph dependency. Before either driver may execute, required component outputs must be built or acquired, verified, and assembled
-into a deterministic build-material manifest. Each entry binds its source-owned binding name, observed component
-name, output kind, exact artifact digest, and a slash-relative path derived from the binding name beneath a private
+into a deterministic build-material manifest. Each v2 entry binds its source-owned binding name, observed component
+name, output kind, selected target architecture, exact artifact digest, and a slash-relative path derived from the binding name beneath a private
 staging root. Binding, component and kind text use the same display-safe UTF-8 policy as producer transport.
 Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
 deterministic description, not an authenticated receipt; admitted execution must derive it from authenticated
 producer observations and bind the exact serialized file bytes before invoking a subprocess. Direct Packer will
-receive the private absolute manifest path through its declared `materialManifestVariable`. The command/Make form
+receive the private absolute manifest path through its declared `materialManifestVariable`; the source must
+cross-check every entry's architecture against the separately supplied architecture variable. The command/Make form
 has no equivalent executable handoff in the current schema and therefore cannot lower a material-bearing command.
 Adding one requires a typed authored field and identity/lowering contract; an adapter may not invent a conventional
 path, append an argument, or inject an undeclared environment variable.
@@ -208,8 +225,11 @@ Malformed manifest schema or fields, including an absent explicit materials arra
 as `invalid-catalog`. They are description-shape failures, not missing provenance or a failed authenticated
 reference verification.
 
-Admitted lowering must bind only declared inputs and variables, provide a private output location, invoke the
-selected driver through the shared runner, collect the declared artifact, and recompute its exact bytes. A driver
+Admitted direct-Packer lowering must bind only declared inputs and variables, expose the authenticated source
+read-only, provide private output, log and HTTP locations, invoke `validate` and then the exact selected build,
+collect the declared artifact, and recompute its exact bytes. It does not run `packer init`, fetch plugins, or
+acquire source or product materials. Build execution remains network-none; all required bytes must already be in
+the authenticated source and material closure. A driver
 may not replace a staged material with an undeclared network fetch. The catalog entry owns the pinned source and
 toolchain, selected driver, exact entrypoint or Packer project and build name, artifact path, material edges, and
 public Packer-variable values. These fields are logical IR v4 inputs and therefore affect Build identity.
@@ -230,6 +250,11 @@ build claim. The VM-image root does not inherit either claim. Rebuilding that ro
 closure and reconciling read-only disk inspection establishes controlled production and composition; it does not
 establish disk reproduction. The root remains pipeline-attested unless ADR-07/08/14 independently admit and
 compare its exact qualified disk subject.
+
+Secret-valued Packer inputs are not public variables and may not be transported in process arguments, environment
+variables, manifests, logs or evidence. The plain-image direct contract needs no such input. FDE remains closed
+until its source-owned contract provides an authenticated file-path secret handoff or generates and removes an
+attempt-local bootstrap secret without exposing it through NKD's public variable transport.
 
 Runner capacity is not part of `vm-image`. A from-source component may declare generic `buildRequirements`
 using ADR-18's per-step execution contract. A `vm-image` producer must use that same generic type to declare a

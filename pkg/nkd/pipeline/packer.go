@@ -26,6 +26,12 @@ import (
 )
 
 const (
+	// MaxVMImagePackerInputBytes bounds both one authenticated material and the
+	// complete material carrier consumed by direct-Packer execution. Factory
+	// admission and every runtime transport use this single executable limit so
+	// an accepted closure cannot fail only after staging begins.
+	MaxVMImagePackerInputBytes int64 = 64 << 30
+
 	maxPackerExecutableBytes       int64 = 512 << 20
 	maxPackerHostToolBytes         int64 = 512 << 20
 	maxPackerHostToolClosureBytes  int64 = 4 << 30
@@ -34,8 +40,8 @@ const (
 	maxPackerPluginClosureBytes    int64 = 4 << 30
 	maxPackerPluginFiles                 = 256
 	maxPackerManifestBytes         int64 = 64 << 20
-	maxPackerMaterialBytes         int64 = 64 << 30
-	maxPackerMaterialTotalBytes    int64 = 128 << 30
+	maxPackerMaterialBytes               = MaxVMImagePackerInputBytes
+	maxPackerMaterialTotalBytes          = MaxVMImagePackerInputBytes
 	maxPackerMaterialFiles               = 256
 	maxPackerBuildNameBytes              = 256
 	maxPackerPathBytes                   = 4096
@@ -228,14 +234,20 @@ type PackerBuildRequest struct {
 
 	ArchitectureVariable string
 	Architecture         string
+	AcceleratorVariable  string
+	Accelerator          string
 
 	MaterialManifestVariable string
 	MaterialManifestPath     string
 	MaterialManifestSHA256   string
 	Materials                []PackerMaterialInput
 
-	OutputDirectoryVariable string
-	OutputParent            string
+	OutputDirectoryVariable   string
+	OutputParent              string
+	BuildLogDirectoryVariable string
+	HTTPDirectoryVariable     string
+	SSHPrivateKeyVariable     string
+	SSHPublicKeyVariable      string
 
 	Variables    []PackerVariable
 	ArtifactPath string
@@ -445,13 +457,30 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	if err := os.WriteFile(configPath, []byte("{}\n"), 0o400); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "creating empty private Packer configuration")
 	}
-
 	bindings := append([]PackerVariable(nil), request.Variables...)
 	bindings = append(bindings,
-		PackerVariable{Name: request.ArchitectureVariable, Value: request.Architecture},
 		PackerVariable{Name: request.MaterialManifestVariable, Value: manifestPath},
 		PackerVariable{Name: request.OutputDirectoryVariable, Value: outputDir},
 	)
+	attemptDirectories := []struct {
+		name string
+		path string
+	}{
+		{request.BuildLogDirectoryVariable, filepath.Join(runRoot, "logs")},
+		{request.HTTPDirectoryVariable, filepath.Join(runRoot, "http")},
+	}
+	for _, directory := range attemptDirectories {
+		if directory.name == "" {
+			continue
+		}
+		if err := os.MkdirAll(directory.path, 0o700); err != nil {
+			return nil, e.Wrap(e.CodeBuildFailed, err, "creating private Packer attempt directory")
+		}
+		bindings = append(bindings, PackerVariable{Name: directory.name, Value: directory.path})
+	}
+	bindings = append(bindings,
+		PackerVariable{Name: request.ArchitectureVariable, Value: request.Architecture},
+		PackerVariable{Name: request.AcceleratorVariable, Value: request.Accelerator})
 	sort.Slice(bindings, func(i, j int) bool { return bindings[i].Name < bindings[j].Name })
 	variableArgs := make([]string, 0, len(bindings)*2)
 	for _, binding := range bindings {
@@ -972,6 +1001,17 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 	if !validPackerTransport(request.Architecture, packertransport.MaxVariableValueBytes, false) {
 		return e.New(e.CodeInvalidCatalog, "Packer architecture value is not transport-safe")
 	}
+	if (request.SSHPrivateKeyVariable == "") != (request.SSHPublicKeyVariable == "") {
+		return e.New(e.CodeInvalidCatalog,
+			"host Packer requires both SSH key variable names or neither")
+	}
+	if request.SSHPrivateKeyVariable != "" {
+		return e.New(e.CodeEngineCapability,
+			"host Packer cannot realize attempt-local SSH key path variables")
+	}
+	if request.Accelerator != "kvm" && request.Accelerator != "tcg" {
+		return e.New(e.CodeInvalidCatalog, "Packer accelerator must be selected by VM runtime admission")
+	}
 	if !canonical.IsDigest(request.MaterialManifestSHA256) {
 		return e.New(e.CodeUnpinnedInput, "Packer material manifest requires an exact lowercase sha256 digest")
 	}
@@ -1025,8 +1065,17 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 	}
 	reserved := []string{
 		request.ArchitectureVariable,
+		request.AcceleratorVariable,
 		request.MaterialManifestVariable,
 		request.OutputDirectoryVariable,
+	}
+	for _, optional := range []string{
+		request.BuildLogDirectoryVariable,
+		request.HTTPDirectoryVariable,
+	} {
+		if optional != "" {
+			reserved = append(reserved, optional)
+		}
 	}
 	if err := packertransport.ValidateVariables(reserved, request.Variables); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "validating Packer variable transport")

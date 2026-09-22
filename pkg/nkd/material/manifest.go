@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	ManifestSchemaVersion = "nkd.dev/build-material-manifest/v1"
+	ManifestSchemaVersion = "nkd.dev/build-material-manifest/v2"
 	maxMaterialNameBytes  = 256
 	maxMaterialKindBytes  = 128
 	maxPathSegmentBytes   = 255
@@ -30,18 +30,23 @@ type Observation struct {
 	Binding   string `json:"binding"`
 	Component string `json:"component"`
 	Kind      string `json:"kind"`
-	Digest    string `json:"digest"`
+	// Architecture repeats the selected target architecture so the source-owned
+	// build can cross-check every material against its explicit architecture
+	// variable before consuming the staged bytes.
+	Architecture string `json:"architecture"`
+	Digest       string `json:"digest"`
 }
 
 // Entry is one material made available beneath the build's private staging root.
 // Path is a deterministic slash-relative path derived from Binding; an absolute or
 // random execution root never enters the canonical manifest.
 type Entry struct {
-	Binding   string `json:"binding"`
-	Component string `json:"component"`
-	Kind      string `json:"kind"`
-	Digest    string `json:"digest"`
-	Path      string `json:"path"`
+	Binding      string `json:"binding"`
+	Component    string `json:"component"`
+	Kind         string `json:"kind"`
+	Architecture string `json:"architecture"`
+	Digest       string `json:"digest"`
+	Path         string `json:"path"`
 }
 
 // Manifest is the canonical material description consumed by a build driver.
@@ -64,11 +69,12 @@ func NewManifest(observations []Observation) (*Manifest, error) {
 			return nil, err
 		}
 		manifest.Materials = append(manifest.Materials, Entry{
-			Binding:   observation.Binding,
-			Component: observation.Component,
-			Kind:      observation.Kind,
-			Digest:    observation.Digest,
-			Path:      path,
+			Binding:      observation.Binding,
+			Component:    observation.Component,
+			Kind:         observation.Kind,
+			Architecture: observation.Architecture,
+			Digest:       observation.Digest,
+			Path:         path,
 		})
 	}
 	if err := manifest.Validate(); err != nil {
@@ -94,6 +100,7 @@ func (manifest *Manifest) Validate() error {
 	components := make(map[string]string, len(manifest.Materials))
 	paths := make(map[string]string, len(manifest.Materials))
 	previousBinding := ""
+	manifestArchitecture := ""
 	for index, entry := range manifest.Materials {
 		if !canonicalText(entry.Component, maxMaterialNameBytes) ||
 			!canonicalText(entry.Kind, maxMaterialKindBytes) {
@@ -105,6 +112,16 @@ func (manifest *Manifest) Validate() error {
 				"build material manifest bindings must be strictly sorted and duplicate-free")
 		}
 		previousBinding = entry.Binding
+		if entry.Architecture != "amd64" && entry.Architecture != "arm64" {
+			return e.New(e.CodeInvalidCatalog,
+				"build material %q has unsupported target architecture %q", entry.Binding, entry.Architecture)
+		}
+		if manifestArchitecture != "" && entry.Architecture != manifestArchitecture {
+			return e.New(e.CodeInvalidCatalog,
+				"build material manifest mixes target architectures %q and %q",
+				manifestArchitecture, entry.Architecture)
+		}
+		manifestArchitecture = entry.Architecture
 		if previous, duplicate := components[entry.Component]; duplicate {
 			return e.New(e.CodeInvalidCatalog,
 				"build material bindings %q and %q ambiguously select component %q",

@@ -316,11 +316,16 @@ func packerConfig(config *catalog.PackerConfig) *ir.PackerConfig {
 	}
 	sort.Slice(variables, func(i, j int) bool { return variables[i].Name < variables[j].Name })
 	return &ir.PackerConfig{
-		ProjectPath: config.ProjectPath, BuildName: config.BuildName,
-		ArchitectureVariable:     config.ArchitectureVariable,
-		MaterialManifestVariable: config.MaterialManifestVariable,
-		OutputDirectoryVariable:  config.OutputDirectoryVariable,
-		Variables:                variables,
+		ProjectPath: config.ProjectPath, PackerVersion: config.PackerVersion, BuildName: config.BuildName,
+		ArchitectureVariable:      config.ArchitectureVariable,
+		AcceleratorVariable:       config.AcceleratorVariable,
+		MaterialManifestVariable:  config.MaterialManifestVariable,
+		OutputDirectoryVariable:   config.OutputDirectoryVariable,
+		SSHPrivateKeyVariable:     config.SSHPrivateKeyVariable,
+		SSHPublicKeyVariable:      config.SSHPublicKeyVariable,
+		BuildLogDirectoryVariable: config.BuildLogDirectoryVariable,
+		HTTPDirectoryVariable:     config.HTTPDirectoryVariable,
+		Variables:                 variables,
 	}
 }
 

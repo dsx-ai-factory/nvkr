@@ -118,8 +118,8 @@ func diskObservationFixture(t *testing.T, encryption string) (*Plan, LifecycleOu
 	component.Disk.Encryption = encryption
 	component.BuildCommand = nil
 	component.Packer = &catalog.PackerConfig{
-		ProjectPath: "os-image/packer", BuildName: "image.qemu.node",
-		ArchitectureVariable: "architecture", MaterialManifestVariable: "material_manifest",
+		ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
+		ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable: "output_directory",
 		Variables:               map[string]string{"image_variant": "standard"},
 	}
@@ -319,7 +319,7 @@ func TestPopulateDiskProducerCompletionCancellationAndDuplicate(t *testing.T) {
 	cancel()
 	called := false
 	err := populateDiskProducerCompletion(ctx, plan, completion.NodeID, localDiskRunResult(t, plan),
-		func(context.Context, ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
+		func(context.Context, Node, ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 			called = true
 			return nil, nil, nil
 		})
@@ -358,7 +358,7 @@ func TestPopulateDiskProducerCompletionDefensivelyClonesInstruction(t *testing.T
 		t.Fatal(err)
 	}
 	err = populateDiskProducerCompletion(t.Context(), plan, completion.NodeID, localDiskRunResult(t, plan),
-		func(_ context.Context, instruction ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
+		func(_ context.Context, _ Node, instruction ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 			instruction.Needs[0] = "changed"
 			instruction.Requirements.Resources.CPUMillis++
 			instruction.ExecutionBinding.Class.Name = "changed"
@@ -398,10 +398,10 @@ func TestRunLocalNodeRoutesDirectPackerThroughConcreteCallback(t *testing.T) {
 				ordinaryCalled = true
 				return nil
 			},
-			executeDisk: func(_ context.Context, instruction ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
+			executeDisk: func(_ context.Context, selected Node, instruction ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 				diskCalled = true
-				if instruction.ID != "build-image" || instruction.Packer == nil {
-					t.Fatalf("disk callback instruction = %#v", instruction)
+				if selected.ID != completion.NodeID || instruction.ID != "build-image" || instruction.Packer == nil {
+					t.Fatalf("disk callback node/instruction = %#v/%#v", selected, instruction)
 				}
 				return nil, nil, e.New(e.CodeBuildFailed, "driver unavailable")
 			},

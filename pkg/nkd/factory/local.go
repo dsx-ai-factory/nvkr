@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -45,6 +46,9 @@ type LocalRunOptions struct {
 	Stdout       io.Writer
 	Stderr       io.Writer
 	producers    *pipeline.NodeSession
+	vmResolver   vmDriverResolver
+	vmDrivers    vmDriverExecutor
+	vmAdmissions map[string]vmAdmission
 }
 
 // LocalNodeResult is a deterministic, unqualified execution observation.
@@ -71,9 +75,12 @@ type LocalRunResult struct {
 }
 
 type localRunDeps struct {
+	admitVMBuilds func(context.Context, *Plan, string) (map[string]vmAdmission, error)
+	admitRunners  func(context.Context, *Plan, LocalRunOptions, []string) error
 	prepareRunner func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error)
 	executeNode   func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error
 	executeDisk   diskProducerCallback
+	makeDisk      func(*Plan, *LocalRunOptions) diskProducerCallback
 }
 
 type localProducerSessionCloser interface {
@@ -86,18 +93,31 @@ type localProducerSessionCloser interface {
 // The caller owns the returned result and must Close it after observation.
 func RunLocal(ctx context.Context, plan *Plan, options LocalRunOptions) (*LocalRunResult, error) {
 	options = withLocalDefaults(options)
+	if hasLocalVMBuild(plan) && !options.DryRun {
+		return runLocal(ctx, plan, options, productionLocalRunDeps())
+	}
 	if err := AdmitLocal(ctx, plan, options); err != nil {
 		return nil, err
 	}
 	return runLocal(ctx, plan, options, productionLocalRunDeps())
 }
 
-// AdmitLocal verifies every capability needed by a local execution before the
-// caller reserves a workspace or creates output. It deliberately performs no
-// filesystem mutation and does not build a runner.
+// AdmitLocal verifies every capability needed by an ordinary local execution
+// before the caller reserves a workspace or creates output. A non-dry-run VM
+// Plan requires RunLocal to create and hold its private workspace before the
+// dedicated per-node admission can run, so this standalone preflight fails
+// closed for that case. It performs no filesystem mutation and does not build a
+// runner.
 func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error {
 	options = withLocalDefaults(options)
-	if err := admitLocalPlan(ctx, plan, options); err != nil {
+	if err := admitLocalPlanBase(ctx, plan); err != nil {
+		return err
+	}
+	if !options.DryRun && hasLocalVMBuild(plan) {
+		return e.New(e.CodeEngineCapability,
+			"local VM execution requires RunLocal's held-workspace admission")
+	}
+	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return err
 	}
 	if options.DryRun {
@@ -128,23 +148,39 @@ func withLocalDefaults(options LocalRunOptions) LocalRunOptions {
 	if options.Stderr == nil {
 		options.Stderr = io.Discard
 	}
+	if options.vmResolver == nil {
+		options.vmResolver = unavailableVMDriverResolver{}
+	}
 	return options
 }
 
 func productionLocalRunDeps() localRunDeps {
 	return localRunDeps{
+		admitVMBuilds: admitLocalVMBuilds,
+		admitRunners:  admitLocalRunners,
 		prepareRunner: prepareLocalRunners,
 		executeNode:   executeLocalFactoryNode,
-		// The direct-Packer adapter remains deliberately absent until its owner
-		// returns a package-issued held payload. runLocal rejects that Plan before
-		// workspace or subprocess work instead of accepting a path-based result.
-		executeDisk: nil,
+		makeDisk:      admittedLocalDiskProducer,
 	}
 }
 
-func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps localRunDeps) (runResult *LocalRunResult, returnErr error) {
-	if err := admitLocalPlan(ctx, plan, options); err != nil {
+func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps localRunDeps) (
+	result *LocalRunResult,
+	returnErr error,
+) {
+	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return nil, err
+	}
+	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
+		return nil, err
+	}
+	if !options.DryRun && hasLocalVMBuild(plan) {
+		if err := validateVMDriverPlan(plan); err != nil {
+			return nil, err
+		}
+	}
+	if deps.executeDisk == nil && deps.makeDisk != nil {
+		deps.executeDisk = deps.makeDisk(plan, &options)
 	}
 	if !options.DryRun && requiresDirectPackerDiskAdapter(plan) && deps.executeDisk == nil {
 		return nil, e.New(e.CodeEngineCapability,
@@ -155,12 +191,15 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err != nil {
 		return nil, err
 	}
-	result := &LocalRunResult{SchemaVersion: LocalRunSchemaVersion,
+	result = &LocalRunResult{SchemaVersion: LocalRunSchemaVersion,
 		Qualification: TierLocalExecution, PlanDigest: planDigest,
 		Workspace: filepath.ToSlash(options.Workspace)}
 	completed := false
 	defer func() {
 		returnErr = finishLocalRun(result, options.producers, completed, returnErr)
+		if returnErr != nil {
+			result = nil
+		}
 	}()
 	if options.DryRun {
 		for _, node := range ordered {
@@ -177,14 +216,65 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if deps.prepareRunner == nil || deps.executeNode == nil {
 		return nil, e.New(e.CodeInternal, "factory local executor is incomplete")
 	}
+	var outputMu sync.Mutex
+	options.Stdout = lockedLocalWriter{mu: &outputMu, Writer: options.Stdout}
+	options.Stderr = lockedLocalWriter{mu: &outputMu, Writer: options.Stderr}
 	options.producers, err = pipeline.NewNodeSession(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if hasLocalVMBuild(plan) {
+		if options.vmResolver == nil {
+			return nil, e.New(e.CodeEngineCapability, "factory local VM driver resolver is unavailable")
+		}
+		relocated, relocateErr := relocateFactoryPlan(plan, options.Workspace)
+		if relocateErr != nil {
+			return nil, relocateErr
+		}
+		options.vmDrivers, err = options.vmResolver.Admit(ctx, relocated, options.producers, vmDriverRunConfig{
+			Runtime: options.Runtime, Stdout: options.Stdout, Stderr: options.Stderr,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if options.vmDrivers == nil {
+			return nil, e.New(e.CodeEngineCapability, "factory local VM driver resolver returned no executor")
+		}
+		defer func() {
+			if closeErr := options.vmDrivers.Close(); closeErr != nil {
+				completed = false
+				returnErr = joinFactoryCleanupError(returnErr, closeErr,
+					"closing local VM driver executor")
+			}
+		}()
 	}
 	if err := ensureLocalWorkspace(ctx, options.Workspace, planDigest); err != nil {
 		return nil, err
 	}
 	platforms := localRunnerPlatforms(ordered)
+	if hasLocalVMBuild(plan) {
+		if deps.admitVMBuilds == nil || deps.admitRunners == nil {
+			return nil, e.New(e.CodeInternal, "factory local VM admission is incomplete")
+		}
+		relocated, relocateErr := relocateFactoryPlan(plan, options.Workspace)
+		if relocateErr != nil {
+			return nil, relocateErr
+		}
+		options.vmAdmissions, err = deps.admitVMBuilds(ctx, relocated, options.Workspace)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if closeErr := closeLocalVMAdmissions(options.vmAdmissions); closeErr != nil {
+				completed = false
+				returnErr = joinFactoryCleanupError(returnErr, closeErr,
+					"closing local VM runtime admissions")
+			}
+		}()
+		if err := deps.admitRunners(ctx, plan, options, platforms); err != nil {
+			return nil, err
+		}
+	}
 	runners, err := deps.prepareRunner(ctx, plan, options, platforms)
 	if err != nil {
 		return nil, err
@@ -193,9 +283,6 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	// One scheduling pass covers producers and utility work. A batch contains only
 	// ready operations; cancel and join the whole batch before returning failure.
 	status := make(map[string]string, len(ordered))
-	var outputMu sync.Mutex
-	options.Stdout = lockedLocalWriter{mu: &outputMu, Writer: options.Stdout}
-	options.Stderr = lockedLocalWriter{mu: &outputMu, Writer: options.Stderr}
 	for len(status) < len(ordered) {
 		var ready []Node
 		for _, node := range ordered {
@@ -266,6 +353,30 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	}
 	completed = true
 	return result, nil
+}
+
+func admittedLocalDiskProducer(plan *Plan, options *LocalRunOptions) diskProducerCallback {
+	return func(
+		ctx context.Context,
+		selected Node,
+		instruction ir.Node,
+	) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
+		if plan == nil || options == nil || selected.ID == "" ||
+			selected.IRNode != instruction.ID || instruction.Packer == nil {
+			return nil, nil, e.New(e.CodeEngineCapability,
+				"local direct-Packer disk execution is incomplete")
+		}
+		relocated, err := relocateFactoryPlan(plan, options.Workspace)
+		if err != nil {
+			return nil, nil, err
+		}
+		admission := options.vmAdmissions[selected.ID]
+		if admission == nil {
+			return nil, nil, e.New(e.CodeEngineCapability,
+				"local VM node %q has no pre-execution runtime admission", selected.ID)
+		}
+		return dispatchAdmittedVMProducer(ctx, admission, relocated, selected, options.vmDrivers)
+	}
 }
 
 // finishLocalRun releases held disk payloads before their producer session on
@@ -384,7 +495,7 @@ func isDirectPackerDiskNode(plan *Plan, node Node) (bool, error) {
 	return instruction.Packer != nil, nil
 }
 
-func admitLocalPlan(ctx context.Context, plan *Plan, options LocalRunOptions) error {
+func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "local execution requires a context")
 	}
@@ -397,15 +508,12 @@ func admitLocalPlan(ctx context.Context, plan *Plan, options LocalRunOptions) er
 	if err := plan.Validate(); err != nil {
 		return err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "local factory execution"); err != nil {
+	if err := rejectUnsupportedLocalPlanRequirements(plan, "local factory execution"); err != nil {
 		return err
 	}
 	if len(plan.Environment.SourceAccess) != 0 {
 		return e.New(e.CodeEngineCapability,
 			"local execution does not support Environment.sourceAccess authentication")
-	}
-	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
-		return err
 	}
 	return nil
 }
@@ -564,6 +672,83 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		return err
 	}
 	return ExecuteNode(ctx, relocated, node.ID, options.Stdout, options.Stderr)
+}
+
+func hasLocalVMBuild(plan *Plan) bool {
+	if plan == nil {
+		return false
+	}
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind != NodeBuild || node.IRNode == "" {
+			continue
+		}
+		_, instruction, err := plan.producerInstruction(node)
+		if err == nil && instruction.BuilderType == ir.BuilderVMImage {
+			return true
+		}
+	}
+	return false
+}
+
+func admitLocalVMBuilds(ctx context.Context, plan *Plan, workspacePath string) (
+	admissions map[string]vmAdmission,
+	returnErr error,
+) {
+	workspace, _, err := securepath.OpenDirectory(workspacePath)
+	if err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "holding local VM workspace")
+	}
+	defer func() {
+		if closeErr := workspace.Close(); closeErr != nil {
+			admissionCloseErr := closeLocalVMAdmissions(admissions)
+			admissions = nil
+			returnErr = joinFactoryCleanupError(returnErr, errors.Join(closeErr, admissionCloseErr),
+				"closing local VM workspace handle")
+		}
+	}()
+	admissions = make(map[string]vmAdmission)
+	for _, node := range topologicalFactoryNodes(plan.Graph) {
+		if node.Kind != NodeBuild || node.IRNode == "" {
+			continue
+		}
+		_, instruction, err := plan.producerInstruction(node)
+		if err != nil {
+			return nil, joinFactoryCleanupError(err, closeLocalVMAdmissions(admissions),
+				"closing partial local VM admissions")
+		}
+		if instruction.BuilderType != ir.BuilderVMImage {
+			continue
+		}
+		admission, err := AdmitLocalVMBuild(ctx, plan, node.ID, workspace)
+		if err != nil {
+			return nil, joinFactoryCleanupError(err, closeLocalVMAdmissions(admissions),
+				"closing partial local VM admissions")
+		}
+		admissions[node.ID] = admission
+	}
+	return admissions, nil
+}
+
+func closeLocalVMAdmissions(admissions map[string]vmAdmission) error {
+	var closeErrs []error
+	for _, id := range sortedKeys(admissions) {
+		if admission := admissions[id]; admission != nil {
+			closeErrs = append(closeErrs, admission.Close())
+		}
+	}
+	return errors.Join(closeErrs...)
+}
+
+func joinFactoryCleanupError(primary, cleanup error, operation string) error {
+	if cleanup == nil {
+		return primary
+	}
+	code := e.CodeInternal
+	var coded *e.Error
+	if errors.As(primary, &coded) {
+		code = coded.Code
+	}
+	return e.Wrap(code, errors.Join(primary, cleanup), "%s", operation)
 }
 
 func relocateFactoryPlan(plan *Plan, workspace string) (*Plan, error) {

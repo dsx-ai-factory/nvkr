@@ -533,6 +533,11 @@ func validateIRPackerConfig(nodeID string, config *PackerConfig) error {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q has an unsafe or inexact Packer build name", nodeID)
 	}
+	if !safetext.Valid(config.PackerVersion, 64, false) ||
+		strings.TrimSpace(config.PackerVersion) != config.PackerVersion {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q has no exact bounded Packer version", nodeID)
+	}
 	public := make([]packertransport.Variable, len(config.Variables))
 	previous := ""
 	for index, variable := range config.Variables {
@@ -543,11 +548,28 @@ func validateIRPackerConfig(nodeID string, config *PackerConfig) error {
 		previous = variable.Name
 		public[index] = packertransport.Variable{Name: variable.Name, Value: variable.Value}
 	}
-	if err := packertransport.ValidateVariables([]string{
+	reserved := []string{
 		config.ArchitectureVariable,
+		config.AcceleratorVariable,
 		config.MaterialManifestVariable,
 		config.OutputDirectoryVariable,
-	}, public); err != nil {
+	}
+	if (config.SSHPrivateKeyVariable == "") != (config.SSHPublicKeyVariable == "") {
+		return e.New(e.CodeInvalidCatalog,
+			"VM build node %q must declare both Packer SSH key variables or neither", nodeID)
+	}
+	if config.SSHPrivateKeyVariable != "" {
+		reserved = append(reserved, config.SSHPrivateKeyVariable, config.SSHPublicKeyVariable)
+	}
+	for _, optional := range []string{
+		config.BuildLogDirectoryVariable,
+		config.HTTPDirectoryVariable,
+	} {
+		if optional != "" {
+			reserved = append(reserved, optional)
+		}
+	}
+	if err := packertransport.ValidateVariables(reserved, public); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err,
 			"VM build node %q has invalid Packer variable bindings", nodeID)
 	}

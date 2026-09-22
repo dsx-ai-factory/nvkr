@@ -301,6 +301,8 @@ func testPackerRequest(t *testing.T, projectDir string) PackerBuildRequest {
 		BuildName:                "qemu.node",
 		ArchitectureVariable:     "architecture",
 		Architecture:             "arm64",
+		AcceleratorVariable:      "accelerator",
+		Accelerator:              "tcg",
 		MaterialManifestVariable: "material_manifest",
 		MaterialManifestPath:     manifest,
 		MaterialManifestSHA256:   FileDigest(raw),
@@ -363,22 +365,23 @@ func TestPackerDriverValidatesThenBuildsExactArgvAndCollectsArtifact(t *testing.
 	}
 	validate := strings.Split(lines[0], "\t")
 	build := strings.Split(lines[1], "\t")
-	if len(validate) != 12 || validate[0] != "CALL" || validate[1] != "validate" ||
-		validate[2] != "-only=qemu.node" || validate[3] != "-var" || validate[4] != "architecture=arm64" ||
-		validate[5] != "-var" || validate[6] != "custom=value" || validate[7] != "-var" ||
-		!strings.HasPrefix(validate[8], "material_manifest=") || validate[9] != "-var" ||
-		!strings.HasPrefix(validate[10], "output_directory=") || validate[11] != "." {
+	if len(validate) != 14 || validate[0] != "CALL" || validate[1] != "validate" ||
+		validate[2] != "-only=qemu.node" || validate[3] != "-var" || validate[4] != "accelerator=tcg" ||
+		validate[5] != "-var" || validate[6] != "architecture=arm64" || validate[7] != "-var" ||
+		validate[8] != "custom=value" || validate[9] != "-var" ||
+		!strings.HasPrefix(validate[10], "material_manifest=") || validate[11] != "-var" ||
+		!strings.HasPrefix(validate[12], "output_directory=") || validate[13] != "." {
 		t.Fatalf("validate argv = %#v", validate)
 	}
-	if len(build) != 13 || build[0] != "CALL" || build[1] != "build" || build[2] != "-on-error=cleanup" ||
+	if len(build) != 15 || build[0] != "CALL" || build[1] != "build" || build[2] != "-on-error=cleanup" ||
 		build[3] != "-only=qemu.node" || !equalStrings(build[4:], validate[3:]) {
 		t.Fatalf("build argv = %#v; validate argv = %#v", build, validate)
 	}
 	if output.String() != "The configuration is valid.\n" {
 		t.Fatalf("Packer output = %q, want one clean validation result", output.String())
 	}
-	manifestPath := strings.TrimPrefix(validate[8], "material_manifest=")
-	outputPath := strings.TrimPrefix(validate[10], "output_directory=")
+	manifestPath := strings.TrimPrefix(validate[10], "material_manifest=")
+	outputPath := strings.TrimPrefix(validate[12], "output_directory=")
 	if _, err := os.Lstat(manifestPath); !os.IsNotExist(err) {
 		t.Fatalf("private manifest survived driver cleanup: %v", err)
 	}
@@ -623,6 +626,13 @@ func TestPackerRequestValidationRejectsUnsafeTransport(t *testing.T) {
 		{name: "build list", edit: func(request *PackerBuildRequest) { request.BuildName = "qemu.a,qemu.b" }, code: nkderr.CodeInvalidCatalog},
 		{name: "build display control", edit: func(request *PackerBuildRequest) { request.BuildName = "qemu.\u202enode" }, code: nkderr.CodeInvalidCatalog},
 		{name: "architecture display control", edit: func(request *PackerBuildRequest) { request.Architecture = "arm\u200b64" }, code: nkderr.CodeInvalidCatalog},
+		{name: "accelerator absent", edit: func(request *PackerBuildRequest) { request.Accelerator = "" }, code: nkderr.CodeInvalidCatalog},
+		{name: "accelerator unadmitted", edit: func(request *PackerBuildRequest) { request.Accelerator = "host" }, code: nkderr.CodeInvalidCatalog},
+		{name: "partial SSH mapping", edit: func(request *PackerBuildRequest) { request.SSHPrivateKeyVariable = "ssh_private_key_file" }, code: nkderr.CodeInvalidCatalog},
+		{name: "host SSH mapping unsupported", edit: func(request *PackerBuildRequest) {
+			request.SSHPrivateKeyVariable = "ssh_private_key_file"
+			request.SSHPublicKeyVariable = "ssh_public_key_file"
+		}, code: nkderr.CodeEngineCapability},
 		{name: "artifact traversal", edit: func(request *PackerBuildRequest) { request.ArtifactPath = "../node.qcow2" }, code: nkderr.CodeInvalidCatalog},
 		{name: "manifest unpinned", edit: func(request *PackerBuildRequest) { request.MaterialManifestSHA256 = "latest" }, code: nkderr.CodeUnpinnedInput},
 		{name: "material traversal", edit: func(request *PackerBuildRequest) { request.Materials[0].Path = "../component.deb" }, code: nkderr.CodeInvalidCatalog},

@@ -73,7 +73,7 @@ type diskProducerCompletion struct {
 // the concrete PackerArtifact is pipeline's package-issued held capability. No
 // path, digest, structural implementation, or caller-composed completion can
 // enter LocalRunResult through this production boundary.
-type diskProducerCallback func(context.Context, ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error)
+type diskProducerCallback func(context.Context, Node, ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error)
 
 // heldDiskProducerCallback is factory's internal adapter after a concrete
 // PackerArtifact has transferred ownership. Tests use it with a factory-owned
@@ -111,7 +111,8 @@ func populateDiskProducerCompletion(ctx context.Context, plan *Plan, nodeID stri
 	}
 	return populateHeldDiskProducerCompletion(ctx, plan, nodeID, execution,
 		func(ctx context.Context, instruction ir.Node) (*diskPayload, *pipeline.ArtifactResult, error) {
-			artifact, description, err := run(ctx, instruction)
+			selected := planNode(plan, nodeID)
+			artifact, description, err := run(ctx, selected, instruction)
 			payload := holdPackerDiskPayload(artifact)
 			if err == nil && payload != nil &&
 				(!canonical.IsDigest(payload.digest) || payload.size <= 0) {
