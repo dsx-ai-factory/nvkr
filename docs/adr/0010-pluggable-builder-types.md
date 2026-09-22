@@ -137,7 +137,10 @@ invocation mechanism, not a builder type or an output semantic:
   outer realized-runtime adapter must additionally authenticate the ELF dynamic loader and shared-library
   closure; a future script lane must bind its interpreter in that same closure.
 
-The direct-Packer authoring form names the stable boundary that compilation records and future execution must enforce:
+The direct-Packer authoring form names the stable boundary that compilation records and future execution must
+enforce. The concrete projection values below match the source-owned
+[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/e45aa0d7f245d9e0ae7def612ebbeeda6c5208f3/os-image/packer/variables.pkr.hcl#L14-L58);
+they are example producer vocabulary, not NKD-reserved values.
 
 ```yaml
 builderType: vm-image

@@ -170,6 +170,36 @@ func TestMaterialManifestProjectionValidationFailsClosed(t *testing.T) {
 	if got := errorCode(ValidateProjection(valid(), []string{"image-inputs", "image-inputs"})); got != e.CodeInvalidCatalog {
 		t.Fatalf("duplicate binding validation = %v, want %s", ValidateProjection(valid(), []string{"image-inputs", "image-inputs"}), e.CodeInvalidCatalog)
 	}
+	if got := errorCode(ValidateProjection(valid(), []string{" bad", "installer-iso"})); got != e.CodeInvalidCatalog {
+		t.Fatalf("invalid declared binding validation = %v, want %s", ValidateProjection(valid(), []string{" bad", "installer-iso"}), e.CodeInvalidCatalog)
+	}
+}
+
+func TestProjectedManifestRejectsAmbiguousObservations(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	projection := &Projection{SchemaVersion: "example.dev/materials/v1", Kinds: map[string]string{
+		"one": "archive", "two": "archive",
+	}}
+	for _, test := range []struct {
+		name         string
+		observations []Observation
+	}{
+		{name: "mixed architecture", observations: []Observation{
+			{Binding: "one", Component: "one", Kind: "raw", Architecture: "amd64", Digest: digest},
+			{Binding: "two", Component: "two", Kind: "raw", Architecture: "arm64", Digest: digest},
+		}},
+		{name: "duplicate component", observations: []Observation{
+			{Binding: "one", Component: "component", Kind: "raw", Architecture: "arm64", Digest: digest},
+			{Binding: "two", Component: "component", Kind: "raw", Architecture: "arm64", Digest: digest},
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw, err := MarshalProjected(test.observations, projection)
+			if raw != nil || errorCode(err) != e.CodeInvalidCatalog {
+				t.Fatalf("MarshalProjected() = %q, %v, want %s", raw, err, e.CodeInvalidCatalog)
+			}
+		})
+	}
 }
 
 func TestManifestValidationFailsClosed(t *testing.T) {
@@ -198,6 +228,7 @@ func TestManifestValidationFailsClosed(t *testing.T) {
 		{name: "component metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Component = "agent\ncomponent" }, want: e.CodeInvalidCatalog},
 		{name: "component display control", mutate: func(manifest *Manifest) { manifest.Materials[0].Component = "agent\u202ecomponent" }, want: e.CodeInvalidCatalog},
 		{name: "kind metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Kind = "" }, want: e.CodeInvalidCatalog},
+		{name: "kind whitespace", mutate: func(manifest *Manifest) { manifest.Materials[0].Kind = "host package" }, want: e.CodeInvalidCatalog},
 		{name: "missing architecture", mutate: func(manifest *Manifest) { manifest.Materials[0].Architecture = "" }, want: e.CodeInvalidCatalog},
 		{name: "unsupported architecture", mutate: func(manifest *Manifest) { manifest.Materials[0].Architecture = "riscv64" }, want: e.CodeInvalidCatalog},
 		{name: "mixed architecture", mutate: func(manifest *Manifest) { manifest.Materials[0].Architecture = "amd64" }, want: e.CodeInvalidCatalog},

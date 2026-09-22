@@ -140,6 +140,9 @@ type Entry struct {
 // Its identity proves the description's exact bytes, not that the referenced
 // artifacts were authenticated or staged correctly.
 type Manifest struct {
+	// SchemaVersion is the native v2 value for NewManifest. MarshalProjected may
+	// emit a source-owned value; projected documents are validated and serialized
+	// by that operation, while Validate, Marshal and Digest admit native v2 only.
 	SchemaVersion string  `json:"schemaVersion"`
 	Materials     []Entry `json:"materials"`
 }
@@ -233,7 +236,7 @@ func (manifest *Manifest) validate(schemaVersion string) error {
 	manifestArchitecture := ""
 	for index, entry := range manifest.Materials {
 		if !canonicalText(entry.Component, maxMaterialNameBytes) ||
-			!canonicalText(entry.Kind, maxMaterialKindBytes) {
+			!canonicalToken(entry.Kind, maxMaterialKindBytes) {
 			return e.New(e.CodeInvalidCatalog,
 				"build material manifest entry %d has non-canonical metadata", index)
 		}

@@ -221,8 +221,10 @@ _Avoid_: Builder type, output format, evidence lane
 
 **Build-material manifest**:
 A deterministic description of one producer's declared component inputs: binding name, observed component name,
-output kind, exact artifact digest, and a slash-relative path beneath a private staging root. It is not an
-authenticated observation or a host-path authority.
+output kind, selected architecture, exact artifact digest, and a slash-relative path beneath a private staging
+root. A producer-owned projection may replace only the envelope schema and per-binding kind vocabulary; it does
+not replace the authenticated input fields. The manifest is not an authenticated observation or a host-path
+authority.
 _Avoid_: Node-SKU staging manifest, producer receipt, absolute staging path
 
 **VM-image builder**:

@@ -268,6 +268,12 @@ func TestObserveVMPackerMaterialsRejectsPlanAndByteSubstitution(t *testing.T) {
 			}
 			t.Fatal("fixture has no agent producer")
 		}},
+		{name: "projection omits observed binding", code: e.CodeInvalidCatalog, mutate: func(t *testing.T, fixture *vmPackerMaterialFixture) {
+			fixture.rootInstruction(t).Packer.MaterialManifest = &material.Projection{
+				SchemaVersion: "nke.dev/os-image-materials/v1",
+				Kinds:         map[string]string{"a-agent": "archive"},
+			}
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newVMPackerMaterialFixture(t)

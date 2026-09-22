@@ -68,6 +68,10 @@ func vmRequirements(policy execution.CapabilityPolicy) *execution.Requirements {
 
 func TestVMGraphBindsExactPackerAndMaterialInputs(t *testing.T) {
 	graph := vmGraph(t)
+	graph.Nodes[0].Packer.MaterialManifest = &material.Projection{
+		SchemaVersion: "nke.dev/os-image-materials/v1",
+		Kinds:         map[string]string{"agent-package": "raw"},
+	}
 	if err := graph.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -85,14 +89,10 @@ func TestVMGraphBindsExactPackerAndMaterialInputs(t *testing.T) {
 		{name: "Packer build name", mutate: func(node *Node) { node.Packer.BuildName = "image.qemu.other" }},
 		{name: "accelerator variable", mutate: func(node *Node) { node.Packer.AcceleratorVariable = "vm_accelerator" }},
 		{name: "material manifest schema", mutate: func(node *Node) {
-			node.Packer.MaterialManifest = &material.Projection{
-				SchemaVersion: "example.dev/materials/v1", Kinds: map[string]string{"agent-package": "raw"},
-			}
+			node.Packer.MaterialManifest.SchemaVersion = "example.dev/materials/v1"
 		}},
 		{name: "producer-visible material kind", mutate: func(node *Node) {
-			node.Packer.MaterialManifest = &material.Projection{
-				SchemaVersion: "nke.dev/os-image-materials/v1", Kinds: map[string]string{"agent-package": "archive"},
-			}
+			node.Packer.MaterialManifest.Kinds["agent-package"] = "archive"
 		}},
 		{name: "SSH variable pair", mutate: func(node *Node) {
 			node.Packer.SSHPrivateKeyVariable = "ssh_private_key_file"
@@ -100,11 +100,19 @@ func TestVMGraphBindsExactPackerAndMaterialInputs(t *testing.T) {
 		}},
 		{name: "build-log directory variable", mutate: func(node *Node) { node.Packer.BuildLogDirectoryVariable = "build_log_directory" }},
 		{name: "HTTP directory variable", mutate: func(node *Node) { node.Packer.HTTPDirectoryVariable = "http_directory" }},
-		{name: "material binding", mutate: func(node *Node) { node.Materials[0].Binding = "agent-deb" }},
+		{name: "material binding", mutate: func(node *Node) {
+			node.Materials[0].Binding = "agent-deb"
+			delete(node.Packer.MaterialManifest.Kinds, "agent-package")
+			node.Packer.MaterialManifest.Kinds["agent-deb"] = "raw"
+		}},
 		{name: "toolchain platform", mutate: func(node *Node) { node.ToolchainPlatform = "linux/arm64" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			changed := vmGraph(t)
+			changed.Nodes[0].Packer.MaterialManifest = &material.Projection{
+				SchemaVersion: "nke.dev/os-image-materials/v1",
+				Kinds:         map[string]string{"agent-package": "raw"},
+			}
 			test.mutate(&changed.Nodes[0])
 			digest, digestErr := changed.Digest()
 			if digestErr != nil {
@@ -249,6 +257,12 @@ func TestVMGraphRejectsInvalidPackerAndMaterialBindings(t *testing.T) {
 		}},
 		{name: "HTTP variable collision", mutate: func(node *Node) {
 			node.Packer.HTTPDirectoryVariable = node.Packer.OutputDirectoryVariable
+		}},
+		{name: "projection omits material binding", mutate: func(node *Node) {
+			node.Packer.MaterialManifest = &material.Projection{
+				SchemaVersion: "nke.dev/os-image-materials/v1",
+				Kinds:         map[string]string{},
+			}
 		}},
 		{name: "unsorted Packer variables", mutate: func(node *Node) {
 			node.Packer.Variables = append(node.Packer.Variables, PackerVariable{Name: "alpha", Value: "value"})

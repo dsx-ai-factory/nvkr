@@ -177,6 +177,18 @@ pins:
 			}
 		})
 	}
+	consistentlyRenamedBinding := strings.Replace(registry,
+		"agent-package: archive", "host-agent-package: archive", 1)
+	consistentlyRenamedBinding = strings.Replace(consistentlyRenamedBinding,
+		"agent-package: agent-package", "host-agent-package: agent-package", 1)
+	renamed := load(t, consistentlyRenamedBinding)
+	after, err := renamed.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Fatal("consistent material binding rename did not affect catalog snapshot identity")
+	}
 }
 
 func TestPackerMaterialManifestProjectionRequiresExactBindingSet(t *testing.T) {
