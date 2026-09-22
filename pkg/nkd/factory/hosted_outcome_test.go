@@ -184,6 +184,7 @@ func TestProductionBuildTypeUsesStrongestNetworkRequirement(t *testing.T) {
 		{name: "acquired", nodes: []ir.Node{{Kind: ir.KindPull}}, want: provenance.BuildTypeAcquired},
 		{name: "offline", nodes: []ir.Node{{Kind: ir.KindBuild, Network: ir.NetworkNone}}, want: provenance.BuildTypeHermeticBuild},
 		{name: "wrapped", nodes: []ir.Node{{Kind: ir.KindBuild, BuilderType: ir.BuilderBuildKit, Network: ir.NetworkDefault}}, want: provenance.BuildTypeWrappedBuild},
+		{name: "networked VM", nodes: []ir.Node{{Kind: ir.KindBuild, BuilderType: ir.BuilderVMImage, Network: ir.NetworkDefault}}, want: provenance.BuildTypeWrappedBuild},
 		{name: "mixed", nodes: []ir.Node{{Kind: ir.KindBuild, Network: ir.NetworkNone}, {Kind: ir.KindBuild, BuilderType: ir.BuilderBuildKit, Network: ir.NetworkDefault}}, want: provenance.BuildTypeWrappedBuild},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

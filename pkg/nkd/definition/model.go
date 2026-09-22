@@ -19,15 +19,17 @@ import (
 )
 
 const (
-	DefinitionAPIVersion  = "nkd.dev/definition/v4"
-	DefinitionKind        = "Definition"
-	EnvironmentAPIVersion = "nkd.dev/environment/v1"
-	EnvironmentKind       = "Environment"
-	OutputExecutable      = "executable"
-	OutputOCI             = "oci"
-	OutputAPT             = "apt-repository"
-	OutputHelm            = "helm-oci"
-	OutputDiskImage       = "disk-image"
+	DefinitionAPIVersion         = "nkd.dev/definition/v4"
+	DefinitionKind               = "Definition"
+	EnvironmentAPIVersion        = "nkd.dev/environment/v1"
+	EnvironmentKind              = "Environment"
+	OutputExecutable             = "executable"
+	OutputOCI                    = "oci"
+	OutputAPT                    = "apt-repository"
+	OutputHelm                   = "helm-oci"
+	OutputDiskImage              = "disk-image"
+	BuildNetworkOfflineOnly      = "offline-only"
+	BuildNetworkProducerDeclared = "producer-declared"
 )
 
 var namePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
@@ -131,6 +133,9 @@ type Runtime struct {
 	Variables         map[string]string `json:"variables,omitempty"`
 	Setup             []string          `json:"setup,omitempty"`
 	ToolchainRegistry string            `json:"toolchainRegistry,omitempty"`
+	// BuildNetworkPolicy independently controls whether a producer declaration
+	// may request network access during its build. Omission is offline-only.
+	BuildNetworkPolicy string `json:"buildNetworkPolicy,omitempty"`
 }
 
 type Signing struct {
@@ -354,6 +359,12 @@ func (profile Runtime) validate() error {
 	}
 	if strings.ContainsAny(profile.ToolchainRegistry, "\r\n\x00 ") {
 		return e.New(e.CodeInvalidCatalog, "delivery toolchainRegistry %q is unsafe", profile.ToolchainRegistry)
+	}
+	if profile.BuildNetworkPolicy != "" && profile.BuildNetworkPolicy != BuildNetworkOfflineOnly &&
+		profile.BuildNetworkPolicy != BuildNetworkProducerDeclared {
+		return e.New(e.CodeInvalidCatalog,
+			"delivery buildNetworkPolicy %q is unsupported (offline-only|producer-declared)",
+			profile.BuildNetworkPolicy)
 	}
 	return nil
 }

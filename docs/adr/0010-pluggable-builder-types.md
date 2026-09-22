@@ -144,6 +144,7 @@ they are example producer vocabulary, not NKD-reserved values.
 
 ```yaml
 builderType: vm-image
+buildNetwork: default
 packer:
   projectPath: os-image/packer
   packerVersion: 1.14.2
@@ -246,8 +247,13 @@ reference verification.
 Admitted direct-Packer lowering must bind only declared inputs and variables, expose the authenticated source
 read-only, provide private output, log and HTTP locations, invoke `validate` and then the exact selected build,
 collect the declared artifact, and recompute its exact bytes. It does not run `packer init`, fetch plugins, or
-acquire source or product materials. Build execution remains network-none; all required bytes must already be in
-the authenticated source and material closure. A driver
+acquire source or product materials. `buildNetwork` is admitted only on a from-source `vm-image`; omission or
+`none` keeps the build offline, while `default` is admitted only for direct Packer and only when the selected
+Environment independently sets `runtime.buildNetworkPolicy: producer-declared`. The networked form grants egress
+to the complete Packer build container, including plugins and local provisioners, and to the QEMU guest through
+NAT. The `default` mode is the container runtime's default bridge, so the build can also address the host gateway
+and unrelated containers attached to that bridge; it is not an outbound-only firewall. It is wrapped execution,
+not authenticated acquisition or a qualified reproduction lane. A driver
 may not replace a staged material with an undeclared network fetch. The catalog entry owns the pinned source and
 toolchain, selected driver, exact entrypoint or Packer project and build name, artifact path, material edges, and
 public Packer-variable values. These fields are logical IR v4 inputs and therefore affect Build identity.
@@ -288,7 +294,7 @@ when two host routes name the same OCI manifest digest. `kvm` is the first
 typed capability: `required` must be exposed and requires an allowed host platform matching the resolved guest
 architecture, `forbidden` must be withheld, and `preferred` retains the cross-architecture TCG route. A future
 Plan compilation binds KVM or the fallback before work rather than choosing opportunistically at runtime. Build network
-remains the existing IR semantic and is not duplicated here.
+remains the existing IR semantic and is not duplicated in resource requirements.
 
 NKE host CPU, memory, storage, platform, KVM policy, and timeout values remain unauthored until supported routes
 are measured. Guest vCPU, guest memory, and logical disk size are not host requests. Produced-artifact size is

@@ -237,6 +237,7 @@ func packerBuildContainerRequest(request packerContainerRunRequest, inputVolume,
 		packerArgs: append([]string{"build", "-on-error=cleanup"}, baseArgs...),
 		labels:     []string{nodeLabel, attemptLabel, "nkd.dev/role=build"},
 		kvm:        request.kvm, groupAdd: kvmGroup,
+		network: request.node.Network,
 	}
 }
 
@@ -364,6 +365,14 @@ func createPackerVolume(ctx context.Context, runtime packerContainerRuntime, nam
 }
 
 func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, request packerContainerCreateRequest) error {
+	switch request.network {
+	case "":
+		request.network = ir.NetworkNone
+	case ir.NetworkNone, ir.NetworkDefault:
+	default:
+		return e.New(e.CodeEngineCapability,
+			"Packer container %q requested unsupported network mode %q", request.name, request.network)
+	}
 	var stdout, stderr bytes.Buffer
 	if err := runtime.Run(ctx, nil, &stdout, &stderr, packerContainerCreateArgs(request)...); err != nil {
 		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed, "creating Packer container %q", request.name)

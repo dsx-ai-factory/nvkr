@@ -207,6 +207,10 @@ type Component struct {
 	// BuilderType selects the from-source build substrate (ADR-10). It is a
 	// build-semantic input and flows into buildDigest.
 	BuilderType string `json:"builderType,omitempty"`
+	// BuildNetwork declares whether the producer needs network access while its
+	// build command runs. Omission means none. The selected Environment must
+	// independently admit any non-none request before compilation can succeed.
+	BuildNetwork string `json:"buildNetwork,omitempty"`
 	// BuildRequirements declares the generic runner contract for this component's
 	// build step. It is operational metadata, not builder-specific behavior or proof
 	// that a selected runner satisfies the request.

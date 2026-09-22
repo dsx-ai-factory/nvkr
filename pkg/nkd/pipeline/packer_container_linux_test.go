@@ -27,6 +27,7 @@ import (
 
 func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	node := testPackerContainerNode()
+	node.Network = ir.NetworkDefault
 	manifest := []byte("{}\n")
 	manifestDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(manifest))
 	sourceRoot := t.TempDir()
@@ -101,7 +102,7 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 		t.Fatal("collected output is not the fake QCOW2")
 	}
 
-	validateIndex, buildIndex, sshContainers := -1, -1, 0
+	validateIndex, buildIndex, sshContainers, networkedContainers := -1, -1, 0, 0
 	workCopyIndex, carrierCopyIndex, bootstrapStartIndex, stageStartIndex := -1, -1, -1, -1
 	hostUser := fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())
 	for index, call := range fake.calls {
@@ -110,9 +111,18 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			t.Fatalf("runtime attempted forbidden acquisition: %#v", call)
 		}
 		if call[0] == "create" {
-			if !slices.Contains(call, "--network=none") || !slices.Contains(call, "--pull=never") ||
-				!slices.Contains(call, "--label") || !slices.Contains(call, "--no-healthcheck") {
+			if !slices.Contains(call, "--pull=never") || !slices.Contains(call, "--label") ||
+				!slices.Contains(call, "--no-healthcheck") {
 				t.Fatalf("container lacks isolation or ownership labels: %#v", call)
+			}
+			isBuild := strings.Contains(joined, "nkd.dev/role=build")
+			if isBuild {
+				networkedContainers++
+				if !slices.Contains(call, "--network=default") || slices.Contains(call, "--network=none") {
+					t.Fatalf("Packer build container lacks its admitted network: %#v", call)
+				}
+			} else if !slices.Contains(call, "--network=none") || slices.Contains(call, "--network=default") {
+				t.Fatalf("Packer preparation container received network access: %#v", call)
 			}
 			if strings.Contains(joined, "nkd.dev/role=bootstrap") {
 				if !slices.Contains(call, "--user=0:0") || !slices.Contains(call, "--cap-add=CHOWN") {
@@ -161,6 +171,9 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	}
 	if sshContainers != 3 {
 		t.Fatalf("SSH key containers = %d, want one generator and two verifiers", sshContainers)
+	}
+	if networkedContainers != 1 {
+		t.Fatalf("networked Packer containers = %d, want only the build container", networkedContainers)
 	}
 	if workCopyIndex < 0 || carrierCopyIndex <= workCopyIndex || bootstrapStartIndex <= carrierCopyIndex ||
 		stageStartIndex <= bootstrapStartIndex || validateIndex <= stageStartIndex {
@@ -282,6 +295,7 @@ func TestPackerBuildContainerRequestThreadsKVMResolution(t *testing.T) {
 	defer kvm.Close()
 	node := testPackerContainerNode()
 	node.ExecutionBinding.Capabilities[0].Enabled = true
+	node.Network = ir.NetworkDefault
 	request := packerContainerRunRequest{
 		node: node, kvm: kvm,
 		bindings: packerContainerBindings{acceleratorVariable: "accelerator"},
@@ -289,7 +303,8 @@ func TestPackerBuildContainerRequestThreadsKVMResolution(t *testing.T) {
 	build := packerBuildContainerRequest(request, "input", "work", "/nkd/input/source",
 		"nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc", "123", true)
 	args := packerContainerCreateArgs(build)
-	if !slices.Contains(args, "accelerator=kvm") || !slices.Contains(args, "--group-add=123") {
+	if !slices.Contains(args, "accelerator=kvm") || !slices.Contains(args, "--group-add=123") ||
+		!slices.Contains(args, "--network=default") {
 		t.Fatalf("KVM build arguments do not preserve the resolved accelerator and device group: %#v", args)
 	}
 	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
@@ -664,7 +679,7 @@ func TestNodeSessionCloseReleasesPackerRuntime(t *testing.T) {
 	copy := *session
 	_, err = copy.AdmitVMImagePacker(t.Context(), []VMImagePackerSelection{{
 		Subject: "plan/node", Node: testPackerContainerNode(),
-	}}, "docker")
+	}}, nil, "docker")
 	if code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed session admission error = %v, want %s", err, e.CodeEngineCapability)
 	}

@@ -64,7 +64,12 @@ type VMImagePackerRun struct {
 // AdmitVMImagePacker performs the runtime and toolchain-image admission phase.
 // It performs no source, material, workspace, output, container, or VM work.
 // The returned executor remains valid only until NodeSession.Close.
-func (handle *NodeSession) AdmitVMImagePacker(ctx context.Context, selections []VMImagePackerSelection, runtimeName string) (*VMImagePackerExecutor, error) {
+func (handle *NodeSession) AdmitVMImagePacker(
+	ctx context.Context,
+	selections []VMImagePackerSelection,
+	networkAdmission *VMImagePackerNetworkAdmission,
+	runtimeName string,
+) (*VMImagePackerExecutor, error) {
 	if err := requireRunContext(ctx, "VM-image Packer admission"); err != nil {
 		return nil, err
 	}
@@ -101,6 +106,9 @@ func (handle *NodeSession) AdmitVMImagePacker(ctx context.Context, selections []
 		if node.Disk == nil || node.Disk.Encryption != "none" {
 			return nil, e.New(e.CodeEngineCapability,
 				"node %q requests encrypted disk execution without a typed secret channel", node.ID)
+		}
+		if err := requireVMImagePackerNetworkAdmission(networkAdmission, selection); err != nil {
+			return nil, err
 		}
 		raw, err := canonical.Marshal(node)
 		if err != nil {

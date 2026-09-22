@@ -54,6 +54,7 @@ type rawComponent struct {
 	FromSource      bool               `json:"fromSource"`
 	Source          string             `json:"source,omitempty"`
 	BuilderType     string             `json:"builderType,omitempty"`    // oci-hermetic (default) | nix | buildkit-rootless | vm-image (ADR-10)
+	BuildNetwork    string             `json:"buildNetwork,omitempty"`   // none (default) | default; default is admitted separately by Environment
 	ToolchainImage  string             `json:"toolchainImage,omitempty"` // component-specific exact builder image
 	Flake           *FlakePin          `json:"flake,omitempty"`          // required iff builderType==nix
 	CGO             bool               `json:"cgo,omitempty"`

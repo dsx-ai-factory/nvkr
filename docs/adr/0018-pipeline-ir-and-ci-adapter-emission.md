@@ -184,13 +184,21 @@ material bytes, digest, component, architecture or deterministic staging path. T
 class, uses its host architecture to select the pinned VM
 toolchain, and projects the raw disk producer artifact into the named lifecycle output without ordinary binary
 packaging. A material-bearing command producer remains unsupported because it has no typed manifest handoff.
-Every local and hosted execution or generation adapter still fails with `CodeEngineCapability` before source,
-subprocess, or output work. Runner requirements are not VM-image-specific
+The local unencrypted direct-Packer adapter is connected; command, encrypted, hosted and qualified VM adapters
+still fail before source, subprocess, or output work. Runner requirements are not VM-image-specific
 metadata. The generic `execution.Requirements` shape carries minimum CPU, memory and ephemeral-storage capacity,
 an optional sorted OR-set of eligible runner-host platforms, typed capability policies, and an exact
 executor-owned wall-time budget. `kvm` is the first admitted capability with `required`, `preferred`, and
 `forbidden` policies. Host platform is distinct from the IR target/toolchain platform. Network mode remains the
 existing T1 IR field and is not duplicated in execution requirements.
+
+The producer may additionally author `buildNetwork: none|default`; omission is effective `none`. Only a direct
+Packer VM producer may request `default`, and compilation admits it only when the exact Environment independently
+authors `runtime.buildNetworkPolicy: producer-declared`. Omission or `offline-only` denies the request. The
+resolved mode is carried once in the identity-bearing IR node and is not duplicated in execution requirements.
+Before runtime preparation, the local adapter issues a process-local receipt binding that validated Environment
+authorization to the exact canonical bytes of every networked Packer node. A raw IR node cannot grant itself
+network access at the exported pipeline boundary.
 
 The currently admitted authoring path is deliberately narrower: a from-source catalog producer authors
 `buildRequirements`, and compilation copies it unchanged into the corresponding build node in the full IR embedded in the
@@ -268,7 +276,13 @@ Direct-Packer execution authenticates one already-local digest-pinned OCI toolch
 it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NKD
 overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
 Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, disabled health check, read-only
-root, no network, no new privileges and all capabilities dropped. Source, configuration, manifest and material inputs are packed into one
+root, no new privileges and all capabilities dropped. Preparation, extraction, version checking, SSH-key
+generation and `packer validate` always use network-none. Only `packer build` receives the exact admitted node
+mode. `default` grants egress to the whole build container, including plugins and local provisioners, as well as
+the QEMU guest through NAT. It selects the container runtime's default bridge, which also permits addressing the
+host gateway and unrelated containers on that bridge; it is not an outbound-only firewall, guest-only networking,
+or authenticated dependency acquisition. No Docker
+socket or ambient credentials are injected. Source, configuration, manifest and material inputs are packed into one
 deterministic bounded tar preserving directories, modes and symlink targets. Docker transports only a one-file
 outer carrier. The pinned toolchain verifies the held inner-tar digest before extracting that same opened inode;
 Packer then sees the input volume read-only. Before transport, the runner derives the material manifest only from
@@ -287,7 +301,7 @@ Fresh Docker volumes and `docker cp` content are root-owned. One fixed ownership
 as root with only `CAP_CHOWN`, mounts only the attempt's input and work volumes, changes their ownership to the
 observed host UID/GID, and is removed before consumer execution. It performs no input
 authentication, extraction, Packer operation or network access. Extraction, version checking, SSH-key generation,
-validation and build all run as the host UID/GID. Only the build receives the admitted KVM device and its observed
+validation and build all run as the host UID/GID. Only the build receives the admitted network mode, KVM device and its observed
 supplemental group when the exact binding enables KVM.
 
 The runtime sets a fixed `PACKER_PLUGIN_PATH`, requires the exact Plan-authored Packer version, generates and checks

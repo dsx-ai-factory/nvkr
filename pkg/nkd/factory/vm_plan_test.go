@@ -107,6 +107,46 @@ func TestCompileProjectsDiskRootWithoutBinaryBundle(t *testing.T) {
 	}
 }
 
+func TestCompileAdmitsNetworkedVMOnlyByEnvironmentPolicy(t *testing.T) {
+	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
+	base := *stack.Catalog
+	base.Components = make(map[string]catalog.Component, len(stack.Catalog.Components))
+	for name, component := range stack.Catalog.Components {
+		component.BuildCommand = nil
+		component.BuildNetwork = ir.NetworkDefault
+		component.Packer = &catalog.PackerConfig{
+			ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
+			ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator",
+			MaterialManifestVariable: "material_manifest", OutputDirectoryVariable: "output_directory",
+		}
+		base.Components[name] = component
+	}
+	networkedStack, err := catalog.ApplyStack(&base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan, err := Compile(t.Context(), definition, environment, networkedStack, "test"); plan != nil || factoryErrorCode(err) != e.CodeEngineCapability {
+		t.Fatalf("offline Environment compiled networked VM Plan = %#v, %v", plan, err)
+	}
+	environment.Runtime.BuildNetworkPolicy = authored.BuildNetworkProducerDeclared
+	plan, err := Compile(t.Context(), definition, environment, networkedStack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := plan.Builds[0].Graph.Nodes[0].Network; got != ir.NetworkDefault {
+		t.Fatalf("admitted VM build network = %q, want %q", got, ir.NetworkDefault)
+	}
+	plan.Environment.Runtime.BuildNetworkPolicy = authored.BuildNetworkOfflineOnly
+	digest, err := plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.EnvironmentDigest = digest
+	if err := plan.Validate(); factoryErrorCode(err) != e.CodeEngineCapability {
+		t.Fatalf("Plan validation accepted revoked network policy: %v", err)
+	}
+}
+
 func TestValidateBuildCatalogBindsDiskOutputFormat(t *testing.T) {
 	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
 	plan, err := Compile(t.Context(), definition, environment, stack, "test")

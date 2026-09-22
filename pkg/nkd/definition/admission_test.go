@@ -118,3 +118,32 @@ func TestEnvironmentRejectsRetiredBuilderImage(t *testing.T) {
 		})
 	}
 }
+
+func TestEnvironmentBuildNetworkPolicy(t *testing.T) {
+	for _, test := range []struct {
+		name, policy string
+		wantCode     e.Code
+	}{
+		{name: "omitted is offline"},
+		{name: "explicit offline", policy: BuildNetworkOfflineOnly},
+		{name: "producer declared", policy: BuildNetworkProducerDeclared},
+		{name: "unknown", policy: "open", wantCode: e.CodeInvalidCatalog},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			environment := Environment{
+				APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind,
+				Metadata:         Metadata{Name: "fixture"},
+				UtilityContainer: "golang@sha256:" + strings.Repeat("a", 64), UtilityPlatform: "linux/amd64",
+				Runtime: Runtime{BuildNetworkPolicy: test.policy},
+			}
+			err := environment.Validate()
+			var coded *e.Error
+			if test.wantCode == "" && err != nil {
+				t.Fatal(err)
+			}
+			if test.wantCode != "" && (!errors.As(err, &coded) || coded.Code != test.wantCode) {
+				t.Fatalf("policy error = %v, want %s", err, test.wantCode)
+			}
+		})
+	}
+}

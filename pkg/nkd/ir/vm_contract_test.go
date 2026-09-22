@@ -226,8 +226,8 @@ func TestVMGraphRejectsInvalidVMContracts(t *testing.T) {
 		{name: "invalid encryption", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
 			graph.Nodes[0].Disk.Encryption = "aes"
 		}},
-		{name: "network enabled", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
-			graph.Nodes[0].Network = NetworkDefault
+		{name: "unknown network", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
+			graph.Nodes[0].Network = "host"
 		}},
 		{name: "both command and Packer", code: e.CodeInvalidCatalog, mutate: func(graph *Graph) {
 			graph.Nodes[0].Command = []string{"make", "image"}

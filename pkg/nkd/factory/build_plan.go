@@ -86,6 +86,9 @@ func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Envir
 		return nil, err
 	}
 	relocateToolchainRegistry(graph, environment.Runtime.ToolchainRegistry)
+	if err := admitBuildNetwork(graph, environment.Runtime.BuildNetworkPolicy); err != nil {
+		return nil, err
+	}
 	selected := make(map[string]bool, len(resolved.Components))
 	for _, component := range resolved.Components {
 		selected[component.Name] = true
@@ -94,6 +97,22 @@ func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Envir
 		return nil, e.Wrap(e.CodeEngineCapability, err, "build cannot satisfy execution requirements")
 	}
 	return graph, nil
+}
+
+func admitBuildNetwork(graph *ir.Graph, policy string) error {
+	if policy == "" {
+		policy = authored.BuildNetworkOfflineOnly
+	}
+	for _, node := range graph.Nodes {
+		if node.Kind != ir.KindBuild || node.Network != ir.NetworkDefault || node.BuilderType == ir.BuilderBuildKit {
+			continue
+		}
+		if policy != authored.BuildNetworkProducerDeclared {
+			return e.New(e.CodeEngineCapability,
+				"build node %q requests network access but Environment policy is %q", node.ID, policy)
+		}
+	}
+	return nil
 }
 
 // toolchainMaterializedPrefix names operator-materialized toolchain images. The catalog pins

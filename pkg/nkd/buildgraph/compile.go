@@ -207,7 +207,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		}
 		var flakeRef, flakeOutput, flakeLock string
 		buildNetwork := ir.NetworkNone
-		if builderType == ir.BuilderBuildKit {
+		if builderType == ir.BuilderBuildKit || nc.BuildNetwork == ir.NetworkDefault {
 			buildNetwork = ir.NetworkDefault
 		}
 		if builderType == ir.BuilderNix && nc.Flake != nil {

@@ -39,6 +39,7 @@ components:
     fromSource: true
     source: image-source
     builderType: vm-image
+    buildNetwork: default
     outputType: disk-image
     disk:
       format: qcow2
@@ -98,7 +99,7 @@ pins:
 
 	cat := load(t, registry)
 	component := cat.Components["node-image"]
-	if component.Packer == nil || component.Packer.ProjectPath != "os-image/packer" ||
+	if component.BuildNetwork != "default" || component.Packer == nil || component.Packer.ProjectPath != "os-image/packer" ||
 		component.Packer.PackerVersion != "1.14.2" ||
 		component.Packer.BuildName != "nke-node-non-fde.qemu.nke-non-fde" ||
 		component.Packer.ArchitectureVariable != "architecture" ||
@@ -165,6 +166,7 @@ pins:
 		{name: "material component", old: "agent-package: agent-package", replacement: "agent-package: runtime-package"},
 		{name: "Packer variable name", old: "image_variant: standard", replacement: "node_variant: standard"},
 		{name: "Packer variable value", old: "image_variant: standard", replacement: "image_variant: minimal"},
+		{name: "build network", old: "buildNetwork: default", replacement: "buildNetwork: none"},
 	} {
 		t.Run(test.name+" changes snapshot identity", func(t *testing.T) {
 			changed := load(t, strings.Replace(registry, test.old, test.replacement, 1))
@@ -276,6 +278,11 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 	if err := validate(valid); err != nil {
 		t.Fatalf("valid direct Packer producer rejected: %v", err)
 	}
+	networked := valid
+	networked.BuildNetwork = "default"
+	if err := validate(networked); err != nil {
+		t.Fatalf("valid networked direct Packer producer rejected: %v", err)
+	}
 	opaquePackerNames := valid
 	opaquePackerConfig := *valid.Packer
 	opaquePackerConfig.BuildName = "image.qemu.nke-non-fde"
@@ -297,6 +304,22 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 		edit     func(*Component)
 		wantText string
 	}{
+		{
+			name: "unknown build network",
+			edit: func(component *Component) {
+				component.BuildNetwork = "host"
+			},
+			wantText: "buildNetwork",
+		},
+		{
+			name: "networked command producer",
+			edit: func(component *Component) {
+				component.BuildNetwork = "default"
+				component.Packer = nil
+				component.BuildCommand = []string{"make", "image"}
+			},
+			wantText: "requires a direct Packer producer",
+		},
 		{
 			name: "command and Packer are contradictory",
 			edit: func(component *Component) {

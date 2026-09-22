@@ -189,6 +189,18 @@ func validateComponent(name string, c Component) error {
 				"component %q has invalid buildRequirements", name)
 		}
 	}
+	if c.BuildNetwork != "" && c.BuildNetwork != "none" && c.BuildNetwork != "default" {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: buildNetwork %q is unsupported (none|default)", name, c.BuildNetwork)
+	}
+	if c.BuildNetwork != "" && (!c.FromSource || c.BuilderType != BuilderVMImage) {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: buildNetwork requires a from-source vm-image component", name)
+	}
+	if c.BuildNetwork == "default" && c.Packer == nil {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: default buildNetwork requires a direct Packer producer", name)
+	}
 	if c.OutputType == "disk-image" {
 		if !c.FromSource {
 			return e.New(e.CodeInvalidCatalog, "component %q: disk-image is supported only in the from-source lane", name)

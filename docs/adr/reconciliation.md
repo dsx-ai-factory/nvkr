@@ -57,7 +57,13 @@ resolver binds the exact full-Plan subject, producer session, held local Docker 
 already-local digest-pinned OCI toolchain after pure validation and before workspace mutation. The production local
 path is connected only for unencrypted direct-Packer VM producers. It transports one authenticated bounded inner
 tar through a one-file Docker carrier, verifies that tar inside the pinned toolchain before extraction, mounts inputs
-read-only, fixes hostname/environment/user, denies network and image pulls, and never invokes `packer init`. A
+read-only, fixes hostname/environment/user, denies image pulls, and never invokes `packer init`. Preparation and
+validation always deny network. An Environment may independently admit a direct-Packer producer's explicit
+`buildNetwork: default`; only its build container receives that mode. The request grants egress to the complete
+build container and QEMU guest. It uses the runtime's default bridge, which also permits addressing the host
+gateway and unrelated containers on that bridge, so it is not an outbound-only firewall and remains wrapped,
+unqualified execution. An opaque process-local receipt binds the validated Environment authorization to the exact
+networked node bytes before runtime preparation. A
 narrow root-plus-`CAP_CHOWN` bootstrap changes only the two attempt-volume ownerships to the observed host UID/GID;
 every authentication, extraction, version, SSH, validation and build operation then runs as that UID/GID. Other
 current adapters still reject selected builds carrying requirements before execution or generated output. The generic
@@ -86,6 +92,11 @@ authenticated and exercised.
 A command producer without materials and a direct-Packer producer lower into IR/Plan, but command/Make VM execution
 also remains disconnected until it has a held-output adapter. A material-bearing command producer remains unsupported
 because the schema has no typed manifest handoff. Hosted and qualified VM execution remain fail-closed.
+
+For the owner summary below, the network contract spans rows 10, 17 and 18: the producer request is a Builder
+input, the exact Environment authorization is part of the public lifecycle identity, and compilation plus the
+direct-Packer runtime enforce the admitted mode. This path is contract-tested only. A real Linux/Docker NKE bake,
+QCOW2 digest/size collection and boot smoke remain required external evidence.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|

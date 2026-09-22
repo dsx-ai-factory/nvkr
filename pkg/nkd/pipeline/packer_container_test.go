@@ -280,6 +280,25 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 	if !slices.Contains(withKVM, wantDevice) {
 		t.Fatalf("KVM container args do not use the minimal rw device grant: %#v", withKVM)
 	}
+	request.network = ir.NetworkDefault
+	withNetwork := packerContainerCreateArgs(request)
+	if !slices.Contains(withNetwork, "--network=default") || slices.Contains(withNetwork, "--network=none") {
+		t.Fatalf("networked Packer build args = %#v", withNetwork)
+	}
+}
+
+func TestCreatePackerContainerRejectsUnknownNetworkBeforeRuntime(t *testing.T) {
+	runtime := &recordingPackerRuntime{}
+	err := createPackerContainer(t.Context(), runtime, packerContainerCreateRequest{
+		name: "build", network: "host",
+	})
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+		t.Fatalf("unknown network error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	if len(runtime.calls) != 0 {
+		t.Fatalf("runtime called before network admission: %#v", runtime.calls)
+	}
 }
 
 func TestPackerVolumeBootstrapIsTheOnlyRootContainer(t *testing.T) {

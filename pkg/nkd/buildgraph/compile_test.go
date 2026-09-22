@@ -89,6 +89,7 @@ func TestCompileLowersVMProducersOnlyAfterHostSelection(t *testing.T) {
 	}
 	validPacker := validVM
 	validPacker.BuildCommand = nil
+	validPacker.BuildNetwork = ir.NetworkDefault
 	validPacker.ArtifactPath = "node-{{.Arch}}.qcow2"
 	validPacker.Packer = &catalog.PackerConfig{
 		ProjectPath:              "os-image/packer",
@@ -156,6 +157,13 @@ func TestCompileLowersVMProducersOnlyAfterHostSelection(t *testing.T) {
 			if len(graph.Nodes) != 3 || graph.Nodes[0].BuilderType != ir.BuilderVMImage ||
 				graph.Nodes[0].Disk == nil || graph.Nodes[0].Disk.Format != "qcow2" {
 				t.Fatalf("VM graph did not retain typed disk producer: %#v", graph.Nodes)
+			}
+			wantNetwork := ir.NetworkNone
+			if test.name == "Packer" {
+				wantNetwork = ir.NetworkDefault
+			}
+			if graph.Nodes[0].Network != wantNetwork {
+				t.Fatalf("VM graph network = %q, want %q", graph.Nodes[0].Network, wantNetwork)
 			}
 		})
 	}

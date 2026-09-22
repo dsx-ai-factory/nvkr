@@ -112,12 +112,17 @@ type packerContainerCreateRequest struct {
 	user          string
 	groupAdd      string
 	allowChown    bool
+	network       string
 }
 
 func packerContainerCreateArgs(request packerContainerCreateRequest) []string {
+	network := request.network
+	if network == "" {
+		network = ir.NetworkNone
+	}
 	args := []string{
 		"create", "--name", request.name, "--pull=never",
-		"--platform", request.platform, "--network=none", "--read-only",
+		"--platform", request.platform, "--network=" + network, "--read-only",
 		"--cap-drop=ALL", "--security-opt=no-new-privileges", "--no-healthcheck", "--hostname=nkd-packer",
 	}
 	if request.allowChown {

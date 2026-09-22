@@ -507,6 +507,12 @@ disabled. Acquisition fetches pinned upstream bytes and makes no upstream build 
 its evidence is `none` unless an upstream evidence reference is declared. Wrapped execution records an external
 build's declared network and privilege (ADR-10).
 
+A direct-Packer VM producer may explicitly request `buildNetwork: default`; the exact Environment must separately
+authorize producer-declared build networking. The permission applies to the full Packer build container and its
+QEMU guest, not only to guest NAT. The runtime default bridge also exposes its host gateway and other containers
+on that bridge; this permission is not an outbound-only firewall. The resulting producer remains wrapped and
+cannot enter the qualified lane.
+
 The proposed wrapped job fuses build, re-hash, run record, publish, sign and verify so a multi-gigabyte artifact
 need not traverse job storage repeatedly. Fetching precedes the build; publication/OIDC credentials enter only
 after the build exits and the run record is written. The mechanism enforcing this phase separation is part of
@@ -796,8 +802,11 @@ handle on completion.
 The local direct-Packer driver consumes that capability for unencrypted VM-image producers. Its run-owned resolver
 binds the full Plan subject, producer session, local runtime/daemon and already-local digest-pinned OCI toolchain
 before workspace mutation. Inside the admitted callback it authenticates one bounded input tar, uses only Docker
-named volumes, mounts consumer inputs read-only, fixes environment/hostname/user, disables network, image pulls and
-`packer init`, validates the exact selector, builds it once and returns one held QCOW2. A one-shot root container
+named volumes, mounts consumer inputs read-only, fixes environment/hostname/user, disables image pulls and uses
+network-none except for an independently authorized direct-Packer build container. It never runs
+`packer init`, validates the exact selector, builds it once and returns one held QCOW2. For an Environment-authorized
+networked producer, only the build container uses default networking; preparation and validation remain offline.
+A one-shot root container
 with only `CAP_CHOWN` bootstraps the two fresh attempt volumes to the host UID/GID; every consumer operation runs as
 that host identity. The material manifest is derived from authenticated producer observations; an authored
 projection can change only its schema and per-binding kind vocabulary. Bounded in-process cleanup owns ordinary
@@ -807,7 +816,7 @@ hosted and qualified VM adapters remain closed.
 
 The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
 Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,
-network-none mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
+default-none network mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
 hosted or qualified identity boundary. Those lanes require an authenticated subordinate identity, user namespace
 or stronger provider sandbox plus recorded interoperability evidence.
 

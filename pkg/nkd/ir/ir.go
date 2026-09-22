@@ -28,7 +28,7 @@ const (
 // Network modes for a node.
 const (
 	NetworkNone    = "none"    // hermetic build sandbox (NKD-FR-BLD-011)
-	NetworkDefault = "default" // permitted only for explicit fetch/vendoring steps
+	NetworkDefault = "default" // explicitly admitted acquisition or wrapped-build networking
 )
 
 // Builder types (ADR-10) refine the from-source lane. The builder type is a
