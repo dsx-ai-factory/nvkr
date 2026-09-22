@@ -164,7 +164,7 @@ func packerContainerCreateArgs(request packerContainerCreateRequest) []string {
 }
 
 func packerContainerVariableArgs(node ir.Node, bindings packerContainerBindings, kvm bool) []string {
-	variables := make([]PackerVariable, 0, len(node.Packer.Variables)+8)
+	variables := make([]PackerVariable, 0, len(node.Packer.Variables))
 	for _, variable := range node.Packer.Variables {
 		variables = append(variables, PackerVariable{Name: variable.Name, Value: variable.Value})
 	}

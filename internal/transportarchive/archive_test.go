@@ -105,23 +105,57 @@ func TestUnpackOpenUsesHeldArchiveAfterPathReplacement(t *testing.T) {
 	}
 }
 
-func TestUnpackOpenReportsRejectedArchiveSize(t *testing.T) {
-	archivePath := filepath.Join(t.TempDir(), "oversized.tar")
-	archive, err := os.OpenFile(archivePath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer archive.Close()
-	if err := archive.Truncate(maxTransportBytes + 1); err != nil {
-		t.Fatal(err)
-	}
-	err = UnpackOpen(t.Context(), archive, t.TempDir(), []string{"artifact"})
-	if transportCode(err) != nkderr.CodeVerifyFailed {
-		t.Fatalf("oversized held archive returned %v, want verify-failed", err)
-	}
-	if !strings.Contains(err.Error(), "invalid size") ||
-		!strings.Contains(err.Error(), fmt.Sprint(maxTransportBytes)) {
-		t.Fatalf("oversized held archive error does not report the rejected size bound: %v", err)
+func TestUnpackOpenRejectsInvalidHeldArchives(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		open        func(*testing.T) *os.File
+		wantMessage string
+	}{
+		{name: "absent", open: func(*testing.T) *os.File { return nil }, wantMessage: "is absent"},
+		{name: "directory", open: func(t *testing.T) *os.File {
+			file, err := os.Open(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return file
+		}, wantMessage: "not a regular file"},
+		{name: "fifo", open: func(t *testing.T) *os.File {
+			path := filepath.Join(t.TempDir(), "archive.fifo")
+			if err := unix.Mkfifo(path, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			fd, err := unix.Open(path, unix.O_RDWR|unix.O_NONBLOCK, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return os.NewFile(uintptr(fd), path)
+		}, wantMessage: "not a regular file"},
+		{name: "oversized", open: func(t *testing.T) *os.File {
+			path := filepath.Join(t.TempDir(), "oversized.tar")
+			file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := file.Truncate(maxTransportBytes + 1); err != nil {
+				_ = file.Close()
+				t.Fatal(err)
+			}
+			return file
+		}, wantMessage: fmt.Sprint(maxTransportBytes)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			archive := test.open(t)
+			if archive != nil {
+				defer archive.Close()
+			}
+			err := UnpackOpen(t.Context(), archive, t.TempDir(), []string{"artifact"})
+			if transportCode(err) != nkderr.CodeVerifyFailed {
+				t.Fatalf("invalid held archive returned %v, want verify-failed", err)
+			}
+			if !strings.Contains(err.Error(), test.wantMessage) {
+				t.Fatalf("invalid held archive error %q does not contain %q", err, test.wantMessage)
+			}
+		})
 	}
 }
 

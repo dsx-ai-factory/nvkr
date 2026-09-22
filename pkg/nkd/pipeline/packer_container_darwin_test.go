@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,5 +21,18 @@ func TestRunPackerContainerRejectsNonLinuxHostBeforeRuntimeWork(t *testing.T) {
 	}
 	if len(runtime.calls) != 0 || len(runtime.cleanups) != 0 {
 		t.Fatalf("non-Linux rejection caused runtime work: calls=%#v cleanups=%#v", runtime.calls, runtime.cleanups)
+	}
+}
+
+func TestAdmitVMImagePackerRejectsNonLinuxBeforeRuntimeResolution(t *testing.T) {
+	session, err := NewNodeSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	executor, err := session.AdmitVMImagePacker(t.Context(), nil, "definitely-missing-runtime")
+	if executor != nil || code(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "requires Linux") {
+		t.Fatalf("non-Linux admission executor/error = %#v/%v, want nil/%s Linux rejection",
+			executor, err, e.CodeEngineCapability)
 	}
 }

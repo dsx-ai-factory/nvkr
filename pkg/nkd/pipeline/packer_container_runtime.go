@@ -180,10 +180,7 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		}
 	}
 
-	variables := packerContainerVariableArgs(request.node, request.bindings, kvmEnabled)
-	baseArgs := []string{"-only=" + request.node.Packer.BuildName}
-	baseArgs = append(baseArgs, variables...)
-	baseArgs = append(baseArgs, ".")
+	baseArgs := packerContainerBaseArgs(request.node, request.bindings, kvmEnabled)
 	project := path.Join(packerContainerInputRoot, "source", request.node.Packer.ProjectPath)
 
 	validateName := "nkd-packer-" + attempt + "-validate"
@@ -210,13 +207,9 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		return nil, err
 	}
 
-	buildName := "nkd-packer-" + attempt + "-build"
-	build := packerContainerCreateRequest{
-		name: buildName, image: request.node.Toolchain, platform: request.node.ToolchainPlatform,
-		input: inputVolume, inputReadOnly: true, work: workVolume, project: project,
-		packerArgs: append([]string{"build", "-on-error=cleanup"}, baseArgs...),
-		labels:     []string{nodeLabel, attemptLabel, "nkd.dev/role=build"}, kvm: request.kvm, groupAdd: kvmGroup,
-	}
+	build := packerBuildContainerRequest(request, inputVolume, workVolume, project,
+		nodeLabel, attemptLabel, attempt, kvmGroup, kvmEnabled)
+	buildName := build.name
 	resources.containers = append(resources.containers, buildName)
 	if err := createPackerContainer(ctx, request.runtime, build); err != nil {
 		return nil, err
@@ -231,6 +224,27 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		return nil, err
 	}
 	return artifact, nil
+}
+
+func packerBuildContainerRequest(request packerContainerRunRequest, inputVolume, workVolume, project,
+	nodeLabel, attemptLabel, attempt, kvmGroup string, kvmEnabled bool,
+) packerContainerCreateRequest {
+	baseArgs := packerContainerBaseArgs(request.node, request.bindings, kvmEnabled)
+	return packerContainerCreateRequest{
+		name: "nkd-packer-" + attempt + "-build", image: request.node.Toolchain,
+		platform: request.node.ToolchainPlatform, input: inputVolume, inputReadOnly: true,
+		work: workVolume, project: project,
+		packerArgs: append([]string{"build", "-on-error=cleanup"}, baseArgs...),
+		labels:     []string{nodeLabel, attemptLabel, "nkd.dev/role=build"},
+		kvm:        request.kvm, groupAdd: kvmGroup,
+	}
+}
+
+func packerContainerBaseArgs(node ir.Node, bindings packerContainerBindings, kvmEnabled bool) []string {
+	variables := packerContainerVariableArgs(node, bindings, kvmEnabled)
+	args := []string{"-only=" + node.Packer.BuildName}
+	args = append(args, variables...)
+	return append(args, ".")
 }
 
 func packerKVMGroup(device *os.File, enabled bool) (string, error) {
@@ -481,6 +495,10 @@ func (resources *packerContainerResources) removeContainer(ctx context.Context, 
 }
 
 func (resources *packerContainerResources) cleanup() error {
+	return resources.cleanupWithTimeout(packerContainerCleanupTimeout)
+}
+
+func (resources *packerContainerResources) cleanupWithTimeout(timeout time.Duration) error {
 	resources.mu.Lock()
 	containers := append([]string(nil), resources.containers...)
 	volumes := append([]string(nil), resources.volumes...)
@@ -489,21 +507,25 @@ func (resources *packerContainerResources) cleanup() error {
 	resources.containers, resources.volumes = nil, nil
 	resources.held, resources.workspace = nil, nil
 	resources.mu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), packerContainerCleanupTimeout)
-	defer cancel()
 	var cleanupErrors []error
+	containerCtx, cancelContainers := context.WithTimeout(context.Background(), timeout)
 	for index := len(containers) - 1; index >= 0; index-- {
-		if err := resources.runtime.Cleanup(ctx, packerContainerTerminationGrace, io.Discard, io.Discard,
+		if err := resources.runtime.Cleanup(containerCtx, packerContainerTerminationGrace, io.Discard, io.Discard,
 			"rm", "-fv", containers[index]); err != nil {
 			cleanupErrors = append(cleanupErrors, err)
 		}
 	}
+	cancelContainers()
+	// Volume removal gets its own bounded window so slow or hung container
+	// teardown cannot consume the entire cleanup budget and strand volumes.
+	volumeCtx, cancelVolumes := context.WithTimeout(context.Background(), timeout)
 	for index := len(volumes) - 1; index >= 0; index-- {
-		if err := resources.runtime.Cleanup(ctx, packerContainerTerminationGrace, io.Discard, io.Discard,
+		if err := resources.runtime.Cleanup(volumeCtx, packerContainerTerminationGrace, io.Discard, io.Discard,
 			"volume", "rm", "-f", volumes[index]); err != nil {
 			cleanupErrors = append(cleanupErrors, err)
 		}
 	}
+	cancelVolumes()
 	for _, file := range held {
 		if err := file.Close(); err != nil {
 			cleanupErrors = append(cleanupErrors, err)

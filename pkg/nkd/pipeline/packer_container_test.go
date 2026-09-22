@@ -46,6 +46,21 @@ func TestPreparePackerContainerTransportAuthenticatesManifestInVolumeClosure(t *
 	}
 	defer input.Close()
 	defer work.Close()
+	secondRoot := t.TempDir()
+	t.Cleanup(func() { _ = removePrivateTree(secondRoot) })
+	secondInput, secondWork, secondStaged, err := preparePackerContainerTransport(t.Context(), secondRoot, packerContainerRunRequest{
+		source:   &materializedSource{Dir: source, InputDigest: "sha256:" + repeatHex("8")},
+		manifest: manifest, digest: digest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer secondInput.Close()
+	defer secondWork.Close()
+	if secondStaged.inputArchiveDigest != staged.inputArchiveDigest {
+		t.Fatalf("identical input closure digest changed across runs: first=%s second=%s",
+			staged.inputArchiveDigest, secondStaged.inputArchiveDigest)
+	}
 	if _, err := input.OSFile().Seek(0, io.SeekStart); err != nil {
 		t.Fatal(err)
 	}
@@ -112,16 +127,20 @@ func TestPackerInputCarrierBoundsIncludeOuterWrapper(t *testing.T) {
 		name          string
 		inner, outer  int64
 		wantErrorCode e.Code
+		wantMessage   string
 	}{
 		{name: "within aggregate", inner: maxPackerInputClosureBytes, outer: MaxVMImagePackerInputBytes},
-		{name: "inner consumes wrapper reserve", inner: maxPackerInputClosureBytes + 1, outer: MaxVMImagePackerInputBytes, wantErrorCode: e.CodeBuildFailed},
-		{name: "outer exceeds aggregate", inner: maxPackerInputClosureBytes, outer: MaxVMImagePackerInputBytes + 1, wantErrorCode: e.CodeBuildFailed},
-		{name: "outer does not wrap inner", inner: 1024, outer: 1024, wantErrorCode: e.CodeBuildFailed},
+		{name: "inner consumes wrapper reserve", inner: maxPackerInputClosureBytes + 1, outer: MaxVMImagePackerInputBytes, wantErrorCode: e.CodeBuildFailed, wantMessage: "closure exceeds"},
+		{name: "outer exceeds aggregate", inner: maxPackerInputClosureBytes, outer: MaxVMImagePackerInputBytes + 1, wantErrorCode: e.CodeBuildFailed, wantMessage: "carrier exceeds"},
+		{name: "outer does not wrap inner", inner: 1024, outer: 1024, wantErrorCode: e.CodeBuildFailed, wantMessage: "does not wrap"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			err := validatePackerInputCarrierBounds(test.inner, test.outer)
 			if code(err) != test.wantErrorCode {
 				t.Fatalf("carrier bounds error = %v, want %s", err, test.wantErrorCode)
+			}
+			if test.wantMessage != "" && !strings.Contains(err.Error(), test.wantMessage) {
+				t.Fatalf("carrier bounds error = %v, want message containing %q", err, test.wantMessage)
 			}
 		})
 	}
@@ -194,6 +213,23 @@ func TestFinalizePackerContainerRunClosesArtifactOnPrimaryFailure(t *testing.T) 
 	}
 	if _, err := file.Stat(); !errors.Is(err, fs.ErrClosed) {
 		t.Fatalf("rejected artifact file remained open: %v", err)
+	}
+}
+
+func TestPackerContainerCleanupGivesVolumesAnIndependentBudget(t *testing.T) {
+	runtime := &cleanupBudgetPackerRuntime{}
+	resources := &packerContainerResources{
+		runtime: runtime, containers: []string{"build"}, volumes: []string{"input"},
+	}
+	err := resources.cleanupWithTimeout(10 * time.Millisecond)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("cleanup error = %v, want the container deadline", err)
+	}
+	if runtime.volumeContextErr != nil {
+		t.Fatalf("volume removal inherited the exhausted container budget: %v", runtime.volumeContextErr)
+	}
+	if !runtime.volumeRemoved {
+		t.Fatal("volume removal was not attempted after container cleanup exhausted its budget")
 	}
 }
 
@@ -323,6 +359,29 @@ type recordingPackerRuntime struct {
 	run        func(io.Reader, io.Writer, io.Writer, []string) error
 	runContext func(context.Context, io.Reader, io.Writer, io.Writer, []string) error
 	cleanupErr error
+}
+
+type cleanupBudgetPackerRuntime struct {
+	volumeContextErr error
+	volumeRemoved    bool
+}
+
+func (*cleanupBudgetPackerRuntime) Endpoint() string { return qualifiedRuntimeEndpoint }
+
+func (*cleanupBudgetPackerRuntime) AdmittedIdentity() (string, string) { return "", "" }
+
+func (*cleanupBudgetPackerRuntime) Run(context.Context, io.Reader, io.Writer, io.Writer, ...string) error {
+	return nil
+}
+
+func (runtime *cleanupBudgetPackerRuntime) Cleanup(ctx context.Context, _ time.Duration, _, _ io.Writer, args ...string) error {
+	if len(args) > 0 && args[0] == "rm" {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	runtime.volumeContextErr = ctx.Err()
+	runtime.volumeRemoved = true
+	return nil
 }
 
 func (runtime *recordingPackerRuntime) Endpoint() string { return runtime.endpoint }

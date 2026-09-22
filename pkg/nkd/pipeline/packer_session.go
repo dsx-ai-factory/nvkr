@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -66,6 +67,9 @@ type VMImagePackerRun struct {
 func (handle *NodeSession) AdmitVMImagePacker(ctx context.Context, selections []VMImagePackerSelection, runtimeName string) (*VMImagePackerExecutor, error) {
 	if err := requireRunContext(ctx, "VM-image Packer admission"); err != nil {
 		return nil, err
+	}
+	if runtime.GOOS != "linux" {
+		return nil, e.New(e.CodeEngineCapability, "containerized Packer execution requires Linux")
 	}
 	if handle == nil || handle.state == nil {
 		return nil, e.New(e.CodeEngineCapability, "node execution session is not open")

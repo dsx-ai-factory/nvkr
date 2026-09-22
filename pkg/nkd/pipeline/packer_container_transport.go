@@ -281,7 +281,11 @@ func validatePackerInputCarrierBounds(innerBytes, carrierBytes int64) error {
 		return e.New(e.CodeBuildFailed,
 			"authenticated Packer input closure exceeds its %d-byte bound", maxPackerInputClosureBytes)
 	}
-	if carrierBytes <= innerBytes || carrierBytes > MaxVMImagePackerInputBytes {
+	if carrierBytes <= innerBytes {
+		return e.New(e.CodeBuildFailed,
+			"authenticated Packer input carrier does not wrap its %d-byte inner closure", innerBytes)
+	}
+	if carrierBytes > MaxVMImagePackerInputBytes {
 		return e.New(e.CodeBuildFailed,
 			"authenticated Packer input carrier exceeds its %d-byte aggregate bound", MaxVMImagePackerInputBytes)
 	}

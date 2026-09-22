@@ -274,6 +274,30 @@ func TestValidatePackerContainerKVMRejectsUnadmittedDevices(t *testing.T) {
 	}
 }
 
+func TestPackerBuildContainerRequestThreadsKVMResolution(t *testing.T) {
+	kvm, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer kvm.Close()
+	node := testPackerContainerNode()
+	node.ExecutionBinding.Capabilities[0].Enabled = true
+	request := packerContainerRunRequest{
+		node: node, kvm: kvm,
+		bindings: packerContainerBindings{acceleratorVariable: "accelerator"},
+	}
+	build := packerBuildContainerRequest(request, "input", "work", "/nkd/input/source",
+		"nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc", "123", true)
+	args := packerContainerCreateArgs(build)
+	if !slices.Contains(args, "accelerator=kvm") || !slices.Contains(args, "--group-add=123") {
+		t.Fatalf("KVM build arguments do not preserve the resolved accelerator and device group: %#v", args)
+	}
+	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
+	if !slices.Contains(args, "--device") || !slices.Contains(args, wantDevice) {
+		t.Fatalf("KVM build arguments do not preserve the held device: %#v", args)
+	}
+}
+
 func TestRunPackerContainerRejectsMissingPluginBeforeBuild(t *testing.T) {
 	node := testPackerContainerNode()
 	manifest := []byte("{}\n")
@@ -435,6 +459,36 @@ func TestRunPackerContainerFailsBeforeBuildOnVersionOrValidationDiagnostics(t *t
 				t.Fatal("Packer build was created after preflight rejection")
 			}
 		})
+	}
+}
+
+func TestRunPackerContainerReapsResourcesWhenBuildStartFails(t *testing.T) {
+	request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n",
+		"The configuration is valid.\n", "", nil)
+	fallback := runtime.run
+	startFailure := errors.New("build start failed")
+	runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+		if len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-build") {
+			return startFailure
+		}
+		return fallback(stdin, stdout, stderr, args)
+	}
+	artifact, err := runPackerContainer(testContext(t), request)
+	if artifact != nil || code(err) != e.CodeBuildFailed || !errors.Is(err, startFailure) {
+		t.Fatalf("build-start artifact/error = %#v/%v, want nil/%s wrapping start failure",
+			artifact, err, e.CodeBuildFailed)
+	}
+	buildRemoved, volumesRemoved := false, 0
+	for _, call := range runtime.cleanups {
+		if len(call) > 2 && call[0] == "rm" && strings.Contains(call[2], "-build") {
+			buildRemoved = true
+		}
+		if len(call) > 3 && call[0] == "volume" && call[1] == "rm" {
+			volumesRemoved++
+		}
+	}
+	if !buildRemoved || volumesRemoved != 2 {
+		t.Fatalf("build-start cleanup calls = %#v, want build container and two volumes reaped", runtime.cleanups)
 	}
 }
 
