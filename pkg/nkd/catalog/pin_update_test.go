@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -154,10 +155,13 @@ func TestSourcePinUpdateRetainsSnapshotAcrossResolution(t *testing.T) {
 	}
 }
 
-func artifactUpdateFixture(t *testing.T, url, digest string) string {
+func artifactUpdateFixture(t *testing.T, url, digest string, platforms ...string) string {
 	t.Helper()
 	dir := t.TempDir()
-	registry := fmt.Sprintf("apiVersion: nkd.dev/catalog/v3\nkind: SourceBuildRegistry\nsources:\n  source: {repo: https://example.invalid/source}\ncomponents:\n  tool:\n    platforms: [linux/amd64, linux/arm64]\n    source: source\n    outputType: raw\n    prebuilt:\n      url: %s\n      evidence: {none: true}\n", url)
+	if len(platforms) == 0 {
+		platforms = []string{"linux/amd64", "linux/arm64"}
+	}
+	registry := fmt.Sprintf("apiVersion: nkd.dev/catalog/v3\nkind: SourceBuildRegistry\nsources:\n  source: {repo: https://example.invalid/source}\ncomponents:\n  tool:\n    platforms: [%s]\n    source: source\n    outputType: raw\n    prebuilt:\n      url: %s\n      evidence: {none: true}\n", strings.Join(platforms, ", "), url)
 	lock := fmt.Sprintf("apiVersion: nkd.dev/lock/v1\nkind: PinLock\npins:\n  source: {tag: v1.2.3, commit: %s, treeHash: %s, sourceDateEpoch: 1733939955}\nartifacts:\n  tool: {tag: v1.2.3, digests: {amd64: %s, arm64: %s}}\n", strings.Repeat("a", 40), strings.Repeat("b", 40), digest, digest)
 	for name, raw := range map[string]string{RegistryFile: registry, LockFile: lock} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(raw), 0o600); err != nil {
@@ -241,4 +245,48 @@ func TestPinUpdateCanceledBeforeCatalogIO(t *testing.T) {
 	assertCatalogContractCode(t, err, e.CodeTimeout)
 	_, err = UpdateArtifactPins(ctx, ArtifactPinRequest{Directory: "does-not-exist", All: true})
 	assertCatalogContractCode(t, err, e.CodeTimeout)
+}
+
+func TestArtifactPinUpdateArchitectureOrder(t *testing.T) {
+	var calls atomic.Int32
+	want := pinFixtureDigest("artifact payload")
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write([]byte(strings.TrimPrefix(want, "sha256:")))
+	}))
+	defer server.Close()
+	original := http.DefaultTransport
+	http.DefaultTransport = server.Client().Transport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	for _, platforms := range [][]string{{"linux/amd64", "linux/arm64"}, {"linux/arm64", "linux/amd64"}} {
+		for _, arches := range [][]string{{"amd64", "arm64"}, {"arm64", "amd64"}} {
+			t.Run(strings.Join(platforms, "-")+"/"+strings.Join(arches, "-"), func(t *testing.T) {
+				dir := artifactUpdateFixture(t, server.URL+"/tool-{{.Arch}}", "sha256:"+strings.Repeat("a", 64), platforms...)
+				lockBefore := readPinFixtureLock(t, dir)
+				calls.Store(0)
+				before := append([]string(nil), arches...)
+				update, err := UpdateArtifactPins(t.Context(), ArtifactPinRequest{Directory: dir, Components: []string{"tool"}, Architectures: arches})
+				if platforms[0] == "linux/arm64" {
+					assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+					if calls.Load() != 0 || len(update.Pins) != 0 || !bytes.Equal(lockBefore, readPinFixtureLock(t, dir)) {
+						t.Fatal("unsorted catalog caused network or lock mutation")
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				lock, err := LoadLockContext(t.Context(), dir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if update.Changed != 1 || !reflect.DeepEqual(lock.Artifacts["tool"].Digests, map[string]string{"amd64": want, "arm64": want}) {
+					t.Fatalf("update=%+v, persisted pins=%+v", update, lock.Artifacts)
+				}
+				if !reflect.DeepEqual(arches, before) {
+					t.Fatal("request architecture order mutated")
+				}
+			})
+		}
+	}
 }
