@@ -123,7 +123,7 @@ changed shapes are:
 | Run and Release views | `nkd.dev/run/v3`, `nkd.dev/release/v3` |
 
 Definition v4 removes cluster views. Catalog v3 removes delivery categories and node-role affinities. IR v4
-binds effective AICR bundle-rendering settings and typed VM disk, producer, selected toolchain-host platform,
+binds typed VM disk, producer, selected toolchain-host platform,
 public-variable and material-edge inputs into Build Digest. Old
 major versions fail closed; the migration does not reinterpret or repair existing signed records.
 
@@ -188,7 +188,7 @@ and registered, domain-separated identities before implementation. Pretty-printe
 Current module-level evidence is `pkg/nkd/canonical/canonical_test.go` (golden JCS bytes, integer boundaries,
 invalid UTF-8 rejection, immutable kind registration, and domain separation), `pkg/nkd/ir/marshal_test.go`
 (structurally transport-free, field-classified build identity), `pkg/nkd/ir/identity_contract_test.go`
-(independently calculated acquisition/source/AICR graph vectors, retired-family separation and old-field rejection), `pkg/nkd/pipeline/source_snapshot_test.go`
+(independently calculated acquisition/source graph vectors, retired-family separation and old-field rejection), `pkg/nkd/pipeline/source_snapshot_test.go`
 (versioned canonical tree identity including empty directories, modes, content, and symlink targets). This is **contract evidence**, not
 corpus-wide or independent-language acceptance.
 

@@ -44,17 +44,17 @@ func TestCatalogValidateReportsProducers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "7 component(s), 1 AICR profile(s)") {
+	if !strings.Contains(output, "8 component(s)") {
 		t.Fatalf("wrong producer summary: %s", output)
 	}
 }
 
-func TestCatalogListShowsDirectProducersAndProfiles(t *testing.T) {
+func TestCatalogListShowsDirectProducers(t *testing.T) {
 	output, err := runCatalogCommand(t, "catalog", "list", "--data", layeredCatalogPath(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"components:", "kubectl", "AICR profiles:", "h100-runtime"} {
+	for _, want := range []string{"components:", "kubectl"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("catalog list omitted %q: %s", want, output)
 		}

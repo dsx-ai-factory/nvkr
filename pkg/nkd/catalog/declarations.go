@@ -3,7 +3,6 @@ package catalog
 import (
 	"regexp"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
@@ -39,12 +38,11 @@ const (
 // registryDoc is the hand-authored registry as parsed from disk, before sources
 // and lock pins are merged in.
 type registryDoc struct {
-	APIVersion   string                  `json:"apiVersion"`
-	Kind         string                  `json:"kind"`
-	Metadata     Metadata                `json:"metadata"`
-	Sources      map[string]Source       `json:"sources"`
-	AICRProfiles map[string]aicr.Profile `json:"aicrProfiles,omitempty"`
-	Components   map[string]rawComponent `json:"components"`
+	APIVersion string                  `json:"apiVersion"`
+	Kind       string                  `json:"kind"`
+	Metadata   Metadata                `json:"metadata"`
+	Sources    map[string]Source       `json:"sources"`
+	Components map[string]rawComponent `json:"components"`
 }
 
 // rawComponent is a component as authored: it references a source by name and

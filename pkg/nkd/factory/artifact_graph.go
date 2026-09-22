@@ -63,7 +63,7 @@ func (graph ArtifactGraph) Validate() error {
 				if node.Network != ir.NetworkNone && node.Network != ir.NetworkDefault {
 					return e.New(e.CodeInvalidCatalog, "artifact graph build node %q has an unknown network mode", node.ID)
 				}
-			case NodeAICR, NodeVerify, NodeSBOM, NodePackage, NodeInventory:
+			case NodeVerify, NodeSBOM, NodePackage, NodeInventory:
 				if node.Network != ir.NetworkNone {
 					return e.New(e.CodeInvalidCatalog, "artifact graph isolated node %q does not declare network none", node.ID)
 				}

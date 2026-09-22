@@ -35,7 +35,6 @@ const (
 	NodeFetch   = "fetch"
 	NodeBuild   = "build"
 	NodeAcquire = "acquire"
-	NodeAICR    = "aicr-render"
 	NodeVerify  = "terminal-observe"
 	// NodeSBOM emits a deterministic CycloneDX SBOM per built artifact plus an
 	// aggregate index for one build target (ADR-13 §1, re-entered into v1 by
@@ -83,7 +82,7 @@ const (
 )
 
 // packageSpec describes dataflow, not ordering. Inputs are artifact selectors:
-// target/component, target/*, target/aicr-bundle, or package/name.
+// target/component, target/*, or package/name.
 type packageSpec struct {
 	HelmImage    *HelmImageBinding `json:"helmImage,omitempty"`
 	Name         string            `json:"name"`
@@ -161,15 +160,13 @@ type LifecycleOutputPlan struct {
 type LifecycleBoundOutput = delivery.Output
 
 type BuildPlan struct {
-	Name                string                   `json:"name"`
-	CatalogDigest       string                   `json:"catalogDigest"`
-	AppliedOverlays     []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`
-	BuildDigest         string                   `json:"buildDigest"`
-	Platform            string                   `json:"platform"`
-	CatalogSnapshot     *catalog.Catalog         `json:"catalogSnapshot"`
-	Components          []string                 `json:"components,omitempty"`
-	AICRProfileName     string                   `json:"aicrProfileName,omitempty"`
-	AICRProfileIdentity string                   `json:"aicrProfileIdentity,omitempty"`
+	Name            string                   `json:"name"`
+	CatalogDigest   string                   `json:"catalogDigest"`
+	AppliedOverlays []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`
+	BuildDigest     string                   `json:"buildDigest"`
+	Platform        string                   `json:"platform"`
+	CatalogSnapshot *catalog.Catalog         `json:"catalogSnapshot"`
+	Components      []string                 `json:"components,omitempty"`
 	// ResolvedComponents is the exact resolved catalog component set this build
 	// compiled from. It is persisted so the SBOM node (ADR-13) can build a
 	// faithful CycloneDX document at node-execution time, where the catalog is not

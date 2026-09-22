@@ -45,7 +45,6 @@ type Metadata = definition.Metadata
 type Definition = definition.Definition
 type Catalog = definition.Catalog
 type DefinitionOutput = definition.DefinitionOutput
-type AICROutput = definition.AICROutput
 type HelmOutput = definition.HelmOutput
 type APTOutput = definition.APTOutput
 type Environment = definition.Environment

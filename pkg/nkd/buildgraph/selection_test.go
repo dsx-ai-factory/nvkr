@@ -24,9 +24,6 @@ func TestDirectSelectionRejectsInvalidRequestsWithoutPartialResult(t *testing.T)
 		{"duplicate producer", Selection{Components: []string{"tool", "tool"}, Platform: "linux/amd64"}, e.CodeInvalidCatalog},
 		{"padded producer", Selection{Components: []string{" tool "}, Platform: "linux/amd64"}, e.CodeInvalidCatalog},
 		{"unknown output format", Selection{Components: []string{"tool"}, Platform: "linux/amd64", OutputFormat: "disk-image "}, e.CodeInvalidCatalog},
-		{"unknown profile", Selection{AICRProfile: "missing", Platform: "linux/amd64"}, e.CodeInvalidCatalog},
-		{"AICR disk output", Selection{AICRProfile: "missing", Platform: "linux/amd64", OutputFormat: "disk-image"}, e.CodeInvalidCatalog},
-		{"ambiguous producer kinds", Selection{Components: []string{"tool"}, AICRProfile: "missing", Platform: "linux/amd64"}, e.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			resolved, err := Resolve(nixCatalog(ir.BuilderOCIHermetic), test.selection)

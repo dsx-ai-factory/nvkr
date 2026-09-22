@@ -27,7 +27,7 @@ sets, clearance, publication roots, and qualification records are generated/auth
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
 Definition declares named outputs directly. Each output selects exact catalog components and a concrete target
-platform, or an explicit AICR profile and generator, together with its artifact format. An output may explicitly
+platform, together with its artifact format. An output may explicitly
 select another catalog. The compiler derives its complete pinned build graph, routine package envelopes,
 required slots, and routes. Byte-changing transformations remain explicit. Missing or duplicate selections,
 unsupported platforms and unsupported formats fail with coded errors before work.
@@ -47,15 +47,11 @@ command/Packer, disk, public-variable, material-edge, execution-class, and host-
 wrap the QCOW2 as a binary bundle. Local or hosted execution, generated jobs, observation, evidence, and
 publication still fail with `engine-capability` before source, subprocess, or output work.
 
-AICR outputs may declare `aicr.bundle` renderer settings: deployer, storage class, node selectors, node
-tolerations and workload selectors. The compiler normalizes owned lists and records the effective settings,
-including explicit `deployer: helm` when omitted, in the generated AICR activation. These settings participate
-in Build identity and execution reads them directly from that activation. One output's settings cannot alter
-another output's rendering. Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
+Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
-(ADR-20). Output-affecting tools such as the AICR generator stay in the build identity they affect.
+(ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
 
 `pkg/nkd/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
@@ -139,7 +135,7 @@ future qualified publication needs an authenticated commit protocol before expos
 ### 4. Package topology and single-owner rule
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
-  `aicr`, `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, and `trust`.
+  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, and `trust`.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not

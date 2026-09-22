@@ -13,8 +13,6 @@ func TestMaintainedDemoScriptsAdvertiseRunnableHonestJourneys(t *testing.T) {
 		name string
 		want []string
 	}{
-		{"demo-ai-factory-github.sh", []string{"public AICR Definition", "byte-exact regeneration", "STATIC-UNQUALIFIED"}},
-		{"demo-ai-factory-local.sh", []string{"maintained AICR Definition", "immutable local Run", "static-unqualified"}},
 		{"demo-catalog-change.sh", []string{"local Git", "preview bump", "UNQUALIFIED"}},
 		{"demo-tamper-detection.sh", []string{"changed artifact digests", "escaping symlinks", "UNQUALIFIED"}},
 		{"demo-release-consumer.sh", []string{"digest-pinned lifecycle publication", "Verification Policy", "Release capability"}},
@@ -31,26 +29,6 @@ func TestMaintainedDemoScriptsAdvertiseRunnableHonestJourneys(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestProviderDemosUseOnlyPublicLifecycleCommands(t *testing.T) {
-	for _, name := range []string{"demo-ai-factory-github.sh"} {
-		raw, err := os.ReadFile(demoScript(t, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		script := string(raw)
-		for _, required := range []string{"definition validate", "run plan", "run generate", "run generate --check", "--environment"} {
-			if !strings.Contains(script, required) {
-				t.Errorf("%s omits %q", name, required)
-			}
-		}
-		for _, legacy := range []string{"factory catalog", "factory explain", "factory graph", "DeliveryProfile", "FactoryDefinition"} {
-			if strings.Contains(script, legacy) {
-				t.Errorf("%s retains legacy public workflow %q", name, legacy)
-			}
-		}
 	}
 }
 

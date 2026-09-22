@@ -84,7 +84,7 @@ func validateReleaseMetadata(root PublicationRoot) error {
 		case "oci":
 			kind, media = "container-image", MediaOCIManifest
 		case "helm-oci":
-			kind, media = "helm-oci", "application/vnd.nkd.aicr-helm-bundle.v1"
+			kind, media = "helm-oci", "application/vnd.nkd.helm-bundle.v1"
 		case "apt-repository":
 			kind, media = "apt-repository", "application/vnd.nkd.apt-repository.v1"
 		default:

@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -90,8 +89,6 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 	switch node.Kind {
 	case NodeAcquire:
 		return executeToolAcquire(ctx, node, artifacts[node.Outputs[0]], stdout)
-	case NodeAICR:
-		return executeAICR(ctx, plan, node, artifacts, stdout, stderr)
 	case NodeVerify:
 		return executeObservation(ctx, plan, node, artifacts)
 	case NodeSBOM:
@@ -234,52 +231,6 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 	}
 	fmt.Fprintf(stdout, "acquired %s: archive %s, executable %s\n", node.ID, node.Digest, node.ExecutableDigest)
 	return nil
-}
-
-func executeAICR(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout, stderr io.Writer) error {
-	var buildPlan *BuildPlan
-	for index := range plan.Builds {
-		if plan.Builds[index].Name == node.BuildTarget {
-			buildPlan = &plan.Builds[index]
-			break
-		}
-	}
-	if buildPlan == nil || buildPlan.Graph == nil || buildPlan.Graph.AICR == nil || len(node.Inputs) != 1 || len(node.Outputs) != 1 {
-		return e.New(e.CodePipelineDrift, "AICR node %q lacks build activation or generator input", node.ID)
-	}
-	activation := buildPlan.Graph.AICR
-	if err := activation.Validate(); err != nil {
-		return err
-	}
-	profile := aicr.Profile{Identity: buildPlan.AICRProfileIdentity,
-		Digest: activation.ProfileDigest, GeneratorDigest: activation.GeneratorDigest,
-		Service: activation.Service, Accelerator: activation.Accelerator, OS: activation.OS,
-		Intent: activation.Intent, Platform: activation.Platform}
-	options := aicrBundleOptions(activation.Bundle, artifacts[node.Outputs[0]].Path)
-	bundler := aicr.CLIBundler{Binary: artifacts[node.Inputs[0]].Path}
-	qualified, err := bundler.BundleQualified(ctx, profile, options, stdout, stderr)
-	if err != nil {
-		return err
-	}
-	_, err = qualified.ValidateFor(ctx, profile)
-	return err
-}
-
-func aicrBundleOptions(bundle aicr.BundleInputs, outputPath string) aicr.Options {
-	options := aicr.Options{OutputDir: outputPath, Deployer: bundle.Deployer}
-	if bundle.StorageClass != "" {
-		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--storage-class", bundle.StorageClass)
-	}
-	for _, value := range bundle.AcceleratedNodeSelectors {
-		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--accelerated-node-selector", value)
-	}
-	for _, value := range bundle.AcceleratedNodeTolerations {
-		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--accelerated-node-toleration", value)
-	}
-	for _, value := range bundle.WorkloadSelectors {
-		options.ExtraBundleArgs = append(options.ExtraBundleArgs, "--workload-selector", value)
-	}
-	return options
 }
 
 type factoryObservation struct {

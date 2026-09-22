@@ -124,7 +124,6 @@ func TestInvalidProducerSelectionPrecedesCatalogIO(t *testing.T) {
 		{Components: []string{"kubectl"}, Platform: "linux/riscv64"},
 		{Platform: "linux/amd64"},
 		{Components: []string{"kubectl", "kubectl"}, Platform: "linux/amd64"},
-		{Components: []string{"kubectl"}, Platform: "linux/amd64", AICRProfile: "profile"},
 		{Components: []string{"kubectl"}, Platform: "linux/amd64", OutputFormat: "archive"},
 	} {
 		catalogIO := &countingCatalogIO{}

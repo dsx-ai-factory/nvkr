@@ -1,13 +1,3 @@
-aicrProfiles:
-  h100-runtime:
-    accelerator: h100
-    digest: sha256:f6fbb6626affcaab365ab2c8926d343b1c441af95bc4612f3ad7c695870b19e9
-    generatorDigest: sha256:3b011745112ecee0c216310c732cbe13f474a21a20da6bc09476a2ee8d840a2a
-    identity: h100-eks-ubuntu-training
-    intent: training
-    os: ubuntu
-    repo: https://github.com/NVIDIA/aicr
-    service: eks
 apiVersion: nkd.dev/catalog/v3
 components:
   acme-kubectl:

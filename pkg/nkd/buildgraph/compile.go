@@ -71,18 +71,6 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		}
 	}
 	g := &ir.Graph{SchemaVersion: ir.SchemaVersion, Platform: r.Platform}
-	if a := r.AICRProfile; a != nil {
-		g.AICR = &ir.AICRActivation{
-			Service:         a.Service,
-			Accelerator:     a.Accelerator,
-			OS:              a.OS,
-			Intent:          a.Intent,
-			Platform:        a.Platform,
-			ProfileDigest:   a.Digest,
-			GeneratorDigest: a.GeneratorDigest,
-			Bundle:          r.Bundle.Clone(),
-		}
-	}
 	fetchByKey := map[string]string{}
 	var verifyNeeds []string // build + pull node IDs the terminal verify waits on
 	components := make(map[string]catalog.NamedComponent, len(r.Components))

@@ -5,24 +5,13 @@ catalog:
   - supplier-kubectl.yaml
 kind: Definition
 metadata:
-  description: Pinned GPU runtime and worker deliverables with explicit AICR rendering
-    settings.
+  description: Pinned GPU runtime and worker deliverables.
   name: nke-gpu-tenant
 outputs:
-- aicr:
-    bundle:
-      acceleratedNodeSelectors:
-      - nvidia.com/gpu.present=true
-      acceleratedNodeTolerations:
-      - nvidia.com/gpu=present:NoSchedule
-      deployer: helm
-      storageClass: gp3
-      workloadSelectors:
-      - nkd.dev/tenant=gpu
-    generator: aicr
-    profile: h100-runtime
-  catalog:
+- catalog:
     base: ../layered-catalog
+  components:
+  - gpu-runtime-chart
   format: helm-oci
   name: gpu-runtime
   platform: linux/amd64

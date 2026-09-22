@@ -54,7 +54,7 @@ Explicit low-level tagged publication remains a discovery operation; automatic v
 promotion policy are not implemented by this lifecycle configuration.
 
 Definition owns selected components, byte-changing packaging intent, and catalog tool selectors (`sbomTool`,
-`cosignTool`, and output `aicr.generator`). Catalog source declarations own release URL templates, executable
+`cosignTool`). Catalog source declarations own release URL templates, executable
 members, formats, platform and version constraints. The generated source lock owns the resolved tool URL,
 archive digest and executable digest (ADR-22). Environment contains no executable pins. A dry-run signing
 Environment does not acquire the selected cosign executable. Output-affecting tools remain bound to Build
@@ -214,7 +214,7 @@ repositories, then publishes the release index last; hosted verification pulls t
 SBOMs as extra products. No tag-based cosign signature substitutes for qualified clearance. The full graph and
 wrapper rationale are in [publication architecture](../publication-architecture.md).
 
-Helm outputs accept either an AICR-generated tree or one observed source archive component. The latter carries
+A Helm output accepts one observed source archive component carrying
 a single `helm/` directory, extracted through the bounded transport adapter and repacked deterministically.
 Lifecycle observation checks the exact archive against its producer result and independently reproduces the
 publication payload. Optional Definition Helm settings select a chart and another named OCI output. The

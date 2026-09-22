@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/fs"
-	"strings"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -55,22 +54,6 @@ func goodComponent() Component {
 func TestKubernetesProducerFixtureValidates(t *testing.T) {
 	if _, err := LoadContext(context.Background(), Dir("../../../testdata/catalogs/kubernetes-layered")); err != nil {
 		t.Fatalf("Kubernetes producer fixture must load and validate: %v", err)
-	}
-}
-
-func TestValidateAllowsAICRProfileOnlyCatalog(t *testing.T) {
-	profile := &AICRProfile{
-		Identity: "h100-eks-ubuntu-training",
-		Digest:   "sha256:" + strings.Repeat("a", 64), GeneratorDigest: "sha256:" + strings.Repeat("b", 64),
-		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-	}
-	cat := &Catalog{AICRProfiles: map[string]AICRProfile{"accelerated-runtime": *profile}}
-	if err := cat.Validate(); err != nil {
-		t.Fatalf("profile-only AICR catalog must validate: %v", err)
-	}
-	cat.AICRProfiles = nil
-	if err := cat.Validate(); err == nil {
-		t.Fatal("empty catalog was accepted")
 	}
 }
 
@@ -199,26 +182,6 @@ func TestExclusionMustBeDeclared(t *testing.T) {
 // Composition (base/overlays/mixins) is a retained-but-inert v1 hook: the fields
 // are recognized (not stripped) but any populated value fails closed rather than
 // being silently flattened (NKD-FR-RC-014/015, NKD-CON-017).
-
-func TestAICRProfileRequiresPinnedGeneratorBytes(t *testing.T) {
-	makeCatalog := func(generatorDigest string) *Catalog {
-		cat := base(goodComponent())
-		cat.AICRProfiles = map[string]AICRProfile{"accelerated-runtime": {
-			Identity: "h100-eks", Digest: "sha256:" + strings.Repeat("a", 64),
-			GeneratorDigest: generatorDigest,
-			Service:         "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-		}}
-		return cat
-	}
-	for _, digest := range []string{"", "sha256:short", "sha256:" + strings.Repeat("A", 64)} {
-		if err := makeCatalog(digest).Validate(); codeOf(err) != nkderr.CodeUnpinnedSource {
-			t.Fatalf("generator digest %q must fail closed, got %v", digest, err)
-		}
-	}
-	if err := makeCatalog("sha256:" + strings.Repeat("b", 64)).Validate(); err != nil {
-		t.Fatalf("exact lowercase generator digest was rejected: %v", err)
-	}
-}
 
 func TestUpdateReadersValidateSourceDeclarations(t *testing.T) {
 	cases := []string{

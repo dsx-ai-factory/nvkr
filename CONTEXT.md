@@ -8,8 +8,7 @@ vocabulary preserves the distinctions needed to authenticate them.
 
 **Definition**:
 Authored product intent declaring named outputs, their exact catalog producers, target platforms and packaging
-intent. An output directly selects components or an AICR profile, generator and optional rendering settings.
-Packaging intent may bind a Helm chart to a named image output; the resulting digest is content, while its
+intent. An output directly selects components. Packaging intent may bind a Helm chart to a named image output; the resulting digest is content, while its
 deployment repository remains transport configuration.
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
@@ -67,7 +66,7 @@ _Avoid_: Authored selection group, artifact, release
 
 **Build Digest**:
 The typed identity of a generated build graph's transport-independent logical content under `nkd.build`.
-Exact AICR rendering inputs belong in this identity. Output names and execution settings are bound by their
+Output names and execution settings are bound by their
 owning records and excluded from this identity. Equal Build Digests do not merge required output uses or their evidence.
 The historical `nkd.recipe` identity family remains reserved; its signed bytes are not renamed or converted.
 _Avoid_: Artifact digest, graph-file hash
@@ -154,25 +153,13 @@ _Avoid_: Build status, local clock, mutable release contents
 ## Catalog language
 
 **Component catalog**:
-Reusable producer, source, tool, AICR profile, and pin declarations from which Definitions select their inputs.
+Reusable producer, source, tool, and pin declarations from which Definitions select their inputs.
 _Avoid_: Inventory, registry destination
 
 **Component producer**:
 A catalog declaration describing how to build or acquire a named component from pinned inputs and which target
 platforms it supports. It carries build or acquisition instructions, never a deployment placement taxonomy.
 _Avoid_: Named output, artifact, authored build group
-
-**AICR profile**:
-A catalog declaration selecting the pinned upstream AICR content and activation values used with an explicitly
-selected generator. Upstream `recipe.yaml` files and their protocol digests remain upstream inputs; they are
-not NKD Recipe objects or a second composition language.
-_Avoid_: Verification Policy, reusable output group, deployment configuration
-
-**AICR bundle inputs**:
-Output-owned rendering arguments: deployer, storage class, node selectors/tolerations and workload selectors.
-The compiler binds their effective values, including the Helm default, into the generated graph and Build
-Digest. They affect produced bytes without declaring or authenticating a deployed cluster.
-_Avoid_: Cluster view, placement authority, runtime evidence
 
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer.

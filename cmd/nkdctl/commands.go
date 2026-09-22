@@ -14,7 +14,6 @@ func selectionFlags() []cli.Flag {
 		&cli.StringFlag{Name: "data", Usage: "explicit catalog directory"},
 		&cli.StringSliceFlag{Name: "component", Usage: "exact component ID to build (repeatable)"},
 		&cli.StringFlag{Name: "platform", Usage: "target platform: linux/amd64 | linux/arm64"},
-		&cli.StringFlag{Name: "aicr-profile", Usage: "exact catalog AICR profile, instead of components"},
 	}
 }
 
@@ -31,7 +30,7 @@ func resolveBuild(c *cli.Context) (*buildgraph.Resolved, string, error) {
 		return nil, "", e.New(e.CodeUsage, "build resolution requires --data <catalog-directory>")
 	}
 	resolution, err := client.New(client.WithProvider(providerFor(c))).ResolveBuild(c.Context, client.ResolveRequest{
-		Components: c.StringSlice("component"), Platform: c.String("platform"), AICRProfile: c.String("aicr-profile"),
+		Components: c.StringSlice("component"), Platform: c.String("platform"),
 	})
 	if err != nil {
 		return nil, "", err

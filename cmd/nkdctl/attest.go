@@ -24,8 +24,6 @@ func cmdAttest() *cli.Command {
 			&cli.StringFlag{Name: "conformance", Usage: "reserved legacy field; qualified publisher vectors reject caller-authored conformance claims"},
 			&cli.StringFlag{Name: "validation-vector", Usage: "reserved legacy field; qualified publisher vectors reject caller-authored validation references"},
 			&cli.StringFlag{Name: "evidence-out", Usage: "also write a deterministic evidence bundle (verdict + preflight + per-component causes)"},
-			&cli.BoolFlag{Name: "aicr-bundle", Usage: "reserved; publisher-attestation AICR bundling is unavailable in this release"},
-			&cli.StringFlag{Name: "aicr-out", Value: ".nkd/work/aicr-bundle", Usage: "reserved output path for --aicr-bundle"},
 			&cli.BoolFlag{Name: "vuln", Usage: "scan the deterministic SBOM with a shelled scanner and fold the report digest into the vector (ADR-13 §3)"},
 			&cli.StringFlag{Name: "vuln-artifact", Usage: "with --vuln: exact component whose per-artifact SBOM is scanned (required for a multi-artifact build)"},
 			&cli.StringFlag{Name: "vuln-scanner", Value: "grype", Usage: "with --vuln: qualified scanner kind (grype|trivy)"},
@@ -41,10 +39,6 @@ func cmdAttest() *cli.Command {
 			if c.String("conformance") != "" || c.String("validation-vector") != "" {
 				return e.New(e.CodeUnsupported,
 					"attest --conformance/--validation-vector cannot add caller-authored later-gate claims to a publisher vector; use a separately authenticated conformance receipt")
-			}
-			if c.Bool("aicr-bundle") {
-				return e.New(e.CodeUnsupported,
-					"attest --aicr-bundle cannot bind a rendered bundle with qualified publisher authority in this release; standalone AICR rendering is a locally verified diagnostic only")
 			}
 			if err := rejectQualifiedPackaging(c); err != nil {
 				return err
@@ -88,19 +82,6 @@ func cmdAttest() *cli.Command {
 			if err != nil {
 				return err
 			}
-			// Record the pinned AICR accelerated-runtime profile as provenance. Rendered
-			// bundles remain standalone locally verified diagnostics in this release; the
-			// publisher vector cannot acquire their authority through a caller-selected path.
-			if res.AICRProfile != nil {
-				p, err := profileFromActivation(res.AICRProfile, g.AICR)
-				if err != nil {
-					return err
-				}
-				ref := &attest.AICRRef{
-					Identity: p.Identity, Digest: p.Digest, GeneratorDigest: p.GeneratorDigest, Repo: p.Repo,
-				}
-				m.AICR = ref
-			}
 			// Publisher evidence is assembled only from two opaque, locally verified
 			// capabilities over this same qualified report: an exact-subject SBOM set and
 			// report/graph-derived provenance. Caller-supplied evidence strings cannot
@@ -139,10 +120,6 @@ func cmdAttest() *cli.Command {
 				return err
 			}
 			fmt.Printf("wrote %s — %s\n", out, m.Summary())
-			if m.AICR != nil {
-				fmt.Printf("AICR accelerated-runtime profile: %s @ %s (profile reference only; standalone `nkdctl aicr bundle` output remains unqualified across process boundaries)\n",
-					m.AICR.Identity, m.AICR.Digest)
-			}
 			if c.Bool("sign") || bundle != "" {
 				if bundle != "" {
 					fmt.Printf("signed + bundled (mirrorable, airgap-verifiable): %s.sig + %s.pem + %s\n", out, out, bundle)

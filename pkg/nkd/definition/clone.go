@@ -14,14 +14,6 @@ func (input Definition) Clone() Definition {
 			value.Overlays = append([]string(nil), value.Overlays...)
 			out.Catalog = &value
 		}
-		if out.AICR != nil {
-			value := *out.AICR
-			if value.Bundle != nil {
-				bundle := value.Bundle.Clone()
-				value.Bundle = &bundle
-			}
-			out.AICR = &value
-		}
 		if out.APT != nil {
 			value := *out.APT
 			out.APT = &value

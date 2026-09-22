@@ -6,9 +6,6 @@
 package ir
 
 import (
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
@@ -109,39 +106,6 @@ type PatchRef struct {
 	Content string `json:"content"`
 }
 
-// AICRActivation is the output-affecting accelerated-runtime selection bound into
-// build identity. These are the exact inputs passed to `aicr recipe`, plus the
-// digest of the canonical AICR recipe they must reproduce and the digest of the
-// exact generator executable. Human profile identity and repository location are
-// deliberately absent: they are labels/transport, not content identity.
-type AICRActivation struct {
-	Service         string            `json:"service"`
-	Accelerator     string            `json:"accelerator"`
-	OS              string            `json:"os"`
-	Intent          string            `json:"intent"`
-	Platform        string            `json:"platform,omitempty"`
-	ProfileDigest   string            `json:"profileDigest"`
-	GeneratorDigest string            `json:"generatorDigest"`
-	Bundle          aicr.BundleInputs `json:"bundle"`
-}
-
-// Validate prevents a caller-composed IR from gaining a build identity while
-// omitting either AICR authority pin or carrying unsupported generator inputs.
-func (a AICRActivation) Validate() error {
-	if !canonical.IsDigest(a.ProfileDigest) {
-		return e.New(e.CodeUnpinnedSource,
-			"AICR activation recipe digest %q is not a lowercase sha256:<64-hex> pin", a.ProfileDigest)
-	}
-	if !canonical.IsDigest(a.GeneratorDigest) {
-		return e.New(e.CodeUnpinnedSource,
-			"AICR activation generator digest %q is not a lowercase sha256:<64-hex> pin", a.GeneratorDigest)
-	}
-	if err := aicr.ValidateValues(a.Service, a.Accelerator, a.OS, a.Intent, a.Platform); err != nil {
-		return e.Wrap(e.CodeInvalidCatalog, err, "AICR activation")
-	}
-	return a.Bundle.Validate()
-}
-
 // Node is one vertex of the build DAG. Field presence depends on Kind; unused
 // fields are omitted from serialization so the digest stays tight.
 type Node struct {
@@ -233,9 +197,5 @@ type Node struct {
 type Graph struct {
 	SchemaVersion string `json:"schemaVersion"`
 	Platform      string `json:"platform"`
-	// AICR is present only for an explicitly selected AICR profile. It remains in
-	// LogicalGraph because changing any generator input or its pinned canonical output
-	// changes what is rendered and must therefore change buildDigest.
-	AICR  *AICRActivation `json:"aicr,omitempty"`
-	Nodes []Node          `json:"nodes"` // sorted by ID
+	Nodes         []Node `json:"nodes"` // sorted by ID
 }

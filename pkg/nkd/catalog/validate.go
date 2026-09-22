@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
@@ -17,9 +16,6 @@ import (
 // well as full Load. Those paths must never act on a repo or toolchain declaration
 // which only a later component resolution would reject.
 func validateRegistryDeclarations(reg *registryDoc) error {
-	if err := validateAICRProfiles(reg.AICRProfiles); err != nil {
-		return err
-	}
 	componentNames := make([]string, 0, len(reg.Components))
 	for name := range reg.Components {
 		componentNames = append(componentNames, name)
@@ -106,11 +102,8 @@ func (cat *Catalog) Validate() error {
 			return err
 		}
 	}
-	if len(cat.Components) == 0 && len(cat.AICRProfiles) == 0 {
-		return e.New(e.CodeInvalidCatalog, "catalog has no component producers or AICR profiles")
-	}
-	if err := validateAICRProfiles(cat.AICRProfiles); err != nil {
-		return err
+	if len(cat.Components) == 0 {
+		return e.New(e.CodeInvalidCatalog, "catalog has no component producers")
 	}
 
 	names := make([]string, 0, len(cat.Components))
@@ -132,29 +125,6 @@ func (cat *Catalog) Validate() error {
 		}
 	}
 	return validateMaterialGraph(cat.Components)
-}
-
-func validateAICRProfiles(profiles map[string]aicr.Profile) error {
-	names := make([]string, 0, len(profiles))
-	for name := range profiles {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		if strings.TrimSpace(name) == "" || name != strings.TrimSpace(name) {
-			return e.New(e.CodeInvalidCatalog, "AICR profile name %q is empty or non-canonical", name)
-		}
-		profile := profiles[name]
-		if err := profile.Validate(); err != nil {
-			return err
-		}
-		if profile.Repo != "" {
-			if err := checkSourceRepoScheme(name+" AICR profile", profile.Repo); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func validateComponentTargets(name string, platforms []string) error {

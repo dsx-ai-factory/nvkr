@@ -3,7 +3,7 @@
 NKE Recipes uses `nkdctl` to turn a product **Definition** into a **Run** and an immutable **Release** of artifacts and evidence.
 Catalog components supply reusable producer instructions; an Environment supplies execution/publication settings; consumers
 apply a Verification Policy. Downstream systems own deployment topology and node placement. Authors declare outputs once; NKD derives packages, routes and internal evidence relationships.
-Each output directly selects catalog components and a concrete target, or an AICR profile and generator.
+Each output directly selects catalog components and a concrete target.
 The resulting build graph is generated and has no separate authoring lifecycle.
 
 ## Start here
@@ -17,8 +17,7 @@ bin/nkdctl run plan --definition definitions/nke-v1/definition.yaml \
 
 Planning reads inputs without building or publishing. Follow the [lifecycle guide](docs/lifecycle.md) for local
 attempts, hosted generation and policy-scoped Release verification, or choose a [runnable demo](scripts/README.md).
-The [NKE inputs](definitions/nke-v1/README.md) build the CLI, CWE image, and Helm bundle; the
-[AICR inputs](definitions/aicr/README.md) produce a pinned Helm OCI output. The NKE OS-image build owns
+The [NKE inputs](definitions/nke-v1/README.md) build the CLI, CWE image, and Helm bundle. The NKE OS-image build owns
 the entire worker payload; its NKD integration remains deferred.
 
 ## Current boundary

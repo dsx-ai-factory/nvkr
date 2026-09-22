@@ -28,7 +28,7 @@ even if the same content checks pass.
 
 ## Artifact scope
 
-V1 targets one amd64 variant per delivered artifact, including one OS image and one AICR package. Source lanes are `hermetic-build`, `wrapped-build`, or `acquired`; production provenance
+V1 targets one amd64 variant per delivered artifact, including one OS image. Source lanes are `hermetic-build`, `wrapped-build`, or `acquired`; production provenance
 records the actual lane. Every separately delivered Artifact is signed and attested in OCI. The Release binds exact named outputs without a deployment topology.
 Each named output selects its producers and concrete target directly. Shared build content does not collapse
 separate required outputs or let one output's evidence satisfy another.
@@ -44,12 +44,10 @@ separate required outputs or let one output's evidence satisfy another.
 | Kubernetes node and control-plane components | NKE OS build | Inside OS image / M2 |
 | CNI | NKE OS build | Inside OS image / M2 |
 | Helm | Digest-pinned acquisition | Operator tooling package / M2 |
-| AICR CLI | Digest-pinned acquisition | Operator tooling package / M2 |
 | Spire-agent | Placement decision: embedded or acquired | Inside OS image or OCI artifact / M2 |
 | Third-party container images | Digest-pinned acquisition when outside OS image | OCI images / M2 |
-| AICR deployment and charts | Pinned renderer and chart inputs | OCI package / M2 |
 | NKE Helm charts | Pinned chart sources | OCI packages / M2 |
-| Operator tooling | Acquired kubectl, Helm and AICR CLI | OCI package / M2 |
+| Operator tooling | Acquired kubectl and Helm | OCI package / M2 |
 
 The NKE OS build team owns embedded-software correctness and runtime validation. NKD's deferred disk delivery
 requires an inventory reconciling traced materials with read-only inspection of the exact disk. Embedded components retain matrix rows for

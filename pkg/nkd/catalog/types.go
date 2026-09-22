@@ -11,7 +11,6 @@
 package catalog
 
 import (
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
@@ -254,21 +253,16 @@ type Component struct {
 	ExclusionReason string `json:"exclusionReason,omitempty"`
 }
 
-// AICRProfile pins the exact upstream profile and generator inputs for an
-// explicitly selected AICR output. It is independent of ordinary components.
-type AICRProfile = aicr.Profile
-
 // Catalog is the loaded, fully resolved registry and lock. Producer selection is
 // explicit in each Definition output; the catalog contains no authored groups.
 type Catalog struct {
-	Actions      map[string]ActionPin
-	Tools        map[string]ToolPin
-	APIVersion   string
-	Kind         string
-	Metadata     Metadata
-	Sources      map[string]Source
-	Components   map[string]Component
-	AICRProfiles map[string]aicr.Profile
+	Actions    map[string]ActionPin
+	Tools      map[string]ToolPin
+	APIVersion string
+	Kind       string
+	Metadata   Metadata
+	Sources    map[string]Source
+	Components map[string]Component
 }
 
 // NamedComponent pairs a component with its registry key, for ordered iteration

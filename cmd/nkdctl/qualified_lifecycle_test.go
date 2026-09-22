@@ -602,7 +602,6 @@ func TestAttestRejectsUnavailableAuthorityOptionsBeforeBuild(t *testing.T) {
 	for _, args := range [][]string{
 		{"nkdctl", "attest", "--conformance", "conformant"},
 		{"nkdctl", "attest", "--validation-vector", testInputDigest},
-		{"nkdctl", "attest", "--aicr-bundle"},
 		{"nkdctl", "attest", "--vuln"},
 		{"nkdctl", "attest", "--release-member", "member.json"},
 		{"nkdctl", "attest", "--evidence-out", "observation.json"},

@@ -102,24 +102,6 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 			producerOutputs = append(producerOutputs, output, result)
 		}
 	}
-	if graph.AICR != nil {
-		generator := aicrGenerator(targetSpec)
-		generatorArtifact := "tool/" + generator
-		if _, ok := artifacts[generatorArtifact]; !ok {
-			return e.New(e.CodeInvalidCatalog,
-				"factory AICR target %q requires exact generator tool %q so the pinned build can be rendered without an ambient executable", target, generator)
-		}
-		nodeID := target + "/aicr-render"
-		output := "artifact/" + target + "/aicr-bundle"
-		nodes[nodeID] = Node{ID: nodeID, Kind: NodeAICR, BuildTarget: target,
-			Network: ir.NetworkNone, RunsOn: runsOn, Container: utilityContainer,
-			Platform: utilityPlatform, Inputs: []string{generatorArtifact}, Outputs: []string{output}}
-		artifacts[output] = Artifact{ID: output, Name: "aicr-bundle", Kind: "aicr-bundle",
-			MediaType: "application/vnd.nkd.aicr-bundle.v1", Producer: nodeID,
-			BuildTarget: target, Component: "aicr-bundle",
-			Path: filepath.ToSlash(filepath.Join(".nkd", "factory", target, "aicr-bundle"))}
-		producerOutputs = append(producerOutputs, output)
-	}
 	sort.Strings(producerOutputs)
 	if len(producerOutputs) == 0 {
 		return e.New(e.CodeInvalidCatalog, "factory build target %q has no selected artifact producers", target)
@@ -143,8 +125,7 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 
 	// SBOM node (ADR-13 §1 / ADR-13): one per build target, gated on the
 	// terminal observation, binding a CycloneDX SBOM per built component to that
-	// component's producer-result digest. It bills only what was built, so a
-	// producer-less target (e.g. AICR-only) mints no SBOM.
+	// component's producer-result digest. It bills only what was built.
 	resultInputs := make([]string, 0, len(producerOutputs))
 	for _, id := range producerOutputs {
 		if strings.HasPrefix(id, "result/") {

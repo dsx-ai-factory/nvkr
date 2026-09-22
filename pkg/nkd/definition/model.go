@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
@@ -61,18 +60,10 @@ type DefinitionOutput struct {
 	Name       string      `json:"name"`
 	Platform   string      `json:"platform"`
 	Catalog    *Catalog    `json:"catalog,omitempty"`
-	AICR       *AICROutput `json:"aicr,omitempty"`
 	Components []string    `json:"components,omitempty"`
 	Format     string      `json:"format"`
 	APT        *APTOutput  `json:"apt,omitempty"`
 	Helm       *HelmOutput `json:"helm,omitempty"`
-}
-
-// AICROutput explicitly selects an imported profile and its pinned generator.
-type AICROutput struct {
-	Bundle    *aicr.BundleInputs `json:"bundle,omitempty"`
-	Profile   string             `json:"profile"`
-	Generator string             `json:"generator"`
 }
 
 // HelmOutput binds a rendered controller chart to another output's native image.
@@ -163,21 +154,12 @@ func (definition Definition) Validate() error {
 		if output.Catalog != nil && output.Catalog.Base == "" {
 			return e.New(e.CodeInvalidCatalog, "output %q has an empty catalog override", output.Name)
 		}
-		if output.AICR != nil && (output.Format != OutputHelm || len(output.Components) != 0 || !namePattern.MatchString(output.AICR.Profile) || !namePattern.MatchString(output.AICR.Generator)) {
-			return e.New(e.CodeInvalidCatalog, "output %q has invalid AICR producer settings", output.Name)
-		}
-		if output.AICR != nil {
-			if _, err := aicr.NormalizeBundleInputs(output.AICR.Bundle); err != nil {
-				return err
-			}
-		}
 		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has unsupported format %q", output.Name, output.Format)
 		}
 		if output.Format == OutputHelm {
-			generated := output.AICR != nil
-			if (generated && len(output.Components) != 0) || (!generated && len(output.Components) != 1) {
-				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires either an AICR build without components or one source archive component", output.Name)
+			if len(output.Components) != 1 {
+				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires exactly one source archive component", output.Name)
 			}
 		} else if len(output.Components) == 0 {
 			return e.New(e.CodeInvalidCatalog, "definition output %q requires components", output.Name)

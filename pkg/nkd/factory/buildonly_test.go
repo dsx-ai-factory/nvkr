@@ -133,7 +133,7 @@ func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 // Tool acquisition is a Run operation; a catalog producer node carries an
 // explicit reference into its output's authoritative build graph.
 func TestToolAcquireNodeIsNotIRProjected(t *testing.T) {
-	if irProjectedNode(Node{ID: "tool/aicr", Kind: NodeAcquire}) {
+	if irProjectedNode(Node{ID: "tool/cosign", Kind: NodeAcquire}) {
 		t.Fatal("a tool acquire node (no BuildTarget/IRNode) must not be IR-projected")
 	}
 	if !irProjectedNode(Node{ID: "gpu/pull-x", Kind: NodeAcquire, BuildTarget: "gpu", IRNode: "pull-x"}) {

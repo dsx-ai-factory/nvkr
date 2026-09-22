@@ -98,7 +98,7 @@ those obligations enter; a v1 run cannot satisfy them by sharing the same packag
 | Registry owner | OCI storage, access policy, retention, immutable-tag enforcement for planned releases | Publication or subsequent verification cannot complete |
 | Identity services and product security | Keyless identity issuance, transparency service, disclosure approval | No live keyless acceptance; approval precedes the first signed run containing NKE bytes |
 | Consumer/operator | Trusted identities, issuer policy, retained references; qualified-lane policies and conformance | Evidence cannot be interpreted as authorization |
-| AICR/downstream teams | Pinned external CLI contract; provisioning projection and proposed qualification/registration handoffs | Those integrations remain capability-gated |
+| Downstream teams | Provisioning projection and proposed qualification/registration handoffs | Those integrations remain capability-gated |
 
 Service owners and concrete limits are **[INPUT NEEDED]** where listed under Future Work. NKD consumes these
 services; their availability is not supplied by the CLI.
@@ -241,9 +241,8 @@ publication routes, and required output slots, then joins independently observed
 Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
 Specialized byte-changing transformations remain explicit product intent.
 
-The compiler derives each output's graph from its exact selected components or AICR profile and concrete
-target. `nkd.build` identifies the logical projection of that validated graph, including effective AICR rendering
-settings. Output names, packaging and execution settings remain bound by their owning records. Equal Build
+The compiler derives each output's graph from its exact selected components and concrete
+target. `nkd.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
 
 A `disk-image` named output explicitly selects one root producer with validated disk-image metadata and every
@@ -266,10 +265,6 @@ inspection of the exact disk. That composition claim does not establish NKE-owne
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
-
-Each AICR output selects its own typed bundle settings. The compiler normalizes effective defaults, binds them
-to build identity, and passes those exact settings to the renderer. Removing deployment topology cannot silently
-change the generated artifact.
 
 The Run Plan embeds the admitted authored inputs and each output’s executable graph. Producer scheduling
 records carry exact output/node references; container, network, platform and execution-class settings live
@@ -320,7 +315,6 @@ in reconciliation; a facade alone does not discharge that debt.
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
 | Release authority and durable status | `release`, `status` | Status owns diagnostic checkpoint acceptance and high-water persistence; qualified release authorization, trusted time and publication remain deferred |
-| External rendering | `aicr` | Typed output settings and exact pinned external AICR execution |
 | Public adaptation | `errors`; `client/v1` and `cmd/nkdctl` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
 
 The purity guard lives in `internal/architecture` as a repository test, not a domain module.
@@ -347,7 +341,7 @@ This index locates design responsibility. Per-ADR maturity and remaining accepta
 | 09 | Reproduction and production provenance | Data Flow |
 | 10 | Builder types | Qualified flow |
 | 11 | Direct producer selection and build graph derivation | Object relationships |
-| 12 | Target platforms and AICR rendering | Configuration Data |
+| 12 | Target platforms | Configuration Data |
 | 13 | Subject-bound supply-chain evidence | Data Flow; SBOM output |
 | 14 | Canonical disk and derived delivery | Qualified flow |
 | 15 | Air-gap closure and activation | Recovery; availability |
@@ -456,7 +450,7 @@ registration transport must consume accepted artifact references without adding 
 | Keyless signing | Signing module ↔ cosign/Fulcio/Rekor | Exact pinned executable and subject, explicit identity/issuer; registry credentials in private `DOCKER_CONFIG` |
 | Consumer verification | Registry → independent verifier | Signature and production attestation against the digest and published identity policy; planned qualification uses a distinct identity |
 | Qualified evidence/status | External evidence producers → authorization modules | Authenticate role, subject, policy, completeness and fresh status before clearance |
-| AICR, qemu, Nix | NKD adapter → external utility | Pinned subprocess interface; reject absent capabilities; qualified Nix remains disabled |
+| qemu, Nix | NKD adapter → external utility | Pinned subprocess interface; reject absent capabilities; qualified Nix remains disabled |
 | Downstream deployment | Accepted artifact references → deployment owner | External systems own topology, placement and provisioning; NKD has no provisioning adapter |
 
 Exact schema and lifecycle contracts belong in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) and the owning

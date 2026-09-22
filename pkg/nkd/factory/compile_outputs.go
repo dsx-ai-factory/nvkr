@@ -3,7 +3,6 @@ package factory
 import (
 	"path/filepath"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -23,29 +22,10 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	return nil
 }
 
-func aicrProfile(output authored.DefinitionOutput) string {
-	if output.AICR != nil {
-		return output.AICR.Profile
-	}
-	return ""
-}
-func aicrGenerator(output authored.DefinitionOutput) string {
-	if output.AICR != nil {
-		return output.AICR.Generator
-	}
-	return ""
-}
-func aicrBundle(output authored.DefinitionOutput) *aicr.BundleInputs {
-	if output.AICR != nil {
-		return output.AICR.Bundle
-	}
-	return nil
-}
-
 // Run-wide tools use the Definition catalog; each generator uses its output's
 // catalog. One tool name identifies one acquisition, so all selected pins must agree.
 func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog,
-	outputCatalogs map[string]*catalog.Catalog) (map[string]catalog.ToolPin, error) {
+) (map[string]catalog.ToolPin, error) {
 	if source == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "tool selection requires a resolved catalog")
 	}
@@ -73,21 +53,6 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 	}
 	for _, name := range uniqueSorted(names) {
 		if err := selectTool(name, source); err != nil {
-			return nil, err
-		}
-	}
-	for _, output := range definition.Outputs {
-		if output.AICR == nil {
-			continue
-		}
-		selected := source
-		if output.Catalog != nil {
-			selected = outputCatalogs[output.Name]
-			if selected == nil {
-				return nil, e.New(e.CodeInvalidCatalog, "output %q has no resolved catalog override", output.Name)
-			}
-		}
-		if err := selectTool(output.AICR.Generator, selected); err != nil {
 			return nil, err
 		}
 	}

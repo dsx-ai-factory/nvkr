@@ -58,17 +58,6 @@ func TestIdentityPathsArePure(t *testing.T) {
 	}
 }
 
-// Rendering-input normalization is pure even though the AICR execution adapter
-// in the same package intentionally performs subprocess and filesystem work.
-func TestAICRBundleInputNormalizationIsPure(t *testing.T) {
-	path := filepath.Join("..", "..", "pkg", "nkd", "aicr", "bundle_inputs.go")
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertPureSource(t, path, b)
-}
-
 func assertPureSource(t *testing.T, path string, b []byte) {
 	t.Helper()
 	for i, line := range strings.Split(string(b), "\n") {

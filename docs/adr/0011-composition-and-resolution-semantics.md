@@ -7,7 +7,7 @@
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-11 in the consolidated NKD ADR set.
-- **Relates to:** ADR-02 (identity over the resolved graph), ADR-12 (target and AICR inputs), ADR-07 (reproduction identity),
+- **Relates to:** ADR-02 (identity over the resolved graph), ADR-12 (target inputs), ADR-07 (reproduction identity),
   ADR-05 (inventory).
 - **Scope:** both evidence lanes share direct selection and graph admission; neither selection nor compilation
   grants execution, reproduction or release authority.
@@ -23,17 +23,16 @@ complete required build graph directly from those producers.
 
 ### 1. Exact producer selection
 
-Each Definition output declares a concrete target platform and either a nonempty explicit component selection
-or one explicit AICR profile (ADR-12). The output uses the Definition's catalog stack unless it supplies its own.
-Catalog sources, tools, components and AICR profiles are reusable. There is no authored Recipe, reusable build
+Each Definition output declares a concrete target platform and a nonempty explicit component selection.
+The output uses the Definition's catalog stack unless it supplies its own.
+Catalog sources, tools and components are reusable. There is no authored Recipe, reusable build
 group, criteria query, wildcard, specificity rule, inheritance chain, mixin, enable/disable merge, or reserved-axis
 activation. Removed fields and reserved legacy `overlays/` and `mixins/` directory layouts fail closed; they
 must not become ignored inputs.
 
 Admission checks the complete catalog, unique selected IDs, supported target declarations, exact source/artifact/
 tool pins, and the producer route before graph generation or external work. Unknown components and unsupported
-platforms are coded failures, never empty selections. Ordinary outputs cannot combine their component set with
-an AICR profile. For a disk output, resolution admits exactly one VM-image root and its complete selected material
+platforms are coded failures, never empty selections. For a disk output, resolution admits exactly one VM-image root and its complete selected material
 closure. Compilation lowers the root's typed command or Packer contract and exact producer edges. Execution,
 observation and publication remain unavailable and fail capability admission before source or output work.
 
@@ -50,7 +49,7 @@ must be covered by the terminal node, and the full graph is validated before ide
 
 The generated graph uses `nkd.dev/ir/v4`; its transport-independent logical projection is identified under
 `nkd.build` (ADR-01/02). An unrelated catalog producer cannot change the selected graph's identity. Changing
-selected membership, target, pins, AICR rendering settings or output-affecting instructions must change it.
+selected membership, target, pins or output-affecting instructions must change it.
 Output labels, packaging and Environment settings remain outside build identity and inside their owning records.
 Deployment categories, node roles and cluster composition are removed rather than transported as unused metadata.
 
@@ -111,6 +110,5 @@ and identity/full-graph tests in `pkg/nkd/ir`. Preserve source pins, complete te
 admission, source deduplication within a graph, deterministic ordering, transport purity and target sensitivity.
 Deleted matching/merge mechanisms need rejection coverage, not replacement golden inheritance fixtures.
 
-Focused IR vectors and producer-selection tests exercise these contracts. AICR bundle tests cover equivalent
-defaults, every rendering setting, owned input slices and malformed or caller-mutated descriptions. The completion
+Focused IR vectors and producer-selection tests exercise these contracts. The completion
 gate, generated-bundle checks and external evidence limits remain recorded in reconciliation.

@@ -65,20 +65,19 @@ func TestCompilerPackageAndRouteAdmissionRejectsWrongRepresentations(t *testing.
 	assertFactoryErrorCode(t, validateRouteCompatibility(Route{Name: "route"}, Target{Kind: TargetOCI}, Artifact{Kind: "raw"}), e.CodeInvalidCatalog)
 }
 
-func TestCompilerSelectorsKeepAICRExplicitAndDeduplicate(t *testing.T) {
+func TestCompilerSelectorsExpandWildcardsAndDeduplicate(t *testing.T) {
 	artifacts := map[string]Artifact{
-		"artifact/worker/z":    {Component: "z"},
-		"artifact/worker/a":    {Component: "a"},
-		"artifact/worker/aicr": {Component: "aicr-bundle"},
-		"artifact/other/a":     {Component: "a"},
-		"package/image":        {Kind: PackageImage},
+		"artifact/worker/z": {Component: "z"},
+		"artifact/worker/a": {Component: "a"},
+		"artifact/other/a":  {Component: "a"},
+		"package/image":     {Kind: PackageImage},
 	}
 	for _, tc := range []struct {
 		name            string
 		selectors, want []string
 	}{
-		{"wildcard excludes generated AICR", []string{"worker/*", " worker/a "}, []string{"artifact/worker/a", "artifact/worker/z"}},
-		{"explicit AICR and package", []string{"worker/aicr", "package/image"}, []string{"artifact/worker/aicr", "package/image"}},
+		{"wildcard", []string{"worker/*", " worker/a "}, []string{"artifact/worker/a", "artifact/worker/z"}},
+		{"explicit component and package", []string{"worker/a", "package/image"}, []string{"artifact/worker/a", "package/image"}},
 		{"missing exact", []string{"worker/missing"}, nil},
 		{"empty wildcard", []string{"missing/*"}, nil},
 		{"partial failure returns no selection", []string{"worker/a", "missing"}, nil},

@@ -1,13 +1,3 @@
-aicrProfiles:
-  h100-runtime:
-    accelerator: h100
-    digest: sha256:f6fbb6626affcaab365ab2c8926d343b1c441af95bc4612f3ad7c695870b19e9
-    generatorDigest: sha256:50287efe53d4b0aeb5c36c7ef792b4039509ae8f0ff5078d48369c09305a676f
-    identity: h100-eks-ubuntu-training
-    intent: training
-    os: ubuntu
-    repo: https://github.com/NVIDIA/aicr
-    service: eks
 apiVersion: nkd.dev/catalog/v3
 components:
   capi-core:
@@ -60,6 +50,25 @@ components:
       KUBE_GIT_TREE_STATE: clean
       KUBE_GIT_VERSION: '{{.Tag}}'
     writeDir: _output
+  gpu-runtime-chart:
+    artifactPath: out/gpu-runtime.tar
+    buildCommand:
+    - tar
+    - --sort=name
+    - --owner=0
+    - --group=0
+    - --numeric-owner
+    - -cf
+    - out/gpu-runtime.tar
+    - helm
+    cgo: false
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: k8s
+    writeDir: out
   kube-proxy:
     artifactPath: _output/local/bin/linux/{{.Arch}}/kube-proxy
     buildCommand:
@@ -132,20 +141,12 @@ components:
     source: k8s
 kind: SourceBuildRegistry
 metadata:
-  description: Pinned component and AICR profile catalog for direct Definition output
-    selection. Each component declares its supported target platforms. Resolve the
-    kubectl producer with `nkdctl resolve --data testdata/examples/layered-catalog
+  description: Pinned component catalog for direct Definition output selection.
+    Each component declares its supported target platforms. Resolve the kubectl
+    producer with `nkdctl resolve --data testdata/examples/layered-catalog
     --component kubectl --platform linux/amd64`.
   name: layered-demo
 sources:
-  aicr:
-    constraint: 0.18.x
-    repo: https://github.com/NVIDIA/aicr
-    tool:
-      executablePath: aicr
-      format: tar-gzip
-      platform: linux/amd64
-      url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_amd64.tar.gz
   k8s:
     constraint: 1.32.x
     repo: https://github.com/kubernetes/kubernetes

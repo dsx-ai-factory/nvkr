@@ -80,11 +80,6 @@ func (g *Graph) Validate() error {
 	if err := target.ValidatePlatform(g.Platform); err != nil {
 		return err
 	}
-	if g.AICR != nil {
-		if err := g.AICR.Validate(); err != nil {
-			return err
-		}
-	}
 	if len(g.Nodes) == 0 {
 		return e.New(e.CodeInvalidCatalog, "IR graph has no terminal verify node")
 	}
@@ -134,11 +129,8 @@ func (g *Graph) Validate() error {
 	if terminal == nil {
 		return e.New(e.CodeInvalidCatalog, "IR graph has no terminal verify node")
 	}
-	if g.AICR != nil && len(producerIDs) != 0 {
-		return e.New(e.CodeInvalidCatalog, "AICR build graph must not contain ordinary artifact producers")
-	}
-	if g.AICR == nil && len(producerIDs) == 0 {
-		return e.New(e.CodeInvalidCatalog, "build graph requires at least one artifact producer or an AICR profile")
+	if len(producerIDs) == 0 {
+		return e.New(e.CodeInvalidCatalog, "build graph requires at least one artifact producer")
 	}
 
 	for _, node := range g.Nodes {

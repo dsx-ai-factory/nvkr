@@ -56,8 +56,6 @@ func githubNodeLabel(plan *Plan, node Node) string {
 		return "Sign and attest release and deliverables: " + name
 	case NodeVerifyPublication:
 		return "Verify release and deliverable signatures: " + name
-	case NodeAICR:
-		return "Generate deployment bundle: " + node.BuildTarget
 	default:
 		return node.Kind + ": " + name
 	}

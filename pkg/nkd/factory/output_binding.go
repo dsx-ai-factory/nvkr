@@ -1,10 +1,8 @@
 package factory
 
 import (
-	"reflect"
 	"sort"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
@@ -65,7 +63,7 @@ func (plan Plan) validateLifecyclePlans() error {
 				if input.Kind == "producer-result" || input.BuildTarget == "" {
 					continue
 				}
-				if input.Component != "" && !(output.Kind == "helm-oci" && input.Kind == "aicr-bundle") {
+				if input.Component != "" {
 					actualComponents = append(actualComponents, input.Component)
 				}
 				if actualBuild == "" {
@@ -84,17 +82,8 @@ func (plan Plan) validateLifecyclePlans() error {
 			return e.New(e.CodeUnverifiedRef, "lifecycle output %q is malformed or not bound to its graph build", output.Name)
 		}
 		authored := plan.Definition.Outputs[i]
-		if build.Platform != authored.Platform || !equalFactoryStrings(build.Components, authored.Components) || build.AICRProfileName != aicrProfile(authored) {
+		if build.Platform != authored.Platform || !equalFactoryStrings(build.Components, authored.Components) {
 			return e.New(e.CodeUnverifiedRef, "output %q producer selection differs from its definition", output.Name)
-		}
-		if authored.AICR != nil {
-			bundle, err := aicr.NormalizeBundleInputs(authored.AICR.Bundle)
-			if err != nil {
-				return err
-			}
-			if build.Graph.AICR == nil || !reflect.DeepEqual(build.Graph.AICR.Bundle, bundle) || build.Graph.AICR.GeneratorDigest != toolExecutableDigest(&plan, authored.AICR.Generator) {
-				return e.New(e.CodeUnverifiedRef, "output %q rendering settings differ from its definition", output.Name)
-			}
 		}
 		previous = output.Name
 	}

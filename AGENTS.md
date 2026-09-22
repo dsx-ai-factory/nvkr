@@ -116,7 +116,7 @@ Read `docs/adr/reconciliation.md` for current support before claiming a capabili
 lifecycle/SDK ownership, ADR-18 for hosted execution/isolation, ADR-04/09/16 for evidence lanes, ADR-19 for
 artifact membership and downstream ownership, ADR-20 for publication, and ADR-21/22 for generated files and pins. `pkg/nkd/lifecycle`
 owns the public workflow; `buildgraph` derives graphs from direct producer selections; `factory` owns
-Run compilation/execution. ADR-11/12 own direct selection, target and AICR rendering contracts.
+Run compilation/execution. ADR-11/12 own direct selection and target contracts.
 
 ## Required Patterns
 

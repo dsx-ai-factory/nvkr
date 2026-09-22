@@ -184,11 +184,15 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	for _, artifact := range plan.Graph.Artifacts {
 		planned[artifact.ID] = artifact
 	}
-	aicrPath := planned["artifact/gpu-runtime/aicr-bundle"].Path
-	if err := os.MkdirAll(aicrPath, 0o700); err != nil {
+	chartInput := planned["artifact/gpu-runtime/gpu-runtime-chart"].Path
+	chartStage := filepath.Dir(chartInput)
+	if err := os.MkdirAll(filepath.Join(chartStage, "helm"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(aicrPath, "Chart.yaml"), []byte("apiVersion: v2\nname: gpu-runtime\nversion: 1.0.0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(chartStage, "helm", "Chart.yaml"), []byte("apiVersion: v2\nname: gpu-runtime\nversion: 1.0.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := transportarchive.Pack(ctx, chartInput, chartStage, []string{"helm"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := factory.ExecuteNode(ctx, plan, "package/gpu-runtime", nil, nil); err != nil {
@@ -241,7 +245,7 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 		t.Fatal(err)
 	}
 	objects := []delivery.ObjectInput{
-		{Name: "gpu-runtime", Kind: factory.PackageHelm, Path: helmPath, Layout: true, ArtifactType: "application/vnd.nkd.aicr-helm-bundle.v1", SemanticDigest: pipeline.FileDigest(helmRaw), BlobDigest: pipeline.FileDigest(helmIndex)},
+		{Name: "gpu-runtime", Kind: factory.PackageHelm, Path: helmPath, Layout: true, ArtifactType: "application/vnd.nkd.helm-bundle.v1", SemanticDigest: pipeline.FileDigest(helmRaw), BlobDigest: pipeline.FileDigest(helmIndex)},
 		{Name: "worker-apt", Kind: factory.PackageAPT, ArtifactType: "application/vnd.nkd.apt-repository.v1", LayerMediaType: "application/vnd.nkd.apt-repository.v1.tar", SemanticDigest: apt.Digest, Bytes: aptRaw},
 	}
 	request := testReleaseRequest(t, artifacts, objects, map[string]string{"agent": pipeline.FileDigest(debRaw)})

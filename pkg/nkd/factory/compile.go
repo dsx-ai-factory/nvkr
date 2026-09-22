@@ -109,13 +109,7 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 	if err != nil {
 		return nil, err
 	}
-	outputCatalogs := make(map[string]*catalog.Catalog, len(targetStacks))
-	for name, selected := range targetStacks {
-		if selected != nil {
-			outputCatalogs[name] = selected.Catalog
-		}
-	}
-	tools, err := selectedTools(definition, delivery, stack.Catalog, outputCatalogs)
+	tools, err := selectedTools(definition, delivery, stack.Catalog)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +131,7 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		if selected := targetStacks[target.Name]; selected != nil {
 			targetStack = selected
 		}
-		build, err := compileOutputBuild(target, delivery, targetStack, tools)
+		build, err := compileOutputBuild(target, delivery, targetStack)
 		if err != nil {
 			return nil, err
 		}

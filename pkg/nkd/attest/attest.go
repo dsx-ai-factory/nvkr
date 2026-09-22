@@ -87,8 +87,7 @@ type Manifest struct {
 	ValidationVectorRef string                 `json:"validationVectorRef,omitempty"`
 	Evidence            *EvidenceRef           `json:"evidence,omitempty"`
 	EvidenceDigest      string                 `json:"evidenceDigest,omitempty"` // aggregate evidence-bundle digest (ADR-05 §4)
-	AICR                *AICRRef               `json:"aicr,omitempty"`
-	Components          []ComponentDigest      `json:"components"` // the artifacts[] of the vector (ADR-05 §1)
+	Components          []ComponentDigest      `json:"components"`               // the artifacts[] of the vector (ADR-05 §1)
 	qualification       *manifestQualification `json:"-"`
 }
 
@@ -166,21 +165,6 @@ func (m *Manifest) ValidatePublished() error {
 			"published validation vector cannot embed legacy caller-authored conformance claims or validation references; conformance requires a separately authenticated receipt")
 	}
 	return nil
-}
-
-// AICRRef is the pinned AICR accelerated-runtime profile carried in the distribution
-// manifest as provenance (NKD-FR-RC-013a). GeneratorDigest identifies the exact AICR
-// executable selected by T1 and is required even when no bundle was rendered.
-// BundleDigest is the authoritative identity of a rendered bundle tree; Bundle is
-// only its descriptive transport/display location and never substitutes for the
-// digest receipt.
-type AICRRef struct {
-	Identity        string `json:"identity"`
-	Digest          string `json:"digest"`
-	GeneratorDigest string `json:"generatorDigest"`
-	Repo            string `json:"repo,omitempty"`
-	Bundle          string `json:"bundle,omitempty"`
-	BundleDigest    string `json:"bundleDigest,omitempty"`
 }
 
 // SetBuilderProfile records the full ADR-05 §1 profile binding (id + digest +
@@ -298,9 +282,6 @@ func (m *Manifest) Validate() error {
 	if err := validateEvidence(m); err != nil {
 		return err
 	}
-	if err := validateAICR(m.AICR); err != nil {
-		return err
-	}
 	if len(m.Components) == 0 {
 		return e.New(e.CodeVerifyFailed, "validation vector has no components")
 	}
@@ -378,34 +359,6 @@ func validateEvidence(m *Manifest) error {
 	} {
 		if err := requireExactDigest(field.name, field.value, false); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-func validateAICR(ref *AICRRef) error {
-	if ref == nil {
-		return nil
-	}
-	if !canonicalIdentity.MatchString(ref.Identity) {
-		return e.New(e.CodeVerifyFailed, "aicr identity %q is not canonical", ref.Identity)
-	}
-	if err := requireExactDigest("aicr.digest", ref.Digest, true); err != nil {
-		return err
-	}
-	if err := requireExactDigest("aicr.generatorDigest", ref.GeneratorDigest, true); err != nil {
-		return err
-	}
-	if err := requireExactDigest("aicr.bundleDigest", ref.BundleDigest, false); err != nil {
-		return err
-	}
-	if ref.Bundle != "" {
-		if strings.TrimSpace(ref.Bundle) != ref.Bundle {
-			return e.New(e.CodeVerifyFailed, "aicr bundle display location %q is not canonical", ref.Bundle)
-		}
-		if ref.BundleDigest == "" {
-			return e.New(e.CodeVerifyFailed,
-				"aicr bundle display location %q has no authoritative bundleDigest receipt", ref.Bundle)
 		}
 	}
 	return nil
@@ -564,8 +517,8 @@ func (m *Manifest) Marshal() ([]byte, error) {
 
 // MarshalQualified returns canonical publication bytes only while the vector's
 // report-derived core still matches its live opaque pipeline qualification. Callers
-// may attach publisher-qualified evidence or receipt-bound AICR before this
-// finalization; build/profile/component mutations still fail.
+// may attach publisher-qualified evidence before this finalization; build/profile/
+// component mutations still fail.
 // Conformance remains a separately authenticated release-gate receipt and cannot be
 // embedded as caller-authored metadata in these bytes.
 // Use these bytes for any signed or publisher-qualified output derived from a build.

@@ -20,7 +20,6 @@ func TestDemoDefaultAttemptsAreAcceptedByRunPreparation(t *testing.T) {
 		prefix, definition, environment string
 	}{
 		{"m1", "definitions/nke-v1/definition.yaml", "definitions/nke-v1/environment-local.yaml"},
-		{"aicr", "definitions/aicr/definition.yaml", "definitions/aicr/environment-local.yaml"},
 	} {
 		t.Run(test.prefix, func(t *testing.T) {
 			cmd := exec.Command("bash", "-c", `source scripts/_demo-common.sh; demo_default_attempt "$1"`, "demo-test", test.prefix)

@@ -45,13 +45,13 @@ func cmdCatalog() *cli.Command {
 					if err != nil {
 						return err
 					}
-					fmt.Printf("ok: %s — %d component(s), %d AICR profile(s)\n", cat.Metadata.Name, len(cat.Components), len(cat.AICRProfiles))
+					fmt.Printf("ok: %s — %d component(s)\n", cat.Metadata.Name, len(cat.Components))
 					return nil
 				},
 			},
 			{
 				Name:  "list",
-				Usage: "list components and AICR profiles",
+				Usage: "list components",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
 					cat, err := catalog.LoadContext(c.Context, providerFor(c))
@@ -59,17 +59,7 @@ func cmdCatalog() *cli.Command {
 						return err
 					}
 					fmt.Printf("catalog: %s\n\n", cat.Metadata.Name)
-					profiles := make([]string, 0, len(cat.AICRProfiles))
-					for name := range cat.AICRProfiles {
-						profiles = append(profiles, name)
-					}
-					sort.Strings(profiles)
-					fmt.Println("AICR profiles:")
-					for _, name := range profiles {
-						fmt.Printf("  %s\t%s\n", name, cat.AICRProfiles[name].Digest)
-					}
-
-					fmt.Printf("\ncomponents:\n")
+					fmt.Printf("components:\n")
 					names := make([]string, 0, len(cat.Components))
 					for n := range cat.Components {
 						names = append(names, n)

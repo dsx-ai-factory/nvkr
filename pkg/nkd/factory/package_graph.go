@@ -42,9 +42,6 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 			spec.Component = output.APT.Component
 		case authored.OutputHelm:
 			spec.Kind = PackageHelm
-			if output.AICR != nil {
-				spec.Inputs = []string{output.Name + "/aicr-bundle"}
-			}
 		}
 		if output.Helm != nil {
 			image := "package/" + output.Helm.ImageOutput
@@ -180,8 +177,8 @@ func expandSelectors(selectors []string, artifacts map[string]Artifact) ([]strin
 		selector = strings.TrimSpace(selector)
 		if strings.HasSuffix(selector, "/*") && strings.Count(selector, "*") == 1 {
 			prefix := "artifact/" + strings.TrimSuffix(selector, "*")
-			for id, artifact := range artifacts {
-				if strings.HasPrefix(id, prefix) && artifact.Component != "aicr-bundle" {
+			for id := range artifacts {
+				if strings.HasPrefix(id, prefix) {
 					expanded = append(expanded, id)
 				}
 			}
@@ -252,8 +249,8 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 				return e.New(e.CodeInvalidCatalog, "APT package %q input %s has kind %q, want host-package", spec.Name, id, artifact.Kind)
 			}
 		case PackageHelm:
-			if artifact.Kind != "aicr-bundle" && (artifact.Kind != "tarball" || artifact.BuildTarget == "") {
-				return e.New(e.CodeInvalidCatalog, "Helm package %q input %s requires an AICR tree or build source archive", spec.Name, id)
+			if artifact.Kind != "tarball" || artifact.BuildTarget == "" {
+				return e.New(e.CodeInvalidCatalog, "Helm package %q input %s requires a build source archive", spec.Name, id)
 			}
 		}
 	}
@@ -270,7 +267,7 @@ func validateRouteCompatibility(route Route, target Target, artifact Artifact) e
 			"delivery route %q requires an object-store publication adapter that is not implemented", route.Name)
 	case TargetOCI:
 		switch artifact.Kind {
-		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageImage, "oci-image", "aicr-bundle":
+		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageImage, "oci-image":
 		default:
 			return e.New(e.CodeInvalidCatalog, "delivery route %q sends unsupported %q to OCI target", route.Name, artifact.Kind)
 		}
@@ -287,7 +284,7 @@ func packageMediaType(kind string) string {
 	case PackageAPT:
 		return "application/vnd.nkd.apt-repository.v1"
 	case PackageHelm:
-		return "application/vnd.nkd.aicr-helm-bundle.v1"
+		return "application/vnd.nkd.helm-bundle.v1"
 	default:
 		return "application/vnd.nkd.publication-root.v3"
 	}

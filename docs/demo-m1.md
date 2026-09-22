@@ -82,5 +82,5 @@ The acceptance specification still calls for a default-branch **push** run and s
 builds. Its per-job helper digest negative demonstration is also not established by the recorded run.
 These remain acceptance gaps; this documentation audit does not relax them or declare M1 complete.
 
-For other journeys, use the [demo index](../scripts/README.md): AICR rendering and packaging, hosted generation,
-pin changes, tamper rejection and policy-scoped publication verification each demonstrate a distinct behavior.
+For other journeys, use the [demo index](../scripts/README.md): pin changes, tamper rejection and
+policy-scoped publication verification each demonstrate a distinct behavior.

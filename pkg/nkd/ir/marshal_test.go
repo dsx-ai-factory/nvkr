@@ -7,27 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 func TestBuildIdentityFieldRulesCoverEveryGraphField(t *testing.T) {
 	assertBuildIdentityFieldRules(t, reflect.TypeOf(Node{}), reflect.TypeOf(LogicalNode{}), nodeBuildIdentityRules)
 	assertBuildIdentityFieldRules(t, reflect.TypeOf(Graph{}), reflect.TypeOf(LogicalGraph{}), graphBuildIdentityRules)
-
-	activation := reflect.TypeOf(AICRActivation{})
-	logicalActivation := reflect.TypeOf(LogicalAICRActivation{})
-	if activation.NumField() != logicalActivation.NumField() {
-		t.Fatalf("AICR logical DTO covers %d of %d fields", logicalActivation.NumField(), activation.NumField())
-	}
-	for i := 0; i < activation.NumField(); i++ {
-		field := activation.Field(i)
-		logicalField, ok := logicalActivation.FieldByName(field.Name)
-		if !ok || logicalField.Tag.Get("json") != field.Tag.Get("json") {
-			t.Fatalf("AICR field %s is not explicitly represented with the same canonical key", field.Name)
-		}
-	}
 }
 
 func assertBuildIdentityFieldRules(t *testing.T, full, logical reflect.Type,
@@ -95,43 +80,6 @@ func TestDigestHostInvariance(t *testing.T) {
 	}
 	if before != after {
 		t.Fatalf("build identity moved under host/clock env mutation: %s -> %s", before, after)
-	}
-}
-
-func TestAICRActivationCannotGainIdentityWithoutBothPins(t *testing.T) {
-	valid := &AICRActivation{
-		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-		Bundle:          aicr.BundleInputs{Deployer: "helm"},
-		ProfileDigest:   "sha256:" + strings.Repeat("a", 64),
-		GeneratorDigest: "sha256:" + strings.Repeat("b", 64),
-	}
-	graph := Graph{SchemaVersion: SchemaVersion, Platform: "linux/amd64", Nodes: []Node{{ID: "verify", Kind: KindVerify}}}
-	graph.AICR = valid
-	if _, err := graph.Digest(); err != nil {
-		t.Fatalf("valid AICR activation was rejected: %v", err)
-	}
-	for _, test := range []struct {
-		name   string
-		mutate func(*AICRActivation)
-		code   e.Code
-	}{
-		{"profile", func(a *AICRActivation) { a.ProfileDigest = "" }, e.CodeUnpinnedSource},
-		{"generator", func(a *AICRActivation) { a.GeneratorDigest = "SHA256:" + strings.Repeat("b", 64) }, e.CodeUnpinnedSource},
-		{"input", func(a *AICRActivation) { a.Accelerator = "future-gpu" }, e.CodeInvalidCatalog},
-		{"missing effective bundle", func(a *AICRActivation) { a.Bundle = aicr.BundleInputs{} }, e.CodeInvalidCatalog},
-		{"unordered bundle", func(a *AICRActivation) { a.Bundle.WorkloadSelectors = []string{"z=1", "a=1"} }, e.CodeInvalidCatalog},
-		{"duplicate bundle selector", func(a *AICRActivation) { a.Bundle.WorkloadSelectors = []string{"a=1", "a=1"} }, e.CodeInvalidCatalog},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			changed := *valid
-			test.mutate(&changed)
-			invalid := graph
-			invalid.AICR = &changed
-			_, err := invalid.Digest()
-			assertIRCode(t, err, test.code)
-			_, err = invalid.CanonicalJSON()
-			assertIRCode(t, err, test.code)
-		})
 	}
 }
 

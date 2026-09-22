@@ -50,8 +50,8 @@ configuration belong to Environment. The complete generated Plan is the executab
 
 ## Repository layout
 
-- `definitions/`: maintained NKE CLI and AICR Definitions, Environments, and their catalogs.
-- `testdata/examples/`: multi-output, worker, AICR rendering, and catalog contract fixtures.
+- `definitions/`: maintained NKE CLI Definitions, Environments, and their catalogs.
+- `testdata/examples/`: multi-output, worker, and catalog contract fixtures.
 - `pkg/nkd/definition/`: authored inputs, admission and identity.
 - `pkg/nkd/factory/`: complete compilation, Run operations and provider generation.
 - `pkg/nkd/lifecycle/`: immutable attempts and policy-scoped Release consumption.

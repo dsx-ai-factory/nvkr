@@ -99,7 +99,6 @@ func TestHelmDependencyMetadataUsesDeclaredVersions(t *testing.T) {
 	raw := helmTestArchive(t, map[string]string{
 		"helm/server/Chart.yaml": "apiVersion: v2\nname: server\nversion: 1.2.3\ndependencies:\n  - name: database\n    version: 4.5.6\n    repository: https://charts.example.test\n",
 		"helm/server/Chart.lock": "dependencies:\n  - name: database\n    version: 4.5.6\n    repository: https://charts.example.test\n",
-		"helm/recipe.yaml":       "apiVersion: aicr.run/v1alpha2\ncomponentRefs:\n  - type: Helm\n    name: cache\n    chart: cache\n    version: 7.8.9\n    source: https://other.example.test\n",
 	})
 	components, err := inspectHelmArchive(t.Context(), bytes.NewReader(raw))
 	if err != nil {
@@ -109,14 +108,14 @@ func TestHelmDependencyMetadataUsesDeclaredVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(bom.Components) != 3 {
+	if len(bom.Components) != 2 {
 		t.Fatalf("got %d components", len(bom.Components))
 	}
 	versions := map[string]string{}
 	for _, component := range bom.Components {
 		versions[component.Name] = component.Version
 	}
-	if versions["server"] != "1.2.3" || versions["database"] != "4.5.6" || versions["cache"] != "7.8.9" {
+	if versions["server"] != "1.2.3" || versions["database"] != "4.5.6" {
 		t.Fatalf("changed declared versions: %v", versions)
 	}
 }

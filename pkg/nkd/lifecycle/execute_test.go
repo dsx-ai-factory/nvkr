@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
@@ -112,14 +113,19 @@ func TestObserveHelmReproducesPayloadAcrossWorkspaceRelocation(t *testing.T) {
 		artifacts[artifact.ID] = artifact
 	}
 	t.Chdir(t.TempDir())
-	inputPath := artifacts["artifact/gpu-runtime/aicr-bundle"].Path
-	if err := os.MkdirAll(inputPath, 0o700); err != nil {
+	inputPath := artifacts["artifact/gpu-runtime/gpu-runtime-chart"].Path
+	chartStage := filepath.Dir(inputPath)
+	if err := os.MkdirAll(filepath.Join(chartStage, "helm"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	chartPath := filepath.Join(inputPath, "Chart.yaml")
-	if err := os.WriteFile(chartPath, []byte("apiVersion: v2\nname: gpu-runtime\nversion: 1.0.0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(chartStage, "helm", "Chart.yaml"), []byte("apiVersion: v2\nname: gpu-runtime\nversion: 1.0.0\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := transportarchive.Pack(ctx, inputPath, chartStage, []string{"helm"}); err != nil {
+		t.Fatal(err)
+	}
+	resultPath := artifacts["result/gpu-runtime/gpu-runtime-chart"].Path
+	writeCanonicalTestFile(t, resultPath, fixtureProducerResult(t, plan, artifacts["artifact/gpu-runtime/gpu-runtime-chart"], inputPath))
 	if err := factory.ExecuteNode(ctx, plan, "package/gpu-runtime", nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -141,11 +147,11 @@ func TestObserveHelmReproducesPayloadAcrossWorkspaceRelocation(t *testing.T) {
 		t.Fatalf("workspace changed Helm payload identity: %s != %s", before.Digest, after.Digest)
 	}
 	relocatedInput := filepath.Join(".nkd/runs/attempt", filepath.FromSlash(strings.TrimPrefix(filepath.ToSlash(inputPath), ".nkd/factory/")))
-	if err := os.WriteFile(filepath.Join(relocatedInput, "Chart.yaml"), []byte("changed\n"), 0o600); err != nil {
+	if err := os.WriteFile(relocatedInput, []byte("changed\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := observeFixtureOutput(ctx, ".nkd/runs/attempt", slot, artifacts, plan); err == nil {
-		t.Fatal("stale Helm payload accepted after AICR input changed")
+		t.Fatal("stale Helm payload accepted after source archive input changed")
 	} else {
 		assertCode(t, err, nkderr.CodeVerifyFailed)
 	}
@@ -196,11 +202,15 @@ func TestCompleteGPUPublicationClosureAcrossFormatsAndArchitectures(t *testing.T
 				case artifact.Kind == "producer-result":
 					input := artifacts["artifact/"+artifact.BuildTarget+"/"+artifact.Component]
 					writeCanonicalTestFile(t, artifact.Path, fixtureProducerResult(t, plan, artifact, input.Path))
-				case strings.HasSuffix(artifact.ID, "/aicr-bundle"):
-					if err := os.MkdirAll(artifact.Path, 0o700); err != nil {
+				case artifact.Kind == "tarball" && artifact.Component == "gpu-runtime-chart":
+					chartStage := filepath.Dir(artifact.Path)
+					if err := os.MkdirAll(filepath.Join(chartStage, "helm"), 0o700); err != nil {
 						t.Fatal(err)
 					}
-					if err := os.WriteFile(filepath.Join(artifact.Path, "Chart.yaml"), []byte("apiVersion: v2\nname: gpu\nversion: 1.0.0\n"), 0o600); err != nil {
+					if err := os.WriteFile(filepath.Join(chartStage, "helm", "Chart.yaml"), []byte("apiVersion: v2\nname: gpu\nversion: 1.0.0\n"), 0o600); err != nil {
+						t.Fatal(err)
+					}
+					if err := transportarchive.Pack(ctx, artifact.Path, chartStage, []string{"helm"}); err != nil {
 						t.Fatal(err)
 					}
 				case strings.HasPrefix(artifact.ID, "artifact/"):

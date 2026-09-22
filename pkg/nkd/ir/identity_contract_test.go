@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
@@ -22,7 +21,6 @@ func TestBuildIdentityCanonicalVectors(t *testing.T) {
 		{"acquisition", pullGraph(), `{"nodes":[{"artifactPath":"tool","component":"tool","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","id":"pull-tool","kind":"pull","network":"default","outputType":"raw","platform":"linux/amd64","version":"1.0.0"},{"id":"verify","kind":"verify","needs":["pull-tool"]}],"platform":"linux/amd64","schemaVersion":"nkd.dev/ir/v4"}`, "sha256:0de705e964c9f4a8fa9fbfcad89fe201e3555a21bb05a8c7c717d2f5dabe85ab"},
 		{"source", sample(), `{"nodes":[{"artifactPath":"out/kubelet","builderType":"oci-hermetic","command":["make"],"component":"kubelet","env":[{"name":"CGO_ENABLED","value":"0"},{"name":"GOAMD64","value":"v1"},{"name":"GOARCH","value":"amd64"},{"name":"GOFLAGS","value":"-trimpath -buildvcs=false"},{"name":"GOOS","value":"linux"},{"name":"GOTOOLCHAIN","value":"local"},{"name":"LC_ALL","value":"C"},{"name":"SOURCE_DATE_EPOCH","value":"1"},{"name":"TZ","value":"UTC"}],"id":"build-kubelet","kind":"build","needs":["fetch-kubernetes-abc"],"network":"none","outputType":"host-package","platform":"linux/amd64","sourceCommit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sourceDest":"kubernetes-aaaaaaaaaaaa","sourceReadOnly":true,"sourceTreeHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","toolchain":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","vendorSpecDigest":"sha256:c2dd0219416b6812e02aaea22f467499ac3d7ae99ae2532f6f1c909262798b64","version":"1.32.0","workdir":"/src","writeDir":"out"},{"commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","dest":"kubernetes-aaaaaaaaaaaa","id":"fetch-kubernetes-abc","kind":"fetch","network":"default","treeHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","vendorImage":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","vendorSpecDigest":"sha256:c2dd0219416b6812e02aaea22f467499ac3d7ae99ae2532f6f1c909262798b64"},{"id":"verify","kind":"verify","needs":["build-kubelet"]}],"platform":"linux/amd64","schemaVersion":"nkd.dev/ir/v4"}`, "sha256:abd54ac28ccf60630ec215710569782b63ec01b2209d805ad76b960506ebd9f5"},
 		{"vm-image", vmGraph(t), `{"nodes":[{"artifactPath":"node.qcow2","builderType":"vm-image","component":"image","disk":{"encryption":"none","format":"qcow2"},"id":"build-image","kind":"build","materials":[{"binding":"agent-package","component":"agent","producer":"pull-agent"}],"needs":["fetch-image","pull-agent"],"network":"none","outputType":"disk-image","packer":{"acceleratorVariable":"accelerator","architectureVariable":"architecture","buildName":"image.qemu.node","materialManifestVariable":"material_manifest","outputDirectoryVariable":"output_directory","packerVersion":"1.14.2","projectPath":"os-image/packer","variables":[{"name":"image_variant","value":"standard"}]},"platform":"linux/arm64","sourceCommit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sourceDest":"source-image","sourceTreeHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","toolchain":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","toolchainPlatform":"linux/amd64","vendorSpecDigest":"sha256:2bef7aee55536ae48fb6fb1bab0f38530ffd04cda898a538d0d2156a9fde037e","version":"1.0.0","workdir":"/src"},{"commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","dest":"source-image","id":"fetch-image","kind":"fetch","network":"default","treeHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","vendorImage":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","vendorSpecDigest":"sha256:2bef7aee55536ae48fb6fb1bab0f38530ffd04cda898a538d0d2156a9fde037e"},{"artifactPath":"agent","component":"agent","digest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","id":"pull-agent","kind":"pull","network":"default","outputType":"raw","platform":"linux/arm64","version":"1.0.0"},{"id":"verify","kind":"verify","needs":["build-image","pull-agent"]}],"platform":"linux/arm64","schemaVersion":"nkd.dev/ir/v4"}`, "sha256:13e2c2189065e9f3715cb664babab8b7b875e1926f117cc63af31845aee173eb"},
-		{"aicr", aicrGraph(), `{"aicr":{"accelerator":"h100","bundle":{"deployer":"helm"},"generatorDigest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","intent":"training","os":"ubuntu","profileDigest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","service":"eks"},"nodes":[{"id":"verify","kind":"verify"}],"platform":"linux/amd64","schemaVersion":"nkd.dev/ir/v4"}`, "sha256:ced0f7a462d21de0938fd690ce63e2723eb827028756da902b6a9106bbf5cc82"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			logical, err := test.graph.DigestView()
@@ -64,14 +62,6 @@ func pullGraph() Graph {
 	}}
 }
 
-func aicrGraph() Graph {
-	return Graph{SchemaVersion: SchemaVersion, Platform: "linux/amd64", AICR: &AICRActivation{
-		Service: "eks", Accelerator: "h100", OS: "ubuntu", Intent: "training",
-		Bundle:        aicr.BundleInputs{Deployer: "helm"},
-		ProfileDigest: "sha256:" + strings.Repeat("a", 64), GeneratorDigest: "sha256:" + strings.Repeat("b", 64),
-	}, Nodes: []Node{{ID: "verify", Kind: KindVerify}}}
-}
-
 func TestBuildGraphRequiresExactTargetAndProducerKind(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -84,7 +74,6 @@ func TestBuildGraphRequiresExactTargetAndProducerKind(t *testing.T) {
 		{"wildcard platform", func(g *Graph) { g.Platform = "linux/any" }, e.CodeInvalidCatalog},
 		{"different producer platform", func(g *Graph) { g.Platform = "linux/arm64" }, e.CodeInvalidCatalog},
 		{"empty ordinary build", func(g *Graph) { g.Nodes = []Node{{ID: "verify", Kind: KindVerify}} }, e.CodeInvalidCatalog},
-		{"mixed AICR and ordinary producer", func(g *Graph) { g.AICR = aicrGraph().AICR }, e.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			graph := pullGraph()
@@ -109,39 +98,6 @@ func TestBuildGraphRejectsRemovedAuthoringFields(t *testing.T) {
 			changed := []byte("{" + field + string(raw[1:]))
 			var decoded Graph
 			assertIRCode(t, canonical.UnmarshalExact(changed, &decoded), e.CodeVerifyFailed)
-		})
-	}
-}
-
-func TestTargetAndAICRInputsAffectBuildIdentity(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		mutate func(*Graph)
-	}{
-		{"target", func(g *Graph) { g.Platform = "linux/arm64" }},
-		{"service", func(g *Graph) { g.AICR.Service = "gke" }},
-		{"accelerator", func(g *Graph) { g.AICR.Accelerator = "h200" }},
-		{"os", func(g *Graph) { g.AICR.OS = "rhel" }},
-		{"intent", func(g *Graph) { g.AICR.Intent = "inference" }},
-		{"platform", func(g *Graph) { g.AICR.Platform = "dynamo" }},
-		{"profile pin", func(g *Graph) { g.AICR.ProfileDigest = "sha256:" + strings.Repeat("c", 64) }},
-		{"generator pin", func(g *Graph) { g.AICR.GeneratorDigest = "sha256:" + strings.Repeat("d", 64) }},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			base := aicrGraph()
-			want, err := base.Digest()
-			if err != nil {
-				t.Fatal(err)
-			}
-			changed := aicrGraph()
-			test.mutate(&changed)
-			got, err := changed.Digest()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got == want {
-				t.Fatal("changed target or AICR content retained build identity")
-			}
 		})
 	}
 }

@@ -7,16 +7,15 @@
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-19 in the consolidated NKD ADR set (artifact membership and downstream ownership).
-- **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-12 (targets and AICR rendering), ADR-16
+- **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-12 (targets), ADR-16
   (release gates), ADR-14 (delivery), ADR-18 (build pipeline).
 
 ## Context
 
-NKD produces and verifies artifacts. The maintained NKE and AICR Definitions require exact output membership,
+NKD produces and verifies artifacts. The maintained NKE Definitions require exact output membership,
 pinned producers, packaging and evidence, but do not require a deployment topology. The former cluster-view
 model added node roles, categories, declared Kubernetes/OS context, and generated composition records without
-an implemented provisioning consumer or runtime-compatibility proof. Its AICR settings did affect rendered bytes
-and must remain explicit producer inputs.
+an implemented provisioning consumer or runtime-compatibility proof.
 
 ## Decision
 
@@ -45,15 +44,7 @@ root v3 reject earlier topology-bearing fields rather than dropping them during 
 identity families remain reserved and cannot mint new identities. Historical signed bytes retain their original
 meaning; this migration grants no compatibility alias or authority to a decoded legacy description.
 
-### 3. Rendering inputs belong to their output
-
-An AICR output carries optional typed bundle settings: deployer, storage class, accelerated-node selectors and
-tolerations, and workload selectors. The AICR owner normalizes the effective defaults and validates all values
-before work. The generated graph binds the effective settings into Build identity with the profile and generator
-pins. Execution reads those graph settings directly. Two outputs using the same profile can select different
-rendering settings and obtain different build identities; no cluster lookup mediates their execution.
-
-### 4. Downstream systems own deployment
+### 3. Downstream systems own deployment
 
 NKE or another downstream owner decides topology, node placement, deployment timing, installation, Helm
 application and reconciliation using accepted artifact references. NKD has no provisioning-adapter interface or
@@ -72,7 +63,6 @@ placement intent; downstream consumers that need such descriptions own them expl
 
 ## Acceptance evidence
 
-Contract checks must reject removed topology fields before output or subprocess work; preserve required-output
-and consumer-substitution negatives; and bind each AICR output's effective rendering settings to its build
-identity and invocation. Repository validation is tracked in reconciliation. Earlier cluster fixture tests are
+Contract checks must reject removed topology fields before output or subprocess work and preserve required-output
+and consumer-substitution negatives. Repository validation is tracked in reconciliation. Earlier cluster fixture tests are
 not retained as an unused product interface. No external provisioning or runtime qualification is claimed.

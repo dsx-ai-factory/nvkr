@@ -36,14 +36,13 @@ func load(p DataProvider) (*Catalog, error) {
 	}
 
 	cat := &Catalog{
-		APIVersion:   reg.APIVersion,
-		Kind:         reg.Kind,
-		Metadata:     reg.Metadata,
-		Sources:      reg.Sources,
-		AICRProfiles: reg.AICRProfiles,
-		Components:   map[string]Component{},
-		Tools:        map[string]ToolPin{},
-		Actions:      map[string]ActionPin{},
+		APIVersion: reg.APIVersion,
+		Kind:       reg.Kind,
+		Metadata:   reg.Metadata,
+		Sources:    reg.Sources,
+		Components: map[string]Component{},
+		Tools:      map[string]ToolPin{},
+		Actions:    map[string]ActionPin{},
 	}
 
 	for name, pin := range lock.Pins {

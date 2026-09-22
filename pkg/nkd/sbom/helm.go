@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// Helm charts and AICR exports declare dependencies which are not necessarily
-// vendored. Record references as references; never execute install scripts or
-// resolve a mutable version over the network to fill out the inventory.
+// Helm charts declare dependencies which are not necessarily vendored. Record
+// references as references; never execute install scripts or resolve a mutable
+// version over the network to fill out the inventory.
 func inspectHelmArchive(ctx context.Context, source io.Reader) ([]Component, error) {
 	buffered := bufio.NewReader(source)
 	var expanded io.Reader = buffered
@@ -56,7 +56,7 @@ func inspectHelmArchive(ctx context.Context, source io.Reader) ([]Component, err
 			return nil, e.New(e.CodeVerifyFailed, "unsupported Helm archive member %q", name)
 		}
 		base := path.Base(name)
-		if base != "Chart.yaml" && base != "Chart.lock" && base != "recipe.yaml" {
+		if base != "Chart.yaml" && base != "Chart.lock" {
 			continue
 		}
 		if header.Size > 8<<20 {
@@ -69,35 +69,6 @@ func inspectHelmArchive(ctx context.Context, source io.Reader) ([]Component, err
 		decoded, err := yaml.YAMLToJSONStrict(raw)
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding Helm dependency document %s", name)
-		}
-		if base == "recipe.yaml" {
-			var recipe struct {
-				APIVersion    string `json:"apiVersion"`
-				ComponentRefs []struct {
-					Type    string `json:"type"`
-					Name    string `json:"name"`
-					Chart   string `json:"chart"`
-					Source  string `json:"source"`
-					Version string `json:"version"`
-				} `json:"componentRefs"`
-			}
-			if err := json.Unmarshal(decoded, &recipe); err != nil {
-				return nil, e.Wrap(e.CodeVerifyFailed, err, "reading deployment references")
-			}
-			if !strings.HasPrefix(recipe.APIVersion, "aicr.run/") {
-				continue
-			}
-			for _, ref := range recipe.ComponentRefs {
-				if ref.Type != "Helm" || ref.Chart == "" {
-					continue
-				}
-				component, err := helmComponent(ref.Chart, ref.Version, ref.Source, "declared-reference")
-				if err != nil {
-					return nil, err
-				}
-				components = append(components, component)
-			}
-			continue
 		}
 		var chart struct {
 			Name         string `json:"name"`

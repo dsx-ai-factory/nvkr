@@ -8,7 +8,7 @@ separately from external operational acceptance.
 ## Declare outputs
 
 A Definition declares named outputs. Each output selects exact catalog components and a concrete target
-platform, or one pinned AICR profile and generator. Catalog components own reusable build or acquisition
+platform. Catalog components own reusable build or acquisition
 instructions. The compiler derives a closed, pinned build graph for each output and derives its packaging,
 publication route, and evidence requirements from the output and selected Environment.
 
@@ -20,10 +20,7 @@ The [NKE Definition](../definitions/nke-v1/definition.yaml) directly selects `nk
 for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
-AICR output rendering settings live under that output's `aicr.bundle`: deployer, storage class, node
-selectors, node tolerations and workload selectors. Omission means Helm with no overrides. The compiler
-records the complete effective settings in the build graph so every output-affecting setting changes its
-Build Digest. Deployment topology and placement are owned by the system that consumes the artifacts;
+Deployment topology and placement are owned by the system that consumes the artifacts;
 Definitions and Releases contain no cluster views, deployment roles or categories.
 
 ## Select an Environment

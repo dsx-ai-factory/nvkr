@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
@@ -38,7 +37,7 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	if len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", node.ID)
 	}
-	archive := filepath.Join(filepath.Dir(output.Path), "."+output.Name+".aicr.tar")
+	archive := filepath.Join(filepath.Dir(output.Path), "."+output.Name+".helm.tar")
 	// The transport archive is an internal carrier, not a graph output. Always
 	// reclaim it, including after interruption or a previous failed run, so an
 	// owned factory workspace is genuinely rerunnable without weakening the
@@ -47,7 +46,7 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 		return err
 	}
 	defer func() { _ = os.Remove(archive) }()
-	root, relative, cleanup, err := helmPackageTree(ctx, plan, inputs[0])
+	root, relative, cleanup, err := helmPackageTree(ctx, inputs[0])
 	if err != nil {
 		return err
 	}
@@ -58,9 +57,7 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 		}
 		fmt.Fprintf(stdout, "Bound Helm chart %q to image %q at %s; checksums refreshed\n", node.HelmImage.Chart, artifacts[node.HelmImage.Image].Name, imageDigest)
 	}
-	if inputs[0].Kind == "tarball" {
-		archive = filepath.Join(root, "bundle.tar")
-	}
+	archive = filepath.Join(root, "bundle.tar")
 	if err := transportarchive.Pack(ctx, archive, root, []string{relative}); err != nil {
 		return err
 	}
@@ -69,48 +66,18 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 		return err
 	}
 	_, err = delivery.BuildArtifact(ctx, output.Path, delivery.ObjectInput{
-		Name: output.Name, Kind: "aicr-bundle", Path: archive,
-		ArtifactType: output.MediaType, LayerMediaType: "application/vnd.nkd.aicr-bundle.v1.tar",
+		Name: output.Name, Kind: "helm-bundle", Path: archive,
+		ArtifactType: output.MediaType, LayerMediaType: "application/vnd.nkd.helm-bundle.v1.tar",
 		SemanticDigest: digest, BlobDigest: digest,
 	})
 	return err
 }
 
-func lifecycleTransportMember(plan *Plan, observed Artifact) (string, string, error) {
-	var canonicalPath string
-	for _, artifact := range plan.Graph.Artifacts {
-		if artifact.ID == observed.ID {
-			canonicalPath = filepath.ToSlash(filepath.Clean(artifact.Path))
-			break
-		}
-	}
-	prefix := filepath.ToSlash(filepath.Join(".nkd", "factory")) + "/"
-	if canonicalPath == "" || !strings.HasPrefix(canonicalPath, prefix) {
-		return "", "", e.New(e.CodePipelineDrift, "package input %q has no canonical factory path", observed.ID)
-	}
-	relative := strings.TrimPrefix(canonicalPath, prefix)
-	observedClean := filepath.Clean(observed.Path)
-	relativeNative := filepath.FromSlash(relative)
-	if observedClean != relativeNative && !strings.HasSuffix(observedClean, string(filepath.Separator)+relativeNative) {
-		return "", "", e.New(e.CodePipelineDrift, "package input %q moved outside its canonical workspace location", observed.ID)
-	}
-	root := strings.TrimSuffix(observedClean, relativeNative)
-	root = strings.TrimSuffix(root, string(filepath.Separator))
-	if root == "" {
-		root = "."
-	}
-	return root, relative, nil
-}
-
-// helmPackageTree normalizes a generated tree or an observed source archive to
-// the same deterministic carrier. Source archives have exactly one helm/ root;
-// transport extraction rejects escaping links, traversal, duplicates and extra roots.
-func helmPackageTree(ctx context.Context, plan *Plan, input Artifact) (string, string, func(), error) {
+// helmPackageTree normalizes an observed source archive to a deterministic
+// carrier. Source archives have exactly one helm/ root; transport extraction
+// rejects escaping links, traversal, duplicates and extra roots.
+func helmPackageTree(ctx context.Context, input Artifact) (string, string, func(), error) {
 	noop := func() {}
-	if input.Kind == "aicr-bundle" {
-		root, relative, err := lifecycleTransportMember(plan, input)
-		return root, relative, noop, err
-	}
 	if input.Kind != "tarball" || input.BuildTarget == "" {
 		return "", "", noop, e.New(e.CodeInvalidCatalog, "Helm input %q is not a build source archive", input.ID)
 	}

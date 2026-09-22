@@ -91,6 +91,7 @@ func TestRetiredDomainsRemainReservedButCannotMint(t *testing.T) {
 		{KindClusterComposition, "nkd.cluster-composition"},
 		{KindClusterRealization, "nkd.cluster-realization/v1"},
 		{KindStagingManifest, "nkd.staging-manifest"},
+		{KindAICRBundle, "nkd.aicr-bundle"},
 	} {
 		t.Run(allocation.want, func(t *testing.T) {
 			kind := allocation.kind
@@ -104,21 +105,6 @@ func TestRetiredDomainsRemainReservedButCannotMint(t *testing.T) {
 				t.Fatalf("retired identity = %q, %v; want no digest and %s", digest, err, e.CodeUnsupported)
 			}
 		})
-	}
-}
-
-func TestAICRBundleHasItsOwnDomain(t *testing.T) {
-	value := map[string]any{"schemaVersion": "nkd.dev/aicr-bundle/v1"}
-	aicrDigest, err := Digest(KindAICRBundle, value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buildDigest, err := Digest(KindBuild, value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if aicrDigest == buildDigest {
-		t.Fatal("AICR output tree can be substituted for a producer build graph")
 	}
 }
 

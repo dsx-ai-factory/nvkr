@@ -5,8 +5,8 @@ links the third-party modules listed below. Each module's license, copyright
 notice, and NOTICE file (where one exists) is reproduced in full.
 
 This file lists modules linked into the `nkdctl` binary. Tools invoked as
-separate processes (the Go and GCC toolchains, `cosign`, `syft`, `docker`, and
-the `aicr` CLI) are not linked and are not covered here.
+separate processes (the Go and GCC toolchains, `cosign`, `syft`, and `docker`)
+are not linked and are not covered here.
 
 The License column in the Summary is a best-effort SPDX guess from each
 license's opening text; the reproduced license and NOTICE text below it is the

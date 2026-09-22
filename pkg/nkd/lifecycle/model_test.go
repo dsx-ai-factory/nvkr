@@ -76,35 +76,6 @@ func TestLifecycleOutputsCompileOnlySelectedProducers(t *testing.T) {
 	}
 }
 
-func TestAICRProfileNameCannotBeSubstitutedOutsideCatalog(t *testing.T) {
-	repo, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(repo)
-	for _, test := range []struct {
-		name string
-		edit func(*factory.Plan)
-	}{
-		{name: "build profile", edit: func(plan *factory.Plan) {
-			for i := range plan.Builds {
-				if plan.Builds[i].Graph.AICR != nil {
-					plan.Builds[i].AICRProfileIdentity = "substituted"
-				}
-			}
-		}},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			plan, err := CompileFiles(t.Context(), "testdata/examples/ai-factory/definition-arm64.yaml", "testdata/examples/ai-factory/environment-local.yaml", "test")
-			if err != nil {
-				t.Fatal(err)
-			}
-			test.edit(plan)
-			assertCode(t, plan.Validate(), nkderr.CodeUnverifiedRef)
-		})
-	}
-}
-
 func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 	definitionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "definitions", "nke-v1", "definition.yaml"))
 	if err != nil {

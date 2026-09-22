@@ -279,21 +279,13 @@ components:
     writeDir: out
 kind: SourceBuildRegistry
 metadata:
-  description: NVIDIA Kubernetes Definition — default LAYERED catalog (top-level recipes/,
-    like AICR). Sources + the full Tier-1 component set are declared here once; the
+  description: NVIDIA Kubernetes Definition — default LAYERED catalog (top-level
+    recipes/). Sources + the full Tier-1 component set are declared here once; the
     recipe for a query is COMPOSED from overlays/ (base + the kubernetes category
     overlay) + mixins/. Resolved pins live in pins.lock.yaml (machine-managed by `nkdctl
     catalog pin/bump`), so a version bump touches only the lock. See docs/versioning.md.
   name: nkd-default
 sources:
-  aicr:
-    constraint: 0.18.x
-    repo: https://github.com/NVIDIA/aicr
-    tool:
-      executablePath: aicr
-      format: tar-gzip
-      platform: linux/amd64
-      url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_amd64.tar.gz
   checkout:
     constraint: 7.x
     kind: github-action

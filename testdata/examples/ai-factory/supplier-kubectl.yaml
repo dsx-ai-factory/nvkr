@@ -13,4 +13,4 @@ components:
     version: v1.32.0
 kind: CatalogOverlay
 name: trusted-kubernetes-supplier
-requiresCatalogDigest: sha256:20a8f860b7b7f0497ca596b3a8cfafd87202caeacefc355c4925f92b0890e1f8
+requiresCatalogDigest: sha256:da06df2e2c3e74baaa9ee7b3a190ab58ba3ed02b4a244bee8cf0d8eec223eb00

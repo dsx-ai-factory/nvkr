@@ -17,7 +17,6 @@ type ResolveRequest struct {
 	Components   []string
 	Platform     string
 	OutputFormat string
-	AICRProfile  string
 	OutputName   string
 }
 
@@ -41,7 +40,7 @@ func (c *Client) ResolveBuild(ctx context.Context, request ResolveRequest) (*Res
 		return nil, e.New(e.CodeUsage, "build resolution requires catalog I/O")
 	}
 	selection := buildgraph.Selection{Components: request.Components, Platform: request.Platform,
-		OutputFormat: request.OutputFormat, AICRProfile: request.AICRProfile}
+		OutputFormat: request.OutputFormat}
 	if err := selection.Validate(); err != nil {
 		return nil, err
 	}

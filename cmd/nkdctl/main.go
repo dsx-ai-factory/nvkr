@@ -64,7 +64,6 @@ func newApp() *cli.App {
 			cmdBakeOff(),
 			cmdSBOM(),
 			cmdDisk(),
-			cmdAICR(),
 			cmdExecNode(),
 			cmdTransportPack(),
 			cmdTransportUnpack(),

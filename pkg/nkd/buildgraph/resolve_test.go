@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
@@ -101,58 +100,6 @@ func TestResolveVMImageKVMHostRoutes(t *testing.T) {
 			}
 			if err != nil || resolved == nil {
 				t.Fatalf("Resolve() = %#v, %v; want success", resolved, err)
-			}
-		})
-	}
-}
-
-func TestAICROutputInputsBindBuildDigestButLabelsDoNot(t *testing.T) {
-	profile := &catalog.AICRProfile{
-		Identity: "friendly-name", Repo: "https://github.com/NVIDIA/aicr",
-		Digest: "sha256:" + strings.Repeat("a", 64), GeneratorDigest: "sha256:" + strings.Repeat("c", 64), Service: "eks", Accelerator: "h100",
-		OS: "ubuntu", Intent: "training", Platform: "kubeflow",
-	}
-	resolved := &Resolved{
-		Platform:    "linux/amd64",
-		AICRProfile: profile,
-		Bundle:      &aicr.BundleInputs{Deployer: "helm"},
-	}
-	digest := func(r *Resolved) string {
-		d, err := mustCompile(t, r).Digest()
-		if err != nil {
-			t.Fatal(err)
-		}
-		return d
-	}
-	baseDigest := digest(resolved)
-	if got := mustCompile(t, resolved).AICR; got == nil || got.ProfileDigest != profile.Digest ||
-		got.GeneratorDigest != profile.GeneratorDigest || got.Accelerator != "h100" {
-		t.Fatalf("compiled graph is missing typed AICR activation: %+v", got)
-	}
-
-	labels := *profile
-	labels.Identity = "renamed-for-humans"
-	labels.Repo = "https://mirror.invalid/aicr"
-	if got := digest(&Resolved{Platform: resolved.Platform, AICRProfile: &labels, Bundle: resolved.Bundle}); got != baseDigest {
-		t.Fatalf("provenance label/transport moved build identity: %s != %s", got, baseDigest)
-	}
-
-	for name, mutate := range map[string]func(*catalog.AICRProfile){
-		"service":       func(p *catalog.AICRProfile) { p.Service = "gke" },
-		"accelerator":   func(p *catalog.AICRProfile) { p.Accelerator = "h200" },
-		"os":            func(p *catalog.AICRProfile) { p.OS = "rhel" },
-		"intent":        func(p *catalog.AICRProfile) { p.Intent = "inference" },
-		"platform":      func(p *catalog.AICRProfile) { p.Platform = "dynamo" },
-		"recipe digest": func(p *catalog.AICRProfile) { p.Digest = "sha256:" + strings.Repeat("b", 64) },
-		"generator digest": func(p *catalog.AICRProfile) {
-			p.GeneratorDigest = "sha256:" + strings.Repeat("d", 64)
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			changed := *profile
-			mutate(&changed)
-			if got := digest(&Resolved{Platform: resolved.Platform, AICRProfile: &changed, Bundle: resolved.Bundle}); got == baseDigest {
-				t.Fatalf("output-affecting AICR %s did not move build identity", name)
 			}
 		})
 	}

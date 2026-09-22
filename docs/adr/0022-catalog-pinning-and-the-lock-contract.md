@@ -40,8 +40,8 @@ Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact 
 versions/kinds/fields, and never interpret a future lock as the current version. A missing lock is an input error,
 not an implicit empty lock.
 
-Registry v3 contains producer components with explicit supported `platforms` and an optional `aicrProfiles`
-map. It contains no recipes, criteria, recipe layers, mixins, `versionFrom`, placement categories or node roles.
+Registry v3 contains producer components with explicit supported `platforms`.
+It contains no recipes, criteria, recipe layers, mixins, `versionFrom`, placement categories or node roles.
 Catalog overlay v3 can replace complete component producers under ADR-11; it is independent of the removed
 recipe merge system. Catalog snapshots use v3 and strict decoding rejects removed classification fields even
 when the caller supplies the current version. Lock v1 remains unchanged because its resolved source and
@@ -74,7 +74,7 @@ output selects exact producer IDs and a concrete platform from that catalog. Com
 executable closure and canonical BuildDigest. A selected source pin, prebuilt artifact or producer toolchain
 change moves that logical build identity when it changes the selected graph. An unrelated catalog edit may
 change catalog and Plan identity without changing another output's BuildDigest. Output names, packaging,
-and transport do not enter this logical identity. Effective AICR rendering settings do enter it.
+and transport do not enter this logical identity.
 
 Templated version stamps such as `KUBE_GIT_VERSION` and `KUBE_GIT_COMMIT` are rendered from source pins at
 load time (`{{.Tag}}`, `{{.Commit}}`, …). Unknown template tokens fail closed. There is no cluster context,

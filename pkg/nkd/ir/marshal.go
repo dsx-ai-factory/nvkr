@@ -4,26 +4,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	"sigs.k8s.io/yaml"
 )
-
-// LogicalAICRActivation contains only output-affecting AICR inputs and pins. Human
-// labels and transport locations do not exist in this representation.
-type LogicalAICRActivation struct {
-	Service         string            `json:"service"`
-	Accelerator     string            `json:"accelerator"`
-	OS              string            `json:"os"`
-	Intent          string            `json:"intent"`
-	Platform        string            `json:"platform,omitempty"`
-	ProfileDigest   string            `json:"profileDigest"`
-	GeneratorDigest string            `json:"generatorDigest"`
-	Bundle          aicr.BundleInputs `json:"bundle"`
-}
 
 // LogicalNode is the explicit T1 build-identity DTO. It intentionally cannot carry
 // source/artifact/flake transport locators. OCI references are reduced to their
@@ -70,10 +56,9 @@ type LogicalNode struct {
 // transport-bearing Graph is fully validated first and then projected into this
 // structurally transport-free DTO.
 type LogicalGraph struct {
-	SchemaVersion string                 `json:"schemaVersion"`
-	Platform      string                 `json:"platform"`
-	AICR          *LogicalAICRActivation `json:"aicr,omitempty"`
-	Nodes         []LogicalNode          `json:"nodes"`
+	SchemaVersion string        `json:"schemaVersion"`
+	Platform      string        `json:"platform"`
+	Nodes         []LogicalNode `json:"nodes"`
 }
 
 type buildIdentityFieldRule uint8
@@ -132,7 +117,6 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 var graphBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"SchemaVersion": includeLogicalValueInBuildIdentity,
 	"Platform":      includeLogicalValueInBuildIdentity,
-	"AICR":          includeLogicalValueInBuildIdentity,
 	"Nodes":         includeLogicalValueInBuildIdentity,
 }
 
@@ -159,11 +143,6 @@ func (g *Graph) Normalize() {
 // Graph.Validate rejects that input before serialization or identity computation.
 func (g Graph) normalizedCopy() Graph {
 	c := g
-	if g.AICR != nil {
-		activation := *g.AICR
-		activation.Bundle = g.AICR.Bundle.Clone()
-		c.AICR = &activation
-	}
 	c.Nodes = append([]Node(nil), g.Nodes...)
 	for i := range c.Nodes {
 		c.Nodes[i].Needs = append([]string(nil), g.Nodes[i].Needs...)
@@ -210,14 +189,6 @@ func (g Graph) logicalGraph() LogicalGraph {
 		SchemaVersion: c.SchemaVersion,
 		Platform:      c.Platform,
 		Nodes:         make([]LogicalNode, 0, len(c.Nodes)),
-	}
-	if c.AICR != nil {
-		logical.AICR = &LogicalAICRActivation{
-			Service: c.AICR.Service, Accelerator: c.AICR.Accelerator, OS: c.AICR.OS,
-			Intent: c.AICR.Intent, Platform: c.AICR.Platform,
-			ProfileDigest: c.AICR.ProfileDigest, GeneratorDigest: c.AICR.GeneratorDigest,
-			Bundle: c.AICR.Bundle.Clone(),
-		}
 	}
 	for _, node := range c.Nodes {
 		logical.Nodes = append(logical.Nodes, LogicalNode{

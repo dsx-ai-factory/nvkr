@@ -78,7 +78,7 @@ const (
 	KindVendorSpec              = "nkd.vendor-spec"              // dependency materialization argv + image content identity
 	KindSourceInput             = "nkd.source-input"             // commit/tree/vendor content identity used by IR lowering
 	KindResolvedInput           = "nkd.resolved-input"           // per-build source closure after ordered patches
-	KindAICRBundle              = "nkd.aicr-bundle"              // validated deterministic AICR bundle tree (ADR-12)
+	KindAICRBundle              = "nkd.aicr-bundle"              // retired AICR bundle-tree family, reserved (ADR-12)
 	KindCatalogSnapshot         = "nkd.catalog-snapshot/v1"      // one fully resolved catalog state
 	KindCatalogOverlay          = "nkd.catalog-overlay/v1"       // one ordered component-level catalog overlay
 	KindArtifactGraph           = "nkd.artifact-graph/v1"        // typed build/package/delivery dataflow
@@ -363,7 +363,7 @@ func Digest(kind string, v any) (string, error) {
 	case KindCompileSpec, KindExecutionSettings, KindLifecycleBinding, KindLegacyRecipe,
 		KindClusterDefinition, KindClusterComposition, KindClusterRealization, KindStagingManifest, KindBundle,
 		KindReproductionResult, KindCompatibilityResult, KindConformanceResult, KindEvidenceWaiver,
-		KindClearance, KindTrustedTime, KindPublication, KindPublicationManifest, KindVulnReport:
+		KindClearance, KindTrustedTime, KindPublication, KindPublicationManifest, KindVulnReport, KindAICRBundle:
 		return "", e.New(e.CodeUnsupported,
 			"canonical: digest domain %q is retired and cannot mint identities", kind)
 	}

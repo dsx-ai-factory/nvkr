@@ -15,29 +15,10 @@ import (
 )
 
 // compileOutputBuild resolves one exact named output into its owned producer graph.
-func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Environment, targetStack *catalog.Stack, tools map[string]catalog.ToolPin) (BuildPlan, error) {
-	resolved, err := buildgraph.Resolve(targetStack.Catalog, buildgraph.Selection{Components: target.Components, Platform: target.Platform, OutputFormat: target.Format, AICRProfile: aicrProfile(target), Bundle: aicrBundle(target)})
+func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Environment, targetStack *catalog.Stack) (BuildPlan, error) {
+	resolved, err := buildgraph.Resolve(targetStack.Catalog, buildgraph.Selection{Components: target.Components, Platform: target.Platform, OutputFormat: target.Format})
 	if err != nil {
 		return BuildPlan{}, e.Wrap(e.CodeNoMatch, err, "factory build target %q", target.Name)
-	}
-	if resolved.AICRProfile != nil {
-		if aicrGenerator(target) == "" {
-			return BuildPlan{}, e.New(e.CodeInvalidCatalog,
-				"factory AICR target %q requires an exact pipeline tool in aicrGenerator", target.Name)
-		}
-		tool := tools[aicrGenerator(target)]
-		profile := *resolved.AICRProfile
-		// Generator identity is execution-platform specific. The catalog selects
-		// the semantic build, while the factory target pins the exact executable
-		// that will reproduce it on this runner. buildgraph.Compile then binds that
-		// executable digest into buildDigest.
-		if profile.GeneratorDigest != tool.ExecutableDigest {
-			return BuildPlan{}, e.New(e.CodeUnpinnedSource, "output %q generator does not match selected profile pin", target.Name)
-		}
-		resolved.AICRProfile = &profile
-	} else if aicrGenerator(target) != "" {
-		return BuildPlan{}, e.New(e.CodeInvalidCatalog,
-			"factory build target %q names aicrGenerator but resolves no AICR profile", target.Name)
 	}
 	graph, err := compileBuildGraph(resolved, delivery)
 	if err != nil {
@@ -53,10 +34,6 @@ func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Envi
 		selectedNames = append(selectedNames, component.Name)
 	}
 	sort.Strings(selectedNames)
-	aicrIdentity := ""
-	if resolved.AICRProfile != nil {
-		aicrIdentity = resolved.AICRProfile.Identity
-	}
 	snapshot, err := catalog.ApplyStack(targetStack.Catalog)
 	if err != nil {
 		return BuildPlan{}, err
@@ -68,7 +45,7 @@ func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Envi
 		// The SBOM node bills the SELECTED (built) components: those are exactly the
 		// ones with a producer-result carrying an observed digest (ADR-13).
 		ResolvedComponents: append([]catalog.NamedComponent(nil), selected.Components...),
-		AICRProfileName:    aicrProfile(target), AICRProfileIdentity: aicrIdentity, Graph: graph}, nil
+		Graph:              graph}, nil
 }
 
 // compileBuildGraph owns the Environment transformations of a catalog-derived
@@ -180,7 +157,7 @@ func (plan Plan) validatePlanBuilds() error {
 		if digest != buildPlan.BuildDigest || buildPlan.Platform != buildPlan.Graph.Platform {
 			return e.New(e.CodeUnverifiedRef, "factory build target %q graph identity does not match its binding", buildPlan.Name)
 		}
-		if len(buildPlan.Components) == 0 && buildPlan.Graph.AICR == nil {
+		if len(buildPlan.Components) == 0 {
 			return e.New(e.CodeInvalidCatalog, "factory build target %q selects no components", buildPlan.Name)
 		}
 		if !sort.StringsAreSorted(buildPlan.Components) || hasAdjacentDuplicate(buildPlan.Components) {
@@ -224,23 +201,13 @@ func validateBuildCatalog(build BuildPlan, outputFormat string, environment auth
 	if digest != build.CatalogDigest {
 		return e.New(e.CodeUnverifiedRef, "output %q catalog snapshot differs", build.Name)
 	}
-	selection := buildgraph.Selection{Components: build.Components, Platform: build.Platform, OutputFormat: outputFormat, AICRProfile: build.AICRProfileName}
-	if build.Graph.AICR != nil {
-		selection.Bundle = &build.Graph.AICR.Bundle
-	}
+	selection := buildgraph.Selection{Components: build.Components, Platform: build.Platform, OutputFormat: outputFormat}
 	selected, err := buildgraph.Resolve(build.CatalogSnapshot, selection)
 	if err != nil {
 		return err
 	}
 	if !reflect.DeepEqual(selected.Components, build.ResolvedComponents) {
 		return e.New(e.CodeUnverifiedRef, "output %q resolved producers differ from catalog", build.Name)
-	}
-	profileIdentity := ""
-	if selected.AICRProfile != nil {
-		profileIdentity = selected.AICRProfile.Identity
-	}
-	if build.AICRProfileIdentity != profileIdentity {
-		return e.New(e.CodeUnverifiedRef, "output %q AICR profile identity differs from catalog", build.Name)
 	}
 	graph, err := compileBuildGraph(selected, environment)
 	if err != nil {

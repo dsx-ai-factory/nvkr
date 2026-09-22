@@ -30,7 +30,7 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root, relative, cleanup, err := helmPackageTree(ctx, &Plan{}, Artifact{ID: "charts", Kind: "tarball", BuildTarget: "nke", Path: archive})
+	root, relative, cleanup, err := helmPackageTree(ctx, Artifact{ID: "charts", Kind: "tarball", BuildTarget: "nke", Path: archive})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -178,16 +178,14 @@ func containsString(values []string, wanted string) bool {
 // validateCompiledGraph checks the complete compiler-owned operation set after
 // authenticating the authored inputs, catalog snapshots and producer selections.
 func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
-	outputCatalogs := make(map[string]*catalog.Catalog, len(plan.Builds))
 	for _, build := range plan.Builds {
-		outputCatalogs[build.Name] = build.CatalogSnapshot
 		for _, output := range plan.Definition.Outputs {
 			if output.Name == build.Name && output.Catalog == nil && build.CatalogDigest != plan.CatalogDigest {
 				return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", output.Name)
 			}
 		}
 	}
-	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, outputCatalogs)
+	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot)
 	if err != nil {
 		return err
 	}

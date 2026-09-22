@@ -46,7 +46,7 @@ func TestSourceHelmArchiveBoundary(t *testing.T) {
 			if err := file.Close(); err != nil {
 				t.Fatal(err)
 			}
-			root, _, cleanup, err := helmPackageTree(context.Background(), &Plan{}, Artifact{ID: "charts", Kind: "tarball", BuildTarget: "charts", Path: archive})
+			root, _, cleanup, err := helmPackageTree(context.Background(), Artifact{ID: "charts", Kind: "tarball", BuildTarget: "charts", Path: archive})
 			defer cleanup()
 			if root != "" || e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
 				t.Fatalf("unsafe archive accepted: %q %v", root, err)
@@ -71,7 +71,7 @@ func TestSourceHelmGNUTarDirectory(t *testing.T) {
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
-	root, relative, cleanup, err := helmPackageTree(context.Background(), &Plan{}, Artifact{ID: "charts", Kind: "tarball", BuildTarget: "charts", Path: archive})
+	root, relative, cleanup, err := helmPackageTree(context.Background(), Artifact{ID: "charts", Kind: "tarball", BuildTarget: "charts", Path: archive})
 	if err != nil {
 		t.Fatal(err)
 	}

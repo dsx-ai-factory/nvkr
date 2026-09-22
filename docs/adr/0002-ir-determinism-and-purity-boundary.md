@@ -33,8 +33,7 @@ Every field lives in exactly one tier:
 - **T1 — inside the Build Digest** (the hashed, compiled graph): resolved logical sources (stable catalog
   source key + commit + tree/content digest + source-date), per-component builder pins (`oci-hermetic` toolchain
   digest; `nix` container-image digest + flake lock), prebuilt content digests, the **builder type**, the pinned
-  normalization / build-flag environment allowlist, concrete target platform, and exact AICR activation and
-  profile/generator pins and effective bundle-rendering settings where present. A network URL, registry host,
+  normalization / build-flag environment allowlist, and concrete target platform. A network URL, registry host,
   mirror path, credential reference, or other transport locator is never a T1 field.
 - **T2 — deterministic metadata, *not* in the Build Digest**: the Build Digest itself, the expected
   per-artifact digests, the **builder-profile identity**, deterministic execution requirements and their
@@ -84,10 +83,6 @@ Generated targets have no display ID inside the graph. Output names bind uses in
 they do not change the logical graph. Equal digests never merge independently required uses: execution,
 restore and terminal evidence must match the exact output/target as well as its Build Digest.
 
-AICR renderer settings affect produced bytes and therefore belong in T1. Authored omission and an explicit
-Helm default compile to the same complete activation. Lists are copied and sorted before compilation;
-executable graph validation rejects missing effective defaults, duplicate entries and noncanonical order.
-The graph does not infer these settings from an external cluster declaration.
 
 A producer's execution requirements and deterministic class binding have one executable representation: the
 full build graph embedded in the Run Plan. Scheduler records reference that exact instruction by output and
@@ -142,7 +137,6 @@ An automated two-part guard enforces the boundary; documentation alone does not:
 ## Follow-ups
 
 - **ADR-07:** the builder-profile digest is T2; the observed engine class is T3; builder pins are T1.
-  The AICR activation's separately owned `profileDigest` identifies a pinned content input and belongs to T1.
 - **ADR-09:** the build record is the T3 home for host/clock/builder observations.
 - **ADR-01:** the identity digest uses the canonical codec and domain tag defined there.
 - **ADR-15:** general air-gap lifecycle remains out of scope; any future adapter must preserve logical
@@ -166,7 +160,7 @@ Compiler tests additionally cover direct authored input binding, independent own
 exact producer references, forbidden copied execution settings, and unchanged Build identity when execution
 requirements change. These are contract checks, not provider capability evidence.
 
-The focused IR migration tests also cover concrete targets, exact producer membership, AICR inputs, strict
+The focused IR migration tests also cover concrete targets, exact producer membership, strict
 legacy-field rejection and the distinct `nkd.build` family. Repository checks are recorded in reconciliation.
 Remaining external acceptance requires:
 

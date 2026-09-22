@@ -47,7 +47,7 @@ workflows; consumers verify the results with standard tooling and no NKD softwar
 
 | Object | Responsibility |
 |---|---|
-| Definition | Authored named outputs with direct component or AICR profile selections, target platforms and packaging |
+| Definition | Authored named outputs with direct component selections, target platforms and packaging |
 | Environment | Execution settings, publication namespace, credential references and signing policy |
 | Run | One immutable attempt with frozen requirements, observed artifacts, evidence and failures |
 | Artifact | Immutable executable, image, chart or packaged bytes |
@@ -162,7 +162,7 @@ any CI engine other than GitHub Actions.
 | **Jira key** | [NKX-15958](https://jirasw.nvidia.com/browse/NKX-15958) (created 2026-09-09) |
 | **Issue type** | Epic |
 | **Epic name** | NKD M2 Breadth |
-| **Summary** | The in-scope artifact set is delivered and signed in OCI with provenance, centred on the wrapped amd64 NKE OS image; the AICR package is one signed artifact and every required output has exact digest-bound release membership |
+| **Summary** | The in-scope artifact set is delivered and signed in OCI with provenance, centred on the wrapped amd64 NKE OS image; every required output has exact digest-bound release membership |
 | **Priority / Rank** | High / 2 |
 | **T-shirt size** | **M** — the wrapped-build lane and image/blob publication are real scope; OS-build feasibility still requires an admitted hosted environment. Re-size if capability testing fails, arm64 is pulled forward or wrapped-build isolation must be stricter |
 | **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m2-breadth` |
@@ -179,7 +179,7 @@ any CI engine other than GitHub Actions.
 NKE node-images build at a pinned commit and published as one signed disk-image artifact; it already contains
 Kubernetes (node side and control-plane images), CNI, and node-agent. Around it: the CWE controller image and the
 NKE cluster images that are not baked into the OS image (enumerated by name in the definition as a Sep 10
-checkpoint output), the operator tooling package, the AICR package, and chart packages. The Release binds
+checkpoint output), the operator tooling package, and chart packages. The Release binds
 these named outputs to the exact delivered artifacts.
 
 **Delivers**
@@ -208,16 +208,15 @@ these named outputs to the exact delivered artifacts.
 - **Image and blob publication.** Pushing container-image layouts by digest with the pinned digest preserved,
   and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
   digest and skips content that is already present, so re-runs are cheap and mirrors are idempotent.
-- **Acquisition.** Digest-pinned acquisition of kubectl, Helm, the AICR CLI, AICR chart tarballs, and the
-  third-party images referenced by the AICR and NKE charts that are not inside the OS image. Pins live in the
+- **Acquisition.** Digest-pinned acquisition of kubectl, Helm, and the
+  third-party images referenced by the NKE charts that are not inside the OS image. Pins live in the
   lockfile and are written by the pin-resolution command (resolve an upstream version to a digest and rewrite the
   lockfile), which M4 schedules and extends. Each acquired artifact carries an `acquired` provenance attestation
   recording the upstream reference, the lockfile pin, and the fetch time, and making no build claim.
 - **Spire-agent.** Placement is decided at the Sep 10 checkpoint and recorded in the definition: inside the OS
   image (its matrix row then reads "inside the OS image" and it joins the embedded-component declaration) or
   acquired by digest as a named output in the Release. Until decided it is a dated deferral, not an omission.
-- **Packages.** An operator tooling package (kubectl, Helm, AICR CLI); an AICR package (the rendered AICR
-  deployment plus its chart tarballs); NKE chart packages where sources are available. Each is one signed,
+- **Packages.** An operator tooling package (kubectl, Helm); NKE chart packages where sources are available. Each is one signed,
   attested OCI artifact.
 - **Release membership.** Every required named output is bound to its exact published artifact digest and
   evidence. Consumer verification rejects omitted, extra or substituted outputs. A Definition describes a
@@ -237,9 +236,9 @@ incomplete; a build failure cannot create an implicit deferral.
 
 **Acceptance criteria**
 1. The OS image is published as one signed, attested amd64 disk-image artifact built from the pinned NKE commit; its provenance names that commit and tree hash with build type `wrapped-build`; consumer verification succeeds. (Under the fallback: the prebuilt QCOW2 is mirrored by digest, signed, consumer-verified, its `acquired` provenance names the upstream reference and digest, and the row is recorded as `acquired`.)
-2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, AICR CLI, spire-agent if acquired, third-party images, AICR package, NKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. The OS image's provenance lists its declared embedded components, and every embedded row in the milestone matrix appears in that declaration. Its software inventory binds the exact delivered disk and reconciles traced materials with read-only inspection; disagreement fails delivery.
+2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, spire-agent if acquired, third-party images, NKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. The OS image's provenance lists its declared embedded components, and every embedded row in the milestone matrix appears in that declaration. Its software inventory binds the exact delivered disk and reconciles traced materials with read-only inspection; disagreement fails delivery.
 3. CWE controller and NKE container images are either built (`wrapped-build`, provenance naming the NKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
-4. The AICR package and the operator tooling package are each published as one signed, attested OCI artifact and pass consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
+4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
 5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
 
 **Definition of done**
@@ -414,7 +413,7 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 
 - **Sizes and order:** M1 XS → M2 M → M3 S → M4 S. M2 is the only epic whose size rests on assumptions (amd64
   only; relaxed builder profile); if either tightens, it drifts toward L and should be re-sized before commitment.
-- **M2 core:** the OS image, the operator tooling package, and the AICR package with exact output membership. Everything
+- **M2 core:** the OS image and the operator tooling package with exact output membership. Everything
   else in M2 is covered by the pre-authorized fallbacks.
 - **Never cut:** the independent reviews and the decision-record and evidence-log work.
 - **Checkpoints:** Thu Sep 10 decides the M2 shape (wrapped OS build or QCOW2 mirror; built or mirrored NKE

@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -17,13 +16,11 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
-// Selection names exactly one output's ordinary producers or one AICR profile.
+// Selection names exactly one output's ordinary producers.
 type Selection struct {
 	Components   []string
 	Platform     string
 	OutputFormat string
-	AICRProfile  string
-	Bundle       *aicr.BundleInputs
 }
 
 // Validate admits the explicit request shape before a caller reads catalog data.
@@ -38,23 +35,8 @@ func (selection Selection) Validate() error {
 	default:
 		return e.New(e.CodeInvalidCatalog, "output format %q is unsupported", selection.OutputFormat)
 	}
-	if (len(selection.Components) == 0) == (selection.AICRProfile == "") {
-		return e.New(e.CodeInvalidCatalog, "output must select components or one AICR profile, exclusively")
-	}
-	if selection.AICRProfile != strings.TrimSpace(selection.AICRProfile) {
-		return e.New(e.CodeInvalidCatalog, "AICR profile selection %q is non-canonical", selection.AICRProfile)
-	}
-	if selection.AICRProfile == "" && selection.Bundle != nil {
-		return e.New(e.CodeInvalidCatalog, "bundle settings require an AICR profile")
-	}
-	if selection.AICRProfile != "" {
-		if selection.OutputFormat != "" && selection.OutputFormat != definition.OutputHelm {
-			return e.New(e.CodeInvalidCatalog,
-				"AICR profile output requires Helm format, not %q", selection.OutputFormat)
-		}
-		if _, err := aicr.NormalizeBundleInputs(selection.Bundle); err != nil {
-			return err
-		}
+	if len(selection.Components) == 0 {
+		return e.New(e.CodeInvalidCatalog, "output must select at least one component")
 	}
 	seen := make(map[string]bool, len(selection.Components))
 	for _, name := range selection.Components {
@@ -72,10 +54,8 @@ func (selection Selection) Validate() error {
 // Resolved is a description of selected, validated producer inputs. It carries no
 // execution or evidence authority; Compile validates it again before lowering.
 type Resolved struct {
-	Platform    string
-	Components  []catalog.NamedComponent
-	AICRProfile *catalog.AICRProfile
-	Bundle      *aicr.BundleInputs
+	Platform   string
+	Components []catalog.NamedComponent
 }
 
 // Resolve validates the complete catalog and selects producers without defaults.
@@ -88,19 +68,6 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 		return nil, err
 	}
 	resolved := &Resolved{Platform: selection.Platform}
-	if selection.AICRProfile != "" {
-		profile, ok := cat.AICRProfiles[selection.AICRProfile]
-		if !ok {
-			return nil, e.New(e.CodeInvalidCatalog, "unknown AICR profile %q", selection.AICRProfile)
-		}
-		bundle, err := aicr.NormalizeBundleInputs(selection.Bundle)
-		if err != nil {
-			return nil, err
-		}
-		resolved.AICRProfile = &profile
-		resolved.Bundle = &bundle
-		return resolved, nil
-	}
 	names := append([]string(nil), selection.Components...)
 	sort.Strings(names)
 	for _, name := range names {
@@ -257,20 +224,8 @@ func validateResolved(resolved *Resolved) error {
 	if err := target.ValidatePlatform(resolved.Platform); err != nil {
 		return err
 	}
-	if (len(resolved.Components) == 0) == (resolved.AICRProfile == nil) {
-		return e.New(e.CodeInvalidCatalog, "resolved output must contain components or one AICR profile, exclusively")
-	}
-	if resolved.AICRProfile != nil {
-		if resolved.Bundle == nil {
-			return e.New(e.CodeInvalidCatalog, "resolved AICR output has no effective bundle settings")
-		}
-		if err := resolved.Bundle.Validate(); err != nil {
-			return err
-		}
-		return resolved.AICRProfile.Validate()
-	}
-	if resolved.Bundle != nil {
-		return e.New(e.CodeInvalidCatalog, "resolved ordinary output carries AICR bundle settings")
+	if len(resolved.Components) == 0 {
+		return e.New(e.CodeInvalidCatalog, "resolved output must contain at least one component")
 	}
 	cat := &catalog.Catalog{Components: make(map[string]catalog.Component, len(resolved.Components))}
 	previous := ""
