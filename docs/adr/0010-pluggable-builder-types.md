@@ -139,7 +139,7 @@ invocation mechanism, not a builder type or an output semantic:
 
 The direct-Packer authoring form names the stable boundary that compilation records and future execution must
 enforce. The concrete projection values below match the source-owned
-[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/e45aa0d7f245d9e0ae7def612ebbeeda6c5208f3/os-image/packer/variables.pkr.hcl#L14-L58);
+[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2/os-image/packer/variables.pkr.hcl#L14-L58);
 they are example producer vocabulary, not NKD-reserved values.
 
 ```yaml
@@ -311,11 +311,13 @@ make -C os-image/packer os-image-fde ARCH={{.Arch}}
   -> os-image/packer/output-fde/nke-node-fde-ubuntu-26.04.1-{{.Arch}}.qcow2
 ```
 
-The current NKE release matrix realizes plain amd64, FDE amd64, and plain arm64. It does not validate or publish
-FDE arm64. Definition output selection records that supported matrix without duplicating components per
-architecture. A maintained NKE component may instead select the `packer` driver after NKE exposes an authenticated
-staged-material input and private-output contract in its source-owned HCL. That catalog choice changes catalog
-snapshot and Build identity. It does not remove or invalidate the standalone Make entrypoint. Compiler lowering
+The current NKE release matrix realizes and publishes plain and FDE images for both amd64 and arm64. Definition
+output selection records that supported matrix without duplicating components per architecture. NKE merge commit
+[`5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2`](https://github.com/dsx-ai-factory/nke/commit/5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2)
+now owns the authenticated staged-material and private-output contract in its source HCL. A maintained NKE
+component may select that `packer` driver only after the catalog carries an ADR-22-valid source pin and the exact
+toolchain and material-supplier pins. That catalog choice changes the catalog snapshot and Build identity. It does
+not remove or invalidate the standalone Make entrypoint. Compiler lowering
 supports a direct-Packer producer with typed materials and a command producer without materials. A
 material-bearing command/Make producer, VM execution, disk collection, and publication remain capability-gated.
 An override that changes NKE's derived

@@ -98,6 +98,14 @@ input, the exact Environment authorization is part of the public lifecycle ident
 direct-Packer runtime enforce the admitted mode. This path is contract-tested only. A real Linux/Docker NKE bake,
 QCOW2 digest/size collection and boot smoke remain required external evidence.
 
+The NKE direct-Packer source contract is now merged at commit
+`5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2`, tree
+`7d9b93c65c3cc8c2317b2953bca638c2203701e9`; its `os-image` subtree is byte-identical to the reviewed PR head.
+That commit is an exact future source identity, but it is not yet a valid maintained lock entry: lock v1 requires
+a tag, and no current `os-image/*` tag resolves to this commit. The approved, published per-host toolchain image
+digests, exact installer/image-input supplier pins, and measured execution-class values are also absent. NKD
+therefore records the merged contract here without adding an incomplete maintained NKE disk component.
+
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 01–03 Identity and errors | Canonical integer-only codec, frozen families, strict decoding, transport-free build identity, explicit execution-metadata exclusion, whole-graph admission, stable coded errors | Independent-language corpus for every signed family; external failures need continuing contract coverage |
