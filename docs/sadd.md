@@ -794,7 +794,9 @@ before workspace mutation. Inside the admitted callback it authenticates one bou
 named volumes, mounts consumer inputs read-only, fixes environment/hostname/user, disables network, image pulls and
 `packer init`, validates the exact selector, builds it once and returns one held QCOW2. A one-shot root container
 with only `CAP_CHOWN` bootstraps the two fresh attempt volumes to the host UID/GID; every consumer operation runs as
-that host identity. Command/Make, encrypted-disk, hosted and qualified VM adapters remain closed.
+that host identity. Bounded in-process cleanup owns ordinary completion and cancellation; authenticated
+cross-process orphan recovery after a hard process or host failure remains deferred. Command/Make, encrypted-disk,
+hosted and qualified VM adapters remain closed.
 
 The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
 Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,

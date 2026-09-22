@@ -289,7 +289,10 @@ an attempt-local SSH key pair when the source contract declares its variables, r
 selector and clean-output rule, then runs `packer build -on-error=cleanup` with that same selector. Validation is the
 authoritative compatibility check for the exact source-declared plugin constraint against the authenticated
 toolchain closure. Exactly one declared QCOW2 is collected into a held inode and re-hashed. All containers, volumes,
-held inputs and private workspace state are reaped on success, failure or cancellation.
+held inputs and private workspace state are reaped on success, returned failure or context cancellation. This
+in-process cleanup cannot run after `SIGKILL`, a process crash or host loss. Cross-process orphan recovery remains
+deferred until NKD has an authenticated owner-liveness protocol; a label-only startup sweep must not delete volumes
+that may belong to another live attempt.
 
 This is current-availability authority for the current local direct-Packer VM adapter, not a resource reservation, authenticated
 provider allocation, cross-process receipt, or qualification evidence. Holding the validated KVM descriptor

@@ -11,7 +11,10 @@ import (
 
 // NodeSession retains prepared source snapshots while an owning scheduler runs
 // individual producers. It never schedules work or reuses producer results.
-// Close cancels and joins calls before releasing their shared snapshots.
+// Producer contexts inherit the caller's values and deadline; Close cancels
+// admitted calls synchronously before the session context, so a resumed
+// producer cannot begin new runtime work. Close then joins active producers
+// before releasing their shared snapshots.
 type NodeSession struct {
 	state *nodeSessionState
 }
@@ -23,6 +26,7 @@ type nodeSessionState struct {
 	closed        bool
 	done          chan struct{}
 	active        sync.WaitGroup
+	calls         map[context.Context]context.CancelFunc
 	sources       map[string]*preparedSourceCache
 	packerRuntime *nodeSessionPackerRuntime
 }
@@ -35,7 +39,8 @@ func NewNodeSession(ctx context.Context) (*NodeSession, error) {
 		return nil, e.Wrap(e.CodeTimeout, err, "node execution session canceled")
 	}
 	owned, cancel := context.WithCancel(ctx)
-	return &NodeSession{state: &nodeSessionState{ctx: owned, cancel: cancel, done: make(chan struct{}), sources: make(map[string]*preparedSourceCache)}}, nil
+	return &NodeSession{state: &nodeSessionState{ctx: owned, cancel: cancel, done: make(chan struct{}),
+		calls: make(map[context.Context]context.CancelFunc), sources: make(map[string]*preparedSourceCache)}}, nil
 }
 
 func (handle *NodeSession) ExecNode(node ir.Node, options RunOptions) (*ArtifactResult, error) {
@@ -74,15 +79,19 @@ func (handle *NodeSession) ExecNode(node ir.Node, options RunOptions) (*Artifact
 		}
 		options.sources = cache
 	}
+	// Retain the caller's values, deadline, and synchronous cancellation while
+	// registering this owned child before Close can begin canceling active work.
+	ctx, cancel := context.WithCancel(options.Ctx)
+	session.calls[ctx] = cancel
 	session.active.Add(1)
 	session.mu.Unlock()
-	defer session.active.Done()
-	// Derive directly from the session so Close cancels admitted work before it
-	// waits for the producer. Forward caller cancellation into the same child.
-	// Reversing these parents leaves a scheduling window where Close has canceled
-	// the session but the AfterFunc callback has not canceled the producer yet.
-	ctx, cancel := context.WithCancel(session.ctx)
-	stop := context.AfterFunc(options.Ctx, cancel)
+	defer func() {
+		session.mu.Lock()
+		delete(session.calls, ctx)
+		session.mu.Unlock()
+		session.active.Done()
+	}()
+	stop := context.AfterFunc(session.ctx, cancel)
 	defer func() { stop(); cancel() }()
 	options.Ctx = ctx
 	return (Local{}).ExecNode(node, options)
@@ -100,6 +109,12 @@ func (handle *NodeSession) Close() {
 		return
 	}
 	session.closed = true
+	// AfterFunc propagates owner-parent cancellation, but its callback is
+	// asynchronous. Close must cancel admitted calls before exposing session
+	// cancellation, so a resumed producer cannot start new runtime work.
+	for _, cancel := range session.calls {
+		cancel()
+	}
 	session.cancel()
 	session.mu.Unlock()
 	session.active.Wait()
