@@ -555,6 +555,11 @@ func TestObserveDiskLifecyclePayloadRejectsSubstitutionAndAmbiguity(t *testing.T
 			binary.BigEndian.PutUint32(payload[100:104], qcow2Version3HeaderLen-1)
 			replaceFakeDiskPayload(result, payload)
 		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 v3 header length is not aligned", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := testQCOW2HeaderPayload()
+			binary.BigEndian.PutUint32(payload[100:104], qcow2Version3HeaderLen+1)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
 		{name: "qcow2 v3 header length beyond cluster", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
 			payload := append(testQCOW2HeaderPayload(), make([]byte, 512)...)
 			binary.BigEndian.PutUint32(payload[100:104], 513)

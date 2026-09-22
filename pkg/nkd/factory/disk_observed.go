@@ -524,7 +524,8 @@ func validateQCOW2Header(header []byte, payloadSize int64) error {
 	if version == 3 {
 		headerLength := binary.BigEndian.Uint32(header[100:104])
 		clusterSize := uint32(1) << clusterBits
-		if headerLength < qcow2Version3HeaderLen || headerLength > clusterSize || int64(headerLength) > payloadSize {
+		if headerLength < qcow2Version3HeaderLen || headerLength%8 != 0 ||
+			headerLength > clusterSize || int64(headerLength) > payloadSize {
 			return errors.New("QCOW2 v3 header length is invalid")
 		}
 	}
