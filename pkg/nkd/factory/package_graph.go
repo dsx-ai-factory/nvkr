@@ -20,7 +20,7 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 			}
 		}
 	}
-	packages := make([]packageSpec, 0, len(definition.Outputs)+1)
+	packages := make([]packageSpec, 0, len(definition.Outputs))
 	closureInputs := make([]string, 0, len(definition.Outputs))
 	for _, output := range definition.Outputs {
 		if output.Format == authored.OutputDiskImage {
