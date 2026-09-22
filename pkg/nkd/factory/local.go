@@ -194,9 +194,10 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	result = &LocalRunResult{SchemaVersion: LocalRunSchemaVersion,
 		Qualification: TierLocalExecution, PlanDigest: planDigest,
 		Workspace: filepath.ToSlash(options.Workspace)}
+	owner := result
 	completed := false
 	defer func() {
-		returnErr = finishLocalRun(result, options.producers, completed, returnErr)
+		returnErr = finishLocalRun(owner, options.producers, completed, returnErr)
 		if returnErr != nil {
 			result = nil
 		}

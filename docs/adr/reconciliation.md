@@ -19,9 +19,10 @@ the exact successful producer result against the revalidated Plan, independently
 checks a bounded QCOW2 v2/v3 header, and records Build/Plan, producer, component, declared format and encryption
 bindings in the Run's delivery observation. The header check is not a full decoder or compatibility verdict. It
 neither decodes RAW nor grants evidence, compatibility, publication or qualification.
-Production VM execution and population of that held result, full-disk SBOM generation, OCI or object-store
-publication, and artifact-level disk compatibility are unimplemented. Deployment topology and cluster runtime qualification
-belong to downstream owners. No existing NKE OS build or publication is claimed.
+Local unencrypted direct-Packer execution and population of its held result are connected and contract-tested.
+No real Docker/Packer/NKE bake has exercised that path. Full-disk SBOM generation, OCI or object-store
+publication, and artifact-level disk compatibility are unimplemented. Deployment topology and cluster runtime
+qualification belong to downstream owners. No existing NKE OS build or publication is claimed.
 The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
 producer evidence verdict, performs content validation, or claims qualified disk reproduction. Reproduced or
 digest-verified materials cannot upgrade a future wrapped aggregate disk; its exact QCOW2 digest would identify

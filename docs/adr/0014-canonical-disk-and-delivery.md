@@ -68,10 +68,10 @@ inspect encrypted content, establish compatibility or qualification, construct a
 
 The observer and private scheduler population seam have controlled contract coverage, including held-file
 no-follow regular-file capture, pathname replacement, byte substitution, cancellation, duplicate-result and
-close races. The production population callback is deliberately absent until the VM driver returns its
-package-issued held result through that seam. Consequently a real direct-Packer lifecycle Run still fails
-capability admission before workspace or subprocess work; a serialized local result or caller-composed path,
-digest, or result cannot restore the in-process capability.
+close races. The local unencrypted direct-Packer callback is connected and passes the VM driver's package-issued
+held result through that seam after capability admission. A serialized local result or caller-composed path,
+digest, or result cannot replace the in-process capability. This path has contract coverage only; no real
+Docker/Packer/NKE bake is claimed.
 
 At NKE commit `6df693a`, the [Make target](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
 produces a QCOW2 and the [hosted workflow](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)

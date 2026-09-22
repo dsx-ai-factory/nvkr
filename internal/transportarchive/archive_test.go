@@ -105,6 +105,26 @@ func TestUnpackOpenUsesHeldArchiveAfterPathReplacement(t *testing.T) {
 	}
 }
 
+func TestUnpackOpenReportsRejectedArchiveSize(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "oversized.tar")
+	archive, err := os.OpenFile(archivePath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	if err := archive.Truncate(maxTransportBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	err = UnpackOpen(t.Context(), archive, t.TempDir(), []string{"artifact"})
+	if transportCode(err) != nkderr.CodeVerifyFailed {
+		t.Fatalf("oversized held archive returned %v, want verify-failed", err)
+	}
+	if !strings.Contains(err.Error(), "invalid size") ||
+		!strings.Contains(err.Error(), fmt.Sprint(maxTransportBytes)) {
+		t.Fatalf("oversized held archive error does not report the rejected size bound: %v", err)
+	}
+}
+
 func TestTransportArchiveRejectsUntrustedTarStructures(t *testing.T) {
 	tests := []struct {
 		name    string

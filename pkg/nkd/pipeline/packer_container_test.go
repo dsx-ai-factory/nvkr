@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -528,9 +530,9 @@ func TestCollectPackerContainerArtifactRejectsInvalidOutput(t *testing.T) {
 		overflow   bool
 		storageMiB uint64
 	}{
-		{name: "truncated", payload: []byte{'Q', 'F', 'I'}},
-		{name: "wrong magic", payload: []byte("not-a-qcow2")},
-		{name: "transport exceeds bound", overflow: true, storageMiB: 1},
+		{name: "truncated", payload: []byte{'Q', 'F', 'I'}, storageMiB: 1},
+		{name: "wrong magic", payload: []byte("not-a-qcow2"), storageMiB: 1},
+		{name: "transport exceeds bound", overflow: true, storageMiB: 4},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var carrier []byte
@@ -547,6 +549,25 @@ func TestCollectPackerContainerArtifactRejectsInvalidOutput(t *testing.T) {
 				"/nkd/work/output/node.qcow2", t.TempDir(), test.storageMiB)
 			if artifact != nil || code(err) != e.CodeVerifyFailed {
 				t.Fatalf("invalid QCOW2 artifact/error = %#v/%v, want nil/%s", artifact, err, e.CodeVerifyFailed)
+			}
+		})
+	}
+}
+
+func TestPackerArtifactArchiveLimitAccountsForConcurrentCopies(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		storageMiB uint64
+		want       int64
+	}{
+		{name: "absent admission", want: 0},
+		{name: "three mebibytes", storageMiB: 3, want: 1 << 20},
+		{name: "shared archive cap", storageMiB: 3 * 64 * 1024, want: transportarchive.MaxArchiveBytes},
+		{name: "integer overflow", storageMiB: uint64(math.MaxInt64>>20) + 1, want: transportarchive.MaxArchiveBytes},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := packerArtifactArchiveLimit(test.storageMiB); got != test.want {
+				t.Fatalf("packerArtifactArchiveLimit(%d) = %d, want %d", test.storageMiB, got, test.want)
 			}
 		})
 	}

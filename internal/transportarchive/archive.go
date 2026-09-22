@@ -507,7 +507,9 @@ func UnpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 		return e.New(e.CodeVerifyFailed, "held transport archive is not a regular file")
 	}
 	if archiveInfo.Size() < 0 || archiveInfo.Size() > maxTransportBytes {
-		return e.New(e.CodeVerifyFailed, "held transport archive is not a regular file within the %d-byte limit", maxTransportBytes)
+		return e.New(e.CodeVerifyFailed,
+			"held transport archive has invalid size %d; expected 0 through %d bytes",
+			archiveInfo.Size(), maxTransportBytes)
 	}
 	if err := os.MkdirAll(rootAbs, 0o755); err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating transport root")

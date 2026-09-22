@@ -19,6 +19,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const packerArtifactCollectionCopies int64 = 3
+
 func validatePackerContainerRequest(request packerContainerRunRequest, kvmEnabled bool) error {
 	if request.workspace == nil {
 		return e.New(e.CodeEngineCapability, "containerized Packer requires the admitted workspace capability")
@@ -320,11 +322,10 @@ func copyArchiveToContainer(ctx context.Context, runtime packerContainerRuntime,
 }
 
 func collectPackerContainerArtifact(ctx context.Context, runtime packerContainerRuntime, container, artifactPath, root string, storageMiB uint64) (artifact *PackerArtifact, returnErr error) {
-	archiveLimit := transportarchive.MaxArchiveBytes
-	if storageMiB <= uint64(math.MaxInt64>>20) {
-		if capacity := int64(storageMiB) << 20; capacity > 0 && capacity < archiveLimit-(1<<20) {
-			archiveLimit = capacity + (1 << 20)
-		}
+	archiveLimit := packerArtifactArchiveLimit(storageMiB)
+	if archiveLimit <= 0 {
+		return nil, e.New(e.CodeEngineCapability,
+			"Packer artifact collection requires positive admitted workspace capacity")
 	}
 	archivePath := filepath.Join(root, "artifact.tar")
 	archive, err := os.OpenFile(archivePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
@@ -406,6 +407,24 @@ func collectPackerContainerArtifact(ctx context.Context, runtime packerContainer
 		return nil, e.Wrap(e.CodeInternal, err, "unlinking private QCOW2 collection path")
 	}
 	return &PackerArtifact{file: artifactFile, digest: digest, size: size}, nil
+}
+
+// packerArtifactArchiveLimit reserves capacity for the held Docker tar, its
+// immutable snapshot, and the extracted QCOW2, which coexist during unpacking.
+// The authored ephemeral-storage request must also cover every other source,
+// build, package, and verification temporary that can coexist in the workspace.
+func packerArtifactArchiveLimit(storageMiB uint64) int64 {
+	if storageMiB == 0 {
+		return 0
+	}
+	if storageMiB > uint64(math.MaxInt64>>20) {
+		return transportarchive.MaxArchiveBytes
+	}
+	limit := (int64(storageMiB) << 20) / packerArtifactCollectionCopies
+	if limit > transportarchive.MaxArchiveBytes {
+		return transportarchive.MaxArchiveBytes
+	}
+	return limit
 }
 
 type packerContainerLimitWriter struct {
