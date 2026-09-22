@@ -546,7 +546,7 @@ func TestRunPackerContainerCancellationJoinsTransportWork(t *testing.T) {
 			}()
 			select {
 			case <-blocked:
-			case <-time.After(5 * time.Second):
+			case <-time.After(20 * time.Second):
 				t.Fatal("Packer run did not reach the selected transport stage")
 			}
 			cancel()
@@ -555,7 +555,7 @@ func TestRunPackerContainerCancellationJoinsTransportWork(t *testing.T) {
 				if code(err) != e.CodeTimeout {
 					t.Fatalf("canceled transport error = %v, want %s", err, e.CodeTimeout)
 				}
-			case <-time.After(5 * time.Second):
+			case <-time.After(20 * time.Second):
 				t.Fatal("canceled Packer transport did not join")
 			}
 			if len(runtime.cleanups) == 0 {

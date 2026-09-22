@@ -173,10 +173,14 @@ func TestNodeSessionCloseCancelsJoinsAndRevokesCopies(t *testing.T) {
 	copy := *session
 	writer := &sessionBlockedWriter{started: make(chan struct{}), release: make(chan struct{})}
 	t.Cleanup(writer.unblock)
+	runtimePath := filepath.Join(t.TempDir(), "runtime")
+	if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\nexit 99\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	node := completeTestBuild(ir.Node{ID: "build-a", Kind: ir.KindBuild, Component: "a"}, fetch)
 	runDone := make(chan error, 1)
 	go func() {
-		_, err := copy.ExecNode(node, RunOptions{Ctx: t.Context(), SourceRoot: root, Runtime: "must-not-run",
+		_, err := copy.ExecNode(node, RunOptions{Ctx: t.Context(), SourceRoot: root, Runtime: runtimePath,
 			Launch: true, Stdout: writer, Stderr: io.Discard})
 		runDone <- err
 	}()
