@@ -45,7 +45,7 @@ func releaseStatusCmdWithVerifier(verifier trust.DocumentVerifier) *cli.Command 
 			&cli.StringFlag{Name: "authority", Required: true, Usage: "stable status authority identity"},
 			&cli.StringFlag{Name: "documents", Required: true, Usage: "canonical JSON locating the checkpoint and its exact declaration set"},
 			&cli.StringFlag{Name: "high-water", Required: true, Usage: "canonical authenticated local high-water policy state"},
-			&cli.StringFlag{Name: "high-water-out", Usage: "atomically persist the accepted high-water state (defaults to --high-water)"},
+			&cli.StringFlag{Name: "high-water-out", Usage: "must equal --high-water when supplied; retained for compatibility; accepted state is updated in place"},
 			&cli.Int64Flag{Name: "as-of", Required: true, Usage: "caller-supplied diagnostic policy epoch; not trusted-time authority"},
 			&cli.StringSliceFlag{Name: "status-identity", Usage: "currently authorized status certificate identity (repeatable; overrides trust store)"},
 			&cli.StringFlag{Name: "status-issuer", Required: true, Usage: "exact pinned status OIDC issuer"},
