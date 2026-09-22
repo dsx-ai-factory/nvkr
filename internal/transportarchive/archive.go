@@ -24,9 +24,13 @@ import (
 )
 
 const (
-	maxTransportEntries             = 1_000_000
-	maxTransportRoots               = 4096
-	maxTransportBytes         int64 = 64 << 30
+	maxTransportEntries = 1_000_000
+	maxTransportRoots   = 4096
+	// MaxArchiveBytes is the shared aggregate bound for one authenticated
+	// workspace carrier. Callers must reject larger execution closures before
+	// starting the consuming subprocess or VM.
+	MaxArchiveBytes           int64 = 64 << 30
+	maxTransportBytes               = MaxArchiveBytes
 	transportCopyBufferSize         = 128 << 10
 	transportReadDirBatchSize       = 1024
 )
@@ -472,17 +476,38 @@ func Unpack(ctx context.Context, archive, root string, allowed []string) error {
 	if err := requireTransportContext(ctx, "unpacking transport"); err != nil {
 		return err
 	}
-	rootAbs, cleanAllowed, err := transportRoots(root, allowed)
-	if err != nil {
-		return err
-	}
-	archiveFile, archiveInfo, err := securepath.OpenRegular(archive)
+	archiveFile, _, err := securepath.OpenRegular(archive)
 	if err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "opening transport archive %s", archive)
 	}
 	defer archiveFile.Close()
+	return UnpackOpen(ctx, archiveFile, root, allowed)
+}
+
+// UnpackOpen applies the same bounded carrier validation as Unpack to an
+// already-held regular-file inode. It does not close archive. This prevents a
+// pathname replacement between an authority module holding transport bytes and
+// the extraction boundary.
+func UnpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed []string) error {
+	if err := requireTransportContext(ctx, "unpacking held transport"); err != nil {
+		return err
+	}
+	rootAbs, cleanAllowed, err := transportRoots(root, allowed)
+	if err != nil {
+		return err
+	}
+	if archiveFile == nil {
+		return e.New(e.CodeVerifyFailed, "held transport archive is absent")
+	}
+	archiveInfo, err := archiveFile.Stat()
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "stating held transport archive")
+	}
+	if !archiveInfo.Mode().IsRegular() {
+		return e.New(e.CodeVerifyFailed, "held transport archive is not a regular file")
+	}
 	if archiveInfo.Size() < 0 || archiveInfo.Size() > maxTransportBytes {
-		return e.New(e.CodeVerifyFailed, "transport archive %s is not a regular file within the %d-byte limit", archive, maxTransportBytes)
+		return e.New(e.CodeVerifyFailed, "held transport archive is not a regular file within the %d-byte limit", maxTransportBytes)
 	}
 	if err := os.MkdirAll(rootAbs, 0o755); err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating transport root")

@@ -32,7 +32,7 @@ type vmDriverRunConfig struct {
 // useful only inside the callback of a Plan-bound VM admission; it is not a
 // serializable or caller-constructible execution authority.
 type vmDriverExecutor interface {
-	RunPacker(context.Context, *VMRuntime, ir.Node, *vmPackerMaterials) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error)
+	RunPacker(context.Context, *VMRuntime, string, ir.Node, *vmPackerMaterials) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error)
 	Close() error
 }
 
@@ -85,6 +85,13 @@ func dispatchAdmittedVMProducer(
 			"vm-image producer %q requires an unimplemented held-output command adapter", selected.Component)
 	}
 	returnErr = admission.Execute(ctx, plan, node.ID, func(runCtx context.Context, runtime *VMRuntime) error {
+		request, err := localVMRequestForPlan(plan, node.ID)
+		if err != nil {
+			return err
+		}
+		if err := runtime.requireSubject(request.Subject); err != nil {
+			return err
+		}
 		_, instruction, err := plan.producerInstruction(node)
 		if err != nil {
 			return err
@@ -102,7 +109,7 @@ func dispatchAdmittedVMProducer(
 		if materialErr != nil {
 			return materialErr
 		}
-		artifact, result, err = executor.RunPacker(runCtx, runtime, instruction, materials)
+		artifact, result, err = executor.RunPacker(runCtx, runtime, request.Subject, instruction, materials)
 		err = joinFactoryCleanupError(err, materials.Close(), "closing VM Packer material capabilities")
 		if err != nil {
 			return err

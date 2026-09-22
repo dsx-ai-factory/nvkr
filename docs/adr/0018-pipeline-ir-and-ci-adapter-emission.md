@@ -254,37 +254,64 @@ no source, subprocess, output, or workspace mutation during admission. The local
 direct-Packer dispatch boundary that requires this exact admission before Packer selection. A separate run-owned
 resolver contract binds the exact Plan, producer session, runtime, daemon and digest-pinned OCI toolchain images
 after pure Plan/workspace-shape validation but before workspace mutation. The resulting executor may perform source,
-material and output work only inside the single-use VM callback. The production OCI resolver is not connected yet,
-so current local execution fails at that resolver boundary before workspace or graph work. Contract tests exercise
-the resolver ordering and post-admission selection boundary. Command/Make `vm-image` authoring still lowers into
-the Plan, but local execution rejects it before resolver or workspace mutation until a held-output adapter exists.
-No VM producer executes yet, and the remaining adapter gates stay closed.
+material and output work only inside the single-use VM callback. The local production resolver is connected for
+the direct-Packer, unencrypted form only. The exact full-Plan subject is checked independently by resolver
+admission, local VM admission and dispatch; a valid Plan-only change with unchanged producer IR fails before the
+driver. Command/Make `vm-image` authoring still lowers into the Plan, but local execution rejects it before resolver
+or workspace mutation until a held-output adapter exists. Every encrypted form is rejected before source,
+material, toolchain or VM work until a typed non-public secret channel exists.
 
-This is current-availability authority for a future local VM adapter, not a resource reservation, authenticated
+Direct-Packer execution authenticates one already-local digest-pinned OCI toolchain for the selected host platform;
+it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NKD
+overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
+Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, disabled health check, read-only
+root, no network, no new privileges and all capabilities dropped. Source, configuration, manifest and material inputs are packed into one
+deterministic bounded tar preserving directories, modes and symlink targets. Docker transports only a one-file
+outer carrier. The pinned toolchain verifies the held inner-tar digest before extracting that same opened inode;
+Packer then sees the input volume read-only. The work volume remains private to the attempt.
+
+Fresh Docker volumes and `docker cp` content are root-owned. One fixed ownership-bootstrap container therefore runs
+as root with only `CAP_CHOWN`, mounts only the attempt's input and work volumes, changes their ownership to the
+observed host UID/GID, and is removed before consumer execution. It performs no input
+authentication, extraction, Packer operation or network access. Extraction, version checking, SSH-key generation,
+validation and build all run as the host UID/GID. Only the build receives the admitted KVM device and its observed
+supplemental group when the exact binding enables KVM.
+
+The runtime sets a fixed `PACKER_PLUGIN_PATH`, requires the exact Plan-authored Packer version, generates and checks
+an attempt-local SSH key pair when the source contract declares its variables, runs `packer validate` with the exact
+selector and clean-output rule, then runs `packer build -on-error=cleanup` with that same selector. Validation is the
+authoritative compatibility check for the exact source-declared plugin constraint against the authenticated
+toolchain closure. Exactly one declared QCOW2 is collected into a held inode and re-hashed. All containers, volumes,
+held inputs and private workspace state are reaped on success, failure or cancellation.
+
+This is current-availability authority for the current local direct-Packer VM adapter, not a resource reservation, authenticated
 provider allocation, cross-process receipt, or qualification evidence. Holding the validated KVM descriptor
 proves availability through the callback lifetime; it does not prove Packer or QEMU consumed that exact
 descriptor. Driver dispatch must enforce the selected device mode and use the supplied deadline context. A hosted
 or qualified adapter must independently authenticate its effective provider or cgroup allocation and outer
 deadline before it can admit work.
 
-Future `vm-image` execution dispatches the typed producer driver owned by ADR-10. The `command` driver executes the
-exact authored argument vector and can therefore invoke Make. The `packer` driver invokes the pinned Packer
-executable against the selected source-owned HCL project without parsing or generating HCL. Both receive only
-authenticated staged materials and declared variable bindings, use the same admitted execution class and network
-policy, write into a private output location, and return the declared disk through the same collection boundary.
-The shared runner owns this driver lowering. A CI adapter may transport its typed inputs and outputs, but it may
-not render an independent Make or Packer command.
+`vm-image` execution dispatches the typed producer driver owned by ADR-10. The connected `packer` driver invokes the
+authenticated containerized Packer against the selected source-owned HCL project without parsing or generating
+HCL. A future `command` driver will execute the exact authored argument vector and can therefore invoke Make after
+it gains an equivalent held-output adapter. Both forms must receive only authenticated staged materials and
+declared variable bindings, use the same admitted execution class and network policy, write into a private output
+location, and return the declared disk through the same collection boundary. The shared runner owns driver
+lowering. A CI adapter may transport typed inputs and outputs, but it may not render an independent Make or Packer
+command.
 
-VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, privilege, nested
-virtualization, NUMA, accelerators, requirements on non-build nodes, adapter integration, qualified runtime
-authentication, and provider-specific lowering remain deferred. Produced-artifact size remains an artifact and
-transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or weaken a
-request; a grouped provider job must satisfy every member node.
+VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, nested virtualization, NUMA,
+accelerators, requirements on non-build nodes, hosted adapter integration, qualified runtime authentication, and
+provider-specific lowering remain deferred. The narrowly scoped volume-ownership bootstrap above is the only local
+direct-Packer root exception; it grants no general privileged producer lane. Produced-artifact size remains an
+artifact and transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or
+weaken a request; a grouped provider job must satisfy every member node.
 
-Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the
-local runner's ownership contract. Private package layouts must remain reopenable by later host transport
-steps. Rootless Podman's existing user mapping is retained; the rootless BuildKit build container keeps its
-separate fixed UID and private output-promotion contract.
+Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the local
+runner's ownership contract. The direct-Packer ownership bootstrap is the sole exception and is constrained as
+specified above. Private package layouts must remain reopenable by later host transport steps. Rootless Podman's
+existing user mapping is retained; the rootless BuildKit build container keeps its separate fixed UID and private
+output-promotion contract.
 
 Each fetched source transports its exact receipt file, using the pipeline module's destination-to-receipt
 path mapping. A receipt carrier must not include the shared receipt directory: independent fetch jobs can

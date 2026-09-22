@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 type fakeVMAdmission struct {
 	err      error
 	closeErr error
+	mutate   func(*Plan)
 	calls    int
 	nodeID   string
 	callback bool
@@ -51,7 +53,7 @@ func (admission *fakeVMAdmission) Close() error {
 
 func (admission *fakeVMAdmission) Execute(
 	ctx context.Context,
-	_ *Plan,
+	plan *Plan,
 	nodeID string,
 	work func(context.Context, *VMRuntime) error,
 ) error {
@@ -60,12 +62,20 @@ func (admission *fakeVMAdmission) Execute(
 	if admission.err != nil {
 		return admission.err
 	}
+	request, err := localVMRequestForPlan(plan, nodeID)
+	if err != nil {
+		return err
+	}
+	if admission.mutate != nil {
+		admission.mutate(plan)
+	}
 	admission.callback = true
-	return work(ctx, nil)
+	return work(ctx, &VMRuntime{inner: &execution.LocalVMRuntime{}, subject: request.Subject})
 }
 
 type fakeVMDriverExecutor struct {
 	packerCalls          int
+	subject              string
 	err                  error
 	missing              bool
 	artifactOnError      bool
@@ -114,10 +124,12 @@ func (resolver *fakeVMDriverResolver) Admit(
 func (executor *fakeVMDriverExecutor) RunPacker(
 	_ context.Context,
 	_ *VMRuntime,
+	subject string,
 	_ ir.Node,
 	materials *vmPackerMaterials,
 ) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 	executor.packerCalls++
+	executor.subject = subject
 	if executor.corruptMaterialClose && materials != nil && len(materials.inputs) > 0 &&
 		materials.inputs[0].Content != nil {
 		_ = materials.inputs[0].Content.OSFile().Close()
@@ -270,6 +282,39 @@ func TestAdmittedVMDispatchRunsExactPackerProducerInsideCallback(t *testing.T) {
 		t.Fatalf("dispatch calls = admission %d/%t/%q, Packer %d",
 			admission.calls, admission.callback, admission.nodeID, executor.packerCalls)
 	}
+	request, err := localVMRequestForPlan(packerPlan, packerNode.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if executor.subject != request.Subject || executor.subject == packerNode.ID {
+		t.Fatalf("executor subject = %q, want exact Plan subject %q", executor.subject, request.Subject)
+	}
+}
+
+func TestAdmittedVMDispatchRejectsPlanSubstitutionWithUnchangedIRNode(t *testing.T) {
+	plan, node := compiledPackerVMNode(t)
+	_, before, err := plan.producerInstruction(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission := &fakeVMAdmission{mutate: func(candidate *Plan) {
+		candidate.GeneratorVersion = "changed-but-valid"
+	}}
+	executor := new(fakeVMDriverExecutor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor)
+	if artifact != nil || description != nil || factoryErrorCode(err) != e.CodePipelineDrift {
+		t.Fatalf("substituted Plan artifact/result/error = %#v/%#v/%v", artifact, description, err)
+	}
+	_, after, instructionErr := plan.producerInstruction(node)
+	if instructionErr != nil {
+		t.Fatal(instructionErr)
+	}
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("test mutation unexpectedly changed the selected IR node")
+	}
+	if executor.packerCalls != 0 {
+		t.Fatal("Plan substitution reached the Packer executor")
+	}
 }
 
 func TestAdmittedVMDispatchRejectsCommandBeforeAdmission(t *testing.T) {
@@ -362,12 +407,19 @@ func TestAdmittedVMDispatchFailsBeforeDriverWithoutAdmission(t *testing.T) {
 	}
 }
 
-func TestAdmittedVMDispatchProductionExecutorFailsClosed(t *testing.T) {
+func TestUnavailableVMDriverResolverFailsClosed(t *testing.T) {
 	resolver := unavailableVMDriverResolver{}
 	executor, err := resolver.Admit(t.Context(), nil, nil, vmDriverRunConfig{})
 	if executor != nil || factoryErrorCode(err) != e.CodeEngineCapability ||
 		!strings.Contains(err.Error(), "Plan-bound realized toolchain") {
 		t.Fatalf("production resolver executor/error = %#v/%v", executor, err)
+	}
+}
+
+func TestLocalDefaultsConnectDirectPackerResolver(t *testing.T) {
+	options := withLocalDefaults(LocalRunOptions{})
+	if _, ok := options.vmResolver.(localVMPackerResolver); !ok {
+		t.Fatalf("default VM resolver = %T, want localVMPackerResolver", options.vmResolver)
 	}
 }
 

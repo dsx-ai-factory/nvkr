@@ -26,11 +26,17 @@ import (
 )
 
 const (
-	// MaxVMImagePackerInputBytes bounds both one authenticated material and the
-	// complete material carrier consumed by direct-Packer execution. Factory
-	// admission and every runtime transport use this single executable limit so
-	// an accepted closure cannot fail only after staging begins.
-	MaxVMImagePackerInputBytes int64 = 64 << 30
+	// MaxVMImagePackerInputBytes bounds the complete authenticated input carrier
+	// consumed by direct-Packer execution. The exact carrier includes source,
+	// materials, manifest, runtime configuration, and archive overhead and is
+	// measured before Docker creates a volume or container.
+	MaxVMImagePackerInputBytes int64 = transportarchive.MaxArchiveBytes
+	// packerInputCarrierReserveBytes leaves room for the outer Docker-copy tar's
+	// one regular-file header, block padding, end markers, and future standard
+	// library tar metadata. Both the authenticated inner closure and its outer
+	// carrier are still measured before Docker creates mutable state.
+	packerInputCarrierReserveBytes int64 = 1 << 20
+	maxPackerInputClosureBytes           = MaxVMImagePackerInputBytes - packerInputCarrierReserveBytes
 
 	maxPackerExecutableBytes       int64 = 512 << 20
 	maxPackerHostToolBytes         int64 = 512 << 20
@@ -82,8 +88,9 @@ type packerFileSnapshot struct {
 // material bytes made visible to Packer. Callers cannot construct it from paths
 // or digest strings.
 type stagedPackerInputs struct {
-	root  string
-	files []packerFileSnapshot
+	root               string
+	files              []packerFileSnapshot
+	inputArchiveDigest string
 }
 
 func (inputs *stagedPackerInputs) verify(ctx context.Context) error {

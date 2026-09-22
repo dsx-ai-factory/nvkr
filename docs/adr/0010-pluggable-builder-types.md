@@ -192,9 +192,11 @@ Packer v1.14.2's
 success line only after diagnostic handling returns zero, and its
 [`validate` tests](https://github.com/hashicorp/packer/blob/v1.14.2/command/validate_test.go) fix clean stdout to
 exactly `The configuration is valid.` plus a newline while demonstrating that warnings can precede that line on
-stdout with exit status zero. The dormant driver therefore accepts only that clean line (ignoring surrounding
-whitespace) with empty stderr; any other output fails closed. A real pinned Packer/NKE execution remains required
-before driver execution is admitted. A local 2026-09-18 framing probe used the official Packer 1.14.2 Darwin ARM64 ZIP
+stdout with exit status zero. The connected local OCI driver therefore accepts only that clean line (ignoring
+surrounding whitespace) with empty stderr; any other output fails closed. Driver admission and lifecycle are
+contract-tested, but a recorded real pinned Docker/Packer/NKE execution remains required before maintained NKE
+support, product acceptance, or any pipeline-attested or qualified production claim; until then the local result
+stays unqualified. A local 2026-09-18 framing probe used the official Packer 1.14.2 Darwin ARM64 ZIP
 (`sha256:b053c01272f87fe669c642dfac167b0b48cfb5c119e2e946d90ef92c2407f746`, matching HashiCorp's published
 `SHA256SUMS`) and Packer-installed Docker plugin 1.1.2. The full compiled selector returned exit zero, the single
 28-byte success line on stdout, and empty stderr; a short selector returned exit zero, a 251-byte warning plus

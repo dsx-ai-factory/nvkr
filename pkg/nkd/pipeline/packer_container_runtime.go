@@ -1,0 +1,556 @@
+package pipeline
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"golang.org/x/sys/unix"
+)
+
+const (
+	packerContainerCleanupTimeout   = 20 * time.Second
+	packerContainerTerminationGrace = 2 * time.Second
+)
+
+func runPackerContainer(ctx context.Context, request packerContainerRunRequest) (artifact *PackerArtifact, returnErr error) {
+	if ctx == nil {
+		return nil, e.New(e.CodeUsage, "running containerized Packer requires a non-nil context")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "running containerized Packer")
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		return nil, e.New(e.CodeEngineCapability, "containerized Packer requires the admitted executor deadline")
+	}
+	if request.runtime == nil || request.runtime.Endpoint() != qualifiedRuntimeEndpoint {
+		return nil, e.New(e.CodeEngineCapability,
+			"containerized Packer requires the held local container runtime endpoint")
+	}
+	if runtime.GOOS != "linux" {
+		return nil, e.New(e.CodeEngineCapability, "containerized Packer execution requires Linux")
+	}
+	if err := request.node.Validate(); err != nil {
+		return nil, err
+	}
+	if request.node.BuilderType != ir.BuilderVMImage || request.node.Packer == nil || request.node.ExecutionBinding == nil {
+		return nil, e.New(e.CodeEngineCapability, "containerized Packer requires one bound VM-image Plan node")
+	}
+	if request.node.Disk == nil || request.node.Disk.Encryption != "none" {
+		return nil, e.New(e.CodeEngineCapability,
+			"containerized Packer does not admit encrypted disks without a typed secret channel")
+	}
+	if request.source == nil || request.source.Dir == "" {
+		return nil, e.New(e.CodeEngineCapability,
+			"containerized Packer requires an authenticated materialized source capability")
+	}
+	if err := validatePackerContainerRequest(request); err != nil {
+		return nil, err
+	}
+	kvmEnabled, err := resolvedPackerKVM(request.node)
+	if err != nil {
+		return nil, err
+	}
+	if err := validatePackerContainerKVM(request.runtime, request.kvm, kvmEnabled); err != nil {
+		return nil, err
+	}
+	kvmGroup, err := packerKVMGroup(request.kvm, kvmEnabled)
+	if err != nil {
+		return nil, err
+	}
+	// Fresh daemon and image observations happen before the first mutable Docker
+	// object exists. They do not mint qualification; the outer verified execution
+	// capability remains the authority for the held executable identity.
+	if err := observePackerRuntimeFreshness(ctx, request.runtime); err != nil {
+		return nil, err
+	}
+	if err := observeLocalPackerImage(ctx, request.runtime, request.node); err != nil {
+		return nil, err
+	}
+
+	attempt, err := packerAttemptID()
+	if err != nil {
+		return nil, e.Wrap(e.CodeInternal, err, "allocating Packer attempt identity")
+	}
+	resources := &packerContainerResources{runtime: request.runtime}
+	defer func() {
+		returnErr = finalizePackerContainerRun(&artifact, returnErr, resources.cleanup())
+	}()
+
+	workspace, err := createPackerWorkspaceRoot(request.workspace, attempt)
+	if err != nil {
+		return nil, err
+	}
+	resources.workspace = workspace
+	runRoot := workspace.path()
+	inputArchive, workArchive, staged, err := preparePackerContainerTransport(ctx, runRoot, request)
+	if err != nil {
+		return nil, err
+	}
+	resources.held = append(resources.held, inputArchive, workArchive)
+
+	nodeLabel := "nkd.dev/node=" + request.node.ID
+	attemptLabel := "nkd.dev/attempt=" + attempt
+	inputVolume := "nkd-packer-" + attempt + "-input"
+	workVolume := "nkd-packer-" + attempt + "-work"
+	for _, volume := range []struct{ name, role string }{{inputVolume, "input"}, {workVolume, "work"}} {
+		resources.volumes = append(resources.volumes, volume.name)
+		if err := createPackerVolume(ctx, request.runtime, volume.name,
+			[]string{nodeLabel, attemptLabel, "nkd.dev/role=" + volume.role}); err != nil {
+			return nil, err
+		}
+	}
+
+	stageName := "nkd-packer-" + attempt + "-stage"
+	stage := packerContainerCreateRequest{
+		name: stageName, image: request.node.Toolchain, platform: request.node.ToolchainPlatform,
+		input: inputVolume, work: workVolume, project: packerContainerWorkRoot,
+		entrypoint: "sh", packerArgs: []string{
+			"-ec", packerInputExtractScript, "nkd-extract-input",
+			strings.TrimPrefix(staged.inputArchiveDigest, "sha256:"), packerContainerWorkRoot + "/stage/input.tar",
+		},
+		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=stage"},
+	}
+	resources.containers = append(resources.containers, stageName)
+	if err := createPackerContainer(ctx, request.runtime, stage); err != nil {
+		return nil, err
+	}
+	if err := copyArchiveToContainer(ctx, request.runtime, workArchive, stageName, packerContainerWorkRoot); err != nil {
+		return nil, err
+	}
+	if err := copyArchiveToContainer(ctx, request.runtime, inputArchive, stageName, packerContainerWorkRoot+"/stage"); err != nil {
+		return nil, err
+	}
+	if err := staged.verify(ctx); err != nil {
+		return nil, err
+	}
+	bootstrapName := "nkd-packer-" + attempt + "-bootstrap"
+	bootstrap := packerContainerCreateRequest{
+		name: bootstrapName, image: request.node.Toolchain, platform: request.node.ToolchainPlatform,
+		input: inputVolume, work: workVolume, project: packerContainerWorkRoot,
+		entrypoint: "sh", packerArgs: []string{
+			"-ec", packerVolumeBootstrapScript, "nkd-bootstrap-volumes",
+			strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()),
+		},
+		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=bootstrap"}, user: "0:0", allowChown: true,
+	}
+	resources.containers = append(resources.containers, bootstrapName)
+	if err := createPackerContainer(ctx, request.runtime, bootstrap); err != nil {
+		return nil, err
+	}
+	if err := startPackerContainer(ctx, request.runtime, bootstrapName, io.Discard, io.Discard); err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err,
+			"initializing private Packer volume ownership")
+	}
+	if err := resources.removeContainer(ctx, bootstrapName); err != nil {
+		return nil, err
+	}
+	if err := startPackerContainer(ctx, request.runtime, stageName, io.Discard, io.Discard); err != nil {
+		return nil, e.Wrap(e.CodeUnverifiedRef, err,
+			"pinned toolchain could not authenticate and extract the Packer input closure")
+	}
+	if err := resources.removeContainer(ctx, stageName); err != nil {
+		return nil, err
+	}
+	if err := preflightPackerVersion(ctx, request.runtime, resources, request.node,
+		inputVolume, workVolume, nodeLabel, attemptLabel, attempt, request.bindings.packerVersion); err != nil {
+		return nil, err
+	}
+	if request.bindings.sshPrivateKeyVariable != "" || request.bindings.sshPublicKeyVariable != "" {
+		if request.bindings.sshPrivateKeyVariable == "" || request.bindings.sshPublicKeyVariable == "" {
+			return nil, e.New(e.CodeInvalidCatalog, "Packer SSH key mappings must be declared as a pair")
+		}
+		if err := generateAndVerifyPackerSSHKey(ctx, request.runtime, resources, request.node,
+			inputVolume, workVolume, nodeLabel, attemptLabel, attempt); err != nil {
+			return nil, err
+		}
+	}
+
+	variables := packerContainerVariableArgs(request.node, request.bindings, kvmEnabled)
+	baseArgs := []string{"-only=" + request.node.Packer.BuildName}
+	baseArgs = append(baseArgs, variables...)
+	baseArgs = append(baseArgs, ".")
+	project := path.Join(packerContainerInputRoot, "source", request.node.Packer.ProjectPath)
+
+	validateName := "nkd-packer-" + attempt + "-validate"
+	validate := packerContainerCreateRequest{
+		name: validateName, image: request.node.Toolchain, platform: request.node.ToolchainPlatform,
+		input: inputVolume, inputReadOnly: true, work: workVolume, project: project,
+		packerArgs: append([]string{"validate"}, baseArgs...),
+		labels:     []string{nodeLabel, attemptLabel, "nkd.dev/role=validate"},
+	}
+	resources.containers = append(resources.containers, validateName)
+	if err := createPackerContainer(ctx, request.runtime, validate); err != nil {
+		return nil, err
+	}
+	validationStdout := newPackerValidationOutput(request.stdout)
+	validationStderr := newPackerValidationOutput(request.stderr)
+	if err := startPackerContainer(ctx, request.runtime, validateName, validationStdout, validationStderr); err != nil {
+		return nil, err
+	}
+	if !validationStdout.exact("The configuration is valid.") || !validationStderr.empty() {
+		return nil, e.New(e.CodeBuildFailed,
+			"Packer validation emitted diagnostics or did not confirm one clean configuration")
+	}
+	if err := resources.removeContainer(ctx, validateName); err != nil {
+		return nil, err
+	}
+
+	buildName := "nkd-packer-" + attempt + "-build"
+	build := packerContainerCreateRequest{
+		name: buildName, image: request.node.Toolchain, platform: request.node.ToolchainPlatform,
+		input: inputVolume, inputReadOnly: true, work: workVolume, project: project,
+		packerArgs: append([]string{"build", "-on-error=cleanup"}, baseArgs...),
+		labels:     []string{nodeLabel, attemptLabel, "nkd.dev/role=build"}, kvm: request.kvm, groupAdd: kvmGroup,
+	}
+	resources.containers = append(resources.containers, buildName)
+	if err := createPackerContainer(ctx, request.runtime, build); err != nil {
+		return nil, err
+	}
+	if err := startPackerContainer(ctx, request.runtime, buildName, request.stdout, request.stderr); err != nil {
+		return nil, err
+	}
+	artifact, err = collectPackerContainerArtifact(ctx, request.runtime, buildName,
+		path.Join(packerContainerOutputPath, path.Clean(request.node.ArtifactPath)), runRoot,
+		request.node.Requirements.Resources.EphemeralStorageMiB)
+	if err != nil {
+		return nil, err
+	}
+	return artifact, nil
+}
+
+func packerKVMGroup(device *os.File, enabled bool) (string, error) {
+	if !enabled {
+		if device != nil {
+			return "", e.New(e.CodeEngineCapability, "Packer received KVM while its exact execution binding disables it")
+		}
+		return "", nil
+	}
+	if device == nil {
+		return "", e.New(e.CodeEngineCapability, "Packer requires a held KVM device")
+	}
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(device.Fd()), &stat); err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "observing admitted KVM device group")
+	}
+	return strconv.FormatUint(uint64(stat.Gid), 10), nil
+}
+
+func resolvedPackerKVM(node ir.Node) (bool, error) {
+	found := false
+	enabled := false
+	for _, capability := range node.ExecutionBinding.Capabilities {
+		if capability.Name != execution.CapabilityKVM {
+			continue
+		}
+		if found {
+			return false, e.New(e.CodeInvalidCatalog, "VM-image Plan node repeats its KVM resolution")
+		}
+		found, enabled = true, capability.Enabled
+	}
+	if !found {
+		return false, e.New(e.CodeEngineCapability, "VM-image Plan node has no KVM resolution")
+	}
+	return enabled, nil
+}
+
+func observePackerRuntimeFreshness(ctx context.Context, runtime packerContainerRuntime) error {
+	executableDigest, admittedIdentity := runtime.AdmittedIdentity()
+	if !canonical.IsDigest(executableDigest) || !canonical.IsDigest(admittedIdentity) {
+		return e.New(e.CodeEngineCapability, "container runtime has no admitted identity")
+	}
+	var versionOut, versionErr bytes.Buffer
+	if err := runtime.Run(ctx, nil, &versionOut, &versionErr, "version", "--format", "{{json .}}"); err != nil {
+		return runtimeCommandError(ctx, err, versionErr.String(), e.CodeEngineCapability,
+			"re-observing held container runtime")
+	}
+	var infoOut, infoErr bytes.Buffer
+	if err := runtime.Run(ctx, nil, &infoOut, &infoErr, "info", "--format", "{{json .ID}}"); err != nil {
+		return runtimeCommandError(ctx, err, infoErr.String(), e.CodeEngineCapability,
+			"re-observing container runtime server")
+	}
+	var serverID string
+	if err := json.Unmarshal(bytes.TrimSpace(infoOut.Bytes()), &serverID); err != nil || strings.TrimSpace(serverID) == "" {
+		return e.New(e.CodeEngineCapability, "container runtime returned no canonical server identity")
+	}
+	observed, err := runtimeIdentityFromOutput(executableDigest, runtime.Endpoint(), serverID, versionOut.Bytes())
+	if err != nil {
+		return err
+	}
+	if observed != admittedIdentity {
+		return e.New(e.CodeEngineCapability, "container runtime identity changed after admission")
+	}
+	return nil
+}
+
+func validatePackerContainerKVM(runtime packerContainerRuntime, kvm *os.File, enabled bool) error {
+	if !enabled {
+		if kvm != nil {
+			return e.New(e.CodeEngineCapability, "Packer KVM device is present for a disabled Plan resolution")
+		}
+		return nil
+	}
+	if runtime.Endpoint() != qualifiedRuntimeEndpoint || kvm == nil {
+		return e.New(e.CodeEngineCapability, "Packer KVM resolution requires a held device on the local runtime")
+	}
+	info, err := kvm.Stat()
+	if err != nil || info.Mode()&os.ModeDevice == 0 || info.Mode()&os.ModeCharDevice == 0 {
+		if err == nil {
+			err = errors.New("descriptor is not a character device")
+		}
+		return e.Wrap(e.CodeEngineCapability, err, "validating admitted KVM device")
+	}
+	procPath := fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), kvm.Fd())
+	target, err := os.Readlink(procPath)
+	if err != nil || target != "/dev/kvm" {
+		if err == nil {
+			err = fmt.Errorf("held device resolves to %q", target)
+		}
+		return e.Wrap(e.CodeEngineCapability, err,
+			"validating local Docker KVM device handoff")
+	}
+	version, err := unix.IoctlGetInt(int(kvm.Fd()), 0xAE00)
+	if err != nil || version != 12 {
+		if err == nil {
+			err = fmt.Errorf("KVM API version is %d", version)
+		}
+		return e.Wrap(e.CodeEngineCapability, err, "revalidating admitted KVM capability")
+	}
+	return nil
+}
+
+func createPackerVolume(ctx context.Context, runtime packerContainerRuntime, name string, labels []string) error {
+	args := []string{"volume", "create"}
+	for _, label := range labels {
+		args = append(args, "--label", label)
+	}
+	args = append(args, name)
+	var stdout, stderr bytes.Buffer
+	if err := runtime.Run(ctx, nil, &stdout, &stderr, args...); err != nil {
+		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed, "creating Packer volume %q", name)
+	}
+	if strings.TrimSpace(stdout.String()) != name {
+		return e.New(e.CodeBuildFailed, "container runtime did not confirm Packer volume %q", name)
+	}
+	return nil
+}
+
+func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, request packerContainerCreateRequest) error {
+	var stdout, stderr bytes.Buffer
+	if err := runtime.Run(ctx, nil, &stdout, &stderr, packerContainerCreateArgs(request)...); err != nil {
+		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed, "creating Packer container %q", request.name)
+	}
+	if strings.TrimSpace(stdout.String()) == "" {
+		return e.New(e.CodeBuildFailed, "container runtime returned no ID for Packer container %q", request.name)
+	}
+	return nil
+}
+
+func startPackerContainer(ctx context.Context, runtime packerContainerRuntime, name string, stdout, stderr io.Writer) error {
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	if stderr == nil {
+		stderr = io.Discard
+	}
+	if err := runtime.Run(ctx, nil, stdout, stderr, "start", "--attach", name); err != nil {
+		return runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "running Packer container %q", name)
+	}
+	return nil
+}
+
+func preflightPackerVersion(ctx context.Context, runtime packerContainerRuntime,
+	resources *packerContainerResources, node ir.Node, inputVolume, workVolume, nodeLabel, attemptLabel, attempt, version string,
+) error {
+	name := "nkd-packer-" + attempt + "-version"
+	request := packerContainerCreateRequest{
+		name: name, image: node.Toolchain, platform: node.ToolchainPlatform,
+		input: inputVolume, inputReadOnly: true, work: workVolume, project: packerContainerWorkRoot,
+		packerArgs: []string{"version"}, labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=version"},
+	}
+	resources.containers = append(resources.containers, name)
+	if err := createPackerContainer(ctx, runtime, request); err != nil {
+		return err
+	}
+	var stdout, stderr bytes.Buffer
+	if err := startPackerContainer(ctx, runtime, name, &stdout, &stderr); err != nil {
+		return err
+	}
+	if strings.TrimSpace(stdout.String()) != "Packer v"+version || strings.TrimSpace(stderr.String()) != "" {
+		return e.New(e.CodeEngineCapability,
+			"pinned toolchain Packer version does not match declared version %q", version)
+	}
+	return resources.removeContainer(ctx, name)
+}
+
+func generateAndVerifyPackerSSHKey(ctx context.Context, runtime packerContainerRuntime,
+	resources *packerContainerResources, node ir.Node, inputVolume, workVolume, nodeLabel, attemptLabel, attempt string,
+) error {
+	generateName := "nkd-packer-" + attempt + "-ssh-generate"
+	generate := packerContainerCreateRequest{
+		name: generateName, image: node.Toolchain, platform: node.ToolchainPlatform,
+		input: inputVolume, inputReadOnly: true, work: workVolume, project: packerContainerWorkRoot,
+		entrypoint: "ssh-keygen", packerArgs: []string{"-q", "-t", "ed25519", "-N", "", "-f", packerContainerWorkRoot + "/ssh/id_ed25519"},
+		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=ssh-generate"},
+	}
+	resources.containers = append(resources.containers, generateName)
+	if err := createPackerContainer(ctx, runtime, generate); err != nil {
+		return err
+	}
+	if err := startPackerContainer(ctx, runtime, generateName, io.Discard, io.Discard); err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "generating attempt-local SSH key with pinned toolchain")
+	}
+	if err := resources.removeContainer(ctx, generateName); err != nil {
+		return err
+	}
+	var fingerprints [2]string
+	for index, key := range []string{"id_ed25519", "id_ed25519.pub"} {
+		name := fmt.Sprintf("nkd-packer-%s-ssh-verify-%d", attempt, index)
+		verify := packerContainerCreateRequest{
+			name: name, image: node.Toolchain, platform: node.ToolchainPlatform,
+			input: inputVolume, inputReadOnly: true, work: workVolume, project: packerContainerWorkRoot,
+			entrypoint: "ssh-keygen", packerArgs: []string{"-l", "-E", "sha256", "-f", packerContainerWorkRoot + "/ssh/" + key},
+			labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=ssh-verify"},
+		}
+		resources.containers = append(resources.containers, name)
+		if err := createPackerContainer(ctx, runtime, verify); err != nil {
+			return err
+		}
+		var output bytes.Buffer
+		if err := startPackerContainer(ctx, runtime, name, &output, io.Discard); err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "verifying attempt-local SSH key with pinned toolchain")
+		}
+		fields := strings.Fields(output.String())
+		if len(fields) < 2 || !strings.HasPrefix(fields[1], "SHA256:") {
+			return e.New(e.CodeEngineCapability, "pinned ssh-keygen returned no canonical fingerprint")
+		}
+		fingerprints[index] = fields[1]
+		if err := resources.removeContainer(ctx, name); err != nil {
+			return err
+		}
+	}
+	if fingerprints[0] != fingerprints[1] {
+		return e.New(e.CodeEngineCapability, "attempt-local SSH public and private keys do not match")
+	}
+	return nil
+}
+
+func packerAttemptID() (string, error) {
+	var token [12]byte
+	if _, err := rand.Read(token[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(token[:]), nil
+}
+
+type packerContainerResources struct {
+	runtime    packerContainerRuntime
+	mu         sync.Mutex
+	containers []string
+	volumes    []string
+	held       []*heldfile.File
+	workspace  *packerContainerWorkspace
+}
+
+func (resources *packerContainerResources) removeContainer(ctx context.Context, name string) error {
+	if err := resources.runtime.Run(ctx, nil, io.Discard, io.Discard, "rm", "-fv", name); err != nil {
+		return e.Wrap(e.CodeInternal, err, "removing Packer container %q", name)
+	}
+	resources.mu.Lock()
+	defer resources.mu.Unlock()
+	for index, current := range resources.containers {
+		if current == name {
+			resources.containers = append(resources.containers[:index], resources.containers[index+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+func (resources *packerContainerResources) cleanup() error {
+	resources.mu.Lock()
+	containers := append([]string(nil), resources.containers...)
+	volumes := append([]string(nil), resources.volumes...)
+	held := append([]*heldfile.File(nil), resources.held...)
+	workspace := resources.workspace
+	resources.containers, resources.volumes = nil, nil
+	resources.held, resources.workspace = nil, nil
+	resources.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), packerContainerCleanupTimeout)
+	defer cancel()
+	var cleanupErrors []error
+	for index := len(containers) - 1; index >= 0; index-- {
+		if err := resources.runtime.Cleanup(ctx, packerContainerTerminationGrace, io.Discard, io.Discard,
+			"rm", "-fv", containers[index]); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+	}
+	for index := len(volumes) - 1; index >= 0; index-- {
+		if err := resources.runtime.Cleanup(ctx, packerContainerTerminationGrace, io.Discard, io.Discard,
+			"volume", "rm", "-f", volumes[index]); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+	}
+	for _, file := range held {
+		if err := file.Close(); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+	}
+	if err := workspace.cleanup(); err != nil {
+		cleanupErrors = append(cleanupErrors, err)
+	}
+	return errors.Join(cleanupErrors...)
+}
+
+func runtimeCommandError(ctx context.Context, err error, stderr string, code e.Code, format string, args ...any) error {
+	if ctx != nil && ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, errors.Join(err, ctx.Err()), format, args...)
+	}
+	if message := strings.TrimSpace(stderr); message != "" {
+		err = fmt.Errorf("%w: %s", err, message)
+	}
+	return e.Wrap(code, err, format, args...)
+}
+
+func joinPackerContainerError(primary, cleanup error) error {
+	var coded *e.Error
+	if errors.As(primary, &coded) {
+		return e.Wrap(coded.Code, errors.Join(primary, cleanup),
+			"containerized Packer failed and cleanup also failed")
+	}
+	return e.Wrap(e.CodeInternal, errors.Join(primary, cleanup),
+		"containerized Packer failed and cleanup also failed")
+}
+
+func finalizePackerContainerRun(artifact **PackerArtifact, primary, cleanup error) error {
+	if cleanup == nil {
+		return primary
+	}
+	var artifactClose error
+	if artifact != nil && *artifact != nil {
+		artifactClose = (*artifact).Close()
+		*artifact = nil
+	}
+	cleanup = errors.Join(cleanup, artifactClose)
+	if primary == nil {
+		return e.Wrap(e.CodeInternal, cleanup, "reaping containerized Packer resources")
+	}
+	return joinPackerContainerError(primary, cleanup)
+}
