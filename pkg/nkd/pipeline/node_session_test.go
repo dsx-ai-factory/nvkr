@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -214,8 +215,9 @@ func TestNodeSessionCloseCancelsJoinsAndRevokesCopies(t *testing.T) {
 }
 
 type sessionContextTransport struct {
-	started chan context.Context
-	release chan struct{}
+	started  chan context.Context
+	release  chan struct{}
+	verified atomic.Bool
 }
 
 func (transport *sessionContextTransport) Acquire(ctx context.Context, _, _ string) (string, int64, error) {
@@ -224,7 +226,8 @@ func (transport *sessionContextTransport) Acquire(ctx context.Context, _, _ stri
 	return "", 0, ctx.Err()
 }
 
-func (*sessionContextTransport) Verify(context.Context, string, string) error {
+func (transport *sessionContextTransport) Verify(context.Context, string, string) error {
+	transport.verified.Store(true)
 	return fmt.Errorf("canceled acquisition must not reach verification")
 }
 
@@ -267,6 +270,11 @@ func TestNodeSessionPreservesCallerContextAndCancellation(t *testing.T) {
 			if got, ok := observed.Deadline(); !ok || !got.Equal(deadline) {
 				t.Fatalf("producer deadline = %v, %t; want %v", got, ok, deadline)
 			}
+			// Only "close" proves synchronous cancel-before-resume: it observes
+			// session cancellation, then asserts the producer ctx is already
+			// canceled. "caller" exercises ordinary parent propagation; "owner"
+			// reaches the producer only through the async AfterFunc, so it must
+			// await observed.Done() and proves eventual (not synchronous) delivery.
 			switch cause {
 			case "close":
 				go session.Close()
@@ -291,7 +299,72 @@ func TestNodeSessionPreservesCallerContextAndCancellation(t *testing.T) {
 			case <-time.After(5 * time.Second):
 				t.Fatal("timed out waiting for canceled producer")
 			}
+			// A canceled acquisition must never advance into verification;
+			// mapCancellation would otherwise mask that error as a timeout.
+			if transport.verified.Load() {
+				t.Fatalf("canceled producer after %s reached verification", cause)
+			}
 		})
+	}
+}
+
+// TestNodeSessionCloseCancelsAllAdmittedCalls exercises the calls map and
+// Close's cancel-loop with multiple concurrently admitted producers: canceling
+// only a subset (or under the wrong lock) would pass the single-producer cases
+// but fail here.
+func TestNodeSessionCloseCancelsAllAdmittedCalls(t *testing.T) {
+	const producers = 3
+	session, err := NewNodeSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(session.Close)
+	transport := &sessionContextTransport{started: make(chan context.Context, producers), release: make(chan struct{})}
+	var release sync.Once
+	unblock := func() { release.Do(func() { close(transport.release) }) }
+	t.Cleanup(unblock)
+	node := ir.Node{ID: "pull-image", Kind: ir.KindPull, Component: "image", OutputType: "oci-image",
+		Network: ir.NetworkDefault, Platform: "linux/amd64", Artifact: "registry.example/image",
+		Digest: sha256Of([]byte("image")), Version: "1.0.0"}
+	runDone := make(chan error, producers)
+	for i := 0; i < producers; i++ {
+		go func() {
+			_, err := session.ExecNode(node, RunOptions{Ctx: t.Context(), Launch: true,
+				SourceRoot: filepath.Join(t.TempDir(), "src"), OCI: transport})
+			runDone <- err
+		}()
+	}
+	observed := make([]context.Context, 0, producers)
+	for i := 0; i < producers; i++ {
+		select {
+		case ctx := <-transport.started:
+			observed = append(observed, ctx)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for producer %d", i)
+		}
+	}
+	go session.Close()
+	awaitSession(t, session.state.ctx.Done(), "session cancellation")
+	// Every admitted producer must be canceled once session cancellation is
+	// visible, before any blocked producer resumes.
+	for i, ctx := range observed {
+		if err := ctx.Err(); err != context.Canceled {
+			t.Fatalf("producer %d context = %v, want canceled", i, err)
+		}
+	}
+	unblock()
+	for i := 0; i < producers; i++ {
+		select {
+		case err := <-runDone:
+			if code(err) != e.CodeTimeout {
+				t.Fatalf("producer error = %v, want %s", err, e.CodeTimeout)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for canceled producer %d", i)
+		}
+	}
+	if transport.verified.Load() {
+		t.Fatal("canceled producer reached verification")
 	}
 }
 

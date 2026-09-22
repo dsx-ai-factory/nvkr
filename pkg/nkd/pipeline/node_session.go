@@ -11,7 +11,10 @@ import (
 
 // NodeSession retains prepared source snapshots while an owning scheduler runs
 // individual producers. It never schedules work or reuses producer results.
-// Close cancels and joins calls before releasing their shared snapshots.
+// Producer contexts inherit the caller's values and deadline; Close cancels
+// admitted calls synchronously before the session context, so a resumed
+// producer cannot begin new runtime work. Close then joins active producers
+// before releasing their shared snapshots.
 type NodeSession struct {
 	state *nodeSessionState
 }
