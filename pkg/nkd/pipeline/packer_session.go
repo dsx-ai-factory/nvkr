@@ -263,7 +263,13 @@ func (executor *VMImagePackerExecutor) Run(
 	session.active.Add(1)
 	session.mu.Unlock()
 	defer session.active.Done()
-	runCtx, cancel := context.WithCancel(session.ctx)
+	var runCtx context.Context
+	var cancel context.CancelFunc
+	if deadline, ok := ctx.Deadline(); ok {
+		runCtx, cancel = context.WithDeadline(session.ctx, deadline)
+	} else {
+		runCtx, cancel = context.WithCancel(session.ctx)
+	}
 	stop := context.AfterFunc(ctx, cancel)
 	defer func() { stop(); cancel() }()
 	options.Ctx = runCtx

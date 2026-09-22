@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -70,6 +71,8 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			_, _ = stdout.Write(artifactCarrier)
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-version"):
 			_, _ = io.WriteString(stdout, "Packer v1.14.2\n")
+		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-ssh-verify-"):
+			_, _ = io.WriteString(stdout, "256 SHA256:matching-fingerprint generated-key (ED25519)\n")
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-validate"):
 			_, _ = io.WriteString(stdout, "The configuration is valid.\n")
 		}
@@ -81,7 +84,10 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	artifact, err := runPackerContainer(ctx, packerContainerRunRequest{
 		runtime: fake, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
 		node: node, manifest: manifest, digest: manifestDigest, workspace: workspace,
-		bindings: packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+		bindings: packerContainerBindings{
+			packerVersion: "1.14.2", acceleratorVariable: "accelerator",
+			sshPrivateKeyVariable: "ssh_private_key", sshPublicKeyVariable: "ssh_public_key",
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +101,7 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 		t.Fatal("collected output is not the fake QCOW2")
 	}
 
-	validateIndex, buildIndex := -1, -1
+	validateIndex, buildIndex, sshContainers := -1, -1, 0
 	workCopyIndex, carrierCopyIndex, bootstrapStartIndex, stageStartIndex := -1, -1, -1, -1
 	hostUser := fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())
 	for index, call := range fake.calls {
@@ -114,6 +120,10 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 				}
 			} else if !slices.Contains(call, hostUser) || slices.Contains(call, "--cap-add=CHOWN") {
 				t.Fatalf("non-bootstrap container does not use the host identity without CHOWN: %#v", call)
+			}
+			if strings.Contains(joined, "nkd.dev/role=ssh-") {
+				sshContainers++
+				assertPackerInputReadOnly(t, call)
 			}
 			if slices.Contains(call, "validate") {
 				validateIndex = index
@@ -149,6 +159,9 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	if validateIndex < 0 || buildIndex <= validateIndex {
 		t.Fatalf("validate/build order is invalid: validate=%d build=%d", validateIndex, buildIndex)
 	}
+	if sshContainers != 3 {
+		t.Fatalf("SSH key containers = %d, want one generator and two verifiers", sshContainers)
+	}
 	if workCopyIndex < 0 || carrierCopyIndex <= workCopyIndex || bootstrapStartIndex <= carrierCopyIndex ||
 		stageStartIndex <= bootstrapStartIndex || validateIndex <= stageStartIndex {
 		t.Fatalf("authenticated staging order is invalid: work=%d carrier=%d bootstrap=%d stage=%d validate=%d",
@@ -180,6 +193,84 @@ func TestRunPackerContainerRejectsEncryptedDiskBeforeRuntimeWork(t *testing.T) {
 	}
 	if len(fake.calls) != 0 {
 		t.Fatalf("encrypted disk caused runtime side effects: %#v", fake.calls)
+	}
+}
+
+func TestRunPackerContainerRejectsUnpairedSSHVariablesBeforeRuntimeWork(t *testing.T) {
+	node := testPackerContainerNode()
+	manifest := []byte("{}\n")
+	workspace, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer workspace.Close()
+	runtime := &recordingPackerRuntime{endpoint: qualifiedRuntimeEndpoint}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	artifact, err := runPackerContainer(ctx, packerContainerRunRequest{
+		runtime: runtime, source: &materializedSource{Dir: t.TempDir(), InputDigest: "sha256:" + repeatHex("8")},
+		node: node, manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)), workspace: workspace,
+		bindings: packerContainerBindings{
+			packerVersion: "1.14.2", acceleratorVariable: "accelerator", sshPrivateKeyVariable: "ssh_private_key",
+		},
+	})
+	if artifact != nil || code(err) != e.CodeInvalidCatalog {
+		t.Fatalf("unpaired SSH artifact/error = %#v/%v, want nil/%s", artifact, err, e.CodeInvalidCatalog)
+	}
+	if len(runtime.calls) != 0 || len(runtime.cleanups) != 0 {
+		t.Fatalf("unpaired SSH variables caused runtime work: calls=%#v cleanups=%#v", runtime.calls, runtime.cleanups)
+	}
+}
+
+func TestGenerateAndVerifyPackerSSHKeyRejectsMismatch(t *testing.T) {
+	runtime := &recordingPackerRuntime{}
+	runtime.run = func(_ io.Reader, stdout, _ io.Writer, args []string) error {
+		switch {
+		case len(args) > 0 && args[0] == "create":
+			_, _ = io.WriteString(stdout, "container-id\n")
+		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-ssh-verify-0"):
+			_, _ = io.WriteString(stdout, "256 SHA256:private key (ED25519)\n")
+		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-ssh-verify-1"):
+			_, _ = io.WriteString(stdout, "256 SHA256:public key.pub (ED25519)\n")
+		}
+		return nil
+	}
+	resources := &packerContainerResources{runtime: runtime}
+	err := generateAndVerifyPackerSSHKey(t.Context(), runtime, resources, testPackerContainerNode(),
+		"input", "work", "nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc")
+	if code(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "do not match") {
+		t.Fatalf("SSH mismatch error = %v, want %s", err, e.CodeEngineCapability)
+	}
+}
+
+func TestValidatePackerContainerKVMRejectsUnadmittedDevices(t *testing.T) {
+	runtime := &recordingPackerRuntime{endpoint: qualifiedRuntimeEndpoint}
+	regularPath := filepath.Join(t.TempDir(), "regular")
+	if err := os.WriteFile(regularPath, []byte("not a device"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	regular, err := os.Open(regularPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer regular.Close()
+	if err := validatePackerContainerKVM(runtime, regular, true); code(err) != e.CodeEngineCapability {
+		t.Fatalf("regular KVM error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	nullDevice, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nullDevice.Close()
+	if err := validatePackerContainerKVM(runtime, nullDevice, true); code(err) != e.CodeEngineCapability ||
+		!strings.Contains(err.Error(), "device handoff") {
+		t.Fatalf("wrong character device error = %v, want handoff %s", err, e.CodeEngineCapability)
+	}
+	if kvm, err := os.Open("/dev/kvm"); err == nil {
+		defer kvm.Close()
+		if err := validatePackerContainerKVM(runtime, kvm, true); err != nil {
+			t.Fatalf("available /dev/kvm failed API revalidation: %v", err)
+		}
 	}
 }
 
@@ -321,6 +412,176 @@ func TestRunPackerContainerRejectsCorruptedVolumeCarrierBeforePacker(t *testing.
 	}
 }
 
+func TestRunPackerContainerFailsBeforeBuildOnVersionOrValidationDiagnostics(t *testing.T) {
+	for _, test := range []struct {
+		name             string
+		version          string
+		validationStdout string
+		validationStderr string
+		wantCode         e.Code
+	}{
+		{name: "version mismatch", version: "Packer v1.14.1\n", validationStdout: "The configuration is valid.\n", wantCode: e.CodeEngineCapability},
+		{name: "validation stderr", version: "Packer v1.14.2\n", validationStdout: "The configuration is valid.\n", validationStderr: "warning\n", wantCode: e.CodeBuildFailed},
+		{name: "validation stdout warning", version: "Packer v1.14.2\n", validationStdout: "warning\nThe configuration is valid.\n", wantCode: e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, _, buildCreated := newPackerContainerTestRun(t, test.version,
+				test.validationStdout, test.validationStderr, nil)
+			artifact, err := runPackerContainer(testContext(t), request)
+			if artifact != nil || code(err) != test.wantCode {
+				t.Fatalf("preflight artifact/error = %#v/%v, want nil/%s", artifact, err, test.wantCode)
+			}
+			if *buildCreated {
+				t.Fatal("Packer build was created after preflight rejection")
+			}
+		})
+	}
+}
+
+func TestRunPackerContainerPreservesRuntimeCleanupFailure(t *testing.T) {
+	cleanupFailure := errors.New("runtime cleanup failed")
+	for _, test := range []struct {
+		name     string
+		version  string
+		wantCode e.Code
+	}{
+		{name: "after successful build", version: "Packer v1.14.2\n", wantCode: e.CodeInternal},
+		{name: "joined with primary failure", version: "Packer v1.14.1\n", wantCode: e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, _, _ := newPackerContainerTestRun(t, test.version,
+				"The configuration is valid.\n", "", cleanupFailure)
+			artifact, err := runPackerContainer(testContext(t), request)
+			if artifact != nil || code(err) != test.wantCode || !errors.Is(err, cleanupFailure) {
+				t.Fatalf("cleanup artifact/error = %#v/%v, want nil/%s joined cleanup", artifact, err, test.wantCode)
+			}
+		})
+	}
+}
+
+func TestRunPackerContainerCancellationJoinsTransportWork(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		block func([]string) bool
+	}{
+		{name: "input copy", block: func(args []string) bool {
+			return len(args) > 1 && args[0] == "cp" && args[1] == "-"
+		}},
+		{name: "artifact copy", block: func(args []string) bool {
+			return len(args) > 2 && args[0] == "cp" && args[len(args)-1] == "-"
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n",
+				"The configuration is valid.\n", "", nil)
+			fallback := runtime.run
+			blocked := make(chan struct{})
+			runtime.runContext = func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+				if test.block(args) {
+					close(blocked)
+					<-ctx.Done()
+					return ctx.Err()
+				}
+				return fallback(stdin, stdout, stderr, args)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan error, 1)
+			go func() {
+				_, err := runPackerContainer(ctx, request)
+				done <- err
+			}()
+			select {
+			case <-blocked:
+			case <-time.After(5 * time.Second):
+				t.Fatal("Packer run did not reach the selected transport stage")
+			}
+			cancel()
+			select {
+			case err := <-done:
+				if code(err) != e.CodeTimeout {
+					t.Fatalf("canceled transport error = %v, want %s", err, e.CodeTimeout)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("canceled Packer transport did not join")
+			}
+			if len(runtime.cleanups) == 0 {
+				t.Fatal("canceled Packer transport did not reap runtime objects")
+			}
+		})
+	}
+}
+
+func newPackerContainerTestRun(
+	t *testing.T,
+	versionOutput, validationStdout, validationStderr string,
+	cleanupErr error,
+) (packerContainerRunRequest, *recordingPackerRuntime, *bool) {
+	t.Helper()
+	manifest := []byte("{}\n")
+	sourceRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(sourceRoot, "os-image", "packer"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceRoot, "os-image", "packer", "node.pkr.hcl"), []byte("packer {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	workspace, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = workspace.Close() })
+	versionDocument := []byte(`{"Client":{"Version":"1"},"Server":{"Version":"1"}}`)
+	runtimeDigest := "sha256:" + repeatHex("9")
+	runtimeIdentity, err := runtimeIdentityFromOutput(runtimeDigest, qualifiedRuntimeEndpoint, "daemon-id", versionDocument)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buildCreated := false
+	runtime := &recordingPackerRuntime{
+		endpoint: qualifiedRuntimeEndpoint, digest: runtimeDigest, identity: runtimeIdentity, cleanupErr: cleanupErr,
+	}
+	carrier := testQCOW2Carrier(t, "node.qcow2")
+	runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+		switch {
+		case reflect.DeepEqual(args, []string{"version", "--format", "{{json .}}"}):
+			_, _ = stdout.Write(versionDocument)
+		case reflect.DeepEqual(args, []string{"info", "--format", "{{json .ID}}"}):
+			_, _ = io.WriteString(stdout, `"daemon-id"`)
+		case len(args) > 2 && args[0] == "image" && args[1] == "inspect":
+			_, _ = fmt.Fprintf(stdout, `{"RepoDigests":["example.test/packer@sha256:%s"],"Os":"linux","Architecture":"amd64","Config":{"Env":["PATH=/ignored"]}}`, repeatHex("c"))
+		case len(args) > 1 && args[0] == "volume" && args[1] == "create":
+			_, _ = io.WriteString(stdout, args[len(args)-1]+"\n")
+		case len(args) > 0 && args[0] == "create":
+			if slices.Contains(args, "build") {
+				buildCreated = true
+			}
+			_, _ = io.WriteString(stdout, "container-id\n")
+		case len(args) > 1 && args[0] == "cp" && args[1] == "-":
+			_, _ = io.Copy(io.Discard, stdin)
+		case len(args) > 2 && args[0] == "cp" && args[len(args)-1] == "-":
+			_, _ = stdout.Write(carrier)
+		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-version"):
+			_, _ = io.WriteString(stdout, versionOutput)
+		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-validate"):
+			_, _ = io.WriteString(stdout, validationStdout)
+			_, _ = io.WriteString(stderr, validationStderr)
+		}
+		return nil
+	}
+	return packerContainerRunRequest{
+		runtime: runtime, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
+		node: testPackerContainerNode(), manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+		workspace: workspace, bindings: packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+	}, runtime, &buildCreated
+}
+
+func testContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func TestNodeSessionCloseReleasesPackerRuntime(t *testing.T) {
 	capability, err := heldfile.FromBytesContext(t.Context(), []byte("runtime"), heldfile.Options{
 		Label: "container-runtime", Executable: true, MaxBytes: 64,
@@ -350,6 +611,62 @@ func TestNodeSessionCloseReleasesPackerRuntime(t *testing.T) {
 	}}, "docker")
 	if code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed session admission error = %v, want %s", err, e.CodeEngineCapability)
+	}
+}
+
+func TestVMImagePackerExecutorPreservesCallbackDeadline(t *testing.T) {
+	node := testPackerContainerNode()
+	raw, err := canonical.Marshal(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := NewNodeSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(session.Close)
+	observed := make(chan time.Time, 1)
+	runFailure := errors.New("stop after observing callback deadline")
+	runtime := &recordingPackerRuntime{
+		endpoint: qualifiedRuntimeEndpoint,
+		digest:   "sha256:" + repeatHex("9"),
+		identity: "sha256:" + repeatHex("a"),
+	}
+	runtime.runContext = func(ctx context.Context, _ io.Reader, _, _ io.Writer, _ []string) error {
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			return errors.New("runtime context has no deadline")
+		}
+		observed <- deadline
+		return runFailure
+	}
+	executor := &VMImagePackerExecutor{
+		session: session.state, runtime: runtime, nodes: map[string][]byte{node.ID: raw},
+	}
+	t.Cleanup(func() { _ = executor.Close() })
+	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("{}\n"), heldfile.Options{
+		Label: "material-manifest", MaxBytes: maxPackerManifestBytes,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.Close()
+	deadline := time.Now().Add(5 * time.Second)
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
+	defer cancel()
+	_, _, err = executor.Run(ctx, node.ID, node, VMImagePackerRun{
+		SourceRoot: t.TempDir(), Manifest: manifest, Runtime: &execution.LocalVMRuntime{},
+	})
+	if code(err) != e.CodeEngineCapability || !errors.Is(err, runFailure) {
+		t.Fatalf("deadline observation error = %v, want %s wrapping runtime failure", err, e.CodeEngineCapability)
+	}
+	select {
+	case got := <-observed:
+		if !got.Equal(deadline) {
+			t.Fatalf("runtime deadline = %s, want callback deadline %s", got, deadline)
+		}
+	default:
+		t.Fatal("runtime did not observe the callback deadline")
 	}
 }
 

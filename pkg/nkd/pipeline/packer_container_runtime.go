@@ -61,11 +61,11 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		return nil, e.New(e.CodeEngineCapability,
 			"containerized Packer requires an authenticated materialized source capability")
 	}
-	if err := validatePackerContainerRequest(request); err != nil {
-		return nil, err
-	}
 	kvmEnabled, err := resolvedPackerKVM(request.node)
 	if err != nil {
+		return nil, err
+	}
+	if err := validatePackerContainerRequest(request, kvmEnabled); err != nil {
 		return nil, err
 	}
 	if err := validatePackerContainerKVM(request.runtime, request.kvm, kvmEnabled); err != nil {
@@ -173,10 +173,7 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		inputVolume, workVolume, nodeLabel, attemptLabel, attempt, request.bindings.packerVersion); err != nil {
 		return nil, err
 	}
-	if request.bindings.sshPrivateKeyVariable != "" || request.bindings.sshPublicKeyVariable != "" {
-		if request.bindings.sshPrivateKeyVariable == "" || request.bindings.sshPublicKeyVariable == "" {
-			return nil, e.New(e.CodeInvalidCatalog, "Packer SSH key mappings must be declared as a pair")
-		}
+	if request.bindings.sshPrivateKeyVariable != "" {
 		if err := generateAndVerifyPackerSSHKey(ctx, request.runtime, resources, request.node,
 			inputVolume, workVolume, nodeLabel, attemptLabel, attempt); err != nil {
 			return nil, err
@@ -367,11 +364,10 @@ func startPackerContainer(ctx context.Context, runtime packerContainerRuntime, n
 	if stdout == nil {
 		stdout = io.Discard
 	}
-	if stderr == nil {
-		stderr = io.Discard
-	}
-	if err := runtime.Run(ctx, nil, stdout, stderr, "start", "--attach", name); err != nil {
-		return runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "running Packer container %q", name)
+	diagnostic := newPackerValidationOutput(stderr)
+	if err := runtime.Run(ctx, nil, stdout, diagnostic, "start", "--attach", name); err != nil {
+		return runtimeCommandError(ctx, err, diagnostic.buffer.String(), e.CodeBuildFailed,
+			"running Packer container %q", name)
 	}
 	return nil
 }
@@ -541,10 +537,20 @@ func joinPackerContainerError(primary, cleanup error) error {
 
 func finalizePackerContainerRun(artifact **PackerArtifact, primary, cleanup error) error {
 	if cleanup == nil {
+		if primary != nil && artifact != nil && *artifact != nil {
+			closeErr := (*artifact).Close()
+			*artifact = nil
+			if closeErr != nil {
+				return joinPackerContainerError(primary, closeErr)
+			}
+		}
 		return primary
 	}
 	var artifactClose error
 	if artifact != nil && *artifact != nil {
+		// Resource reaping is part of the run contract. Do not return produced
+		// bytes from a run that left its containers, volumes or private state in
+		// an unknown state, even when the artifact itself was already verified.
 		artifactClose = (*artifact).Close()
 		*artifact = nil
 	}

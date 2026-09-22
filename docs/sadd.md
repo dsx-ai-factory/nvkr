@@ -796,6 +796,12 @@ named volumes, mounts consumer inputs read-only, fixes environment/hostname/user
 with only `CAP_CHOWN` bootstraps the two fresh attempt volumes to the host UID/GID; every consumer operation runs as
 that host identity. Command/Make, encrypted-disk, hosted and qualified VM adapters remain closed.
 
+The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
+Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,
+network-none mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
+hosted or qualified identity boundary. Those lanes require an authenticated subordinate identity, user namespace
+or stronger provider sandbox plus recorded interoperability evidence.
+
 The local capability and driver result are unqualified current-availability evidence, not authenticated provider
 allocation, reservation, pipeline attestation or qualification evidence. Holding a validated KVM descriptor proves
 availability through the callback lifetime; it does not prove that Packer or QEMU consumed that exact descriptor.

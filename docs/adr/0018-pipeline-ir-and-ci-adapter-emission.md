@@ -270,6 +270,13 @@ deterministic bounded tar preserving directories, modes and symlink targets. Doc
 outer carrier. The pinned toolchain verifies the held inner-tar digest before extracting that same opened inode;
 Packer then sees the input volume read-only. The work volume remains private to the attempt.
 
+The local unqualified adapter does not configure a subordinate container UID or Docker user-namespace remap.
+An escape from its Packer/QEMU consumer would therefore act as the invoking host user against resources already
+available to that user, despite the container's network, filesystem, capability and privilege restrictions. This
+is an explicit limitation of the unqualified local lane, not an accepted hosted or qualified isolation boundary.
+A hosted or qualified adapter must authenticate and enforce a subordinate identity, user namespace or stronger
+provider sandbox and record real interoperability evidence before it may admit this producer.
+
 Fresh Docker volumes and `docker cp` content are root-owned. One fixed ownership-bootstrap container therefore runs
 as root with only `CAP_CHOWN`, mounts only the attempt's input and work volumes, changes their ownership to the
 observed host UID/GID, and is removed before consumer execution. It performs no input

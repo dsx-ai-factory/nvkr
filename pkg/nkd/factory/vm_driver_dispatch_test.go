@@ -16,6 +16,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
@@ -420,6 +421,97 @@ func TestLocalDefaultsConnectDirectPackerResolver(t *testing.T) {
 	options := withLocalDefaults(LocalRunOptions{})
 	if _, ok := options.vmResolver.(localVMPackerResolver); !ok {
 		t.Fatalf("default VM resolver = %T, want localVMPackerResolver", options.vmResolver)
+	}
+}
+
+func TestLocalVMPackerResolverRejectsUnsupportedPlans(t *testing.T) {
+	directPlan, _ := compiledPackerVMNode(t)
+	commandPlan, _ := compiledCommandVMNodeWithEncryption(t, "none")
+	encryptedPlan, _ := compiledPackerVMNodeWithEncryption(t, "luks2")
+	ordinaryPlan := buildOnlyPlan(t, "ordinary")
+	session, err := pipeline.NewNodeSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(session.Close)
+	for _, test := range []struct {
+		name    string
+		ctx     context.Context
+		plan    *Plan
+		session *pipeline.NodeSession
+		code    e.Code
+	}{
+		{name: "nil context", plan: directPlan, session: session, code: e.CodeUsage},
+		{name: "nil plan", ctx: t.Context(), session: session, code: e.CodeEngineCapability},
+		{name: "nil session", ctx: t.Context(), plan: directPlan, code: e.CodeEngineCapability},
+		{name: "command producer", ctx: t.Context(), plan: commandPlan, session: session, code: e.CodeEngineCapability},
+		{name: "encrypted producer", ctx: t.Context(), plan: encryptedPlan, session: session, code: e.CodeEngineCapability},
+		{name: "no VM producer", ctx: t.Context(), plan: ordinaryPlan, session: session, code: e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			executor, err := (localVMPackerResolver{}).Admit(test.ctx, test.plan, test.session, vmDriverRunConfig{Runtime: "docker"})
+			if executor != nil || factoryErrorCode(err) != test.code {
+				t.Fatalf("resolver executor/error = %#v/%v, want nil/%s", executor, err, test.code)
+			}
+		})
+	}
+}
+
+func TestLocalVMPackerExecutorRejectsUnadmittedRoutes(t *testing.T) {
+	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("{}\n"), heldfile.Options{Label: "manifest", MaxBytes: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.Close()
+	materials := &vmPackerMaterials{manifest: manifest}
+	runtime := &VMRuntime{inner: &execution.LocalVMRuntime{}}
+	for _, test := range []struct {
+		name     string
+		executor *localVMPackerExecutor
+		subject  string
+		code     e.Code
+	}{
+		{name: "nil executor", code: e.CodeEngineCapability},
+		{name: "subject not admitted", executor: &localVMPackerExecutor{inner: &pipeline.VMImagePackerExecutor{}, subjects: map[string]struct{}{}}, subject: "plan/node", code: e.CodePipelineDrift},
+		{name: "source route missing", executor: &localVMPackerExecutor{inner: &pipeline.VMImagePackerExecutor{}, subjects: map[string]struct{}{"plan/node": {}}, sourceRoots: map[string]string{}}, subject: "plan/node", code: e.CodePipelineDrift},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			artifact, result, err := test.executor.RunPacker(t.Context(), runtime, test.subject, ir.Node{}, materials)
+			if artifact != nil || result != nil || factoryErrorCode(err) != test.code {
+				t.Fatalf("executor artifact/result/error = %#v/%#v/%v, want nil/nil/%s", artifact, result, err, test.code)
+			}
+		})
+	}
+}
+
+func TestPlannedPackerSourceRootUsesExplicitSourceArtifact(t *testing.T) {
+	plan, node := compiledPackerVMNode(t)
+	build, instruction, err := plan.producerInstruction(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, artifacts := planIndex(plan)
+	resultID := "result/" + node.BuildTarget + "/" + instruction.Component
+	result := artifacts[resultID]
+	result.Path = ".nkd/unrelated/layout/result.json"
+	artifacts[resultID] = result
+	root, err := plannedPackerSourceRoot(build, node, instruction, artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.ToSlash(filepath.Join(".nkd", "factory", node.BuildTarget, "src"))
+	if filepath.ToSlash(root) != want {
+		t.Fatalf("source root = %q, want explicit Plan route %q", root, want)
+	}
+	for id, artifact := range artifacts {
+		if !strings.HasPrefix(id, "source/"+node.BuildTarget+"/") {
+			continue
+		}
+		artifact.Path = ".nkd/substituted-source"
+		artifacts[id] = artifact
+	}
+	if _, err := plannedPackerSourceRoot(build, node, instruction, artifacts); factoryErrorCode(err) != e.CodePipelineDrift {
+		t.Fatalf("substituted source route error = %v, want %s", err, e.CodePipelineDrift)
 	}
 }
 

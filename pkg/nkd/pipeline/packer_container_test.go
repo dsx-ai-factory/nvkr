@@ -177,6 +177,24 @@ func TestFinalizePackerContainerRunPreservesEveryFailure(t *testing.T) {
 	}
 }
 
+func TestFinalizePackerContainerRunClosesArtifactOnPrimaryFailure(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "rejected-artifact-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := &PackerArtifact{file: file}
+	primary := e.New(e.CodeBuildFailed, "build failed after collection")
+	if err := finalizePackerContainerRun(&artifact, primary, nil); !errors.Is(err, primary) {
+		t.Fatalf("final error = %v, want primary failure", err)
+	}
+	if artifact != nil {
+		t.Fatal("artifact remained available after the run failed")
+	}
+	if _, err := file.Stat(); !errors.Is(err, fs.ErrClosed) {
+		t.Fatalf("rejected artifact file remained open: %v", err)
+	}
+}
+
 func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 	kvm, err := os.Open(os.DevNull)
 	if err != nil {
@@ -219,6 +237,10 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 	if len(withKVM) != len(want)+3 || !slices.Contains(withKVM, "--group-add=123") ||
 		!slices.Contains(withKVM, "--device") {
 		t.Fatalf("KVM container args do not add the admitted group and device: %#v", withKVM)
+	}
+	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
+	if !slices.Contains(withKVM, wantDevice) {
+		t.Fatalf("KVM container args do not use the minimal rw device grant: %#v", withKVM)
 	}
 }
 
@@ -273,6 +295,23 @@ func TestPackerKVMGroupUsesHeldDeviceGID(t *testing.T) {
 	}
 }
 
+func TestStartPackerContainerReturnsBoundedRuntimeDiagnostic(t *testing.T) {
+	runFailure := errors.New("start failed")
+	var forwarded bytes.Buffer
+	runtime := &recordingPackerRuntime{run: func(_ io.Reader, _ io.Writer, stderr io.Writer, _ []string) error {
+		_, _ = io.WriteString(stderr, "OCI runtime rejected device setup")
+		return runFailure
+	}}
+	err := startPackerContainer(t.Context(), runtime, "build", io.Discard, &forwarded)
+	if code(err) != e.CodeBuildFailed || !errors.Is(err, runFailure) ||
+		!strings.Contains(err.Error(), "OCI runtime rejected device setup") {
+		t.Fatalf("start error = %v, want coded runtime diagnostic", err)
+	}
+	if forwarded.String() != "OCI runtime rejected device setup" {
+		t.Fatalf("forwarded stderr = %q", forwarded.String())
+	}
+}
+
 type recordingPackerRuntime struct {
 	endpoint   string
 	digest     string
@@ -280,6 +319,7 @@ type recordingPackerRuntime struct {
 	calls      [][]string
 	cleanups   [][]string
 	run        func(io.Reader, io.Writer, io.Writer, []string) error
+	runContext func(context.Context, io.Reader, io.Writer, io.Writer, []string) error
 	cleanupErr error
 }
 
@@ -289,8 +329,11 @@ func (runtime *recordingPackerRuntime) AdmittedIdentity() (string, string) {
 	return runtime.digest, runtime.identity
 }
 
-func (runtime *recordingPackerRuntime) Run(_ context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
+func (runtime *recordingPackerRuntime) Run(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
 	runtime.calls = append(runtime.calls, append([]string(nil), args...))
+	if runtime.runContext != nil {
+		return runtime.runContext(ctx, stdin, stdout, stderr, args)
+	}
 	if runtime.run != nil {
 		return runtime.run(stdin, stdout, stderr, args)
 	}
@@ -315,7 +358,7 @@ func TestCreatePackerVolumeUsesPositionalNameAndLabels(t *testing.T) {
 	if !reflect.DeepEqual(runtime.calls, [][]string{want}) {
 		t.Fatalf("volume create calls = %#v, want %#v", runtime.calls, [][]string{want})
 	}
-	if slices.Contains(want, "--name") {
+	if slices.Contains(runtime.calls[0], "--name") {
 		t.Fatal("Docker volume create does not support --name")
 	}
 }
@@ -362,6 +405,33 @@ func TestObserveLocalPackerImageRejectsInheritedMutableConfig(t *testing.T) {
 			}}
 			if err := observeLocalPackerImage(t.Context(), runtime, node); code(err) != e.CodePreflightFailed {
 				t.Fatalf("image config error = %v, want %s", err, e.CodePreflightFailed)
+			}
+		})
+	}
+}
+
+func TestObserveLocalPackerImageRejectsIdentityMismatch(t *testing.T) {
+	digest := "sha256:" + repeatHex("a")
+	node := ir.Node{ID: "build-node", Toolchain: "registry.example/packer@" + digest, ToolchainPlatform: "linux/amd64"}
+	for _, test := range []struct {
+		name       string
+		repoDigest string
+		os         string
+		arch       string
+	}{
+		{name: "manifest digest", repoDigest: "sha256:" + repeatHex("b"), os: "linux", arch: "amd64"},
+		{name: "operating system", repoDigest: digest, os: "windows", arch: "amd64"},
+		{name: "architecture", repoDigest: digest, os: "linux", arch: "arm64"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &recordingPackerRuntime{run: func(_ io.Reader, stdout, _ io.Writer, _ []string) error {
+				_, _ = fmt.Fprintf(stdout,
+					`{"RepoDigests":["registry.example/packer@%s"],"Os":%q,"Architecture":%q,"Config":{"Env":["PATH=/ignored"]}}`,
+					test.repoDigest, test.os, test.arch)
+				return nil
+			}}
+			if err := observeLocalPackerImage(t.Context(), runtime, node); code(err) != e.CodePreflightFailed {
+				t.Fatalf("image identity error = %v, want %s", err, e.CodePreflightFailed)
 			}
 		})
 	}
@@ -425,6 +495,53 @@ func TestCollectPackerContainerArtifactHoldsOneQCOW2(t *testing.T) {
 	if !bytes.Equal(got.Bytes(), payload) {
 		t.Fatalf("artifact = %x, want %x", got.Bytes(), payload)
 	}
+}
+
+func TestCollectPackerContainerArtifactRejectsInvalidOutput(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		payload    []byte
+		overflow   bool
+		storageMiB uint64
+	}{
+		{name: "truncated", payload: []byte{'Q', 'F', 'I'}},
+		{name: "wrong magic", payload: []byte("not-a-qcow2")},
+		{name: "transport exceeds bound", overflow: true, storageMiB: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var carrier []byte
+			if test.overflow {
+				carrier = bytes.Repeat([]byte("x"), (2<<20)+1)
+			} else {
+				carrier = testPackerArtifactCarrier(t, "node.qcow2", test.payload)
+			}
+			runtime := &recordingPackerRuntime{run: func(_ io.Reader, stdout, _ io.Writer, _ []string) error {
+				_, err := stdout.Write(carrier)
+				return err
+			}}
+			artifact, err := collectPackerContainerArtifact(t.Context(), runtime, "build",
+				"/nkd/work/output/node.qcow2", t.TempDir(), test.storageMiB)
+			if artifact != nil || code(err) != e.CodeVerifyFailed {
+				t.Fatalf("invalid QCOW2 artifact/error = %#v/%v, want nil/%s", artifact, err, e.CodeVerifyFailed)
+			}
+		})
+	}
+}
+
+func testPackerArtifactCarrier(t *testing.T, name string, payload []byte) []byte {
+	t.Helper()
+	var carrier bytes.Buffer
+	writer := tar.NewWriter(&carrier)
+	if err := writer.WriteHeader(&tar.Header{Name: name, Mode: 0o600, Size: int64(len(payload)), Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return carrier.Bytes()
 }
 
 func TestPackerContainerVariableArgsAreCanonical(t *testing.T) {

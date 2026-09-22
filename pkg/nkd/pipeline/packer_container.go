@@ -157,7 +157,7 @@ func packerContainerCreateArgs(request packerContainerCreateRequest) []string {
 		"--entrypoint="+entrypoint,
 	)
 	if request.kvm != nil {
-		args = append(args, "--device", fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rwm", os.Getpid(), request.kvm.Fd()))
+		args = append(args, "--device", fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), request.kvm.Fd()))
 	}
 	args = append(args, request.image)
 	return append(args, request.packerArgs...)

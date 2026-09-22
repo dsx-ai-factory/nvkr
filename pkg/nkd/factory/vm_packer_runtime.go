@@ -3,7 +3,7 @@ package factory
 import (
 	"context"
 	"io"
-	"path/filepath"
+	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -47,7 +47,7 @@ func (localVMPackerResolver) Admit(
 		if selected.Kind != NodeBuild || selected.IRNode == "" {
 			continue
 		}
-		_, instruction, err := plan.producerInstruction(selected)
+		build, instruction, err := plan.producerInstruction(selected)
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +76,11 @@ func (localVMPackerResolver) Admit(
 				"VM-image producer subject %q is selected more than once", request.Subject)
 		}
 		subjects[request.Subject] = struct{}{}
-		sourceRoots[request.Subject] = filepath.Join(filepath.Dir(filepath.Dir(result.Path)), "src")
+		sourceRoot, err := plannedPackerSourceRoot(build, selected, instruction, artifacts)
+		if err != nil {
+			return nil, err
+		}
+		sourceRoots[request.Subject] = sourceRoot
 		selections = append(selections, pipeline.VMImagePackerSelection{Subject: request.Subject, Node: instruction})
 	}
 	if len(selections) == 0 {
@@ -91,6 +95,46 @@ func (localVMPackerResolver) Admit(
 		inner: admitted, subjects: subjects, sourceRoots: sourceRoots,
 		stdout: config.Stdout, stderr: config.Stderr,
 	}, nil
+}
+
+// plannedPackerSourceRoot resolves the source route already authored into the
+// validated Plan. It does not reconstruct that route from the result-directory
+// layout, so changing an unrelated result path cannot redirect source access.
+func plannedPackerSourceRoot(build BuildPlan, selected Node, instruction ir.Node, artifacts map[string]Artifact) (string, error) {
+	if build.Graph == nil {
+		return "", e.New(e.CodePipelineDrift, "VM-image producer %q has no build graph", selected.ID)
+	}
+	byID := make(map[string]ir.Node, len(build.Graph.Nodes))
+	for _, node := range build.Graph.Nodes {
+		byID[node.ID] = node
+	}
+	var sourceID string
+	for _, dependency := range instruction.Needs {
+		if byID[dependency].Kind != ir.KindFetch {
+			continue
+		}
+		if sourceID != "" {
+			return "", e.New(e.CodePipelineDrift,
+				"VM-image producer %q has more than one planned source route", selected.ID)
+		}
+		sourceID = "source/" + selected.BuildTarget + "/" + dependency
+	}
+	if sourceID == "" {
+		return "", e.New(e.CodePipelineDrift,
+			"VM-image producer %q has no planned source route", selected.ID)
+	}
+	source, ok := artifacts[sourceID]
+	suffix := "/" + instruction.SourceDest
+	if !ok || source.Path == "" || !strings.HasSuffix(source.Path, suffix) {
+		return "", e.New(e.CodePipelineDrift,
+			"VM-image producer %q source route does not bind destination %q", selected.ID, instruction.SourceDest)
+	}
+	root := strings.TrimSuffix(source.Path, suffix)
+	if root == "" {
+		return "", e.New(e.CodePipelineDrift,
+			"VM-image producer %q has an empty planned source root", selected.ID)
+	}
+	return root, nil
 }
 
 func (executor *localVMPackerExecutor) RunPacker(

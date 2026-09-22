@@ -10,18 +10,16 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
 	"golang.org/x/sys/unix"
 )
 
-func validatePackerContainerRequest(request packerContainerRunRequest) error {
+func validatePackerContainerRequest(request packerContainerRunRequest, kvmEnabled bool) error {
 	if request.workspace == nil {
 		return e.New(e.CodeEngineCapability, "containerized Packer requires the admitted workspace capability")
 	}
@@ -41,40 +39,28 @@ func validatePackerContainerRequest(request packerContainerRunRequest) error {
 	if err := validatePackerContainerManifest(request.manifest, request.digest); err != nil {
 		return err
 	}
-	buildRequest := PackerBuildRequest{
-		ProjectPath: request.node.Packer.ProjectPath, BuildName: request.node.Packer.BuildName,
-		ArchitectureVariable: request.node.Packer.ArchitectureVariable, Architecture: packerArchitecture(request.node.Platform),
-		MaterialManifestVariable: request.node.Packer.MaterialManifestVariable,
-		MaterialManifestPath:     "/manifest-placeholder", MaterialManifestSHA256: request.digest,
-		Materials: request.materials, OutputDirectoryVariable: request.node.Packer.OutputDirectoryVariable,
-		OutputParent: "/output-placeholder", ArtifactPath: request.node.ArtifactPath, Timeout: time.Second,
+	accelerator := "tcg"
+	if kvmEnabled {
+		accelerator = "kvm"
+	}
+	contract := packerBuildContract{
+		projectPath: request.node.Packer.ProjectPath, buildName: request.node.Packer.BuildName,
+		architectureVariable: request.node.Packer.ArchitectureVariable,
+		architecture:         packerArchitecture(request.node.Platform),
+		acceleratorVariable:  request.bindings.acceleratorVariable, accelerator: accelerator,
+		materialManifestVariable: request.node.Packer.MaterialManifestVariable,
+		materialManifestPath:     packerContainerManifestPath, materialManifestSHA256: request.digest,
+		materials: request.materials, outputDirectoryVariable: request.node.Packer.OutputDirectoryVariable,
+		buildLogDirectoryVariable: request.bindings.buildLogDirectoryVariable,
+		httpDirectoryVariable:     request.bindings.httpDirectoryVariable,
+		sshPrivateKeyVariable:     request.bindings.sshPrivateKeyVariable,
+		sshPublicKeyVariable:      request.bindings.sshPublicKeyVariable,
+		artifactPath:              request.node.ArtifactPath,
 	}
 	for _, variable := range request.node.Packer.Variables {
-		buildRequest.Variables = append(buildRequest.Variables, PackerVariable{Name: variable.Name, Value: variable.Value})
+		contract.variables = append(contract.variables, PackerVariable{Name: variable.Name, Value: variable.Value})
 	}
-	if err := validatePackerBuildRequest(buildRequest); err != nil {
-		return err
-	}
-	reserved := []string{
-		request.node.Packer.ArchitectureVariable,
-		request.node.Packer.MaterialManifestVariable,
-		request.node.Packer.OutputDirectoryVariable,
-	}
-	for _, name := range []string{
-		request.bindings.acceleratorVariable,
-		request.bindings.buildLogDirectoryVariable,
-		request.bindings.httpDirectoryVariable,
-		request.bindings.sshPrivateKeyVariable,
-		request.bindings.sshPublicKeyVariable,
-	} {
-		if name != "" {
-			reserved = append(reserved, name)
-		}
-	}
-	if err := packertransport.ValidateVariables(reserved, buildRequest.Variables); err != nil {
-		return e.Wrap(e.CodeInvalidCatalog, err, "validating containerized Packer runtime variables")
-	}
-	return nil
+	return validatePackerBuildContract(contract, true)
 }
 
 type packerContainerWorkspace struct {
