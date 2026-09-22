@@ -35,7 +35,13 @@ func TestAdmitVMImagePackerRequiresExactEnvironmentNetworkAdmission(t *testing.T
 		UtilityPlatform:  "linux/amd64",
 		Runtime:          definition.Runtime{BuildNetworkPolicy: definition.BuildNetworkProducerDeclared},
 	}
-	receipt, err := AuthorizeVMImagePackerNetwork(environment, []VMImagePackerSelection{selection})
+	environmentDigest, err := environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := AuthorizeVMImagePackerNetwork(
+		environment, environmentDigest, []VMImagePackerSelection{selection},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,9 +68,38 @@ func TestAuthorizeVMImagePackerNetworkRejectsOfflineEnvironment(t *testing.T) {
 		UtilityContainer: "example.test/utility@sha256:" + repeatHex("a"),
 		UtilityPlatform:  "linux/amd64",
 	}
-	if receipt, err := AuthorizeVMImagePackerNetwork(environment, []VMImagePackerSelection{{
+	environmentDigest, err := environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt, err := AuthorizeVMImagePackerNetwork(environment, environmentDigest, []VMImagePackerSelection{{
 		Subject: "plan/node", Node: node,
 	}}); receipt != nil || code(err) != e.CodeEngineCapability {
 		t.Fatalf("offline Environment network receipt/error = %#v/%v, want nil/%s", receipt, err, e.CodeEngineCapability)
+	}
+}
+
+func TestAuthorizeVMImagePackerNetworkRejectsPlanEnvironmentMismatch(t *testing.T) {
+	node := testPackerContainerNode()
+	node.Network = ir.NetworkDefault
+	environment := definition.Environment{
+		APIVersion:       definition.EnvironmentAPIVersion,
+		Kind:             definition.EnvironmentKind,
+		Metadata:         definition.Metadata{Name: "fixture"},
+		UtilityContainer: "example.test/utility@sha256:" + repeatHex("a"),
+		UtilityPlatform:  "linux/amd64",
+		Runtime:          definition.Runtime{BuildNetworkPolicy: definition.BuildNetworkProducerDeclared},
+	}
+	differentEnvironment := environment
+	differentEnvironment.Metadata.Name = "different"
+	differentDigest, err := differentEnvironment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := AuthorizeVMImagePackerNetwork(environment, differentDigest, []VMImagePackerSelection{{
+		Subject: "plan/node", Node: node,
+	}})
+	if receipt != nil || code(err) != e.CodeUnverifiedRef || !strings.Contains(err.Error(), "differs") {
+		t.Fatalf("mismatched Plan Environment receipt/error = %#v/%v, want nil/%s mismatch", receipt, err, e.CodeUnverifiedRef)
 	}
 }

@@ -23,11 +23,20 @@ type VMImagePackerNetworkAdmission struct {
 // networked selection. Offline selections need no network receipt.
 func AuthorizeVMImagePackerNetwork(
 	environment definition.Environment,
+	expectedEnvironmentDigest string,
 	selections []VMImagePackerSelection,
 ) (*VMImagePackerNetworkAdmission, error) {
 	environmentDigest, err := environment.Digest()
 	if err != nil {
 		return nil, err
+	}
+	if !canonical.IsDigest(expectedEnvironmentDigest) {
+		return nil, e.New(e.CodeUnverifiedRef,
+			"Packer network admission requires an exact Plan Environment identity")
+	}
+	if environmentDigest != expectedEnvironmentDigest {
+		return nil, e.New(e.CodeUnverifiedRef,
+			"Packer network admission Environment differs from the Plan Environment identity")
 	}
 	policy := environment.Runtime.BuildNetworkPolicy
 	if policy == "" {

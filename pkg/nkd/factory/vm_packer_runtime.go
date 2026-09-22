@@ -87,7 +87,9 @@ func (localVMPackerResolver) Admit(
 		return nil, e.New(e.CodeEngineCapability,
 			"local Packer resolver found no direct-Packer VM-image producer")
 	}
-	networkAdmission, err := pipeline.AuthorizeVMImagePackerNetwork(plan.Environment, selections)
+	networkAdmission, err := pipeline.AuthorizeVMImagePackerNetwork(
+		plan.Environment, plan.EnvironmentDigest, selections,
+	)
 	if err != nil {
 		return nil, err
 	}

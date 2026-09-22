@@ -120,6 +120,7 @@ tag="${tag:-localhost/nkd-packer-toolchain:dev-${arch}}"
 
 "${runtime}" build \
   --platform "linux/${arch}" \
+  --build-arg "TARGETARCH=${arch}" \
   --build-arg "BASE_IMAGE=${base_image}" \
   --build-arg "DOWNLOAD_IMAGE=${download_image}" \
   --build-arg "UBUNTU_SNAPSHOT=${snapshot}" \
