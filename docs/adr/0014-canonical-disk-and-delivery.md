@@ -56,13 +56,15 @@ full-disk evidence adapters exist. The process-local observer accepts only a pro
 capability, never a caller pathname or digest. It revalidates the complete Plan, resolves the unique disk root
 and successful producer outcome, checks the producer's unqualified result against the compiled instruction,
 then independently streams the held bytes to recompute exact SHA-256 and size and checks a bounded QCOW2 v2/v3
-header: signature, version, cluster-bit range, positive virtual size, absence of QCOW-layer encryption, and the
-v3 header length. The `qcow2` format remains the compiler/producer declaration; this framing check is not a full
-decoder or compatibility verdict. The result binds the logical Build and Plan identities, producer, component,
-format, `none` or `luks2` declaration, and successful outcome. The execution result owns and closes the held
-capability; observation and close are serialized. This record is exact delivery-byte observation only. It does
-not decode RAW, inspect encrypted content, establish compatibility or qualification, construct an SBOM, or
-authorize publication.
+header: signature, version, absence of backing-file references, cluster-bit range, positive virtual size,
+absence of QCOW-layer encryption, and the v3 header length. The `qcow2` format remains the compiler/producer
+declaration; this framing check is not a full decoder or compatibility verdict. The result binds the logical
+Build and Plan identities, producer, component, format, producer-declared `none` or `luks2` content encryption,
+and successful outcome. That `Encryption` field does not assert QCOW container encryption; a nonzero QCOW
+encryption method is rejected. The execution result owns and closes the held capability; observation and close
+are serialized. A held payload's streaming operation must stop and return on context cancellation before its
+lifetime permit can be released. This record is exact delivery-byte observation only. It does not decode RAW,
+inspect encrypted content, establish compatibility or qualification, construct an SBOM, or authorize publication.
 
 The observer and private scheduler population seam have controlled contract coverage, including held-file
 no-follow regular-file capture, pathname replacement, byte substitution, cancellation, duplicate-result and

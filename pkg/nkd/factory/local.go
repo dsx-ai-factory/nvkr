@@ -76,6 +76,10 @@ type localRunDeps struct {
 	executeDisk   diskProducerCallback
 }
 
+type localProducerSessionCloser interface {
+	Close()
+}
+
 // RunLocal executes the Plan's artifact graph in dependency order. Every producer
 // uses the same exact-node execution operation as hosted Runs; utility work runs
 // in its pinned container. Source receipts remain reusable across local attempts.
@@ -156,17 +160,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		Workspace: filepath.ToSlash(options.Workspace)}
 	completed := false
 	defer func() {
-		if !completed {
-			if closeErr := result.Close(); closeErr != nil {
-				code := e.CodeInternal
-				var coded *e.Error
-				if errors.As(returnErr, &coded) {
-					code = coded.Code
-				}
-				returnErr = e.Wrap(code, errors.Join(returnErr, closeErr),
-					"local Run failed and closing disk results also failed")
-			}
-		}
+		returnErr = finishLocalRun(result, options.producers, completed, returnErr)
 	}()
 	if options.DryRun {
 		for _, node := range ordered {
@@ -187,7 +181,6 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err != nil {
 		return nil, err
 	}
-	defer options.producers.Close()
 	if err := ensureLocalWorkspace(ctx, options.Workspace, planDigest); err != nil {
 		return nil, err
 	}
@@ -273,6 +266,27 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	}
 	completed = true
 	return result, nil
+}
+
+// finishLocalRun releases held disk payloads before their producer session on
+// failure. A successful result retains its payload capabilities for lifecycle
+// observation; only the producer session is closed before returning it.
+func finishLocalRun(result *LocalRunResult, producers localProducerSessionCloser, completed bool, returnErr error) error {
+	if !completed {
+		if closeErr := result.Close(); closeErr != nil {
+			code := e.CodeInternal
+			var coded *e.Error
+			if errors.As(returnErr, &coded) {
+				code = coded.Code
+			}
+			returnErr = e.Wrap(code, errors.Join(returnErr, closeErr),
+				"local Run failed and closing disk results also failed")
+		}
+	}
+	if producers != nil {
+		producers.Close()
+	}
+	return returnErr
 }
 
 // The same lock covers stdout and stderr because callers may share one writer.

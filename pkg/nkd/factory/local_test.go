@@ -3,6 +3,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,49 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
+
+type recordingLocalSessionCloser struct {
+	order *[]string
+}
+
+func (closer recordingLocalSessionCloser) Close() {
+	*closer.order = append(*closer.order, "session")
+}
+
+func TestFinishLocalRunOrdersFailureCleanupAndRetainsSuccessfulPayload(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		completed bool
+		wantOrder []string
+		closed    bool
+	}{
+		{name: "failure closes payload before session", wantOrder: []string{"payload", "session"}, closed: true},
+		{name: "success retains payload", completed: true, wantOrder: []string{"session"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			order := []string{}
+			payload := &fakeDiskProducerResult{onClose: func() { order = append(order, "payload") }}
+			result := &LocalRunResult{}
+			if err := result.recordDiskCompletion(diskProducerCompletion{
+				NodeID: "build-image", Payload: fakeDiskPayload(payload),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			cause := e.New(e.CodeBuildFailed, "build sentinel")
+			if err := finishLocalRun(result, recordingLocalSessionCloser{order: &order}, test.completed, cause); !errors.Is(err, cause) {
+				t.Fatalf("finish error = %v, want original cause", err)
+			}
+			if strings.Join(order, ",") != strings.Join(test.wantOrder, ",") || payload.closed != test.closed {
+				t.Fatalf("cleanup order=%v closed=%v, want order=%v closed=%v", order, payload.closed, test.wantOrder, test.closed)
+			}
+			if test.completed {
+				if err := result.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
 
 func TestRunLocalDryRunIsCompleteAndPerformsNoIO(t *testing.T) {
 	t.Chdir(t.TempDir())

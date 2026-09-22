@@ -109,6 +109,43 @@ func TestObserveDiskOutputRejectsPathDescriptionWithoutHeldExecutionResult(t *te
 	assertCode(t, err, nkderr.CodeEngineCapability)
 }
 
+func TestObserveDiskOutputRecordsHeldFactoryObservation(t *testing.T) {
+	run := testRun()
+	run.Expected[0] = requiredOutput{Name: "node-image", Kind: OutputDiskImage,
+		ArtifactID: "artifact/node-image/image", MemberArtifactID: "artifact/node-image/image",
+		BuildDigest: run.Expected[0].BuildDigest, Components: []string{"image"},
+		ComponentResults: []string{"result/node-image/image"}}
+	plan := &factory.Plan{}
+	observation := factory.DiskPayloadObservation{
+		Digest: "sha256:" + strings.Repeat("4", 64), Size: 4096,
+		BuildDigest: run.Expected[0].BuildDigest, Components: []string{"image"},
+		Producer: "build-image", Component: "image", Format: "qcow2", Encryption: "none",
+		Outcome: "succeeded", PlanDigest: run.PlanDigest,
+	}
+	observed, err := observeHeldDiskOutput(t.Context(), run.Expected[0], plan,
+		func(ctx context.Context, gotPlan *factory.Plan, expected factory.LifecycleOutputPlan) (factory.DiskPayloadObservation, error) {
+			if ctx != t.Context() || gotPlan != plan || expected.Name != run.Expected[0].Name ||
+				expected.ArtifactID != run.Expected[0].MemberArtifactID ||
+				expected.BuildDigest != run.Expected[0].BuildDigest ||
+				!equalStrings(expected.Components, run.Expected[0].Components) {
+				t.Fatalf("held observation request: plan=%p expected=%+v", gotPlan, expected)
+			}
+			return observation, nil
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound, err := bindObserved(run, []Artifact{observed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bound.Status != RunComplete || len(bound.Observed) != 1 || bound.Observed[0].Disk == nil ||
+		bound.Observed[0].Digest != observation.Digest || bound.Observed[0].Disk.PlanDigest != run.PlanDigest ||
+		bound.Observed[0].Disk.Size != observation.Size {
+		t.Fatalf("recorded held disk observation = %+v", bound)
+	}
+}
+
 func TestObserveAPTRejectsSubstitutedProducerBytes(t *testing.T) {
 	ctx := context.Background()
 	definition, environment := testDefinition(t), testEnvironment()

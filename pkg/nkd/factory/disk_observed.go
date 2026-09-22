@@ -28,6 +28,8 @@ const (
 // diskPayloadContent is held only behind factory's opaque diskPayload. It lets
 // controlled tests exercise lifecycle failures without weakening the production
 // callback, which accepts pipeline's concrete package-issued PackerArtifact.
+// WriteToContext implementations must stop streaming and return when ctx is
+// canceled; observation holds the result lifetime permit until that return.
 type diskPayloadContent interface {
 	WriteToContext(context.Context, io.Writer) (int64, error)
 	Close() error
@@ -84,8 +86,10 @@ type diskExecutionState struct {
 }
 
 // DiskPayloadObservation binds one exact delivered QCOW2 to its logical Build
-// and Plan identities. It deliberately contains no RAW reproduction, inspection,
-// SBOM, compatibility, or publication verdict.
+// and Plan identities. Encryption records the producer's none/luks2 declaration,
+// not QCOW container encryption, which the bounded framing check rejects. It
+// deliberately contains no RAW reproduction, inspection, SBOM, compatibility,
+// or publication verdict.
 type DiskPayloadObservation struct {
 	Digest      string
 	Size        int64
@@ -503,6 +507,9 @@ func validateQCOW2Header(header []byte, payloadSize int64) error {
 	}
 	if len(header) < minimum || payloadSize < int64(minimum) {
 		return errors.New("QCOW2 header is truncated")
+	}
+	if binary.BigEndian.Uint64(header[8:16]) != 0 || binary.BigEndian.Uint32(header[16:20]) != 0 {
+		return errors.New("QCOW2 backing files are unsupported")
 	}
 	clusterBits := binary.BigEndian.Uint32(header[20:24])
 	if clusterBits < 9 || clusterBits > 21 {

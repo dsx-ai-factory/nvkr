@@ -20,11 +20,14 @@ type Output struct {
 	Disk        *DiskOutput `json:"disk,omitempty"`
 }
 
-// DiskOutput records the binding established by the held Run observer between
-// exact delivered QCOW2 bytes, their producer and the compiled Plan. ADR-20
-// deliberately omits these execution fields from release-content identity. No
-// field claims a decoded RAW reproduction identity, compatibility, inspection,
-// SBOM, or publication authority.
+// DiskOutput is the descriptive copy of a binding established by factory's held
+// Run observer between exact delivered QCOW2 bytes, their producer and the
+// compiled Plan. Validate does not authenticate caller-composed values.
+// Encryption is the producer's none/luks2 declaration; it does not describe QCOW
+// container encryption, which observation rejects. ADR-20 deliberately omits
+// these execution fields from release-content identity. No field claims a
+// decoded RAW reproduction identity, compatibility, inspection, SBOM, or
+// publication authority.
 type DiskOutput struct {
 	Producer   string `json:"producer"`
 	Component  string `json:"component"`

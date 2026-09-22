@@ -348,18 +348,7 @@ func observeOutput(ctx context.Context, workspace string, slot requiredOutput, a
 			return Artifact{}, e.New(e.CodeEngineCapability,
 				"disk output %q requires an in-process held producer result", slot.Name)
 		}
-		expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind,
-			ArtifactID: slot.MemberArtifactID, BuildDigest: slot.BuildDigest,
-			Components: append([]string(nil), slot.Components...)}
-		observation, err := execution.ObserveDiskLifecyclePayload(ctx, plan, expected)
-		if err != nil {
-			return Artifact{}, err
-		}
-		return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest,
-			BuildDigest: observation.BuildDigest, Components: append([]string(nil), observation.Components...),
-			Disk: &delivery.DiskOutput{Producer: observation.Producer, Component: observation.Component,
-				Format: observation.Format, Encryption: observation.Encryption, Size: observation.Size,
-				PlanDigest: observation.PlanDigest, Outcome: observation.Outcome}}, nil
+		return observeHeldDiskOutput(ctx, slot, plan, execution.ObserveDiskLifecyclePayload)
 	}
 	member, ok := artifacts[slot.MemberArtifactID]
 	if !ok {
@@ -513,6 +502,29 @@ func observeOutput(ctx context.Context, workspace string, slot requiredOutput, a
 	}
 	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: digest, BuildDigest: slot.BuildDigest,
 		Components: components}, nil
+}
+
+type heldDiskObserver func(context.Context, *factory.Plan, factory.LifecycleOutputPlan) (factory.DiskPayloadObservation, error)
+
+// observeHeldDiskOutput is reached in production only after observeOutput has
+// required factory's concrete in-process LocalRunResult. Keeping the callback
+// private makes the recording projection testable without exposing a
+// caller-mintable lifecycle authority boundary.
+func observeHeldDiskOutput(ctx context.Context, slot requiredOutput, plan *factory.Plan,
+	observe heldDiskObserver,
+) (Artifact, error) {
+	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind,
+		ArtifactID: slot.MemberArtifactID, BuildDigest: slot.BuildDigest,
+		Components: append([]string(nil), slot.Components...)}
+	observation, err := observe(ctx, plan, expected)
+	if err != nil {
+		return Artifact{}, err
+	}
+	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest,
+		BuildDigest: observation.BuildDigest, Components: append([]string(nil), observation.Components...),
+		Disk: &delivery.DiskOutput{Producer: observation.Producer, Component: observation.Component,
+			Format: observation.Format, Encryption: observation.Encryption, Size: observation.Size,
+			PlanDigest: observation.PlanDigest, Outcome: observation.Outcome}}, nil
 }
 
 func lifecycleArtifactPath(path, workspace string) (string, error) {

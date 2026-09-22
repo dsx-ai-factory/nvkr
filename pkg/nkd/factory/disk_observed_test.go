@@ -32,6 +32,7 @@ type fakeDiskProducerResult struct {
 	closeErr error
 	started  chan struct{}
 	release  <-chan struct{}
+	onClose  func()
 }
 
 func (result *fakeDiskProducerResult) WriteToContext(ctx context.Context, destination io.Writer) (int64, error) {
@@ -76,6 +77,9 @@ func (result *fakeDiskProducerResult) WriteToContext(ctx context.Context, destin
 
 func (result *fakeDiskProducerResult) Close() error {
 	result.closed = true
+	if result.onClose != nil {
+		result.onClose()
+	}
 	return result.closeErr
 }
 
@@ -516,14 +520,49 @@ func TestObserveDiskLifecyclePayloadRejectsSubstitutionAndAmbiguity(t *testing.T
 			binary.BigEndian.PutUint32(payload[4:8], 4)
 			replaceFakeDiskPayload(result, payload)
 		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 backing offset", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := testQCOW2HeaderPayload()
+			binary.BigEndian.PutUint64(payload[8:16], 4096)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 backing size", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := testQCOW2HeaderPayload()
+			binary.BigEndian.PutUint32(payload[16:20], 64)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
 		{name: "invalid qcow2 cluster bits", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
 			payload := testQCOW2HeaderPayload()
 			binary.BigEndian.PutUint32(payload[20:24], 8)
 			replaceFakeDiskPayload(result, payload)
 		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 cluster bits above admitted range", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := testQCOW2HeaderPayload()
+			binary.BigEndian.PutUint32(payload[20:24], 22)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
 		{name: "zero qcow2 virtual size", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
 			payload := testQCOW2HeaderPayload()
 			binary.BigEndian.PutUint64(payload[24:32], 0)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 container encryption", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := testQCOW2HeaderPayload()
+			binary.BigEndian.PutUint32(payload[32:36], 1)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 v3 header length below minimum", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := testQCOW2HeaderPayload()
+			binary.BigEndian.PutUint32(payload[100:104], qcow2Version3HeaderLen-1)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 v3 header length beyond cluster", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := append(testQCOW2HeaderPayload(), make([]byte, 512)...)
+			binary.BigEndian.PutUint32(payload[100:104], 513)
+			replaceFakeDiskPayload(result, payload)
+		}, code: e.CodeVerifyFailed},
+		{name: "qcow2 v3 header length beyond payload", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			payload := testQCOW2HeaderPayload()[:qcow2Version3HeaderLen]
+			binary.BigEndian.PutUint32(payload[100:104], 512)
 			replaceFakeDiskPayload(result, payload)
 		}, code: e.CodeVerifyFailed},
 		{name: "truncated qcow2 header", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
