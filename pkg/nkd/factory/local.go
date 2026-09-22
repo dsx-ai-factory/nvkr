@@ -149,7 +149,7 @@ func withLocalDefaults(options LocalRunOptions) LocalRunOptions {
 		options.Stderr = io.Discard
 	}
 	if options.vmResolver == nil {
-		options.vmResolver = unavailableVMDriverResolver{}
+		options.vmResolver = localVMPackerResolver{}
 	}
 	return options
 }

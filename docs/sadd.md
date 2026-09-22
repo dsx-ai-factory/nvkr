@@ -777,8 +777,7 @@ name, and records the complete selected binding in the full IR and Plan. Plan va
 from the exact Environment inventory, so a substituted class, capability resolution, or route is pipeline drift.
 These planning declarations affect Environment and Plan identity but remain outside build identity.
 
-Execution classes are not runtime evidence. Current execution adapters still reject selected builds carrying
-requirements before work or emitted output. The execution owner has both a process-local Linux diagnostic helper
+Execution classes are not runtime evidence. The execution owner has both a process-local Linux diagnostic helper
 and a narrower local VM admission primitive. The diagnostic helper observes host platform, cgroup-v2-capped CPU
 and memory, available capacity relative to the executor's held workspace directory, and KVM exposure without
 accepting a request or granting authority. Local VM admission additionally binds the exact current Plan bytes and
@@ -787,14 +786,30 @@ capped by process affinity and complete cgroup-v2 ancestry; memory is capped by 
 cgroup-v2 headroom. It retains the workspace directory and any selected KVM device for one deadline-scoped
 callback, re-observes mutable capacity immediately before work, rejects class, resource, platform, or KVM
 availability mismatch, withholds the KVM handle for a disabled resolution, and closes every retained or borrowed
-handle on completion. No driver consumes this capability yet, so adapter gates remain closed.
+handle on completion.
 
-The local capability is current-availability authority, not authenticated provider allocation, reservation, or
-qualification evidence. Holding a validated KVM descriptor proves availability through the callback lifetime;
-it does not prove that Packer or QEMU consumed that exact descriptor. Driver integration must enforce the selected
-device mode rather than infer consumption from admission. Hosted admission, provider proof, and VM topology beyond
-the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege, nested virtualization,
-NUMA, accelerators, and provider-specific lowering remain deferred.
+The local direct-Packer driver consumes that capability for unencrypted VM-image producers. Its run-owned resolver
+binds the full Plan subject, producer session, local runtime/daemon and already-local digest-pinned OCI toolchain
+before workspace mutation. Inside the admitted callback it authenticates one bounded input tar, uses only Docker
+named volumes, mounts consumer inputs read-only, fixes environment/hostname/user, disables network, image pulls and
+`packer init`, validates the exact selector, builds it once and returns one held QCOW2. A one-shot root container
+with only `CAP_CHOWN` bootstraps the two fresh attempt volumes to the host UID/GID; every consumer operation runs as
+that host identity. Command/Make, encrypted-disk, hosted and qualified VM adapters remain closed.
+
+The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
+Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,
+network-none mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
+hosted or qualified identity boundary. Those lanes require an authenticated subordinate identity, user namespace
+or stronger provider sandbox plus recorded interoperability evidence.
+
+The local capability and driver result are unqualified current-availability evidence, not authenticated provider
+allocation, reservation, pipeline attestation or qualification evidence. Holding a validated KVM descriptor proves
+availability through the callback lifetime; it does not prove that Packer or QEMU consumed that exact descriptor.
+The driver enforces whether the selected device is exposed but does not promote that into consumption proof. No
+real Docker/Packer/NKE bake has yet established external interoperability. Hosted admission, provider proof, and VM
+topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
+the scoped ownership bootstrap, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
+deferred.
 Produced-artifact size remains an artifact and transport budget.
 
 ### High Availability {#high-availability}

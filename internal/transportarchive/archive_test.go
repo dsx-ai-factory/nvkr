@@ -75,6 +75,36 @@ func TestTransportArchiveRoundTripIsDeterministicAndExact(t *testing.T) {
 	}
 }
 
+func TestUnpackOpenUsesHeldArchiveAfterPathReplacement(t *testing.T) {
+	producer := t.TempDir()
+	if err := os.WriteFile(filepath.Join(producer, "artifact"), []byte("held bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(producer, "carrier.tar")
+	if err := Pack(t.Context(), archive, producer, []string{"artifact"}); err != nil {
+		t.Fatal(err)
+	}
+	held, err := os.Open(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Close()
+	if err := os.Rename(archive, filepath.Join(producer, "moved.tar")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archive, []byte("replacement"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	destination := t.TempDir()
+	if err := UnpackOpen(t.Context(), held, destination, []string{"artifact"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(destination, "artifact"))
+	if err != nil || string(got) != "held bytes" {
+		t.Fatalf("held archive output = %q, %v", got, err)
+	}
+}
+
 func TestTransportArchiveRejectsUntrustedTarStructures(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -17,13 +17,14 @@ type NodeSession struct {
 }
 
 type nodeSessionState struct {
-	mu      sync.Mutex
-	ctx     context.Context
-	cancel  context.CancelFunc
-	closed  bool
-	done    chan struct{}
-	active  sync.WaitGroup
-	sources map[string]*preparedSourceCache
+	mu            sync.Mutex
+	ctx           context.Context
+	cancel        context.CancelFunc
+	closed        bool
+	done          chan struct{}
+	active        sync.WaitGroup
+	sources       map[string]*preparedSourceCache
+	packerRuntime *nodeSessionPackerRuntime
 }
 
 func NewNodeSession(ctx context.Context) (*NodeSession, error) {
@@ -104,6 +105,12 @@ func (handle *NodeSession) Close() {
 	session.active.Wait()
 	for _, cache := range session.sources {
 		cache.close()
+	}
+	if session.packerRuntime != nil {
+		<-session.packerRuntime.ready
+		if session.packerRuntime.runtime != nil && session.packerRuntime.runtime.capability != nil {
+			_ = session.packerRuntime.runtime.capability.Close()
+		}
 	}
 	close(session.done)
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
@@ -22,6 +24,7 @@ import (
 type fakeVMAdmission struct {
 	err      error
 	closeErr error
+	mutate   func(*Plan)
 	calls    int
 	nodeID   string
 	callback bool
@@ -51,7 +54,7 @@ func (admission *fakeVMAdmission) Close() error {
 
 func (admission *fakeVMAdmission) Execute(
 	ctx context.Context,
-	_ *Plan,
+	plan *Plan,
 	nodeID string,
 	work func(context.Context, *VMRuntime) error,
 ) error {
@@ -60,12 +63,20 @@ func (admission *fakeVMAdmission) Execute(
 	if admission.err != nil {
 		return admission.err
 	}
+	request, err := localVMRequestForPlan(plan, nodeID)
+	if err != nil {
+		return err
+	}
+	if admission.mutate != nil {
+		admission.mutate(plan)
+	}
 	admission.callback = true
-	return work(ctx, nil)
+	return work(ctx, &VMRuntime{inner: &execution.LocalVMRuntime{}, subject: request.Subject})
 }
 
 type fakeVMDriverExecutor struct {
 	packerCalls          int
+	subject              string
 	err                  error
 	missing              bool
 	artifactOnError      bool
@@ -114,10 +125,12 @@ func (resolver *fakeVMDriverResolver) Admit(
 func (executor *fakeVMDriverExecutor) RunPacker(
 	_ context.Context,
 	_ *VMRuntime,
+	subject string,
 	_ ir.Node,
 	materials *vmPackerMaterials,
 ) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 	executor.packerCalls++
+	executor.subject = subject
 	if executor.corruptMaterialClose && materials != nil && len(materials.inputs) > 0 &&
 		materials.inputs[0].Content != nil {
 		_ = materials.inputs[0].Content.OSFile().Close()
@@ -270,6 +283,39 @@ func TestAdmittedVMDispatchRunsExactPackerProducerInsideCallback(t *testing.T) {
 		t.Fatalf("dispatch calls = admission %d/%t/%q, Packer %d",
 			admission.calls, admission.callback, admission.nodeID, executor.packerCalls)
 	}
+	request, err := localVMRequestForPlan(packerPlan, packerNode.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if executor.subject != request.Subject || executor.subject == packerNode.ID {
+		t.Fatalf("executor subject = %q, want exact Plan subject %q", executor.subject, request.Subject)
+	}
+}
+
+func TestAdmittedVMDispatchRejectsPlanSubstitutionWithUnchangedIRNode(t *testing.T) {
+	plan, node := compiledPackerVMNode(t)
+	_, before, err := plan.producerInstruction(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission := &fakeVMAdmission{mutate: func(candidate *Plan) {
+		candidate.GeneratorVersion = "changed-but-valid"
+	}}
+	executor := new(fakeVMDriverExecutor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor)
+	if artifact != nil || description != nil || factoryErrorCode(err) != e.CodePipelineDrift {
+		t.Fatalf("substituted Plan artifact/result/error = %#v/%#v/%v", artifact, description, err)
+	}
+	_, after, instructionErr := plan.producerInstruction(node)
+	if instructionErr != nil {
+		t.Fatal(instructionErr)
+	}
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("test mutation unexpectedly changed the selected IR node")
+	}
+	if executor.packerCalls != 0 {
+		t.Fatal("Plan substitution reached the Packer executor")
+	}
 }
 
 func TestAdmittedVMDispatchRejectsCommandBeforeAdmission(t *testing.T) {
@@ -362,12 +408,110 @@ func TestAdmittedVMDispatchFailsBeforeDriverWithoutAdmission(t *testing.T) {
 	}
 }
 
-func TestAdmittedVMDispatchProductionExecutorFailsClosed(t *testing.T) {
+func TestUnavailableVMDriverResolverFailsClosed(t *testing.T) {
 	resolver := unavailableVMDriverResolver{}
 	executor, err := resolver.Admit(t.Context(), nil, nil, vmDriverRunConfig{})
 	if executor != nil || factoryErrorCode(err) != e.CodeEngineCapability ||
 		!strings.Contains(err.Error(), "Plan-bound realized toolchain") {
 		t.Fatalf("production resolver executor/error = %#v/%v", executor, err)
+	}
+}
+
+func TestLocalDefaultsConnectDirectPackerResolver(t *testing.T) {
+	options := withLocalDefaults(LocalRunOptions{})
+	if _, ok := options.vmResolver.(localVMPackerResolver); !ok {
+		t.Fatalf("default VM resolver = %T, want localVMPackerResolver", options.vmResolver)
+	}
+}
+
+func TestLocalVMPackerResolverRejectsUnsupportedPlans(t *testing.T) {
+	directPlan, _ := compiledPackerVMNode(t)
+	commandPlan, _ := compiledCommandVMNodeWithEncryption(t, "none")
+	encryptedPlan, _ := compiledPackerVMNodeWithEncryption(t, "luks2")
+	ordinaryPlan := buildOnlyPlan(t, "ordinary")
+	session, err := pipeline.NewNodeSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(session.Close)
+	for _, test := range []struct {
+		name    string
+		ctx     context.Context
+		plan    *Plan
+		session *pipeline.NodeSession
+		code    e.Code
+	}{
+		{name: "nil context", plan: directPlan, session: session, code: e.CodeUsage},
+		{name: "nil plan", ctx: t.Context(), session: session, code: e.CodeEngineCapability},
+		{name: "nil session", ctx: t.Context(), plan: directPlan, code: e.CodeEngineCapability},
+		{name: "command producer", ctx: t.Context(), plan: commandPlan, session: session, code: e.CodeEngineCapability},
+		{name: "encrypted producer", ctx: t.Context(), plan: encryptedPlan, session: session, code: e.CodeEngineCapability},
+		{name: "no VM producer", ctx: t.Context(), plan: ordinaryPlan, session: session, code: e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			executor, err := (localVMPackerResolver{}).Admit(test.ctx, test.plan, test.session, vmDriverRunConfig{Runtime: "docker"})
+			if executor != nil || factoryErrorCode(err) != test.code {
+				t.Fatalf("resolver executor/error = %#v/%v, want nil/%s", executor, err, test.code)
+			}
+		})
+	}
+}
+
+func TestLocalVMPackerExecutorRejectsUnadmittedRoutes(t *testing.T) {
+	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("{}\n"), heldfile.Options{Label: "manifest", MaxBytes: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.Close()
+	materials := &vmPackerMaterials{manifest: manifest}
+	runtime := &VMRuntime{inner: &execution.LocalVMRuntime{}}
+	for _, test := range []struct {
+		name     string
+		executor *localVMPackerExecutor
+		subject  string
+		code     e.Code
+	}{
+		{name: "nil executor", code: e.CodeEngineCapability},
+		{name: "subject not admitted", executor: &localVMPackerExecutor{inner: &pipeline.VMImagePackerExecutor{}, subjects: map[string]struct{}{}}, subject: "plan/node", code: e.CodePipelineDrift},
+		{name: "source route missing", executor: &localVMPackerExecutor{inner: &pipeline.VMImagePackerExecutor{}, subjects: map[string]struct{}{"plan/node": {}}, sourceRoots: map[string]string{}}, subject: "plan/node", code: e.CodePipelineDrift},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			artifact, result, err := test.executor.RunPacker(t.Context(), runtime, test.subject, ir.Node{}, materials)
+			if artifact != nil || result != nil || factoryErrorCode(err) != test.code {
+				t.Fatalf("executor artifact/result/error = %#v/%#v/%v, want nil/nil/%s", artifact, result, err, test.code)
+			}
+		})
+	}
+}
+
+func TestPlannedPackerSourceRootUsesExplicitSourceArtifact(t *testing.T) {
+	plan, node := compiledPackerVMNode(t)
+	build, instruction, err := plan.producerInstruction(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, artifacts := planIndex(plan)
+	resultID := "result/" + node.BuildTarget + "/" + instruction.Component
+	result := artifacts[resultID]
+	result.Path = ".nkd/unrelated/layout/result.json"
+	artifacts[resultID] = result
+	root, err := plannedPackerSourceRoot(build, node, instruction, artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.ToSlash(filepath.Join(".nkd", "factory", node.BuildTarget, "src"))
+	if filepath.ToSlash(root) != want {
+		t.Fatalf("source root = %q, want explicit Plan route %q", root, want)
+	}
+	for id, artifact := range artifacts {
+		if !strings.HasPrefix(id, "source/"+node.BuildTarget+"/") {
+			continue
+		}
+		artifact.Path = ".nkd/substituted-source"
+		artifacts[id] = artifact
+	}
+	if _, err := plannedPackerSourceRoot(build, node, instruction, artifacts); factoryErrorCode(err) != e.CodePipelineDrift {
+		t.Fatalf("substituted source route error = %v, want %s", err, e.CodePipelineDrift)
 	}
 }
 

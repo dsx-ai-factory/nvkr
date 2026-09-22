@@ -19,7 +19,8 @@ type VMRuntimeAdmission struct {
 // VMRuntime exposes only held descriptor capabilities during one admitted
 // execution callback. It deliberately exposes no workspace or KVM path.
 type VMRuntime struct {
-	inner *execution.LocalVMRuntime
+	inner   *execution.LocalVMRuntime
+	subject string
 }
 
 // AdmitLocalVMBuild validates the complete Plan, resolves one exact vm-image
@@ -63,8 +64,19 @@ func (admission *VMRuntimeAdmission) Execute(
 		return err
 	}
 	return admission.inner.Execute(ctx, request, func(runCtx context.Context, runtime *execution.LocalVMRuntime) error {
-		return work(runCtx, &VMRuntime{inner: runtime})
+		return work(runCtx, &VMRuntime{inner: runtime, subject: request.Subject})
 	})
+}
+
+func (runtime *VMRuntime) requireSubject(subject string) error {
+	if runtime == nil || runtime.inner == nil || runtime.subject == "" {
+		return e.New(e.CodeEngineCapability, "VM runtime is absent")
+	}
+	if runtime.subject != subject {
+		return e.New(e.CodePipelineDrift,
+			"VM runtime subject changed after admission")
+	}
+	return nil
 }
 
 // HoldWorkspace duplicates the admitted workspace directory capability. The
