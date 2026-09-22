@@ -76,13 +76,13 @@ func dispatchAdmittedVMProducer(
 	if err != nil {
 		return nil, nil, err
 	}
-	if selected.BuilderType != ir.BuilderVMImage || selected.Packer == nil || len(selected.Command) != 0 {
-		return nil, nil, e.New(e.CodeEngineCapability,
-			"vm-image producer %q requires an unimplemented held-output command adapter", selected.Component)
-	}
 	if selected.Disk == nil || selected.Disk.Encryption != "none" {
 		return nil, nil, e.New(e.CodeEngineCapability,
 			"vm-image producer %q requires a typed non-public encryption secret channel", selected.Component)
+	}
+	if selected.BuilderType != ir.BuilderVMImage || selected.Packer == nil || len(selected.Command) != 0 {
+		return nil, nil, e.New(e.CodeEngineCapability,
+			"vm-image producer %q requires an unimplemented held-output command adapter", selected.Component)
 	}
 	returnErr = admission.Execute(ctx, plan, node.ID, func(runCtx context.Context, runtime *VMRuntime) error {
 		_, instruction, err := plan.producerInstruction(node)
@@ -118,20 +118,32 @@ func dispatchAdmittedVMProducer(
 		return nil
 	})
 	if returnErr != nil && artifact != nil {
-		closeErr := artifact.Close()
+		returnErr = closeRejectedVMArtifact(returnErr, artifact)
 		artifact = nil
 		result = nil
-		if closeErr != nil {
-			code := e.CodeInternal
-			var coded *e.Error
-			if errors.As(returnErr, &coded) {
-				code = coded.Code
-			}
-			returnErr = e.Wrap(code, errors.Join(returnErr, closeErr),
-				"closing rejected VM driver artifact")
-		}
 	}
 	return artifact, result, returnErr
+}
+
+type vmArtifactCloser interface {
+	Close() error
+}
+
+func closeRejectedVMArtifact(primary error, artifact vmArtifactCloser) error {
+	if artifact == nil {
+		return primary
+	}
+	closeErr := artifact.Close()
+	if closeErr == nil {
+		return primary
+	}
+	code := e.CodeInternal
+	var coded *e.Error
+	if errors.As(primary, &coded) {
+		code = coded.Code
+	}
+	return e.Wrap(code, errors.Join(primary, closeErr),
+		"closing rejected VM driver artifact")
 }
 
 // validateVMDriverPlan keeps every encrypted vm-image form closed until the

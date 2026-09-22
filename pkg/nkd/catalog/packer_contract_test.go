@@ -241,6 +241,13 @@ func TestDirectPackerProducerValidation(t *testing.T) {
 			wantText: "exact bounded version",
 		},
 		{
+			name: "Packer version with interior whitespace",
+			edit: func(component *Component) {
+				component.Packer.PackerVersion = "1.14.2 rc1"
+			},
+			wantText: "exact bounded version",
+		},
+		{
 			name: "missing producer",
 			edit: func(component *Component) {
 				component.Packer = nil

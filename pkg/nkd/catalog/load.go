@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/aicr"
@@ -718,7 +719,8 @@ func validatePackerConfig(name string, config *PackerConfig) error {
 			name, config.BuildName)
 	}
 	if !validPackerTransportValue(config.PackerVersion, 64) ||
-		strings.TrimSpace(config.PackerVersion) != config.PackerVersion {
+		strings.TrimSpace(config.PackerVersion) != config.PackerVersion ||
+		strings.IndexFunc(config.PackerVersion, unicode.IsSpace) >= 0 {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: packer.packerVersion must be an exact bounded version", name)
 	}

@@ -232,6 +232,13 @@ func TestVMGraphRejectsInvalidPackerAndMaterialBindings(t *testing.T) {
 	}{
 		{name: "unsafe Packer project", mutate: func(node *Node) { node.Packer.ProjectPath = "../packer" }},
 		{name: "glob Packer build", mutate: func(node *Node) { node.Packer.BuildName = "image.*" }},
+		{name: "Packer version with interior whitespace", mutate: func(node *Node) { node.Packer.PackerVersion = "1.14.2 rc1" }},
+		{name: "build-log variable collision", mutate: func(node *Node) {
+			node.Packer.BuildLogDirectoryVariable = node.Packer.OutputDirectoryVariable
+		}},
+		{name: "HTTP variable collision", mutate: func(node *Node) {
+			node.Packer.HTTPDirectoryVariable = node.Packer.OutputDirectoryVariable
+		}},
 		{name: "unsorted Packer variables", mutate: func(node *Node) {
 			node.Packer.Variables = append(node.Packer.Variables, PackerVariable{Name: "alpha", Value: "value"})
 		}},

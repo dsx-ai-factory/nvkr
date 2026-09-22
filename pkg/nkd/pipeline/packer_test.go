@@ -646,6 +646,12 @@ func TestPackerRequestValidationRejectsUnsafeTransport(t *testing.T) {
 			})
 		}, code: nkderr.CodeInvalidCatalog},
 		{name: "reserved collision", edit: func(request *PackerBuildRequest) { request.Variables[0].Name = "architecture" }, code: nkderr.CodeInvalidCatalog},
+		{name: "build-log variable collision", edit: func(request *PackerBuildRequest) {
+			request.BuildLogDirectoryVariable = request.OutputDirectoryVariable
+		}, code: nkderr.CodeInvalidCatalog},
+		{name: "HTTP variable collision", edit: func(request *PackerBuildRequest) {
+			request.HTTPDirectoryVariable = request.OutputDirectoryVariable
+		}, code: nkderr.CodeInvalidCatalog},
 		{name: "delimiter in name", edit: func(request *PackerBuildRequest) { request.Variables[0].Name = "architecture=other" }, code: nkderr.CodeInvalidCatalog},
 		{name: "control in value", edit: func(request *PackerBuildRequest) { request.Variables[0].Value = "one\ntwo" }, code: nkderr.CodeInvalidCatalog},
 		{name: "too many variables", edit: func(request *PackerBuildRequest) {

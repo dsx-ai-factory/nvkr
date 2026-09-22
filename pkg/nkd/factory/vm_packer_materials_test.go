@@ -244,6 +244,7 @@ func TestObserveVMPackerMaterialsEnforcesBoundsAndCleansLateFailure(t *testing.T
 		{name: "file count", limits: vmPackerMaterialLimits{files: 1, perFile: 1024, total: 2048, manifest: 4096}, code: e.CodeEngineCapability},
 		{name: "per file bytes", limits: vmPackerMaterialLimits{files: 2, perFile: 2, total: 2048, manifest: 4096}, code: e.CodeUnverifiedRef},
 		{name: "total bytes", limits: vmPackerMaterialLimits{files: 2, perFile: 1024, total: 20, manifest: 4096}, code: e.CodeEngineCapability},
+		{name: "manifest bytes", limits: vmPackerMaterialLimits{files: 2, perFile: 1024, total: 2048, manifest: 1}, code: e.CodeInternal},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newVMPackerMaterialFixture(t)

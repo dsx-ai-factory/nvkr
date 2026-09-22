@@ -65,11 +65,13 @@ func (admission *fakeVMAdmission) Execute(
 }
 
 type fakeVMDriverExecutor struct {
-	packerCalls int
-	err         error
-	missing     bool
-	closeErr    error
-	closed      bool
+	packerCalls          int
+	err                  error
+	missing              bool
+	artifactOnError      bool
+	corruptMaterialClose bool
+	closeErr             error
+	closed               bool
 }
 
 func (executor *fakeVMDriverExecutor) Close() error {
@@ -113,10 +115,27 @@ func (executor *fakeVMDriverExecutor) RunPacker(
 	_ context.Context,
 	_ *VMRuntime,
 	_ ir.Node,
-	_ *vmPackerMaterials,
+	materials *vmPackerMaterials,
 ) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 	executor.packerCalls++
+	if executor.corruptMaterialClose && materials != nil && len(materials.inputs) > 0 &&
+		materials.inputs[0].Content != nil {
+		_ = materials.inputs[0].Content.OSFile().Close()
+	}
+	if executor.artifactOnError {
+		return &pipeline.PackerArtifact{}, nil, executor.err
+	}
 	return executor.result()
+}
+
+type fakeVMArtifactCloser struct {
+	err    error
+	closed bool
+}
+
+func (artifact *fakeVMArtifactCloser) Close() error {
+	artifact.closed = true
+	return artifact.err
 }
 
 func (executor *fakeVMDriverExecutor) result() (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
@@ -264,6 +283,68 @@ func TestAdmittedVMDispatchRejectsCommandBeforeAdmission(t *testing.T) {
 	}
 	if admission.calls != 0 || executor.packerCalls != 0 {
 		t.Fatalf("unsupported command reached admission/executor: %#v/%#v", admission, executor)
+	}
+}
+
+func TestAdmittedVMDispatchRejectsEncryptedCommandBeforeAdmission(t *testing.T) {
+	plan, node := compiledCommandVMNodeWithEncryption(t, "luks2")
+	admission := new(fakeVMAdmission)
+	executor := new(fakeVMDriverExecutor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor)
+	if artifact != nil || description != nil || factoryErrorCode(err) != e.CodeEngineCapability ||
+		!strings.Contains(err.Error(), "encryption secret channel") {
+		t.Fatalf("encrypted command artifact/result/error = %#v/%#v/%v", artifact, description, err)
+	}
+	if admission.calls != 0 || executor.packerCalls != 0 {
+		t.Fatalf("encrypted command reached admission/executor: %#v/%#v", admission, executor)
+	}
+}
+
+func TestAdmittedVMDispatchCleansRejectedArtifactAndMaterialCapabilities(t *testing.T) {
+	driverFailure := e.New(e.CodeVerifyFailed, "driver failed")
+	for _, test := range []struct {
+		name     string
+		fixture  func(*testing.T) (*Plan, Node)
+		executor *fakeVMDriverExecutor
+		wantText string
+		wantCode e.Code
+	}{
+		{
+			name: "rejected artifact", fixture: compiledPackerVMNode,
+			executor: &fakeVMDriverExecutor{err: driverFailure, artifactOnError: true},
+			wantCode: e.CodeVerifyFailed,
+		},
+		{
+			name: "material close failure", fixture: func(t *testing.T) (*Plan, Node) {
+				fixture := newVMPackerMaterialFixture(t)
+				return fixture.plan, fixture.node
+			},
+			executor: &fakeVMDriverExecutor{err: driverFailure, corruptMaterialClose: true},
+			wantText: "closing VM Packer material capabilities", wantCode: e.CodeVerifyFailed,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, node := test.fixture(t)
+			artifact, result, err := dispatchAdmittedVMProducer(
+				t.Context(), new(fakeVMAdmission), plan, node, test.executor,
+			)
+			if artifact != nil || result != nil || factoryErrorCode(err) != test.wantCode ||
+				!errors.Is(err, driverFailure) || (test.wantText != "" && !strings.Contains(err.Error(), test.wantText)) {
+				t.Fatalf("rejected dispatch artifact/result/error = %#v/%#v/%v", artifact, result, err)
+			}
+		})
+	}
+}
+
+func TestCloseRejectedVMArtifactJoinsCloseFailure(t *testing.T) {
+	primary := e.New(e.CodeVerifyFailed, "driver rejected artifact")
+	closeFailure := errors.New("artifact close failed")
+	artifact := &fakeVMArtifactCloser{err: closeFailure}
+	err := closeRejectedVMArtifact(primary, artifact)
+	if !artifact.closed || factoryErrorCode(err) != e.CodeVerifyFailed ||
+		!errors.Is(err, primary) || !errors.Is(err, closeFailure) ||
+		!strings.Contains(err.Error(), "closing rejected VM driver artifact") {
+		t.Fatalf("rejected artifact cleanup = closed:%t error:%v", artifact.closed, err)
 	}
 }
 
@@ -533,11 +614,34 @@ func TestLocalVMInvalidWorkspaceFailsBeforeResolver(t *testing.T) {
 	options := withLocalDefaults(LocalRunOptions{Workspace: "../unsafe"})
 	options.vmResolver = resolver
 	result, err := runLocal(t.Context(), plan, options, productionLocalRunDeps())
-	if result != nil || err == nil {
+	if result != nil || factoryErrorCode(err) != e.CodeUsage {
 		t.Fatalf("unsafe workspace result/error = %#v/%v", result, err)
 	}
 	if resolver.calls != 0 {
 		t.Fatalf("resolver ran for unsafe workspace: %#v", resolver)
+	}
+}
+
+func TestLocalVMIncompleteAdmissionMapFailsClosed(t *testing.T) {
+	t.Chdir(t.TempDir())
+	plan, _ := compiledPackerVMNode(t)
+	options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/vm-incomplete-admission", Jobs: 1})
+	options.vmResolver = &fakeVMDriverResolver{executor: new(fakeVMDriverExecutor)}
+	deps := localRunDeps{
+		makeDisk: admittedLocalDiskProducer,
+		admitVMBuilds: func(context.Context, *Plan, string) (map[string]vmAdmission, error) {
+			return map[string]vmAdmission{}, nil
+		},
+		admitRunners: func(context.Context, *Plan, LocalRunOptions, []string) error { return nil },
+		prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
+			return map[string]string{}, nil
+		},
+		executeNode: func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error { return nil },
+	}
+	result, err := runLocal(t.Context(), plan, options, deps)
+	if result != nil || factoryErrorCode(err) != e.CodeEngineCapability ||
+		!strings.Contains(err.Error(), "no pre-execution runtime admission") {
+		t.Fatalf("incomplete admission result/error = %#v/%v", result, err)
 	}
 }
 
@@ -575,35 +679,47 @@ func TestLocalVMAdmissionFailureStopsBeforeRuntimeAndNodeWork(t *testing.T) {
 	}
 }
 
-func TestLocalVMAdmissionCleanupFailureIsReturned(t *testing.T) {
-	t.Chdir(t.TempDir())
-	plan, vmNode := compiledPackerVMNode(t)
-	options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/vm-close", Jobs: 1})
-	resolver := &fakeVMDriverResolver{executor: new(fakeVMDriverExecutor)}
-	options.vmResolver = resolver
-	closeFailure := errors.New("admission close failed")
-	runnerFailure := errors.New("runner admission failed")
-	admission := &fakeVMAdmission{closeErr: closeFailure}
-	deps := localRunDeps{
-		makeDisk: admittedLocalDiskProducer,
-		admitVMBuilds: func(context.Context, *Plan, string) (map[string]vmAdmission, error) {
-			return map[string]vmAdmission{vmNode.ID: admission}, nil
-		},
-		admitRunners: func(context.Context, *Plan, LocalRunOptions, []string) error { return runnerFailure },
-		prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
-			return map[string]string{}, nil
-		},
-		executeNode: func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error { return nil },
-	}
-	result, err := runLocal(t.Context(), plan, options, deps)
-	if result != nil || factoryErrorCode(err) != e.CodeInternal ||
-		!errors.Is(err, runnerFailure) || !errors.Is(err, closeFailure) {
-		t.Fatalf("cleanup result/error = %#v/%v", result, err)
-	}
-	if !admission.closed {
-		t.Fatal("local VM admission was not closed")
-	}
-	if !resolver.executor.closed {
-		t.Fatal("local VM driver executor was not closed")
+func TestLocalVMCleanupFailureIsReturned(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		admissionClose error
+		executorClose  error
+	}{
+		{name: "runtime admission", admissionClose: errors.New("admission close failed")},
+		{name: "driver executor", executorClose: errors.New("executor close failed")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			plan, vmNode := compiledPackerVMNode(t)
+			options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/vm-close", Jobs: 1})
+			executor := &fakeVMDriverExecutor{closeErr: test.executorClose}
+			resolver := &fakeVMDriverResolver{executor: executor}
+			options.vmResolver = resolver
+			runnerFailure := errors.New("runner admission failed")
+			admission := &fakeVMAdmission{closeErr: test.admissionClose}
+			wantCloseFailure := test.admissionClose
+			if wantCloseFailure == nil {
+				wantCloseFailure = test.executorClose
+			}
+			deps := localRunDeps{
+				makeDisk: admittedLocalDiskProducer,
+				admitVMBuilds: func(context.Context, *Plan, string) (map[string]vmAdmission, error) {
+					return map[string]vmAdmission{vmNode.ID: admission}, nil
+				},
+				admitRunners: func(context.Context, *Plan, LocalRunOptions, []string) error { return runnerFailure },
+				prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+				executeNode: func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error { return nil },
+			}
+			result, err := runLocal(t.Context(), plan, options, deps)
+			if result != nil || factoryErrorCode(err) != e.CodeInternal ||
+				!errors.Is(err, runnerFailure) || !errors.Is(err, wantCloseFailure) {
+				t.Fatalf("cleanup result/error = %#v/%v", result, err)
+			}
+			if !admission.closed || !executor.closed {
+				t.Fatalf("cleanup state = admission:%t executor:%t", admission.closed, executor.closed)
+			}
+		})
 	}
 }

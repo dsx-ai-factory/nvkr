@@ -177,7 +177,8 @@ default cannot override that decision. The required variable names and any sourc
 mapping are explicit and distinct, so NKD never guesses HCL names. Cache, temporary, configuration and home
 directories remain runtime-owned standard paths rather than authored HCL-variable mappings.
 The optional SSH private/public variable-name pair, when declared, receives paths to an attempt-local keypair
-created inside the private execution root. The variable names affect Build identity; generated key bytes and
+created inside the private execution root. That handoff remains reserved and unrealized until the authenticated
+OCI executor supplies the attempt-local keypair. The variable names affect Build identity; generated key bytes and
 paths affect only the Run and never enter the catalog, logical Build identity, logs or evidence.
 `packerVersion` is an exact logical input. The admitted runtime compares it with the Packer executable inside the
 digest-pinned OCI toolchain before validation. The source-owned HCL constrains required plugins; the same OCI

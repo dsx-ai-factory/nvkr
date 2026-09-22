@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -534,7 +535,8 @@ func validateIRPackerConfig(nodeID string, config *PackerConfig) error {
 			"VM build node %q has an unsafe or inexact Packer build name", nodeID)
 	}
 	if !safetext.Valid(config.PackerVersion, 64, false) ||
-		strings.TrimSpace(config.PackerVersion) != config.PackerVersion {
+		strings.TrimSpace(config.PackerVersion) != config.PackerVersion ||
+		strings.IndexFunc(config.PackerVersion, unicode.IsSpace) >= 0 {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q has no exact bounded Packer version", nodeID)
 	}

@@ -1069,6 +1069,9 @@ func validatePackerBuildRequest(request PackerBuildRequest) error {
 		request.MaterialManifestVariable,
 		request.OutputDirectoryVariable,
 	}
+	if request.SSHPrivateKeyVariable != "" {
+		reserved = append(reserved, request.SSHPrivateKeyVariable, request.SSHPublicKeyVariable)
+	}
 	for _, optional := range []string{
 		request.BuildLogDirectoryVariable,
 		request.HTTPDirectoryVariable,
