@@ -157,7 +157,7 @@ func (session *nodeSessionState) admitPackerRuntime(ctx context.Context, runtime
 		session.mu.Unlock()
 
 		held, err := snapshotRuntimeExecutableContext(ctx, runtimePath) //nolint:staticcheck // Linux authority path.
-		if err == nil {
+		if err == nil {                                                 //nolint:staticcheck // Linux authority path; the non-Linux snapshot always fails.
 			held.identity, err = observeHeldRuntimeIdentity(ctx, held)
 		}
 		if err != nil && held != nil && held.capability != nil {
