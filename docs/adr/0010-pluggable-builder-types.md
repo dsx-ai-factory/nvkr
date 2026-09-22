@@ -224,8 +224,9 @@ path derived from the binding name beneath a private staging root. A Packer prod
 `materialManifest` projection with its source-owned `schemaVersion` and one producer-visible `kind` for every
 declared binding. The projection must cover the binding set exactly and is a logical Build input. It changes only
 the serialized schema and kind vocabulary; authenticated bytes, component, architecture, digest and deterministic
-staging path remain the same. NKD has no source-specific conditional or implicit kind translation. Binding,
-component, schema and kind text use the same display-safe UTF-8 policy as producer transport.
+staging path remain the same. NKD has no source-specific conditional or implicit kind translation. Binding and
+component text use the display-safe canonical-text policy. Schema and kind values use the stricter
+whitespace-free canonical-token policy.
 Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
 deterministic description, not an authenticated receipt; admitted execution must derive it from authenticated
 producer observations and bind the exact serialized file bytes before invoking a subprocess. Direct Packer will
