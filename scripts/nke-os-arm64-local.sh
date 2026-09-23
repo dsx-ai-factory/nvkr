@@ -64,12 +64,13 @@ if [[ "${host_os}" == Darwin ]]; then
     echo "the macOS bootstrap requires Podman; Docker is supported on Linux ARM64" >&2
     exit 1
   fi
-  exec podman machine ssh -- sh -c '
-    set -eu
-    cd "$1"
-    exec env CONTAINER_RUNTIME=podman NKE_OVN_SUPPLIER="$4" \
-      ./scripts/nke-os-arm64-local.sh "$2" "$3"
-  ' sh "${repo_root}" "${attempt}" "${jobs}" "${ovn_supplier}"
+  # podman machine ssh concatenates COMMAND arguments before the remote shell
+  # evaluates them. Pass one shell-escaped command so paths and values retain
+  # their argument boundaries inside the Linux VM.
+  printf -v remote_command \
+    'cd %q && exec env CONTAINER_RUNTIME=podman NKE_OVN_SUPPLIER=%q ./scripts/nke-os-arm64-local.sh %q %q' \
+    "${repo_root}" "${ovn_supplier}" "${attempt}" "${jobs}"
+  exec podman machine ssh "${remote_command}"
 fi
 if [[ "${host_os}" != Linux ]]; then
   echo "the NKE image build requires Linux ARM64 or macOS with an ARM64 Podman machine" >&2
