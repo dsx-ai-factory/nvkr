@@ -49,6 +49,10 @@ type RunOptions struct {
 	// sources is a run-owned single-flight cache for exact prepared source inputs.
 	// It is intentionally private: authority and lifetime cannot cross a Run call.
 	sources *preparedSourceCache
+	// BuildMaterials is a process-local capability over the exact manifest and
+	// producer bytes selected by the factory Plan. It is required for a build node
+	// with material bindings and rejected by every other node.
+	BuildMaterials *BuildMaterials
 	// Qualification is required for a from-source run whose report may back a signed
 	// validation vector or a Reproduced/ValidatedVariant claim. Nil permits an
 	// unqualified from-source development run or a profile-free, terminally verified
@@ -86,6 +90,9 @@ type ArtifactResult struct {
 	// InputDigest identifies the exact post-vendor, post-patch source snapshot that
 	// entered this build. It is observed by the runner, not copied from a declaration.
 	InputDigest string `json:"inputDigest,omitempty"`
+	// MaterialManifestDigest identifies the exact canonical manifest staged for
+	// this producer. It is present iff the producer consumed material bindings.
+	MaterialManifestDigest string `json:"materialManifestDigest,omitempty"`
 	// BuilderType is the DECLARED from-source substrate (from the IR node). EngineClass
 	// is the OBSERVED substrate the runner actually used. Verify fails closed if they
 	// diverge — a producer that declares nix but whose artifact came off a native lane is

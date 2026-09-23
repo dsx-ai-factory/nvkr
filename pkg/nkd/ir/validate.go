@@ -153,10 +153,8 @@ func (g *Graph) Validate() error {
 			return e.New(e.CodeInvalidCatalog,
 				"build node %q source pins do not exactly match dependency %q", node.ID, fetch.ID)
 		}
-		if node.BuilderType == BuilderVMImage {
-			if err := validateVMMaterialDependencies(node, byID, fetch.ID); err != nil {
-				return err
-			}
+		if err := validateMaterialDependencies(node, byID, fetch.ID); err != nil {
+			return err
 		}
 	}
 	for _, node := range g.Nodes {
@@ -308,7 +306,7 @@ func validateBuildNode(n Node) error {
 		"component", "builderType", "flakeRef", "flakeOutput", "flakeLockDigest",
 		"toolchain", "platform", "network", "env", "patches", "command", "workdir",
 		"sourceDest", "sourceCommit", "sourceTreeHash", "vendorSpecDigest",
-		"sourceReadOnly", "writeDir", "outputType", "artifactPath", "version")); err != nil {
+		"sourceReadOnly", "writeDir", "materials", "outputType", "artifactPath", "version")); err != nil {
 		return err
 	}
 	if n.ExecutionBinding != nil {
@@ -321,9 +319,9 @@ func validateBuildNode(n Node) error {
 		return e.New(e.CodeInvalidCatalog,
 			"build node %q must be named build-<canonical component>", n.ID)
 	}
-	if len(n.Needs) != 1 {
+	if len(n.Needs) == 0 {
 		return e.New(e.CodeInvalidCatalog,
-			"build node %q must depend on exactly one pinned fetch", n.ID)
+			"build node %q must depend on one pinned fetch", n.ID)
 	}
 	if !exactOCIIdentity(n.Toolchain) {
 		return e.New(e.CodeTagToolchain,
@@ -379,8 +377,15 @@ func validateBuildNode(n Node) error {
 	if !safeVersion(n.Version) {
 		return e.New(e.CodeInvalidCatalog, "build node %q has no canonical component version", n.ID)
 	}
+	if err := validateMaterialBindings(n.ID, n.Materials); err != nil {
+		return err
+	}
 	switch n.BuilderType {
 	case BuilderBuildKit:
+		if len(n.Materials) != 0 {
+			return e.New(e.CodeEngineCapability,
+				"rootless BuildKit node %q does not support material inputs", n.ID)
+		}
 		if n.OutputType != "oci-image" || n.FlakeRef != "" || n.FlakeOutput != "" || n.FlakeLockDigest != "" {
 			return e.New(e.CodeInvalidCatalog, "rootless BuildKit node %q requires an OCI export and build arguments", n.ID)
 		}
@@ -395,6 +400,10 @@ func validateBuildNode(n Node) error {
 				"OCI build node %q must not carry Nix flake fields", n.ID)
 		}
 	case BuilderNix:
+		if len(n.Materials) != 0 {
+			return e.New(e.CodeEngineCapability,
+				"Nix build node %q does not support material inputs", n.ID)
+		}
 		if !safeReference(n.FlakeRef) || !flakeOutput.MatchString(n.FlakeOutput) ||
 			!canonical.IsDigest(n.FlakeLockDigest) {
 			return e.New(e.CodeUnpinnedSource,
@@ -588,25 +597,25 @@ func validateMaterialBindings(nodeID string, bindings []MaterialBinding) error {
 	for index, binding := range bindings {
 		if _, err := material.StagingPath(binding.Binding); err != nil {
 			return e.Wrap(e.CodeInvalidCatalog, err,
-				"VM build node %q material binding %d", nodeID, index)
+				"build node %q material binding %d", nodeID, index)
 		}
 		if index > 0 && binding.Binding <= previous {
 			return e.New(e.CodeInvalidCatalog,
-				"VM build node %q material bindings must be sorted and unique", nodeID)
+				"build node %q material bindings must be sorted and unique", nodeID)
 		}
 		previous = binding.Binding
 		if !canonicalNodeID.MatchString(binding.Component) || !canonicalNodeID.MatchString(binding.Producer) {
 			return e.New(e.CodeInvalidCatalog,
-				"VM build node %q material %q has a non-canonical component or producer", nodeID, binding.Binding)
+				"build node %q material %q has a non-canonical component or producer", nodeID, binding.Binding)
 		}
 		if prior, duplicate := components[binding.Component]; duplicate {
 			return e.New(e.CodeInvalidCatalog,
-				"VM build node %q bindings %q and %q select component %q",
+				"build node %q bindings %q and %q select component %q",
 				nodeID, prior, binding.Binding, binding.Component)
 		}
 		if prior, duplicate := producers[binding.Producer]; duplicate {
 			return e.New(e.CodeInvalidCatalog,
-				"VM build node %q bindings %q and %q select producer %q",
+				"build node %q bindings %q and %q select producer %q",
 				nodeID, prior, binding.Binding, binding.Producer)
 		}
 		components[binding.Component] = binding.Binding
@@ -635,14 +644,14 @@ func sourceDependency(node Node, byID map[string]Node) (Node, error) {
 	return fetch, nil
 }
 
-func validateVMMaterialDependencies(node Node, byID map[string]Node, fetchID string) error {
+func validateMaterialDependencies(node Node, byID map[string]Node, fetchID string) error {
 	expected := make(map[string]MaterialBinding, len(node.Materials))
 	for _, binding := range node.Materials {
 		producer, ok := byID[binding.Producer]
 		if !ok || (producer.Kind != KindBuild && producer.Kind != KindPull) ||
 			producer.Component != binding.Component {
 			return e.New(e.CodeInvalidCatalog,
-				"VM build node %q material %q does not bind producer %q for component %q",
+				"build node %q material %q does not bind producer %q for component %q",
 				node.ID, binding.Binding, binding.Producer, binding.Component)
 		}
 		expected[binding.Producer] = binding
@@ -653,13 +662,13 @@ func validateVMMaterialDependencies(node Node, byID map[string]Node, fetchID str
 		}
 		if _, ok := expected[dependency]; !ok {
 			return e.New(e.CodeInvalidCatalog,
-				"VM build node %q has undeclared material producer dependency %q", node.ID, dependency)
+				"build node %q has undeclared material producer dependency %q", node.ID, dependency)
 		}
 		delete(expected, dependency)
 	}
 	if len(expected) != 0 {
 		return e.New(e.CodeInvalidCatalog,
-			"VM build node %q omits one or more declared material producer dependencies", node.ID)
+			"build node %q omits one or more declared material producer dependencies", node.ID)
 	}
 	return nil
 }
@@ -706,10 +715,10 @@ func validatePullNode(n Node) error {
 		if err := validateSourceDateOnly(n.ID, n.Env); err != nil {
 			return err
 		}
-	case "raw":
+	case "raw", "tarball":
 		if !safeRelativePath(n.ArtifactPath) || len(n.Env) != 0 {
 			return e.New(e.CodeInvalidCatalog,
-				"raw pull node %q requires a bounded artifactPath and no environment", n.ID)
+				"byte-preserving pull node %q requires a bounded artifactPath and no environment", n.ID)
 		}
 	default:
 		return e.New(e.CodeInvalidCatalog,

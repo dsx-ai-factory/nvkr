@@ -463,7 +463,7 @@ func TestLocalVMPackerExecutorRejectsUnadmittedRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer manifest.Close()
-	materials := &vmPackerMaterials{manifest: manifest}
+	materials := &vmPackerMaterials{observedProducerMaterials: &observedProducerMaterials{manifest: manifest}}
 	runtime := &VMRuntime{inner: &execution.LocalVMRuntime{}}
 	for _, test := range []struct {
 		name     string

@@ -307,7 +307,7 @@ func (executor *VMImagePackerExecutor) Run(
 			return nil, nil, err
 		}
 	}
-	manifest, err := input.Manifest.ReadAllContext(runCtx, maxPackerManifestBytes)
+	manifest, err := input.Manifest.ReadAllContext(runCtx, maxBuildMaterialManifestBytes)
 	if err != nil {
 		return nil, nil, e.Wrap(e.CodeUnverifiedRef, err, "reading held Packer material manifest")
 	}
@@ -339,10 +339,14 @@ func (executor *VMImagePackerExecutor) Run(
 	if err != nil {
 		return nil, nil, err
 	}
+	materialManifestDigest := ""
+	if len(node.Materials) != 0 {
+		materialManifestDigest = input.Manifest.Digest()
+	}
 	result = &ArtifactResult{
 		Component: node.Component, OutputType: node.OutputType,
 		Qualification: ArtifactUnqualified, Toolchain: node.Toolchain,
-		InputDigest: source.InputDigest, BuilderType: node.BuilderType,
+		InputDigest: source.InputDigest, MaterialManifestDigest: materialManifestDigest, BuilderType: node.BuilderType,
 		EngineClass: node.BuilderType, Path: node.ArtifactPath,
 		SHA256: artifact.Digest(), Size: artifact.Size(),
 	}

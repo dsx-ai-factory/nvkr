@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -306,6 +307,30 @@ func TestRuntimeIdentityRejectsAmbiguousVersionJSON(t *testing.T) {
 	)
 	if executionErrorCode(err) != nkderr.CodeEngineCapability {
 		t.Fatalf("ambiguous runtime identity JSON did not fail closed: %v", err)
+	}
+}
+
+func TestPodmanServerIdentityExcludesChangingCapacity(t *testing.T) {
+	base := []byte(`{"host":{"arch":"arm64","cgroupManager":"systemd","cgroupVersion":"v2","databaseBackend":"sqlite","hostname":"builder","kernel":"6.1","networkBackend":"netavark","os":"linux","security":{"rootless":true,"seccompEnabled":true,"selinuxEnabled":false},"memAvailable":100,"uptime":"1m"},"store":{"graphDriverName":"overlay","graphRoot":"/var/lib/containers","runRoot":"/run/containers"},"version":{"APIVersion":"5.6.2","GitCommit":"abc","OsArch":"linux/arm64","Version":"5.6.2"}}`)
+	changed := bytes.ReplaceAll(base, []byte(`"memAvailable":100,"uptime":"1m"`), []byte(`"memAvailable":1,"uptime":"2h"`))
+	first, err := podmanServerIdentity(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := podmanServerIdentity(changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("Podman identity includes changing capacity or uptime")
+	}
+	other := bytes.ReplaceAll(base, []byte(`"graphRoot":"/var/lib/containers"`), []byte(`"graphRoot":"/other"`))
+	third, err := podmanServerIdentity(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == third {
+		t.Fatal("Podman identity omitted its storage root")
 	}
 }
 

@@ -101,7 +101,7 @@ Each component has exactly one declared production source lane, separate from th
 
 The lane must agree in provenance, Release membership, evidence records, and milestone scope. Unknown or
 indeterminate lanes are definition errors. The `buildkit-rootless` builder implements the wrapped-build lane
-for OCI-export archives on Docker, locally and in generated lifecycle Runs. Other wrapped adapters and Nix
+for OCI-export archives on the admitted Docker or Podman runtime, locally and in generated lifecycle Runs. Other wrapped adapters and Nix
 qualified execution remain deferred. A component may select its own digest-pinned toolchain image while
 retaining the same pinned source as other components; this changes its build identity, not its source pin.
 
@@ -139,7 +139,7 @@ invocation mechanism, not a builder type or an output semantic:
 
 The direct-Packer authoring form names the stable boundary that compilation records and future execution must
 enforce. The concrete projection values below match the source-owned
-[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2/os-image/packer/variables.pkr.hcl#L14-L58);
+[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/de0e46bb14cae2f892677bf9e21b91a7add2f9d9/os-image/packer/variables.pkr.hcl#L14-L58);
 they are example producer vocabulary, not NKD-reserved values.
 
 ```yaml
@@ -147,7 +147,7 @@ builderType: vm-image
 buildNetwork: default
 packer:
   projectPath: os-image/packer
-  packerVersion: 1.14.2
+  packerVersion: 1.15.4
   buildName: nke-node-non-fde.qemu.nke-non-fde
   architectureVariable: architecture
   acceleratorVariable: accelerator
@@ -197,20 +197,20 @@ digest authenticates their preinstalled bytes, and execution exposes only its fi
 credential channel, and future invocation records expose these values. The pinned Packer subprocess remains
 authoritative for checking their names and values against source-owned HCL declarations.
 
-Packer v1.14.2's
-[`validate` implementation](https://github.com/hashicorp/packer/blob/v1.14.2/command/validate.go) emits the clean
+Packer v1.15.4's
+[`validate` implementation](https://github.com/hashicorp/packer/blob/v1.15.4/command/validate.go) emits the clean
 success line only after diagnostic handling returns zero, and its
-[`validate` tests](https://github.com/hashicorp/packer/blob/v1.14.2/command/validate_test.go) fix clean stdout to
+[`validate` tests](https://github.com/hashicorp/packer/blob/v1.15.4/command/validate_test.go) fix clean stdout to
 exactly `The configuration is valid.` plus a newline while demonstrating that warnings can precede that line on
 stdout with exit status zero. The connected local OCI driver therefore accepts only that clean line (ignoring
 surrounding whitespace) with empty stderr; any other output fails closed. Driver admission and lifecycle are
 contract-tested, but a recorded real pinned Docker/Packer/NKE execution remains required before maintained NKE
 support, product acceptance, or any pipeline-attested or qualified production claim; until then the local result
-stays unqualified. A local 2026-09-18 framing probe used the official Packer 1.14.2 Darwin ARM64 ZIP
-(`sha256:b053c01272f87fe669c642dfac167b0b48cfb5c119e2e946d90ef92c2407f746`, matching HashiCorp's published
-`SHA256SUMS`) and Packer-installed Docker plugin 1.1.2. The full compiled selector returned exit zero, the single
-28-byte success line on stdout, and empty stderr; a short selector returned exit zero, a 251-byte warning plus
-the same success line on stdout, and empty stderr. This probes validation framing only, not NKE execution or disk
+stays unqualified. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
+(`sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80`) and QEMU plugin 1.1.6
+(`sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6`), both matching HashiCorp's
+published `SHA256SUMS`. A minimal exact-version QEMU source returned exit zero, the single 28-byte success line
+on stdout, and empty stderr. This probes plugin discovery and validation framing only, not NKE execution or disk
 production.
 
 `materials` is a one-to-one map from a source-owned binding name to another explicitly selected component in
@@ -233,12 +233,24 @@ component text use the display-safe canonical-text policy. Schema and kind value
 whitespace-free canonical-token policy.
 Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
 deterministic description, not an authenticated receipt; admitted execution must derive it from authenticated
-producer observations and bind the exact serialized file bytes before invoking a subprocess. Direct Packer will
+producer observations and bind the exact serialized file bytes before invoking a subprocess.
+
+An ordinary `oci-hermetic` producer may consume that native v2 closure without another authored field. NKD
+stages the manifest at `/nkd/inputs/material-manifest.json`, stages each exact producer output at the manifest's
+`/nkd/inputs/materials/<binding>` path, and mounts `/nkd/inputs` read-only beside the existing read-only `/src`
+source mount. The exact source-owned command reads those fixed paths and writes only beneath its declared
+`writeDir`; NKD neither appends arguments nor injects environment variables, unpacks inputs, or interprets the
+producer's composition order. The build remains offline. Missing, extra, relabeled, non-regular, or changed
+producer bytes fail before the toolchain container starts. This permits one selected component to compose other
+selected component outputs, including a deterministic tarball or repository payload, while every material
+producer retains its own build or byte-preserving acquisition semantics.
+
+Direct Packer will
 receive the private absolute manifest path through its declared `materialManifestVariable`; the source must
-cross-check every entry's architecture against the separately supplied architecture variable. The command/Make form
-has no equivalent executable handoff in the current schema and therefore cannot lower a material-bearing command.
-Adding one requires a typed authored field and identity/lowering contract; an adapter may not invent a conventional
-path, append an argument, or inject an undeclared environment variable.
+cross-check every entry's architecture against the separately supplied architecture variable. The `vm-image`
+command/Make form has no admitted executable handoff and therefore cannot lower a material-bearing VM command.
+An adapter may not silently reuse the ordinary-container mount contract across the different VM executor boundary,
+append an argument, or inject an undeclared environment variable.
 
 Malformed manifest schema or fields, including an absent explicit materials array or malformed digest text, fail
 as `invalid-catalog`. They are description-shape failures, not missing provenance or a failed authenticated
@@ -319,7 +331,8 @@ component may select that `packer` driver only after the catalog carries an ADR-
 toolchain and material-supplier pins. That catalog choice changes the catalog snapshot and Build identity. It does
 not remove or invalidate the standalone Make entrypoint. Compiler lowering
 supports a direct-Packer producer with typed materials and a command producer without materials. A
-material-bearing command/Make producer, VM execution, disk collection, and publication remain capability-gated.
+material-bearing `vm-image` command/Make producer, VM execution, disk collection, and publication remain
+capability-gated. Ordinary `oci-hermetic` producers use the admitted fixed material mount described above.
 An override that changes NKE's derived
 output filename must also change the catalog artifact path; NKD never guesses it.
 

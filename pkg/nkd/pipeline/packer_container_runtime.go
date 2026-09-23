@@ -125,8 +125,10 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		entrypoint: "sh", packerArgs: []string{
 			"-ec", packerInputExtractScript, "nkd-extract-input",
 			strings.TrimPrefix(staged.inputArchiveDigest, "sha256:"), packerContainerWorkRoot + "/stage/input.tar",
+			packerContainerInputRoot, strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()),
 		},
 		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=stage"},
+		user:   "0:0", allowChown: true, allowDAC: true,
 	}
 	resources.containers = append(resources.containers, stageName)
 	if err := createPackerContainer(ctx, request.runtime, stage); err != nil {
@@ -294,13 +296,25 @@ func observePackerRuntimeFreshness(ctx context.Context, runtime packerContainerR
 			"re-observing held container runtime")
 	}
 	var infoOut, infoErr bytes.Buffer
-	if err := runtime.Run(ctx, nil, &infoOut, &infoErr, "info", "--format", "{{json .ID}}"); err != nil {
-		return runtimeCommandError(ctx, err, infoErr.String(), e.CodeEngineCapability,
-			"re-observing container runtime server")
-	}
 	var serverID string
-	if err := json.Unmarshal(bytes.TrimSpace(infoOut.Bytes()), &serverID); err != nil || strings.TrimSpace(serverID) == "" {
-		return e.New(e.CodeEngineCapability, "container runtime returned no canonical server identity")
+	if named, ok := runtime.(interface{ RuntimeName() string }); ok && named.RuntimeName() == "podman" {
+		if err := runtime.Run(ctx, nil, &infoOut, &infoErr, "info", "--format", "{{json .}}"); err != nil {
+			return runtimeCommandError(ctx, err, infoErr.String(), e.CodeEngineCapability,
+				"re-observing Podman runtime server")
+		}
+		var err error
+		serverID, err = podmanServerIdentity(infoOut.Bytes())
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := runtime.Run(ctx, nil, &infoOut, &infoErr, "info", "--format", "{{json .ID}}"); err != nil {
+			return runtimeCommandError(ctx, err, infoErr.String(), e.CodeEngineCapability,
+				"re-observing container runtime server")
+		}
+		if err := json.Unmarshal(bytes.TrimSpace(infoOut.Bytes()), &serverID); err != nil || strings.TrimSpace(serverID) == "" {
+			return e.New(e.CodeEngineCapability, "container runtime returned no canonical server identity")
+		}
 	}
 	observed, err := runtimeIdentityFromOutput(executableDigest, runtime.Endpoint(), serverID, versionOut.Bytes())
 	if err != nil {
@@ -365,6 +379,12 @@ func createPackerVolume(ctx context.Context, runtime packerContainerRuntime, nam
 }
 
 func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, request packerContainerCreateRequest) error {
+	switch runtime.RuntimeName() {
+	case "docker", "podman":
+	default:
+		return e.New(e.CodeEngineCapability,
+			"Packer container %q requires the Docker or Podman runtime adapter", request.name)
+	}
 	switch request.network {
 	case "":
 		request.network = ir.NetworkNone
@@ -374,7 +394,7 @@ func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, 
 			"Packer container %q requested unsupported network mode %q", request.name, request.network)
 	}
 	var stdout, stderr bytes.Buffer
-	if err := runtime.Run(ctx, nil, &stdout, &stderr, packerContainerCreateArgs(request)...); err != nil {
+	if err := runtime.Run(ctx, nil, &stdout, &stderr, packerContainerCreateArgs(runtime.RuntimeName(), request)...); err != nil {
 		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed, "creating Packer container %q", request.name)
 	}
 	if strings.TrimSpace(stdout.String()) == "" {

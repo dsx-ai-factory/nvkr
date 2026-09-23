@@ -290,7 +290,7 @@ func testPackerRequest(t *testing.T, projectDir string) PackerBuildRequest {
 		t.Fatal(err)
 	}
 	heldMaterial, err := heldfile.OpenContext(t.Context(), material, heldfile.Options{
-		Label: "test-packer-material", MaxBytes: maxPackerMaterialBytes, ExpectedDigest: FileDigest(materialBytes),
+		Label: "test-packer-material", MaxBytes: MaxBuildMaterialBytes, ExpectedDigest: FileDigest(materialBytes),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1131,7 +1131,7 @@ func TestPackerClosureCountAndSizeBoundsFailClosed(t *testing.T) {
 	})
 	t.Run("material count", func(t *testing.T) {
 		request := testPackerRequest(t, t.TempDir())
-		request.Materials = make([]PackerMaterialInput, maxPackerMaterialFiles+1)
+		request.Materials = make([]PackerMaterialInput, maxBuildMaterialFiles+1)
 		if code := packerErrorCode(validatePackerBuildRequest(request)); code != nkderr.CodeInvalidCatalog {
 			t.Fatalf("material count code = %q", code)
 		}

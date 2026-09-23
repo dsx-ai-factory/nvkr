@@ -1,0 +1,78 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
+	"github.com/urfave/cli/v2"
+)
+
+func TestRunLocalPrintsDurableDiskOutput(t *testing.T) {
+	repository, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repository)
+	attemptsRoot := t.TempDir()
+	payload := []byte("durable-qcow2")
+	var printedPath string
+	execute := func(_ context.Context, prepared *lifecycle.PreparedRun,
+		options lifecycle.LocalOptions,
+	) (*lifecycle.Run, error) {
+		run := prepared.Description()
+		run.Status = lifecycle.RunComplete
+		run.Lane = "unqualified-local-execution"
+		run.Observed = []lifecycle.Artifact{{Name: "node-image", Kind: lifecycle.OutputDiskImage}}
+		printedPath, err = lifecycle.LocalDiskOutputPath(
+			filepath.Join(options.AttemptsRoot, run.Attempt), run.Observed[0].Name)
+		if err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(filepath.Dir(printedPath), 0o700); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(printedPath, payload, 0o444); err != nil {
+			return nil, err
+		}
+		return &run, nil
+	}
+
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = writer
+	t.Cleanup(func() { os.Stdout = oldStdout })
+	app := &cli.App{Commands: []*cli.Command{cmdRunWithLocalExecutor(execute)}}
+	runErr := app.RunContext(t.Context(), []string{
+		"nkdctl", "run", "local",
+		"--definition", filepath.Join("definitions", "nke-v1", "definition.yaml"),
+		"--environment", filepath.Join("definitions", "nke-v1", "environment-local.yaml"),
+		"--attempt", "disk-cli-output", "--attempts-root", attemptsRoot,
+	})
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = oldStdout
+	output, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runErr != nil {
+		t.Fatal(runErr)
+	}
+	if !strings.Contains(string(output), "disk: "+printedPath+"\n") {
+		t.Fatalf("local run output omitted durable disk path: %q", output)
+	}
+	got, err := os.ReadFile(printedPath)
+	if err != nil || !bytes.Equal(got, payload) {
+		t.Fatalf("printed disk path is not durable: %q, %v", got, err)
+	}
+}

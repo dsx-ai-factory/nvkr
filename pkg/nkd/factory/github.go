@@ -15,10 +15,13 @@ import (
 )
 
 const (
-	GitHubWorkflowPath       = ".github/workflows/nkd-run.yml"
-	FactoryPlanPath          = ".github/nkd-run/plan.json"
-	githubReleaseEnvironment = "nkd-release"
-	githubExecutionCondition = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
+	GitHubWorkflowPath               = ".github/workflows/nkd-run.yml"
+	FactoryPlanPath                  = ".github/nkd-run/plan.json"
+	githubReleaseEnvironment         = "nkd-release"
+	githubExecutionCondition         = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
+	githubSupportJobTimeoutMinutes   = 15
+	githubDefaultStageTimeoutMinutes = 60
+	githubMaximumJobTimeoutMinutes   = 360
 )
 
 var githubLayout = generationLayout{workflowPath: GitHubWorkflowPath,
@@ -91,7 +94,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "  %s:\n", jobID)
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle("Prepare NKD runner ("+runner+")"))
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runner))
-		fmt.Fprintln(&body, "    timeout-minutes: 15")
+		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		fmt.Fprintf(&body, "    steps:\n")
 		actions.writeCheckoutStep(&body)
 		actions.writeSetupGoStep(&body)
@@ -102,6 +105,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	}
 	for _, stage := range stages {
 		node := stage.Nodes[0]
+		timeoutMinutes, err := githubStageTimeoutMinutes(stage)
+		if err != nil {
+			return nil, err
+		}
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "GitHub factory rendering canceled")
 		}
@@ -110,7 +117,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "  %s:\n", jobID)
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle(stage.Name))
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(node.RunsOn))
-		fmt.Fprintln(&body, "    timeout-minutes: 60")
+		fmt.Fprintf(&body, "    timeout-minutes: %d\n", timeoutMinutes)
 		// Engine-agnostic environment config (ADR-18 §8), rendered in GitHub syntax: a docker-capable
 		// job container, dind service containers, and job env — for a runner that lacks them
 		// natively. GitHub provisions Go via setup-go.
@@ -232,7 +239,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintln(&body, "  nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runners[0]))
-		fmt.Fprintln(&body, "    timeout-minutes: 15")
+		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubExecutionCondition)
 		fmt.Fprintln(&body, "    steps:")

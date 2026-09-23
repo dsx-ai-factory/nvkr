@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -18,12 +19,75 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
+
+func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"config", "inputs", "source"} {
+		directory := filepath.Join(root, name)
+		if err := os.Mkdir(directory, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, name+".txt"), []byte(name+"\n"), 0o400); err != nil {
+			t.Fatal(err)
+		}
+	}
+	nested := filepath.Join(root, "source", "sealed", "nested")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "payload"), []byte("nested\n"), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	for directory := nested; directory != filepath.Join(root, "source"); directory = filepath.Dir(directory) {
+		if err := os.Chmod(directory, 0o500); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"config", "inputs", "source"} {
+		if err := os.Chmod(filepath.Join(root, name), 0o500); err != nil {
+			t.Fatal(err)
+		}
+	}
+	archive := filepath.Join(root, "input.tar")
+	if err := transportarchive.Pack(t.Context(), archive, root, []string{"config", "inputs", "source"}); err != nil {
+		t.Fatal(err)
+	}
+	archiveBytes, err := os.ReadFile(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(archiveBytes)
+	destination := t.TempDir()
+	command := exec.CommandContext(t.Context(), "sh", "-ec", packerInputExtractScript,
+		"nkd-extract-input", fmt.Sprintf("%x", digest), archive, destination,
+		fmt.Sprint(os.Getuid()), fmt.Sprint(os.Getgid()))
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("extracting sealed Packer input closure: %v: %s", err, output)
+	}
+	for _, name := range []string{"config", "inputs", "source"} {
+		content, err := os.ReadFile(filepath.Join(destination, name, name+".txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(content) != name+"\n" {
+			t.Fatalf("extracted %s content = %q", name, content)
+		}
+	}
+	nestedContent, err := os.ReadFile(filepath.Join(destination, "source", "sealed", "nested", "payload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(nestedContent) != "nested\n" {
+		t.Fatalf("extracted nested content = %q", nestedContent)
+	}
+}
 
 func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	node := testPackerContainerNode()
@@ -127,6 +191,11 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			if strings.Contains(joined, "nkd.dev/role=bootstrap") {
 				if !slices.Contains(call, "--user=0:0") || !slices.Contains(call, "--cap-add=CHOWN") {
 					t.Fatalf("volume bootstrap lacks its narrow root/CHOWN authority: %#v", call)
+				}
+			} else if strings.Contains(joined, "nkd.dev/role=stage") {
+				if !slices.Contains(call, "--user=0:0") || !slices.Contains(call, "--cap-add=CHOWN") ||
+					!slices.Contains(call, "--cap-add=DAC_OVERRIDE") {
+					t.Fatalf("authenticated input stage lacks its narrow extraction authority: %#v", call)
 				}
 			} else if !slices.Contains(call, hostUser) || slices.Contains(call, "--cap-add=CHOWN") {
 				t.Fatalf("non-bootstrap container does not use the host identity without CHOWN: %#v", call)
@@ -302,9 +371,9 @@ func TestPackerBuildContainerRequestThreadsKVMResolution(t *testing.T) {
 	}
 	build := packerBuildContainerRequest(request, "input", "work", "/nkd/input/source",
 		"nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc", "123", true)
-	args := packerContainerCreateArgs(build)
+	args := packerContainerCreateArgs("docker", build)
 	if !slices.Contains(args, "accelerator=kvm") || !slices.Contains(args, "--group-add=123") ||
-		!slices.Contains(args, "--network=default") {
+		!slices.Contains(args, "--network=bridge") {
 		t.Fatalf("KVM build arguments do not preserve the resolved accelerator and device group: %#v", args)
 	}
 	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
@@ -716,7 +785,7 @@ func TestVMImagePackerExecutorPreservesCallbackDeadline(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = executor.Close() })
 	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("{}\n"), heldfile.Options{
-		Label: "material-manifest", MaxBytes: maxPackerManifestBytes,
+		Label: "material-manifest", MaxBytes: maxBuildMaterialManifestBytes,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -746,6 +815,8 @@ type blockingPackerRuntime struct {
 }
 
 func (runtime *blockingPackerRuntime) Endpoint() string { return qualifiedRuntimeEndpoint }
+
+func (runtime *blockingPackerRuntime) RuntimeName() string { return "docker" }
 
 func (runtime *blockingPackerRuntime) AdmittedIdentity() (string, string) {
 	return "sha256:" + repeatHex("9"), "sha256:" + repeatHex("a")
@@ -780,7 +851,7 @@ func TestVMImagePackerExecutorCloseAndSessionCloseJoinActiveRun(t *testing.T) {
 		session: session.state, runtime: runtime, nodes: map[string][]byte{node.ID: raw},
 	}
 	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("{}\n"), heldfile.Options{
-		Label: "material-manifest", MaxBytes: maxPackerManifestBytes,
+		Label: "material-manifest", MaxBytes: maxBuildMaterialManifestBytes,
 	})
 	if err != nil {
 		t.Fatal(err)

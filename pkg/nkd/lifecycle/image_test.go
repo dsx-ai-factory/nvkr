@@ -27,14 +27,16 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, runtime := range []string{"docker", "podman", ""} {
-		t.Run("runtime="+runtime, func(t *testing.T) {
-			environment.Runtime.Runtime = runtime
+	for _, tc := range []struct {
+		name, authored, resolved string
+	}{
+		{name: "docker", authored: "docker", resolved: "docker"},
+		{name: "podman", authored: "podman", resolved: "podman"},
+		{name: "default", resolved: "podman"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			environment.Runtime.Runtime = tc.authored
 			plan, err := Compile(ctx, definitionPath, definition, environmentPath, environment, "v0.0.0 (test)")
-			if runtime != "docker" {
-				assertCode(t, err, e.CodeEngineCapability)
-				return
-			}
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -56,9 +58,9 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 				t.Fatal(err)
 			}
 			workflow := string(bundle.Files[factory.GitHubWorkflowPath])
-			if plan.Environment.RuntimeBinary() != "docker" || !strings.Contains(workflow,
+			if plan.Environment.RuntimeBinary() != tc.resolved || !strings.Contains(workflow,
 				"factory execute-node --plan "+bundle.PlanPath+" --node cwe/build-cwe") {
-				t.Fatal("CWE launch does not execute the plan carrying its admitted Docker runtime")
+				t.Fatalf("CWE launch does not execute the plan carrying its admitted %s runtime", tc.resolved)
 			}
 		})
 	}

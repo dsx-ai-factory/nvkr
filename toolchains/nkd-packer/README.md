@@ -1,22 +1,32 @@
 # Direct-Packer toolchain image
 
 This directory defines the OCI toolchain consumed by NKD's local direct-Packer
-executor. Each host-platform image contains Packer 1.14.2, the QEMU plugin 1.1.6,
+executor. Each host-platform image contains Packer 1.15.4, the QEMU plugin 1.1.6,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NKE
-Packer project.
+Packer project. It also contains Go 1.27.1, crane 0.21.9, nfpm 2.47.0,
+`dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
+and xorriso. Those
+are the preparation and ISO-composition tools required by the exact NKE source
+at `de0e46bb14cae2f892677bf9e21b91a7add2f9d9` for an AMD64 non-FDE build.
+Go 1.27.1 satisfies that source's Go 1.26.8 minimum and the NKD 1.27 module
+used to build the source-bound local bootstrap runner.
 
 `toolchain.lock.json` binds the Ubuntu and download-helper multi-platform base
 indexes, one immutable Ubuntu archive snapshot, and the official Packer and
 QEMU-plugin release archive and extracted executable digests for both host
-architectures. The download
+architectures. It also pins the official Go, crane and nfpm archives and the
+extracted crane and nfpm executables. The download
 helper supplies the CA bundle needed to bootstrap the signed Ubuntu snapshot
-from a minimal Ubuntu base. The Dockerfile reproduces Packer 1.14.2's documented
+from a minimal Ubuntu base. The Dockerfile reproduces Packer 1.15.4's documented
 namespaced plugin layout and checksum file from the separately verified plugin
 executable. It never executes a target-architecture Go binary while assembling
 an image. No plugin discovery or download is performed by NKD at runtime.
 
-Build and validate one local host architecture:
+Build and validate one local host architecture. The runtime check proves the
+exact Packer, plugin, Go, crane and nfpm versions; QEMU/QCOW2 and firmware
+availability; the SSH-key, Debian-package and ISO-composition tools; and a real
+`packer validate` call through the preinstalled QEMU plugin:
 
 ```sh
 toolchains/nkd-packer/build.sh --arch arm64
@@ -30,16 +40,31 @@ followed by the same validation and a real bake on a native host before
 publication.
 
 Use `--check` for the network-free source-lock validation. Building uses the
-fixed Ubuntu snapshot and verifies both downloaded release archives before
+fixed Ubuntu snapshot and verifies every downloaded release archive before
 extracting them. The command does not push, sign, or write a transport digest.
-After both platform images are published through an approved registry workflow,
-record their immutable repository digests in the lock and only then select them
-from a maintained catalog.
+There is no toolchain publication workflow in this repository. Consequently the
+image digest remains `null`: a local image ID is not an OCI repository digest.
+After license approval and a vulnerability scan, the exact external publication
+sequence is:
+
+```sh
+IMAGE_REPOSITORY=<approved-registry>/nkd-packer-toolchain
+IMAGE_TAG=nke-de0e46bb-amd64
+toolchains/nkd-packer/build.sh --arch amd64 --tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+crane digest "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+```
+
+Record the resulting `${IMAGE_REPOSITORY}@sha256:...` under `images.amd64`,
+then sign, attach the SBOM and read the digest back through the approved
+registry workflow before selecting it from a maintained catalog. Do not use the
+mutable tag as the catalog pin.
 
 The Packer executable remains an external subprocess under the repository's
 license policy; it is not linked into `nkdctl`. The image preserves the release
 archives' Packer BUSL-1.1 and QEMU-plugin MPL-2.0 license texts. Ubuntu package
-copyright records remain under `/usr/share/doc`.
+copyright records remain under `/usr/share/doc`; the Go BSD-3-Clause, crane
+Apache-2.0 and nfpm MIT texts are retained with the toolchain notices.
 
 This repository does not record NVIDIA approval to redistribute Packer under
 BUSL-1.1 or a completed vulnerability review of this image. The source may be

@@ -23,16 +23,18 @@ import (
 )
 
 type fakeDiskProducerResult struct {
-	digest   string
-	size     int64
-	payload  []byte
-	writeErr error
-	cancel   context.CancelFunc
-	closed   bool
-	closeErr error
-	started  chan struct{}
-	release  <-chan struct{}
-	onClose  func()
+	digest              string
+	size                int64
+	payload             []byte
+	writeErr            error
+	cancel              context.CancelFunc
+	closed              bool
+	closeErr            error
+	started             chan struct{}
+	release             <-chan struct{}
+	onClose             func()
+	streams             int
+	allowChangedPayload bool
 }
 
 func (result *fakeDiskProducerResult) WriteToContext(ctx context.Context, destination io.Writer) (int64, error) {
@@ -42,6 +44,7 @@ func (result *fakeDiskProducerResult) WriteToContext(ctx context.Context, destin
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
+	result.streams++
 	if result.started != nil {
 		close(result.started)
 	}
@@ -54,6 +57,10 @@ func (result *fakeDiskProducerResult) WriteToContext(ctx context.Context, destin
 	}
 	if result.writeErr != nil {
 		return 0, result.writeErr
+	}
+	if !result.allowChangedPayload &&
+		(pipeline.FileDigest(result.payload) != result.digest || int64(len(result.payload)) != result.size) {
+		return 0, e.New(e.CodeVerifyFailed, "fake held disk payload changed")
 	}
 	written := int64(0)
 	for offset := 0; offset < len(result.payload); {
@@ -421,6 +428,63 @@ func TestRunLocalNodeRoutesDirectPackerThroughConcreteCallback(t *testing.T) {
 	}
 }
 
+func TestRunLocalNodeRoutesDiskTerminalObservationThroughHeldPayload(t *testing.T) {
+	t.Chdir(t.TempDir())
+	plan, _, completion := diskObservationFixture(t, "none")
+	var terminal Node
+	for _, node := range plan.Graph.Nodes {
+		if node.ID == "node-image/terminal-observe" {
+			terminal = node
+		}
+	}
+	if terminal.ID == "" {
+		t.Fatal("disk fixture has no terminal observation")
+	}
+	owner := localDiskRunResult(t, plan)
+	if err := owner.recordDiskCompletion(completion); err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+	ordinaryCalled := false
+	options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/disk-terminal"})
+	result, err := runLocalNode(t.Context(), plan, terminal, options, nil, owner,
+		localRunDeps{executeNode: func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error {
+			ordinaryCalled = true
+			return nil
+		}})
+	if err != nil || result.Status != "ok" || ordinaryCalled {
+		t.Fatalf("held terminal routing: result=%+v ordinary=%v error=%v", result, ordinaryCalled, err)
+	}
+	_, artifacts := planIndex(plan)
+	path, err := relocatedFactoryPath(artifacts[terminal.Outputs[0]].Path, options.Workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var observation factoryObservation
+	if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &observation); err != nil {
+		t.Fatal(err)
+	}
+	if len(observation.Inputs) != 2 {
+		t.Fatalf("disk terminal inputs = %#v", observation.Inputs)
+	}
+	foundPayload := false
+	for _, input := range observation.Inputs {
+		if input.ArtifactID == "artifact/node-image/image" {
+			foundPayload = input.Digest == completion.Payload.digest
+		}
+	}
+	if !foundPayload {
+		t.Fatalf("terminal observation omitted held disk identity: %#v", observation.Inputs)
+	}
+	if streams := fakeDiskPayloadState(completion.Payload).streams; streams != 0 {
+		t.Fatalf("terminal scheduling observation streamed the QCOW2 %d times", streams)
+	}
+}
+
 func diskExecutionFixture(t *testing.T, plan *Plan) diskExecutionState {
 	t.Helper()
 	digest, err := plan.Digest()
@@ -502,6 +566,11 @@ func TestObserveDiskLifecyclePayloadRejectsSubstitutionAndAmbiguity(t *testing.T
 		}, code: e.CodeVerifyFailed},
 		{name: "payload changed", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
 			fakeDiskPayloadState(result.Payload).payload[4] ^= 0xff
+		}, code: e.CodeVerifyFailed},
+		{name: "streamed payload digest changed", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
+			held := fakeDiskPayloadState(result.Payload)
+			held.payload[len(held.payload)-1] ^= 0xff
+			held.allowChangedPayload = true
 		}, code: e.CodeVerifyFailed},
 		{name: "mutable content identity cannot retarget snapshot", change: func(_ *Plan, _ *LifecycleOutputPlan, _ *diskExecutionState, result *diskProducerCompletion, _ *[]diskProducerCompletion) {
 			held := fakeDiskPayloadState(result.Payload)

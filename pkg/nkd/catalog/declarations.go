@@ -17,9 +17,9 @@ var (
 	knownOutputSet = map[string]bool{
 		"host-package": true, "oci-image": true, "disk-image": true, "raw": true, "tarball": true,
 	}
-	// prebuiltOutputSet constrains a prebuilt component's delivery form: a URL binary
-	// becomes a host-package (.deb) or is kept raw; an Image is itself the oci-image.
-	prebuiltOutputSet = map[string]bool{"host-package": true, "oci-image": true, "raw": true}
+	// prebuiltOutputSet constrains a prebuilt component's delivery form: URL bytes
+	// become a host-package, raw file, or tarball; an Image is itself the oci-image.
+	prebuiltOutputSet = map[string]bool{"host-package": true, "oci-image": true, "raw": true, "tarball": true}
 	// reproEnvKeys are the reproducibility/hermeticity variables the compiler owns
 	// and pins from target/component metadata. A catalog's versionStamp may add
 	// extra pinned env (KUBE_GIT_*, CC), but must not resolve to a value that

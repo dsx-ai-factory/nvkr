@@ -246,13 +246,13 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		project: "/nkd/input/source/os-image/packer", packerArgs: []string{"build", "-only=build.qemu.node", "."},
 		labels: []string{"nkd.dev/node=build-node", "nkd.dev/attempt=abc"}, inputReadOnly: true,
 	}
-	withoutKVM := packerContainerCreateArgs(request)
+	withoutKVM := packerContainerCreateArgs("docker", request)
 	want := []string{
 		"create", "--name", "nkd-packer-build", "--pull=never", "--platform", "linux/amd64",
 		"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
 		"--no-healthcheck", "--hostname=nkd-packer", fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid()),
 		"--label", "nkd.dev/node=build-node", "--label", "nkd.dev/attempt=abc",
-		"--mount", "type=volume,src=nkd-input,dst=/nkd/input,readonly",
+		"--mount", "type=volume,src=nkd-input,dst=/nkd/input,volume-nocopy,readonly",
 		"--mount", "type=volume,src=nkd-work,dst=/nkd/work,volume-nocopy",
 		"--workdir", "/nkd/input/source/os-image/packer",
 		"--env", "CHECKPOINT_DISABLE=1", "--env", "HOME=/nkd/work/home", "--env", "PACKER_CACHE_DIR=/nkd/work/cache",
@@ -270,8 +270,14 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 			t.Fatalf("container args contain a host bind mount: %#v", withoutKVM)
 		}
 	}
+	podman := packerContainerCreateArgs("podman", request)
+	if slices.Contains(podman, "type=volume,src=nkd-work,dst=/nkd/work,volume-nocopy") ||
+		!slices.Contains(podman, "nkd-input:/nkd/input:nocopy,ro") ||
+		!slices.Contains(podman, "nkd-work:/nkd/work:nocopy") {
+		t.Fatalf("Podman container args do not use its named-volume nocopy syntax: %#v", podman)
+	}
 	request.kvm, request.groupAdd = kvm, "123"
-	withKVM := packerContainerCreateArgs(request)
+	withKVM := packerContainerCreateArgs("docker", request)
 	if len(withKVM) != len(want)+3 || !slices.Contains(withKVM, "--group-add=123") ||
 		!slices.Contains(withKVM, "--device") {
 		t.Fatalf("KVM container args do not add the admitted group and device: %#v", withKVM)
@@ -281,9 +287,13 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		t.Fatalf("KVM container args do not use the minimal rw device grant: %#v", withKVM)
 	}
 	request.network = ir.NetworkDefault
-	withNetwork := packerContainerCreateArgs(request)
-	if !slices.Contains(withNetwork, "--network=default") || slices.Contains(withNetwork, "--network=none") {
-		t.Fatalf("networked Packer build args = %#v", withNetwork)
+	withDockerNetwork := packerContainerCreateArgs("docker", request)
+	if !slices.Contains(withDockerNetwork, "--network=bridge") || slices.Contains(withDockerNetwork, "--network=none") {
+		t.Fatalf("networked Docker Packer build args = %#v", withDockerNetwork)
+	}
+	withPodmanNetwork := packerContainerCreateArgs("podman", request)
+	if !slices.Contains(withPodmanNetwork, "--network=default") || slices.Contains(withPodmanNetwork, "--network=none") {
+		t.Fatalf("networked Podman Packer build args = %#v", withPodmanNetwork)
 	}
 }
 
@@ -301,19 +311,31 @@ func TestCreatePackerContainerRejectsUnknownNetworkBeforeRuntime(t *testing.T) {
 	}
 }
 
+func TestCreatePackerContainerRejectsUnknownRuntimeBeforeWork(t *testing.T) {
+	runtime := &recordingPackerRuntime{name: "containerd"}
+	err := createPackerContainer(t.Context(), runtime, packerContainerCreateRequest{name: "build"})
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+		t.Fatalf("unknown runtime error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	if len(runtime.calls) != 0 {
+		t.Fatalf("runtime called before adapter admission: %#v", runtime.calls)
+	}
+}
+
 func TestPackerVolumeBootstrapIsTheOnlyRootContainer(t *testing.T) {
 	base := packerContainerCreateRequest{
 		name: "stage", image: "registry.example/packer@sha256:" + repeatHex("a"), platform: "linux/amd64",
 		input: "nkd-input", work: "nkd-work", project: "/nkd/work", entrypoint: "sh",
 		packerArgs: []string{"-ec", "true"},
 	}
-	consumer := packerContainerCreateArgs(base)
+	consumer := packerContainerCreateArgs("docker", base)
 	if !slices.Contains(consumer, fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())) ||
 		slices.Contains(consumer, "--user=0:0") || slices.Contains(consumer, "--cap-add=CHOWN") {
 		t.Fatalf("consumer identity/capabilities = %#v", consumer)
 	}
 	base.name, base.user, base.allowChown = "bootstrap", "0:0", true
-	bootstrap := packerContainerCreateArgs(base)
+	bootstrap := packerContainerCreateArgs("docker", base)
 	if !slices.Contains(bootstrap, "--user=0:0") || !slices.Contains(bootstrap, "--cap-add=CHOWN") {
 		t.Fatalf("bootstrap identity/capabilities = %#v", bootstrap)
 	}
@@ -370,6 +392,7 @@ func TestStartPackerContainerReturnsBoundedRuntimeDiagnostic(t *testing.T) {
 }
 
 type recordingPackerRuntime struct {
+	name       string
 	endpoint   string
 	digest     string
 	identity   string
@@ -386,6 +409,8 @@ type cleanupBudgetPackerRuntime struct {
 }
 
 func (*cleanupBudgetPackerRuntime) Endpoint() string { return qualifiedRuntimeEndpoint }
+
+func (*cleanupBudgetPackerRuntime) RuntimeName() string { return "docker" }
 
 func (*cleanupBudgetPackerRuntime) AdmittedIdentity() (string, string) { return "", "" }
 
@@ -404,6 +429,13 @@ func (runtime *cleanupBudgetPackerRuntime) Cleanup(ctx context.Context, _ time.D
 }
 
 func (runtime *recordingPackerRuntime) Endpoint() string { return runtime.endpoint }
+
+func (runtime *recordingPackerRuntime) RuntimeName() string {
+	if runtime.name == "" {
+		return "docker"
+	}
+	return runtime.name
+}
 
 func (runtime *recordingPackerRuntime) AdmittedIdentity() (string, string) {
 	return runtime.digest, runtime.identity
@@ -447,8 +479,10 @@ func TestObserveLocalPackerImageUsesExactHostPlatformWithoutPull(t *testing.T) {
 	digest := "sha256:" + repeatHex("a")
 	for _, test := range []struct {
 		name       string
+		runtime    string
 		toolchain  string
 		inspection string
+		want       []string
 	}{
 		{
 			name:       "repository manifest digest",
@@ -460,9 +494,16 @@ func TestObserveLocalPackerImageUsesExactHostPlatformWithoutPull(t *testing.T) {
 			toolchain:  digest,
 			inspection: fmt.Sprintf(`{"Id":"%s","RepoDigests":[],"Os":"linux","Architecture":"arm64","Config":{"Env":["PATH=/ignored"]}}`, digest),
 		},
+		{
+			name:       "Podman bare image ID",
+			runtime:    "podman",
+			toolchain:  digest,
+			inspection: fmt.Sprintf(`{"Id":"%s","RepoDigests":[],"Os":"linux","Architecture":"arm64","Config":{"Env":["PATH=/ignored"]}}`, strings.TrimPrefix(digest, "sha256:")),
+			want:       []string{"image", "inspect", "--format", "{{json .}}", digest},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			runtime := &recordingPackerRuntime{run: func(_ io.Reader, stdout, _ io.Writer, _ []string) error {
+			runtime := &recordingPackerRuntime{name: test.runtime, run: func(_ io.Reader, stdout, _ io.Writer, _ []string) error {
 				_, _ = io.WriteString(stdout, test.inspection)
 				return nil
 			}}
@@ -470,7 +511,10 @@ func TestObserveLocalPackerImageUsesExactHostPlatformWithoutPull(t *testing.T) {
 			if err := observeLocalPackerImage(t.Context(), runtime, node); err != nil {
 				t.Fatal(err)
 			}
-			want := []string{"image", "inspect", "--platform", "linux/arm64", "--format", "{{json .}}", node.Toolchain}
+			want := test.want
+			if want == nil {
+				want = []string{"image", "inspect", "--platform", "linux/arm64", "--format", "{{json .}}", node.Toolchain}
+			}
 			if !reflect.DeepEqual(runtime.calls, [][]string{want}) {
 				t.Fatalf("image calls = %#v, want %#v", runtime.calls, [][]string{want})
 			}
@@ -563,6 +607,43 @@ func TestObservePackerRuntimeFreshnessRequiresAdmittedIdentity(t *testing.T) {
 	runtime.identity = "sha256:" + repeatHex("c")
 	if err := observePackerRuntimeFreshness(t.Context(), runtime); code(err) != e.CodeEngineCapability {
 		t.Fatalf("identity substitution error = %v, want %s", err, e.CodeEngineCapability)
+	}
+}
+
+func TestObservePackerRuntimeFreshnessUsesPodmanIdentity(t *testing.T) {
+	digest := "sha256:" + repeatHex("b")
+	version := []byte(`{"Client":{"APIVersion":"5.6.2","Version":"5.6.2","GitCommit":"abc","OsArch":"linux/arm64"}}`)
+	info := []byte(`{"host":{"arch":"arm64","cgroupManager":"systemd","cgroupVersion":"v2","databaseBackend":"sqlite","hostname":"builder","kernel":"6.1","networkBackend":"netavark","os":"linux","security":{"rootless":true,"seccompEnabled":true,"selinuxEnabled":true}},"store":{"graphDriverName":"overlay","graphRoot":"/var/lib/containers","runRoot":"/run/containers"},"version":{"APIVersion":"5.6.2","GitCommit":"abc","OsArch":"linux/arm64","Version":"5.6.2"}}`)
+	serverID, err := podmanServerIdentity(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := runtimeIdentityFromOutput(digest, qualifiedRuntimeEndpoint, serverID, version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := &recordingPackerRuntime{
+		name: "podman", endpoint: qualifiedRuntimeEndpoint, digest: digest, identity: identity,
+		run: func(_ io.Reader, stdout, _ io.Writer, args []string) error {
+			switch args[0] {
+			case "version":
+				_, _ = stdout.Write(version)
+			case "info":
+				_, _ = stdout.Write(info)
+			default:
+				return fmt.Errorf("unexpected Podman freshness command: %v", args)
+			}
+			return nil
+		},
+	}
+	if err := observePackerRuntimeFreshness(t.Context(), runtime); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(runtime.calls, [][]string{
+		{"version", "--format", "{{json .}}"},
+		{"info", "--format", "{{json .}}"},
+	}) {
+		t.Fatalf("Podman freshness calls = %#v", runtime.calls)
 	}
 }
 

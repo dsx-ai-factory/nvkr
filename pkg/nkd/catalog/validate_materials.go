@@ -12,9 +12,13 @@ func validateMaterialBindings(name string, component Component) error {
 	if len(component.Materials) == 0 {
 		return nil
 	}
-	if component.BuilderType != BuilderVMImage {
+	if !component.FromSource {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: material bindings require builderType vm-image", name)
+			"component %q: material bindings require a from-source component", name)
+	}
+	if component.BuilderType != "" && component.BuilderType != BuilderVMImage && component.BuilderType != BuilderOCIHermetic {
+		return e.New(e.CodeInvalidCatalog,
+			"component %q: material bindings require builderType oci-hermetic or vm-image", name)
 	}
 	boundComponents := make(map[string]string, len(component.Materials))
 	for _, binding := range sortedStringKeys(component.Materials) {

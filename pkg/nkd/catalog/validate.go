@@ -411,7 +411,7 @@ func validatePrebuilt(name string, c Component) error {
 	}
 	if !prebuiltOutputSet[c.OutputType] {
 		return e.New(e.CodeInvalidCatalog,
-			"prebuilt component %q: outputType %q not valid for the prebuilt lane (host-package|oci-image|raw)", name, c.OutputType)
+			"prebuilt component %q: outputType %q not valid for the prebuilt lane (host-package|oci-image|raw|tarball)", name, c.OutputType)
 	}
 	if hasImg && c.OutputType != "oci-image" {
 		return e.New(e.CodeInvalidCatalog,
@@ -419,7 +419,7 @@ func validatePrebuilt(name string, c Component) error {
 	}
 	if hasURL && c.OutputType == "oci-image" {
 		return e.New(e.CodeInvalidCatalog,
-			"prebuilt component %q: prebuilt.url cannot deliver an oci-image (use host-package or raw)", name)
+			"prebuilt component %q: prebuilt.url cannot deliver an oci-image (use host-package, raw, or tarball)", name)
 	}
 	ref := p.URL
 	if hasImg {

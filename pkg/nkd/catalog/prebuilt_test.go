@@ -36,6 +36,11 @@ func TestPrebuiltValidates(t *testing.T) {
 	if err := base(img).Validate(); err != nil {
 		t.Fatalf("valid prebuilt image must validate: %v", err)
 	}
+	tarball := goodPrebuilt()
+	tarball.OutputType = "tarball"
+	if err := base(tarball).Validate(); err != nil {
+		t.Fatalf("valid digest-pinned tarball must validate: %v", err)
+	}
 }
 
 // ADR-13 §2: a prebuilt component must declare external evidence explicitly — either

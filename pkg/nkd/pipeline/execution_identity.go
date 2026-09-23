@@ -64,6 +64,7 @@ type verifiedExecution struct {
 // execve'd through an inherited descriptor referring to that exact inode.
 type heldRuntimeExecutable struct {
 	capability  *heldfile.File
+	name        string
 	endpoint    string
 	environment []string
 	identity    string
@@ -205,16 +206,77 @@ func observeHeldRuntimeIdentity(ctx context.Context, runtime *heldRuntimeExecuta
 	if err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "observing held container runtime identity")
 	}
-	serverRaw, err := heldExecutionOutput(ctx, runtime, "info", "--format", "{{json .ID}}")
-	if err != nil {
-		return "", e.Wrap(e.CodeEngineCapability, err, "observing container runtime server identity")
-	}
 	var serverID string
-	if err := json.Unmarshal(bytes.TrimSpace(serverRaw), &serverID); err != nil || strings.TrimSpace(serverID) == "" {
-		return "", e.New(e.CodeEngineCapability,
-			"container runtime returned no canonical server identity")
+	if runtime.name == "podman" {
+		serverRaw, err := heldExecutionOutput(ctx, runtime, "info", "--format", "{{json .}}")
+		if err != nil {
+			return "", e.Wrap(e.CodeEngineCapability, err, "observing Podman runtime identity")
+		}
+		serverID, err = podmanServerIdentity(serverRaw)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		serverRaw, err := heldExecutionOutput(ctx, runtime, "info", "--format", "{{json .ID}}")
+		if err != nil {
+			return "", e.Wrap(e.CodeEngineCapability, err, "observing container runtime server identity")
+		}
+		if err := json.Unmarshal(bytes.TrimSpace(serverRaw), &serverID); err != nil || strings.TrimSpace(serverID) == "" {
+			return "", e.New(e.CodeEngineCapability,
+				"container runtime returned no canonical server identity")
+		}
 	}
 	return runtimeIdentityFromOutput(runtime.capability.Digest(), runtime.endpoint, serverID, raw)
+}
+
+// Podman does not expose Docker's daemon ID. Bind the unqualified local session
+// to the stable host, storage, security, and engine fields it does expose while
+// deliberately excluding changing capacity and uptime observations.
+func podmanServerIdentity(raw []byte) (string, error) {
+	if err := canonical.ValidateJSONDocument(bytes.TrimSpace(raw)); err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "decoding Podman runtime identity")
+	}
+	var info struct {
+		Host struct {
+			Arch            string `json:"arch"`
+			CgroupManager   string `json:"cgroupManager"`
+			CgroupVersion   string `json:"cgroupVersion"`
+			DatabaseBackend string `json:"databaseBackend"`
+			Hostname        string `json:"hostname"`
+			Kernel          string `json:"kernel"`
+			NetworkBackend  string `json:"networkBackend"`
+			OS              string `json:"os"`
+			Security        struct {
+				Rootless       bool `json:"rootless"`
+				SeccompEnabled bool `json:"seccompEnabled"`
+				SELinuxEnabled bool `json:"selinuxEnabled"`
+			} `json:"security"`
+		} `json:"host"`
+		Store struct {
+			GraphDriverName string `json:"graphDriverName"`
+			GraphRoot       string `json:"graphRoot"`
+			RunRoot         string `json:"runRoot"`
+		} `json:"store"`
+		Version struct {
+			APIVersion string `json:"APIVersion"`
+			GitCommit  string `json:"GitCommit"`
+			OsArch     string `json:"OsArch"`
+			Version    string `json:"Version"`
+		} `json:"version"`
+	}
+	if err := json.Unmarshal(raw, &info); err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "decoding Podman runtime identity")
+	}
+	if info.Host.Arch == "" || info.Host.OS == "" || info.Host.Hostname == "" ||
+		info.Store.GraphDriverName == "" || info.Store.GraphRoot == "" ||
+		info.Version.Version == "" || info.Version.OsArch == "" {
+		return "", e.New(e.CodeEngineCapability, "Podman returned an incomplete runtime identity")
+	}
+	identity, err := canonical.Marshal(info)
+	if err != nil {
+		return "", err
+	}
+	return string(identity), nil
 }
 
 func runtimeIdentityFromOutput(executableDigest, endpoint, serverID string, raw []byte) (string, error) {

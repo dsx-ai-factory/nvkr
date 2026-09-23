@@ -83,6 +83,7 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 	}{
 		{name: "execution-event", code: e.CodeEngineCapability, old: []byte(githubExecutionCondition), new: []byte("true")},
 		{name: "job-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 15"), new: []byte("timeout-minutes: 0")},
+		{name: "stage-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 60"), new: []byte("timeout-minutes: 59")},
 		{name: "cancel-running-publication", code: e.CodeEngineCapability, old: []byte("cancel-in-progress: false"), new: []byte("cancel-in-progress: true")},
 		{name: "network", old: []byte("--network none"), new: []byte("--network bridge")},
 		{name: "node-dispatch", old: []byte("factory execute-node --plan"), new: []byte("exec-node --nodes")},

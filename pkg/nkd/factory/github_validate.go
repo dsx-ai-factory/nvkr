@@ -103,6 +103,20 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		bootstrap[node.RunsOn] = "build-runner-" + shortStableName(node.RunsOn)
 	}
+	expectedTimeouts := make(map[string]int, len(stages)+len(bootstrap)+1)
+	for _, stage := range stages {
+		timeoutMinutes, err := githubStageTimeoutMinutes(stage)
+		if err != nil {
+			return err
+		}
+		expectedTimeouts[stage.ID] = timeoutMinutes
+	}
+	for _, jobID := range bootstrap {
+		expectedTimeouts[jobID] = githubSupportJobTimeoutMinutes
+	}
+	if len(plan.LifecycleOutputs) > 0 {
+		expectedTimeouts["nkd-lifecycle-run"] = githubSupportJobTimeoutMinutes
+	}
 	expectedJobCount := len(stages) + len(bootstrap)
 	if len(plan.LifecycleOutputs) > 0 {
 		expectedJobCount++
@@ -154,8 +168,11 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if len(wantSourceEnv) > 0 && !foundSource {
 			return e.New(e.CodeEngineCapability, "GitHub job %q omits source authentication", jobID)
 		}
-		if job.TimeoutMinutes <= 0 || job.TimeoutMinutes > 60 {
-			return e.New(e.CodeEngineCapability, "GitHub job %q requires a bounded timeout", jobID)
+		wantTimeout, ok := expectedTimeouts[jobID]
+		if !ok || job.TimeoutMinutes != wantTimeout {
+			return e.New(e.CodeEngineCapability,
+				"GitHub job %q timeout is %d minutes; expected %d",
+				jobID, job.TimeoutMinutes, wantTimeout)
 		}
 		if jobID == "nkd-lifecycle-run" && job.If != "${{ always() && "+githubExecutionCondition+" }}" {
 			return e.New(e.CodeEngineCapability, "GitHub Run finalization must follow the admitted execution event even after failure")

@@ -8,10 +8,55 @@ import (
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"sigs.k8s.io/yaml"
 )
+
+func TestGitHubStageTimeoutMinutes(t *testing.T) {
+	requirements := func(seconds uint64) *execution.Requirements {
+		return &execution.Requirements{TimeoutSeconds: seconds}
+	}
+	tests := []struct {
+		name    string
+		stage   githubStage
+		want    int
+		wantErr e.Code
+	}{
+		{name: "adapter default", stage: githubStage{ID: "default", Nodes: []Node{{ID: "build"}}}, want: 60},
+		{name: "round one second up", stage: githubStage{ID: "short", Nodes: []Node{{ID: "build", Requirements: requirements(1)}}}, want: 1},
+		{name: "round partial minute up", stage: githubStage{ID: "partial", Nodes: []Node{{ID: "build", Requirements: requirements(61)}}}, want: 2},
+		{name: "NKE image budget", stage: githubStage{ID: "nke-image", Nodes: []Node{{ID: "build", Requirements: requirements(21600)}}}, want: 360},
+		{
+			name: "sum sequential nodes",
+			stage: githubStage{ID: "grouped", Nodes: []Node{
+				{ID: "first", Requirements: requirements(60)},
+				{ID: "second", Requirements: requirements(61)},
+			}},
+			want: 3,
+		},
+		{name: "reject over GitHub limit", stage: githubStage{ID: "too-long", Nodes: []Node{{ID: "build", Requirements: requirements(21601)}}}, wantErr: e.CodeEngineCapability},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := githubStageTimeoutMinutes(test.stage)
+			if test.wantErr != "" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != test.wantErr {
+					t.Fatalf("want %s, got %v", test.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Fatalf("got %d minutes, want %d", got, test.want)
+			}
+		})
+	}
+}
 
 func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
 	base := Node{

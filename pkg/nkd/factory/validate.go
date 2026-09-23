@@ -155,8 +155,13 @@ func (plan Plan) validatePlanNodes(builds map[string]ir.Node) error {
 		if !ok {
 			return e.New(e.CodePipelineDrift, "operation %q has no selected producer instruction", node.ID)
 		}
-		if build.BuilderType == ir.BuilderBuildKit && plan.Environment.RuntimeBinary() != "docker" {
-			return e.New(e.CodeEngineCapability, "rootless BuildKit node %q requires the Docker runtime in its Environment", node.ID)
+		if build.BuilderType == ir.BuilderBuildKit {
+			switch plan.Environment.RuntimeBinary() {
+			case "docker", "podman":
+			default:
+				return e.New(e.CodeEngineCapability,
+					"rootless BuildKit node %q requires Docker or Podman in its Environment", node.ID)
+			}
 		}
 	}
 	return nil

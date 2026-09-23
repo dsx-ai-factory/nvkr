@@ -1,0 +1,15 @@
+apiVersion: nkd.dev/catalog-overlay/v3
+kind: CatalogOverlay
+name: ovn-kube-ubuntu-prebuilt
+requiresCatalogDigest: ${NKE_OS_BASE_CATALOG_DIGEST}
+components:
+  ovn-kube-ubuntu:
+    version: release-1.4
+    sourceDateEpoch: 1788540677
+    outputType: oci-image
+    prebuilt:
+      image: ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu:release-1.4
+      digests:
+        arm64: sha256:11b8b4dc5124a29053a7618a848050ce2ad7abb0d167454dfe2f193a8b38e124
+      evidence:
+        none: true

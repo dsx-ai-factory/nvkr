@@ -73,6 +73,16 @@ held result through that seam after capability admission. A serialized local res
 digest, or result cannot replace the in-process capability. This path has contract coverage only; no real
 Docker/Packer/NKE bake is claimed.
 
+A successful local lifecycle attempt streams the held QCOW2 once into an attempt-owned temporary file while the
+held Packer capability rechecks its collection digest and the observer checks size and QCOW2 framing. Lifecycle
+syncs the complete file, applies its read-only mode, syncs that metadata, and closes the descriptor before
+binding the Run. After binding succeeds and the held producer result closes, an attempt marker covers atomic
+no-replace publication of `outputs/<output-name>.qcow2` and the lifecycle record. After successful rollback, a
+returned commit failure records a failed Run. Removing the marker and syncing its attempt directory is the durable
+success commit point; descriptor cleanup after that point cannot change success into failure. An interrupted
+transaction remains explicitly marked and cannot be mistaken for success. This local retained file is the
+observed delivery payload; it is not publication, qualified reproduction, or a caller-selected export path.
+
 At NKE commit `6df693a`, the [Make target](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
 produces a QCOW2 and the [hosted workflow](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)
 later creates the published QCOW2 with another `qemu-img convert -c`. Source inspection alone does not establish

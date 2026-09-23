@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -20,8 +21,11 @@ import (
 // the shared source is mounted read-only and a fresh per-build output dir is mounted
 // over WriteDir, so any number of build nodes can run concurrently without clobbering
 // each other or mutating the shared source.
-func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
+func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, returnErr error) {
 	if err := admitBuildKit(n, opts); err != nil {
+		return nil, err
+	}
+	if err := admitBuildMaterials(n, opts); err != nil {
 		return nil, err
 	}
 	var executionIdentity profile.VerifiedNodeIdentity
@@ -52,8 +56,8 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	}
 	isolated := n.SourceReadOnly && n.WriteDir != ""
 	if opts.DryRun {
-		fmt.Fprintf(opts.Stdout, "[build:%s] materialize authenticated source; apply %d patch(es); run %s with --network=%s\n",
-			n.Component, len(n.Patches), n.Toolchain, n.Network)
+		fmt.Fprintf(opts.Stdout, "[build:%s] materialize authenticated source and %d material(s); apply %d patch(es); run %s with --network=%s\n",
+			n.Component, len(n.Materials), len(n.Patches), n.Toolchain, n.Network)
 		return nil, nil
 	}
 	snapshot, err := materializeSource(n, opts)
@@ -78,6 +82,20 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	}
 	if err := os.MkdirAll(outRoot, 0o755); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "creating output dir for %s", n.Component)
+	}
+	var stagedMaterials *stagedBuildMaterials
+	if len(n.Materials) != 0 {
+		stagedMaterials, err = opts.BuildMaterials.stage(opts.ctx(), n, filepath.Dir(outRoot))
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if cleanupErr := stagedMaterials.cleanup(); cleanupErr != nil {
+				result = nil
+				returnErr = errors.Join(returnErr,
+					e.Wrap(e.CodeInternal, cleanupErr, "removing private build-material root"))
+			}
+		}()
 	}
 	mountOut := outRoot
 	promoteOutput := func() error { return nil }
@@ -118,7 +136,7 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		args = append(args, "-e", ev.Name+"="+ev.Value)
 	}
 	if n.BuilderType == ir.BuilderBuildKit {
-		args = append(args, buildKitRuntimeArgs()...)
+		args = append(args, buildKitRuntimeArgs(opts.Runtime)...)
 	}
 	if isolated {
 		mountpoint, err := pathWithin(absSrc, n.WriteDir)
@@ -131,6 +149,9 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		args = append(args, "-v", absSrc+":/src:ro", "-v", mountOut+":"+path.Join(n.Workdir, n.WriteDir))
 	} else {
 		args = append(args, "-v", absSrc+":/src")
+	}
+	if stagedMaterials != nil {
+		args = append(args, buildMaterialMountArgs(stagedMaterials.root)...)
 	}
 	args = append(args, "-w", n.Workdir, n.Toolchain)
 	args = append(args, n.Command...)
@@ -165,7 +186,13 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		Qualification: ArtifactUnqualified,
 		Toolchain:     n.Toolchain,
 		InputDigest:   snapshot.InputDigest,
-		BuilderType:   n.BuilderType,
+		MaterialManifestDigest: func() string {
+			if stagedMaterials == nil {
+				return ""
+			}
+			return stagedMaterials.manifestDigest
+		}(),
+		BuilderType: n.BuilderType,
 		// Local selected and executed this exact in-process dispatch lane. Recording
 		// that observation is useful even on an unqualified development report;
 		// ProfileDigest/ExecutionBinding below remain the authority boundary.
@@ -189,6 +216,10 @@ func (l Local) build(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		}
 	}
 	return res, nil
+}
+
+func buildMaterialMountArgs(root string) []string {
+	return []string{"-v", root + ":" + buildInputsContainerRoot + ":ro"}
 }
 
 func packageArtifact(n ir.Node, binPath string, opts RunOptions, res *ArtifactResult) error {

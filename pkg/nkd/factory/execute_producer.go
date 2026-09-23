@@ -15,7 +15,7 @@ import (
 // Local and hosted execution use this same operation. The Plan selects the exact
 // instruction, workspace and result slot; pipeline owns launching and collecting it.
 func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string, jobs int, stdout, stderr io.Writer,
-	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) error {
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) (returnErr error) {
 	_, instruction, err := plan.producerInstruction(node)
 	if err != nil {
 		return err
@@ -36,8 +36,24 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 		}
 		sourceRoot = filepath.Join(filepath.Dir(filepath.Dir(result.Path)), "src")
 	}
+	var buildMaterials *pipeline.BuildMaterials
+	var observedMaterials *observedProducerMaterials
+	if instruction.Kind == ir.KindBuild && instruction.BuilderType == ir.BuilderOCIHermetic && len(instruction.Materials) != 0 {
+		observedMaterials, err = observeBuildMaterials(ctx, plan, node)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			returnErr = joinFactoryCleanupError(returnErr, observedMaterials.Close(), "closing producer material capabilities")
+		}()
+		buildMaterials, err = pipeline.NewBuildMaterials(observedMaterials.manifest, observedMaterials.inputs)
+		if err != nil {
+			return err
+		}
+	}
 	result, err := run(instruction, pipeline.RunOptions{
-		Ctx: ctx, SourceRoot: sourceRoot, Runtime: runtime, Jobs: jobs, Launch: true, Stdout: stdout, Stderr: stderr,
+		Ctx: ctx, SourceRoot: sourceRoot, Runtime: runtime, Jobs: jobs, Launch: true,
+		BuildMaterials: buildMaterials, Stdout: stdout, Stderr: stderr,
 	})
 	if err != nil {
 		return err

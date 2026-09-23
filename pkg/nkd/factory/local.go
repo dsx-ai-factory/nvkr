@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ const (
 	LocalRunSchemaVersion = "nkd.dev/factory-local-run/v1"
 	localWorkspaceMarker  = ".nkd-factory-workspace.json"
 	localPlanPath         = ".runner/plan.json"
+	nkdRunnerPackage      = "github.com/NVIDIA/nke-recipes/cmd/nkdctl"
 )
 
 // LocalRunOptions configures one local execution of a compiled factory plan.
@@ -72,6 +74,16 @@ type LocalRunResult struct {
 	diskPermit      chan struct{}
 	diskClosed      bool
 	diskCompletions []diskProducerCompletion
+}
+
+// QualificationLane returns the evidence lane recorded by this local execution.
+// It is descriptive until the lifecycle binds the independently observed
+// outputs into its Run.
+func (result *LocalRunResult) QualificationLane() string {
+	if result == nil {
+		return ""
+	}
+	return result.Qualification.String()
 }
 
 type localRunDeps struct {
@@ -448,6 +460,20 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 	fmt.Fprintf(options.Stdout, "[start] %s (%s)\n", node.ID, node.Kind)
 	if directPacker {
 		err = populateDiskProducerCompletion(ctx, plan, node.ID, owner, deps.executeDisk)
+	} else if node.Kind == NodeVerify {
+		_, artifacts := planIndex(plan)
+		if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
+			var relocated *Plan
+			relocated, err = relocateFactoryPlan(plan, options.Workspace)
+			if err == nil {
+				_, relocatedArtifacts := planIndex(relocated)
+				err = executeHeldDiskObservation(ctx, relocated, node, relocatedArtifacts, owner)
+			}
+		} else if deps.executeNode == nil {
+			err = e.New(e.CodeInternal, "factory local node executor is incomplete")
+		} else {
+			err = deps.executeNode(ctx, plan, node, options, runners)
+		}
 	} else if deps.executeNode == nil {
 		err = e.New(e.CodeInternal, "factory local node executor is incomplete")
 	} else {
@@ -529,19 +555,39 @@ func admitLocalRunners(ctx context.Context, plan *Plan, options LocalRunOptions,
 	if _, err := exec.LookPath(options.Runtime); err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "finding container runtime %s", options.Runtime)
 	}
-	if _, err := exec.LookPath(options.Go); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "finding Go compiler %s", options.Go)
-	}
 	if _, err := ownedcmd.Output(ctx, options.Runtime, "version", "--format", "{{.Server.Version}}"); err != nil {
 		return classifyContext(ctx, e.Wrap(e.CodeEngineCapability, err, "contacting local container runtime"))
 	}
-	if _, err := generatorLinkerFlags(plan.GeneratorVersion); err != nil {
-		return err
-	}
-	if _, err := os.Stat(filepath.Join(options.RunnerSource, "go.mod")); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "runner source %s is not an nkdctl checkout", options.RunnerSource)
+	if requiresLocalRunnerCompilation(platforms) {
+		if _, err := exec.LookPath(options.Go); err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "finding Go compiler %s", options.Go)
+		}
+		if _, err := generatorLinkerFlags(plan.GeneratorVersion); err != nil {
+			return err
+		}
+		if _, err := os.Stat(filepath.Join(options.RunnerSource, "go.mod")); err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "runner source %s is not an nkdctl checkout", options.RunnerSource)
+		}
 	}
 	return nil
+}
+
+func requiresLocalRunnerCompilation(platforms []string) bool {
+	for _, platform := range platforms {
+		if runtime.GOOS != "linux" || platform != "linux/"+runtime.GOARCH || !currentProcessIsNKDRunner() {
+			return true
+		}
+	}
+	return false
+}
+
+func currentProcessIsNKDRunner() bool {
+	info, ok := debug.ReadBuildInfo()
+	return isNKDRunnerBuild(info, ok)
+}
+
+func isNKDRunnerBuild(info *debug.BuildInfo, ok bool) bool {
+	return ok && info != nil && info.Path == nkdRunnerPackage
 }
 
 func prepareLocalRunners(ctx context.Context, plan *Plan, options LocalRunOptions, platforms []string) (map[string]string, error) {
@@ -573,13 +619,19 @@ func prepareLocalRunners(ctx context.Context, plan *Plan, options LocalRunOption
 		if err != nil {
 			return nil, err
 		}
-		cmd := exec.CommandContext(ctx, options.Go, "build", "-trimpath", "-ldflags", linkerFlags,
-			"-o", absoluteOutput, "./cmd/nkdctl")
-		cmd.Dir = options.RunnerSource
-		cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+arch)
-		cmd.Stdout, cmd.Stderr = options.Stdout, options.Stderr
-		if err := ownedcmd.Run(ctx, cmd); err != nil {
-			return nil, classifyContext(ctx, e.Wrap(e.CodeEngineCapability, err, "building linux/%s factory runner", arch))
+		if runtime.GOOS == "linux" && platform == "linux/"+runtime.GOARCH && currentProcessIsNKDRunner() {
+			if err := copyCurrentRunner(ctx, absoluteOutput); err != nil {
+				return nil, err
+			}
+		} else {
+			cmd := exec.CommandContext(ctx, options.Go, "build", "-trimpath", "-ldflags", linkerFlags,
+				"-o", absoluteOutput, "./cmd/nkdctl")
+			cmd.Dir = options.RunnerSource
+			cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+arch)
+			cmd.Stdout, cmd.Stderr = options.Stdout, options.Stderr
+			if err := ownedcmd.Run(ctx, cmd); err != nil {
+				return nil, classifyContext(ctx, e.Wrap(e.CodeEngineCapability, err, "building linux/%s factory runner", arch))
+			}
 		}
 		if err := os.Chmod(stagePath, 0o555); err != nil {
 			return nil, e.Wrap(e.CodeInternal, err, "protecting local factory runner")
@@ -622,6 +674,28 @@ func prepareLocalRunners(ctx context.Context, plan *Plan, options LocalRunOption
 		return nil, err
 	}
 	return runners, nil
+}
+
+func copyCurrentRunner(ctx context.Context, destination string) error {
+	source, err := os.Open("/proc/self/exe")
+	if err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "opening mapped factory runner")
+	}
+	defer source.Close()
+
+	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "opening staged factory runner")
+	}
+	_, copyErr := copyContext(ctx, output, source)
+	closeErr := output.Close()
+	if copyErr != nil {
+		return e.Wrap(e.CodeInternal, copyErr, "copying mapped factory runner")
+	}
+	if closeErr != nil {
+		return e.Wrap(e.CodeInternal, closeErr, "closing staged factory runner")
+	}
+	return nil
 }
 
 func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string) error {

@@ -1,0 +1,35 @@
+# Bootstrap commit snapshot. Replace the describe value with the first tag that
+# resolves to this exact commit before promoting this directory to maintained input.
+apiVersion: nkd.dev/lock/v1
+kind: PinLock
+pins:
+  nke-cni-calico-source:
+    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
+    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
+    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
+    sourceDateEpoch: 1790126681
+  nke-kubeadm-distro-source:
+    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
+    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
+    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
+    sourceDateEpoch: 1790126681
+  nke-os:
+    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
+    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
+    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
+    sourceDateEpoch: 1790126681
+  nke-spire-agent-source:
+    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
+    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
+    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
+    sourceDateEpoch: 1790126681
+  ovn-kubernetes:
+    tag: v1.4.0
+    commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
+    treeHash: ce0cb49cd14f2fc260457e61a5a222c027a07f79
+    sourceDateEpoch: 1788540677
+artifacts:
+  ubuntu-installer-iso:
+    tag: 26.04.1
+    digests:
+      arm64: sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168

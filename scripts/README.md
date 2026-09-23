@@ -22,8 +22,19 @@ scripts/demo-m1-local.sh --publish
 [M1 walkthrough and acceptance limits](../docs/demo-m1.md).
 
 The demo uses the loopback registry on port 5000. It generates its own valid
-immutable attempt names. The OS-image wrapper remains unimplemented; the
-worker-package contract fixtures are not an OS-image demo.
+immutable attempt names.
+
+The ARM64 non-FDE OS-image bootstrap is available for Linux ARM64 with either Podman or Docker:
+
+```sh
+CONTAINER_RUNTIME=podman scripts/nke-os-arm64-local.sh local-arm64-podman-001 1
+CONTAINER_RUNTIME=docker scripts/nke-os-arm64-local.sh local-arm64-docker-001 1
+```
+
+Use a different immutable attempt name for each run. The Podman path has one recorded full build and boot smoke;
+Docker is contract-tested but has not completed a recorded full image build. See the
+[Definition guide](../definitions/nke-os-arm64/README.md) and
+[local execution evidence](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
 
 ## Release consumption
 

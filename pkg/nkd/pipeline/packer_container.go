@@ -31,12 +31,15 @@ const (
 	// the canonical expected digest and fixed container path are arguments.
 	packerInputExtractScript = `exec 3<"$2"
 printf '%s  %s\n' "$1" /proc/self/fd/3 | sha256sum -c - >/dev/null
-tar --no-same-owner --delay-directory-restore -xf /proc/self/fd/3 -C /nkd/input`
+install -d -m 0700 "$3/config" "$3/inputs" "$3/source"
+tar --no-same-owner --no-overwrite-dir -xf /proc/self/fd/3 -C "$3"
+chown -R "$4:$5" "$3"`
 	packerVolumeBootstrapScript = `chown -R "$1:$2" /nkd/input /nkd/work`
 )
 
 type packerContainerRuntime interface {
 	Endpoint() string
+	RuntimeName() string
 	AdmittedIdentity() (string, string)
 	Run(context.Context, io.Reader, io.Writer, io.Writer, ...string) error
 	Cleanup(context.Context, time.Duration, io.Writer, io.Writer, ...string) error
@@ -49,6 +52,13 @@ func (runtime heldPackerContainerRuntime) Endpoint() string {
 		return ""
 	}
 	return runtime.runtime.endpoint
+}
+
+func (runtime heldPackerContainerRuntime) RuntimeName() string {
+	if runtime.runtime == nil {
+		return ""
+	}
+	return runtime.runtime.name
 }
 
 func (runtime heldPackerContainerRuntime) AdmittedIdentity() (string, string) {
@@ -112,13 +122,17 @@ type packerContainerCreateRequest struct {
 	user          string
 	groupAdd      string
 	allowChown    bool
+	allowDAC      bool
 	network       string
 }
 
-func packerContainerCreateArgs(request packerContainerCreateRequest) []string {
+func packerContainerCreateArgs(runtimeName string, request packerContainerCreateRequest) []string {
 	network := request.network
 	if network == "" {
 		network = ir.NetworkNone
+	}
+	if runtimeName == "docker" && network == ir.NetworkDefault {
+		network = "bridge"
 	}
 	args := []string{
 		"create", "--name", request.name, "--pull=never",
@@ -127,6 +141,9 @@ func packerContainerCreateArgs(request packerContainerCreateRequest) []string {
 	}
 	if request.allowChown {
 		args = append(args, "--cap-add=CHOWN")
+	}
+	if request.allowDAC {
+		args = append(args, "--cap-add=DAC_OVERRIDE")
 	}
 	user := request.user
 	if user == "" {
@@ -139,17 +156,32 @@ func packerContainerCreateArgs(request packerContainerCreateRequest) []string {
 	for _, label := range request.labels {
 		args = append(args, "--label", label)
 	}
-	inputMount := "type=volume,src=" + request.input + ",dst=" + packerContainerInputRoot
-	if request.inputReadOnly {
-		inputMount += ",readonly"
-	}
 	entrypoint := request.entrypoint
 	if entrypoint == "" {
 		entrypoint = "packer"
 	}
+	switch runtimeName {
+	case "docker":
+		inputMount := "type=volume,src=" + request.input + ",dst=" + packerContainerInputRoot + ",volume-nocopy"
+		if request.inputReadOnly {
+			inputMount += ",readonly"
+		}
+		args = append(args, "--mount", inputMount)
+		args = append(args, "--mount", "type=volume,src="+request.work+",dst="+packerContainerWorkRoot+",volume-nocopy")
+	case "podman":
+		// Podman exposes named-volume copy control through --volume rather
+		// than Docker's --mount volume-nocopy option. Both source values are
+		// internally generated named volumes, never caller-provided paths.
+		inputOptions := "nocopy"
+		if request.inputReadOnly {
+			inputOptions += ",ro"
+		}
+		args = append(args,
+			"--volume", request.input+":"+packerContainerInputRoot+":"+inputOptions,
+			"--volume", request.work+":"+packerContainerWorkRoot+":nocopy",
+		)
+	}
 	args = append(args,
-		"--mount", inputMount,
-		"--mount", "type=volume,src="+request.work+",dst="+packerContainerWorkRoot+",volume-nocopy",
 		"--workdir", request.project,
 		"--env", "CHECKPOINT_DISABLE=1",
 		"--env", "HOME="+packerContainerWorkRoot+"/home",
@@ -239,8 +271,12 @@ func observeLocalPackerImage(ctx context.Context, runtime packerContainerRuntime
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	if err := runtime.Run(ctx, nil, &stdout, &stderr,
-		"image", "inspect", "--platform", node.ToolchainPlatform, "--format", "{{json .}}", node.Toolchain); err != nil {
+	args := []string{"image", "inspect"}
+	if named, ok := runtime.(interface{ RuntimeName() string }); !ok || named.RuntimeName() != "podman" {
+		args = append(args, "--platform", node.ToolchainPlatform)
+	}
+	args = append(args, "--format", "{{json .}}", node.Toolchain)
+	if err := runtime.Run(ctx, nil, &stdout, &stderr, args...); err != nil {
 		return runtimeCommandError(ctx, err, stderr.String(), e.CodeEngineCapability,
 			"inspecting already-local Packer toolchain for node %q", node.ID)
 	}
@@ -276,7 +312,11 @@ func observeLocalPackerImage(ctx context.Context, runtime packerContainerRuntime
 			"local Packer toolchain declares PATH more than once")
 	}
 	if wantImageID != "" {
-		if inspection.ID != wantImageID {
+		observedImageID := inspection.ID
+		if !canonical.IsDigest(observedImageID) && canonical.IsDigest("sha256:"+observedImageID) {
+			observedImageID = "sha256:" + observedImageID
+		}
+		if observedImageID != wantImageID {
 			return e.New(e.CodePreflightFailed,
 				"runtime selected local Packer toolchain image ID %q for node %q, want %q",
 				inspection.ID, node.ID, wantImageID)
@@ -293,7 +333,7 @@ func observeLocalPackerImage(ctx context.Context, runtime packerContainerRuntime
 }
 
 func validatePackerContainerManifest(manifest []byte, digest string) error {
-	if len(manifest) == 0 || len(manifest) > int(maxPackerManifestBytes) || !canonical.IsDigest(digest) {
+	if len(manifest) == 0 || len(manifest) > int(maxBuildMaterialManifestBytes) || !canonical.IsDigest(digest) {
 		return e.New(e.CodeUnpinnedInput, "Packer material manifest requires bounded bytes and an exact digest")
 	}
 	got := fmt.Sprintf("sha256:%x", sha256.Sum256(manifest))

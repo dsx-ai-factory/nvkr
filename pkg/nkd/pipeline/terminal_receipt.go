@@ -145,6 +145,14 @@ func validateTerminalDeclaration(node ir.Node, artifact ArtifactResult, opts Run
 		if artifact.Toolchain != node.Toolchain || artifact.BuilderType != node.BuilderType || artifact.InputDigest == "" {
 			return e.New(e.CodeVerifyFailed, "build artifact %q does not match its pinned build declaration", node.Component)
 		}
+		if len(node.Materials) != 0 && !canonical.IsDigest(artifact.MaterialManifestDigest) {
+			return e.New(e.CodeVerifyFailed,
+				"build artifact %q lacks its exact material manifest digest", node.Component)
+		}
+		if len(node.Materials) == 0 && artifact.MaterialManifestDigest != "" {
+			return e.New(e.CodeVerifyFailed,
+				"build artifact %q records undeclared material inputs", node.Component)
+		}
 		if !artifact.Packaged && artifact.Path != node.ArtifactPath {
 			return e.New(e.CodeVerifyFailed, "build artifact %q path does not match its graph declaration", node.Component)
 		}

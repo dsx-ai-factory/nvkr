@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -84,6 +85,77 @@ func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
 		if !strings.Contains(progress.String(), phase) {
 			t.Errorf("source progress omitted %q: %s", phase, progress.String())
 		}
+	}
+}
+
+func TestMaterializeSourceAppliesAuthenticatedNewFilePatch(t *testing.T) {
+	repository := t.TempDir()
+	if output, err := exec.Command("git", "-C", repository, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("initializing enclosing repository: %v: %s", err, output)
+	}
+	t.Chdir(repository)
+	// Production run snapshots live beneath the nke-recipes checkout. The patch
+	// application must therefore remain rooted at the private snapshot instead of
+	// inheriting repository context from an enclosing worktree.
+	root := filepath.Join(".nkd", "work", "src")
+	dest := "repo-70d3cc986aa8"
+	source := filepath.Join(root, dest)
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "existing.txt"), []byte("pinned\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fetch := ir.Node{ID: "fetch-r", Dest: dest, Commit: goodSourceCommit, TreeHash: "tree"}
+	vendorDigest, err := fetchVendorSpecDigest(fetch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closure, err := sourceTreeDigest(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiptPath, err := sourceReceiptPath(root, dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSourceReceipt(receiptPath, sourceReceipt{
+		Schema: sourceReceiptSchema, Commit: fetch.Commit, TreeHash: fetch.TreeHash,
+		VendorSpecDigest: vendorDigest, ClosureDigest: closure,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	patch := "diff --git a/scripts/generated.sh b/scripts/generated.sh\n" +
+		"new file mode 100755\n" +
+		"index 0000000..4163036\n" +
+		"--- /dev/null\n" +
+		"+++ b/scripts/generated.sh\n" +
+		"@@ -0,0 +1,2 @@\n" +
+		"+#!/bin/sh\n" +
+		"+echo generated\n"
+	build := ir.Node{
+		ID: "build-r", Component: "r", SourceDest: dest,
+		SourceCommit: fetch.Commit, SourceTreeHash: fetch.TreeHash, VendorSpecDigest: vendorDigest,
+		Patches: []ir.PatchRef{{
+			Name: "patches/add-generated-script.patch", SHA256: digestBytes([]byte(patch)), Content: patch,
+		}},
+	}
+	snapshot, err := materializeSource(build, RunOptions{SourceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer snapshot.cleanup()
+	generated := filepath.Join(snapshot.Dir, "scripts", "generated.sh")
+	info, err := os.Stat(generated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Fatalf("new patched file mode = %04o, want 0755", info.Mode().Perm())
+	}
+	if _, err := os.Stat(filepath.Join(source, "scripts", "generated.sh")); !os.IsNotExist(err) {
+		t.Fatalf("new patched file reached fetched source: %v", err)
 	}
 }
 

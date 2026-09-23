@@ -5,6 +5,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -98,24 +100,70 @@ func TestLocalFactoryContainerArgumentsAndCleanup(t *testing.T) {
 func TestLocalRunnerAdmissionRejectsUnavailableCapabilities(t *testing.T) {
 	plan := githubTestPlan(t)
 	root := t.TempDir()
-	runtime := filepath.Join(root, "runtime")
-	if err := os.WriteFile(runtime, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+	runtimePath := filepath.Join(root, "runtime")
+	if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	compilePlatform := "linux/amd64"
+	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" {
+		compilePlatform = "linux/arm64"
+	}
 	for _, tc := range []struct{ name, runtime, compiler, source string }{
-		{"missing runtime", filepath.Join(root, "missing"), runtime, root},
-		{"missing compiler", runtime, filepath.Join(root, "missing"), root},
-		{"missing source", runtime, runtime, root},
+		{"missing runtime", filepath.Join(root, "missing"), runtimePath, root},
+		{"missing compiler", runtimePath, filepath.Join(root, "missing"), root},
+		{"missing source", runtimePath, runtimePath, root},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			options := withLocalDefaults(LocalRunOptions{Runtime: tc.runtime, Go: tc.compiler, RunnerSource: tc.source})
-			assertFactoryErrorCode(t, admitLocalRunners(context.Background(), plan, options, []string{"linux/amd64"}), e.CodeEngineCapability)
+			assertFactoryErrorCode(t, admitLocalRunners(context.Background(), plan, options, []string{compilePlatform}), e.CodeEngineCapability)
 		})
 	}
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module fixture\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := admitLocalRunners(t.Context(), plan, withLocalDefaults(LocalRunOptions{Runtime: runtime, Go: runtime, RunnerSource: root}), []string{"linux/amd64"}); err != nil {
+	if err := admitLocalRunners(t.Context(), plan, withLocalDefaults(LocalRunOptions{Runtime: runtimePath, Go: runtimePath, RunnerSource: root}), []string{compilePlatform}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSamePlatformEmbeddedRunnerRequiresGoSource(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("same-platform Linux admission is Linux-only")
+	}
+	plan := githubTestPlan(t)
+	root := t.TempDir()
+	runtimePath := filepath.Join(root, "runtime")
+	if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	options := withLocalDefaults(LocalRunOptions{
+		Workspace: filepath.Join(root, "workspace"), Runtime: runtimePath,
+		Go: filepath.Join(root, "missing-go"), RunnerSource: filepath.Join(root, "missing-source"),
+	})
+	platform := "linux/" + runtime.GOARCH
+	if err := admitLocalRunners(t.Context(), plan, options, []string{platform}); factoryErrorCode(err) != e.CodeEngineCapability {
+		t.Fatalf("embedded same-platform admission error = %v, want %s", err, e.CodeEngineCapability)
+	}
+}
+
+func TestIsNKDRunnerBuild(t *testing.T) {
+	tests := []struct {
+		name string
+		info *debug.BuildInfo
+		ok   bool
+		want bool
+	}{
+		{name: "nkdctl", info: &debug.BuildInfo{Path: nkdRunnerPackage}, ok: true, want: true},
+		{name: "embedded host", info: &debug.BuildInfo{Path: "example.invalid/host"}, ok: true},
+		{name: "missing metadata", info: &debug.BuildInfo{Path: nkdRunnerPackage}},
+		{name: "nil metadata", ok: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := isNKDRunnerBuild(test.info, test.ok)
+			if got != test.want {
+				t.Fatalf("is NKD runner = %v, want %v", got, test.want)
+			}
+		})
 	}
 }

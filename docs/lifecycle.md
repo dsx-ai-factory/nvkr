@@ -87,6 +87,14 @@ selected attempts root; the default root is `.nkd/runs`. The attempts root must 
 path under `.nkd`. Publication is a separately enabled operation. The
 implementation record distinguishes contract tests from external execution.
 
+For a completed local `disk-image` output, lifecycle retains the exact observed QCOW2 as
+`<attempts-root>/<attempt>/outputs/<output-name>.qcow2` and prints that path. The file is read-only, is committed
+only after held-source digest/size revalidation and successful Run binding, and remains local unqualified output.
+An attempt transaction prevents an interrupted disk/record pair from being treated as complete. It is not an OCI
+or object-store publication and the caller cannot redirect it outside the immutable attempt workspace. Marker
+removal plus attempt-directory sync is the durable success point; after successful rollback, errors before it
+record failure.
+
 A Run records one attempt against frozen inputs and expected output slots. Execution must match independently
 observed package contents to those slots, including selected build identities and exact component membership.
 An omitted or conflicting output cannot make the Run complete. Once execution has prepared an attempt, its

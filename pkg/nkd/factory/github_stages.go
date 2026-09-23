@@ -3,6 +3,7 @@ package factory
 import (
 	"strings"
 
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -13,6 +14,35 @@ type githubStage struct {
 	ID    string
 	Name  string
 	Nodes []Node
+}
+
+// githubStageTimeoutMinutes projects the producer-owned per-node timeout into
+// GitHub's whole-minute job limit. A stage with no declared timeout keeps the
+// bounded 60-minute adapter default. Grouped nodes execute serially, so their
+// declared budgets are added rather than taking only the largest value.
+func githubStageTimeoutMinutes(stage githubStage) (int, error) {
+	var total uint64
+	declared := false
+	for _, node := range stage.Nodes {
+		if node.Requirements == nil || node.Requirements.TimeoutSeconds == 0 {
+			continue
+		}
+		declared = true
+		minutes := node.Requirements.TimeoutSeconds / 60
+		if node.Requirements.TimeoutSeconds%60 != 0 {
+			minutes++
+		}
+		if minutes > githubMaximumJobTimeoutMinutes || total > githubMaximumJobTimeoutMinutes-minutes {
+			return 0, e.New(e.CodeEngineCapability,
+				"GitHub stage %q timeout exceeds the %d-minute job limit",
+				stage.ID, githubMaximumJobTimeoutMinutes)
+		}
+		total += minutes
+	}
+	if !declared {
+		return githubDefaultStageTimeoutMinutes, nil
+	}
+	return int(total), nil
 }
 
 func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {

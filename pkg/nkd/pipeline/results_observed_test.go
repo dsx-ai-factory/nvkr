@@ -174,3 +174,101 @@ func TestObserveResultRequiresLiveContextBeforeReading(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthenticateResultForConsumptionRejectsUnauthenticatedBuildMetadata(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		change func(*ir.Node, *ArtifactResult)
+		want   e.Code
+	}{
+		{name: "exact material consumer"},
+		{name: "exact producer without materials", change: func(n *ir.Node, r *ArtifactResult) {
+			n.Materials = nil
+			r.MaterialManifestDigest = ""
+		}},
+		{name: "missing input digest", change: func(_ *ir.Node, r *ArtifactResult) { r.InputDigest = "" }, want: e.CodeVerifyFailed},
+		{name: "missing material manifest", change: func(_ *ir.Node, r *ArtifactResult) { r.MaterialManifestDigest = "" }, want: e.CodeVerifyFailed},
+		{name: "undeclared material manifest", change: func(n *ir.Node, r *ArtifactResult) {
+			n.Materials = nil
+		}, want: e.CodeVerifyFailed},
+		{name: "direct execution without authenticated engine", change: func(_ *ir.Node, r *ArtifactResult) { r.EngineClass = "" }},
+		{name: "foreign engine", change: func(_ *ir.Node, r *ArtifactResult) { r.EngineClass = ir.BuilderNix }, want: e.CodeVerifyFailed},
+		{name: "forged profile binding", change: func(_ *ir.Node, r *ArtifactResult) {
+			r.ProfileDigest = "sha256:" + repeatHex("e")
+		}, want: e.CodeVerifyFailed},
+		{name: "qualified claim without receipt", change: func(_ *ir.Node, r *ArtifactResult) {
+			r.Qualification = ArtifactQualifiedExecution
+			r.ProfileDigest = "sha256:" + repeatHex("e")
+			r.ExecutionBinding = "sha256:" + repeatHex("f")
+		}, want: e.CodePreflightFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			work := t.TempDir()
+			payload := filepath.Join(work, "expected")
+			raw := []byte("built bytes\n")
+			if err := os.WriteFile(payload, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			node := ir.Node{
+				ID: "build-tool", Kind: ir.KindBuild, Component: "tool", OutputType: "tarball",
+				ArtifactPath: "out/tool.tar", BuilderType: ir.BuilderOCIHermetic,
+				Toolchain: "toolchain@sha256:" + repeatHex("b"),
+				Materials: []ir.MaterialBinding{{Binding: "runtime", Component: "runtime", Producer: "pull-runtime"}},
+			}
+			result := ArtifactResult{
+				Component: node.Component, OutputType: node.OutputType,
+				Qualification: ArtifactUnqualified, Toolchain: node.Toolchain,
+				InputDigest: "sha256:" + repeatHex("c"), MaterialManifestDigest: "sha256:" + repeatHex("d"),
+				BuilderType: node.BuilderType, EngineClass: node.BuilderType,
+				Path: node.ArtifactPath, SHA256: digestBytes(raw), Size: int64(len(raw)),
+			}
+			if test.change != nil {
+				test.change(&node, &result)
+			}
+			recordPath := filepath.Join(work, "result.json")
+			writeObservedResult(t, recordPath, result)
+			got, err := AuthenticateResultForConsumption(t.Context(), node, payload, recordPath)
+			if test.want != "" {
+				if code(err) != test.want {
+					t.Fatalf("error = %v, want %s", err, test.want)
+				}
+				return
+			}
+			if err != nil || got.InputDigest != result.InputDigest || got.MaterialManifestDigest != result.MaterialManifestDigest {
+				t.Fatalf("authenticated result = %+v, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestAuthenticateResultForConsumptionRequiresProfileFreePull(t *testing.T) {
+	work := t.TempDir()
+	payload := filepath.Join(work, "runtime.tar")
+	raw := []byte("runtime archive\n")
+	if err := os.WriteFile(payload, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	digest := digestBytes(raw)
+	node := ir.Node{ID: "pull-runtime", Kind: ir.KindPull, Component: "runtime", OutputType: "tarball", Digest: digest}
+	for _, test := range []struct {
+		name          string
+		qualification ArtifactQualification
+		want          e.Code
+	}{
+		{name: "exact", qualification: ArtifactProfileFreeAcquisition},
+		{name: "unqualified", qualification: ArtifactUnqualified, want: e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			result := ArtifactResult{
+				Component: node.Component, OutputType: node.OutputType, Qualification: test.qualification,
+				EngineClass: ir.EnginePrebuiltAcquire, SHA256: digest, Size: int64(len(raw)),
+			}
+			recordPath := filepath.Join(work, test.name+".json")
+			writeObservedResult(t, recordPath, result)
+			_, err := AuthenticateResultForConsumption(t.Context(), node, payload, recordPath)
+			if code(err) != test.want {
+				t.Fatalf("error = %v, want %s", err, test.want)
+			}
+		})
+	}
+}

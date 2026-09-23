@@ -54,13 +54,34 @@ func TestVMMaterialBindingValidation(t *testing.T) {
 		wantText string
 	}{
 		{
-			name: "non VM owner",
+			name: "unsupported BuildKit owner",
 			mutate: func(catalog *Catalog) {
 				agent := catalog.Components["agent"]
+				agent.BuilderType = BuilderBuildKit
+				agent.OutputType = "oci-image"
 				agent.Materials = map[string]string{"runtime": "runtime"}
 				catalog.Components["agent"] = agent
 			},
-			wantText: "require builderType vm-image",
+			wantText: "require builderType oci-hermetic or vm-image",
+		},
+		{
+			name: "prebuilt owner",
+			mutate: func(catalog *Catalog) {
+				component := goodPrebuilt()
+				component.Materials = map[string]string{"runtime": "runtime"}
+				catalog.Components["agent"] = component
+			},
+			wantText: "require a from-source component",
+		},
+		{
+			name: "excluded owner",
+			mutate: func(catalog *Catalog) {
+				catalog.Components["agent"] = Component{
+					Platforms: []string{"linux/amd64"}, ExclusionReason: "not distributed",
+					Materials: map[string]string{"runtime": "runtime"},
+				}
+			},
+			wantText: "require a from-source component",
 		},
 		{
 			name: "noncanonical binding",
@@ -158,6 +179,21 @@ func TestVMMaterialBindingValidation(t *testing.T) {
 			err = catalog.Validate()
 			if catalogErrorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), test.wantText) {
 				t.Fatalf("validation error = %v, want %s containing %q", err, nkderr.CodeInvalidCatalog, test.wantText)
+			}
+		})
+	}
+}
+
+func TestOCIHermeticComponentAcceptsMaterialBindings(t *testing.T) {
+	for _, builderType := range []string{"", BuilderOCIHermetic} {
+		t.Run("builder-"+builderType, func(t *testing.T) {
+			catalog := materialCatalog(t)
+			component := catalog.Components["agent"]
+			component.BuilderType = builderType
+			component.Materials = map[string]string{"runtime-archive": "runtime"}
+			catalog.Components["agent"] = component
+			if err := catalog.Validate(); err != nil {
+				t.Fatalf("OCI-hermetic material consumer was rejected: %v", err)
 			}
 		})
 	}

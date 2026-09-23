@@ -16,12 +16,23 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-// This opt-in Docker test exercises the real launch settings. Repeated Dockerfile
-// copies must not multiply storage for unchanged files on hosted runners.
+// This opt-in test exercises the real Docker or Podman launch settings. Repeated
+// Dockerfile copies must not multiply storage for unchanged files on hosted runners.
 func TestBuildKitSnapshotStorageBudget(t *testing.T) {
 	image := os.Getenv("NKD_BUILDKIT_TEST_IMAGE")
 	if image == "" {
 		t.Skip("set NKD_BUILDKIT_TEST_IMAGE to the pinned rootless BuildKit image")
+	}
+	runtime := os.Getenv("NKD_BUILDKIT_TEST_RUNTIME")
+	if runtime == "" {
+		runtime = "docker"
+	}
+	if runtime != "docker" && runtime != "podman" {
+		t.Fatalf("NKD_BUILDKIT_TEST_RUNTIME must be docker or podman, got %q", runtime)
+	}
+	platform := os.Getenv("NKD_BUILDKIT_TEST_PLATFORM")
+	if platform == "" {
+		platform = "linux/amd64"
 	}
 	root := t.TempDir()
 	if err := os.Chmod(root, 0o755); err != nil {
@@ -44,17 +55,17 @@ func TestBuildKitSnapshotStorageBudget(t *testing.T) {
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		_ = exec.CommandContext(ctx, "docker", "rm", "-f", name).Run()
+		_ = exec.CommandContext(ctx, runtime, "rm", "-f", name).Run()
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	args := []string{"run", "--rm", "--init", "--name", name, "--platform", "linux/amd64", "--network", "none"}
-	args = append(args, buildKitRuntimeArgs()...)
+	args := []string{"run", "--rm", "--init", "--name", name, "--platform", platform, "--network", "none"}
+	args = append(args, buildKitRuntimeArgs(runtime)...)
 	args = append(args, "-v", root+":/src:ro", image, "sh", "-ec",
 		"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local dockerfile=/src; "+
 			"find /home/user/.local/share/buildkit -name work -prune -o -type f -exec stat -c %b '{}' ';' > /tmp/blocks; "+
 			"awk '{blocks += $1} END {print \"NKD_STORAGE_KIB=\" blocks / 2}' /tmp/blocks")
-	raw, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	raw, err := exec.CommandContext(ctx, runtime, args...).CombinedOutput()
 	if err != nil {
 		t.Fatalf("rootless build: %v\n%s", err, raw)
 	}
@@ -69,6 +80,22 @@ func TestBuildKitSnapshotStorageBudget(t *testing.T) {
 	t.Logf("BuildKit allocated %d KiB for the repeated-copy fixture", kib)
 }
 
+func TestBuildKitRuntimeArgumentsIsolatePodmanSELinuxLabel(t *testing.T) {
+	docker := strings.Join(buildKitRuntimeArgs("/usr/bin/docker"), " ")
+	podman := strings.Join(buildKitRuntimeArgs("/usr/bin/podman"), " ")
+	if strings.Contains(docker, "label=disable") {
+		t.Fatal("Docker BuildKit unexpectedly disables SELinux label separation")
+	}
+	if !strings.Contains(podman, "--security-opt label=disable") {
+		t.Fatal("Podman BuildKit lacks the required nested-worker SELinux mount admission")
+	}
+	for _, forbidden := range []string{"--privileged", "/dev/fuse", "docker.sock", "podman.sock"} {
+		if strings.Contains(podman, forbidden) {
+			t.Fatalf("Podman BuildKit gained forbidden capability %q", forbidden)
+		}
+	}
+}
+
 func TestBuildKitAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -79,8 +106,9 @@ func TestBuildKitAdmission(t *testing.T) {
 		code      e.Code
 	}{
 		{name: "launched Docker", launch: true, runtime: "docker"},
+		{name: "launched Podman", launch: true, runtime: "podman"},
 		{name: "direct execution", runtime: "docker", code: e.CodeEngineCapability},
-		{name: "unsupported runtime", launch: true, runtime: "podman", code: e.CodeEngineCapability},
+		{name: "unsupported runtime", launch: true, runtime: "containerd", code: e.CodeEngineCapability},
 		{name: "qualified", launch: true, runtime: "docker", qualified: true, code: e.CodeEngineCapability},
 		{name: "legacy packaging", launch: true, runtime: "docker", packaged: true, code: e.CodeEngineCapability},
 	} {

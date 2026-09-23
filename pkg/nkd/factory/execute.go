@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -248,7 +249,29 @@ type factoryObservedInput struct {
 }
 
 func executeObservation(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) error {
+	if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
+		return e.New(e.CodeEngineCapability,
+			"disk terminal observation %q requires the local Run's held producer result", node.ID)
+	}
+	return executeObservationWithHeldDisk(ctx, plan, node, artifacts, nil)
+}
+
+func executeHeldDiskObservation(ctx context.Context, plan *Plan, node Node,
+	artifacts map[string]Artifact, execution *LocalRunResult,
+) error {
+	if execution == nil || !plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
+		return e.New(e.CodeEngineCapability,
+			"disk terminal observation %q requires an exact held producer result", node.ID)
+	}
+	return executeObservationWithHeldDisk(ctx, plan, node, artifacts, execution)
+}
+
+func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
+	artifacts map[string]Artifact, execution *LocalRunResult,
+) error {
 	observation := factoryObservation{SchemaVersion: "nkd.dev/factory-observation/v2", Qualification: TierStaticUnqualified, BuildTarget: node.BuildTarget}
+	var diskObservation DiskPayloadObservation
+	var diskResult pipeline.ArtifactResult
 	for _, buildPlan := range plan.Builds {
 		if buildPlan.Name == node.BuildTarget {
 			observation.BuildDigest = buildPlan.BuildDigest
@@ -256,11 +279,31 @@ func executeObservation(ctx context.Context, plan *Plan, node Node, artifacts ma
 			for _, id := range node.Inputs {
 				visible[id] = artifacts[id]
 			}
+			if execution != nil {
+				var expected LifecycleOutputPlan
+				for _, output := range plan.LifecycleOutputs {
+					if output.Name == node.BuildTarget && output.Kind == authored.OutputDiskImage {
+						expected = output
+					}
+				}
+				if expected.Name == "" {
+					return e.New(e.CodePipelineDrift,
+						"disk terminal observation %q has no lifecycle output binding", node.ID)
+				}
+				var err error
+				diskObservation, diskResult, err = execution.inspectDiskLifecycleMetadata(ctx, plan, expected)
+				if err != nil {
+					return err
+				}
+			}
 			for _, component := range buildPlan.Components {
 				id := "artifact/" + buildPlan.Name + "/" + component
 				input, ok := visible[id]
 				if !ok || input.BuildTarget != buildPlan.Name || input.Component != component {
 					return e.New(e.CodeVerifyFailed, "terminal output %q omits its exact producer bytes for %q", buildPlan.Name, component)
+				}
+				if execution != nil && component == diskObservation.Component {
+					continue
 				}
 				if _, err := observeProducerPayload(ctx, plan, input, visible); err != nil {
 					return err
@@ -268,13 +311,42 @@ func executeObservation(ctx context.Context, plan *Plan, node Node, artifacts ma
 			}
 		}
 	}
+	diskResultDigest := ""
+	if execution != nil {
+		raw, err := canonical.Marshal(diskResult)
+		if err != nil {
+			return err
+		}
+		diskResultDigest = pipeline.FileDigest(raw)
+	}
+	diskPayloadInputs, diskResultInputs := 0, 0
 	for _, input := range node.Inputs {
 		artifact := artifacts[input]
-		digest, err := digestFactoryPath(ctx, artifact.Path)
-		if err != nil {
-			return e.Wrap(e.CodeVerifyFailed, err, "observing factory input %s", input)
+		digest := ""
+		if execution != nil && artifact.Component == diskObservation.Component {
+			switch artifact.Kind {
+			case authored.OutputDiskImage:
+				digest = diskObservation.Digest
+				diskPayloadInputs++
+			case "producer-result":
+				digest = diskResultDigest
+				diskResultInputs++
+			default:
+				return e.New(e.CodePipelineDrift,
+					"disk terminal input %q has unexpected kind %q", input, artifact.Kind)
+			}
+		} else {
+			var err error
+			digest, err = digestFactoryPath(ctx, artifact.Path)
+			if err != nil {
+				return e.Wrap(e.CodeVerifyFailed, err, "observing factory input %s", input)
+			}
 		}
 		observation.Inputs = append(observation.Inputs, factoryObservedInput{ArtifactID: input, Kind: artifact.Kind, Digest: digest})
+	}
+	if execution != nil && (diskPayloadInputs != 1 || diskResultInputs != 1) {
+		return e.New(e.CodePipelineDrift,
+			"disk terminal observation %q requires one held payload and producer result input", node.ID)
 	}
 	if observation.BuildDigest == "" {
 		return e.New(e.CodePipelineDrift, "terminal node %q has no build digest", node.ID)

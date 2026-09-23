@@ -166,24 +166,25 @@ func preparePackerContainerTransport(ctx context.Context, root string, request p
 	}
 	manifestPath := filepath.Join(inputRoot, "inputs", "material-manifest.json")
 	manifestHeld, err := heldfile.FromBytesContext(ctx, request.manifest, heldfile.Options{
-		Label: "packer-material-manifest", MaxBytes: maxPackerManifestBytes, ExpectedDigest: request.digest,
+		Label: "packer-material-manifest", MaxBytes: maxBuildMaterialManifestBytes, ExpectedDigest: request.digest,
 	})
 	if err != nil {
 		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "staging Packer material manifest")
 	}
-	if err := materializePackerInput(ctx, filepath.Dir(manifestPath), filepath.Base(manifestPath), manifestHeld); err != nil {
+	if err := materializeHeldInput(ctx, filepath.Dir(manifestPath), filepath.Base(manifestPath), manifestHeld); err != nil {
 		_ = manifestHeld.Close()
 		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "staging Packer material manifest")
 	}
 	_ = manifestHeld.Close()
-	staged, err := stagePackerInputs(ctx, filepath.Join(inputRoot, "inputs"), request.digest, request.materials)
+	buildInputs, err := stageBuildMaterialInputs(ctx, filepath.Join(inputRoot, "inputs"), request.digest, request.materials)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	staged := &stagedPackerInputs{stagedBuildMaterialInputs: buildInputs}
 	if err := materializePackerContainerBytes(ctx, filepath.Join(inputRoot, "config"), "packer.json", []byte("{}\n")); err != nil {
 		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "staging private Packer configuration")
 	}
-	if err := sealPackerDirectories(inputRoot); err != nil {
+	if err := sealPrivateInputDirectories(inputRoot); err != nil {
 		return nil, nil, nil, e.Wrap(e.CodeInternal, err, "sealing private Packer consumer-input closure")
 	}
 	// The transport archive is created beside the selected config/inputs/source
@@ -224,7 +225,7 @@ func preparePackerContainerTransport(ctx context.Context, root string, request p
 		_ = innerHeld.Close()
 		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "creating private Packer carrier state")
 	}
-	if err := materializePackerInput(ctx, carrierRoot, "input.tar", innerHeld); err != nil {
+	if err := materializeHeldInput(ctx, carrierRoot, "input.tar", innerHeld); err != nil {
 		_ = innerHeld.Close()
 		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "materializing held Packer input closure")
 	}
@@ -294,12 +295,12 @@ func validatePackerInputCarrierBounds(innerBytes, carrierBytes int64) error {
 
 func materializePackerContainerBytes(ctx context.Context, root, name string, value []byte) error {
 	held, err := heldfile.FromBytesContext(ctx, value, heldfile.Options{
-		Label: name, MaxBytes: maxPackerManifestBytes,
+		Label: name, MaxBytes: maxBuildMaterialManifestBytes,
 	})
 	if err != nil {
 		return err
 	}
-	materializeErr := materializePackerInput(ctx, root, name, held)
+	materializeErr := materializeHeldInput(ctx, root, name, held)
 	return errors.Join(materializeErr, held.Close())
 }
 

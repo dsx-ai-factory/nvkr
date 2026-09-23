@@ -22,7 +22,6 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -45,10 +44,6 @@ const (
 	maxPackerPluginBytes           int64 = 512 << 20
 	maxPackerPluginClosureBytes    int64 = 4 << 30
 	maxPackerPluginFiles                 = 256
-	maxPackerManifestBytes         int64 = 64 << 20
-	maxPackerMaterialBytes               = MaxVMImagePackerInputBytes
-	maxPackerMaterialTotalBytes          = MaxVMImagePackerInputBytes
-	maxPackerMaterialFiles               = 256
 	maxPackerBuildNameBytes              = 256
 	maxPackerPathBytes                   = 4096
 	maxPackerValidationOutputBytes       = 1 << 20
@@ -78,26 +73,11 @@ type packerHostTool struct {
 	file *heldfile.File
 }
 
-type packerFileSnapshot struct {
-	Path   string
-	SHA256 string
-	Mode   os.FileMode
-}
-
-// stagedPackerInputs is an internal capability for the exact manifest and
-// material bytes made visible to Packer. Callers cannot construct it from paths
-// or digest strings.
+// stagedPackerInputs adds the deterministic transport-archive observation used
+// only by the direct-Packer container adapter.
 type stagedPackerInputs struct {
-	root               string
-	files              []packerFileSnapshot
+	*stagedBuildMaterialInputs
 	inputArchiveDigest string
-}
-
-func (inputs *stagedPackerInputs) verify(ctx context.Context) error {
-	if inputs == nil || inputs.root == "" {
-		return e.New(e.CodeEngineCapability, "authenticated staged Packer inputs are required")
-	}
-	return verifyPackerFileSnapshot(ctx, inputs.root, inputs.files, "material")
 }
 
 // PackerToolchain is a process-local capability for one exact Packer executable,
@@ -108,7 +88,7 @@ type PackerToolchain struct {
 	executable *heldfile.File
 	hostTools  []packerHostTool
 	pluginsDir string
-	plugins    []packerFileSnapshot
+	plugins    []privateFileSnapshot
 	closed     bool
 }
 
@@ -223,14 +203,9 @@ func (toolchain *PackerToolchain) Close() error {
 // authoritative for HCL variable semantics.
 type PackerVariable = packertransport.Variable
 
-// PackerMaterialInput binds one manifest-relative destination to exact held
-// artifact bytes. Pipeline lowering must derive Content from an authenticated
-// producer receipt; a pathname or ArtifactResult is not accepted here.
-type PackerMaterialInput struct {
-	Path    string
-	SHA256  string
-	Content *heldfile.File
-}
+// PackerMaterialInput is retained as the direct-Packer API name. Both ordinary
+// OCI and Packer producers consume the same held material capability.
+type PackerMaterialInput = BuildMaterialInput
 
 // PackerBuildRequest contains only runtime values. Catalog and material-graph
 // owners lower their typed declarations into this boundary; the driver does not
@@ -438,7 +413,7 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 
 	manifest, err := heldfile.OpenContext(runCtx, request.MaterialManifestPath, heldfile.Options{
 		Label:          "packer-material-manifest",
-		MaxBytes:       maxPackerManifestBytes,
+		MaxBytes:       maxBuildMaterialManifestBytes,
 		ExpectedDigest: request.MaterialManifestSHA256,
 	})
 	if err != nil {
@@ -490,10 +465,10 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	if err := materializePackerHostPath(hostPath, toolchain.hostTools); err != nil {
 		return nil, err
 	}
-	if err := materializePackerManifest(runCtx, manifest, manifestPath); err != nil {
+	if err := materializeBuildMaterialManifest(runCtx, manifest, manifestPath); err != nil {
 		return nil, err
 	}
-	stagedInputs, err := stagePackerInputs(runCtx, filepath.Dir(manifestPath), request.MaterialManifestSHA256, request.Materials)
+	stagedInputs, err := stageBuildMaterialInputs(runCtx, filepath.Dir(manifestPath), request.MaterialManifestSHA256, request.Materials)
 	if err != nil {
 		return nil, err
 	}
@@ -707,11 +682,7 @@ func requireELFExecutable(reader io.ReaderAt, label string) error {
 }
 
 func addPackerBoundedSize(total, size, maxFile, maxTotal int64) (int64, bool) {
-	if total < 0 || size < 0 || maxFile < 0 || maxTotal < 0 || size > maxFile || size > maxTotal ||
-		total > maxTotal-size {
-		return 0, false
-	}
-	return total + size, true
+	return addBoundedSize(total, size, maxFile, maxTotal)
 }
 
 func validPackerHostToolName(name string) bool {
@@ -818,7 +789,7 @@ func validatePackerPluginManifest(plugins []PackerPluginFile) ([]PackerPluginFil
 	return pins, nil
 }
 
-func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []PackerPluginFile) (string, []packerFileSnapshot, error) {
+func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []PackerPluginFile) (string, []privateFileSnapshot, error) {
 	if len(pins) > 0 {
 		if _, err := requireCleanAbsoluteDirectory(sourceRoot, "Packer plugin source root"); err != nil {
 			return "", nil, err
@@ -828,14 +799,14 @@ func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []Packer
 	if err != nil {
 		return "", nil, e.Wrap(e.CodeInternal, err, "creating private Packer plugin root")
 	}
-	cleanup := func(cause error) (string, []packerFileSnapshot, error) {
+	cleanup := func(cause error) (string, []privateFileSnapshot, error) {
 		_ = removePrivateTree(privateRoot)
 		return "", nil, cause
 	}
 	if err := os.Chmod(privateRoot, 0o700); err != nil {
 		return cleanup(e.Wrap(e.CodeInternal, err, "sealing private Packer plugin root"))
 	}
-	snapshots := make([]packerFileSnapshot, 0, len(pins))
+	snapshots := make([]privateFileSnapshot, 0, len(pins))
 	var total int64
 	for _, pin := range pins {
 		if err := ctx.Err(); err != nil {
@@ -898,12 +869,12 @@ func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []Packer
 					"closing captured Packer plugin executable %q", pin.Path))
 			}
 		}
-		snapshots = append(snapshots, packerFileSnapshot{Path: pin.Path, SHA256: pin.SHA256, Mode: mode})
+		snapshots = append(snapshots, privateFileSnapshot{Path: pin.Path, SHA256: pin.SHA256, Mode: mode})
 	}
-	if err := sealPackerDirectories(privateRoot); err != nil {
+	if err := sealPrivateInputDirectories(privateRoot); err != nil {
 		return cleanup(e.Wrap(e.CodeInternal, err, "sealing private Packer plugin closure"))
 	}
-	if err := verifyPackerFileSnapshot(ctx, privateRoot, snapshots, "plugin"); err != nil {
+	if err := verifyPrivateFileSnapshot(ctx, privateRoot, snapshots, "Packer plugin"); err != nil {
 		return cleanup(err)
 	}
 	return privateRoot, snapshots, nil
@@ -931,101 +902,7 @@ func verifyPackerToolchain(ctx context.Context, toolchain *PackerToolchain) erro
 			return e.Wrap(e.CodeUnverifiedRef, err, "verifying held Packer host-tool %q", tool.name)
 		}
 	}
-	return verifyPackerFileSnapshot(ctx, toolchain.pluginsDir, toolchain.plugins, "plugin")
-}
-
-func verifyPackerFileSnapshot(ctx context.Context, root string, files []packerFileSnapshot, label string) error {
-	expected := make(map[string]packerFileSnapshot, len(files))
-	for _, file := range files {
-		expected[filepath.Clean(file.Path)] = file
-	}
-	seen := make(map[string]bool, len(expected))
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			info, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			if info.Mode().Perm()&0o222 != 0 {
-				return fmt.Errorf("%s directory %q is writable", label, path)
-			}
-			return nil
-		}
-		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		pin, ok := expected[relative]
-		if !ok || entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("%s closure contains undeclared file %q", label, relative)
-		}
-		file, before, err := openRegularBeneath(root, relative)
-		if err != nil {
-			return err
-		}
-		digest, _, after, hashErr := hashOpenRegularContext(ctx, file, before)
-		closeErr := file.Close()
-		if err := errors.Join(hashErr, closeErr); err != nil {
-			return err
-		}
-		if digest != pin.SHA256 || after.Mode().Perm() != pin.Mode {
-			return fmt.Errorf("%s file %q changed", label, relative)
-		}
-		seen[relative] = true
-		return nil
-	})
-	if err != nil {
-		if ctx.Err() != nil {
-			return e.Wrap(e.CodeTimeout, ctx.Err(), "verifying private Packer %s closure", label)
-		}
-		return e.Wrap(e.CodeUnverifiedRef, err, "verifying private Packer %s closure", label)
-	}
-	if len(seen) != len(expected) {
-		return e.New(e.CodeUnverifiedRef,
-			"private Packer %s closure has %d files, want %d", label, len(seen), len(expected))
-	}
-	return nil
-}
-
-func sealPackerDirectories(root string) error {
-	directories := make([]string, 0)
-	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			directories = append(directories, path)
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	sort.Slice(directories, func(i, j int) bool { return len(directories[i]) > len(directories[j]) })
-	for _, directory := range directories {
-		if err := os.Chmod(directory, 0o500); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func removePrivateTree(root string) error {
-	if root == "" {
-		return nil
-	}
-	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, _ error) error {
-		if entry != nil && entry.IsDir() {
-			_ = os.Chmod(path, 0o700)
-		}
-		return nil
-	})
-	return os.RemoveAll(root)
+	return verifyPrivateFileSnapshot(ctx, toolchain.pluginsDir, toolchain.plugins, "Packer plugin")
 }
 
 func validatePackerBuildRequest(request PackerBuildRequest) error {
@@ -1066,9 +943,9 @@ func validatePackerBuildContract(contract packerBuildContract, allowSSHKeyPaths 
 	if !validCleanAbsolutePath(contract.materialManifestPath) {
 		return e.New(e.CodeInvalidCatalog, "Packer material manifest path must be clean and absolute")
 	}
-	if len(contract.materials) > maxPackerMaterialFiles {
+	if len(contract.materials) > maxBuildMaterialFiles {
 		return e.New(e.CodeInvalidCatalog,
-			"Packer build has %d materials, exceeding the %d-file bound", len(contract.materials), maxPackerMaterialFiles)
+			"Packer build has %d materials, exceeding the %d-file bound", len(contract.materials), maxBuildMaterialFiles)
 	}
 	materialPaths := make(map[string]bool, len(contract.materials))
 	orderedMaterialPaths := make([]string, 0, len(contract.materials))
@@ -1090,7 +967,7 @@ func validatePackerBuildContract(contract packerBuildContract, allowSSHKeyPaths 
 				"Packer material %q lacks the exact authenticated held bytes", material.Path)
 		}
 		nextMaterialBytes, ok := addPackerBoundedSize(materialBytes, material.Content.Size(),
-			maxPackerMaterialBytes, maxPackerMaterialTotalBytes)
+			MaxBuildMaterialBytes, maxBuildMaterialTotalBytes)
 		if !ok {
 			return e.New(e.CodeEngineCapability,
 				"Packer material %q exceeds the authenticated closure size bound", material.Path)
@@ -1138,16 +1015,7 @@ func validPackerTransport(value string, maxBytes int, allowEmpty bool) bool {
 }
 
 func validPackerRelativePath(path string) bool {
-	if !validPackerTransport(path, maxPackerPathBytes, false) || strings.ContainsRune(path, '\\') ||
-		filepath.IsAbs(path) || filepath.Clean(path) != path || path == "." {
-		return false
-	}
-	for _, part := range strings.Split(path, string(filepath.Separator)) {
-		if part == "" || part == "." || part == ".." {
-			return false
-		}
-	}
-	return true
+	return validCleanRelativePath(path, maxPackerPathBytes)
 }
 
 func validPackerProjectPath(path string) bool {
@@ -1192,113 +1060,6 @@ func openPackerProjectDirectory(root, relative string) (string, *os.File, error)
 		current = next
 	}
 	return filepath.Join(root, relative), current, nil
-}
-
-func materializePackerManifest(ctx context.Context, manifest *heldfile.File, destination string) error {
-	file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		return e.Wrap(e.CodeBuildFailed, err, "creating private Packer material manifest")
-	}
-	written, copyErr := manifest.WriteToContext(ctx, file)
-	chmodErr := file.Chmod(0o400)
-	syncErr := file.Sync()
-	closeErr := file.Close()
-	if err := errors.Join(copyErr, syncErr, chmodErr, closeErr); err != nil {
-		if ctx.Err() != nil {
-			return e.Wrap(e.CodeTimeout, ctx.Err(), "materializing Packer material manifest")
-		}
-		return e.Wrap(e.CodeBuildFailed, err, "materializing Packer material manifest")
-	}
-	if written != manifest.Size() {
-		return e.New(e.CodeVerifyFailed,
-			"materialized Packer manifest size %d does not match held size %d", written, manifest.Size())
-	}
-	return nil
-}
-
-func stagePackerInputs(ctx context.Context, root, manifestDigest string, inputs []PackerMaterialInput) (*stagedPackerInputs, error) {
-	files, err := stagePackerMaterials(ctx, root, inputs)
-	if err != nil {
-		return nil, err
-	}
-	files = append(files, packerFileSnapshot{Path: "material-manifest.json", SHA256: manifestDigest, Mode: 0o400})
-	if err := sealPackerDirectories(root); err != nil {
-		return nil, e.Wrap(e.CodeInternal, err, "sealing private Packer material closure")
-	}
-	staged := &stagedPackerInputs{root: root, files: files}
-	if err := staged.verify(ctx); err != nil {
-		return nil, err
-	}
-	return staged, nil
-}
-
-// stagePackerMaterials is the material authority boundary for Packer. Each
-// receipt-derived held capability is re-verified, copied under the private input
-// root at its manifest-relative path, and re-verified before it is released.
-// Packer never receives an artifact pathname outside the private run root.
-func stagePackerMaterials(ctx context.Context, root string, inputs []PackerMaterialInput) ([]packerFileSnapshot, error) {
-	ordered := append([]PackerMaterialInput(nil), inputs...)
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Path < ordered[j].Path })
-	snapshots := make([]packerFileSnapshot, 0, len(ordered))
-	for _, input := range ordered {
-		if err := input.Content.AssertUnchangedContext(ctx); err != nil {
-			if ctx.Err() != nil {
-				return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "verifying Packer material %q", input.Path)
-			}
-			return nil, e.Wrap(e.CodeUnverifiedRef, err, "verifying Packer material %q", input.Path)
-		}
-		if err := materializePackerInput(ctx, root, input.Path, input.Content); err != nil {
-			if ctx.Err() != nil {
-				return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "staging Packer material %q", input.Path)
-			}
-			return nil, e.Wrap(e.CodeBuildFailed, err, "staging Packer material %q", input.Path)
-		}
-		if err := input.Content.AssertUnchangedContext(ctx); err != nil {
-			if ctx.Err() != nil {
-				return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "re-verifying Packer material %q", input.Path)
-			}
-			return nil, e.Wrap(e.CodeUnverifiedRef, err, "re-verifying Packer material %q", input.Path)
-		}
-		snapshots = append(snapshots, packerFileSnapshot{Path: input.Path, SHA256: input.SHA256, Mode: 0o400})
-	}
-	return snapshots, nil
-}
-
-func materializePackerInput(ctx context.Context, root, relative string, material *heldfile.File) error {
-	parent, finalName, err := securepath.CreateParentBeneath(root, relative)
-	if err != nil {
-		return err
-	}
-	defer parent.Close()
-	temporary, temporaryName, err := securepath.CreateTemporarySibling(parent)
-	if err != nil {
-		return err
-	}
-	closed := false
-	defer func() {
-		if !closed {
-			_ = temporary.Close()
-		}
-		_ = unix.Unlinkat(int(parent.Fd()), temporaryName, 0)
-	}()
-	written, writeErr := material.WriteToContext(ctx, temporary)
-	chmodErr := temporary.Chmod(0o400)
-	syncErr := temporary.Sync()
-	closeErr := temporary.Close()
-	closed = true
-	if err := errors.Join(writeErr, syncErr, chmodErr, closeErr); err != nil {
-		return err
-	}
-	if written != material.Size() {
-		return fmt.Errorf("staged material size %d does not match held size %d", written, material.Size())
-	}
-	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), temporaryName, int(parent.Fd()), finalName); err != nil {
-		return err
-	}
-	if err := unix.Fsync(int(parent.Fd())); err != nil {
-		return err
-	}
-	return nil
 }
 
 func packerEnvironment(runRoot, hostPath, pluginsDir, configPath string) []string {

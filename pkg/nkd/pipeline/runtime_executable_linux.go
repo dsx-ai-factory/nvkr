@@ -12,7 +12,7 @@ import (
 
 const maxQualifiedRuntimeBytes int64 = 1 << 30
 
-var qualifiedRuntimeEnvironment = []string{
+var dockerRuntimeEnvironment = []string{
 	"HOME=/dev/null",
 	"PATH=/nonexistent",
 	"LANG=C",
@@ -20,6 +20,15 @@ var qualifiedRuntimeEnvironment = []string{
 	"TZ=UTC",
 	"DOCKER_CONFIG=/dev/null",
 	"DOCKER_HOST=" + qualifiedRuntimeEndpoint,
+}
+
+var podmanRuntimeEnvironment = []string{
+	"HOME=/nonexistent",
+	"PATH=/nonexistent",
+	"LANG=C",
+	"LC_ALL=C",
+	"TZ=UTC",
+	"REGISTRY_AUTH_FILE=/nonexistent",
 }
 
 // snapshotRuntimeExecutable copies the resolved runtime inode into the shared
@@ -36,6 +45,7 @@ func snapshotRuntimeExecutableContext(ctx context.Context, runtimePath string) (
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "holding container runtime %s", runtimePath)
 	}
+	name := filepath.Base(runtimePath)
 	resolved, err := filepath.EvalSymlinks(runtimePath)
 	if err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "resolving container runtime %s", runtimePath)
@@ -49,8 +59,12 @@ func snapshotRuntimeExecutableContext(ctx context.Context, runtimePath string) (
 		}
 		return nil, e.Wrap(e.CodeEngineCapability, err, "holding container runtime %s", runtimePath)
 	}
+	environment := dockerRuntimeEnvironment
+	if name == "podman" {
+		environment = podmanRuntimeEnvironment
+	}
 	return &heldRuntimeExecutable{
-		capability: capability, endpoint: qualifiedRuntimeEndpoint,
-		environment: append([]string(nil), qualifiedRuntimeEnvironment...),
+		capability: capability, name: name, endpoint: qualifiedRuntimeEndpoint,
+		environment: append([]string(nil), environment...),
 	}, nil
 }

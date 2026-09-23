@@ -61,9 +61,14 @@ partially completed plan and exposes no independently authored CompileSpec or Ex
 snapshot; subsequent caller mutation cannot change execution. `factory` owns Run scheduling/execution and
 provider generation. Its typed payload observer rechecks binary, APT, Helm and image outputs against their
 exact planned producer inputs; lifecycle retains frozen requirements and outer publication membership.
-Disk outputs use factory's concrete in-process `LocalRunResult` and held-QCOW2 observer. Lifecycle closes that
-result before committing a successful or failed observation record; serialized descriptions cannot restore
-the held capability. This observation contract does not enable production VM execution or disk publication.
+Disk outputs use factory's concrete in-process `LocalRunResult` and held-QCOW2 observer. Lifecycle stages the
+observed bytes beneath its immutable attempt workspace while the held capability rechecks their digest, syncs
+the read-only file, binds the observation, and closes the held result. An explicit attempt transaction then
+commits the QCOW2 and successful Run record together. After successful rollback, a commit failure records a
+failed Run. Its durable marker makes interruption
+distinct from completion on a reused attempt. Marker removal plus attempt-directory sync is the success commit
+point; handle cleanup after it is non-authoritative. Serialized descriptions cannot restore the held capability,
+and callers cannot select an export path. This local retention contract does not enable disk publication.
 `delivery` owns checked publication membership and canonical release-content identity;
 Release consumers do not reconstruct compiler bindings. Existing domain modules retain their
 canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,

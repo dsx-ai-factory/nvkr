@@ -16,8 +16,11 @@ func admitBuildKit(node ir.Node, opts RunOptions) error {
 	if opts.Qualification != nil || opts.execution != nil || opts.Package {
 		return e.New(e.CodeEngineCapability, "rootless BuildKit produces wrapped OCI exports, not qualified or legacy-packaged builds")
 	}
-	if filepath.Base(opts.Runtime) != "docker" {
-		return e.New(e.CodeEngineCapability, "rootless BuildKit currently requires the Docker runtime adapter")
+	switch filepath.Base(opts.Runtime) {
+	case "docker", "podman":
+	default:
+		return e.New(e.CodeEngineCapability,
+			"rootless BuildKit requires the Docker or Podman runtime adapter")
 	}
 	return nil
 }
@@ -27,11 +30,18 @@ func admitBuildKit(node ir.Node, opts RunOptions) error {
 // credentials. Overlayfs avoids copying entire source/toolchain trees for each
 // Dockerfile step and requires a kernel supporting unprivileged overlay mounts.
 // It needs no /dev/fuse; an unsupported host fails rather than falling back to
-// the native snapshotter's unbounded full-tree copies.
-func buildKitRuntimeArgs() []string {
-	return []string{"--user", "1000:1000", "--security-opt", "seccomp=unconfined",
+// the native snapshotter's unbounded full-tree copies. Rootless Podman on an
+// SELinux host also needs label separation disabled for this container so the
+// nested BuildKit worker can mount proc and devpts. This grants no host device,
+// runtime socket, credential, or privileged-container access.
+func buildKitRuntimeArgs(runtime string) []string {
+	args := []string{"--user", "1000:1000", "--security-opt", "seccomp=unconfined",
 		"--security-opt", "apparmor=unconfined", "--security-opt", "systempaths=unconfined",
-		"--entrypoint", "", "-e", "BUILDKITD_FLAGS=--oci-worker-snapshotter=overlayfs"}
+	}
+	if filepath.Base(runtime) == "podman" {
+		args = append(args, "--security-opt", "label=disable")
+	}
+	return append(args, "--entrypoint", "", "-e", "BUILDKITD_FLAGS=--oci-worker-snapshotter=overlayfs")
 }
 
 // A private parent prevents other host users from reaching the writable mount.

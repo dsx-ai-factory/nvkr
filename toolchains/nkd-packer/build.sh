@@ -64,12 +64,25 @@ jq -e '
   (.ubuntuSnapshot | type == "string" and test("^[0-9]{8}T[0-9]{6}Z$")) and
   (.baseImage | type == "string" and test("^ubuntu@sha256:[0-9a-f]{64}$")) and
   (.downloadImage | type == "string" and test("^curlimages/curl@sha256:[0-9a-f]{64}$")) and
-  .packer.version == "1.14.2" and
+  .validatedNKE.commit == "de0e46bb14cae2f892677bf9e21b91a7add2f9d9" and
+  .validatedNKE.goVersion == "1.26.8" and
+  .validatedNKE.packerProject == "os-image/packer" and
+  .validatedNKE.requiredBuild == "nke-node-non-fde.qemu.nke-non-fde" and
+  .packer.version == "1.15.4" and
   .packer.license == "BUSL-1.1" and
   .qemuPlugin.source == "github.com/hashicorp/qemu" and
   .qemuPlugin.version == "1.1.6" and
   .qemuPlugin.license == "MPL-2.0" and
-  ([.packer.archives, .packer.binaries, .qemuPlugin.archives, .qemuPlugin.binaries] | all(
+  .go.version == "1.27.1" and
+  .go.license == "BSD-3-Clause" and
+  .crane.version == "0.21.9" and
+  .crane.license == "Apache-2.0" and
+  .nfpm.version == "2.47.0" and
+  .nfpm.license == "MIT" and
+  .publicationGates.packerBUSLRedistributionApproval == "not-recorded" and
+  .publicationGates.vulnerabilityReviewApproval == "not-recorded" and
+  ([.packer.archives, .packer.binaries, .qemuPlugin.archives, .qemuPlugin.binaries,
+    .go.archives, .crane.archives, .crane.binaries, .nfpm.archives, .nfpm.binaries] | all(
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
   )) and
@@ -116,6 +129,14 @@ packer_binary_digest="$(jq -r --arg arch "${arch}" '.packer.binaries[$arch]' "${
 plugin_version="$(jq -r '.qemuPlugin.version' "${lock}")"
 plugin_digest="$(jq -r --arg arch "${arch}" '.qemuPlugin.archives[$arch]' "${lock}")"
 plugin_binary_digest="$(jq -r --arg arch "${arch}" '.qemuPlugin.binaries[$arch]' "${lock}")"
+go_version="$(jq -r '.go.version' "${lock}")"
+go_digest="$(jq -r --arg arch "${arch}" '.go.archives[$arch]' "${lock}")"
+crane_version="$(jq -r '.crane.version' "${lock}")"
+crane_digest="$(jq -r --arg arch "${arch}" '.crane.archives[$arch]' "${lock}")"
+crane_binary_digest="$(jq -r --arg arch "${arch}" '.crane.binaries[$arch]' "${lock}")"
+nfpm_version="$(jq -r '.nfpm.version' "${lock}")"
+nfpm_digest="$(jq -r --arg arch "${arch}" '.nfpm.archives[$arch]' "${lock}")"
+nfpm_binary_digest="$(jq -r --arg arch "${arch}" '.nfpm.binaries[$arch]' "${lock}")"
 tag="${tag:-localhost/nkd-packer-toolchain:dev-${arch}}"
 
 "${runtime}" build \
@@ -130,6 +151,14 @@ tag="${tag:-localhost/nkd-packer-toolchain:dev-${arch}}"
   --build-arg "QEMU_PLUGIN_VERSION=${plugin_version}" \
   --build-arg "QEMU_PLUGIN_ARCHIVE_SHA256=${plugin_digest#sha256:}" \
   --build-arg "QEMU_PLUGIN_BINARY_SHA256=${plugin_binary_digest#sha256:}" \
+  --build-arg "GO_VERSION=${go_version}" \
+  --build-arg "GO_ARCHIVE_SHA256=${go_digest#sha256:}" \
+  --build-arg "CRANE_VERSION=${crane_version}" \
+  --build-arg "CRANE_ARCHIVE_SHA256=${crane_digest#sha256:}" \
+  --build-arg "CRANE_BINARY_SHA256=${crane_binary_digest#sha256:}" \
+  --build-arg "NFPM_VERSION=${nfpm_version}" \
+  --build-arg "NFPM_ARCHIVE_SHA256=${nfpm_digest#sha256:}" \
+  --build-arg "NFPM_BINARY_SHA256=${nfpm_binary_digest#sha256:}" \
   --file "${here}/Dockerfile" \
   --tag "${tag}" \
   "${here}"
@@ -164,13 +193,14 @@ fi
   --tmpfs /nkd/work:rw,nosuid,nodev,mode=1777 \
   --env CHECKPOINT_DISABLE=1 \
   --env HOME=/nkd/work/home \
+  --env "EXPECTED_GO_VERSION=${go_version}" \
   --env PACKER_PLUGIN_PATH=/nkd/toolchain/packer/plugins \
   --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --env TMPDIR=/nkd/work/tmp \
   --entrypoint sh \
   "${tag}" -ec '
   mkdir -p "${HOME}" "${TMPDIR}"
-  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.14.2"
+  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.15.4"
   plugin=/nkd/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.6_x5.0_linux_'"${arch}"'
   test -x "${plugin}"
   test "$(cat "${plugin}_SHA256SUM")" = "$(sha256sum "${plugin}" | cut -d" " -f1)"
@@ -191,6 +221,27 @@ fi
   command -v dirname >/dev/null
   command -v python3 >/dev/null
   command -v tar >/dev/null
+  command -v curl >/dev/null
+  command -v cloud-localds >/dev/null
+  command -v dpkg-scanpackages >/dev/null
+  command -v file >/dev/null
+  command -v gcc >/dev/null
+  command -v git >/dev/null
+  command -v go >/dev/null
+  command -v gpg >/dev/null
+  command -v gzip >/dev/null
+  command -v make >/dev/null
+  command -v crane >/dev/null
+  command -v nfpm >/dev/null
+  command -v 7z >/dev/null
+  command -v unzip >/dev/null
+  command -v xorriso >/dev/null
+  test "$(GOTOOLCHAIN=local go version)" = "go version go${EXPECTED_GO_VERSION} linux/'"${arch}"'"
+  test "$(crane version)" = "0.21.9"
+  nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.47.0$"
+  dpkg-scanpackages --version >/dev/null
+  7z i >/dev/null
+  xorriso -version >/dev/null 2>&1
   case "$(qemu-system-x86_64 -help)" in *"-vnc "*) ;; *) exit 1 ;; esac
   qemu-system-aarch64 -device virtio-gpu-pci,help >/dev/null
   qemu-system-aarch64 -device qemu-xhci,help >/dev/null
@@ -200,6 +251,37 @@ fi
   test -f /usr/share/OVMF/OVMF_VARS_4M.fd
   test -f /usr/share/AAVMF/AAVMF_CODE.fd
   test -f /usr/share/AAVMF/AAVMF_VARS.fd
+  key="${TMPDIR}/id_ed25519"
+  ssh-keygen -q -t ed25519 -N "" -f "${key}"
+  test "$(ssh-keygen -y -f "${key}" | cut -d" " -f1-2)" = "$(cut -d" " -f1-2 "${key}.pub")"
+  mkdir -p "${TMPDIR}/packer-probe"
+  cat >"${TMPDIR}/packer-probe/probe.pkr.hcl" <<"EOF"
+packer {
+  required_version = "= 1.15.4"
+  required_plugins {
+    qemu = {
+      source  = "github.com/hashicorp/qemu"
+      version = "= 1.1.6"
+    }
+  }
+}
+source "qemu" "probe" {
+  iso_url          = "https://example.invalid/installer.iso"
+  iso_checksum     = "none"
+  ssh_username     = "probe"
+  accelerator      = "none"
+  disk_size        = "1G"
+  format           = "qcow2"
+  headless         = true
+  shutdown_command = "echo ready"
+  output_directory = "/nkd/work/packer-probe-output"
+}
+build {
+  sources = ["source.qemu.probe"]
+}
+EOF
+  packer validate "${TMPDIR}/packer-probe/probe.pkr.hcl" >"${TMPDIR}/packer-validate.out"
+  grep -Fx "The configuration is valid." "${TMPDIR}/packer-validate.out" >/dev/null
 '
 
 printf 'validated local toolchain %s (%s)\n' "${tag}" "${image_id}"

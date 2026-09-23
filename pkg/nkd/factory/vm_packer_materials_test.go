@@ -138,7 +138,7 @@ func TestObserveVMPackerMaterialsEmitsNKEProducerContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer observed.Close()
-	raw, err := observed.manifest.ReadAllContext(t.Context(), maxVMPackerManifestBytes)
+	raw, err := observed.manifest.ReadAllContext(t.Context(), maxProducerManifestBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestObserveVMPackerMaterialsBindsExactPlanClosure(t *testing.T) {
 	if len(observed.inputs) != 2 || observed.manifest == nil {
 		t.Fatalf("observed material closure = %#v", observed)
 	}
-	raw, err := observed.manifest.ReadAllContext(t.Context(), maxVMPackerManifestBytes)
+	raw, err := observed.manifest.ReadAllContext(t.Context(), maxProducerManifestBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,13 +289,13 @@ func TestObserveVMPackerMaterialsRejectsPlanAndByteSubstitution(t *testing.T) {
 func TestObserveVMPackerMaterialsEnforcesBoundsAndCleansLateFailure(t *testing.T) {
 	for _, test := range []struct {
 		name   string
-		limits vmPackerMaterialLimits
+		limits producerMaterialLimits
 		code   e.Code
 	}{
-		{name: "file count", limits: vmPackerMaterialLimits{files: 1, perFile: 1024, total: 2048, manifest: 4096}, code: e.CodeEngineCapability},
-		{name: "per file bytes", limits: vmPackerMaterialLimits{files: 2, perFile: 2, total: 2048, manifest: 4096}, code: e.CodeUnverifiedRef},
-		{name: "total bytes", limits: vmPackerMaterialLimits{files: 2, perFile: 1024, total: 20, manifest: 4096}, code: e.CodeEngineCapability},
-		{name: "manifest bytes", limits: vmPackerMaterialLimits{files: 2, perFile: 1024, total: 2048, manifest: 1}, code: e.CodeInternal},
+		{name: "file count", limits: producerMaterialLimits{files: 1, perFile: 1024, total: 2048, manifest: 4096}, code: e.CodeEngineCapability},
+		{name: "per file bytes", limits: producerMaterialLimits{files: 2, perFile: 2, total: 2048, manifest: 4096}, code: e.CodeUnverifiedRef},
+		{name: "total bytes", limits: producerMaterialLimits{files: 2, perFile: 1024, total: 20, manifest: 4096}, code: e.CodeEngineCapability},
+		{name: "manifest bytes", limits: producerMaterialLimits{files: 2, perFile: 1024, total: 2048, manifest: 1}, code: e.CodeInternal},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newVMPackerMaterialFixture(t)

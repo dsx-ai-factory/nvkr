@@ -81,6 +81,53 @@ func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath st
 	return result, nil
 }
 
+// AuthenticateResultForConsumption admits one exact producer payload/result pair
+// for use by a downstream producer. It strengthens ObserveResult with the
+// producer-kind metadata invariants available without a terminal execution
+// receipt. Qualified-execution claims are rejected here because this boundary
+// does not own the receipt needed to authenticate them.
+func AuthenticateResultForConsumption(ctx context.Context, node ir.Node, payloadPath, resultPath string) (ArtifactResult, error) {
+	result, err := ObserveResult(ctx, node, payloadPath, resultPath)
+	if err != nil {
+		return ArtifactResult{}, err
+	}
+	switch node.Kind {
+	case ir.KindBuild:
+		if !canonical.IsDigest(result.InputDigest) {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
+				"build result %q has no exact prepared-source identity", node.ID)
+		}
+		if len(node.Materials) != 0 && !canonical.IsDigest(result.MaterialManifestDigest) {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
+				"build result %q has no exact material-manifest identity", node.ID)
+		}
+		if len(node.Materials) == 0 && result.MaterialManifestDigest != "" {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
+				"build result %q records undeclared material inputs", node.ID)
+		}
+		if result.Qualification != ArtifactUnqualified {
+			return ArtifactResult{}, e.New(e.CodePreflightFailed,
+				"build result %q requires its execution receipt before downstream consumption", node.ID)
+		}
+		if result.ProfileDigest != "" || result.ExecutionBinding != "" ||
+			(result.EngineClass != "" && result.EngineClass != node.BuilderType) {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
+				"unqualified build result %q carries unauthenticated execution metadata", node.ID)
+		}
+	case ir.KindPull:
+		if result.Qualification != ArtifactProfileFreeAcquisition || result.BuilderType != "" ||
+			result.ProfileDigest != "" || result.ExecutionBinding != "" ||
+			result.EngineClass != ir.EnginePrebuiltAcquire {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
+				"pull result %q is not an exact profile-free acquisition", node.ID)
+		}
+	default:
+		return ArtifactResult{}, e.New(e.CodeInternal,
+			"producer result %q has unsupported kind %q", node.ID, node.Kind)
+	}
+	return result, nil
+}
+
 // VerifyResults is the terminal CI seam. It accepts only one strict result document
 // for every graph producer, reconstructs storage locations from the graph and current
 // workspace (never from producer-controlled absolute paths), and invokes the same

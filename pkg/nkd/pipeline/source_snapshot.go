@@ -304,6 +304,11 @@ func materializeSourceUncached(n ir.Node, opts RunOptions) (*materializedSource,
 			cleanup()
 			return nil, e.Wrap(e.CodeBuildFailed, err, "hashing patched source snapshot for %s", n.Component)
 		}
+		if prepared == copied {
+			cleanup()
+			return nil, e.New(e.CodeBuildFailed,
+				"build %q authenticated patch series did not change the prepared source", n.Component)
+		}
 		opts.progress.printf("[source] build %s — final patched-input hash computed in %s\n",
 			n.Component, time.Since(phaseStarted).Round(time.Millisecond))
 	}
@@ -341,17 +346,29 @@ func materializeSourceUncached(n ir.Node, opts RunOptions) (*materializedSource,
 }
 
 func applyPatches(n ir.Node, dir string, opts RunOptions) error {
+	ceiling, err := filepath.Abs(filepath.Dir(dir))
+	if err != nil {
+		return e.Wrap(e.CodeBuildFailed, err, "resolving private patch root for %s", n.Component)
+	}
 	for i, p := range n.Patches {
 		got := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(p.Content)))
 		if got != p.SHA256 {
 			return e.New(e.CodeBuildFailed, "build %q patch[%d] %q bytes do not match %s", n.Component, i, p.Name, p.SHA256)
 		}
 		for _, args := range [][]string{
-			{"apply", "--check", "--whitespace=nowarn", "-"},
-			{"apply", "--whitespace=nowarn", "-"},
+			{"apply", "--no-index", "--check", "--whitespace=nowarn", "-"},
+			{"apply", "--no-index", "--whitespace=nowarn", "-"},
+			{"apply", "--no-index", "--reverse", "--check", "--whitespace=nowarn", "-"},
 		} {
 			cmd := execCmd(opts, "git", args...)
 			cmd.Dir = dir
+			// Run snapshots may live beneath the nke-recipes checkout. Prevent Git
+			// from discovering that enclosing repository, which would make apply
+			// treat the snapshot as a subdirectory and silently skip unrelated paths.
+			cmd.Env = deterministicExecEnv(nil, map[string]string{
+				"GIT_CEILING_DIRECTORIES": ceiling,
+				"LC_ALL":                  "C",
+			})
 			cmd.Stdin = strings.NewReader(p.Content)
 			cmd.Stdout, cmd.Stderr = opts.Stdout, opts.Stderr
 			if err := runOwnedCommand(opts.ctx(), cmd); err != nil {

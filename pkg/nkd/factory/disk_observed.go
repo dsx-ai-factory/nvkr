@@ -146,7 +146,7 @@ func populateHeldDiskProducerCompletion(ctx context.Context, plan *Plan, nodeID 
 	if err := plan.Validate(); err != nil {
 		return err
 	}
-	planDigest, err := plan.Digest()
+	planDigest, err := plan.IdentityDigest()
 	if err != nil {
 		return err
 	}
@@ -239,28 +239,43 @@ func closeRejectedDiskPayload(cause error, payload *diskPayload) error {
 func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected LifecycleOutputPlan,
 	execution diskExecutionState, results []diskProducerCompletion,
 ) (DiskPayloadObservation, error) {
+	observation, _, err := inspectDiskLifecyclePayload(ctx, plan, expected, execution, results, nil, true)
+	return observation, err
+}
+
+// inspectDiskLifecyclePayload always authenticates the Plan, execution outcome,
+// producer result, and held payload identity. Only lifecycle observation/export
+// asks it to stream the bytes. Factory's terminal scheduling record uses the
+// metadata-only mode because the held payload was authenticated when ownership
+// transferred and lifecycle will subsequently stream it into durable staging.
+func inspectDiskLifecyclePayload(ctx context.Context, plan *Plan, expected LifecycleOutputPlan,
+	execution diskExecutionState, results []diskProducerCompletion, destination io.Writer, streamPayload bool,
+) (DiskPayloadObservation, pipeline.ArtifactResult, error) {
 	if ctx == nil {
-		return DiskPayloadObservation{}, e.New(e.CodeUsage, "disk lifecycle observation requires a non-nil context")
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{},
+			e.New(e.CodeUsage, "disk lifecycle observation requires a non-nil context")
 	}
 	if err := ctx.Err(); err != nil {
-		return DiskPayloadObservation{}, e.Wrap(e.CodeTimeout, err, "disk lifecycle observation canceled")
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{},
+			e.Wrap(e.CodeTimeout, err, "disk lifecycle observation canceled")
 	}
 	if plan == nil {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed, "disk lifecycle observation requires its compiled plan")
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{},
+			e.New(e.CodeVerifyFailed, "disk lifecycle observation requires its compiled plan")
 	}
 	if err := plan.Validate(); err != nil {
-		return DiskPayloadObservation{}, err
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, err
 	}
-	planDigest, err := plan.Digest()
+	planDigest, err := plan.IdentityDigest()
 	if err != nil {
-		return DiskPayloadObservation{}, err
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, err
 	}
 	if execution.PlanDigest != planDigest {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle output %q execution does not bind its exact Plan", expected.Name)
 	}
 	if expected.Kind != authored.OutputDiskImage || !canonical.IsDigest(expected.BuildDigest) {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle output %q has no exact disk build binding", expected.Name)
 	}
 	bindings := 0
@@ -272,7 +287,7 @@ func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 		}
 	}
 	if bindings != 1 {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle output %q differs from its unique plan binding", expected.Name)
 	}
 	var build *BuildPlan
@@ -280,19 +295,19 @@ func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 		candidate := &plan.Builds[index]
 		if candidate.Name == expected.Name && candidate.BuildDigest == expected.BuildDigest {
 			if build != nil {
-				return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+				return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 					"disk lifecycle output %q has an ambiguous logical build", expected.Name)
 			}
 			build = candidate
 		}
 	}
 	if build == nil || build.Graph == nil {
-		return DiskPayloadObservation{}, e.New(e.CodeReleaseIncomplete,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeReleaseIncomplete,
 			"disk lifecycle output %q has no exact logical build", expected.Name)
 	}
 	root, err := buildgraph.DiskRootName(build.ResolvedComponents)
 	if err != nil {
-		return DiskPayloadObservation{}, e.Wrap(e.CodeVerifyFailed, err,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.Wrap(e.CodeVerifyFailed, err,
 			"disk lifecycle output %q has no unique QCOW2 root", expected.Name)
 	}
 	var producer ir.Node
@@ -306,7 +321,7 @@ func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 	}
 	if producers != 1 || producer.Disk.Format != "qcow2" ||
 		(producer.Disk.Encryption != "none" && producer.Disk.Encryption != "luks2") {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle output %q has no unique admitted QCOW2 producer", expected.Name)
 	}
 	producerNodeID := expected.Name + "/" + producer.ID
@@ -320,7 +335,7 @@ func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 		}
 	}
 	if outcomes != 1 || successful != 1 {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle output %q has no unique successful producer outcome", expected.Name)
 	}
 	var completion diskProducerCompletion
@@ -332,11 +347,11 @@ func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 		}
 	}
 	if completions != 1 || completion.Payload == nil {
-		return DiskPayloadObservation{}, e.New(e.CodeReleaseIncomplete,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeReleaseIncomplete,
 			"disk lifecycle output %q requires exactly one authenticated producer result", expected.Name)
 	}
 	if completion.PlanDigest != planDigest {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle output %q producer did not execute under its exact Plan", expected.Name)
 	}
 	result, payload := completion.Result, completion.Payload
@@ -349,33 +364,44 @@ func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 		!canonical.IsDigest(result.InputDigest) || !canonical.IsDigest(result.SHA256) || result.Size <= 0 ||
 		!canonical.IsDigest(payload.digest) || payload.size <= 0 ||
 		result.SHA256 != payload.digest || result.Size != payload.size {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle output %q producer result differs from its compiled producer", expected.Name)
 	}
-	stream := &diskObservationWriter{ctx: ctx, hash: sha256.New()}
-	written, err := payload.WriteToContext(ctx, stream)
-	if err != nil {
-		if ctx.Err() != nil {
-			return DiskPayloadObservation{}, e.Wrap(e.CodeTimeout, ctx.Err(), "observing disk lifecycle payload")
-		}
-		return DiskPayloadObservation{}, e.Wrap(e.CodeVerifyFailed, err, "observing disk lifecycle payload")
-	}
-	digest := "sha256:" + hex.EncodeToString(stream.hash.Sum(nil))
-	if written != stream.size || stream.size != payload.size || digest != payload.digest {
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
-			"disk lifecycle output %q bytes differ from producer result: got %s/%d, want %s/%d",
-			expected.Name, digest, stream.size, payload.digest, payload.size)
-	}
-	if err := validateQCOW2Header(stream.header, stream.size); err != nil {
-		return DiskPayloadObservation{}, e.Wrap(e.CodeVerifyFailed, err,
-			"disk lifecycle output %q does not carry an admitted QCOW2 header", expected.Name)
-	}
-	return DiskPayloadObservation{
-		Digest: digest, Size: stream.size, BuildDigest: build.BuildDigest,
+	observation := DiskPayloadObservation{
+		Digest: payload.digest, Size: payload.size, BuildDigest: build.BuildDigest,
 		Components: append([]string(nil), expected.Components...),
 		Producer:   producer.ID, Component: root, Format: producer.Disk.Format,
 		Encryption: producer.Disk.Encryption, Outcome: "succeeded", PlanDigest: planDigest,
-	}, nil
+	}
+	if !streamPayload {
+		return observation, result, nil
+	}
+	stream := &diskObservationWriter{ctx: ctx, destination: destination, digest: sha256.New()}
+	written, err := payload.WriteToContext(ctx, stream)
+	if err != nil {
+		if ctx.Err() != nil {
+			return DiskPayloadObservation{}, pipeline.ArtifactResult{},
+				e.Wrap(e.CodeTimeout, ctx.Err(), "observing disk lifecycle payload")
+		}
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{},
+			e.Wrap(e.CodeVerifyFailed, err, "observing disk lifecycle payload")
+	}
+	if written != stream.size || stream.size != payload.size {
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
+			"disk lifecycle output %q byte count differs from producer result: got %d, want %d",
+			expected.Name, stream.size, payload.size)
+	}
+	streamDigest := "sha256:" + hex.EncodeToString(stream.digest.Sum(nil))
+	if streamDigest != payload.digest || streamDigest != result.SHA256 {
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
+			"disk lifecycle output %q streamed digest %q differs from producer result %q",
+			expected.Name, streamDigest, result.SHA256)
+	}
+	if err := validateQCOW2Header(stream.header, stream.size); err != nil {
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.Wrap(e.CodeVerifyFailed, err,
+			"disk lifecycle output %q does not carry an admitted QCOW2 header", expected.Name)
+	}
+	return observation, result, nil
 }
 
 // ObserveDiskLifecyclePayload consumes one still-open local execution result and
@@ -384,28 +410,62 @@ func observeDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 func (result *LocalRunResult) ObserveDiskLifecyclePayload(ctx context.Context, plan *Plan,
 	expected LifecycleOutputPlan,
 ) (DiskPayloadObservation, error) {
+	observation, _, err := result.observeDiskLifecyclePayloadTo(ctx, plan, expected, nil)
+	return observation, err
+}
+
+// ExportDiskLifecyclePayload writes one already-admitted disk payload to the
+// caller's staging writer while independently repeating the exact Plan, producer,
+// digest, size, and QCOW2 framing checks used by observation. It does not grant
+// authority to a pathname or commit a durable artifact.
+func (result *LocalRunResult) ExportDiskLifecyclePayload(ctx context.Context, plan *Plan,
+	expected LifecycleOutputPlan, destination io.Writer,
+) (DiskPayloadObservation, error) {
+	if destination == nil {
+		return DiskPayloadObservation{}, e.New(e.CodeUsage,
+			"disk lifecycle export requires a staging writer")
+	}
+	observation, _, err := result.observeDiskLifecyclePayloadTo(ctx, plan, expected, destination)
+	return observation, err
+}
+
+func (result *LocalRunResult) observeDiskLifecyclePayloadTo(ctx context.Context, plan *Plan,
+	expected LifecycleOutputPlan, destination io.Writer,
+) (DiskPayloadObservation, pipeline.ArtifactResult, error) {
+	return result.inspectDiskLifecyclePayload(ctx, plan, expected, destination, true)
+}
+
+func (result *LocalRunResult) inspectDiskLifecycleMetadata(ctx context.Context, plan *Plan,
+	expected LifecycleOutputPlan,
+) (DiskPayloadObservation, pipeline.ArtifactResult, error) {
+	return result.inspectDiskLifecyclePayload(ctx, plan, expected, nil, false)
+}
+
+func (result *LocalRunResult) inspectDiskLifecyclePayload(ctx context.Context, plan *Plan,
+	expected LifecycleOutputPlan, destination io.Writer, streamPayload bool,
+) (DiskPayloadObservation, pipeline.ArtifactResult, error) {
 	if result == nil {
-		return DiskPayloadObservation{}, e.New(e.CodeReleaseIncomplete,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeReleaseIncomplete,
 			"disk lifecycle observation requires a local execution result")
 	}
 	if ctx == nil {
-		return DiskPayloadObservation{}, e.New(e.CodeUsage,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeUsage,
 			"disk lifecycle observation requires a non-nil context")
 	}
 	release, err := result.acquireDiskPermit(ctx)
 	if err != nil {
-		return DiskPayloadObservation{}, err
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, err
 	}
 	defer release()
 	result.diskMu.Lock()
 	if result.diskClosed {
 		result.diskMu.Unlock()
-		return DiskPayloadObservation{}, e.New(e.CodeGateUnmet,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeGateUnmet,
 			"local disk execution result is closed")
 	}
 	if result.SchemaVersion != LocalRunSchemaVersion || result.Qualification != TierLocalExecution {
 		result.diskMu.Unlock()
-		return DiskPayloadObservation{}, e.New(e.CodeVerifyFailed,
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
 			"disk lifecycle observation requires an exact local execution record")
 	}
 	execution := diskExecutionState{
@@ -413,7 +473,7 @@ func (result *LocalRunResult) ObserveDiskLifecyclePayload(ctx context.Context, p
 	}
 	completions := append([]diskProducerCompletion(nil), result.diskCompletions...)
 	result.diskMu.Unlock()
-	return observeDiskLifecyclePayload(ctx, plan, expected, execution, completions)
+	return inspectDiskLifecyclePayload(ctx, plan, expected, execution, completions, destination, streamPayload)
 }
 
 // Close releases every held disk payload owned by this local execution result.
@@ -486,10 +546,11 @@ func (result *LocalRunResult) recordDiskCompletion(completion diskProducerComple
 }
 
 type diskObservationWriter struct {
-	ctx    context.Context
-	hash   hash.Hash
-	header []byte
-	size   int64
+	ctx         context.Context
+	destination io.Writer
+	digest      hash.Hash
+	header      []byte
+	size        int64
 }
 
 // validateQCOW2Header performs a bounded framing check, not a complete QCOW2
@@ -539,14 +600,28 @@ func (writer *diskObservationWriter) Write(chunk []byte) (int, error) {
 	if err := writer.ctx.Err(); err != nil {
 		return 0, err
 	}
+	n := len(chunk)
+	var err error
+	if writer.destination != nil {
+		n, err = writer.destination.Write(chunk)
+		if n < 0 || n > len(chunk) {
+			return 0, io.ErrShortWrite
+		}
+		if n != len(chunk) && err == nil {
+			err = io.ErrShortWrite
+		}
+	}
+	if writer.digest == nil {
+		return 0, e.New(e.CodeInternal, "disk observation digest is unavailable")
+	}
+	_, _ = writer.digest.Write(chunk[:n])
 	if len(writer.header) < qcow2HeaderCaptureLen {
 		remaining := qcow2HeaderCaptureLen - len(writer.header)
-		if remaining > len(chunk) {
-			remaining = len(chunk)
+		if remaining > n {
+			remaining = n
 		}
 		writer.header = append(writer.header, chunk[:remaining]...)
 	}
-	n, err := writer.hash.Write(chunk)
 	writer.size += int64(n)
 	return n, err
 }

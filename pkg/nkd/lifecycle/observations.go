@@ -14,6 +14,28 @@ import (
 func observeOutputs(ctx context.Context, workspace string, slots []requiredOutput, artifacts map[string]factory.Artifact,
 	plan *factory.Plan, execution *factory.LocalRunResult,
 ) ([]Artifact, error) {
+	if execution == nil {
+		for _, slot := range slots {
+			if slot.Kind == OutputDiskImage {
+				return nil, e.New(e.CodeEngineCapability,
+					"disk output %q requires an in-process held producer result", slot.Name)
+			}
+		}
+	}
+	return observeOutputsWithDiskStaging(ctx, workspace, slots, artifacts, plan, execution, nil)
+}
+
+type heldDiskStager func(context.Context, requiredOutput, *factory.Plan, diskPayloadExporter) (Artifact, error)
+
+type diskPayloadObserver interface {
+	diskPayloadExporter
+	ObserveDiskLifecyclePayload(context.Context, *factory.Plan, factory.LifecycleOutputPlan) (factory.DiskPayloadObservation, error)
+}
+
+func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots []requiredOutput,
+	artifacts map[string]factory.Artifact, plan *factory.Plan, execution diskPayloadObserver,
+	stage heldDiskStager,
+) ([]Artifact, error) {
 	var localized map[string]factory.Artifact
 	observed := make([]Artifact, 0, len(slots))
 	for _, slot := range slots {
@@ -34,7 +56,13 @@ func observeOutputs(ctx context.Context, workspace string, slots []requiredOutpu
 				localized[id] = artifact
 			}
 		}
-		artifact, err := observeOutput(ctx, slot, localized, plan, execution)
+		var artifact Artifact
+		var err error
+		if slot.Kind == OutputDiskImage && stage != nil {
+			artifact, err = stage(ctx, slot, plan, execution)
+		} else {
+			artifact, err = observeOutput(ctx, slot, localized, plan, execution)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +72,7 @@ func observeOutputs(ctx context.Context, workspace string, slots []requiredOutpu
 }
 
 func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[string]factory.Artifact,
-	plan *factory.Plan, execution *factory.LocalRunResult,
+	plan *factory.Plan, execution diskPayloadObserver,
 ) (Artifact, error) {
 	if slot.Kind == OutputDiskImage {
 		if execution == nil {
@@ -127,11 +155,15 @@ func observeHeldDiskOutput(ctx context.Context, slot requiredOutput, plan *facto
 	if err != nil {
 		return Artifact{}, err
 	}
+	return artifactFromDiskObservation(slot, observation), nil
+}
+
+func artifactFromDiskObservation(slot requiredOutput, observation factory.DiskPayloadObservation) Artifact {
 	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest,
 		BuildDigest: observation.BuildDigest, Components: append([]string(nil), observation.Components...),
 		Disk: &delivery.DiskOutput{Producer: observation.Producer, Component: observation.Component,
 			Format: observation.Format, Encryption: observation.Encryption, Size: observation.Size,
-			PlanDigest: observation.PlanDigest, Outcome: observation.Outcome}}, nil
+			PlanDigest: observation.PlanDigest, Outcome: observation.Outcome}}
 }
 
 func lifecycleArtifactPath(path, workspace string) (string, error) {

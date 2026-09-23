@@ -99,6 +99,10 @@ func (l Local) execBuild(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if !n.SourceReadOnly || n.WriteDir == "" {
 		return nil, e.New(e.CodeEngineCapability, "exec-node build %q requires sourceReadOnly=true and an explicit writeDir", n.Component)
 	}
+	if len(n.Materials) != 0 {
+		return nil, e.New(e.CodeEngineCapability,
+			"exec-node build %q with material inputs requires --launch", n.Component)
+	}
 	if opts.DryRun {
 		fmt.Fprintf(opts.Stdout, "[exec-node:%s] materialize authenticated source; apply %d patch(es); sandbox=%s; (%s) %v\n", n.Component, len(n.Patches), ExecutionSandboxMode, n.BuilderType, n.Command)
 		return nil, nil

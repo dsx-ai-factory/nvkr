@@ -3,16 +3,22 @@
   "ubuntuSnapshot": "20260920T000000Z",
   "baseImage": "ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78",
   "downloadImage": "curlimages/curl@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40",
+  "validatedNKE": {
+    "commit": "de0e46bb14cae2f892677bf9e21b91a7add2f9d9",
+    "goVersion": "1.26.8",
+    "packerProject": "os-image/packer",
+    "requiredBuild": "nke-node-non-fde.qemu.nke-non-fde"
+  },
   "packer": {
-    "version": "1.14.2",
+    "version": "1.15.4",
     "license": "BUSL-1.1",
     "archives": {
-      "amd64": "sha256:cfefdea4ac580eba7b254ef34d25b756d4961741004e3e701a1476594d13e64a",
-      "arm64": "sha256:370002d15b07c0dc47dd0d188cdea8e6746606f6fcc3b4de48d02496d71d74ee"
+      "amd64": "sha256:15f97a6a99645c7d5308c609973b5280837b38e112beac413ccbce80da927cf1",
+      "arm64": "sha256:23e6d2e596dd9e2527e0f7bea9aedd26059729375a0d17c462c2621f1b97b82d"
     },
     "binaries": {
-      "amd64": "sha256:ac8e393c53a8cca5bf5c2ccd49bb8841d3704b6f1cfa0a8736883beff1935af9",
-      "arm64": "sha256:77fc8eba27555782568cecaa959d5d839744f244a55ca4a17f34454d10f99567"
+      "amd64": "sha256:6f016067b41152b9f49981727eb9f02c8dddc46cbdf5684d6f35f6c02b4958db",
+      "arm64": "sha256:147b17e1088be369f4b7d74fb3a5744edf0162632083c58d63c7c41d5a73fd4e"
     }
   },
   "qemuPlugin": {
@@ -27,6 +33,42 @@
       "amd64": "sha256:4b336cdddbbc91e30eb54ad6d5ca62f02edcce70c1cf54667104d33c25c1b9b5",
       "arm64": "sha256:d672c5b820cb4ce54c8eb6bde1f453b04976935a144f5180f836b6457cd2556c"
     }
+  },
+  "go": {
+    "version": "1.27.1",
+    "license": "BSD-3-Clause",
+    "archives": {
+      "amd64": "sha256:63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445",
+      "arm64": "sha256:3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"
+    }
+  },
+  "crane": {
+    "version": "0.21.9",
+    "license": "Apache-2.0",
+    "archives": {
+      "amd64": "sha256:5c16d8ddb971cb1d5e6ed8b1e743da8224414eeba2c2762d8f1a61b2f095699e",
+      "arm64": "sha256:1f4c647b7bb260ab5435661df5b526cf59950ebf95201790db7183ac189cbcbd"
+    },
+    "binaries": {
+      "amd64": "sha256:b0bb9155edd97f42f1f9438860b71e8d68177c5ca11536fe755e6b11aefa5f4d",
+      "arm64": "sha256:db5b5f8ecb141c369f9fa173d9fe1a0477c8d57bd3c1ea48dc05258bb86864b6"
+    }
+  },
+  "nfpm": {
+    "version": "2.47.0",
+    "license": "MIT",
+    "archives": {
+      "amd64": "sha256:0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783",
+      "arm64": "sha256:1c0f5f2999b9a974bfb04fdb0cc3306096de530ac5dbb25d739cc5f5219c919c"
+    },
+    "binaries": {
+      "amd64": "sha256:17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936",
+      "arm64": "sha256:4d7ddf169945f7f557ac5373035d373429050d00476925953560e1ac65e16c74"
+    }
+  },
+  "publicationGates": {
+    "packerBUSLRedistributionApproval": "not-recorded",
+    "vulnerabilityReviewApproval": "not-recorded"
   },
   "images": {
     "amd64": null,
