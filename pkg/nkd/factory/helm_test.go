@@ -23,7 +23,7 @@ func TestSourceHelmArchiveBoundary(t *testing.T) {
 		name    string
 		headers []tar.Header
 	}{
-		{"extra root", []tar.Header{{Name: "other", Typeflag: tar.TypeDir, Mode: 0o755}}},
+		{"multiple roots", []tar.Header{{Name: "helm", Typeflag: tar.TypeDir, Mode: 0o755}, {Name: "other", Typeflag: tar.TypeDir, Mode: 0o755}}},
 		{"root is file", []tar.Header{{Name: "helm", Typeflag: tar.TypeReg, Mode: 0o644}}},
 		{"escaping symlink", []tar.Header{{Name: "helm", Typeflag: tar.TypeDir, Mode: 0o755}, {Name: "helm/link", Typeflag: tar.TypeSymlink, Linkname: "../../outside"}}},
 		{"duplicate directory", []tar.Header{{Name: "helm", Typeflag: tar.TypeDir, Mode: 0o755}, {Name: "helm", Typeflag: tar.TypeDir, Mode: 0o755}}},
@@ -95,7 +95,14 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	t.Helper()
 	ctx := context.Background()
 	root := t.TempDir()
-	chart := filepath.Join(root, "helm", "controller")
+	// An image-bound tree is a wrapper ("helm") one level above the named chart
+	// ("controller"); an unbound tree's discovered archive root is the chart
+	// itself, since nothing else names which subdirectory would hold it.
+	chartDir := "helm"
+	if binding {
+		chartDir = filepath.Join("helm", "controller")
+	}
+	chart := filepath.Join(root, chartDir)
 	if err := os.MkdirAll(filepath.Join(chart, "templates"), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -161,8 +161,9 @@ signature/attestation storage and ADR-16 owns evidence tiers and full release ac
 one release index from named outputs; normal authors do not wire payload → root → route.
 
 The signed metadata references each deliverable manifest once in its own sibling repository: CLI binary bundle,
-unchanged native CWE image, and Helm artifact. The OCI index directly references only its metadata manifest. Helm has an empty-config artifact manifest and its final bound archive layer; its former
-nested publication root is removed. The native image is pullable from its own output repository by its manifest
+unchanged native CWE image, and Helm artifact. The OCI index directly references only its metadata manifest. Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
+standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NKD-specific
+decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
@@ -214,10 +215,12 @@ repositories, then publishes the release index last; hosted verification pulls t
 SBOMs as extra products. No tag-based cosign signature substitutes for qualified clearance. The full graph and
 wrapper rationale are in [publication architecture](../publication-architecture.md).
 
-A Helm output accepts one observed source archive component carrying
-a single `helm/` directory, extracted through the bounded transport adapter and repacked deterministically.
-Lifecycle observation checks the exact archive against its producer result and independently reproduces the
-publication payload. Optional Definition Helm settings select a chart and another named OCI output. The
+A Helm output accepts one observed source archive component carrying exactly one top-level chart directory —
+its name discovered from the archive itself rather than assumed, the same shape a real `helm package` .tgz has
+— extracted through the bounded transport adapter and repacked deterministically, re-rooted onto the chart's
+own declared name exactly as `helm package` would produce it. Lifecycle observation checks the exact archive
+against its producer result and independently reproduces the publication payload. Optional Definition Helm
+settings select a chart and another named OCI output. The
 compiler adds that image package as an explicit dependency. The rendered-controller adapter checks the native
 image closure, embeds its manifest digest in the unique single-container Deployment, clears the default
 repository, and refreshes bundle checksums. The template requires a repository at deployment time, preserving

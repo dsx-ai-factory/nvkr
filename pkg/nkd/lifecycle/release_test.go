@@ -384,16 +384,19 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 			add(bom, artifact.Name, component, stage, kind, subject, input)
 		}
 		if artifact.Kind == OutputHelm {
-			_, raw, err := delivery.ReadArtifact(context.Background(), objects[i].Path)
+			descriptor, raw, err := delivery.ReadArtifact(context.Background(), objects[i].Path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			subject := pipeline.FileDigest(raw)
+			// subject is the OCI manifest digest; input is the digest of the actual
+			// scanned bytes (the chart tarball layer), matching releaseEvidenceObjects.
+			subject := descriptor.Digest
+			input := pipeline.FileDigest(raw)
 			path := filepath.Join(t.TempDir(), "chart.tar")
 			if err := os.WriteFile(path, raw, 0600); err != nil {
 				t.Fatal(err)
 			}
-			inventory, err := sbom.InspectDependencies(context.Background(), path, subject, "tarball", sbom.Scanner{})
+			inventory, err := sbom.InspectDependencies(context.Background(), path, input, "tarball", sbom.Scanner{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -405,7 +408,7 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 			if err != nil {
 				t.Fatal(err)
 			}
-			add(bom, artifact.Name, artifact.Name, "packaging", "helm-bundle", subject, subject)
+			add(bom, artifact.Name, artifact.Name, "packaging", "helm-bundle", subject, input)
 		}
 	}
 	return request
