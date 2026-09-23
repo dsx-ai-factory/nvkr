@@ -185,7 +185,7 @@ func compiledPackerVMNodeWithEncryption(t *testing.T, encryption string) (*Plan,
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	plan, err := Compile(t.Context(), definition, environment, stack, vmTestGeneratorVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func compiledCommandVMNodeWithEncryption(t *testing.T, encryption string) (*Plan
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	plan, err := Compile(t.Context(), definition, environment, stack, vmTestGeneratorVersion)
 	if err != nil {
 		t.Fatal(err)
 	}

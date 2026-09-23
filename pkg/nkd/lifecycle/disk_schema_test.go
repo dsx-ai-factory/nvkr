@@ -102,7 +102,7 @@ func TestDiskImageCompileAndPrepareFreezeRootArtifactButExecutionStaysClosed(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := factory.Compile(context.Background(), definition, environment, stack, "test")
+	plan, err := factory.Compile(context.Background(), definition, environment, stack, "test (test)")
 	if err != nil {
 		t.Fatal(err)
 	}

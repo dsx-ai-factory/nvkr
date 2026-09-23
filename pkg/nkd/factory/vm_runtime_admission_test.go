@@ -9,10 +9,12 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
+const vmTestGeneratorVersion = "test (test)"
+
 func compiledVMNode(t *testing.T, policy execution.CapabilityPolicy) (*Plan, Node) {
 	t.Helper()
 	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", policy)
-	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	plan, err := Compile(t.Context(), definition, environment, stack, vmTestGeneratorVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
