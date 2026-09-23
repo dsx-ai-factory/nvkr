@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -199,5 +200,101 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	_, err = ObserveLifecyclePayload(ctx, plan, expected, artifacts)
 	if e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
 		t.Fatalf("substituted producer: %v", err)
+	}
+}
+
+// A bound wrapper can carry a sibling chart alongside the one image-bound
+// chart. Silently publishing only the bound chart would drop the sibling from
+// the release with no signal; packaging must fail closed instead, naming what
+// it would have dropped.
+func TestHelmPackageFailsClosedOnUnpublishedSiblingContent(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	chart := filepath.Join(root, "helm", "controller")
+	if err := os.MkdirAll(filepath.Join(chart, "templates"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chart, "Chart.yaml"), []byte("apiVersion: v2\nname: controller\nversion: 0.1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chart, "templates", "controller.yaml"), []byte(helmDeploymentFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chart, "values.yaml"), []byte("image:\n  repository: old\n  tag: dev\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A sibling chart alongside the bound one, exactly like NKE's real wrapper
+	// (007-controller plus 002-postgresql, 004-spire-crds-post).
+	sibling := filepath.Join(root, "helm", "sidecar")
+	if err := os.MkdirAll(sibling, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sibling, "Chart.yaml"), []byte("apiVersion: v2\nname: sidecar\nversion: 0.1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(root, "source.tar")
+	if err := transportarchive.Pack(ctx, archive, root, []string{"helm"}); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(root, "worker")
+	if err := os.WriteFile(binary, []byte("fixture worker"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	imagePath := filepath.Join(root, "image")
+	if _, err := assemble.OCIImage(binary, "worker", 1, "amd64", imagePath); err != nil {
+		t.Fatal(err)
+	}
+	artifacts := map[string]Artifact{
+		"source":         {ID: "source", Name: "charts", Kind: "tarball", Component: "charts", BuildTarget: "charts", Path: archive},
+		"package/charts": {ID: "package/charts", Name: "charts", Kind: PackageHelm, Producer: "package/charts", MediaType: packageMediaType(PackageHelm), Path: filepath.Join(root, "packaged")},
+		"package/image":  {ID: "package/image", Name: "image", Kind: PackageImage, Producer: "package/image", Path: imagePath},
+		"rawimage":       {ID: "rawimage", Kind: "oci-image", BuildTarget: "charts", Component: "image"},
+	}
+	node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm,
+		Inputs: []string{"source", "package/image"}, Outputs: []string{"package/charts"},
+		HelmImage: &HelmImageBinding{Image: "package/image", Chart: "controller"}}
+	buildDigest := "sha256:" + strings.Repeat("a", 64)
+	plan := &Plan{Builds: []BuildPlan{{Name: "charts", BuildDigest: buildDigest, Platform: "linux/amd64",
+		Graph: &ir.Graph{Nodes: []ir.Node{{Kind: ir.KindBuild, Component: "charts", OutputType: "tarball"}}}}}}
+	plan.Graph.Nodes = append(plan.Graph.Nodes, Node{ID: "package/image", Kind: NodePackage, PackageKind: PackageImage, Inputs: []string{"rawimage"}, Outputs: []string{"package/image"}}, node)
+	for _, artifact := range artifacts {
+		plan.Graph.Artifacts = append(plan.Graph.Artifacts, artifact)
+	}
+	err := executePackage(ctx, plan, node, artifacts, io.Discard)
+	if e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+		t.Fatalf("expected a fail-closed error naming the dropped sibling, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "sidecar") {
+		t.Fatalf("error does not name the dropped sibling: %v", err)
+	}
+}
+
+// An unbound source archive's chart must live at the discovered archive root
+// itself; a chart nested one level deeper (with nothing naming that deeper
+// path, since there is no HelmImage binding) must fail closed rather than
+// silently package an empty or wrong-rooted chart.
+func TestSourceHelmArchiveRequiresChartAtDiscoveredRootWhenUnbound(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	nested := filepath.Join(root, "helm", "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "Chart.yaml"), []byte("apiVersion: v2\nname: nested\nversion: 0.1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(root, "source.tar")
+	if err := transportarchive.Pack(ctx, archive, root, []string{"helm"}); err != nil {
+		t.Fatal(err)
+	}
+	artifacts := map[string]Artifact{
+		"source":         {ID: "source", Name: "charts", Kind: "tarball", Component: "charts", BuildTarget: "charts", Path: archive},
+		"package/charts": {ID: "package/charts", Name: "charts", Kind: PackageHelm, Producer: "package/charts", MediaType: packageMediaType(PackageHelm), Path: filepath.Join(root, "packaged")},
+	}
+	node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, Inputs: []string{"source"}, Outputs: []string{"package/charts"}}
+	plan := &Plan{Graph: ArtifactGraph{Nodes: []Node{node}, Artifacts: []Artifact{artifacts["source"], artifacts["package/charts"]}}}
+	err := executePackage(ctx, plan, node, artifacts, io.Discard)
+	if e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+		t.Fatalf("expected a fail-closed error, got %v", err)
 	}
 }

@@ -23,6 +23,14 @@ import (
 
 const maxHelmChartYAMLBytes = 1 << 20
 
+// maxHelmChartEntries bounds Chart.yaml discovery against the same 1,000,000-
+// entry ceiling the transport layer already enforces on this exact content
+// (internal/transportarchive.maxTransportEntries), rather than the much
+// tighter maxDeliveryObjects (4096) — a bound sized for publication-object
+// counts, unrelated to how many files one chart archive may legitimately
+// contain (e.g. a CRD-heavy umbrella chart).
+const maxHelmChartEntries = 1_000_000
+
 // helmChartDependency mirrors helm.sh/helm/v3/pkg/chart.Dependency exactly, so
 // the config blob is byte-for-byte what a real `helm package`+`helm push` would
 // encode for a chart's dependency list.
@@ -95,18 +103,28 @@ func helmChartMetadata(chartData []byte) (helmChartConfig, error) {
 			return helmChartConfig{}, e.Wrap(e.CodeVerifyFailed, err, "reading Helm chart archive")
 		}
 		entries++
-		if entries > maxDeliveryObjects {
-			return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart archive exceeds %d entries", maxDeliveryObjects)
+		if entries > maxHelmChartEntries {
+			return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart archive exceeds %d entries", maxHelmChartEntries)
 		}
 		name := strings.TrimSuffix(header.Name, "/")
 		segments := strings.Split(name, "/")
-		switch {
-		case len(segments) == 1 && segments[0] != "":
-			if root != "" && root != segments[0] {
-				return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart archive has multiple top-level roots")
-			}
+		if segments[0] == "" {
+			continue
+		}
+		// Track the declared root from every entry's own first path segment,
+		// not only entries that happen to carry an explicit top-level
+		// directory tar header: some writers omit directory entries and emit
+		// only file entries, and a second root's Chart.yaml must still be
+		// caught as a conflict rather than silently overwriting the first.
+		if root == "" {
 			root = segments[0]
-		case len(segments) == 2 && segments[1] == "Chart.yaml":
+		} else if root != segments[0] {
+			return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart archive has multiple top-level roots")
+		}
+		if len(segments) == 2 && segments[1] == "Chart.yaml" && header.Typeflag == tar.TypeReg {
+			if raw != nil {
+				return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart archive has multiple Chart.yaml entries")
+			}
 			if header.Size < 0 || header.Size > maxHelmChartYAMLBytes {
 				return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart archive Chart.yaml exceeds %d bytes", maxHelmChartYAMLBytes)
 			}
@@ -237,41 +255,58 @@ func helmChartAnnotations(config helmChartConfig) map[string]string {
 	return annotations
 }
 
-// helmChartVersionTag derives the registry tag from the chart's own already-
-// published config blob (application/vnd.cncf.helm.config.v1+json) and the
-// exact manifest digest being tagged, so publication never needs a second,
-// separately maintained source of truth for the chart's version, and two
-// different chart builds published under the same nominal version can never
-// collide on the same mutable tag: the tag itself is a deterministic, pure
-// function of the chart's version and its published content. Per ADR-20 a
-// registry tag remains a non-authoritative discovery hint only:
-// digest-plus-signature verification remains mandatory and unaffected by this
-// tag; embedding the digest only makes the hint itself collision-free.
-func helmChartVersionTag(ref name.Reference, img v1.Image) (name.Tag, error) {
+// helmChartTags derives two registry tags from the chart's own already-
+// published config blob (application/vnd.cncf.helm.config.v1+json), so
+// publication never needs a second, separately maintained source of truth for
+// the chart's version. Per ADR-20 a registry tag remains a non-authoritative
+// discovery hint only: digest-plus-signature verification remains mandatory
+// and unaffected by either tag.
+//
+// discovery is the plain `<version>` tag real Helm itself pushes, so an
+// unmodified `helm show/pull --version <version>` resolves it; like any
+// mutable Helm tag it can be re-pointed by a later push under the same
+// nominal version.
+//
+// content additionally embeds the exact manifest digest
+// (`<version>-<digest>`), so two different chart builds published under the
+// same nominal version can never collide on the same mutable tag: it is a
+// deterministic, pure function of the chart's version and its published
+// content, safe to treat as immutable and skip re-pushing when it already
+// resolves to the same digest.
+//
+// options extends tag parsing (e.g. name.Insecure for a plain-HTTP registry);
+// callers must pass the same transport options used to publish ref itself.
+func helmChartTags(ref name.Reference, img v1.Image, options ...name.Option) (discovery, content name.Tag, err error) {
 	raw, err := img.RawConfigFile()
 	if err != nil {
-		return name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "reading Helm chart config")
+		return name.Tag{}, name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "reading Helm chart config")
 	}
 	var config helmChartConfig
 	if err := json.Unmarshal(raw, &config); err != nil || config.Version == "" {
-		return name.Tag{}, e.New(e.CodeVerifyFailed, "Helm chart config has no version")
+		return name.Tag{}, name.Tag{}, e.New(e.CodeVerifyFailed, "Helm chart config has no version")
 	}
 	digest, err := img.Digest()
 	if err != nil {
-		return name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "digesting Helm chart manifest")
+		return name.Tag{}, name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "digesting Helm chart manifest")
 	}
 	// A SemVer build-metadata suffix ("1.2.3+build.5") is legal in Chart.yaml but
 	// illegal in an OCI tag, as is the "sha256:" digest separator; both would
 	// collide with "+" and ":" being outside the OCI tag grammar. Substitute "_"
 	// for "+" the way Helm's own OCI client does, and append the manifest
-	// digest's hex behind a "-" so the tag stays a single conformant token;
-	// config.Version and the digest itself stay exact everywhere else.
+	// digest's hex behind a "-" for the content tag so it stays a single
+	// conformant token; config.Version and the digest itself stay exact
+	// everywhere else.
 	tagVersion := strings.ReplaceAll(config.Version, "+", "_")
-	tag, err := name.NewTag(fmt.Sprintf("%s:%s-%s", ref.Context().Name(), tagVersion, digest.Hex), name.StrictValidation)
+	parseOptions := append([]name.Option{name.StrictValidation}, options...)
+	discovery, err = name.NewTag(fmt.Sprintf("%s:%s", ref.Context().Name(), tagVersion), parseOptions...)
 	if err != nil {
-		return name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "Helm chart version %q is not a valid registry tag", config.Version)
+		return name.Tag{}, name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "Helm chart version %q is not a valid registry tag", config.Version)
 	}
-	return tag, nil
+	content, err = name.NewTag(fmt.Sprintf("%s:%s-%s", ref.Context().Name(), tagVersion, digest.Hex), parseOptions...)
+	if err != nil {
+		return name.Tag{}, name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "Helm chart version %q is not a valid registry tag", config.Version)
+	}
+	return discovery, content, nil
 }
 
 // removeEmptyLayoutDir removes an empty scaffolding directory the OCI store

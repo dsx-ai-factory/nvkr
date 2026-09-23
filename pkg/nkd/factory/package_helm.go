@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -78,18 +79,30 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	}
 	// The Helm OCI chart-content layer is exactly what `helm package` produces: a
 	// tar rooted at the chart's own name (Chart.yaml one level in), gzip-
-	// compressed with a fixed header so the compressed bytes stay reproducible.
-	// The transport archive just packed may carry the chart under a deeper,
-	// carrier-specific prefix (chartPrefix); re-root it onto a single
+	// compressed with a fixed header so the compressed bytes are a function of
+	// chart content and the pinned Go toolchain that compresses them (the DEFLATE
+	// stream itself is not guaranteed byte-stable across toolchain versions; see
+	// .go-version). The transport archive just packed may carry the chart under a
+	// deeper, carrier-specific prefix (chartPrefix); re-root it onto a single
 	// <chartName>/ entry instead of writing into the (possibly shared, not
-	// node-owned) source tree to relocate it on disk.
+	// node-owned) source tree to relocate it on disk. A bound tree may carry
+	// sibling charts and files outside chartPrefix (e.g. other local charts, a
+	// wrapper-level checksums.txt); rerootHelmChartLayer fails closed on those
+	// rather than silently publishing only the bound chart and discarding the rest.
 	chartArchive := archive + ".tgz"
 	if err := removeFactoryCarrier(chartArchive); err != nil {
 		return err
 	}
 	defer func() { _ = os.Remove(chartArchive) }()
-	if err := rerootHelmChartLayer(archive, chartArchive, filepath.ToSlash(chartPrefix), chartName); err != nil {
+	if err := rerootHelmChartLayer(archive, chartArchive, filepath.ToSlash(relative), filepath.ToSlash(chartPrefix), chartName); err != nil {
 		return err
+	}
+	chartInfo, err := os.Stat(chartArchive)
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "stating packaged Helm chart archive")
+	}
+	if chartInfo.Size() > maxHelmChartArchiveBytes {
+		return e.New(e.CodeVerifyFailed, "packaged Helm chart archive exceeds %d bytes", maxHelmChartArchiveBytes)
 	}
 	chartData, err := os.ReadFile(chartArchive)
 	if err != nil {
@@ -99,26 +112,31 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	return err
 }
 
+// maxHelmChartArchiveBytes bounds the packaged Helm chart archive read fully
+// into memory before publication. It is generous for any real chart (which
+// are KB-to-low-MB in practice) while still failing closed on an unexpectedly
+// large input instead of allocating an unbounded amount of memory.
+const maxHelmChartArchiveBytes = 512 << 20
+
 // helmPackageTree normalizes an observed source archive to a deterministic
 // carrier. Source archives (e.g. a real `helm package` .tgz) have exactly one
 // top-level root, whose name is discovered from the archive itself rather than
 // assumed; transport extraction rejects escaping links, traversal, duplicates
-// and extra roots.
+// and extra roots. Discovery and extraction share one held file descriptor
+// (DetectAndUnpackChartRoot) rather than opening input.Path twice, closing the
+// pathname-replacement window a two-open sequence would otherwise leave.
 func helmPackageTree(ctx context.Context, input Artifact) (string, string, func(), error) {
 	noop := func() {}
 	if input.Kind != "tarball" || input.BuildTarget == "" {
 		return "", "", noop, e.New(e.CodeInvalidCatalog, "Helm input %q is not a build source archive", input.ID)
-	}
-	chartRoot, err := transportarchive.DetectTransportChartRoot(ctx, input.Path)
-	if err != nil {
-		return "", "", noop, err
 	}
 	stage, err := os.MkdirTemp("", "nkd-helm-")
 	if err != nil {
 		return "", "", noop, e.Wrap(e.CodeInternal, err, "staging Helm source archive")
 	}
 	cleanup := func() { _ = os.RemoveAll(stage) }
-	if err := transportarchive.Unpack(ctx, input.Path, stage, []string{chartRoot}); err != nil {
+	chartRoot, err := transportarchive.DetectAndUnpackChartRoot(ctx, input.Path, stage)
+	if err != nil {
 		cleanup()
 		return "", "", noop, err
 	}
@@ -157,7 +175,7 @@ func readHelmChartName(path string) (string, error) {
 // gzip-compresses the result deterministically into destination. This is the
 // exact shape a real `helm package` archive has: a tar rooted directly at the
 // chart, one path segment a Helm-conformant reader strips to find Chart.yaml.
-func rerootHelmChartLayer(source, destination, prefix, chartName string) error {
+func rerootHelmChartLayer(source, destination, wrapperRoot, prefix, chartName string) error {
 	in, err := os.Open(source)
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "opening Helm chart tar")
@@ -172,13 +190,17 @@ func rerootHelmChartLayer(source, destination, prefix, chartName string) error {
 		_ = out.Close()
 		return e.Wrap(e.CodeInternal, err, "initializing compressor")
 	}
-	// A fixed gzip header keeps the compressed bytes a pure function of content,
-	// per this repo's deterministic-output rule.
+	// A fixed gzip header keeps the compressed bytes independent of wall-clock
+	// time and the local OS, per this repo's deterministic-output rule; exact
+	// byte reproduction additionally depends on the pinned Go toolchain (see
+	// executeHelmPackage), since compress/gzip's DEFLATE output is not
+	// guaranteed byte-stable across toolchain versions.
 	gz.ModTime = time.Time{}
 	gz.OS = 255
 	tw := tar.NewWriter(gz)
 	tr := tar.NewReader(in)
 	found := false
+	extra := map[string]bool{}
 	for {
 		header, readErr := tr.Next()
 		if readErr == io.EOF {
@@ -197,7 +219,21 @@ func rerootHelmChartLayer(source, destination, prefix, chartName string) error {
 			rerooted = chartName
 		case strings.HasPrefix(name, prefix+"/"):
 			rerooted = chartName + strings.TrimPrefix(name, prefix)
+		case name == wrapperRoot || strings.HasPrefix(prefix, name+"/"):
+			// An ancestor directory of prefix (including the wrapper root
+			// itself): not chart content, safe to omit from the chart layer.
+			continue
+		case name == wrapperRoot+"/checksums.txt":
+			// bindHelmImage's own wrapper-level integrity bookkeeping (see
+			// helm_binding.go), not a real Helm chart file in any chart it
+			// writes about; it was never meant to reach a published chart.
+			continue
 		default:
+			// Content that lives in the wrapper alongside the bound chart but
+			// is not part of it (a sibling chart, ...). Silently omitting this
+			// from the published chart layer would drop it from the release
+			// with no signal; record it and fail closed below instead.
+			extra[topLevelHelmEntry(name, wrapperRoot)] = true
 			continue
 		}
 		found = true
@@ -223,6 +259,18 @@ func rerootHelmChartLayer(source, destination, prefix, chartName string) error {
 		_ = out.Close()
 		return e.New(e.CodeVerifyFailed, "Helm source archive has no chart directory %q", prefix)
 	}
+	if len(extra) > 0 {
+		_ = tw.Close()
+		_ = gz.Close()
+		_ = out.Close()
+		names := make([]string, 0, len(extra))
+		for name := range extra {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		return e.New(e.CodeVerifyFailed,
+			"Helm source archive carries unpublished content outside the bound chart %q: %s", chartName, strings.Join(names, ", "))
+	}
 	if err := tw.Close(); err != nil {
 		_ = gz.Close()
 		_ = out.Close()
@@ -233,4 +281,15 @@ func rerootHelmChartLayer(source, destination, prefix, chartName string) error {
 		return e.Wrap(e.CodeInternal, err, "closing Helm chart archive")
 	}
 	return out.Close()
+}
+
+// topLevelHelmEntry reduces a tar entry name to its first path segment
+// beneath base, so a whole sibling tree (many files) collapses to one
+// reported name instead of flooding the fail-closed error with every member.
+func topLevelHelmEntry(name, base string) string {
+	trimmed := strings.TrimPrefix(name, base+"/")
+	if idx := strings.IndexByte(trimmed, '/'); idx >= 0 {
+		trimmed = trimmed[:idx]
+	}
+	return trimmed
 }

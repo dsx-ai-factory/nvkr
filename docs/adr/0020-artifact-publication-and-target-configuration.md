@@ -53,6 +53,13 @@ a fixed version tag, or a development tag. It returns the digest-pinned referenc
 Explicit low-level tagged publication remains a discovery operation; automatic version/channel aliases and
 promotion policy are not implemented by this lifecycle configuration.
 
+A Helm chart deliverable is the one bounded exception: after its manifest is durably published at its digest,
+the publisher additionally advances two chart-scoped tags — the chart's own `<version>` (matching what real
+`helm push` itself would tag) and a `<version>-<digest>` tag that is a deterministic, collision-free function of
+the chart's exact published content. Both remain non-authoritative discovery hints under the same tag rule
+stated above and in §6; no consumer, evidence binding, or release acceptance path treats either tag as
+identity. This is scoped to `helm-oci` outputs only — no other output kind advances any tag.
+
 Definition owns selected components, byte-changing packaging intent, and catalog tool selectors (`sbomTool`,
 `cosignTool`). Catalog source declarations own release URL templates, executable
 members, formats, platform and version constraints. The generated source lock owns the resolved tool URL,

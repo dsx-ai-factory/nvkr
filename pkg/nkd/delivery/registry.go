@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sort"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
 
 // RegistryOptions selects transport only. PlainHTTP is deliberately explicit and
@@ -95,12 +97,8 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 			return "", e.Wrap(e.CodeUnavailable, err, "publishing deliverable %q", object.Name)
 		}
 		if object.Output != nil && object.Output.Format == "helm-oci" {
-			tag, err := helmChartVersionTag(child, img)
-			if err != nil {
+			if err := tagHelmChart(ctx, child, img, object.Name, parseOptions, remoteOptions); err != nil {
 				return "", err
-			}
-			if err := remote.Tag(tag, img, remoteOptions...); err != nil {
-				return "", e.Wrap(e.CodeUnavailable, err, "tagging Helm chart %q", object.Name)
 			}
 		}
 		if _, err := ResolveDigest(ctx, child.Name(), options); err != nil {
@@ -243,6 +241,59 @@ func ResolveDigest(ctx context.Context, reference string, options RegistryOption
 			"registry served %s for %s; the published bytes do not match the requested digest", served, reference)
 	}
 	return served, nil
+}
+
+// tagHelmChart pushes both the plain-version discovery tag and the digest-
+// suffixed content tag for a published Helm chart manifest (see
+// helmChartTags), after the manifest itself is already durably published at
+// its digest (remote.Write, called by the caller before this). options
+// carries the same transport settings (StrictValidation plus, for a plain-
+// HTTP registry, name.Insecure) used to parse ref, so a plain-HTTP chart
+// cannot silently default to https tag resolution.
+func tagHelmChart(ctx context.Context, ref name.Reference, img v1.Image, chart string, options []name.Option, remoteOptions []remote.Option) error {
+	discovery, content, err := helmChartTags(ref, img, options...)
+	if err != nil {
+		return err
+	}
+	manifestDigest, err := img.Digest()
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "digesting Helm chart manifest")
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "tagging Helm chart %q", chart)
+	}
+	// The content tag is a pure function of the chart's own bytes, so a rerun
+	// that already tagged the same content is a no-op rather than a re-push;
+	// this keeps reruns working against a registry that forbids overwriting
+	// an existing tag (e.g. ECR IMMUTABLE, Harbor/Artifactory immutable-tag
+	// rules), which would otherwise reject every rerun after the first. The
+	// discovery tag is intentionally mutable (it mirrors real Helm's own
+	// `<version>` tag) and is always re-pushed, matching normal Helm publish
+	// semantics; only the content tag gets this idempotent skip.
+	existing, headErr := remote.Head(content, remoteOptions...)
+	if headErr != nil || existing.Digest != manifestDigest {
+		if err := remote.Tag(content, img, remoteOptions...); err != nil {
+			return helmTagPublishError(err, content, chart)
+		}
+	}
+	if err := remote.Tag(discovery, img, remoteOptions...); err != nil {
+		return helmTagPublishError(err, discovery, chart)
+	}
+	return nil
+}
+
+// helmTagPublishError distinguishes a permanent, registry-side rejection (a
+// 4xx response, e.g. an OCI tag-grammar or policy violation the registry
+// enforces beyond this package's own local name.NewTag validation) from a
+// transient failure. A caller or retry policy that treats every tagging
+// failure as CodeUnavailable would keep retrying a chart that can never
+// succeed instead of surfacing a coded input error.
+func helmTagPublishError(err error, tag name.Tag, chart string) error {
+	var transportErr *transport.Error
+	if errors.As(err, &transportErr) && transportErr.StatusCode >= 400 && transportErr.StatusCode < 500 {
+		return e.Wrap(e.CodeInvalidCatalog, err, "registry rejected Helm chart tag %q for %q", tag.TagStr(), chart)
+	}
+	return e.Wrap(e.CodeUnavailable, err, "tagging Helm chart %q", chart)
 }
 
 // registryOptions is the ONE place transport credentials become remote options,

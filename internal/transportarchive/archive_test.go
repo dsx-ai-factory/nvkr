@@ -566,18 +566,42 @@ func TestDetectTransportChartRootDiscoversTheSingleTopLevelDirectory(t *testing.
 	}
 }
 
-func TestUnpackAcceptsAGzipCompressedCarrier(t *testing.T) {
+// Only DetectAndUnpackChartRoot (the Helm chart-root discovery path) accepts a
+// gzip-compressed carrier; every other extraction entry point requires plain
+// tar, so this widened decompression exposure and its budget stay scoped to
+// the one caller that actually needs it.
+func TestDetectAndUnpackChartRootAcceptsAGzipCompressedCarrier(t *testing.T) {
 	archive := filepath.Join(t.TempDir(), "chart.tgz")
 	writeTestTarGz(t, archive, []*tar.Header{
 		{Name: "postgresql", Typeflag: tar.TypeDir, Mode: 0o755},
 		{Name: "postgresql/Chart.yaml", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
 	})
 	root := filepath.Join(t.TempDir(), "extracted")
-	if err := Unpack(context.Background(), archive, root, []string{"postgresql"}); err != nil {
+	chartRoot, err := DetectAndUnpackChartRoot(context.Background(), archive, root)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if chartRoot != "postgresql" {
+		t.Fatalf("chartRoot = %q, want postgresql", chartRoot)
 	}
 	if info, err := os.Stat(filepath.Join(root, "postgresql", "Chart.yaml")); err != nil || info.IsDir() {
 		t.Fatalf("extracted gzip carrier: %v", err)
+	}
+}
+
+// Plain Unpack/UnpackOpen must reject a gzip-compressed carrier rather than
+// silently widening every caller's decompression exposure; only the dedicated
+// Helm chart-root path opts into compression.
+func TestUnpackRejectsAGzipCompressedCarrier(t *testing.T) {
+	archive := filepath.Join(t.TempDir(), "chart.tgz")
+	writeTestTarGz(t, archive, []*tar.Header{
+		{Name: "postgresql", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "postgresql/Chart.yaml", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+	})
+	root := filepath.Join(t.TempDir(), "extracted")
+	err := Unpack(context.Background(), archive, root, []string{"postgresql"})
+	if transportCode(err) != nkderr.CodeVerifyFailed {
+		t.Fatalf("got %v, want a fail-closed rejection of the compressed carrier", err)
 	}
 }
 
@@ -600,6 +624,21 @@ func TestTransportLimitReaderFailsClosedPastItsBudget(t *testing.T) {
 	}
 }
 
+// A stream of exactly the budget is not over budget: the reader must not
+// reject a maximum-size but otherwise legal input merely because its counter
+// reached zero.
+func TestTransportLimitReaderAcceptsExactlyItsBudget(t *testing.T) {
+	t.Parallel()
+	reader := &transportLimitReader{reader: bytes.NewReader(bytes.Repeat([]byte{'x'}, 8)), remaining: 8}
+	consumed, err := io.Copy(io.Discard, reader)
+	if err != nil {
+		t.Fatalf("exact-budget stream rejected: %v", err)
+	}
+	if consumed != 8 {
+		t.Fatalf("consumed = %d, want 8", consumed)
+	}
+}
+
 // Both DetectTransportChartRoot and Unpack read through openTransportTarSource,
 // so wiring the budget there covers discovery and extraction alike, including
 // bytes tar.Reader.Next skips between entries.
@@ -619,7 +658,7 @@ func TestOpenTransportTarSourceBoundsBothCarrierShapes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		source, closeSource, err := openTransportTarSource(file)
+		source, closeSource, err := openTransportTarSource(file, true)
 		if err != nil {
 			t.Fatal(err)
 		}
