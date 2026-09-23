@@ -11,10 +11,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/nke-os-arm64-local.sh ATTEMPT [JOBS]
 
-Build the exact local ARM64 toolchain when its image variable is unset, freeze
-the rendered recipe under .nkd/inputs/ATTEMPT, and execute one local ARM64
-non-FDE NKE OS build with QEMU TCG. This is a development bootstrap route, not
-a production runner profile.
+Build the locked local ARM64 toolchain, freeze the exact authored recipe under
+.nkd/inputs/ATTEMPT, and execute one local ARM64 non-FDE NKE OS build with QEMU
+TCG. On macOS the command delegates to the existing ARM64 Podman machine. This
+is a development bootstrap route, not a production runner profile.
 
 Set CONTAINER_RUNTIME=podman or CONTAINER_RUNTIME=docker. Podman is the default.
 
@@ -38,8 +38,41 @@ if [[ ! "${jobs}" =~ ^[1-9][0-9]*$ ]]; then
   echo "JOBS must be a positive integer" >&2
   exit 2
 fi
-if [[ "$(uname -s)" != Linux ]]; then
-  echo "the NKE image build requires a Linux host" >&2
+input_root=".nkd/inputs/${attempt}"
+if [[ -e "${input_root}" || -L "${input_root}" ]]; then
+  echo "frozen input already exists: ${input_root}" >&2
+  exit 1
+fi
+runtime="${CONTAINER_RUNTIME:-podman}"
+case "${runtime}" in
+  podman|docker) ;;
+  *) echo "CONTAINER_RUNTIME must be podman or docker" >&2; exit 2 ;;
+esac
+ovn_supplier="${NKE_OVN_SUPPLIER:-source}"
+case "${ovn_supplier}" in
+  source|prebuilt) ;;
+  *) echo "NKE_OVN_SUPPLIER must be source or prebuilt" >&2; exit 2 ;;
+esac
+command -v "${runtime}" >/dev/null 2>&1 || {
+  echo "container runtime not found: ${runtime}" >&2
+  exit 1
+}
+
+host_os="$(uname -s)"
+if [[ "${host_os}" == Darwin ]]; then
+  if [[ "${runtime}" != podman ]]; then
+    echo "the macOS bootstrap requires Podman; Docker is supported on Linux ARM64" >&2
+    exit 1
+  fi
+  exec podman machine ssh -- sh -c '
+    set -eu
+    cd "$1"
+    exec env CONTAINER_RUNTIME=podman NKE_OVN_SUPPLIER="$4" \
+      ./scripts/nke-os-arm64-local.sh "$2" "$3"
+  ' sh "${repo_root}" "${attempt}" "${jobs}" "${ovn_supplier}"
+fi
+if [[ "${host_os}" != Linux ]]; then
+  echo "the NKE image build requires Linux ARM64 or macOS with an ARM64 Podman machine" >&2
   exit 1
 fi
 case "$(uname -m)" in
@@ -49,76 +82,28 @@ case "$(uname -m)" in
     exit 1
     ;;
 esac
-
-runtime="${CONTAINER_RUNTIME:-podman}"
-case "${runtime}" in
-  podman|docker) ;;
-  *) echo "CONTAINER_RUNTIME must be podman or docker" >&2; exit 2 ;;
-esac
-command -v "${runtime}" >/dev/null 2>&1 || {
-  echo "container runtime not found: ${runtime}" >&2
+command -v jq >/dev/null 2>&1 || {
+  echo "jq is required to read the locked local toolchain identity" >&2
   exit 1
 }
-command -v python3 >/dev/null 2>&1 || {
-  echo "python3 is required to freeze the exact catalog input" >&2
-  exit 1
-}
-ovn_supplier="${NKE_OVN_SUPPLIER:-source}"
-case "${ovn_supplier}" in
-  source|prebuilt) ;;
-  *) echo "NKE_OVN_SUPPLIER must be source or prebuilt" >&2; exit 2 ;;
-esac
-
-toolchain_image_arm64="${NKE_OS_TOOLCHAIN_IMAGE_ARM64:-}"
-if [[ -z "${toolchain_image_arm64}" ]]; then
-  toolchain_tag="localhost/nkd-nke-os-toolchain:${attempt}-arm64"
-  CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh \
-    --arch arm64 --tag "${toolchain_tag}"
-  toolchain_image_arm64="$(${runtime} image inspect --format '{{.Id}}' "${toolchain_tag}")"
-  if [[ "${toolchain_image_arm64}" =~ ^[0-9a-f]{64}$ ]]; then
-    toolchain_image_arm64="sha256:${toolchain_image_arm64}"
-  fi
-fi
+toolchain_image_arm64="$(jq -r '.localImages.arm64 // empty' toolchains/nkd-packer/toolchain.lock.json)"
 if [[ ! "${toolchain_image_arm64}" =~ (^|@)sha256:[0-9a-f]{64}$ ]]; then
-  echo "NKE_OS_TOOLCHAIN_IMAGE_ARM64 must be a repository digest or local sha256 image ID" >&2
+  echo "the Packer toolchain lock has no exact ARM64 local image ID" >&2
   exit 1
 fi
+CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch arm64
 
-input_root=".nkd/inputs/${attempt}"
-if [[ -e "${input_root}" || -L "${input_root}" ]]; then
-  echo "frozen input already exists: ${input_root}" >&2
-  exit 1
-fi
 mkdir -p "${input_root}/catalog"
 cp definitions/nke-os-arm64/definition.yaml "${input_root}/definition.yaml"
 cp definitions/nke-os-arm64/definition-ovn-prebuilt.yaml \
   "${input_root}/definition-ovn-prebuilt.yaml"
 environment_source="definitions/nke-os-arm64/environment-local-macos-apple-m4-pro-podman.yaml"
 if [[ "${runtime}" == docker ]]; then
-  environment_source="definitions/nke-os-arm64/environment-local-macos-apple-m4-pro-docker.yaml"
+  environment_source="definitions/nke-os-arm64/environment-local-linux-arm64-docker.yaml"
 fi
 cp "${environment_source}" "${input_root}/environment-local.yaml"
 cp definitions/nke-os-arm64/catalog/pins.lock.yaml "${input_root}/catalog/pins.lock.yaml"
-cp -R definitions/nke-os-arm64/catalog/patches "${input_root}/catalog/patches"
-cp definitions/nke-os-arm64/catalog/registry.yaml.in "${input_root}/catalog/registry.yaml"
-
-NKE_OS_RENDER_IMAGE_ARM64="${toolchain_image_arm64}" \
-  python3 - "${input_root}/catalog/registry.yaml" <<'PY'
-import os
-import pathlib
-import sys
-
-path = pathlib.Path(sys.argv[1])
-content = path.read_text(encoding="utf-8")
-tokens = {
-    "${NKE_OS_TOOLCHAIN_IMAGE_ARM64}": (5, os.environ["NKE_OS_RENDER_IMAGE_ARM64"]),
-}
-for token, (expected, value) in tokens.items():
-    if content.count(token) != expected:
-        raise SystemExit(f"expected {expected} {token} tokens in {path}")
-    content = content.replace(token, value)
-path.write_text(content, encoding="utf-8")
-PY
+cp definitions/nke-os-arm64/catalog/registry.yaml "${input_root}/catalog/registry.yaml"
 
 # Build the bootstrap runner from this checkout in the exact pinned ARM64
 # toolchain. The Podman machine intentionally has no ambient Go or Make
@@ -149,22 +134,8 @@ if [[ ! -x "${runner}" ]]; then
   exit 1
 fi
 
-base_catalog_digest="$("${runner}" catalog digest --data "${input_root}/catalog")"
-cp definitions/nke-os-arm64/ovn-prebuilt-overlay.yaml.in \
+cp definitions/nke-os-arm64/ovn-prebuilt-overlay.yaml \
   "${input_root}/ovn-prebuilt-overlay.yaml"
-NKE_OS_BASE_CATALOG_DIGEST="${base_catalog_digest}" python3 - \
-  "${input_root}/ovn-prebuilt-overlay.yaml" <<'PY'
-import os
-import pathlib
-import sys
-
-path = pathlib.Path(sys.argv[1])
-content = path.read_text(encoding="utf-8")
-token = "${NKE_OS_BASE_CATALOG_DIGEST}"
-if content.count(token) != 1:
-    raise SystemExit(f"expected one {token} token in {path}")
-path.write_text(content.replace(token, os.environ["NKE_OS_BASE_CATALOG_DIGEST"]), encoding="utf-8")
-PY
 
 definition_path="${input_root}/definition.yaml"
 if [[ "${ovn_supplier}" == prebuilt ]]; then

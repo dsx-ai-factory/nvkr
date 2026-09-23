@@ -75,6 +75,15 @@ type BuildMaterials struct {
 // not accept caller paths, and it snapshots the slice so later caller mutation
 // cannot relabel an input.
 func NewBuildMaterials(manifest *heldfile.File, inputs []BuildMaterialInput) (*BuildMaterials, error) {
+	return newBuildMaterials(manifest, inputs, MaxBuildMaterialBytes, maxBuildMaterialTotalBytes)
+}
+
+func newBuildMaterials(
+	manifest *heldfile.File,
+	inputs []BuildMaterialInput,
+	maxFileBytes int64,
+	maxTotalBytes int64,
+) (*BuildMaterials, error) {
 	if manifest == nil || !canonical.IsDigest(manifest.Digest()) {
 		return nil, e.New(e.CodeUnverifiedRef,
 			"build materials require an authenticated manifest capability")
@@ -100,8 +109,7 @@ func NewBuildMaterials(manifest *heldfile.File, inputs []BuildMaterialInput) (*B
 			return nil, e.New(e.CodeUnverifiedRef,
 				"build material %q lacks its exact authenticated bytes", input.Path)
 		}
-		next, ok := addBoundedSize(total, input.Content.Size(),
-			MaxBuildMaterialBytes, maxBuildMaterialTotalBytes)
+		next, ok := addBoundedSize(total, input.Content.Size(), maxFileBytes, maxTotalBytes)
 		if !ok {
 			return nil, e.New(e.CodeEngineCapability,
 				"build material %q exceeds the authenticated closure size bound", input.Path)
@@ -211,7 +219,7 @@ func sealPrivateInputDirectories(root string) error {
 	}
 	sort.Slice(directories, func(i, j int) bool { return len(directories[i]) > len(directories[j]) })
 	for _, directory := range directories {
-		if err := os.Chmod(directory, 0o500); err != nil {
+		if err := os.Chmod(directory, 0o555); err != nil {
 			return err
 		}
 	}
@@ -237,7 +245,7 @@ func materializeBuildMaterialManifest(ctx context.Context, manifest *heldfile.Fi
 		return e.Wrap(e.CodeBuildFailed, err, "creating private build-material manifest")
 	}
 	written, copyErr := manifest.WriteToContext(ctx, file)
-	chmodErr := file.Chmod(0o400)
+	chmodErr := file.Chmod(0o444)
 	syncErr := file.Sync()
 	closeErr := file.Close()
 	if err := errors.Join(copyErr, syncErr, chmodErr, closeErr); err != nil {
@@ -258,7 +266,7 @@ func stageBuildMaterialInputs(ctx context.Context, root, manifestDigest string, 
 	if err != nil {
 		return nil, err
 	}
-	files = append(files, privateFileSnapshot{Path: "material-manifest.json", SHA256: manifestDigest, Mode: 0o400})
+	files = append(files, privateFileSnapshot{Path: "material-manifest.json", SHA256: manifestDigest, Mode: 0o444})
 	if err := sealPrivateInputDirectories(root); err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "sealing private build-material closure")
 	}
@@ -296,7 +304,7 @@ func stageBuildMaterials(ctx context.Context, root string, inputs []BuildMateria
 			}
 			return nil, e.Wrap(e.CodeUnverifiedRef, err, "re-verifying build material %q", input.Path)
 		}
-		snapshots = append(snapshots, privateFileSnapshot{Path: input.Path, SHA256: input.SHA256, Mode: 0o400})
+		snapshots = append(snapshots, privateFileSnapshot{Path: input.Path, SHA256: input.SHA256, Mode: 0o444})
 	}
 	return snapshots, nil
 }
@@ -319,7 +327,7 @@ func materializeHeldInput(ctx context.Context, root, relative string, material *
 		_ = unix.Unlinkat(int(parent.Fd()), temporaryName, 0)
 	}()
 	written, writeErr := material.WriteToContext(ctx, temporary)
-	chmodErr := temporary.Chmod(0o400)
+	chmodErr := temporary.Chmod(0o444)
 	syncErr := temporary.Sync()
 	closeErr := temporary.Close()
 	closed = true

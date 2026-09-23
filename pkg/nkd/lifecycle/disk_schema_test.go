@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -60,6 +59,7 @@ func TestDiskImageOutputSchemaAndIdentity(t *testing.T) {
 }
 
 func TestDiskImageCompileAndPrepareFreezeRootArtifactButExecutionStaysClosed(t *testing.T) {
+	t.Chdir(t.TempDir())
 	definition := diskDefinition(t)
 	definition.Catalog.Base = "catalog"
 	definition.Outputs[0].Components = []string{"nke-node-non-fde"}
@@ -115,7 +115,7 @@ func TestDiskImageCompileAndPrepareFreezeRootArtifactButExecutionStaysClosed(t *
 		prepared.Expected[0].ArtifactID != wantArtifact {
 		t.Fatalf("prepared disk slot = %#v, want compiler-owned artifact %q", prepared.Expected, wantArtifact)
 	}
-	workspace := filepath.Join(t.TempDir(), "not-created")
+	workspace := ".nkd/not-created"
 	err = factory.AdmitLocal(t.Context(), plan, factory.LocalRunOptions{Workspace: workspace})
 	assertCode(t, err, nkderr.CodeEngineCapability)
 	if _, statErr := os.Stat(workspace); !os.IsNotExist(statErr) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -109,6 +110,75 @@ printf '%s|%s|%s|%s|%s|%s' "${LD_PRELOAD-unset}" "${LD_LIBRARY_PATH-unset}" "$PA
 	want := "unset|unset|/nonexistent|/dev/null|" + qualifiedRuntimeEndpoint + "|/dev/null"
 	if string(out) != want {
 		t.Fatalf("qualified runtime inherited ambient execution controls: got %q want %q", out, want)
+	}
+}
+
+func TestQualifiedPodmanRuntimePreservesOnlyValidatedRootlessPaths(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	runtimeDir := filepath.Join(root, "run")
+	dataHome := filepath.Join(root, "data")
+	configHome := filepath.Join(root, "config")
+	for _, directory := range []string{home, runtimeDir, dataHome, configHome} {
+		if err := os.Mkdir(directory, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("CONTAINERS_STORAGE_CONF", "/attacker/storage.conf")
+	t.Setenv("REGISTRY_AUTH_FILE", "/attacker/auth.json")
+
+	source := filepath.Join(root, "podman")
+	script := `#!/bin/sh
+printf '%s|%s|%s|%s|%s|%s' "$HOME" "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$REGISTRY_AUTH_FILE" "${CONTAINERS_STORAGE_CONF-unset}"
+`
+	if err := os.WriteFile(source, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	held, err := snapshotRuntimeExecutable(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.capability.Close()
+	out, err := heldExecutionOutput(t.Context(), held)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Join([]string{home, runtimeDir, dataHome, configHome, "/nonexistent", "unset"}, "|")
+	if string(out) != want {
+		t.Fatalf("qualified Podman environment = %q, want %q", out, want)
+	}
+}
+
+func TestQualifiedPodmanRuntimeRejectsUnsafeRootlessPaths(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "podman")
+	if err := os.WriteFile(source, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, variable, value string
+	}{
+		{name: "relative home", variable: "HOME", value: "relative"},
+		{name: "relative runtime dir", variable: "XDG_RUNTIME_DIR", value: "relative"},
+		{name: "unclean data home", variable: "XDG_DATA_HOME", value: "/tmp/../var"},
+		{name: "relative config home", variable: "XDG_CONFIG_HOME", value: "relative"},
+		{name: "control character", variable: "XDG_CONFIG_HOME", value: "/tmp/config\nother"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("HOME", filepath.Join(root, "home"))
+			t.Setenv("XDG_RUNTIME_DIR", filepath.Join(root, "run"))
+			t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+			t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
+			t.Setenv(test.variable, test.value)
+			held, err := snapshotRuntimeExecutable(source)
+			if held != nil || code(err) != e.CodeEngineCapability {
+				t.Fatalf("snapshotRuntimeExecutable() = %#v, %v; want nil, %s", held, err, e.CodeEngineCapability)
+			}
+		})
 	}
 }
 

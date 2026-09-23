@@ -64,8 +64,8 @@ jq -e '
   (.ubuntuSnapshot | type == "string" and test("^[0-9]{8}T[0-9]{6}Z$")) and
   (.baseImage | type == "string" and test("^ubuntu@sha256:[0-9a-f]{64}$")) and
   (.downloadImage | type == "string" and test("^curlimages/curl@sha256:[0-9a-f]{64}$")) and
-  .validatedNKE.commit == "de0e46bb14cae2f892677bf9e21b91a7add2f9d9" and
-  .validatedNKE.goVersion == "1.26.8" and
+  .validatedNKE.commit == "726f76944404e1106626b8333d3576bdf67b575b" and
+  .validatedNKE.goVersion == "1.27.1" and
   .validatedNKE.packerProject == "os-image/packer" and
   .validatedNKE.requiredBuild == "nke-node-non-fde.qemu.nke-non-fde" and
   .packer.version == "1.15.4" and
@@ -86,6 +86,8 @@ jq -e '
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
   )) and
+  (.localImages | keys | sort) == ["amd64", "arm64"] and
+  all(.localImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
   (.images | keys | sort) == ["amd64", "arm64"] and
   all(.images[]; . == null or test("^.+@sha256:[0-9a-f]{64}$"))
 ' "${lock}" >/dev/null
@@ -176,6 +178,14 @@ if ! jq -e --arg arch "${arch}" '
 fi
 
 image_id="$("${runtime}" image inspect --format '{{.Id}}' "${tag}")"
+if [[ "${image_id}" =~ ^[0-9a-f]{64}$ ]]; then
+  image_id="sha256:${image_id}"
+fi
+expected_local_image="$(jq -r --arg arch "${arch}" '.localImages[$arch] // empty' "${lock}")"
+if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" ]]; then
+  echo "local toolchain image ID ${image_id} does not match locked ${arch} ID ${expected_local_image}" >&2
+  exit 1
+fi
 if [[ "${arch}" != "${native_arch}" ]]; then
   printf 'built structurally checked cross-architecture toolchain %s (%s)\n' "${tag}" "${image_id}"
   echo "run this build on a native ${arch} host before publication"

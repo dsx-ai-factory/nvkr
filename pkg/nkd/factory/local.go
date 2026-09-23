@@ -114,20 +114,14 @@ func RunLocal(ctx context.Context, plan *Plan, options LocalRunOptions) (*LocalR
 	return runLocal(ctx, plan, options, productionLocalRunDeps())
 }
 
-// AdmitLocal verifies every capability needed by an ordinary local execution
-// before the caller reserves a workspace or creates output. A non-dry-run VM
-// Plan requires RunLocal to create and hold its private workspace before the
-// dedicated per-node admission can run, so this standalone preflight fails
-// closed for that case. It performs no filesystem mutation and does not build a
-// runner.
+// AdmitLocal verifies every workspace-independent capability before the caller
+// reserves a workspace or creates output. A non-dry-run VM Plan defers only the
+// held-workspace, capacity, and KVM checks to RunLocal. It performs no
+// filesystem mutation and does not build a runner.
 func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error {
 	options = withLocalDefaults(options)
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return err
-	}
-	if !options.DryRun && hasLocalVMBuild(plan) {
-		return e.New(e.CodeEngineCapability,
-			"local VM execution requires RunLocal's held-workspace admission")
 	}
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return err
@@ -135,7 +129,16 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if options.DryRun {
 		return nil
 	}
-	return admitLocalRunners(ctx, plan, options, localRunnerPlatforms(topologicalFactoryNodes(plan.Graph)))
+	vmBuild := hasLocalVMBuild(plan)
+	if vmBuild && runtime.GOOS != "linux" {
+		return e.New(e.CodeEngineCapability,
+			"local VM execution requires Linux; host is %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	platforms := localRunnerPlatforms(topologicalFactoryNodes(plan.Graph))
+	if vmBuild && len(platforms) == 0 {
+		return admitLocalRuntime(ctx, options)
+	}
+	return admitLocalRunners(ctx, plan, options, platforms)
 }
 
 func withLocalDefaults(options LocalRunOptions) LocalRunOptions {
@@ -552,11 +555,8 @@ func admitLocalRunners(ctx context.Context, plan *Plan, options LocalRunOptions,
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return e.New(e.CodeEngineCapability, "factory local execution requires Linux or Darwin process ownership")
 	}
-	if _, err := exec.LookPath(options.Runtime); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "finding container runtime %s", options.Runtime)
-	}
-	if _, err := ownedcmd.Output(ctx, options.Runtime, "version", "--format", "{{.Server.Version}}"); err != nil {
-		return classifyContext(ctx, e.Wrap(e.CodeEngineCapability, err, "contacting local container runtime"))
+	if err := admitLocalRuntime(ctx, options); err != nil {
+		return err
 	}
 	if requiresLocalRunnerCompilation(platforms) {
 		if _, err := exec.LookPath(options.Go); err != nil {
@@ -568,6 +568,16 @@ func admitLocalRunners(ctx context.Context, plan *Plan, options LocalRunOptions,
 		if _, err := os.Stat(filepath.Join(options.RunnerSource, "go.mod")); err != nil {
 			return e.Wrap(e.CodeEngineCapability, err, "runner source %s is not an nkdctl checkout", options.RunnerSource)
 		}
+	}
+	return nil
+}
+
+func admitLocalRuntime(ctx context.Context, options LocalRunOptions) error {
+	if _, err := exec.LookPath(options.Runtime); err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "finding container runtime %s", options.Runtime)
+	}
+	if _, err := ownedcmd.Output(ctx, options.Runtime, "version", "--format", "{{.Server.Version}}"); err != nil {
+		return classifyContext(ctx, e.Wrap(e.CodeEngineCapability, err, "contacting local container runtime"))
 	}
 	return nil
 }
@@ -587,7 +597,15 @@ func currentProcessIsNKDRunner() bool {
 }
 
 func isNKDRunnerBuild(info *debug.BuildInfo, ok bool) bool {
-	return ok && info != nil && info.Path == nkdRunnerPackage
+	if !ok || info == nil || info.Path != nkdRunnerPackage {
+		return false
+	}
+	for _, setting := range info.Settings {
+		if setting.Key == "CGO_ENABLED" {
+			return setting.Value == "0"
+		}
+	}
+	return false
 }
 
 func prepareLocalRunners(ctx context.Context, plan *Plan, options LocalRunOptions, platforms []string) (map[string]string, error) {

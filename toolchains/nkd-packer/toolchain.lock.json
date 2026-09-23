@@ -4,8 +4,8 @@
   "baseImage": "ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78",
   "downloadImage": "curlimages/curl@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40",
   "validatedNKE": {
-    "commit": "de0e46bb14cae2f892677bf9e21b91a7add2f9d9",
-    "goVersion": "1.26.8",
+    "commit": "726f76944404e1106626b8333d3576bdf67b575b",
+    "goVersion": "1.27.1",
     "packerProject": "os-image/packer",
     "requiredBuild": "nke-node-non-fde.qemu.nke-non-fde"
   },
@@ -69,6 +69,10 @@
   "publicationGates": {
     "packerBUSLRedistributionApproval": "not-recorded",
     "vulnerabilityReviewApproval": "not-recorded"
+  },
+  "localImages": {
+    "amd64": null,
+    "arm64": "sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51"
   },
   "images": {
     "amd64": null,

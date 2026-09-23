@@ -74,14 +74,11 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	factoryOptions := factory.LocalRunOptions{Workspace: workspace, RunnerSource: options.RunnerSource,
 		Jobs: options.Jobs, Runtime: options.Runtime, Go: options.Go, Publish: options.Publish,
 		DryRun: options.DryRun, Stdout: options.Stdout, Stderr: options.Stderr}
-	// Standalone factory admission intentionally rejects a non-dry-run VM Plan
-	// because only RunLocal owns the held workspace needed for storage and KVM
-	// admission. Ordinary and dry-run executions retain the mutation-free
-	// preflight before attempt storage is reserved.
-	if options.DryRun || !hasDiskLifecycleOutput(prepared.plan) {
-		if err := deps.admitLocal(ctx, prepared.plan, factoryOptions); err != nil {
-			return nil, err
-		}
+	// Workspace-independent admission always precedes immutable attempt
+	// reservation. RunLocal owns only the later held-workspace, capacity, and
+	// KVM admission for disk plans.
+	if err := deps.admitLocal(ctx, prepared.plan, factoryOptions); err != nil {
+		return nil, err
 	}
 	if options.DryRun {
 		if _, err := deps.runFactory(ctx, prepared.plan, factoryOptions); err != nil {
@@ -180,30 +177,19 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 			"recording failed run after local disk commit rollback")
 	}
 	if err := attemptTransaction.complete(); err != nil {
-		rollbackErr := attemptTransaction.rollback(recordLinked, diskExports.stages)
-		if rollbackErr != nil {
-			return nil, e.Wrap(e.CodeImmutableViolation, errors.Join(err, rollbackErr),
-				"completing local disk transaction and rolling it back")
+		// The immutable record and byte-verified disk outputs are already
+		// committed. Marker cleanup cannot revoke that successful result.
+		releaseDiskExportHandles(diskExports.stages)
+		if closeErr := attemptTransaction.close(); closeErr != nil {
+			return bound, e.Wrap(e.CodeImmutableViolation, errors.Join(err, closeErr),
+				"closing completed local disk transaction after cleanup failure")
 		}
-		return recordRunFailure(ctx, recordPath, &runForObservation, err,
-			"recording failed run after local disk transaction rollback")
+		return bound, err
 	}
 	// Marker-directory sync is the durable success commit point. Descriptor
 	// close cannot change the completed outcome after it.
 	releaseDiskExportHandles(diskExports.stages)
 	return bound, nil
-}
-
-func hasDiskLifecycleOutput(plan *factory.Plan) bool {
-	if plan == nil {
-		return false
-	}
-	for _, output := range plan.LifecycleOutputs {
-		if output.Kind == OutputDiskImage {
-			return true
-		}
-	}
-	return false
 }
 
 func closeLocalExecutionResult(result localExecutionResult, cause error) error {

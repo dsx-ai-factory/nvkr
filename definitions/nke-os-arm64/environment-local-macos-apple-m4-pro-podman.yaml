@@ -2,7 +2,7 @@ apiVersion: nkd.dev/environment/v1
 kind: Environment
 metadata:
   name: nke-os-arm64-local-macos-apple-m4-pro-podman
-  description: Podman Linux ARM64 VM on a local macOS Apple M4 Pro for development only; not a production runner profile.
+  description: ARM64 Podman machine on a local macOS Apple M4 Pro for development only; not a production runner profile.
 utilityContainer: golang@sha256:6c2a5538f964f1c82f97ad14988bf05de100d922d159d0e398b54c7b0ca0c6c9
 utilityPlatform: linux/arm64
 executionClasses:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -68,6 +69,187 @@ func testBuildMaterials(t *testing.T, observations []material.Observation) (*Bui
 	}
 }
 
+func TestNewBuildMaterialsRejectsInvalidInputs(t *testing.T) {
+	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("manifest\n"), heldfile.Options{
+		Label: "test-build-manifest", MaxBytes: maxBuildMaterialManifestBytes,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.Close()
+	payload := []byte("payload\n")
+	digest := FileDigest(payload)
+	content, err := heldfile.FromBytesContext(t.Context(), payload, heldfile.Options{
+		Label: "test-build-material", MaxBytes: MaxBuildMaterialBytes, ExpectedDigest: digest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer content.Close()
+	valid := BuildMaterialInput{Path: "materials/runtime", SHA256: digest, Content: content}
+
+	tests := []struct {
+		name     string
+		manifest *heldfile.File
+		inputs   []BuildMaterialInput
+		maxFile  int64
+		maxTotal int64
+		want     e.Code
+	}{
+		{name: "unauthenticated manifest", inputs: []BuildMaterialInput{valid}, want: e.CodeUnverifiedRef},
+		{name: "no inputs", manifest: manifest, want: e.CodeEngineCapability},
+		{name: "too many inputs", manifest: manifest, inputs: make([]BuildMaterialInput, maxBuildMaterialFiles+1), want: e.CodeEngineCapability},
+		{name: "absolute path", manifest: manifest, inputs: []BuildMaterialInput{{Path: "/material", SHA256: digest, Content: content}}, want: e.CodeInvalidCatalog},
+		{name: "traversal path", manifest: manifest, inputs: []BuildMaterialInput{{Path: "../material", SHA256: digest, Content: content}}, want: e.CodeInvalidCatalog},
+		{name: "manifest collision", manifest: manifest, inputs: []BuildMaterialInput{{Path: "material-manifest.json", SHA256: digest, Content: content}}, want: e.CodeInvalidCatalog},
+		{name: "duplicate path", manifest: manifest, inputs: []BuildMaterialInput{valid, valid}, want: e.CodeInvalidCatalog},
+		{name: "nil content", manifest: manifest, inputs: []BuildMaterialInput{{Path: valid.Path, SHA256: digest}}, want: e.CodeUnverifiedRef},
+		{name: "digest mismatch", manifest: manifest, inputs: []BuildMaterialInput{{Path: valid.Path, SHA256: "sha256:" + strings.Repeat("a", 64), Content: content}}, want: e.CodeUnverifiedRef},
+		{name: "per-file size bound", manifest: manifest, inputs: []BuildMaterialInput{valid}, maxFile: content.Size() - 1, maxTotal: content.Size(), want: e.CodeEngineCapability},
+		{name: "closure size bound", manifest: manifest, inputs: []BuildMaterialInput{valid, {Path: "materials/other", SHA256: digest, Content: content}}, maxFile: content.Size(), maxTotal: content.Size(), want: e.CodeEngineCapability},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			maxFile, maxTotal := test.maxFile, test.maxTotal
+			if maxFile == 0 {
+				maxFile = MaxBuildMaterialBytes
+			}
+			if maxTotal == 0 {
+				maxTotal = maxBuildMaterialTotalBytes
+			}
+			materials, err := newBuildMaterials(test.manifest, test.inputs, maxFile, maxTotal)
+			if materials != nil || code(err) != test.want {
+				t.Fatalf("NewBuildMaterials() = %#v, %v; want nil, %s", materials, err, test.want)
+			}
+		})
+	}
+}
+
+func TestAddBoundedSize(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		total, size       int64
+		maxFile, maxTotal int64
+		wantTotal         int64
+		wantOK            bool
+	}{
+		{name: "exact limit", total: 4, size: 6, maxFile: 6, maxTotal: 10, wantTotal: 10, wantOK: true},
+		{name: "over file limit", size: 7, maxFile: 6, maxTotal: 10},
+		{name: "over total limit", total: 5, size: 6, maxFile: 6, maxTotal: 10},
+		{name: "near max int overflow", total: math.MaxInt64 - 1, size: 2, maxFile: math.MaxInt64, maxTotal: math.MaxInt64},
+		{name: "negative input", total: -1, size: 1, maxFile: 1, maxTotal: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := addBoundedSize(test.total, test.size, test.maxFile, test.maxTotal)
+			if got != test.wantTotal || ok != test.wantOK {
+				t.Fatalf("addBoundedSize(%d, %d, %d, %d) = %d, %t; want %d, %t",
+					test.total, test.size, test.maxFile, test.maxTotal, got, ok, test.wantTotal, test.wantOK)
+			}
+		})
+	}
+}
+
+func TestVerifyPrivateFileSnapshotRejectsMutations(t *testing.T) {
+	payload := []byte("payload\n")
+	for _, test := range []struct {
+		name   string
+		mutate func(*testing.T, string, string)
+		cancel bool
+		want   e.Code
+	}{
+		{name: "undeclared file", want: e.CodeUnverifiedRef, mutate: func(t *testing.T, root, _ string) {
+			if err := os.Chmod(root, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, "extra"), []byte("extra\n"), 0o444); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(root, 0o555); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "symlink entry", want: e.CodeUnverifiedRef, mutate: func(t *testing.T, _, path string) {
+			parent := filepath.Dir(path)
+			if err := os.Chmod(parent, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink("missing", path); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(parent, 0o555); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "changed content", want: e.CodeUnverifiedRef, mutate: func(t *testing.T, _, path string) {
+			if err := os.Chmod(path, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("changed\n"), 0o444); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(path, 0o444); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "changed mode", want: e.CodeUnverifiedRef, mutate: func(t *testing.T, _, path string) {
+			if err := os.Chmod(path, 0o400); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "writable directory", want: e.CodeUnverifiedRef, mutate: func(t *testing.T, _, path string) {
+			if err := os.Chmod(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "missing file", want: e.CodeUnverifiedRef, mutate: func(t *testing.T, _, path string) {
+			parent := filepath.Dir(path)
+			if err := os.Chmod(parent, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(parent, 0o555); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "canceled context", cancel: true, want: e.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Cleanup(func() { _ = removePrivateTree(root) })
+			materialPath := filepath.Join(root, "materials", "runtime")
+			if err := os.MkdirAll(filepath.Dir(materialPath), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(materialPath, payload, 0o444); err != nil {
+				t.Fatal(err)
+			}
+			if err := sealPrivateInputDirectories(root); err != nil {
+				t.Fatal(err)
+			}
+			if test.mutate != nil {
+				test.mutate(t, root, materialPath)
+			}
+			ctx := t.Context()
+			if test.cancel {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			err := verifyPrivateFileSnapshot(ctx, root, []privateFileSnapshot{{
+				Path: filepath.Join("materials", "runtime"), SHA256: FileDigest(payload), Mode: 0o444,
+			}}, "build-material")
+			if code(err) != test.want {
+				t.Fatalf("verifyPrivateFileSnapshot() error = %v, want %s", err, test.want)
+			}
+		})
+	}
+}
+
 func TestBuildMaterialsStageNativeReadOnlyClosure(t *testing.T) {
 	payloadDigest := FileDigest([]byte("payload for runtime-archive\n"))
 	materials, closeMaterials := testBuildMaterials(t, []material.Observation{{
@@ -101,8 +283,17 @@ func TestBuildMaterialsStageNativeReadOnlyClosure(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Mode().Perm() != 0o400 {
-			t.Fatalf("staged %s mode = %o, want 0400", relative, info.Mode().Perm())
+		if info.Mode().Perm() != 0o444 {
+			t.Fatalf("staged %s mode = %o, want 0444", relative, info.Mode().Perm())
+		}
+	}
+	for _, directory := range []string{staged.root, filepath.Join(staged.root, "materials")} {
+		info, err := os.Stat(directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o555 {
+			t.Fatalf("staged directory %s mode = %o, want 0555", directory, info.Mode().Perm())
 		}
 	}
 	wantMount := []string{"-v", staged.root + ":/nkd/inputs:ro"}

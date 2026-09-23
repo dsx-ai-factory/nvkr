@@ -9,7 +9,7 @@ sources:
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
-      arm64: ${NKE_OS_TOOLCHAIN_IMAGE_ARM64}
+      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
       - -ec
@@ -21,7 +21,7 @@ sources:
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
-      arm64: ${NKE_OS_TOOLCHAIN_IMAGE_ARM64}
+      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
       - -ec
@@ -32,13 +32,13 @@ sources:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
     toolchainImagesByArch:
-      arm64: ${NKE_OS_TOOLCHAIN_IMAGE_ARM64}
+      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
   nke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nke
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
-      arm64: ${NKE_OS_TOOLCHAIN_IMAGE_ARM64}
+      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
       - -ec
@@ -50,7 +50,7 @@ sources:
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
-      arm64: ${NKE_OS_TOOLCHAIN_IMAGE_ARM64}
+      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
       - -ec
@@ -69,7 +69,7 @@ components:
       - -ec
       - |
         GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-arm64 \
-          VERSION=v0.2.1-rc.6-86-gde0e46bb \
+          VERSION=v0.2.1-rc.6-109-g726f7694 \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nke-agent.deb
     writeDir: agent/bin
@@ -137,9 +137,6 @@ components:
     builderType: buildkit-rootless
     toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
     outputType: oci-image
-    patches:
-      - name: patches/ovn-reproducible-metadata.patch
-        sha256: sha256:69dc04572a9e4437337ed1da860a969493d885700a8ecb84fa9a5c927528eebf
     buildCommand:
       - buildctl-daemonless.sh
       - build
@@ -208,12 +205,15 @@ components:
       kubeadm-distro: nke-kubeadm-distro
       ovn: nke-cni-ovn
       spire-agent: nke-spire-agent
-    patches:
-      - name: patches/nkd-material-producers.patch
-        sha256: sha256:fc57ca19fbda5a10e9019e2a0ace148ede968817299712c7cf5bacfa0f682122
     buildCommand:
-      - python3
-      - /src/os-image/packer/scripts/nkd-compose-image-inputs.py
+      - bash
+      - -ec
+      - |
+        exec python3 /src/os-image/packer/scripts/compose-image-inputs.py \
+          --materials-dir /nkd/inputs/materials \
+          --source-files-dir /src/os-image/files \
+          --output /src/nkd-output/image-inputs.tar \
+          --source-date-epoch "$SOURCE_DATE_EPOCH"
     writeDir: nkd-output
     artifactPath: nkd-output/image-inputs.tar
   nke-kubeadm-distro:
@@ -285,9 +285,6 @@ components:
         efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
         guest_memory_mib: 4096
         ssh_timeout: 180m
-    patches:
-      - name: patches/nkd-packer-guest-memory.patch
-        sha256: sha256:1ae3e1f19ac5f9c6d51adea41f449978d44a91a31eb8418723c29ed04395c294
     materials:
       image-inputs: nke-image-inputs
       installer-iso: nke-patched-installer-iso
@@ -300,12 +297,11 @@ components:
     outputType: raw
     materials:
       installer-source: ubuntu-installer-iso
-    patches:
-      - name: patches/nkd-material-producers.patch
-        sha256: sha256:fc57ca19fbda5a10e9019e2a0ace148ede968817299712c7cf5bacfa0f682122
     buildCommand:
       - bash
-      - /src/os-image/packer/scripts/nkd-patch-installer-iso.sh
+      - /src/os-image/packer/scripts/patch-installer-iso.sh
+      - /nkd/inputs/materials/installer-source
+      - /src/nkd-output/installer.iso
     writeDir: nkd-output
     artifactPath: nkd-output/installer.iso
   nke-spire-agent:

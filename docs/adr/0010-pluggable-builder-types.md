@@ -139,7 +139,7 @@ invocation mechanism, not a builder type or an output semantic:
 
 The direct-Packer authoring form names the stable boundary that compilation records and future execution must
 enforce. The concrete projection values below match the source-owned
-[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/de0e46bb14cae2f892677bf9e21b91a7add2f9d9/os-image/packer/variables.pkr.hcl#L14-L58);
+[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/726f76944404e1106626b8333d3576bdf67b575b/os-image/packer/variables.pkr.hcl#L14-L58);
 they are example producer vocabulary, not NKD-reserved values.
 
 ```yaml
@@ -204,9 +204,10 @@ success line only after diagnostic handling returns zero, and its
 exactly `The configuration is valid.` plus a newline while demonstrating that warnings can precede that line on
 stdout with exit status zero. The connected local OCI driver therefore accepts only that clean line (ignoring
 surrounding whitespace) with empty stderr; any other output fails closed. Driver admission and lifecycle are
-contract-tested, but a recorded real pinned Docker/Packer/NKE execution remains required before maintained NKE
-support, product acceptance, or any pipeline-attested or qualified production claim; until then the local result
-stays unqualified. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
+contract-tested. One attempt-frozen draft Podman/Packer/NKE ARM64 execution and boot smoke is recorded, but it was
+not run from the current committed NKD head and exact current NKE pin. That committed-head repeat, Docker and hosted
+execution remain required before maintained NKE support, product acceptance, or any pipeline-attested or qualified
+production claim; the recorded local result stays unqualified. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
 (`sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80`) and QEMU plugin 1.1.6
 (`sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6`), both matching HashiCorp's
 published `SHA256SUMS`. A minimal exact-version QEMU source returned exit zero, the single 28-byte success line
@@ -335,6 +336,13 @@ material-bearing `vm-image` command/Make producer, VM execution, disk collection
 capability-gated. Ordinary `oci-hermetic` producers use the admitted fixed material mount described above.
 An override that changes NKE's derived
 output filename must also change the catalog artifact path; NKD never guesses it.
+
+The commit references in this section have distinct roles. `6df693a9748a78aafdf96e1f2d03772530783487` is the
+historical `NVIDIA/nke` Make-target example above; `5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2` is the
+`dsx-ai-factory/nke` merge that introduced the staged-material contract. The current development catalog pins
+`726f76944404e1106626b8333d3576bdf67b575b`, while the recorded 2026-09-23 Podman bake used the older
+`de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NKD bytes. A rerun from the current
+committed NKD head and exact current NKE pin remains owed.
 
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
 seccomp/AppArmor/system paths for user-namespace operation, the overlayfs snapshotter, no host runtime socket

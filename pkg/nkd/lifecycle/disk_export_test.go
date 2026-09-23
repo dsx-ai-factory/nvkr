@@ -408,6 +408,11 @@ func TestDiskAttemptTransactionMarksIncompleteAndRollsBackLinkedRecord(t *testin
 	if err != nil || !linked {
 		t.Fatal(err)
 	}
+	if err := describeExistingAttempt(workspace, "attempt"); err == nil ||
+		!strings.Contains(err.Error(), "immutable lifecycle record") ||
+		!strings.Contains(err.Error(), "incomplete local disk commit cleanup") {
+		t.Fatalf("committed attempt with retained marker classification = %v", err)
+	}
 	if err := transaction.rollback(linked, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -419,6 +424,87 @@ func TestDiskAttemptTransactionMarksIncompleteAndRollsBackLinkedRecord(t *testin
 	err = describeExistingAttempt(workspace, "attempt")
 	if err == nil || !strings.Contains(err.Error(), "interrupted before its lifecycle record") {
 		t.Fatalf("interrupted attempt classification = %v", err)
+	}
+}
+
+func TestExecuteLocalPreflightsDiskBeforeAttemptReservation(t *testing.T) {
+	t.Chdir(t.TempDir())
+	prepared, _ := diskLifecycleFixture(t, "preflight-rejected")
+	sentinel := nkderr.New(nkderr.CodeEngineCapability, "synthetic VM host rejection")
+	runFactoryCalled := false
+	beginCalled := false
+	run, err := executeLocalWithDependencies(t.Context(), prepared,
+		LocalOptions{AttemptsRoot: ".nkd/runs"}, localExecutionDependencies{
+			admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error {
+				return sentinel
+			},
+			runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
+				runFactoryCalled = true
+				return nil, nil
+			},
+			writeRecordState: writeRunRecordState,
+			beginDiskCommit: func(string) (*diskAttemptTransaction, error) {
+				beginCalled = true
+				return nil, nil
+			},
+		})
+	if run != nil || !errors.Is(err, sentinel) || runFactoryCalled || beginCalled {
+		t.Fatalf("preflight rejection: run=%+v error=%v runFactory=%t begin=%t",
+			run, err, runFactoryCalled, beginCalled)
+	}
+	if _, statErr := os.Stat(".nkd"); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("disk preflight reserved attempt storage: %v", statErr)
+	}
+}
+
+func TestExecuteLocalRetainsCommittedDiskWhenMarkerCleanupFails(t *testing.T) {
+	t.Chdir(t.TempDir())
+	prepared, exporter := diskLifecycleFixture(t, "marker-cleanup-failed")
+	sentinel := errors.New("marker unlink failed")
+	run, err := executeLocalWithDependencies(t.Context(), prepared,
+		LocalOptions{AttemptsRoot: ".nkd/runs"}, localExecutionDependencies{
+			admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+			runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
+				return exporter, nil
+			},
+			writeRecordState: writeRunRecordState,
+			beginDiskCommit: func(workspace string) (*diskAttemptTransaction, error) {
+				transaction, err := beginDiskAttemptTransaction(workspace)
+				if err != nil {
+					return nil, err
+				}
+				original := transaction.unlink
+				transaction.unlink = func(directory int, name string, flags int) error {
+					if name == diskAttemptMarker {
+						return sentinel
+					}
+					return original(directory, name, flags)
+				}
+				return transaction, nil
+			},
+		})
+	if run == nil || run.Status != RunComplete || !errors.Is(err, sentinel) {
+		t.Fatalf("completed Run after marker cleanup failure = %+v, error=%v", run, err)
+	}
+	workspace := filepath.Join(".nkd", "runs", "marker-cleanup-failed")
+	record, readErr := os.ReadFile(filepath.Join(workspace, "lifecycle.json"))
+	if readErr != nil || !bytes.Contains(record, []byte(`"status":"complete"`)) {
+		t.Fatalf("committed lifecycle record = %q, error=%v", record, readErr)
+	}
+	path, pathErr := LocalDiskOutputPath(workspace, run.Observed[0].Name)
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+	if payload, readErr := os.ReadFile(path); readErr != nil || !bytes.Equal(payload, exporter.payload) {
+		t.Fatalf("committed disk = %q, error=%v", payload, readErr)
+	}
+	if _, statErr := os.Stat(filepath.Join(workspace, diskAttemptMarker)); statErr != nil {
+		t.Fatalf("cleanup marker was not retained: %v", statErr)
+	}
+	classification := describeExistingAttempt(workspace, "marker-cleanup-failed")
+	if classification == nil || !strings.Contains(classification.Error(), "immutable lifecycle record") ||
+		!strings.Contains(classification.Error(), "incomplete local disk commit cleanup") {
+		t.Fatalf("completed-but-uncleaned attempt classification = %v", classification)
 	}
 }
 
@@ -505,7 +591,7 @@ func TestExecuteLocalRecordsFailureAfterLinkedRecordSyncFault(t *testing.T) {
 	closeCalled := false
 	run, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{AttemptsRoot: ".nkd/runs"},
 		localExecutionDependencies{
-			admitLocal: factory.AdmitLocal,
+			admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
 			runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
 				return exporter, nil
 			},
@@ -550,14 +636,18 @@ func TestDiskLifecycleUsesRunLocalAndRetainsDiskAfterResultClose(t *testing.T) {
 	t.Chdir(t.TempDir())
 	prepared, exporter := diskLifecycleFixture(t, "disk-attempt")
 	called := false
-	run, err := executeLocalWithFactoryRunner(t.Context(), prepared,
-		LocalOptions{AttemptsRoot: ".nkd/runs"},
-		func(_ context.Context, _ *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
-			called = true
-			if options.Workspace != ".nkd/runs/disk-attempt" {
-				t.Fatalf("factory workspace = %q", options.Workspace)
-			}
-			return exporter, nil
+	run, err := executeLocalWithDependencies(t.Context(), prepared,
+		LocalOptions{AttemptsRoot: ".nkd/runs"}, localExecutionDependencies{
+			admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+			runFactory: func(_ context.Context, _ *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
+				called = true
+				if options.Workspace != ".nkd/runs/disk-attempt" {
+					t.Fatalf("factory workspace = %q", options.Workspace)
+				}
+				return exporter, nil
+			},
+			writeRecordState: writeRunRecordState,
+			beginDiskCommit:  beginDiskAttemptTransaction,
 		})
 	if err != nil || !called || !exporter.closed || exporter.exports != 1 || run == nil || run.Status != RunComplete {
 		t.Fatalf("local disk lifecycle: called=%t closed=%t exports=%d run=%+v error=%v",

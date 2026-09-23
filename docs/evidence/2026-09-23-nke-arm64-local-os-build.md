@@ -5,6 +5,11 @@
 **Attempt:** `20260923-arm64-e2e-17`
 **Repository base:** `05c20375f9f6ee3ba7bf8b871fee2058536b2998`, with the uncommitted change under review
 
+This is historical evidence for those exact working-tree bytes. It was not run from the subsequently committed
+NKD PR head `59ecee3f5ee66ddc9ff4666966697f6e33052310`, and it used the NKE source recorded below rather than the newer
+development pin. A complete rerun from the then-current committed NKD head and exact current NKE pin, with new
+Plan, Definition, Environment and artifact identities, remains owed until separately recorded.
+
 ## Scope
 
 This record establishes one local, network-enabled ARM64 non-FDE build through the NKD public lifecycle. NKD built
@@ -81,3 +86,5 @@ digest, and the current generated NKE workflow does not contain this OS Definiti
 After this run, the local Environment metadata was renamed to identify the macOS Apple M4 Pro and Podman runtime
 explicitly. Its execution requirements did not change, but the rename changes Environment and Plan identity. The
 renamed Podman and Docker inputs have static Plan validation only; this record retains the identities actually run.
+A current-head rerun remains an acceptance prerequisite; this historical record must not be relabeled as evidence
+for later committed bytes.

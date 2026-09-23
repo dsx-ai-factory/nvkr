@@ -153,7 +153,11 @@ func TestIsNKDRunnerBuild(t *testing.T) {
 		ok   bool
 		want bool
 	}{
-		{name: "nkdctl", info: &debug.BuildInfo{Path: nkdRunnerPackage}, ok: true, want: true},
+		{name: "static nkdctl", info: &debug.BuildInfo{Path: nkdRunnerPackage,
+			Settings: []debug.BuildSetting{{Key: "CGO_ENABLED", Value: "0"}}}, ok: true, want: true},
+		{name: "cgo nkdctl", info: &debug.BuildInfo{Path: nkdRunnerPackage,
+			Settings: []debug.BuildSetting{{Key: "CGO_ENABLED", Value: "1"}}}, ok: true},
+		{name: "nkdctl without cgo metadata", info: &debug.BuildInfo{Path: nkdRunnerPackage}, ok: true},
 		{name: "embedded host", info: &debug.BuildInfo{Path: "example.invalid/host"}, ok: true},
 		{name: "missing metadata", info: &debug.BuildInfo{Path: nkdRunnerPackage}},
 		{name: "nil metadata", ok: true},

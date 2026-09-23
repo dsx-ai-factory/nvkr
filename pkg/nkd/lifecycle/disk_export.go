@@ -159,11 +159,17 @@ func describeExistingAttempt(workspace, attempt string) error {
 		var stat unix.Stat_t
 		return unix.Fstatat(int(root.Fd()), name, &stat, unix.AT_SYMLINK_NOFOLLOW) == nil
 	}
-	if exists(diskAttemptMarker) {
+	markerExists := exists(diskAttemptMarker)
+	recordExists := exists("lifecycle.json")
+	if markerExists && recordExists {
+		return e.New(e.CodeImmutableViolation,
+			"run attempt %q has an immutable lifecycle record and an incomplete local disk commit cleanup", attempt)
+	}
+	if markerExists {
 		return e.New(e.CodeImmutableViolation,
 			"run attempt %q contains an incomplete local disk commit transaction", attempt)
 	}
-	if exists("lifecycle.json") {
+	if recordExists {
 		return e.New(e.CodeImmutableViolation, "run attempt %q already has an immutable lifecycle record", attempt)
 	}
 	return e.New(e.CodeImmutableViolation,

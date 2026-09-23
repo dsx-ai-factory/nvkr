@@ -586,12 +586,31 @@ func TestLocalRequirementGateAdmitsOnlyVMRequirements(t *testing.T) {
 	}
 }
 
-func TestStandaloneLocalAdmissionKeepsVMExecutionClosed(t *testing.T) {
+func TestStandaloneLocalAdmissionPreflightsVMWithoutWorkspace(t *testing.T) {
+	t.Chdir(t.TempDir())
 	plan, _ := compiledVMNode(t, execution.CapabilityPreferred)
-	if err := AdmitLocal(t.Context(), plan, LocalRunOptions{Workspace: ".nkd/vm"}); factoryErrorCode(err) != e.CodeEngineCapability {
-		t.Fatalf("standalone VM admission error = %v, want %s", err, e.CodeEngineCapability)
+	workspace := ".nkd/vm"
+	if runtime.GOOS == "linux" {
+		root := t.TempDir()
+		runtimePath := filepath.Join(root, "runtime")
+		if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module fixture\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		err := AdmitLocal(t.Context(), plan, LocalRunOptions{Workspace: workspace,
+			Runtime: runtimePath, Go: runtimePath, RunnerSource: root})
+		if err != nil {
+			t.Fatalf("standalone VM preflight failed: %v", err)
+		}
+	} else if err := AdmitLocal(t.Context(), plan, LocalRunOptions{Workspace: workspace}); factoryErrorCode(err) != e.CodeEngineCapability {
+		t.Fatalf("non-Linux VM preflight error = %v, want %s", err, e.CodeEngineCapability)
 	}
-	if err := AdmitLocal(t.Context(), plan, LocalRunOptions{Workspace: ".nkd/vm", DryRun: true}); err != nil {
+	if _, err := os.Stat(workspace); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("standalone VM preflight touched workspace: %v", err)
+	}
+	if err := AdmitLocal(t.Context(), plan, LocalRunOptions{Workspace: workspace, DryRun: true}); err != nil {
 		t.Fatalf("static VM dry-run admission failed: %v", err)
 	}
 }

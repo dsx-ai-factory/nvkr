@@ -4,10 +4,13 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 )
 
 const maxQualifiedRuntimeBytes int64 = 1 << 30
@@ -22,13 +25,42 @@ var dockerRuntimeEnvironment = []string{
 	"DOCKER_HOST=" + qualifiedRuntimeEndpoint,
 }
 
-var podmanRuntimeEnvironment = []string{
-	"HOME=/nonexistent",
+var podmanRuntimeEnvironmentBase = []string{
 	"PATH=/nonexistent",
 	"LANG=C",
 	"LC_ALL=C",
 	"TZ=UTC",
 	"REGISTRY_AUTH_FILE=/nonexistent",
+}
+
+func resolvedPodmanRuntimeEnvironment() ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "resolving Podman user home")
+	}
+	paths := []struct {
+		name     string
+		value    string
+		fallback string
+	}{
+		{name: "HOME", value: home},
+		{name: "XDG_RUNTIME_DIR", value: os.Getenv("XDG_RUNTIME_DIR"), fallback: fmt.Sprintf("/run/user/%d", os.Getuid())},
+		{name: "XDG_DATA_HOME", value: os.Getenv("XDG_DATA_HOME"), fallback: filepath.Join(home, ".local", "share")},
+		{name: "XDG_CONFIG_HOME", value: os.Getenv("XDG_CONFIG_HOME"), fallback: filepath.Join(home, ".config")},
+	}
+	environment := append([]string(nil), podmanRuntimeEnvironmentBase...)
+	for _, item := range paths {
+		value := item.value
+		if value == "" {
+			value = item.fallback
+		}
+		if !safetext.Valid(value, 4096, false) || !filepath.IsAbs(value) || filepath.Clean(value) != value {
+			return nil, e.New(e.CodeEngineCapability,
+				"Podman %s must be an absolute clean path", item.name)
+		}
+		environment = append(environment, item.name+"="+value)
+	}
+	return environment, nil
 }
 
 // snapshotRuntimeExecutable copies the resolved runtime inode into the shared
@@ -46,6 +78,14 @@ func snapshotRuntimeExecutableContext(ctx context.Context, runtimePath string) (
 		return nil, e.Wrap(e.CodeTimeout, err, "holding container runtime %s", runtimePath)
 	}
 	name := filepath.Base(runtimePath)
+	environment := dockerRuntimeEnvironment
+	if name == "podman" {
+		podmanEnvironment, err := resolvedPodmanRuntimeEnvironment()
+		if err != nil {
+			return nil, err
+		}
+		environment = podmanEnvironment
+	}
 	resolved, err := filepath.EvalSymlinks(runtimePath)
 	if err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "resolving container runtime %s", runtimePath)
@@ -58,10 +98,6 @@ func snapshotRuntimeExecutableContext(ctx context.Context, runtimePath string) (
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "holding container runtime %s", runtimePath)
 		}
 		return nil, e.Wrap(e.CodeEngineCapability, err, "holding container runtime %s", runtimePath)
-	}
-	environment := dockerRuntimeEnvironment
-	if name == "podman" {
-		environment = podmanRuntimeEnvironment
 	}
 	return &heldRuntimeExecutable{
 		capability: capability, name: name, endpoint: qualifiedRuntimeEndpoint,

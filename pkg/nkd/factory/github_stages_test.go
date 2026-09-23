@@ -36,6 +36,14 @@ func TestGitHubStageTimeoutMinutes(t *testing.T) {
 			}},
 			want: 3,
 		},
+		{
+			name: "sum declared and default sequential nodes",
+			stage: githubStage{ID: "mixed", Nodes: []Node{
+				{ID: "declared", Requirements: requirements(60)},
+				{ID: "undeclared"},
+			}},
+			want: 61,
+		},
 		{name: "reject over GitHub limit", stage: githubStage{ID: "too-long", Nodes: []Node{{ID: "build", Requirements: requirements(21601)}}}, wantErr: e.CodeEngineCapability},
 	}
 	for _, test := range tests {

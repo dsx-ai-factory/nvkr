@@ -29,6 +29,7 @@ import (
 
 func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) {
 	root := t.TempDir()
+	t.Cleanup(func() { _ = removePrivateTree(root) })
 	for _, name := range []string{"config", "inputs", "source"} {
 		directory := filepath.Join(root, name)
 		if err := os.Mkdir(directory, 0o700); err != nil {
@@ -65,6 +66,7 @@ func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) 
 	}
 	digest := sha256.Sum256(archiveBytes)
 	destination := t.TempDir()
+	t.Cleanup(func() { _ = removePrivateTree(destination) })
 	command := exec.CommandContext(t.Context(), "sh", "-ec", packerInputExtractScript,
 		"nkd-extract-input", fmt.Sprintf("%x", digest), archive, destination,
 		fmt.Sprint(os.Getuid()), fmt.Sprint(os.Getgid()))
@@ -182,10 +184,10 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			isBuild := strings.Contains(joined, "nkd.dev/role=build")
 			if isBuild {
 				networkedContainers++
-				if !slices.Contains(call, "--network=default") || slices.Contains(call, "--network=none") {
+				if !slices.Contains(call, "--network=bridge") || slices.Contains(call, "--network=none") {
 					t.Fatalf("Packer build container lacks its admitted network: %#v", call)
 				}
-			} else if !slices.Contains(call, "--network=none") || slices.Contains(call, "--network=default") {
+			} else if !slices.Contains(call, "--network=none") || slices.Contains(call, "--network=bridge") {
 				t.Fatalf("Packer preparation container received network access: %#v", call)
 			}
 			if strings.Contains(joined, "nkd.dev/role=bootstrap") {

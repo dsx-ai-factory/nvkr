@@ -23,8 +23,10 @@ type githubStage struct {
 func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	var total uint64
 	declared := false
+	undeclared := 0
 	for _, node := range stage.Nodes {
 		if node.Requirements == nil || node.Requirements.TimeoutSeconds == 0 {
+			undeclared++
 			continue
 		}
 		declared = true
@@ -41,6 +43,17 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	}
 	if !declared {
 		return githubDefaultStageTimeoutMinutes, nil
+	}
+	// Once any node declares a timeout, the stage budget is the sum of its
+	// serial node budgets. Give each undeclared node the bounded adapter default
+	// rather than silently counting it as zero.
+	for range undeclared {
+		if total > githubMaximumJobTimeoutMinutes-githubDefaultStageTimeoutMinutes {
+			return 0, e.New(e.CodeEngineCapability,
+				"GitHub stage %q timeout exceeds the %d-minute job limit",
+				stage.ID, githubMaximumJobTimeoutMinutes)
+		}
+		total += githubDefaultStageTimeoutMinutes
 	}
 	return int(total), nil
 }

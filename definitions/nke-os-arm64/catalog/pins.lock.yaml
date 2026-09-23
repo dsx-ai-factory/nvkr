@@ -1,28 +1,29 @@
-# Bootstrap commit snapshot. Replace the describe value with the first tag that
-# resolves to this exact commit before promoting this directory to maintained input.
+# Bootstrap commit snapshot for the reviewed NKE external-material interface.
+# Replace the describe value with the first release tag that resolves to this
+# exact commit before promoting this directory to a maintained release input.
 apiVersion: nkd.dev/lock/v1
 kind: PinLock
 pins:
   nke-cni-calico-source:
-    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
-    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
-    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
-    sourceDateEpoch: 1790126681
+    tag: os-image/v0.1.0-rc.4-51-g726f7694
+    commit: 726f76944404e1106626b8333d3576bdf67b575b
+    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+    sourceDateEpoch: 1790192178
   nke-kubeadm-distro-source:
-    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
-    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
-    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
-    sourceDateEpoch: 1790126681
+    tag: os-image/v0.1.0-rc.4-51-g726f7694
+    commit: 726f76944404e1106626b8333d3576bdf67b575b
+    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+    sourceDateEpoch: 1790192178
   nke-os:
-    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
-    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
-    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
-    sourceDateEpoch: 1790126681
+    tag: os-image/v0.1.0-rc.4-51-g726f7694
+    commit: 726f76944404e1106626b8333d3576bdf67b575b
+    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+    sourceDateEpoch: 1790192178
   nke-spire-agent-source:
-    tag: os-image/v0.1.0-rc.4-28-gde0e46bb
-    commit: de0e46bb14cae2f892677bf9e21b91a7add2f9d9
-    treeHash: a489dc5753e49cb25264cf7732f04736075261eb
-    sourceDateEpoch: 1790126681
+    tag: os-image/v0.1.0-rc.4-51-g726f7694
+    commit: 726f76944404e1106626b8333d3576bdf67b575b
+    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+    sourceDateEpoch: 1790192178
   ovn-kubernetes:
     tag: v1.4.0
     commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d

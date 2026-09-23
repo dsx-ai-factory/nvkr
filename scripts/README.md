@@ -36,6 +36,25 @@ Docker is contract-tested but has not completed a recorded full image build. See
 [Definition guide](../definitions/nke-os-arm64/README.md) and
 [local execution evidence](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
 
+Local attempts deliberately retain their frozen inputs, bootstrap runner and Run outputs. After reviewing an
+attempt, archive those three attempt-scoped directories together instead of reusing its name:
+
+```sh
+attempt=local-arm64-podman-001
+archive_root=/absolute/path/to/nkd-attempt-archive
+for area in inputs bootstrap runs; do
+  if [[ -e ".nkd/${area}/${attempt}" ]]; then
+    mkdir -p "${archive_root}/${area}"
+    mv -- ".nkd/${area}/${attempt}" "${archive_root}/${area}/"
+  fi
+done
+```
+
+The toolchain uses the stable local tag `localhost/nkd-packer-toolchain:dev-arm64`, not a per-attempt tag. Once no
+build is running and no retained workflow needs the local image, remove that optional cache with
+`podman image rm localhost/nkd-packer-toolchain:dev-arm64` or the equivalent `docker image rm` command. Archiving or
+removing storage does not make an attempt name reusable; choose a new name for every Run.
+
 ## Release consumption
 
 ```sh

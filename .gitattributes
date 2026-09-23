@@ -1,3 +1,0 @@
-# Unified-diff context prefixes intentionally look like whitespace errors to
-# the outer repository diff. Preserve the source-owned patch bytes verbatim.
-definitions/nke-os-arm64/catalog/patches/*.patch whitespace=-blank-at-eol,-space-before-tab

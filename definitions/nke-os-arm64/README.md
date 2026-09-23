@@ -5,8 +5,9 @@ NKE agent, Calico, OVN, kubeadm distribution, SPIRE package, patched installer I
 running the source-owned Packer project. The default path builds OVN from its pinned source. The optional overlay
 selects a digest-pinned prebuilt OVN image while leaving the remaining graph unchanged.
 
-The wrapper supports Podman and Docker. The selected runtime is recorded in the frozen Environment for the attempt.
-Podman is the default:
+The wrapper supports Podman and Docker on Linux ARM64. On the documented macOS Apple M4 Pro development host, the
+wrapper delegates the command to its existing Linux ARM64 Podman machine. The selected runtime is recorded in the
+frozen Environment for the attempt. Podman is the default:
 
 ```sh
 CONTAINER_RUNTIME=podman scripts/nke-os-arm64-local.sh local-arm64-podman-001 1
@@ -18,19 +19,23 @@ To use Docker:
 CONTAINER_RUNTIME=docker scripts/nke-os-arm64-local.sh local-arm64-docker-001 1
 ```
 
-These Environments describe the local macOS Apple M4 Pro setup used for development. Run the command inside its
-Linux ARM64 Docker or Podman machine, with Python 3 and the workspace mounted. The admitted VM profile requires at
-least 8 CPUs, 10 GiB memory, 64 GiB free workspace storage and producer-declared network access. KVM is preferred,
-with QEMU TCG fallback.
+The Podman Environment describes the Linux ARM64 machine behind the local macOS Apple M4 Pro development host. The
+Docker Environment describes a native Linux ARM64 development host. Both admitted VM profiles require at least 8
+CPUs, 10 GiB memory, 64 GiB free workspace storage and producer-declared network access. KVM is preferred, with QEMU
+TCG fallback.
 
-The wrapper builds the pinned toolchain locally unless `NKE_OS_TOOLCHAIN_IMAGE_ARM64` names an already-local exact
-image ID or repository digest. It freezes all authored inputs below `.nkd/inputs/<attempt>` before execution. Attempt
-names are immutable. The resulting disk and lifecycle record are:
+The wrapper rebuilds the locked toolchain and rejects any result whose content-addressed local image ID differs from
+the catalog and toolchain lock. It freezes all authored inputs below `.nkd/inputs/<attempt>` before execution.
+Attempt names are immutable. The resulting disk and lifecycle record are:
 
 ```text
 .nkd/runs/<attempt>/outputs/nke-node-image-arm64.qcow2
 .nkd/runs/<attempt>/lifecycle.json
 ```
+
+Frozen inputs, the attempt-scoped bootstrap runner and Run outputs remain on disk for review. Archive all three
+together and never reuse the attempt name; the exact recoverable archive procedure and optional stable-toolchain
+image cleanup are documented in the [script guide](../../scripts/README.md).
 
 Select the explicit prebuilt OVN supplier with:
 
