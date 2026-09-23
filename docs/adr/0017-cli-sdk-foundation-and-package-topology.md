@@ -44,8 +44,9 @@ Definition has no disk variant, encryption boolean, build command, or Packer fie
 and production details. Definition schema validation, catalog resolution, and compiler-only Run Plan lowering
 are supported. The Plan points the lifecycle output at the root producer's exact disk artifact and carries typed
 command/Packer, disk, public-variable, material-edge, execution-class, and host-toolchain inputs. It does not
-wrap the QCOW2 as a binary bundle. Local or hosted execution, generated jobs, observation, evidence, and
-publication still fail with `engine-capability` before source, subprocess, or output work.
+wrap the QCOW2 as a binary bundle. Local unencrypted direct-Packer execution and held-QCOW2 observation are
+supported as described below. Hosted and qualified execution, generated VM jobs, FDE, full-disk evidence, and
+disk publication remain unsupported and fail with `engine-capability` before source, subprocess, or output work.
 
 Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
