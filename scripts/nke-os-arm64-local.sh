@@ -17,10 +17,6 @@ TCG. On macOS the command delegates to the existing ARM64 Podman machine. This
 is a development bootstrap route, not a production runner profile.
 
 Set CONTAINER_RUNTIME=podman or CONTAINER_RUNTIME=docker. Podman is the default.
-
-NKE_OVN_SUPPLIER=source (the default) builds OVN from its pinned upstream
-source. Set NKE_OVN_SUPPLIER=prebuilt to select the explicit digest-pinned
-upstream-image overlay instead.
 EOF
 }
 
@@ -48,11 +44,6 @@ case "${runtime}" in
   podman|docker) ;;
   *) echo "CONTAINER_RUNTIME must be podman or docker" >&2; exit 2 ;;
 esac
-ovn_supplier="${NKE_OVN_SUPPLIER:-source}"
-case "${ovn_supplier}" in
-  source|prebuilt) ;;
-  *) echo "NKE_OVN_SUPPLIER must be source or prebuilt" >&2; exit 2 ;;
-esac
 command -v "${runtime}" >/dev/null 2>&1 || {
   echo "container runtime not found: ${runtime}" >&2
   exit 1
@@ -68,8 +59,8 @@ if [[ "${host_os}" == Darwin ]]; then
   # evaluates them. Pass one shell-escaped command so paths and values retain
   # their argument boundaries inside the Linux VM.
   printf -v remote_command \
-    'cd %q && exec env CONTAINER_RUNTIME=podman NKE_OVN_SUPPLIER=%q ./scripts/nke-os-arm64-local.sh %q %q' \
-    "${repo_root}" "${ovn_supplier}" "${attempt}" "${jobs}"
+    'cd %q && exec env CONTAINER_RUNTIME=podman ./scripts/nke-os-arm64-local.sh %q %q' \
+    "${repo_root}" "${attempt}" "${jobs}"
   exec podman machine ssh "${remote_command}"
 fi
 if [[ "${host_os}" != Linux ]]; then
@@ -96,8 +87,6 @@ CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch arm64
 
 mkdir -p "${input_root}/catalog"
 cp definitions/nke-os-arm64/definition.yaml "${input_root}/definition.yaml"
-cp definitions/nke-os-arm64/definition-ovn-prebuilt.yaml \
-  "${input_root}/definition-ovn-prebuilt.yaml"
 environment_source="definitions/nke-os-arm64/environment-local-macos-apple-m4-pro-podman.yaml"
 if [[ "${runtime}" == docker ]]; then
   environment_source="definitions/nke-os-arm64/environment-local-linux-arm64-docker.yaml"
@@ -135,16 +124,8 @@ if [[ ! -x "${runner}" ]]; then
   exit 1
 fi
 
-cp definitions/nke-os-arm64/ovn-prebuilt-overlay.yaml \
-  "${input_root}/ovn-prebuilt-overlay.yaml"
-
-definition_path="${input_root}/definition.yaml"
-if [[ "${ovn_supplier}" == prebuilt ]]; then
-  definition_path="${input_root}/definition-ovn-prebuilt.yaml"
-fi
-
 exec "${runner}" run local \
-  --definition "${definition_path}" \
+  --definition "${input_root}/definition.yaml" \
   --environment "${input_root}/environment-local.yaml" \
   --attempt "${attempt}" \
   --attempts-root .nkd/runs \

@@ -31,6 +31,7 @@ var podmanRuntimeEnvironmentBase = []string{
 	"LC_ALL=C",
 	"TZ=UTC",
 	"REGISTRY_AUTH_FILE=/nonexistent",
+	"XDG_CONFIG_HOME=/nonexistent",
 }
 
 func resolvedPodmanRuntimeEnvironment() ([]string, error) {
@@ -46,7 +47,6 @@ func resolvedPodmanRuntimeEnvironment() ([]string, error) {
 		{name: "HOME", value: home},
 		{name: "XDG_RUNTIME_DIR", value: os.Getenv("XDG_RUNTIME_DIR"), fallback: fmt.Sprintf("/run/user/%d", os.Getuid())},
 		{name: "XDG_DATA_HOME", value: os.Getenv("XDG_DATA_HOME"), fallback: filepath.Join(home, ".local", "share")},
-		{name: "XDG_CONFIG_HOME", value: os.Getenv("XDG_CONFIG_HOME"), fallback: filepath.Join(home, ".config")},
 	}
 	environment := append([]string(nil), podmanRuntimeEnvironmentBase...)
 	for _, item := range paths {

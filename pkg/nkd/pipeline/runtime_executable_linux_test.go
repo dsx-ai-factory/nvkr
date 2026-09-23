@@ -113,7 +113,7 @@ printf '%s|%s|%s|%s|%s|%s' "${LD_PRELOAD-unset}" "${LD_LIBRARY_PATH-unset}" "$PA
 	}
 }
 
-func TestQualifiedPodmanRuntimePreservesOnlyValidatedRootlessPaths(t *testing.T) {
+func TestQualifiedPodmanRuntimePreservesRequiredRootlessPathsAndScrubsConfig(t *testing.T) {
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	runtimeDir := filepath.Join(root, "run")
@@ -128,12 +128,15 @@ func TestQualifiedPodmanRuntimePreservesOnlyValidatedRootlessPaths(t *testing.T)
 	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
 	t.Setenv("XDG_DATA_HOME", dataHome)
 	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("CONTAINERS_CONF", "/attacker/containers.conf")
+	t.Setenv("CONTAINERS_REGISTRIES_CONF", "/attacker/registries.conf")
+	t.Setenv("CONTAINERS_POLICY", "/attacker/policy.json")
 	t.Setenv("CONTAINERS_STORAGE_CONF", "/attacker/storage.conf")
 	t.Setenv("REGISTRY_AUTH_FILE", "/attacker/auth.json")
 
 	source := filepath.Join(root, "podman")
 	script := `#!/bin/sh
-printf '%s|%s|%s|%s|%s|%s' "$HOME" "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$REGISTRY_AUTH_FILE" "${CONTAINERS_STORAGE_CONF-unset}"
+printf '%s|%s|%s|%s|%s|%s|%s|%s|%s' "$HOME" "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$REGISTRY_AUTH_FILE" "${CONTAINERS_CONF-unset}" "${CONTAINERS_REGISTRIES_CONF-unset}" "${CONTAINERS_POLICY-unset}" "${CONTAINERS_STORAGE_CONF-unset}"
 `
 	if err := os.WriteFile(source, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
@@ -147,7 +150,10 @@ printf '%s|%s|%s|%s|%s|%s' "$HOME" "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" "$XDG_CON
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := strings.Join([]string{home, runtimeDir, dataHome, configHome, "/nonexistent", "unset"}, "|")
+	want := strings.Join([]string{
+		home, runtimeDir, dataHome, "/nonexistent", "/nonexistent",
+		"unset", "unset", "unset", "unset",
+	}, "|")
 	if string(out) != want {
 		t.Fatalf("qualified Podman environment = %q, want %q", out, want)
 	}
@@ -165,8 +171,6 @@ func TestQualifiedPodmanRuntimeRejectsUnsafeRootlessPaths(t *testing.T) {
 		{name: "relative home", variable: "HOME", value: "relative"},
 		{name: "relative runtime dir", variable: "XDG_RUNTIME_DIR", value: "relative"},
 		{name: "unclean data home", variable: "XDG_DATA_HOME", value: "/tmp/../var"},
-		{name: "relative config home", variable: "XDG_CONFIG_HOME", value: "relative"},
-		{name: "control character", variable: "XDG_CONFIG_HOME", value: "/tmp/config\nother"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv("HOME", filepath.Join(root, "home"))

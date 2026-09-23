@@ -126,6 +126,52 @@ func TestPrebuiltMissingArchFailsClosed(t *testing.T) {
 	}
 }
 
+func TestCompileRejectsPrebuiltOCIImageMaterial(t *testing.T) {
+	consumer := nixCatalog(ir.BuilderOCIHermetic).Components["tool"]
+	consumer.Materials = map[string]string{"input": "material"}
+
+	for _, test := range []struct {
+		name     string
+		producer catalog.Component
+		wantCode nkderr.Code
+		wantText string
+	}{
+		{
+			name:     "regular file material",
+			producer: prebuiltCatalog().Components["tool"],
+		},
+		{
+			name:     "OCI layout material",
+			producer: prebuiltCatalog().Components["img"],
+			wantCode: nkderr.CodeEngineCapability,
+			wantText: "acquired OCI layouts cannot be staged as one regular-file material",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cat := &catalog.Catalog{Components: map[string]catalog.Component{
+				"consumer": consumer,
+				"material": test.producer,
+			}}
+			resolved, err := Resolve(cat, Selection{
+				Components: []string{"consumer", "material"}, Platform: "linux/amd64",
+			})
+			if err != nil {
+				t.Fatalf("resolve material graph: %v", err)
+			}
+			graph, err := Compile(resolved)
+			if test.wantCode == "" {
+				if err != nil || graph == nil {
+					t.Fatalf("Compile = %#v, %v; want a graph", graph, err)
+				}
+				return
+			}
+			if graph != nil || code(err) != test.wantCode || !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("Compile = %#v, %v; want no graph, %s, and %q", graph, err, test.wantCode, test.wantText)
+			}
+		})
+	}
+}
+
 func envValue(n ir.Node, name string) string {
 	for _, ev := range n.Env {
 		if ev.Name == name {

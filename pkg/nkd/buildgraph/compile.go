@@ -77,6 +77,9 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 	for _, component := range r.Components {
 		components[component.Name] = component
 	}
+	if err := rejectUnsupportedMaterialTransports(r.Components, components); err != nil {
+		return nil, err
+	}
 
 	for _, nc := range r.Components {
 		// Prebuilt (no-compile) lane: one pull node acquires a pinned, content-addressed
@@ -260,6 +263,28 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "compiled build graph is invalid")
 	}
 	return g, nil
+}
+
+// rejectUnsupportedMaterialTransports rejects producer transports that the material
+// handoff cannot represent. A prebuilt OCI image is acquired as an OCI layout,
+// while a material binding currently carries exactly one authenticated regular
+// file. Source-built OCI components remain valid because their authored artifact
+// path names the regular-file archive emitted by that producer.
+func rejectUnsupportedMaterialTransports(
+	consumers []catalog.NamedComponent,
+	components map[string]catalog.NamedComponent,
+) error {
+	for _, consumer := range consumers {
+		for _, binding := range materialBindings(consumer, components) {
+			producer := components[binding.Component]
+			if producer.Prebuilt != nil && producer.OutputType == "oci-image" {
+				return e.New(e.CodeEngineCapability,
+					"component %q material binding %q selects prebuilt OCI image %q, but acquired OCI layouts cannot be staged as one regular-file material",
+					consumer.Name, binding.Binding, binding.Component)
+			}
+		}
+	}
+	return nil
 }
 
 func vmRequiresKVM(requirements *execution.Requirements) bool {

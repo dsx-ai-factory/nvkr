@@ -2,8 +2,8 @@
 
 This development Definition builds the NKE ARM64 non-FDE QCOW2 from its pinned component graph. NKD builds the
 NKE agent, Calico, OVN, kubeadm distribution, SPIRE package, patched installer ISO and aggregate image inputs before
-running the source-owned Packer project. The default path builds OVN from its pinned source. The optional overlay
-selects a digest-pinned prebuilt OVN image while leaving the remaining graph unchanged.
+running the source-owned Packer project. OVN is built from its pinned source into the regular-file OCI archive consumed
+by the image-inputs producer.
 
 The wrapper supports Podman and Docker on Linux ARM64. On the documented macOS Apple M4 Pro development host, the
 wrapper delegates the command to its existing Linux ARM64 Podman machine. The selected runtime is recorded in the
@@ -36,13 +36,6 @@ Attempt names are immutable. The resulting disk and lifecycle record are:
 Frozen inputs, the attempt-scoped bootstrap runner and Run outputs remain on disk for review. Archive all three
 together and never reuse the attempt name; the exact recoverable archive procedure and optional stable-toolchain
 image cleanup are documented in the [script guide](../../scripts/README.md).
-
-Select the explicit prebuilt OVN supplier with:
-
-```sh
-NKE_OVN_SUPPLIER=prebuilt CONTAINER_RUNTIME=podman \
-  scripts/nke-os-arm64-local.sh local-arm64-prebuilt-001 1
-```
 
 This is an `unqualified-local-execution` bootstrap path. The toolchain images are not published, GitHub workflow
 generation for requirement-bearing VM builds remains fail-closed, Docker has contract coverage but no recorded full
