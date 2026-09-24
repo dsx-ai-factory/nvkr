@@ -11,8 +11,8 @@ on:
         required: true
         type: string
       approved_nke_commit:
-        description: Exact NKE commit approved for the secret-backed checkout
-        required: true
+        description: Exact NKE commit approved for a full secret-backed validation
+        required: false
         type: string
       arch:
         description: Native architecture to validate
@@ -38,10 +38,6 @@ on:
 
 permissions:
   contents: read
-
-concurrency:
-  group: nke-os-validation-${{ github.ref }}-${{ inputs.commit_sha || github.run_id }}-${{ inputs.arch || github.event_name }}
-  cancel-in-progress: false
 
 jobs:
   select:
@@ -154,6 +150,7 @@ jobs:
 
       - name: Resolve the recipe-owned NKE source pin
         id: source
+        if: steps.select.outputs.mode == 'full'
         run: |
           set -euo pipefail
           pin="$(bin/nkdctl catalog source-pin \
@@ -167,6 +164,7 @@ jobs:
       # independent dispatch value makes the trusted operator authorize that pin
       # before the repository credential can be used to acquire it.
       - name: Authorize the NKE source pin
+        if: steps.select.outputs.mode == 'full'
         env:
           APPROVED_NKE_COMMIT: ${{ inputs.approved_nke_commit }}
           PINNED_NKE_COMMIT: ${{ steps.source.outputs.commit }}
