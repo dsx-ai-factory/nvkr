@@ -10,6 +10,10 @@ on:
         description: Exact 40-character nke-recipes commit to validate
         required: true
         type: string
+      approved_nke_commit:
+        description: Exact NKE commit approved for the secret-backed checkout
+        required: true
+        type: string
       arch:
         description: Native architecture to validate
         required: true
@@ -36,7 +40,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nke-os-validation-${{ github.ref }}-${{ inputs.arch || github.event_name }}
+  group: nke-os-validation-${{ github.ref }}-${{ inputs.commit_sha || github.run_id }}-${{ inputs.arch || github.event_name }}
   cancel-in-progress: false
 
 jobs:
@@ -158,6 +162,24 @@ jobs:
             echo "commit=$(jq -er '.commit' <<<"${pin}")"
             echo "tree=$(jq -er '.treeHash' <<<"${pin}")"
           } >>"${GITHUB_OUTPUT}"
+
+      # The candidate recipe remains authoritative for the exact NKE pin. This
+      # independent dispatch value makes the trusted operator authorize that pin
+      # before the repository credential can be used to acquire it.
+      - name: Authorize the NKE source pin
+        env:
+          APPROVED_NKE_COMMIT: ${{ inputs.approved_nke_commit }}
+          PINNED_NKE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${APPROVED_NKE_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "approved_nke_commit must be one exact lowercase 40-character SHA" >&2
+            exit 1
+          fi
+          if [[ "${PINNED_NKE_COMMIT}" != "${APPROVED_NKE_COMMIT}" ]]; then
+            echo "the recipe-selected NKE commit does not match the approved dispatch value" >&2
+            exit 1
+          fi
 
   validate-toolchain:
     name: NKE OS toolchain (${{ matrix.arch }})
