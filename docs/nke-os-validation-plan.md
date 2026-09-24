@@ -16,14 +16,15 @@ Full image validation is also manual-only and never uses `pull_request_target`. 
 commit reachable from `main` or the exact tip of a named same-repository mirror, while the workflow definition itself
 is dispatched from `main`. The AMD64 leg retains the NKE workflow's verified runner label. The ARM64 leg uses the
 repository-specific 16-vCPU, 64-GiB KVM scale set defined by `NVIDIA-dev/nke-gha-runners` at `488424d`. Those VMs are
-single-use, so full-mode preflight may hand `/dev/kvm` to the attempt's primary group.
+single-use and must expose `/dev/kvm` to the runner identity; NKD performs the runtime admission before build work.
 
 Full validation uses the existing repository secret `NKE_SOURCE_TOKEN`, which must provide read-only Contents access
-to `dsx-ai-factory/nke`. Only the trusted default-branch workflow receives it. The checkout fetches the exact
-catalog-pinned NKE commit into a clean staging path before the candidate checkout, does not persist credentials, and is
-followed by explicit commit, tree and credential-state checks. The selected candidate receives the private source bytes
-and declared outbound build network, but not the source credential itself. NKD uses the local checkout through a
-process-scoped Git transport override.
+to `dsx-ai-factory/nke`. Only the trusted default-branch workflow receives it. The trusted selector reads the `nke-os`
+commit and tree from the selected Recipe catalog lock; the workflow does not own or duplicate an NKE version. The
+checkout fetches that exact commit into a clean staging path before the candidate checkout, does not persist
+credentials, and is followed by explicit commit, tree and credential-state checks. The selected candidate receives the
+private source bytes and declared outbound build network, but not the source credential itself. NKD uses the local
+checkout through a process-scoped Git transport override.
 
 ## Two-pass AMD64 gate
 
@@ -41,5 +42,9 @@ SHA-256 and size; and pass NKE's pinned source-owned boot smoke under KVM. Plan,
 logs produced before a failure are uploaded. A failure can occur before one or more of those records exists. QCOW2
 upload is an explicit short-retention option because the image is large. These results remain unqualified integration
 evidence and do not publish or sign an image.
+
+The workflow owns runner selection, credential-scoped source transport and artifact transport only. Catalog loading,
+source-pin validation, runtime admission, build execution, disk observation and lifecycle completeness remain in their
+owning NKD modules.
 
 FDE, generated hosted execution, publication and qualified byte reproduction are outside this change.
