@@ -64,6 +64,52 @@ func TestCompileCarriesGenericBuildRequirementsOutsideBuildIdentity(t *testing.T
 	}
 }
 
+func TestCompileRendersVendorArchitectureBeforeIdentity(t *testing.T) {
+	component := catalog.Component{Platforms: []string{"linux/amd64", "linux/arm64"},
+		FromSource: true, Repo: "https://example.test/source", Tag: "v1.0.0",
+		Commit: strings.Repeat("a", 40), TreeHash: strings.Repeat("b", 40),
+		ToolchainImages: map[string]string{
+			"amd64": "example.test/toolchain@sha256:" + strings.Repeat("c", 64),
+			"arm64": "example.test/toolchain@sha256:" + strings.Repeat("d", 64),
+		},
+		VendorCommand: []string{"make", "vendor", "ARCH={{.Arch}}"},
+		OutputType:    "raw", BuildCommand: []string{"make"}, WriteDir: "out",
+		ArtifactPath: "out/artifact", SourceDate: 1,
+	}
+	for _, test := range []struct {
+		arch string
+		want string
+	}{
+		{arch: "amd64", want: "ARCH=amd64"},
+		{arch: "arm64", want: "ARCH=arm64"},
+	} {
+		t.Run(test.arch, func(t *testing.T) {
+			graph := mustCompile(t, &Resolved{Platform: "linux/" + test.arch,
+				Components: []catalog.NamedComponent{{Name: "artifact", Component: component}}})
+			var fetch ir.Node
+			for _, node := range graph.Nodes {
+				if node.Kind == ir.KindFetch {
+					fetch = node
+					break
+				}
+			}
+			if !slices.Equal(fetch.VendorCmd, []string{"make", "vendor", test.want}) {
+				t.Fatalf("vendor command = %q, want architecture-rendered argv", fetch.VendorCmd)
+			}
+			wantDigest, err := ir.VendorSpecIdentity(fetch.VendorCmd, fetch.VendorImage)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fetch.VendorSpecDigest != wantDigest {
+				t.Fatalf("vendor digest = %q, want identity of rendered argv %q", fetch.VendorSpecDigest, wantDigest)
+			}
+			if strings.Contains(fetch.VendorSpecDigest+strings.Join(fetch.VendorCmd, ""), "{{.Arch}}") {
+				t.Fatal("compiled vendor closure retained an unresolved architecture token")
+			}
+		})
+	}
+}
+
 func TestCompileLowersVMProducersOnlyAfterHostSelection(t *testing.T) {
 	validVM := catalog.Component{Platforms: []string{"linux/amd64", "linux/arm64"},
 		FromSource: true, BuilderType: catalog.BuilderVMImage, OutputType: "disk-image",

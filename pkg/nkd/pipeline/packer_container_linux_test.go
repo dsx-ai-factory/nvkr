@@ -27,6 +27,35 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
+func testPackerDiagnosticSink(t *testing.T, root *os.File) *PackerDiagnosticSink {
+	t.Helper()
+	sink, err := NewPackerDiagnosticSink(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { makePackerDiagnosticsRemovable(root.Name()) })
+	t.Cleanup(func() {
+		if err := sink.Close(); err != nil {
+			t.Errorf("closing test Packer diagnostic sink: %v", err)
+		}
+	})
+	return sink
+}
+
+func testPackerDiagnosticSinkAt(t *testing.T, root string) *PackerDiagnosticSink {
+	t.Helper()
+	directory, err := os.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := directory.Close(); err != nil {
+			t.Errorf("closing test Packer diagnostic root: %v", err)
+		}
+	}()
+	return testPackerDiagnosticSink(t, directory)
+}
+
 func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) {
 	root := t.TempDir()
 	t.Cleanup(func() { _ = removePrivateTree(root) })
@@ -238,6 +267,7 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	artifactCarrier := testQCOW2Carrier(t, "node.qcow2")
+	logCarrier := testPackerArtifactCarrier(t, "serial.log", []byte("serial console\n"))
 	fake := &recordingPackerRuntime{
 		endpoint: qualifiedRuntimeEndpoint, digest: runtimeDigest, identity: runtimeIdentity,
 	}
@@ -256,7 +286,11 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 		case len(args) > 1 && args[0] == "cp" && args[1] == "-":
 			_, _ = io.Copy(io.Discard, stdin)
 		case len(args) > 2 && args[0] == "cp" && args[len(args)-1] == "-":
-			_, _ = stdout.Write(artifactCarrier)
+			if strings.Contains(args[1], packerContainerBuildLogPath) {
+				_, _ = stdout.Write(logCarrier)
+			} else {
+				_, _ = stdout.Write(artifactCarrier)
+			}
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-version"):
 			_, _ = io.WriteString(stdout, "Packer v1.14.2\n")
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-ssh-verify-"):
@@ -269,14 +303,17 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	artifact, err := runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: fake, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: manifestDigest, workspace: workspace,
+		node: node, subject: "plan/node", manifest: manifest, digest: manifestDigest, workspace: workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
 		bindings: packerContainerBindings{
 			packerVersion: "1.14.2", acceleratorVariable: "accelerator",
-			sshPrivateKeyVariable: "ssh_private_key", sshPublicKeyVariable: "ssh_public_key",
+			buildLogDirectoryVariable: "build_logs",
+			sshPrivateKeyVariable:     "ssh_private_key", sshPublicKeyVariable: "ssh_public_key",
 		},
-	})
+	}
+	artifact, err := runPackerContainer(ctx, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,6 +412,14 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	if len(fake.cleanups) < 3 {
 		t.Fatalf("cleanup calls = %#v, want build container and two volumes", fake.cleanups)
 	}
+	diagnosticLogs, err := filepath.Glob(filepath.Join(workspacePath, packerDiagnosticDirectory,
+		packerDiagnosticProducerDir, "run-*", packerDiagnosticLogsName, "serial.log"))
+	if err != nil || len(diagnosticLogs) != 1 {
+		t.Fatalf("retained diagnostic logs = %#v, error=%v", diagnosticLogs, err)
+	}
+	if raw, err := os.ReadFile(diagnosticLogs[0]); err != nil || string(raw) != "serial console\n" {
+		t.Fatalf("retained serial log = %q, error=%v", raw, err)
+	}
 }
 
 func TestRunPackerContainerRejectsEncryptedDiskBeforeRuntimeWork(t *testing.T) {
@@ -412,13 +457,15 @@ func TestRunPackerContainerRejectsUnpairedSSHVariablesBeforeRuntimeWork(t *testi
 	runtime := &recordingPackerRuntime{endpoint: qualifiedRuntimeEndpoint}
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	artifact, err := runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: runtime, source: &materializedSource{Dir: t.TempDir(), InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)), workspace: workspace,
+		node: node, subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)), workspace: workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
 		bindings: packerContainerBindings{
 			packerVersion: "1.14.2", acceleratorVariable: "accelerator", sshPrivateKeyVariable: "ssh_private_key",
 		},
-	})
+	}
+	artifact, err := runPackerContainer(ctx, request)
 	if artifact != nil || code(err) != e.CodeInvalidCatalog {
 		t.Fatalf("unpaired SSH artifact/error = %#v/%v, want nil/%s", artifact, err, e.CodeInvalidCatalog)
 	}
@@ -559,12 +606,14 @@ func TestRunPackerContainerRejectsMissingPluginBeforeBuild(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	_, err = runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: fake, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
-		workspace: workspace,
-		bindings:  packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
-	})
+		node: node, subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+		workspace:   workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
+		bindings:    packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+	}
+	_, err = runPackerContainer(ctx, request)
 	if code(err) != e.CodeBuildFailed {
 		t.Fatalf("missing plugin error = %v, want %s", err, e.CodeBuildFailed)
 	}
@@ -623,12 +672,14 @@ func TestRunPackerContainerRejectsCorruptedVolumeCarrierBeforePacker(t *testing.
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	_, err = runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: fake, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
-		workspace: workspace,
-		bindings:  packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
-	})
+		node: node, subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+		workspace:   workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
+		bindings:    packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+	}
+	_, err = runPackerContainer(ctx, request)
 	if code(err) != e.CodeUnverifiedRef {
 		t.Fatalf("corrupted carrier error = %v, want %s", err, e.CodeUnverifiedRef)
 	}
@@ -673,6 +724,7 @@ func TestRunPackerContainerFailsBeforeBuildOnVersionOrValidationDiagnostics(t *t
 func TestRunPackerContainerReapsResourcesWhenBuildStartFails(t *testing.T) {
 	request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n",
 		"The configuration is valid.\n", "", nil)
+	request.bindings.buildLogDirectoryVariable = "build_logs"
 	fallback := runtime.run
 	startFailure := errors.New("build start failed")
 	runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
@@ -697,6 +749,11 @@ func TestRunPackerContainerReapsResourcesWhenBuildStartFails(t *testing.T) {
 	}
 	if !buildRemoved || volumesRemoved != 2 {
 		t.Fatalf("build-start cleanup calls = %#v, want build container and two volumes reaped", runtime.cleanups)
+	}
+	logs, globErr := filepath.Glob(filepath.Join(request.workspace.Name(), packerDiagnosticDirectory,
+		packerDiagnosticProducerDir, "run-*", packerDiagnosticLogsName, "serial.log"))
+	if globErr != nil || len(logs) != 1 {
+		t.Fatalf("failed-build diagnostic logs = %#v, error=%v", logs, globErr)
 	}
 }
 
@@ -805,6 +862,7 @@ func newPackerContainerTestRun(
 		endpoint: qualifiedRuntimeEndpoint, digest: runtimeDigest, identity: runtimeIdentity, cleanupErr: cleanupErr,
 	}
 	carrier := testQCOW2Carrier(t, "node.qcow2")
+	logCarrier := testPackerArtifactCarrier(t, "serial.log", []byte("failed build serial\n"))
 	runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
 		switch {
 		case reflect.DeepEqual(args, []string{"version", "--format", "{{json .}}"}):
@@ -823,7 +881,11 @@ func newPackerContainerTestRun(
 		case len(args) > 1 && args[0] == "cp" && args[1] == "-":
 			_, _ = io.Copy(io.Discard, stdin)
 		case len(args) > 2 && args[0] == "cp" && args[len(args)-1] == "-":
-			_, _ = stdout.Write(carrier)
+			if strings.Contains(args[1], packerContainerBuildLogPath) {
+				_, _ = stdout.Write(logCarrier)
+			} else {
+				_, _ = stdout.Write(carrier)
+			}
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-version"):
 			_, _ = io.WriteString(stdout, versionOutput)
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-validate"):
@@ -834,8 +896,9 @@ func newPackerContainerTestRun(
 	}
 	return packerContainerRunRequest{
 		runtime: runtime, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: testPackerContainerNode(), manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
-		workspace: workspace, bindings: packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+		node: testPackerContainerNode(), subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+		workspace: workspace, diagnostics: testPackerDiagnosticSink(t, workspace),
+		bindings: packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
 	}, runtime, &buildCreated
 }
 
@@ -920,6 +983,7 @@ func TestVMImagePackerExecutorPreservesCallbackDeadline(t *testing.T) {
 	defer cancel()
 	_, _, err = executor.Run(ctx, node.ID, node, VMImagePackerRun{
 		SourceRoot: t.TempDir(), Manifest: manifest, Runtime: &execution.LocalVMRuntime{},
+		Diagnostics: testPackerDiagnosticSinkAt(t, t.TempDir()),
 	})
 	if code(err) != e.CodeEngineCapability || !errors.Is(err, runFailure) {
 		t.Fatalf("deadline observation error = %v, want %s wrapping runtime failure", err, e.CodeEngineCapability)
@@ -986,6 +1050,7 @@ func TestVMImagePackerExecutorCloseAndSessionCloseJoinActiveRun(t *testing.T) {
 	go func() {
 		_, _, runErr := executor.Run(t.Context(), node.ID, node, VMImagePackerRun{
 			SourceRoot: sourceRoot, Manifest: manifest, Runtime: &execution.LocalVMRuntime{},
+			Diagnostics: testPackerDiagnosticSinkAt(t, t.TempDir()),
 		})
 		runDone <- runErr
 	}()

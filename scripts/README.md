@@ -24,16 +24,17 @@ scripts/demo-m1-local.sh --publish
 The demo uses the loopback registry on port 5000. It generates its own valid
 immutable attempt names.
 
-The ARM64 non-FDE OS-image bootstrap is available for Linux ARM64 with either Podman or Docker:
+The non-FDE OS-image bootstrap uses one shared catalog. ARM64 Podman/TCG and native Linux Docker/KVM are the currently
+authored routes:
 
 ```sh
-CONTAINER_RUNTIME=podman scripts/nke-os-arm64-local.sh local-arm64-podman-001 1
-CONTAINER_RUNTIME=docker scripts/nke-os-arm64-local.sh local-arm64-docker-001 1
+CONTAINER_RUNTIME=podman scripts/nke-os-local.sh local-arm64-podman-001 1
+CONTAINER_RUNTIME=docker NKE_OS_ARCH=arm64 scripts/nke-os-local.sh local-arm64-docker-001 1
 ```
 
 Use a different immutable attempt name for each run. The Podman path has one recorded full build and boot smoke;
 Docker is contract-tested but has not completed a recorded full image build. See the
-[Definition guide](../definitions/nke-os-arm64/README.md) and
+[Definition guide](../definitions/nke-os/README.md) and
 [local execution evidence](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
 
 Local attempts deliberately retain their frozen inputs, bootstrap runner and Run outputs. After reviewing an

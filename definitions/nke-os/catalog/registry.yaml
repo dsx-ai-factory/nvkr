@@ -1,8 +1,8 @@
 apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nke-os-arm64
-  description: ARM64 non-FDE NKE node image from explicit authenticated component outputs.
+  name: nke-os
+  description: Non-FDE NKE node image from explicit authenticated component outputs.
 sources:
   nke-os:
     repo: https://github.com/dsx-ai-factory/nke
@@ -27,7 +27,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/cni-calico bundle nfpm \
-          ARCH=arm64 BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
   ovn-kubernetes:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
@@ -44,7 +44,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/kubeadm-distro bundle nfpm \
-          ARCH=arm64 BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
   nke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nke
     constraint: 0.1.x
@@ -56,7 +56,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/spire-agent bundle nfpm \
-          ARCH=arm64 BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
 components:
   nke-agent:
     platforms: [linux/arm64]
@@ -68,7 +68,7 @@ components:
       - bash
       - -ec
       - |
-        GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-arm64 \
+        GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
           VERSION=v0.2.1-rc.6-109-g726f7694 \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nke-agent.deb
@@ -88,7 +88,7 @@ components:
           /src/nkd-output/work/
         CNI=cni-calico PRODUCT=Calico CONTENT_KIND=manifests \
           CONTENT_SPEC=/src/nkd-output/work/cni-calico/packaging/nfpm-manifests.yaml \
-          NFPM_BIN=/usr/local/bin/nfpm ARCH=arm64 DEB_REVISION=1 \
+          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
           /src/nkd-output/work/cni-common/build-deb.sh v3.30.1 \
           /src/os-image/packages/cni-calico/dist/v3.30.1 \
           /src/nkd-output/calico
@@ -117,12 +117,12 @@ components:
           "${work}/"
         tar -xf /nkd/inputs/materials/ovn-chart -C "${stage}/charts"
         gzip -n -9 -c /nkd/inputs/materials/ovn-image >"${stage}/images.tgz"
-        printf '%s  ovn-images_1.4.0_linux_arm64.tgz\n' \
+        printf '%s  ovn-images_1.4.0_linux_{{.Arch}}.tgz\n' \
           "$(sha256sum "${stage}/images.tgz" | cut -d' ' -f1)" \
           >"${stage}/images.tgz.sha256"
         CNI=cni-ovn PRODUCT=OVN CONTENT_KIND=charts \
           CONTENT_SPEC="${work}/cni-ovn/packaging/nfpm-charts.yaml" \
-          NFPM_BIN=/usr/local/bin/nfpm ARCH=arm64 DEB_REVISION=1 \
+          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
           "${work}/cni-common/build-deb.sh" 1.4.0 "${stage}" \
           /src/nkd-output/ovn
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -149,7 +149,7 @@ components:
       - --opt
       - filename=Dockerfile.ubuntu
       - --opt
-      - platform=linux/arm64
+      - platform=linux/{{.Arch}}
       - --opt
       - build-arg:OVN_KUBERNETES_DIR=.
       - --opt
@@ -229,7 +229,7 @@ components:
         cp -a os-image/packages/kubeadm-distro /src/nkd-output/work/
         for version in v1.36.3 v1.35.3 v1.34.2; do
           PEER_VERSIONS='v1.36.3 v1.35.3 v1.34.2' DEB_REVISION=1 \
-            NFPM_BIN=/usr/local/bin/nfpm ARCH=arm64 \
+            NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} \
             /src/nkd-output/work/kubeadm-distro/packaging/build-deb.sh \
             "$version" "/src/os-image/packages/kubeadm-distro/dist/$version" \
             /src/nkd-output/kubeadm-distro
@@ -319,7 +319,7 @@ components:
         SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
           NFPM_BIN=/usr/local/bin/nfpm \
           /src/nkd-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
-          arm64 /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/arm64 \
+          {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \
           /src/nkd-output/spire-agent
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
           --numeric-owner -C /src/nkd-output/spire-agent \

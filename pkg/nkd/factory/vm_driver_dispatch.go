@@ -23,9 +23,10 @@ type vmDriverResolver interface {
 }
 
 type vmDriverRunConfig struct {
-	Runtime string
-	Stdout  io.Writer
-	Stderr  io.Writer
+	Runtime     string
+	Stdout      io.Writer
+	Stderr      io.Writer
+	Diagnostics *pipeline.PackerDiagnosticSink
 }
 
 // vmDriverExecutor is deliberately private and run-owned. Its methods are

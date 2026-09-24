@@ -75,7 +75,23 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err != nil {
 		return nil, err
 	}
-	// Fresh daemon and image observations happen before the first mutable Docker
+	resources := &packerContainerResources{runtime: request.runtime}
+	var diagnosticTarget *packerDiagnosticTarget
+	defer func() {
+		var diagnosticErr error
+		if diagnosticTarget != nil {
+			diagnosticErr = diagnosticTarget.close()
+		}
+		returnErr = joinPackerDiagnosticError(returnErr, diagnosticErr)
+		returnErr = finalizePackerContainerRun(&artifact, returnErr, resources.cleanup())
+	}()
+	diagnosticTarget, err = request.diagnostics.start(ctx, request.subject, request.manifest, request.digest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Manifest retention precedes the first external runtime command. Fresh
+	// daemon and image observations still happen before the first mutable Docker
 	// object exists. They do not mint qualification; the outer verified execution
 	// capability remains the authority for the held executable identity.
 	if err := observePackerRuntimeFreshness(ctx, request.runtime); err != nil {
@@ -89,11 +105,6 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "allocating Packer attempt identity")
 	}
-	resources := &packerContainerResources{runtime: request.runtime}
-	defer func() {
-		returnErr = finalizePackerContainerRun(&artifact, returnErr, resources.cleanup())
-	}()
-
 	workspace, err := createPackerWorkspaceRoot(request.workspace, attempt)
 	if err != nil {
 		return nil, err
@@ -226,8 +237,19 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err := createPackerContainer(ctx, request.runtime, build); err != nil {
 		return nil, err
 	}
-	if err := startPackerContainer(ctx, request.runtime, buildName, request.stdout, request.stderr); err != nil {
-		return nil, err
+	buildErr := startPackerContainer(ctx, request.runtime, buildName, request.stdout, request.stderr)
+	var diagnosticErr error
+	if request.bindings.buildLogDirectoryVariable != "" {
+		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), packerContainerCleanupTimeout)
+		diagnosticErr = collectPackerContainerBuildLogs(diagnosticCtx, request.runtime, buildName,
+			runRoot, diagnosticTarget)
+		cancel()
+	}
+	if buildErr != nil {
+		return nil, joinPackerDiagnosticError(buildErr, diagnosticErr)
+	}
+	if diagnosticErr != nil {
+		return nil, diagnosticErr
 	}
 	artifact, err = collectPackerContainerArtifact(ctx, request.runtime, buildName,
 		path.Join(packerContainerOutputPath, path.Clean(request.node.ArtifactPath)), runRoot,

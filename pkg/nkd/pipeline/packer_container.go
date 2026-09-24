@@ -94,18 +94,20 @@ type packerContainerBindings struct {
 }
 
 type packerContainerRunRequest struct {
-	runtime   packerContainerRuntime
-	source    *materializedSource
-	node      ir.Node
-	manifest  []byte
-	digest    string
-	materials []PackerMaterialInput
-	workspace *os.File
-	kvm       *os.File
-	bindings  packerContainerBindings
-	stdout    io.Writer
-	stderr    io.Writer
-	identity  packerContainerIdentity
+	runtime     packerContainerRuntime
+	source      *materializedSource
+	node        ir.Node
+	subject     string
+	manifest    []byte
+	digest      string
+	materials   []PackerMaterialInput
+	workspace   *os.File
+	kvm         *os.File
+	diagnostics *PackerDiagnosticSink
+	bindings    packerContainerBindings
+	stdout      io.Writer
+	stderr      io.Writer
+	identity    packerContainerIdentity
 }
 
 type packerContainerIdentity struct {

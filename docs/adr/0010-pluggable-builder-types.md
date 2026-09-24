@@ -204,7 +204,16 @@ success line only after diagnostic handling returns zero, and its
 exactly `The configuration is valid.` plus a newline while demonstrating that warnings can precede that line on
 stdout with exit status zero. The connected local OCI driver therefore accepts only that clean line (ignoring
 surrounding whitespace) with empty stderr; any other output fails closed. Driver admission and lifecycle are
-contract-tested. One attempt-frozen draft Podman/Packer/NKE ARM64 execution and boot smoke is recorded, but it was
+contract-tested. Before the first external runtime command, the driver uses a lifecycle-issued opaque capability
+for the immutable attempt directory to retain and recheck the exact material-manifest bytes. When the source
+contract declares `buildLogDirectoryVariable`, the driver also copies only regular files from that source-owned
+directory after the build returns and before private containers, volumes and workspace state are reaped. Entry,
+file and aggregate byte counts are bounded; absolute or traversing paths, links, devices, duplicate paths and
+replacement of an existing diagnostic set fail closed. These files are non-authoritative diagnostics, not Build,
+Artifact or qualification evidence. The supported route supplies no secret channel and rejects FDE before work;
+the adapter does not retain the generated SSH key, environment, home, configuration, cache, HTTP or output
+directories. This retention boundary is contract-tested but has no hosted execution evidence. One attempt-frozen
+draft Podman/Packer/NKE ARM64 execution and boot smoke is recorded, but it was
 not run from the current committed NKD head and exact current NKE pin. That committed-head repeat, Docker and hosted
 execution remain required before maintained NKE support, product acceptance, or any pipeline-attested or qualified
 production claim; the recorded local result stays unqualified. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP

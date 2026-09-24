@@ -497,6 +497,18 @@ type recordingPackerRuntime struct {
 	cleanupErr error
 }
 
+func makePackerDiagnosticsRemovable(root string) {
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			_ = os.Chmod(path, 0o700)
+		}
+		return nil
+	})
+}
+
 type cleanupBudgetPackerRuntime struct {
 	volumeContextErr error
 	volumeRemoved    bool

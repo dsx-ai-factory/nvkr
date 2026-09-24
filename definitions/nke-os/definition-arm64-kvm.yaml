@@ -1,10 +1,12 @@
 apiVersion: nkd.dev/definition/v4
 kind: Definition
 metadata:
-  name: nke-os-arm64
-  description: Build the ARM64 non-FDE NKE node QCOW2 from explicit component outputs.
+  name: nke-os-arm64-kvm
+  description: Build the ARM64 non-FDE NKE node QCOW2 on a native KVM host.
 catalog:
   base: ./catalog
+  overlays:
+    - arm64-kvm.yaml
 outputs:
   - name: nke-node-image-arm64
     platform: linux/arm64
