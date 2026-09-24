@@ -619,7 +619,23 @@ func TestRunLocalUnavailableVMExecutorFailsBeforeWorkspaceOrWork(t *testing.T) {
 	t.Chdir(t.TempDir())
 	plan, _ := compiledPackerVMNode(t)
 	workspace := ".nkd/vm-unavailable"
-	result, err := RunLocal(t.Context(), plan, LocalRunOptions{Workspace: workspace})
+	diagnosticRoot, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, err := pipeline.NewPackerDiagnosticSink(t.Context(), diagnosticRoot)
+	_ = diagnosticRoot.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := diagnostics.Close(); err != nil {
+			t.Errorf("closing Packer diagnostic sink: %v", err)
+		}
+	})
+	result, err := RunLocal(t.Context(), plan, LocalRunOptions{
+		Workspace: workspace, Diagnostics: diagnostics,
+	})
 	if result != nil || factoryErrorCode(err) != e.CodeEngineCapability {
 		t.Fatalf("local VM result/error = %#v/%v", result, err)
 	}

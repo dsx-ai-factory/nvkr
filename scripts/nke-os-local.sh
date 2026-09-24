@@ -105,9 +105,6 @@ if [[ ! "${toolchain_image}" =~ (^|@)sha256:[0-9a-f]{64}$ ]]; then
   echo "the Packer toolchain lock has no exact ${arch} local image ID" >&2
   exit 1
 fi
-CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
-
-mkdir -p "${input_root}/catalog"
 definition_source="definitions/nke-os/definition-${arch}-kvm.yaml"
 environment_source="definitions/nke-os/environment-local-macos-apple-m4-pro-podman.yaml"
 overlay_source=""
@@ -127,6 +124,10 @@ for required_input in "${required_inputs[@]}"; do
     exit 1
   fi
 done
+
+CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
+
+mkdir -p "${input_root}/catalog"
 cp "${definition_source}" "${input_root}/definition.yaml"
 cp "${environment_source}" "${input_root}/environment-local.yaml"
 cp definitions/nke-os/catalog/pins.lock.yaml "${input_root}/catalog/pins.lock.yaml"

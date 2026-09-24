@@ -124,11 +124,7 @@ func TestPackerDiagnosticArchiveRejectsUnsafeEntriesAndCleansStaging(t *testing.
 			_ = archive.Close()
 			_ = target.close()
 			_ = sink.Close()
-			logs, globErr := filepath.Glob(filepath.Join(root, packerDiagnosticDirectory,
-				packerDiagnosticProducerDir, "run-*", ".logs-*"))
-			if globErr != nil || len(logs) != 0 {
-				t.Fatalf("unsafe archive left staging paths %#v, error=%v", logs, globErr)
-			}
+			assertNoPackerDiagnosticStages(t, root)
 			if _, statErr := os.Stat(filepath.Join(root, "escape")); statErr == nil {
 				t.Fatal("unsafe archive wrote outside its diagnostic route")
 			}
@@ -223,6 +219,7 @@ func TestPackerDiagnosticRetentionHandlesCancellationNoLogsAndNoReplace(t *testi
 			if err != nil || string(raw) != "first" {
 				t.Fatalf("no-replace changed original log to %q, error=%v", raw, err)
 			}
+			assertNoPackerDiagnosticStages(t, root)
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -312,5 +309,14 @@ func assertNoPackerDiagnosticLogs(t *testing.T, root string) {
 		packerDiagnosticProducerDir, "run-*", packerDiagnosticLogsName))
 	if err != nil || len(matches) != 0 {
 		t.Fatalf("unexpected retained Packer logs %#v, error=%v", matches, err)
+	}
+}
+
+func assertNoPackerDiagnosticStages(t *testing.T, root string) {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(root, packerDiagnosticDirectory,
+		packerDiagnosticProducerDir, "run-*", ".logs-*"))
+	if err != nil || len(matches) != 0 {
+		t.Fatalf("unexpected Packer diagnostic staging paths %#v, error=%v", matches, err)
 	}
 }

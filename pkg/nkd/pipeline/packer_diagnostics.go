@@ -358,6 +358,9 @@ func (target *packerDiagnosticTarget) retainBuildLogsWithLimits(ctx context.Cont
 	}
 	published := false
 	defer func() {
+		if !published {
+			_ = stage.Chmod(0o700)
+		}
 		_ = stage.Close()
 		if !published {
 			_ = removePackerDiagnosticTree(target.root, stageName)

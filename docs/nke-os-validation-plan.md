@@ -20,11 +20,12 @@ single-use and must expose `/dev/kvm` to the runner identity; NKD performs the r
 
 Full validation uses the existing repository secret `NKE_SOURCE_TOKEN`, which must provide read-only Contents access
 to `dsx-ai-factory/nke`. Only the trusted default-branch workflow receives it. The trusted selector reads the `nke-os`
-commit and tree from the selected Recipe catalog lock; the workflow does not own or duplicate an NKE version. The
-checkout fetches that exact commit into a clean staging path before the candidate checkout, does not persist
-credentials, and is followed by explicit commit, tree and credential-state checks. The selected candidate receives the
-private source bytes and declared outbound build network, but not the source credential itself. NKD uses the local
-checkout through a process-scoped Git transport override.
+commit and tree from the selected Recipe catalog lock; the workflow does not own or hardcode an NKE version. Before
+the credential is used, the trusted operator must independently enter that exact NKE commit in the dispatch, and the
+selector rejects a mismatch. The checkout fetches that authorized commit into a clean staging path before the candidate
+checkout, does not persist credentials, and is followed by explicit commit, tree and credential-state checks. The
+selected candidate receives the private source bytes and declared outbound build network, but not the source credential
+itself. NKD uses the local checkout through a process-scoped Git transport override.
 
 ## Two-pass AMD64 gate
 
