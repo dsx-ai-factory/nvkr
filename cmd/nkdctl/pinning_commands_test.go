@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,32 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
+
+func TestCatalogSourcePinReadOnlyOutput(t *testing.T) {
+	data := filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")
+	output, err := runCLIWithCapturedStdout(t, newApp(),
+		"nkdctl", "catalog", "source-pin", "--data", data, "kubernetes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Commit   string `json:"commit"`
+		TreeHash string `json:"treeHash"`
+	}
+	if err := json.Unmarshal(output, &got); err != nil {
+		t.Fatalf("source-pin output is not JSON: %v: %s", err, output)
+	}
+	if got.Commit != "70d3cc986aa8221cd1dfb1121852688902d3bf53" ||
+		got.TreeHash != "195abcc8a74b362b88fc76b0ee676a3354e4937e" {
+		t.Fatalf("source pin = %+v", got)
+	}
+	output, err = runCLIWithCapturedStdout(t, newApp(),
+		"nkdctl", "catalog", "source-pin", "--data", data, "missing")
+	assertLifecycleCommandCode(t, err, e.CodeInvalidCatalog)
+	if len(output) != 0 {
+		t.Fatalf("missing source produced output: %s", output)
+	}
+}
 
 func TestCatalogSourcePinCommandOutput(t *testing.T) {
 	repo, data := t.TempDir(), t.TempDir()

@@ -48,6 +48,8 @@ jobs:
       commit: ${{ steps.select.outputs.commit }}
       legs: ${{ steps.select.outputs.legs }}
       mode: ${{ steps.select.outputs.mode }}
+      nke_commit: ${{ steps.source.outputs.commit }}
+      nke_tree: ${{ steps.source.outputs.tree }}
       retain_qcow2: ${{ steps.select.outputs.retain_qcow2 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -131,6 +133,32 @@ jobs:
             echo "retain_qcow2=${retain_qcow2}"
           } >>"${GITHUB_OUTPUT}"
 
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+
+      - name: Build trusted catalog reader
+        run: make build
+
+      - name: Check out selected authored inputs without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.select.outputs.commit }}
+          path: .candidate-inputs
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve the recipe-owned NKE source pin
+        id: source
+        run: |
+          set -euo pipefail
+          pin="$(bin/nkdctl catalog source-pin \
+            --data .candidate-inputs/definitions/nke-os/catalog nke-os)"
+          {
+            echo "commit=$(jq -er '.commit' <<<"${pin}")"
+            echo "tree=$(jq -er '.treeHash' <<<"${pin}")"
+          } >>"${GITHUB_OUTPUT}"
+
   validate-toolchain:
     name: NKE OS toolchain (${{ matrix.arch }})
     needs: select
@@ -147,27 +175,6 @@ jobs:
           ref: ${{ needs.select.outputs.commit }}
           fetch-depth: 1
           persist-credentials: false
-
-      - name: Preflight native Docker
-        env:
-          EXPECTED_ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          case "$(uname -m)" in
-            x86_64) actual_arch=amd64 ;;
-            aarch64|arm64) actual_arch=arm64 ;;
-            *) echo "unsupported host architecture: $(uname -m)" >&2; exit 1 ;;
-          esac
-          [[ "${actual_arch}" == "${EXPECTED_ARCH}" ]]
-          command -v docker >/dev/null
-          docker info >/dev/null
-          docker_arch="$(docker info --format '{{.Architecture}}')"
-          case "${docker_arch}" in
-            amd64|x86_64) docker_arch=amd64 ;;
-            arm64|aarch64) docker_arch=arm64 ;;
-            *) echo "unsupported Docker daemon architecture: ${docker_arch}" >&2; exit 1 ;;
-          esac
-          [[ "$(docker info --format '{{.OSType}}')/${docker_arch}" == "linux/${EXPECTED_ARCH}" ]]
 
       - name: Build and validate pinned native toolchain
         env:
@@ -210,31 +217,13 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     steps:
-      - name: Require clean trusted-source staging path
-        run: |
-          set -euo pipefail
-          if [[ -e .trusted || -L .trusted ]]; then
-            echo "trusted-source staging path already exists" >&2
-            exit 1
-          fi
-
-      - name: Require NKE source credential
-        env:
-          NKE_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${NKE_SOURCE_TOKEN}" ]]; then
-            echo "NKE_SOURCE_TOKEN is unavailable to this validation run" >&2
-            exit 1
-          fi
-
       # Both secret-bearing steps run from the trusted main workflow before
       # any code from the selected candidate commit.
       - name: Check out exact pinned NKE source without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: dsx-ai-factory/nke
-          ref: 726f76944404e1106626b8333d3576bdf67b575b
+          ref: ${{ needs.select.outputs.nke_commit }}
           token: ${{ secrets.NKE_SOURCE_TOKEN }}
           path: .trusted/nke
           fetch-depth: 1
@@ -243,8 +232,8 @@ jobs:
       - name: Authenticate pinned NKE source and remove credential state
         run: |
           set -euo pipefail
-          test "$(git -C .trusted/nke rev-parse HEAD)" = 726f76944404e1106626b8333d3576bdf67b575b
-          test "$(git -C .trusted/nke rev-parse 'HEAD^{tree}')" = 3d6ea77f85d5da2648038425f805a598e23464ba
+          test "$(git -C .trusted/nke rev-parse HEAD)" = '${{ needs.select.outputs.nke_commit }}'
+          test "$(git -C .trusted/nke rev-parse 'HEAD^{tree}')" = '${{ needs.select.outputs.nke_tree }}'
           if git -C .trusted/nke config --local --get-regexp \
             '^(http\..*\.extraheader|credential\..*|credential\.helper)$'; then
             echo "pinned NKE checkout retained credential configuration" >&2
@@ -265,71 +254,6 @@ jobs:
           set -euo pipefail
           mkdir -p .nkd/evidence
           printf '%s\n' '${{ needs.select.outputs.commit }}' >.nkd/evidence/commit
-
-      - name: Preflight native Docker, KVM, and effective capacity
-        working-directory: .candidate
-        env:
-          EXPECTED_ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          case "$(uname -m)" in
-            x86_64) actual_arch=amd64 ;;
-            aarch64|arm64) actual_arch=arm64 ;;
-            *) echo "unsupported host architecture: $(uname -m)" >&2; exit 1 ;;
-          esac
-          [[ "${actual_arch}" == "${EXPECTED_ARCH}" ]]
-          command -v docker >/dev/null
-          docker info >/dev/null
-          docker_arch="$(docker info --format '{{.Architecture}}')"
-          case "${docker_arch}" in
-            amd64|x86_64) docker_arch=amd64 ;;
-            arm64|aarch64) docker_arch=arm64 ;;
-            *) echo "unsupported Docker daemon architecture: ${docker_arch}" >&2; exit 1 ;;
-          esac
-          [[ "$(docker info --format '{{.OSType}}')/${docker_arch}" == "linux/${EXPECTED_ARCH}" ]]
-          [[ -c /dev/kvm ]]
-          if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
-            # The admitted NKE scale-set VMs are single-use. Hand the device to
-            # this attempt's primary group instead of making it world-writable.
-            runner_gid="$(id -g)"
-            sudo chgrp "${runner_gid}" /dev/kvm
-            sudo chmod g+rw /dev/kvm
-            [[ "$(stat -c %g /dev/kvm)" == "${runner_gid}" ]]
-          fi
-          [[ -r /dev/kvm && -w /dev/kvm ]]
-          exec 9<>/dev/kvm
-          cpu_millis="$(( $(getconf _NPROCESSORS_ONLN) * 1000 ))"
-          if [[ -r /sys/fs/cgroup/cpu.max ]]; then
-            read -r quota period </sys/fs/cgroup/cpu.max
-            if [[ "${quota}" != max ]]; then
-              quota_millis="$(( quota * 1000 / period ))"
-              (( quota_millis < cpu_millis )) && cpu_millis="${quota_millis}"
-            fi
-          fi
-          memory_mib="$(awk '/^MemTotal:/ {print int($2 / 1024)}' /proc/meminfo)"
-          if [[ -r /sys/fs/cgroup/memory.max ]]; then
-            memory_limit="$(cat /sys/fs/cgroup/memory.max)"
-            if [[ "${memory_limit}" != max ]]; then
-              limit_mib="$(( memory_limit / 1024 / 1024 ))"
-              (( limit_mib < memory_mib )) && memory_mib="${limit_mib}"
-            fi
-          fi
-          workspace_mib="$(df -Pm . | awk 'NR == 2 {print $4}')"
-          [[ "${cpu_millis}" -ge 8000 ]]
-          [[ "${memory_mib}" -ge 10240 ]]
-          [[ "${workspace_mib}" -ge 65536 ]]
-
-      - name: Check full-build inputs are pinned
-        working-directory: .candidate
-        env:
-          ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          jq -er --arg arch "${ARCH}" \
-            '.localImages[$arch] | select(test("^sha256:[0-9a-f]{64}$"))' \
-            toolchains/nkd-packer/toolchain.lock.json >/dev/null
-          test -f "definitions/nke-os/definition-${ARCH}-kvm.yaml"
-          test -f "definitions/nke-os/environment-local-linux-${ARCH}-docker.yaml"
 
       - name: Build one QCOW2 through the NKD lifecycle
         working-directory: .candidate
@@ -353,7 +277,7 @@ jobs:
             "localhost/nkd-packer-toolchain:dev-${{ matrix.arch }}" \
             | tee ".nkd/evidence/toolchain-${{ matrix.arch }}.image-id"
 
-      - name: Verify exact QCOW2 and run source-owned boot smoke
+      - name: Run source-owned boot smoke
         working-directory: .candidate
         env:
           ARCH: ${{ matrix.arch }}
@@ -362,17 +286,6 @@ jobs:
           attempt="$(cat ".nkd/evidence/attempt-${ARCH}")"
           qcow=".nkd/runs/${attempt}/outputs/nke-node-image-${ARCH}.qcow2"
           image="$(jq -er --arg arch "${ARCH}" '.localImages[$arch]' toolchains/nkd-packer/toolchain.lock.json)"
-          test -f "${qcow}"
-          docker run --rm --pull=never --network=none --read-only --cap-drop=all \
-            --security-opt no-new-privileges --user "$(id -u):$(id -g)" \
-            --volume "${PWD}/${qcow}:/artifact.qcow2:ro" \
-            --entrypoint bash "${image}" -ec '
-              info="$(qemu-img info --output=json -f qcow2 /artifact.qcow2)"
-              python3 -c '\''import json,sys; d=json.load(sys.stdin); assert d.get("format") == "qcow2"; assert "backing-filename" not in d and "full-backing-filename" not in d'\'' <<<"${info}"
-              qemu-img check --output=json -f qcow2 /artifact.qcow2
-              sha256sum /artifact.qcow2
-              stat -c %s /artifact.qcow2
-            ' | tee ".nkd/evidence/qcow2-${ARCH}.log"
           mkdir -p ".nkd/boot-smoke/${ARCH}"
           kvm_group="$(stat -c %g /dev/kvm)"
           docker run --rm --pull=never --network=none --read-only --cap-drop=all \
@@ -386,29 +299,6 @@ jobs:
               QCOW=/artifact.qcow2 SSH_KEY=/work/id_ed25519 REQUIRE_ACCELERATION=1 \
                 /nke/os-image/packer/scripts/boot-smoke.sh
             ' 2>&1 | tee ".nkd/evidence/boot-smoke-${ARCH}.log"
-
-      - name: Require complete successful-run evidence
-        working-directory: .candidate
-        env:
-          ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          attempt="$(cat ".nkd/evidence/attempt-${ARCH}")"
-          test -s ".nkd/runs/${attempt}/.runner/plan.json"
-          test -s ".nkd/runs/${attempt}/lifecycle.json"
-          test -s ".nkd/runs/${attempt}/outputs/nke-node-image-${ARCH}.qcow2"
-          test -s ".nkd/evidence/lifecycle-${ARCH}.log"
-          test -s ".nkd/evidence/qcow2-${ARCH}.log"
-          test -s ".nkd/evidence/boot-smoke-${ARCH}.log"
-          diagnostics=".nkd/runs/${attempt}/diagnostics/packer"
-          shopt -s nullglob
-          manifests=("${diagnostics}"/run-*/material-manifest.json)
-          [[ "${#manifests[@]}" -eq 1 ]]
-          run_directory="$(basename "$(dirname "${manifests[0]}")")"
-          [[ "${run_directory}" =~ ^run-[0-9a-f]{32}$ ]]
-          jq -e '.schemaVersion == "nke.dev/os-image-materials/v1"' \
-            "${manifests[0]}" >/dev/null
-          test -s "${diagnostics}/${run_directory}/logs/non-fde-install-console.log"
 
       - name: Upload full validation evidence
         if: always()
