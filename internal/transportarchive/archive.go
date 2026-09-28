@@ -5,6 +5,8 @@ package transportarchive
 
 import (
 	"archive/tar"
+	"bufio"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -468,10 +470,200 @@ func validateTransportEntryUnchanged(expected transportEntry, observed securepat
 	return nil
 }
 
+// openTransportTarSource detects a gzip-compressed carrier (such as a real `helm
+// package` .tgz) by its magic bytes and transparently decompresses it; an
+// uncompressed carrier is read as plain tar. Detection only consumes from the
+// returned buffered reader, so the caller sees the complete stream from the
+// beginning regardless of which branch is taken. allowCompressed scopes gzip
+// acceptance to the one caller that actually needs it (Helm chart carriers);
+// every other transport consumer keeps requiring plain tar, so this widened
+// decompression exposure and its budget do not silently apply to Packer,
+// APT, or the generic `nkdctl transport` carriers.
+//
+// maxHelmTransportDecompressedBytes bounds the decompressed size of the one
+// gzip-compressed transport lane (a real `helm package` .tgz, read via
+// DetectTransportChartRoot / DetectAndUnpackChartRoot). Unlike
+// maxTransportBytes — sized for the full uncompressed workspace/VM carriers
+// this package also transports — this lane's on-disk (compressed) size can
+// be tens of MB while still decompressing to many times that (a
+// "decompression bomb"), so it gets its own, Helm-chart-sized decompressed
+// ceiling instead of inheriting the much larger aggregate budget.
+const maxHelmTransportDecompressedBytes = 512 << 20
+
+// The returned reader carries a single aggregate decompressed-byte budget: the
+// gzip lane gets maxHelmTransportDecompressedBytes, every other (plain tar)
+// lane keeps the full maxTransportBytes its on-disk size precondition already
+// bounds 1:1. Without a smaller budget on the gzip lane, a small decompression
+// bomb could expand without bound; the budget is charged for every
+// decompressed byte, including data tar.Reader.Next skips between entries.
+func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, func(), error) {
+	buffered := bufio.NewReader(source)
+	magic, err := buffered.Peek(2)
+	if err != nil && err != io.EOF {
+		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive")
+	}
+	if len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
+		if !allowCompressed {
+			return nil, nil, e.New(e.CodeVerifyFailed, "transport archive is gzip-compressed but this carrier requires plain tar")
+		}
+		gz, err := gzip.NewReader(buffered)
+		if err != nil {
+			return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed transport archive")
+		}
+		return &transportLimitReader{reader: gz, remaining: maxHelmTransportDecompressedBytes, bound: maxHelmTransportDecompressedBytes},
+			func() { _ = gz.Close() }, nil
+	}
+	return &transportLimitReader{reader: buffered, remaining: maxTransportBytes, bound: maxTransportBytes}, func() {}, nil
+}
+
+// transportLimitReader fails closed once an untrusted stream has yielded more
+// than its aggregate byte budget, rather than truncating at the bound the way
+// io.LimitedReader would. A stream that ends with exactly the budget consumed
+// is not over budget: the boundary is confirmed with a one-byte probe read of
+// the underlying stream rather than inferred merely from the counter reaching
+// zero, so the reader does not reject a maximum-size but otherwise legal input.
+type transportLimitReader struct {
+	reader    io.Reader
+	remaining int64
+	bound     int64
+}
+
+func (reader *transportLimitReader) Read(p []byte) (int, error) {
+	if reader.remaining <= 0 {
+		probe := make([]byte, 1)
+		n, err := reader.reader.Read(probe)
+		if n > 0 {
+			return 0, fmt.Errorf("transport archive exceeds its %d-byte decompressed bound", reader.bound)
+		}
+		return 0, err
+	}
+	if int64(len(p)) > reader.remaining {
+		p = p[:reader.remaining]
+	}
+	n, err := reader.reader.Read(p)
+	reader.remaining -= int64(n)
+	return n, err
+}
+
+// detectTransportChartRootFrom scans an already-open tar/tar.gz stream and
+// returns the name of its single top-level directory, without extracting any
+// file contents or requiring the caller to know that name in advance. A real
+// `helm package` archive has no fixed root name (it is rooted at the chart's
+// own name), so a caller that requires a named allow-list (Unpack) must
+// discover that name first. Multiple distinct top-level entries, or an archive
+// with no top-level directory, fail closed; extraction independently
+// re-validates every entry.
+func detectTransportChartRootFrom(ctx context.Context, source io.Reader, allowCompressed bool) (string, error) {
+	tarSource, closeTarSource, err := openTransportTarSource(source, allowCompressed)
+	if err != nil {
+		return "", err
+	}
+	defer closeTarSource()
+	tr := tar.NewReader(tarSource)
+	root := ""
+	entries := 0
+	for {
+		if err := ctx.Err(); err != nil {
+			return "", e.Wrap(e.CodeTimeout, err, "inspecting transport canceled")
+		}
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", e.Wrap(e.CodeVerifyFailed, err, "reading transport archive")
+		}
+		entries++
+		if entries > maxTransportEntries {
+			return "", e.New(e.CodeVerifyFailed, "transport exceeds %d entries", maxTransportEntries)
+		}
+		name := strings.TrimSuffix(header.Name, "/")
+		if !filepath.IsLocal(name) {
+			return "", e.New(e.CodeVerifyFailed, "transport contains non-local path %q", header.Name)
+		}
+		top := name
+		if idx := strings.IndexByte(top, '/'); idx >= 0 {
+			top = top[:idx]
+		}
+		if top == "" {
+			continue
+		}
+		if root == "" {
+			root = top
+		} else if root != top {
+			return "", e.New(e.CodeVerifyFailed,
+				"transport archive has multiple top-level roots %q and %q", root, top)
+		}
+	}
+	if root == "" {
+		return "", e.New(e.CodeVerifyFailed, "transport archive has no top-level directory")
+	}
+	return root, nil
+}
+
+// DetectTransportChartRoot inspects an untrusted carrier and returns the name of
+// its single top-level directory, without extracting any file contents. See
+// detectTransportChartRootFrom. Prefer DetectAndUnpackChartRoot when the
+// caller will immediately extract that same root: it holds one file
+// descriptor across both steps instead of opening the path twice.
+func DetectTransportChartRoot(ctx context.Context, archive string) (string, error) {
+	if err := requireTransportContext(ctx, "inspecting transport"); err != nil {
+		return "", err
+	}
+	file, info, err := securepath.OpenRegular(archive)
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "opening transport archive %s", archive)
+	}
+	defer file.Close()
+	if info.Size() < 0 || info.Size() > maxTransportBytes {
+		return "", e.New(e.CodeVerifyFailed, "transport archive %s is not a regular file within the %d-byte limit", archive, maxTransportBytes)
+	}
+	root, err := detectTransportChartRootFrom(ctx, file, true)
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
+	}
+	return root, nil
+}
+
+// DetectAndUnpackChartRoot discovers a gzip-or-plain carrier's single
+// top-level chart-root directory name and extracts exactly that root into a
+// private staging directory beneath root, holding one file descriptor across
+// both steps. A caller that opened the path twice instead (once to detect,
+// once to extract) would leave a pathname-replacement window between the two
+// opens; UnpackOpen's held-descriptor design exists specifically to close
+// that window, so chart-root discovery must share its descriptor rather than
+// reopen the path.
+func DetectAndUnpackChartRoot(ctx context.Context, archive, root string) (string, error) {
+	if err := requireTransportContext(ctx, "inspecting transport"); err != nil {
+		return "", err
+	}
+	file, info, err := securepath.OpenRegular(archive)
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "opening transport archive %s", archive)
+	}
+	defer file.Close()
+	if info.Size() < 0 || info.Size() > maxTransportBytes {
+		return "", e.New(e.CodeVerifyFailed, "transport archive %s is not a regular file within the %d-byte limit", archive, maxTransportBytes)
+	}
+	chartRoot, err := detectTransportChartRootFrom(ctx, file, true)
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "rewinding transport archive %s", archive)
+	}
+	if err := unpackOpen(ctx, file, root, []string{chartRoot}, true); err != nil {
+		return "", err
+	}
+	return chartRoot, nil
+}
+
 // Unpack extracts an untrusted carrier into a private staging directory,
 // accepts only the producer's declared paths, and publishes them only after the full
 // archive has been validated. Traversal, hard links, devices, duplicate entries,
 // escaping symlinks, missing roots, and destination overwrite all fail closed.
+// The carrier must be plain tar; a gzip-compressed carrier fails closed here
+// (see DetectAndUnpackChartRoot for the one caller that needs compression).
 func Unpack(ctx context.Context, archive, root string, allowed []string) error {
 	if err := requireTransportContext(ctx, "unpacking transport"); err != nil {
 		return err
@@ -487,8 +679,12 @@ func Unpack(ctx context.Context, archive, root string, allowed []string) error {
 // UnpackOpen applies the same bounded carrier validation as Unpack to an
 // already-held regular-file inode. It does not close archive. This prevents a
 // pathname replacement between an authority module holding transport bytes and
-// the extraction boundary.
+// the extraction boundary. The carrier must be plain tar.
 func UnpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed []string) error {
+	return unpackOpen(ctx, archiveFile, root, allowed, false)
+}
+
+func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed []string, allowCompressed bool) error {
 	if err := requireTransportContext(ctx, "unpacking held transport"); err != nil {
 		return err
 	}
@@ -536,7 +732,12 @@ func UnpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 		return e.Wrap(e.CodeInternal, err, "opening transport staging root")
 	}
 	defer func() { _ = stageRoot.Close() }()
-	tr := tar.NewReader(file)
+	tarSource, closeTarSource, err := openTransportTarSource(file, allowCompressed)
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "opening held transport archive")
+	}
+	defer closeTarSource()
+	tr := tar.NewReader(tarSource)
 	seen := map[string]bool{}
 	directoryModes := map[string]fs.FileMode{}
 	directories := map[string]bool{"": true}

@@ -100,6 +100,14 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	}
 	resources.workspace = workspace
 	runRoot := workspace.path()
+	if request.runtime.RuntimeName() == "docker" {
+		request.identity, err = workspace.prepareDockerIdentity(ctx)
+	} else {
+		request.identity, err = preparePackerContainerIdentity(ctx, runRoot, request.runtime.RuntimeName())
+	}
+	if err != nil {
+		return nil, err
+	}
 	inputArchive, workArchive, staged, err := preparePackerContainerTransport(ctx, runRoot, request)
 	if err != nil {
 		return nil, err
@@ -172,12 +180,13 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		return nil, err
 	}
 	if err := preflightPackerVersion(ctx, request.runtime, resources, request.node,
-		inputVolume, workVolume, nodeLabel, attemptLabel, attempt, request.bindings.packerVersion); err != nil {
+		inputVolume, workVolume, nodeLabel, attemptLabel, attempt, request.bindings.packerVersion,
+		request.identity); err != nil {
 		return nil, err
 	}
 	if request.bindings.sshPrivateKeyVariable != "" {
 		if err := generateAndVerifyPackerSSHKey(ctx, request.runtime, resources, request.node,
-			inputVolume, workVolume, nodeLabel, attemptLabel, attempt); err != nil {
+			inputVolume, workVolume, nodeLabel, attemptLabel, attempt, request.identity); err != nil {
 			return nil, err
 		}
 	}
@@ -191,6 +200,7 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		input: inputVolume, inputReadOnly: true, work: workVolume, project: project,
 		packerArgs: append([]string{"validate"}, baseArgs...),
 		labels:     []string{nodeLabel, attemptLabel, "nkd.dev/role=validate"},
+		identity:   request.identity,
 	}
 	resources.containers = append(resources.containers, validateName)
 	if err := createPackerContainer(ctx, request.runtime, validate); err != nil {
@@ -239,7 +249,7 @@ func packerBuildContainerRequest(request packerContainerRunRequest, inputVolume,
 		packerArgs: append([]string{"build", "-on-error=cleanup"}, baseArgs...),
 		labels:     []string{nodeLabel, attemptLabel, "nkd.dev/role=build"},
 		kvm:        request.kvm, groupAdd: kvmGroup,
-		network: request.node.Network,
+		network: request.node.Network, identity: request.identity,
 	}
 }
 
@@ -393,6 +403,11 @@ func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, 
 		return e.New(e.CodeEngineCapability,
 			"Packer container %q requested unsupported network mode %q", request.name, request.network)
 	}
+	if runtime.RuntimeName() == "docker" && request.user == "" &&
+		(request.identity.passwdPath == "" || request.identity.groupPath == "") {
+		return e.New(e.CodeEngineCapability,
+			"Packer container %q requires an attempt-owned Docker identity projection", request.name)
+	}
 	var stdout, stderr bytes.Buffer
 	if err := runtime.Run(ctx, nil, &stdout, &stderr, packerContainerCreateArgs(runtime.RuntimeName(), request)...); err != nil {
 		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed, "creating Packer container %q", request.name)
@@ -417,12 +432,14 @@ func startPackerContainer(ctx context.Context, runtime packerContainerRuntime, n
 
 func preflightPackerVersion(ctx context.Context, runtime packerContainerRuntime,
 	resources *packerContainerResources, node ir.Node, inputVolume, workVolume, nodeLabel, attemptLabel, attempt, version string,
+	identity packerContainerIdentity,
 ) error {
 	name := "nkd-packer-" + attempt + "-version"
 	request := packerContainerCreateRequest{
 		name: name, image: node.Toolchain, platform: node.ToolchainPlatform,
 		input: inputVolume, inputReadOnly: true, work: workVolume, project: packerContainerWorkRoot,
 		packerArgs: []string{"version"}, labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=version"},
+		identity: identity,
 	}
 	resources.containers = append(resources.containers, name)
 	if err := createPackerContainer(ctx, runtime, request); err != nil {
@@ -441,13 +458,15 @@ func preflightPackerVersion(ctx context.Context, runtime packerContainerRuntime,
 
 func generateAndVerifyPackerSSHKey(ctx context.Context, runtime packerContainerRuntime,
 	resources *packerContainerResources, node ir.Node, inputVolume, workVolume, nodeLabel, attemptLabel, attempt string,
+	identity packerContainerIdentity,
 ) error {
 	generateName := "nkd-packer-" + attempt + "-ssh-generate"
 	generate := packerContainerCreateRequest{
 		name: generateName, image: node.Toolchain, platform: node.ToolchainPlatform,
 		input: inputVolume, inputReadOnly: true, work: workVolume, project: packerContainerWorkRoot,
 		entrypoint: "ssh-keygen", packerArgs: []string{"-q", "-t", "ed25519", "-N", "", "-f", packerContainerWorkRoot + "/ssh/id_ed25519"},
-		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=ssh-generate"},
+		labels:   []string{nodeLabel, attemptLabel, "nkd.dev/role=ssh-generate"},
+		identity: identity,
 	}
 	resources.containers = append(resources.containers, generateName)
 	if err := createPackerContainer(ctx, runtime, generate); err != nil {
@@ -466,7 +485,8 @@ func generateAndVerifyPackerSSHKey(ctx context.Context, runtime packerContainerR
 			name: name, image: node.Toolchain, platform: node.ToolchainPlatform,
 			input: inputVolume, inputReadOnly: true, work: workVolume, project: packerContainerWorkRoot,
 			entrypoint: "ssh-keygen", packerArgs: []string{"-l", "-E", "sha256", "-f", packerContainerWorkRoot + "/ssh/" + key},
-			labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=ssh-verify"},
+			labels:   []string{nodeLabel, attemptLabel, "nkd.dev/role=ssh-verify"},
+			identity: identity,
 		}
 		resources.containers = append(resources.containers, name)
 		if err := createPackerContainer(ctx, runtime, verify); err != nil {

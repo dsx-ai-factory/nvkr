@@ -250,6 +250,10 @@ func cloneCatalog(in *Catalog) (*Catalog, error) {
 	if err := json.Unmarshal(raw, &out); err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "cloning catalog stack base")
 	}
+	out.sourcePins = make(map[string]Pin, len(in.sourcePins))
+	for name, pin := range in.sourcePins {
+		out.sourcePins[name] = clonePin(pin)
+	}
 	return &out, nil
 }
 

@@ -253,7 +253,7 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 				members = append(members, pkg.Name)
 			}
 			sort.Strings(members)
-		case "helm-oci":
+		case outputFormatHelm:
 			if binding.TransportPath != "" {
 				return nil, e.New(e.CodeVerifyFailed, "Helm output has an unexpected transport path")
 			}

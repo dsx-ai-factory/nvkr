@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -19,6 +20,31 @@ func cmdCatalog() *cli.Command {
 		Name:  "catalog",
 		Usage: "inspect and validate a catalog",
 		Subcommands: []*cli.Command{
+			{
+				Name:      "source-pin",
+				Usage:     "print one validated source pin as JSON",
+				ArgsUsage: "<source>",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+				},
+				Action: func(c *cli.Context) error {
+					if c.Args().Len() != 1 {
+						return e.New(e.CodeUsage, "catalog source-pin requires exactly one source name")
+					}
+					loaded, err := catalog.LoadContext(c.Context, providerFor(c))
+					if err != nil {
+						return err
+					}
+					pin, err := loaded.SourcePin(c.Args().First())
+					if err != nil {
+						return err
+					}
+					return json.NewEncoder(os.Stdout).Encode(struct {
+						Commit   string `json:"commit"`
+						TreeHash string `json:"treeHash"`
+					}{Commit: pin.Commit, TreeHash: pin.TreeHash})
+				},
+			},
 			{
 				Name:  "digest",
 				Usage: "print the exact resolved catalog snapshot digest used to pin an ordered component overlay",

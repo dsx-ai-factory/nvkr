@@ -25,6 +25,71 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
+func TestPreparePackerContainerIdentity(t *testing.T) {
+	tests := []struct {
+		name     string
+		runtime  string
+		created  bool
+		cancel   bool
+		wantCode e.Code
+	}{
+		{name: "docker projection", runtime: "docker", created: true},
+		{name: "podman native entries", runtime: "podman"},
+		{name: "canceled Docker projection", runtime: "docker", cancel: true, wantCode: e.CodeTimeout},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			ctx := t.Context()
+			if test.cancel {
+				canceled, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = canceled
+			}
+			identity, err := preparePackerContainerIdentity(ctx, root, test.runtime)
+			if code(err) != test.wantCode {
+				t.Fatalf("Docker identity error = %v, want %s", err, test.wantCode)
+			}
+			if !test.created {
+				if identity != (packerContainerIdentity{}) {
+					t.Fatalf("non-Docker identity = %#v", identity)
+				}
+				if _, err := os.Stat(filepath.Join(root, "identity")); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("non-Docker identity directory error = %v, want not-exist", err)
+				}
+				return
+			}
+			want := map[string]string{
+				identity.passwdPath: fmt.Sprintf("nkd:x:%d:%d:NKD Builder:/nkd/work/home:/bin/sh\n", os.Getuid(), os.Getgid()),
+				identity.groupPath:  fmt.Sprintf("nkd:x:%d:\n", os.Getgid()),
+			}
+			directory, err := os.Stat(filepath.Dir(identity.passwdPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if directory.Mode().Perm() != 0o700 {
+				t.Fatalf("identity directory mode = %o, want 0700", directory.Mode().Perm())
+			}
+			for name, wantContent := range want {
+				raw, err := os.ReadFile(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(raw) != wantContent {
+					t.Fatalf("identity projection %q = %q, want %q", name, raw, wantContent)
+				}
+				info, err := os.Stat(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if info.Mode().Perm() != 0o400 {
+					t.Fatalf("identity projection %q mode = %o, want 0400", name, info.Mode().Perm())
+				}
+			}
+		})
+	}
+}
+
 func TestPreparePackerContainerTransportAuthenticatesManifestInVolumeClosure(t *testing.T) {
 	source := t.TempDir()
 	if err := os.WriteFile(filepath.Join(source, "node.pkr.hcl"), []byte("packer {}\n"), 0o700); err != nil {
@@ -245,12 +310,16 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		platform: "linux/amd64", input: "nkd-input", work: "nkd-work",
 		project: "/nkd/input/source/os-image/packer", packerArgs: []string{"build", "-only=build.qemu.node", "."},
 		labels: []string{"nkd.dev/node=build-node", "nkd.dev/attempt=abc"}, inputReadOnly: true,
+		identity: packerContainerIdentity{passwdPath: "/private/passwd", groupPath: "/private/group"},
 	}
 	withoutKVM := packerContainerCreateArgs("docker", request)
 	want := []string{
 		"create", "--name", "nkd-packer-build", "--pull=never", "--platform", "linux/amd64",
 		"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-		"--no-healthcheck", "--hostname=nkd-packer", fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid()),
+		"--no-healthcheck", "--hostname=nkd-packer",
+		"--mount", "type=bind,src=/private/passwd,dst=/etc/passwd,readonly",
+		"--mount", "type=bind,src=/private/group,dst=/etc/group,readonly",
+		fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid()),
 		"--label", "nkd.dev/node=build-node", "--label", "nkd.dev/attempt=abc",
 		"--mount", "type=volume,src=nkd-input,dst=/nkd/input,volume-nocopy,readonly",
 		"--mount", "type=volume,src=nkd-work,dst=/nkd/work,volume-nocopy",
@@ -265,15 +334,22 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 	if !reflect.DeepEqual(withoutKVM, want) {
 		t.Fatalf("container args = %#v, want %#v", withoutKVM, want)
 	}
+	if !slices.Contains(withoutKVM, "type=bind,src=/private/passwd,dst=/etc/passwd,readonly") ||
+		!slices.Contains(withoutKVM, "type=bind,src=/private/group,dst=/etc/group,readonly") {
+		t.Fatalf("container args do not carry the bounded public identity mounts: %#v", withoutKVM)
+	}
 	for _, arg := range withoutKVM {
-		if strings.Contains(arg, "type=bind") || arg == "--volume" || arg == "-v" {
-			t.Fatalf("container args contain a host bind mount: %#v", withoutKVM)
+		if (strings.Contains(arg, "type=bind") && !strings.Contains(arg, "src=/private/")) || arg == "-v" {
+			t.Fatalf("container args contain an unexpected host bind mount: %#v", withoutKVM)
 		}
 	}
 	podman := packerContainerCreateArgs("podman", request)
 	if slices.Contains(podman, "type=volume,src=nkd-work,dst=/nkd/work,volume-nocopy") ||
 		!slices.Contains(podman, "nkd-input:/nkd/input:nocopy,ro") ||
-		!slices.Contains(podman, "nkd-work:/nkd/work:nocopy") {
+		!slices.Contains(podman, "nkd-work:/nkd/work:nocopy") ||
+		!slices.Contains(podman, fmt.Sprintf("--passwd-entry=nkd:x:%d:%d:NKD Builder:/nkd/work/home:/bin/sh", os.Getuid(), os.Getgid())) ||
+		!slices.Contains(podman, fmt.Sprintf("--group-entry=nkd:x:%d:", os.Getgid())) ||
+		slices.ContainsFunc(podman, func(arg string) bool { return strings.Contains(arg, "dst=/etc/passwd") }) {
 		t.Fatalf("Podman container args do not use its named-volume nocopy syntax: %#v", podman)
 	}
 	request.kvm, request.groupAdd = kvm, "123"
@@ -323,11 +399,24 @@ func TestCreatePackerContainerRejectsUnknownRuntimeBeforeWork(t *testing.T) {
 	}
 }
 
+func TestCreatePackerContainerRejectsMissingDockerIdentityBeforeWork(t *testing.T) {
+	runtime := &recordingPackerRuntime{name: "docker"}
+	err := createPackerContainer(t.Context(), runtime, packerContainerCreateRequest{name: "build"})
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+		t.Fatalf("missing identity error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	if len(runtime.calls) != 0 {
+		t.Fatalf("runtime called before identity admission: %#v", runtime.calls)
+	}
+}
+
 func TestPackerVolumeBootstrapIsTheOnlyRootContainer(t *testing.T) {
 	base := packerContainerCreateRequest{
 		name: "stage", image: "registry.example/packer@sha256:" + repeatHex("a"), platform: "linux/amd64",
 		input: "nkd-input", work: "nkd-work", project: "/nkd/work", entrypoint: "sh",
 		packerArgs: []string{"-ec", "true"},
+		identity:   packerContainerIdentity{passwdPath: "/private/passwd", groupPath: "/private/group"},
 	}
 	consumer := packerContainerCreateArgs("docker", base)
 	if !slices.Contains(consumer, fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())) ||
@@ -338,6 +427,11 @@ func TestPackerVolumeBootstrapIsTheOnlyRootContainer(t *testing.T) {
 	bootstrap := packerContainerCreateArgs("docker", base)
 	if !slices.Contains(bootstrap, "--user=0:0") || !slices.Contains(bootstrap, "--cap-add=CHOWN") {
 		t.Fatalf("bootstrap identity/capabilities = %#v", bootstrap)
+	}
+	if slices.ContainsFunc(bootstrap, func(arg string) bool {
+		return strings.Contains(arg, "dst=/etc/passwd") || strings.Contains(arg, "dst=/etc/group")
+	}) {
+		t.Fatalf("root bootstrap received unnecessary host identity mounts: %#v", bootstrap)
 	}
 	for _, args := range [][]string{consumer, bootstrap} {
 		for _, required := range []string{"--network=none", "--read-only", "--no-healthcheck", "--hostname=nkd-packer", "--cap-drop=ALL"} {

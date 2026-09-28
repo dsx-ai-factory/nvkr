@@ -267,6 +267,12 @@ type Catalog struct {
 	Metadata   Metadata
 	Sources    map[string]Source
 	Components map[string]Component
+
+	// sourcePins is populated only by the validated registry-and-lock loader.
+	// Keeping it private prevents callers from treating an authored PinLock as a
+	// resolved catalog while still allowing read-only projections from the exact
+	// snapshot that produced this Catalog.
+	sourcePins map[string]Pin
 }
 
 // NamedComponent pairs a component with its registry key, for ordered iteration

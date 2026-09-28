@@ -97,6 +97,8 @@ if [[ "${check_only}" -eq 1 ]]; then
   exit 0
 fi
 
+command -v mktemp >/dev/null 2>&1 || { echo "mktemp is required" >&2; exit 1; }
+
 case "$(uname -m)" in
   x86_64) native_arch=amd64 ;;
   aarch64|arm64) native_arch=arm64 ;;
@@ -121,6 +123,40 @@ if [[ -z "${runtime}" ]]; then
   runtime="$(command -v podman || command -v docker || true)"
 fi
 [[ -n "${runtime}" ]] || { echo "podman or docker is required" >&2; exit 1; }
+
+uid="$(id -u)"
+gid="$(id -g)"
+identity_dir=""
+cleanup_identity() {
+  if [[ -n "${identity_dir}" ]]; then
+    rm -f -- "${identity_dir}/passwd" "${identity_dir}/group"
+    rmdir -- "${identity_dir}"
+  fi
+}
+trap cleanup_identity EXIT
+case "${runtime##*/}" in
+  podman)
+    identity_args=(
+      --passwd-entry "nkd:x:${uid}:${gid}:NKD Builder:/nkd/work/home:/bin/sh"
+      --group-entry "nkd:x:${gid}:"
+    )
+    ;;
+  docker)
+    identity_dir="$(mktemp -d "${TMPDIR:-/tmp}/nkd-packer-identity.XXXXXX")"
+    printf 'nkd:x:%s:%s:NKD Builder:/nkd/work/home:/bin/sh\n' "${uid}" "${gid}" \
+      >"${identity_dir}/passwd"
+    printf 'nkd:x:%s:\n' "${gid}" >"${identity_dir}/group"
+    chmod 0400 "${identity_dir}/passwd" "${identity_dir}/group"
+    identity_args=(
+      --mount "type=bind,src=${identity_dir}/passwd,dst=/etc/passwd,readonly"
+      --mount "type=bind,src=${identity_dir}/group,dst=/etc/group,readonly"
+    )
+    ;;
+  *)
+    echo "unsupported container runtime: ${runtime}" >&2
+    exit 1
+    ;;
+esac
 
 base_image="$(jq -r '.baseImage' "${lock}")"
 download_image="$(jq -r '.downloadImage' "${lock}")"
@@ -198,7 +234,8 @@ fi
   --read-only \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  --user "$(id -u):$(id -g)" \
+  --user "${uid}:${gid}" \
+  "${identity_args[@]}" \
   --hostname nkd-packer \
   --tmpfs /nkd/work:rw,nosuid,nodev,mode=1777 \
   --env CHECKPOINT_DISABLE=1 \

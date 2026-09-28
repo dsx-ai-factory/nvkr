@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,81 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
+
+func TestCatalogSourcePinProjection(t *testing.T) {
+	data := filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")
+	unpinned := t.TempDir()
+	registry, err := os.ReadFile(filepath.Join(data, catalog.RegistryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(unpinned, catalog.RegistryFile), registry, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(unpinned, catalog.LockFile),
+		[]byte("apiVersion: nkd.dev/lock/v1\nkind: PinLock\npins: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name     string
+		args     []string
+		wantCode e.Code
+		commit   string
+		tree     string
+	}{
+		{
+			name:   "validated source",
+			args:   []string{"nkdctl", "catalog", "source-pin", "--data", data, "kubernetes"},
+			commit: "70d3cc986aa8221cd1dfb1121852688902d3bf53",
+			tree:   "195abcc8a74b362b88fc76b0ee676a3354e4937e",
+		},
+		{
+			name:     "unknown source",
+			args:     []string{"nkdctl", "catalog", "source-pin", "--data", data, "missing"},
+			wantCode: e.CodeInvalidCatalog,
+		},
+		{
+			name:     "unvalidated missing pin",
+			args:     []string{"nkdctl", "catalog", "source-pin", "--data", unpinned, "kubernetes"},
+			wantCode: e.CodeUnpinnedSource,
+		},
+		{
+			name:     "missing source argument",
+			args:     []string{"nkdctl", "catalog", "source-pin", "--data", data},
+			wantCode: e.CodeUsage,
+		},
+		{
+			name:     "too many source arguments",
+			args:     []string{"nkdctl", "catalog", "source-pin", "--data", data, "kubernetes", "extra"},
+			wantCode: e.CodeUsage,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			output, err := runCLIWithCapturedStdout(t, newApp(), test.args...)
+			if test.wantCode != "" {
+				assertLifecycleCommandCode(t, err, test.wantCode)
+				if len(output) != 0 {
+					t.Fatalf("failed source-pin produced output: %s", output)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got struct {
+				Commit   string `json:"commit"`
+				TreeHash string `json:"treeHash"`
+			}
+			if err := json.Unmarshal(output, &got); err != nil {
+				t.Fatalf("source-pin output is not JSON: %v: %s", err, output)
+			}
+			if got.Commit != test.commit || got.TreeHash != test.tree {
+				t.Fatalf("source pin = %+v, want commit %q tree %q", got, test.commit, test.tree)
+			}
+		})
+	}
+}
 
 func TestCatalogSourcePinCommandOutput(t *testing.T) {
 	repo, data := t.TempDir(), t.TempDir()

@@ -1,0 +1,5 @@
+# Configuration for NVIDIA's copy-pr-bot GitHub App.
+# https://docs.gha-runners.nvidia.com/platform/apps/copy-pr-bot/
+enabled: true
+auto_sync_draft: false
+auto_sync_ready: false
