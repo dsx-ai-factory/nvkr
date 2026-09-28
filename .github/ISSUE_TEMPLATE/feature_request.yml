@@ -79,6 +79,9 @@ body:
         - Catalog — pins (pins.lock.yaml)
         - Catalog — registry (sources / constraints / build commands)
         - Definitions — output selection / catalog substitutions
+        - Environment — execution or publication configuration
+        - Run — planning, generation, or execution
+        - Release — verification or consumption
         - CLI (nkdctl)
         - Generator / pipeline emission
         - Signing / provenance / evidence

@@ -63,6 +63,9 @@ reported to the community leaders responsible for enforcement at
 **GitHub_Conduct@nvidia.com**.
 All complaints will be reviewed and investigated promptly and fairly.
 
+Repository maintainer responsibilities are listed in [MAINTAINERS.md](MAINTAINERS.md) and
+[GOVERNANCE.md](GOVERNANCE.md). Conduct reports still go to the address above, not to a public issue.
+
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.
 

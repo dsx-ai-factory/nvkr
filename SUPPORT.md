@@ -4,9 +4,12 @@
 
 | Channel | When to use |
 |---|---|
-| [GitHub Issues](https://github.com/dsx-ai-factory/nke-recipes/issues) | Reproducible bugs, feature requests, and documentation gaps |
+| [GitHub Issues](https://github.com/dsx-ai-factory/nke-recipes/issues) | Reproducible bugs, concrete feature requests, and documentation gaps |
 | [GitHub Discussions Q&A](https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/q-a) | Usage questions and answers |
-| [GitHub Discussions Ideas](https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/ideas) | Design proposals and feature ideas |
+| [GitHub Discussions Ideas](https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/ideas) | Open-ended design proposals and feature ideas needing discussion before an issue |
+
+NKE Recipes is a pre-1.0 proof of concept. Community support is best effort, and fixes target `main`.
+See [SECURITY.md](SECURITY.md) for the security-supported version scope.
 
 ## Before opening an issue
 
@@ -27,8 +30,3 @@ reporting process in [SECURITY.md](SECURITY.md).
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development and submission requirements
 and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
-
-## NVIDIA enterprise support
-
-For NKE Recipes used as part of a supported NVIDIA product, contact your NVIDIA support representative or use
-the [NVIDIA Support Portal](https://www.nvidia.com/en-us/support/).
