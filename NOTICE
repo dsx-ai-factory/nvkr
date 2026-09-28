@@ -6,7 +6,7 @@ This product includes software developed at NVIDIA CORPORATION.
 Licensed under the Apache License, Version 2.0. The full terms are in the
 LICENSE file at the root of this repository.
 
-This product links third-party software. The copyright notices and license
+This product includes third-party software. The copyright notices and license
 terms collected for the nkdctl binary are reproduced in:
 
     THIRD_PARTY_NOTICES.md

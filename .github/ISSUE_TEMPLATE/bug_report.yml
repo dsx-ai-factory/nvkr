@@ -25,9 +25,9 @@ body:
       options:
         - label: I searched existing issues and found no duplicates
           required: true
-        - label: I can reproduce this issue consistently
+        - label: I included reproduction steps or, for an intermittent failure, its observed frequency and conditions
           required: true
-        - label: This is not a security vulnerability (report those to [NVIDIA PSIRT](https://www.nvidia.com/en-us/security/report-vulnerability/), not through GitHub)
+        - label: This is not a security vulnerability. I will report security vulnerabilities privately as described in the [security policy](https://github.com/dsx-ai-factory/nke-recipes/blob/main/SECURITY.md)
           required: true
 
   - type: textarea
@@ -82,7 +82,8 @@ body:
   - type: textarea
     id: reproduction
     attributes:
-      label: Steps to Reproduce
+      label: Reproduction steps or observed pattern
+      description: Provide reliable reproduction steps, or for an intermittent failure, its observed frequency and conditions.
       placeholder: |
         1. Step one
         2. Step two
