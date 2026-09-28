@@ -321,7 +321,8 @@ func TestGenerateAndVerifyPackerSSHKeyRejectsMismatch(t *testing.T) {
 	}
 	resources := &packerContainerResources{runtime: runtime}
 	err := generateAndVerifyPackerSSHKey(t.Context(), runtime, resources, testPackerContainerNode(),
-		"input", "work", "nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc")
+		"input", "work", "nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc",
+		packerContainerIdentity{passwdPath: "/private/passwd", groupPath: "/private/group"})
 	if code(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "do not match") {
 		t.Fatalf("SSH mismatch error = %v, want %s", err, e.CodeEngineCapability)
 	}
