@@ -122,6 +122,27 @@ if [[ -z "${runtime}" ]]; then
 fi
 [[ -n "${runtime}" ]] || { echo "podman or docker is required" >&2; exit 1; }
 
+uid="$(id -u)"
+gid="$(id -g)"
+case "${runtime##*/}" in
+  podman)
+    identity_args=(
+      --passwd-entry "nkd:x:${uid}:${gid}:NKD Builder:/nkd/work/home:/bin/sh"
+      --group-entry "nkd:x:${gid}:"
+    )
+    ;;
+  docker)
+    identity_args=(
+      --volume /etc/passwd:/etc/passwd:ro
+      --volume /etc/group:/etc/group:ro
+    )
+    ;;
+  *)
+    echo "unsupported container runtime: ${runtime}" >&2
+    exit 1
+    ;;
+esac
+
 base_image="$(jq -r '.baseImage' "${lock}")"
 download_image="$(jq -r '.downloadImage' "${lock}")"
 snapshot="$(jq -r '.ubuntuSnapshot' "${lock}")"
@@ -198,7 +219,8 @@ fi
   --read-only \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  --user "$(id -u):$(id -g)" \
+  --user "${uid}:${gid}" \
+  "${identity_args[@]}" \
   --hostname nkd-packer \
   --tmpfs /nkd/work:rw,nosuid,nodev,mode=1777 \
   --env CHECKPOINT_DISABLE=1 \

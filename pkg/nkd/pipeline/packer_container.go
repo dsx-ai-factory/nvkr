@@ -147,7 +147,23 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 	}
 	user := request.user
 	if user == "" {
-		user = fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
+		uid, gid := os.Getuid(), os.Getgid()
+		user = fmt.Sprintf("%d:%d", uid, gid)
+		// Consumer processes retain the invoking numeric identity. OpenSSH also
+		// requires that identity to resolve through getpwuid(3). Podman can inject
+		// exact public identity rows without a host bind. Docker receives only the
+		// host's public account databases; shadow files are never mounted.
+		if runtimeName == "podman" {
+			args = append(args,
+				fmt.Sprintf("--passwd-entry=nkd:x:%d:%d:NKD Builder:%s/home:/bin/sh", uid, gid, packerContainerWorkRoot),
+				fmt.Sprintf("--group-entry=nkd:x:%d:", gid),
+			)
+		} else {
+			args = append(args,
+				"--volume", "/etc/passwd:/etc/passwd:ro",
+				"--volume", "/etc/group:/etc/group:ro",
+			)
+		}
 	}
 	args = append(args, "--user="+user)
 	if request.groupAdd != "" {

@@ -43,9 +43,11 @@ func load(p DataProvider) (*Catalog, error) {
 		Components: map[string]Component{},
 		Tools:      map[string]ToolPin{},
 		Actions:    map[string]ActionPin{},
+		sourcePins: make(map[string]Pin, len(lock.Pins)),
 	}
 
 	for name, pin := range lock.Pins {
+		cat.sourcePins[name] = clonePin(pin)
 		if source := reg.Sources[name]; source.Kind == SourceGitHubAction {
 			action := ActionPin{Repo: strings.TrimPrefix(source.Repo, "https://github.com/"), Version: pin.Tag, SHA: pin.Commit}
 			if err := action.Validate(); err != nil {
@@ -79,6 +81,14 @@ func load(p DataProvider) (*Catalog, error) {
 		return nil, err
 	}
 	return cat, nil
+}
+
+func clonePin(pin Pin) Pin {
+	if pin.Tool != nil {
+		tool := *pin.Tool
+		pin.Tool = &tool
+	}
+	return pin
 }
 
 // rejectLegacyComposition rejects stale recipe layer inputs rather than silently

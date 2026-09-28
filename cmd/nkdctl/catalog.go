@@ -35,17 +35,9 @@ func cmdCatalog() *cli.Command {
 					if err != nil {
 						return err
 					}
-					source := c.Args().First()
-					if _, ok := loaded.Sources[source]; !ok {
-						return e.New(e.CodeInvalidCatalog, "catalog source %q does not exist", source)
-					}
-					lock, err := catalog.LoadLockContext(c.Context, c.String("data"))
+					pin, err := loaded.SourcePin(c.Args().First())
 					if err != nil {
 						return err
-					}
-					pin, ok := lock.Pins[source]
-					if !ok {
-						return e.New(e.CodeUnpinnedSource, "catalog source %q has no lock pin", source)
 					}
 					return json.NewEncoder(os.Stdout).Encode(struct {
 						Commit   string `json:"commit"`

@@ -250,7 +250,9 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 	want := []string{
 		"create", "--name", "nkd-packer-build", "--pull=never", "--platform", "linux/amd64",
 		"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-		"--no-healthcheck", "--hostname=nkd-packer", fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid()),
+		"--no-healthcheck", "--hostname=nkd-packer",
+		"--volume", "/etc/passwd:/etc/passwd:ro", "--volume", "/etc/group:/etc/group:ro",
+		fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid()),
 		"--label", "nkd.dev/node=build-node", "--label", "nkd.dev/attempt=abc",
 		"--mount", "type=volume,src=nkd-input,dst=/nkd/input,volume-nocopy,readonly",
 		"--mount", "type=volume,src=nkd-work,dst=/nkd/work,volume-nocopy",
@@ -265,15 +267,23 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 	if !reflect.DeepEqual(withoutKVM, want) {
 		t.Fatalf("container args = %#v, want %#v", withoutKVM, want)
 	}
+	if countArg(withoutKVM, "--volume") != 2 ||
+		!slices.Contains(withoutKVM, "/etc/passwd:/etc/passwd:ro") ||
+		!slices.Contains(withoutKVM, "/etc/group:/etc/group:ro") {
+		t.Fatalf("container args do not carry the bounded public identity mounts: %#v", withoutKVM)
+	}
 	for _, arg := range withoutKVM {
-		if strings.Contains(arg, "type=bind") || arg == "--volume" || arg == "-v" {
-			t.Fatalf("container args contain a host bind mount: %#v", withoutKVM)
+		if strings.Contains(arg, "type=bind") || arg == "-v" {
+			t.Fatalf("container args contain an unexpected host bind mount: %#v", withoutKVM)
 		}
 	}
 	podman := packerContainerCreateArgs("podman", request)
 	if slices.Contains(podman, "type=volume,src=nkd-work,dst=/nkd/work,volume-nocopy") ||
 		!slices.Contains(podman, "nkd-input:/nkd/input:nocopy,ro") ||
-		!slices.Contains(podman, "nkd-work:/nkd/work:nocopy") {
+		!slices.Contains(podman, "nkd-work:/nkd/work:nocopy") ||
+		!slices.Contains(podman, fmt.Sprintf("--passwd-entry=nkd:x:%d:%d:NKD Builder:/nkd/work/home:/bin/sh", os.Getuid(), os.Getgid())) ||
+		!slices.Contains(podman, fmt.Sprintf("--group-entry=nkd:x:%d:", os.Getgid())) ||
+		slices.Contains(podman, "/etc/passwd:/etc/passwd:ro") {
 		t.Fatalf("Podman container args do not use its named-volume nocopy syntax: %#v", podman)
 	}
 	request.kvm, request.groupAdd = kvm, "123"
@@ -295,6 +305,16 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 	if !slices.Contains(withPodmanNetwork, "--network=default") || slices.Contains(withPodmanNetwork, "--network=none") {
 		t.Fatalf("networked Podman Packer build args = %#v", withPodmanNetwork)
 	}
+}
+
+func countArg(args []string, want string) int {
+	count := 0
+	for _, arg := range args {
+		if arg == want {
+			count++
+		}
+	}
+	return count
 }
 
 func TestCreatePackerContainerRejectsUnknownNetworkBeforeRuntime(t *testing.T) {
@@ -338,6 +358,9 @@ func TestPackerVolumeBootstrapIsTheOnlyRootContainer(t *testing.T) {
 	bootstrap := packerContainerCreateArgs("docker", base)
 	if !slices.Contains(bootstrap, "--user=0:0") || !slices.Contains(bootstrap, "--cap-add=CHOWN") {
 		t.Fatalf("bootstrap identity/capabilities = %#v", bootstrap)
+	}
+	if slices.Contains(bootstrap, "/etc/passwd:/etc/passwd:ro") || slices.Contains(bootstrap, "/etc/group:/etc/group:ro") {
+		t.Fatalf("root bootstrap received unnecessary host identity mounts: %#v", bootstrap)
 	}
 	for _, args := range [][]string{consumer, bootstrap} {
 		for _, required := range []string{"--network=none", "--read-only", "--no-healthcheck", "--hostname=nkd-packer", "--cap-drop=ALL"} {

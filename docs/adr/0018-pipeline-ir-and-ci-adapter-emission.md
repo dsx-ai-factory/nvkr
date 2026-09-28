@@ -127,6 +127,16 @@ or weaker isolation. Rootless operation still depends on supported user namespac
 cgroups and the provider's nesting policy. A mounted privileged Docker socket remains an explicit trust cost.
 Missing prerequisites fail capability admission. No bespoke/self-hosted runner labels are emitted.
 
+The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
+a hosted VM adapter. It is manually dispatched from the default-branch workflow and may select only the declared
+`linux-amd64-gpu-l4-latest-1` or `nke-recipes-arm64-16c64g` KVM pool after an exact main commit or copy-pr-bot
+mirror is authenticated. The cross-repository source credential must not share a job with candidate code; the
+initial workflow remains ineligible for full validation until that separation is implemented. Candidate code
+receives no authority-bearing evidence role. Its logs, image observations, QCOW2 digest and boot result are explicitly
+unqualified diagnostic output. Runner labels, availability and isolation remain provider facts that require an
+actual successful run; this exception grants no pipeline-attested or qualified claim and changes no generated
+adapter rule.
+
 Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.
 Prebuilt helper-image qualification stays disabled until that admission contract exists. Runtime/helper changes
@@ -274,7 +284,10 @@ Direct-Packer execution authenticates one already-local digest-pinned OCI toolch
 it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NKD
 overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
 Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, disabled health check, read-only
-root, no new privileges and all capabilities dropped. Preparation, extraction, version checking, SSH-key
+root, no new privileges and all capabilities dropped. OpenSSH must be able to resolve that numeric identity.
+Podman therefore generates exact passwd/group rows for the invoking UID/GID; Docker receives read-only mounts of
+the host's public `/etc/passwd` and `/etc/group` identity databases. Shadow databases are never mounted. These
+public identity projections do not change the process's numeric authority. Preparation, extraction, version checking, SSH-key
 generation and `packer validate` always use network-none. Only `packer build` receives the exact admitted node
 mode. `default` grants egress to the whole build container, including plugins and local provisioners, as well as
 the QEMU guest through NAT. It selects the container runtime's default bridge, which also permits addressing the

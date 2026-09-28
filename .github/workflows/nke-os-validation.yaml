@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+# Companion implementation: https://github.com/dsx-ai-factory/nke-recipes/pull/59
+# Merge this trusted workflow first; full mode remains fail-closed until #59 lands.
 
 name: NKE OS validation
 
@@ -15,9 +17,11 @@ on:
         required: false
         type: string
       arch:
-        description: Native architecture to validate
+        description: Native architecture; ARM64 is the default until maintained AMD64 inputs land
         required: true
-        default: both
+        # AMD64 remains an explicit selection until its maintained Definition
+        # and native toolchain identity land in the companion change.
+        default: arm64
         type: choice
         options: [both, amd64, arm64]
       mode:
@@ -27,7 +31,7 @@ on:
         type: choice
         options: [toolchain, full]
       mirror_pr:
-        description: Optional PR number whose exact pull-request/N mirror-branch tip must equal commit_sha
+        description: Optional PR number whose copy-pr-bot mirror and current PR head must equal commit_sha
         required: false
         type: string
       retain_qcow2:
@@ -38,6 +42,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   select:
@@ -67,7 +72,8 @@ jobs:
           DISPATCH_RETAIN_QCOW2: ${{ inputs.retain_qcow2 }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_REF: ${{ github.ref }}
-          EVENT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           if [[ "${EVENT_NAME}" != workflow_dispatch || "${EVENT_REF}" != refs/heads/main ]]; then
@@ -97,14 +103,22 @@ jobs:
               exit 1
             fi
             mirror_ref="refs/remotes/origin/pull-request/${mirror_pr}"
-            git fetch --no-tags origin \
-              "refs/heads/pull-request/${mirror_pr}:${mirror_ref}"
-            if [[ "$(git rev-parse "${mirror_ref}^{commit}")" != "${commit}" ]]; then
-              echo "commit_sha is not the exact tip of pull-request/${mirror_pr}" >&2
+            if ! git show-ref --verify --quiet "${mirror_ref}"; then
+              echo "copy-pr-bot mirror pull-request/${mirror_pr} is unavailable" >&2
+              exit 1
+            fi
+            mirror_commit="$(git rev-parse "${mirror_ref}^{commit}")"
+            IFS=$'\t' read -r pr_commit pr_state pr_repo < <(
+              gh api "repos/${REPOSITORY}/pulls/${mirror_pr}" \
+                --jq '[.head.sha, .state, .head.repo.full_name] | @tsv'
+            )
+            if [[ "${mirror_commit}" != "${commit}" || "${pr_commit}" != "${commit}" ||
+                  "${pr_state}" != open || "${pr_repo}" != "${REPOSITORY}" ]]; then
+              echo "commit_sha ${commit} is not the authenticated open in-repository PR ${mirror_pr} tip" >&2
+              echo "mirror=${mirror_commit} head=${pr_commit} state=${pr_state} repository=${pr_repo}" >&2
               exit 1
             fi
           else
-            git fetch --no-tags origin main
             if ! git merge-base --is-ancestor "${commit}" origin/main; then
               echo "commit_sha is not reachable from main; select its exact mirror_pr" >&2
               exit 1
@@ -115,8 +129,8 @@ jobs:
             amd64='{"arch":"amd64","runner":"ubuntu-24.04"}'
             arm64='{"arch":"arm64","runner":"ubuntu-24.04-arm"}'
           else
-            # Full builds use the NKE AMD64 pool and the repository-specific
-            # ARM64 KVM scale set recorded by nke-gha-runners at 488424d.
+            # Full builds declare the two operator-provisioned KVM pools. An
+            # actual successful job is still required to prove repository access.
             amd64='{"arch":"amd64","runner":"linux-amd64-gpu-l4-latest-1"}'
             arm64='{"arch":"arm64","runner":"nke-recipes-arm64-16c64g"}'
           fi
@@ -134,13 +148,16 @@ jobs:
           } >>"${GITHUB_OUTPUT}"
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: steps.select.outputs.mode == 'full'
         with:
           go-version-file: .go-version
 
       - name: Build trusted catalog reader
+        if: steps.select.outputs.mode == 'full'
         run: make build
 
       - name: Check out selected authored inputs without persisted credentials
+        if: steps.select.outputs.mode == 'full'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.select.outputs.commit }}
@@ -175,7 +192,7 @@ jobs:
             exit 1
           fi
           if [[ "${PINNED_NKE_COMMIT}" != "${APPROVED_NKE_COMMIT}" ]]; then
-            echo "the recipe-selected NKE commit does not match the approved dispatch value" >&2
+            echo "recipe-selected NKE commit ${PINNED_NKE_COMMIT} does not match approved ${APPROVED_NKE_COMMIT}" >&2
             exit 1
           fi
 
@@ -202,12 +219,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .nkd/evidence
+          printf '%s\n' 'unqualified-diagnostic' >.nkd/evidence/evidence-scope
           toolchains/nkd-packer/build.sh --arch '${{ matrix.arch }}' \
             2>&1 | tee ".nkd/evidence/toolchain-${{ matrix.arch }}.log"
 
-      # Record the image ID even when the first native build discovers that
-      # the authored lock is absent or differs. That exact ID is the input to
-      # the required review update; the failed job never authorizes it.
+      # This observation is candidate-influenced diagnostic output. It never
+      # authorizes a lock update or a release identity.
       - name: Record exact native toolchain image ID
         if: always()
         run: |
@@ -218,13 +235,15 @@ jobs:
 
       - name: Upload toolchain evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nke-os-${{ matrix.arch }}-toolchain-${{ needs.select.outputs.commit }}
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
-          path: .nkd/evidence/toolchain-${{ matrix.arch }}.*
+          path: |
+            .nkd/evidence/evidence-scope
+            .nkd/evidence/toolchain-${{ matrix.arch }}.*
 
   validate-full:
     name: NKE OS full validation (${{ matrix.arch }})
@@ -270,10 +289,33 @@ jobs:
 
       - name: Initialize retained evidence
         working-directory: .candidate
+        env:
+          CANDIDATE_COMMIT: ${{ needs.select.outputs.commit }}
+          NKE_COMMIT: ${{ needs.select.outputs.nke_commit }}
+          NKE_TREE: ${{ needs.select.outputs.nke_tree }}
+          RUN_ID: ${{ github.run_id }}
+          RUNNER_ARCH: ${{ runner.arch }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+          TARGET_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           mkdir -p .nkd/evidence
-          printf '%s\n' '${{ needs.select.outputs.commit }}' >.nkd/evidence/commit
+          jq -n \
+            --arg scope unqualified-diagnostic \
+            --arg candidateCommit "${CANDIDATE_COMMIT}" \
+            --arg nkeCommit "${NKE_COMMIT}" \
+            --arg nkeTree "${NKE_TREE}" \
+            --arg runID "${RUN_ID}" \
+            --arg runnerName "${RUNNER_NAME}" \
+            --arg runnerOS "${RUNNER_OS}" \
+            --arg runnerArch "${RUNNER_ARCH}" \
+            --arg targetArch "${TARGET_ARCH}" \
+            '{schemaVersion:"nkd.dev/nke-os-validation/v1", scope:$scope,
+              candidateCommit:$candidateCommit, nkeCommit:$nkeCommit, nkeTree:$nkeTree,
+              runID:$runID, targetArch:$targetArch,
+              runner:{name:$runnerName, os:$runnerOS, arch:$runnerArch}}' \
+            >.nkd/evidence/context.json
 
       - name: Build one QCOW2 through the NKD lifecycle
         working-directory: .candidate
@@ -287,6 +329,40 @@ jobs:
           scripts/nke-os-local.sh "${attempt}" 4 \
             2>&1 | tee ".nkd/evidence/lifecycle-${{ matrix.arch }}.log"
           echo "${attempt}" >".nkd/evidence/attempt-${{ matrix.arch }}"
+
+      - name: Record diagnostic QCOW2 identity
+        working-directory: .candidate
+        env:
+          ARCH: ${{ matrix.arch }}
+          NKE_COMMIT: ${{ needs.select.outputs.nke_commit }}
+          NKE_TREE: ${{ needs.select.outputs.nke_tree }}
+          RUNNER_ARCH: ${{ runner.arch }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+        run: |
+          set -euo pipefail
+          attempt="$(cat ".nkd/evidence/attempt-${ARCH}")"
+          output_dir=".nkd/runs/${attempt}/outputs"
+          qcow="${output_dir}/nke-node-image-${ARCH}.qcow2"
+          test -f "${qcow}"
+          test "$(find "${output_dir}" -maxdepth 1 -type f -name '*.qcow2' | wc -l | tr -d ' ')" = 1
+          digest="$(sha256sum "${qcow}" | cut -d' ' -f1)"
+          size="$(stat -c %s "${qcow}")"
+          printf 'sha256:%s\n' "${digest}" >".nkd/evidence/qcow2-${ARCH}.digest"
+          printf '%s\n' "${size}" >".nkd/evidence/qcow2-${ARCH}.size"
+          jq --arg digest "sha256:${digest}" --argjson size "${size}" \
+            '. + {qcow2:{digest:$digest, size:$size}}' \
+            .nkd/evidence/context.json >.nkd/evidence/metadata.json
+          {
+            echo "### NKE OS ${ARCH} diagnostic validation"
+            echo
+            echo "- Evidence scope: unqualified diagnostic"
+            echo "- NKE commit: \`${NKE_COMMIT}\`"
+            echo "- NKE tree: \`${NKE_TREE}\`"
+            echo "- Runner: \`${RUNNER_NAME}\` (\`${RUNNER_OS}/${RUNNER_ARCH}\`)"
+            echo "- QCOW2 digest: \`sha256:${digest}\`"
+            echo "- QCOW2 size: \`${size}\` bytes"
+          } >>"${GITHUB_STEP_SUMMARY}"
 
       - name: Record exact native toolchain image ID
         if: always()
@@ -311,6 +387,8 @@ jobs:
           docker run --rm --pull=never --network=none --read-only --cap-drop=all \
             --security-opt no-new-privileges --device /dev/kvm --group-add "${kvm_group}" \
             --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
+            --volume /etc/passwd:/etc/passwd:ro \
+            --volume /etc/group:/etc/group:ro \
             --volume "${GITHUB_WORKSPACE}/.trusted/nke:/nke:ro" \
             --volume "${PWD}/${qcow}:/artifact.qcow2:ro" \
             --volume "${PWD}/.nkd/boot-smoke/${ARCH}:/work:rw" \
@@ -322,7 +400,7 @@ jobs:
 
       - name: Upload full validation evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nke-os-${{ matrix.arch }}-evidence-${{ needs.select.outputs.commit }}
           if-no-files-found: error
@@ -336,7 +414,7 @@ jobs:
 
       - name: Upload retained QCOW2
         if: success() && needs.select.outputs.retain_qcow2 == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nke-os-${{ matrix.arch }}-qcow2-${{ needs.select.outputs.commit }}
           if-no-files-found: error
