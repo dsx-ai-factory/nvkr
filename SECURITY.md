@@ -15,6 +15,13 @@ To report a potential security vulnerability in an NVIDIA product:
 
 NVIDIA follows a coordinated vulnerability disclosure process. See the [NVIDIA PSIRT policies](https://www.nvidia.com/en-us/security/psirt-policies/) for details.
 
+## Maintainer response
+
+NKE Recipes maintainers use the [vulnerability management procedure](docs/cve-management.md)
+to detect, triage, track, and remediate findings in this repository. PSIRT
+coordinates external reports, disclosure, and incident-specific timelines;
+the repository procedure does not supersede those decisions.
+
 ## NVIDIA Product Security
 
 For security bulletins, policies, acknowledgements, and reporting resources, visit the [NVIDIA Product Security portal](https://www.nvidia.com/en-us/product-security/).

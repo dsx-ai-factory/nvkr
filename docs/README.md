@@ -19,6 +19,8 @@
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
 | Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
 | Build or contribute | [Development](../DEVELOPMENT.md), [contribution guide](../CONTRIBUTING.md) |
+| Triage repository vulnerabilities | [CVE management](cve-management.md), [security reporting](../SECURITY.md) |
+| Manage GitHub issues, discussions, and pull requests | [GitHub issue and PR management](github-issue-pr-management.md) |
 
 ADRs contain current decisions directly. Update the owning ADR and reconciliation when changing a contract;
 create a new ADR only for an independently owned decision. Keep the SADD and glossary consistent. A current

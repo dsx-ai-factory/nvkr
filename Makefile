@@ -72,6 +72,10 @@ shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed — https://www.shellcheck.net/"; exit 1; }
 	shellcheck -S warning scripts/*.sh toolchains/**/*.sh
 
+.PHONY: vulncheck
+vulncheck: ## Check reachable Go vulnerabilities using the pinned upstream scanner.
+	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
 .PHONY: test
 test: ## Unit tests with race + coverage (pure logic; no docker required).
 	go test -race -covermode=atomic -coverprofile=coverage.out $(PKG)
@@ -110,7 +114,7 @@ workflows-check: ## Verify the committed Run generation matches the catalog (ADR
 		--root . --check
 
 .PHONY: check
-check: fmt-check vet lint shellcheck test ## Full local gate — run before pushing.
+check: fmt-check vet lint shellcheck test vulncheck ## Full local gate — run before pushing.
 
 # --- housekeeping -----------------------------------------------------------
 

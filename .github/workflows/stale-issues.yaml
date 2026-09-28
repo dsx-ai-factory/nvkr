@@ -1,0 +1,55 @@
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# The DGXC policy's operative text specifies issues: 90 inactive days, then
+# 30 more days before closure. PRs are deliberately excluded because the
+# section heading and text disagree about whether PRs are in scope.
+name: Stale issues
+
+on:
+  schedule:
+    - cron: '41 8 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stale-issues-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  stale-issues:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      issues: write
+    steps:
+      - name: Ensure policy labels exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create 'lifecycle/stale' --repo "$GITHUB_REPOSITORY" \
+            --color 'EDEDED' --description 'Inactive issue awaiting response' --force
+          gh label create 'lifecycle/frozen' --repo "$GITHUB_REPOSITORY" \
+            --color '5319E7' --description 'Exempt from automated stale-issue closure' --force
+
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
+        with:
+          days-before-issue-stale: 90
+          days-before-issue-close: 30
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: lifecycle/stale
+          exempt-issue-labels: lifecycle/frozen
+          stale-issue-message: >-
+            This issue has had no activity for 90 days. It will close in 30
+            more days without an update. Comment to keep it active, or ask a
+            maintainer to apply lifecycle/frozen if it must remain open.
+          close-issue-message: >-
+            Closed after 30 additional days without activity. Reopen with
+            updated information if the issue still applies.
+          remove-stale-when-updated: true
+          operations-per-run: 100

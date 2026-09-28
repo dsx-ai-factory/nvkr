@@ -215,6 +215,9 @@ jobs:
       - name: test (race + coverage)
         run: make test
 
+      - name: Go vulnerability check
+        run: make vulncheck
+
       - name: build
         run: make build
 

@@ -10,6 +10,8 @@
 
 NKE Recipes is a pre-1.0 proof of concept. Community support is best effort, and fixes target `main`.
 See [SECURITY.md](SECURITY.md) for the security-supported version scope.
+Maintainers route and review work under the
+[GitHub issue and PR management procedure](docs/github-issue-pr-management.md).
 
 ## Before opening an issue
 

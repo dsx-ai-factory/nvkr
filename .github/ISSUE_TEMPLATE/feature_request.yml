@@ -91,14 +91,14 @@ body:
       required: true
 
   - type: dropdown
-    id: priority
+    id: requester_impact
     attributes:
-      label: Priority
-      description: How important is this feature to you?
+      label: Impact to you
+      description: Describe your impact; maintainers assign official priority during triage.
       options:
         - Nice to have
         - Important (would improve my workflow)
-        - Critical (blocking adoption or major use case)
+        - Blocking adoption or a major use case
     validations:
       required: true
 
