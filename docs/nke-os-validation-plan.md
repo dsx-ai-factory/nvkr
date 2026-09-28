@@ -10,11 +10,14 @@ because the generated hosted adapter still rejects requirement-bearing VM jobs a
 
 The credential-free toolchain pass is manually dispatched from the trusted workflow on `main` and uses GitHub-hosted
 native AMD64 and ARM64 runners. It checks out the exact selected implementation commit, has no KVM or private-source
-access, and records the exact native toolchain image IDs.
+access, and records the exact native toolchain image IDs. For a named same-repository PR, this mode authenticates
+its current API head, fetches the branch, and compares the fetched object with the dispatch SHA. It does not require
+a copy-pr-bot mirror.
 
 Full image validation is also manual-only and never uses `pull_request_target`. Its selector authenticates either a
-commit reachable from `main` or the exact tip of a named same-repository mirror, while the workflow definition itself
-is dispatched from `main`. The AMD64 leg retains the NKE workflow's verified runner label. The ARM64 leg uses the
+commit reachable from `main` or the exact tip of a named same-repository copy-pr-bot mirror and current open PR.
+The mirror remains a separate gate before private NKE source is handed to candidate code. The workflow definition
+itself is dispatched from `main`. The AMD64 leg retains the NKE workflow's verified runner label. The ARM64 leg uses the
 repository-specific 16-vCPU, 64-GiB KVM scale set defined by `NVIDIA-dev/nke-gha-runners` at `488424d`. Those VMs are
 single-use and must expose `/dev/kvm` to the runner identity; NKD performs the runtime admission before build work.
 
@@ -29,11 +32,14 @@ itself. NKD uses the local checkout through a process-scoped Git transport overr
 
 ## Two-pass AMD64 gate
 
-The source lock contains verified AMD64 inputs but `localImages.amd64` is intentionally null. The initial toolchain
-dispatch therefore builds the toolchain natively and uploads its exact local image ID. A follow-up change in the same review
-must record that ID, extend the shared catalog platforms and toolchain map, and add the thin AMD64 Definition,
-installer supplier selection and Environment. Only then can AMD64 full validation run. Runtime mutation of authored
-inputs and reuse of the ARM64 image ID are forbidden.
+The source lock contains verified AMD64 tool binaries but `localImages.amd64` is intentionally null. The initial
+toolchain dispatch builds natively and uploads its observed local image ID. Two runs from the same locked source
+must agree before recording a Docker pin; the first two native Docker runs on 2026-09-28 did not agree on either
+architecture. A fixed BuildKit source-date epoch is now under test, not accepted as reproduction evidence.
+Once a stable Docker ID is observed, a follow-up change must record a separate Docker pin, extend the shared
+catalog platforms and toolchain map, and add the thin AMD64 Definition, installer supplier selection and
+Environment. The existing ARM64 Podman pin is not a Docker pin. Runtime mutation of authored inputs or reuse of
+the Podman ID for Docker are forbidden.
 
 ## Acceptance
 

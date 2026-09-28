@@ -177,7 +177,17 @@ nfpm_digest="$(jq -r --arg arch "${arch}" '.nfpm.archives[$arch]' "${lock}")"
 nfpm_binary_digest="$(jq -r --arg arch "${arch}" '.nfpm.binaries[$arch]' "${lock}")"
 tag="${tag:-localhost/nkd-packer-toolchain:dev-${arch}}"
 
-"${runtime}" build \
+build_command=("${runtime}" build)
+if [[ "${runtime##*/}" == docker ]]; then
+  # Buildx passes the fixed epoch into BuildKit's image config and history.
+  # Keep the existing Podman path unchanged so its recorded ARM64 image ID
+  # remains an independently checkable local development pin.
+  "${runtime}" buildx version
+  "${runtime}" version --format 'Docker server {{.Server.Version}}'
+  build_command=("${runtime}" buildx build --load --build-arg SOURCE_DATE_EPOCH=0)
+fi
+
+"${build_command[@]}" \
   --platform "linux/${arch}" \
   --build-arg "TARGETARCH=${arch}" \
   --build-arg "BASE_IMAGE=${base_image}" \

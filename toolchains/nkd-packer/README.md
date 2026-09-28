@@ -42,6 +42,11 @@ publication.
 Use `--check` for the network-free source-lock validation. Building uses the
 fixed Ubuntu snapshot and verifies every downloaded release archive before
 extracting them. The command does not push, sign, or write a transport digest.
+Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` for deterministic image
+creation metadata; Podman retains its existing build path and independent
+ARM64 local image pin. The fixed epoch does not itself prove identical image
+bytes. Repeat a native Docker build on fresh runners and compare the resulting
+image IDs before adding a Docker pin.
 There is no toolchain publication workflow in this repository. `localImages`
 records a validated content-addressed local image ID when one has been built
 and reproduced on its native architecture; `images` remains `null` because a
