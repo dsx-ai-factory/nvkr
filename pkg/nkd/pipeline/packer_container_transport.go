@@ -21,6 +21,44 @@ import (
 
 const packerArtifactCollectionCopies int64 = 3
 
+func preparePackerContainerIdentity(root, runtimeName string) (packerContainerIdentity, error) {
+	if runtimeName != "docker" {
+		return packerContainerIdentity{}, nil
+	}
+	identityRoot := filepath.Join(root, "identity")
+	if err := os.Mkdir(identityRoot, 0o700); err != nil {
+		return packerContainerIdentity{}, e.Wrap(e.CodeEngineCapability, err,
+			"creating private Docker identity projection")
+	}
+	uid, gid := os.Getuid(), os.Getgid()
+	identity := packerContainerIdentity{
+		passwdPath: filepath.Join(identityRoot, "passwd"),
+		groupPath:  filepath.Join(identityRoot, "group"),
+	}
+	if err := writePackerIdentityFile(identity.passwdPath,
+		fmt.Sprintf("nkd:x:%d:%d:NKD Builder:%s/home:/bin/sh\n", uid, gid, packerContainerWorkRoot)); err != nil {
+		return packerContainerIdentity{}, err
+	}
+	if err := writePackerIdentityFile(identity.groupPath, fmt.Sprintf("nkd:x:%d:\n", gid)); err != nil {
+		return packerContainerIdentity{}, err
+	}
+	return identity, nil
+}
+
+func writePackerIdentityFile(name, content string) error {
+	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
+	if err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "creating Docker identity projection")
+	}
+	_, writeErr := io.WriteString(file, content)
+	syncErr := file.Sync()
+	closeErr := file.Close()
+	if err := errors.Join(writeErr, syncErr, closeErr); err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "persisting Docker identity projection")
+	}
+	return nil
+}
+
 func validatePackerContainerRequest(request packerContainerRunRequest, kvmEnabled bool) error {
 	if request.workspace == nil {
 		return e.New(e.CodeEngineCapability, "containerized Packer requires the admitted workspace capability")

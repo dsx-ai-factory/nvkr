@@ -97,6 +97,8 @@ if [[ "${check_only}" -eq 1 ]]; then
   exit 0
 fi
 
+command -v mktemp >/dev/null 2>&1 || { echo "mktemp is required" >&2; exit 1; }
+
 case "$(uname -m)" in
   x86_64) native_arch=amd64 ;;
   aarch64|arm64) native_arch=arm64 ;;
@@ -124,6 +126,14 @@ fi
 
 uid="$(id -u)"
 gid="$(id -g)"
+identity_dir=""
+cleanup_identity() {
+  if [[ -n "${identity_dir}" ]]; then
+    rm -f -- "${identity_dir}/passwd" "${identity_dir}/group"
+    rmdir -- "${identity_dir}"
+  fi
+}
+trap cleanup_identity EXIT
 case "${runtime##*/}" in
   podman)
     identity_args=(
@@ -132,9 +142,14 @@ case "${runtime##*/}" in
     )
     ;;
   docker)
+    identity_dir="$(mktemp -d "${TMPDIR:-/tmp}/nkd-packer-identity.XXXXXX")"
+    printf 'nkd:x:%s:%s:NKD Builder:/nkd/work/home:/bin/sh\n' "${uid}" "${gid}" \
+      >"${identity_dir}/passwd"
+    printf 'nkd:x:%s:\n' "${gid}" >"${identity_dir}/group"
+    chmod 0400 "${identity_dir}/passwd" "${identity_dir}/group"
     identity_args=(
-      --volume /etc/passwd:/etc/passwd:ro
-      --volume /etc/group:/etc/group:ro
+      --mount "type=bind,src=${identity_dir}/passwd,dst=/etc/passwd,readonly"
+      --mount "type=bind,src=${identity_dir}/group,dst=/etc/group,readonly"
     )
     ;;
   *)

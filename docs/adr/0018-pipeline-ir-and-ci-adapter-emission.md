@@ -285,9 +285,10 @@ it never pulls an image or invokes `packer init`. The image may declare at most 
 overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
 Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, disabled health check, read-only
 root, no new privileges and all capabilities dropped. OpenSSH must be able to resolve that numeric identity.
-Podman therefore generates exact passwd/group rows for the invoking UID/GID; Docker receives read-only mounts of
-the host's public `/etc/passwd` and `/etc/group` identity databases. Shadow databases are never mounted. These
-public identity projections do not change the process's numeric authority. Preparation, extraction, version checking, SSH-key
+Podman therefore generates exact passwd/group rows for the invoking UID/GID. Docker receives read-only mounts of
+attempt-owned public passwd/group projections containing only that numeric identity, so it does not depend on the
+host's NSS or account-file configuration. Shadow databases are never mounted. These public identity projections do
+not change the process's numeric authority. Preparation, extraction, version checking, SSH-key
 generation and `packer validate` always use network-none. Only `packer build` receives the exact admitted node
 mode. `default` grants egress to the whole build container, including plugins and local provisioners, as well as
 the QEMU guest through NAT. It selects the container runtime's default bridge, which also permits addressing the

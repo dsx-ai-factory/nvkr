@@ -105,6 +105,12 @@ type packerContainerRunRequest struct {
 	bindings  packerContainerBindings
 	stdout    io.Writer
 	stderr    io.Writer
+	identity  packerContainerIdentity
+}
+
+type packerContainerIdentity struct {
+	passwdPath string
+	groupPath  string
 }
 
 type packerContainerCreateRequest struct {
@@ -124,6 +130,7 @@ type packerContainerCreateRequest struct {
 	allowChown    bool
 	allowDAC      bool
 	network       string
+	identity      packerContainerIdentity
 }
 
 func packerContainerCreateArgs(runtimeName string, request packerContainerCreateRequest) []string {
@@ -151,8 +158,8 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 		user = fmt.Sprintf("%d:%d", uid, gid)
 		// Consumer processes retain the invoking numeric identity. OpenSSH also
 		// requires that identity to resolve through getpwuid(3). Podman can inject
-		// exact public identity rows without a host bind. Docker receives only the
-		// host's public account databases; shadow files are never mounted.
+		// exact public identity rows directly. Docker receives attempt-owned public
+		// identity projections prepared before any consumer container is created.
 		if runtimeName == "podman" {
 			args = append(args,
 				fmt.Sprintf("--passwd-entry=nkd:x:%d:%d:NKD Builder:%s/home:/bin/sh", uid, gid, packerContainerWorkRoot),
@@ -160,8 +167,8 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 			)
 		} else {
 			args = append(args,
-				"--volume", "/etc/passwd:/etc/passwd:ro",
-				"--volume", "/etc/group:/etc/group:ro",
+				"--mount", "type=bind,src="+request.identity.passwdPath+",dst=/etc/passwd,readonly",
+				"--mount", "type=bind,src="+request.identity.groupPath+",dst=/etc/group,readonly",
 			)
 		}
 	}

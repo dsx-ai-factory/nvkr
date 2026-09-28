@@ -383,12 +383,18 @@ jobs:
           qcow=".nkd/runs/${attempt}/outputs/nke-node-image-${ARCH}.qcow2"
           image="$(jq -er --arg arch "${ARCH}" '.localImages[$arch]' toolchains/nkd-packer/toolchain.lock.json)"
           mkdir -p ".nkd/boot-smoke/${ARCH}"
+          identity_dir="${PWD}/.nkd/boot-smoke/${ARCH}/identity"
+          install -d -m 0700 "${identity_dir}"
+          printf 'nkd:x:%s:%s:NKD Builder:/work:/bin/sh\n' "$(id -u)" "$(id -g)" \
+            >"${identity_dir}/passwd"
+          printf 'nkd:x:%s:\n' "$(id -g)" >"${identity_dir}/group"
+          chmod 0400 "${identity_dir}/passwd" "${identity_dir}/group"
           kvm_group="$(stat -c %g /dev/kvm)"
           docker run --rm --pull=never --network=none --read-only --cap-drop=all \
             --security-opt no-new-privileges --device /dev/kvm --group-add "${kvm_group}" \
             --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
-            --volume /etc/passwd:/etc/passwd:ro \
-            --volume /etc/group:/etc/group:ro \
+            --mount "type=bind,src=${identity_dir}/passwd,dst=/etc/passwd,readonly" \
+            --mount "type=bind,src=${identity_dir}/group,dst=/etc/group,readonly" \
             --volume "${GITHUB_WORKSPACE}/.trusted/nke:/nke:ro" \
             --volume "${PWD}/${qcow}:/artifact.qcow2:ro" \
             --volume "${PWD}/.nkd/boot-smoke/${ARCH}:/work:rw" \
