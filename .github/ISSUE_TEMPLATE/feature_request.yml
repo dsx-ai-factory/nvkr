@@ -15,7 +15,7 @@
 name: Feature Request
 description: Suggest a new feature or enhancement
 title: "[Feature]: "
-labels: ["feature", "needs-triage"]
+labels: ["enhancement"]
 
 body:
   - type: checkboxes
@@ -122,6 +122,14 @@ body:
       options:
         - Yes, I can open a PR
         - Maybe, with guidance
-        - No
+        - "No"
     validations:
       required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nke-recipes/blob/main/CODE_OF_CONDUCT.md)
+          required: true

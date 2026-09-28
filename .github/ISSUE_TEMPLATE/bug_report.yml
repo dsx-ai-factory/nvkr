@@ -15,7 +15,7 @@
 name: Bug Report
 description: Report a bug or unexpected behavior
 title: "[Bug]: "
-labels: ["bug", "needs-triage"]
+labels: ["bug"]
 
 body:
   - type: checkboxes
@@ -27,7 +27,7 @@ body:
           required: true
         - label: I can reproduce this issue consistently
           required: true
-        - label: This is not a security vulnerability (report those to [NVIDIA PSIRT](https://www.nvidia.com/object/submit-security-vulnerability.html), not through GitHub)
+        - label: This is not a security vulnerability (report those to [NVIDIA PSIRT](https://www.nvidia.com/en-us/security/report-vulnerability/), not through GitHub)
           required: true
 
   - type: textarea
@@ -112,22 +112,22 @@ body:
       label: Environment
       placeholder: |
         - NKE Recipes version (CLI `nkdctl --version` or commit SHA):
-        - Install method (release binary / build from source / container image):
-        - Platform (eks/gke/aks/oke/ocp/kind/lke/bcm/rke2/generic/k0s/other):
-        - Kubernetes version:
-        - OS (ubuntu/cos/other) + version:
-        - Kernel version:
-        - GPU type (h100/h200/gb200/b200/a100/l40/l40s/rtx-pro-6000/vr200/other):
-        - Workload intent (training/inference):
+        - Source checkout commit (if building from source):
+        - OS and architecture:
+        - Go version:
+        - Operation (plan, generate, local run, or GitHub run):
+        - Engine and Environment file:
+        - Container runtime and version (if applicable):
+        - Relevant tool versions (for example Packer, cosign, or Syft):
       value: |
         - NKE Recipes version (CLI `nkdctl --version` or commit SHA):
-        - Install method (release binary / build from source / container image):
-        - Platform (eks/gke/aks/oke/ocp/kind/lke/bcm/rke2/generic/k0s/other):
-        - Kubernetes version:
-        - OS (ubuntu/cos/other) + version:
-        - Kernel version:
-        - GPU type (h100/h200/gb200/b200/a100/l40/l40s/rtx-pro-6000/vr200/other):
-        - Workload intent (training/inference):
+        - Source checkout commit (if building from source):
+        - OS and architecture:
+        - Go version:
+        - Operation (plan, generate, local run, or GitHub run):
+        - Engine and Environment file:
+        - Container runtime and version (if applicable):
+        - Relevant tool versions (for example Packer, cosign, or Syft):
     validations:
       required: true
 
@@ -158,3 +158,11 @@ body:
       description: Anything else that might help (regression? recent upgrade? related issues?).
     validations:
       required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nke-recipes/blob/main/CODE_OF_CONDUCT.md)
+          required: true

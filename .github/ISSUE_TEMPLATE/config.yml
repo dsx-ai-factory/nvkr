@@ -15,11 +15,14 @@
 blank_issues_enabled: false
 contact_links:
   - name: 🔒 Security Issue
-    url: https://www.nvidia.com/object/submit-security-vulnerability.html
+    url: https://www.nvidia.com/en-us/security/report-vulnerability/
     about: Report a security vulnerability to NVIDIA PSIRT (not through GitHub)
   - name: 💬 Questions
-    url: https://github.com/dsx-ai-factory/nke-recipes/issues?q=is%3Aissue+label%3Aquestion
-    about: Browse issues already labelled question for an existing answer
+    url: https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/q-a
+    about: Ask usage questions and browse answers in GitHub Discussions
+  - name: 🤝 Getting Help
+    url: https://github.com/dsx-ai-factory/nke-recipes/blob/main/SUPPORT.md
+    about: Review support channels and what to include in a report
   - name: 📖 Documentation
     url: https://github.com/dsx-ai-factory/nke-recipes/blob/main/README.md
     about: Read the documentation and guides

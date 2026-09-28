@@ -43,3 +43,15 @@ The [documentation map](docs/README.md) routes architecture, vocabulary, milesto
 The [SADD](docs/sadd.md) explains the architecture; current [ADRs](docs/adr/) own engineering contracts pending
 named-decider ratification. [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) cover reporting
 and community expectations.
+
+## Support
+
+Use [GitHub Discussions](https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/q-a) for usage
+questions and [GitHub Issues](https://github.com/dsx-ai-factory/nke-recipes/issues) for reproducible bugs,
+feature requests, and documentation gaps. See [SUPPORT.md](SUPPORT.md) for the full support policy. Report
+security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+NKE Recipes is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
