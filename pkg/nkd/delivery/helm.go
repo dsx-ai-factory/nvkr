@@ -5,11 +5,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -31,9 +33,63 @@ const maxHelmChartYAMLBytes = 1 << 20
 // contain (e.g. a CRD-heavy umbrella chart).
 const maxHelmChartEntries = 1_000_000
 
-// helmChartDependency mirrors helm.sh/helm/v3/pkg/chart.Dependency exactly, so
-// the config blob is byte-for-byte what a real `helm package`+`helm push` would
-// encode for a chart's dependency list.
+// maxHelmChartDecompressedBytes bounds the aggregate decompressed size
+// helmChartMetadata reads while scanning a chart archive for Chart.yaml, the
+// same defense internal/transportarchive.transportLimitReader applies to its
+// own gzip lane. helmChartMetadata's sole caller today (BuildHelmChartArtifact)
+// feeds it NKD-produced, already size-checked data, but both are exported, so
+// this bound does not depend on caller provenance to stop a small
+// decompression bomb from expanding without limit.
+const maxHelmChartDecompressedBytes = 512 << 20
+
+// boundedGzipReader fails closed once a decompressed gzip stream has yielded
+// more than its byte budget, mirroring
+// internal/transportarchive.transportLimitReader: the boundary is confirmed
+// with a one-byte probe read of the underlying stream, not merely inferred
+// from the counter reaching zero, so a maximum-size but otherwise legal
+// stream is not rejected.
+type boundedGzipReader struct {
+	reader    io.Reader
+	remaining int64
+}
+
+func (b *boundedGzipReader) Read(p []byte) (int, error) {
+	if b.remaining <= 0 {
+		probe := make([]byte, 1)
+		n, err := b.reader.Read(probe)
+		if n > 0 {
+			return 0, fmt.Errorf("helm chart archive exceeds its %d-byte decompressed bound", maxHelmChartDecompressedBytes)
+		}
+		return 0, err
+	}
+	if int64(len(p)) > b.remaining {
+		p = p[:b.remaining]
+	}
+	n, err := b.reader.Read(p)
+	b.remaining -= int64(n)
+	return n, err
+}
+
+// helmChartSemVer is the strict SemVer 2.0.0 grammar
+// (https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string),
+// the same grammar Helm's own chart.Metadata.Validate applies to
+// Chart.yaml's version via Masterminds/semver's StrictNewVersion. Matched by
+// hand here rather than importing helm.sh/helm or Masterminds/semver, since
+// this is the entire authoritative rule this boundary needs.
+var helmChartSemVer = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)` +
+	`(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?` +
+	`(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+
+// helmChartValidAPIVersions are the two Chart.yaml apiVersion values Helm's
+// own loader accepts: "v1" (legacy Helm 2 chart, still loadable by Helm 3)
+// and "v2" (the current chart API). Any other value is rejected by the real
+// Helm loader before a chart is packaged or pushed.
+var helmChartValidAPIVersions = map[string]bool{"v1": true, "v2": true}
+
+// helmChartDependency mirrors the field names, JSON tags and order of
+// helm.sh/helm/v3/pkg/chart.Dependency (helm.sh/helm is not imported here;
+// this is a hand-kept structural mirror, not a binary comparison against a
+// real `helm package` output).
 type helmChartDependency struct {
 	Name         string   `json:"name" yaml:"name"`
 	Version      string   `json:"version,omitempty" yaml:"version,omitempty"`
@@ -52,11 +108,12 @@ type helmChartMaintainer struct {
 	URL   string `json:"url,omitempty"`
 }
 
-// helmChartConfig mirrors helm.sh/helm/v3/pkg/chart.Metadata field-for-field
-// (same names, same json tags, same order), so the config blob this produces is
-// exactly what a real `helm package`+`helm push` would encode for the same
-// Chart.yaml: every field is a pure, deterministic function of Chart.yaml's own
-// bytes, so re-running this on the same chart reproduces the same config blob.
+// helmChartConfig mirrors the field names, JSON tags and order of
+// helm.sh/helm/v3/pkg/chart.Metadata (a hand-kept structural mirror;
+// helm.sh/helm is not imported here, and no test drives a real `helm
+// package`+`helm push` to confirm byte-identical output). Every field is a
+// pure, deterministic function of Chart.yaml's own bytes, so re-running this
+// on the same chart reproduces the same config blob.
 type helmChartConfig struct {
 	Name         string                 `json:"name,omitempty"`
 	Home         string                 `json:"home,omitempty"`
@@ -90,7 +147,7 @@ func helmChartMetadata(chartData []byte) (helmChartConfig, error) {
 		return helmChartConfig{}, e.Wrap(e.CodeVerifyFailed, err, "opening Helm chart archive")
 	}
 	defer func() { _ = gz.Close() }()
-	tr := tar.NewReader(gz)
+	tr := tar.NewReader(&boundedGzipReader{reader: gz, remaining: maxHelmChartDecompressedBytes})
 	root := ""
 	var raw []byte
 	entries := 0
@@ -141,25 +198,54 @@ func helmChartMetadata(chartData []byte) (helmChartConfig, error) {
 	if err := yaml.Unmarshal(raw, &config); err != nil {
 		return helmChartConfig{}, e.Wrap(e.CodeVerifyFailed, err, "decoding Helm chart Chart.yaml")
 	}
-	if config.Name == "" || config.Version == "" {
-		return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml requires a name and version")
+	if err := validateHelmChartMetadata(config); err != nil {
+		return helmChartConfig{}, err
 	}
 	return config, nil
 }
 
+// validateHelmChartMetadata applies the same authoritative rules Helm's own
+// chart.Metadata.Validate enforces before a chart can be loaded or pushed:
+// apiVersion, name and version are required, apiVersion must be a value
+// Helm's loader accepts, type (when set) must be a value Helm's loader
+// accepts, and version must be strict SemVer. Accepting a Chart.yaml that
+// fails these rules would package it under the standard Helm media types
+// anyway, deferring the real failure to whatever consumer later runs the
+// authoritative Helm loader against it.
+func validateHelmChartMetadata(config helmChartConfig) error {
+	if config.Name == "" {
+		return e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml requires a name")
+	}
+	if config.Version == "" {
+		return e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml requires a version")
+	}
+	if !helmChartValidAPIVersions[config.APIVersion] {
+		return e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml apiVersion %q must be %q or %q", config.APIVersion, "v1", "v2")
+	}
+	if config.Type != "" && config.Type != "application" && config.Type != "library" {
+		return e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml type %q must be %q or %q", config.Type, "application", "library")
+	}
+	if !helmChartSemVer.MatchString(config.Version) {
+		return e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml version %q is not a valid SemVer", config.Version)
+	}
+	return nil
+}
+
 // BuildHelmChartArtifact packages chartData — a `helm package`-shaped,
-// gzip-compressed chart tarball — as a standards-defined Helm OCI chart artifact:
-// config media type application/vnd.cncf.helm.config.v1+json (real Chart.yaml
-// metadata) and one layer application/vnd.cncf.helm.chart.content.v1.tar+gzip
-// (the chart bytes themselves), exactly what `helm push oci://...` produces. The
+// gzip-compressed chart tarball — as a structurally standards-conformant Helm
+// OCI chart artifact: config media type application/vnd.cncf.helm.config.v1+json
+// (real Chart.yaml metadata) and one layer
+// application/vnd.cncf.helm.chart.content.v1.tar+gzip (the chart bytes
+// themselves), matching what `helm push oci://...` documents producing. The
 // ORAS-go library that Helm's own registry client is built on constructs the
 // local OCI Image Layout at out; this function performs no network I/O — the
 // separate delivery Push path (registry.go) is solely responsible for
-// transporting the committed layout to a registry, so any conformant client
-// (stock `helm pull`, `helm install oci://...`, `oras pull`, ...) can read it
-// without an NKD-specific decoder. artifactType is NKD's own package identity,
-// carried on the manifest alongside the standard fields; Helm's Pull never reads
-// a manifest-level artifactType, so this addition is inert to it.
+// transporting the committed layout to a registry. This is contract-tested
+// against generic OCI-layout readers (go-containerregistry, oras-go); reading
+// the produced layout with an unmodified `helm pull`/`helm show`/`oras pull`
+// binary is not yet externally exercised. artifactType is NKD's own package
+// identity, carried on the manifest alongside the standard fields; Helm's Pull
+// never reads a manifest-level artifactType, so this addition is inert to it.
 func BuildHelmChartArtifact(ctx context.Context, out, artifactType string, chartData []byte) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Result{}, err
@@ -298,15 +384,46 @@ func helmChartTags(ref name.Reference, img v1.Image, options ...name.Option) (di
 	// everywhere else.
 	tagVersion := strings.ReplaceAll(config.Version, "+", "_")
 	parseOptions := append([]name.Option{name.StrictValidation}, options...)
-	discovery, err = name.NewTag(fmt.Sprintf("%s:%s", ref.Context().Name(), tagVersion), parseOptions...)
+	// SemVer places no length ceiling on config.Version, but the OCI tag
+	// grammar caps a whole tag at maxOCITagLength; boundedHelmTagToken keeps
+	// an over-length version from making name.NewTag fail below by
+	// deterministically shortening it to a collision-resistant token that
+	// still fits, rather than leaving publication of that chart permanently
+	// impossible. The content tag additionally reserves room for the "-" and
+	// the manifest digest's 64 hex characters.
+	discoveryToken := boundedHelmTagToken(tagVersion, maxOCITagLength)
+	discovery, err = name.NewTag(fmt.Sprintf("%s:%s", ref.Context().Name(), discoveryToken), parseOptions...)
 	if err != nil {
 		return name.Tag{}, name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "Helm chart version %q is not a valid registry tag", config.Version)
 	}
-	content, err = name.NewTag(fmt.Sprintf("%s:%s-%s", ref.Context().Name(), tagVersion, digest.Hex), parseOptions...)
+	contentToken := boundedHelmTagToken(tagVersion, maxOCITagLength-1-len(digest.Hex))
+	content, err = name.NewTag(fmt.Sprintf("%s:%s-%s", ref.Context().Name(), contentToken, digest.Hex), parseOptions...)
 	if err != nil {
 		return name.Tag{}, name.Tag{}, e.Wrap(e.CodeVerifyFailed, err, "Helm chart version %q is not a valid registry tag", config.Version)
 	}
 	return discovery, content, nil
+}
+
+// maxOCITagLength is the OCI/Distribution tag grammar's maximum length:
+// [a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}, 128 characters total.
+const maxOCITagLength = 128
+
+// boundedHelmTagToken returns token unchanged when it already fits within
+// budget characters. Otherwise it deterministically shortens token to a
+// collision-resistant form that fits: a truncated prefix plus a short hex
+// digest of the full token, so two different over-length tokens that share
+// the same truncated prefix cannot collide on the same shortened tag.
+func boundedHelmTagToken(token string, budget int) string {
+	if len(token) <= budget {
+		return token
+	}
+	sum := sha256.Sum256([]byte(token))
+	suffix := fmt.Sprintf("-%x", sum[:8])
+	prefix := budget - len(suffix)
+	if prefix < 0 {
+		prefix = 0
+	}
+	return token[:prefix] + suffix
 }
 
 // removeEmptyLayoutDir removes an empty scaffolding directory the OCI store

@@ -83,8 +83,8 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			kind, media = "binary-bundle", MediaBinaryBundle
 		case "oci":
 			kind, media = "container-image", MediaOCIManifest
-		case "helm-oci":
-			kind, media = "helm-oci", "application/vnd.nkd.helm-bundle.v1"
+		case outputFormatHelm:
+			kind, media = outputFormatHelm, "application/vnd.nkd.helm-bundle.v1"
 		case "apt-repository":
 			kind, media = "apt-repository", "application/vnd.nkd.apt-repository.v1"
 		default:
@@ -100,7 +100,7 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			}
 			previous = component
 		}
-		if o.Output.Format != "helm-oci" && len(o.Output.Components) == 0 {
+		if o.Output.Format != outputFormatHelm && len(o.Output.Components) == 0 {
 			return e.New(e.CodeProvenanceMissing, "release output has no build subjects")
 		}
 		if o.Output.Format == "oci" && len(o.Output.Components) != 1 {

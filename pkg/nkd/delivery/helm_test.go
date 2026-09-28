@@ -317,13 +317,18 @@ func TestHelmChartTagsContentTagIsCollisionFreeAcrossContent(t *testing.T) {
 	}
 }
 
-func TestHelmChartTagsRejectsAnUntaggableVersion(t *testing.T) {
+// A version shaped so it would be illegal as an OCI tag (a space, an embedded
+// "/") is also illegal strict SemVer, so validateHelmChartMetadata now catches
+// it at chart-build time, before any registry tag is ever derived from it.
+func TestBuildHelmChartArtifactRejectsAnUntaggableVersion(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	for _, version := range []string{"1.2.3 dev", "1.2.3/4"} {
-		ref, img := helmChartImage(t, helmChartArchiveFixture(t, map[string]string{
+		chartData := helmChartArchiveFixture(t, map[string]string{
 			"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: " + version + "\n",
-		}))
-		if _, _, err := helmChartTags(ref, img); e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+		})
+		out := filepath.Join(t.TempDir(), "packaged")
+		if _, err := BuildHelmChartArtifact(ctx, out, "application/vnd.nkd.helm-chart.v1", chartData); e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
 			t.Fatalf("version %q: expected a fail-closed error, got %v", version, err)
 		}
 	}
@@ -415,11 +420,91 @@ func TestBuildHelmChartArtifactRejectsMalformedInput(t *testing.T) {
 	}
 }
 
-// tagHelmChart must push both tags on first publish, then skip re-pushing the
-// deterministic content tag on a rerun with identical content (only the
-// discovery tag, which mirrors real Helm's own mutable version tag, is
-// re-pushed unconditionally). This is what keeps a rerun working against a
-// registry that forbids overwriting an already-existing tag.
+// A Chart.yaml just over the 1 MiB bound must be rejected before it is ever
+// decoded, so a weakened or off-by-one bound would be caught here.
+func TestBuildHelmChartArtifactRejectsOversizedChartYAML(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	oversized := strings.Repeat("#", maxHelmChartYAMLBytes) + "\napiVersion: v2\nname: demo\nversion: 1.0.0\n"
+	chartData := helmChartArchiveFixture(t, map[string]string{"demo/Chart.yaml": oversized})
+	out := filepath.Join(t.TempDir(), "packaged")
+	_, err := BuildHelmChartArtifact(ctx, out, "application/vnd.nkd.helm-chart.v1", chartData)
+	if e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+		t.Fatalf("expected a fail-closed error for an over-budget Chart.yaml, got %v", err)
+	}
+}
+
+// helmChartMetadata must apply the same authoritative rules Helm's own
+// chart.Metadata.Validate enforces before a real `helm package` would accept
+// this Chart.yaml, instead of accepting any non-empty name and version and
+// deferring the failure to whatever consumer later runs the real Helm loader.
+func TestBuildHelmChartArtifactValidatesAuthoritativeChartMetadata(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, tc := range []struct{ name, chartYAML string }{
+		{"missing apiVersion", "name: demo\nversion: 1.0.0\n"},
+		{"invalid apiVersion", "apiVersion: v3\nname: demo\nversion: 1.0.0\n"},
+		{"invalid type", "apiVersion: v2\nname: demo\nversion: 1.0.0\ntype: library-x\n"},
+		{"non-semver version", "apiVersion: v2\nname: demo\nversion: not-a-version\n"},
+		{"semver missing patch", "apiVersion: v2\nname: demo\nversion: 1.0\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			chartData := helmChartArchiveFixture(t, map[string]string{"demo/Chart.yaml": tc.chartYAML})
+			out := filepath.Join(t.TempDir(), "packaged")
+			_, err := BuildHelmChartArtifact(ctx, out, "application/vnd.nkd.helm-chart.v1", chartData)
+			if e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+				t.Fatalf("expected a fail-closed error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestBuildHelmChartArtifactAcceptsValidChartTypesAndAPIVersions(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, tc := range []struct{ name, chartYAML string }{
+		{"v1 legacy chart", "apiVersion: v1\nname: demo\nversion: 1.0.0\n"},
+		{"v2 application chart", "apiVersion: v2\nname: demo\nversion: 1.0.0\ntype: application\n"},
+		{"v2 library chart", "apiVersion: v2\nname: demo\nversion: 1.0.0\ntype: library\n"},
+		{"prerelease and build metadata", "apiVersion: v2\nname: demo\nversion: 1.0.0-rc.1+build.5\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			chartData := helmChartArchiveFixture(t, map[string]string{"demo/Chart.yaml": tc.chartYAML})
+			out := filepath.Join(t.TempDir(), "packaged")
+			if _, err := BuildHelmChartArtifact(ctx, out, "application/vnd.nkd.helm-chart.v1", chartData); err != nil {
+				t.Fatalf("valid Chart.yaml rejected: %v", err)
+			}
+		})
+	}
+}
+
+// SemVer places no length ceiling on a version string; helmChartTags must
+// still produce tags the OCI tag grammar accepts (<=128 characters) instead
+// of making every publication of such a chart fail at the tagging step.
+func TestHelmChartTagsBoundsOverLengthVersion(t *testing.T) {
+	t.Parallel()
+	longVersion := "1.0.0-" + strings.Repeat("a", 200)
+	ref, img := helmChartImage(t, helmChartArchiveFixture(t, map[string]string{
+		"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: " + longVersion + "\n",
+	}))
+	discovery, content, err := helmChartTags(ref, img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(discovery.TagStr()) > maxOCITagLength {
+		t.Fatalf("discovery tag length = %d, want <= %d", len(discovery.TagStr()), maxOCITagLength)
+	}
+	if len(content.TagStr()) > maxOCITagLength {
+		t.Fatalf("content tag length = %d, want <= %d", len(content.TagStr()), maxOCITagLength)
+	}
+}
+
+// tagHelmChart must push both tags on first publish, then skip re-pushing
+// either tag on a rerun with identical content: both discovery and content
+// are pure functions of the chart's own bytes and version, so a rerun that
+// finds either tag already resolved to this manifest's digest is a no-op.
+// This is what keeps a rerun working against a registry that forbids
+// overwriting an already-existing tag.
 func TestTagHelmChartIsIdempotentOnRerunWithIdenticalContent(t *testing.T) {
 	ctx := context.Background()
 	chartData := helmChartArchiveFixture(t, map[string]string{
@@ -464,9 +549,12 @@ func TestTagHelmChartIsIdempotentOnRerunWithIdenticalContent(t *testing.T) {
 	if err := remote.Write(ref, img, remoteOptions...); err != nil {
 		t.Fatal(err)
 	}
-	parseOptions := []name.Option{name.Insecure}
+	discovery, content, err := helmChartTags(ref, img, name.Insecure)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if err := tagHelmChart(ctx, ref, img, "demo", parseOptions, remoteOptions); err != nil {
+	if err := tagHelmChart(ctx, img, discovery, content, "demo", remoteOptions); err != nil {
 		t.Fatal(err)
 	}
 	mu.Lock()
@@ -476,14 +564,98 @@ func TestTagHelmChartIsIdempotentOnRerunWithIdenticalContent(t *testing.T) {
 		t.Fatalf("first publish: want 2 tag PUTs (discovery+content), got %d: %v", first, tagPuts)
 	}
 
-	if err := tagHelmChart(ctx, ref, img, "demo", parseOptions, remoteOptions); err != nil {
+	if err := tagHelmChart(ctx, img, discovery, content, "demo", remoteOptions); err != nil {
 		t.Fatal(err)
 	}
 	mu.Lock()
 	second := len(tagPuts) - first
 	mu.Unlock()
-	if second != 1 {
-		t.Fatalf("rerun: want 1 additional tag PUT (discovery only; content tag skipped as already current), got %d", second)
+	if second != 0 {
+		t.Fatalf("rerun: want 0 additional tag PUTs (both tags already current), got %d", second)
+	}
+}
+
+// A discovery tag pointing at a stale manifest (a prior chart build under
+// the same nominal version) must still move to the new manifest, matching
+// real Helm's own mutable `<version>` tag semantics; only an already-current
+// tag is skipped.
+func TestTagHelmChartRepointsDiscoveryTagWhenStale(t *testing.T) {
+	ctx := context.Background()
+	buildImage := func(templateBody string) (v1.Image, Descriptor) {
+		chartData := helmChartArchiveFixture(t, map[string]string{
+			"demo/Chart.yaml":                "apiVersion: v2\nname: demo\nversion: 1.2.3\n",
+			"demo/templates/deployment.yaml": templateBody,
+		})
+		out := filepath.Join(t.TempDir(), "packaged")
+		if _, err := BuildHelmChartArtifact(ctx, out, "application/vnd.nkd.helm-chart.v1", chartData); err != nil {
+			t.Fatal(err)
+		}
+		descriptor, err := PayloadDescriptor(ctx, out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hash, err := v1.NewHash(descriptor.Digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		img, err := layout.Path(out).Image(hash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return img, descriptor
+	}
+	imgA, descriptorA := buildImage("kind: Deployment\nfirst\n")
+	imgB, descriptorB := buildImage("kind: Deployment\nsecond\n")
+
+	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	repository := strings.TrimPrefix(server.URL, "http://") + "/charts/demo"
+	remoteOptions := registryOptions(ctx, RegistryOptions{PlainHTTP: true, Anonymous: true})
+
+	refA, err := name.NewDigest(repository+"@"+descriptorA.Digest, name.StrictValidation, name.Insecure)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := remote.Write(refA, imgA, remoteOptions...); err != nil {
+		t.Fatal(err)
+	}
+	discoveryA, contentA, err := helmChartTags(refA, imgA, name.Insecure)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tagHelmChart(ctx, imgA, discoveryA, contentA, "demo", remoteOptions); err != nil {
+		t.Fatal(err)
+	}
+
+	refB, err := name.NewDigest(repository+"@"+descriptorB.Digest, name.StrictValidation, name.Insecure)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := remote.Write(refB, imgB, remoteOptions...); err != nil {
+		t.Fatal(err)
+	}
+	discoveryB, contentB, err := helmChartTags(refB, imgB, name.Insecure)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if discoveryB.TagStr() != discoveryA.TagStr() {
+		t.Fatalf("discovery tag changed across builds under the same nominal version: %s vs %s", discoveryA.TagStr(), discoveryB.TagStr())
+	}
+	if err := tagHelmChart(ctx, imgB, discoveryB, contentB, "demo", remoteOptions); err != nil {
+		t.Fatal(err)
+	}
+
+	moved, err := remote.Head(discoveryB, remoteOptions...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDigest, err := imgB.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved.Digest != wantDigest {
+		t.Fatalf("discovery tag did not move to the newer manifest: got %s, want %s", moved.Digest, wantDigest)
 	}
 }
 

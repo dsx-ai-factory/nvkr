@@ -12,6 +12,12 @@ import (
 
 const MediaEmptyConfig = "application/vnd.oci.empty.v1+json"
 
+// outputFormatHelm mirrors definition.OutputHelm and factory.PackageHelm; the
+// delivery package intentionally does not import definition to dispatch on an
+// Output.Format string, so it carries its own copy of the same literal instead
+// of a bare "helm-oci" repeated at every call site.
+const outputFormatHelm = "helm-oci"
+
 // The Helm OCI support media types (https://helm.sh/docs/topics/registries/), used
 // by BuildHelmChartArtifact so a packaged chart is a standards-conformant Helm OCI
 // artifact: real `helm pull`/`helm show`/`oras pull` resolve content purely from

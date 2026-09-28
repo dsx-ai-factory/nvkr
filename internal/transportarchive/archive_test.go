@@ -608,7 +608,8 @@ func TestUnpackRejectsAGzipCompressedCarrier(t *testing.T) {
 // A compressed carrier only passes its on-disk size through the caller's size
 // precondition, so the decompressed stream carries its own aggregate budget.
 // The budget is exercised at a small size here; production uses
-// maxTransportBytes.
+// maxHelmTransportDecompressedBytes for the gzip lane and maxTransportBytes
+// for every plain-tar lane.
 func TestTransportLimitReaderFailsClosedPastItsBudget(t *testing.T) {
 	t.Parallel()
 	reader := &transportLimitReader{reader: bytes.NewReader(bytes.Repeat([]byte{'x'}, 16)), remaining: 8}
@@ -644,6 +645,7 @@ func TestTransportLimitReaderAcceptsExactlyItsBudget(t *testing.T) {
 // bytes tar.Reader.Next skips between entries.
 func TestOpenTransportTarSourceBoundsBothCarrierShapes(t *testing.T) {
 	t.Parallel()
+	wantBudget := map[string]int64{"plain": maxTransportBytes, "gzip": maxHelmTransportDecompressedBytes}
 	for name, path := range map[string]string{
 		"plain": filepath.Join(t.TempDir(), "carrier.tar"),
 		"gzip":  filepath.Join(t.TempDir(), "carrier.tgz"),
@@ -666,8 +668,8 @@ func TestOpenTransportTarSourceBoundsBothCarrierShapes(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s carrier is unbounded: %T", name, source)
 		}
-		if limited.remaining != maxTransportBytes {
-			t.Fatalf("%s carrier budget = %d, want %d", name, limited.remaining, maxTransportBytes)
+		if limited.remaining != wantBudget[name] {
+			t.Fatalf("%s carrier budget = %d, want %d", name, limited.remaining, wantBudget[name])
 		}
 		closeSource()
 		if err := file.Close(); err != nil {

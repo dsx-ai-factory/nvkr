@@ -191,7 +191,8 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 		if _, err := readBlob(ctx, root, manifest.Config, 8<<20); err != nil {
 			return err
 		}
-		if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.ArtifactType != object.ArtifactType {
+		if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest ||
+			manifest.Layers[0].MediaType != MediaHelmChartLayer || manifest.ArtifactType != object.ArtifactType {
 			return e.New(e.CodeVerifyFailed, "Helm chart artifact differs from release binding")
 		}
 		return nil

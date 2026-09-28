@@ -43,15 +43,14 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	if len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", node.ID)
 	}
-	archive := filepath.Join(filepath.Dir(output.Path), "."+output.Name+".helm.tar")
-	// The transport archive is an internal carrier, not a graph output. Always
-	// reclaim it, including after interruption or a previous failed run, so an
-	// owned factory workspace is genuinely rerunnable without weakening the
-	// archive publisher's no-replace guarantee.
-	if err := removeFactoryCarrier(archive); err != nil {
+	// legacyCarrier is not written by this function itself; it reclaims a
+	// same-named carrier a prior interrupted run (or an older build of this
+	// binary) may have left beside output.Path, so an owned factory workspace
+	// is genuinely rerunnable.
+	legacyCarrier := filepath.Join(filepath.Dir(output.Path), "."+output.Name+".helm.tar")
+	if err := removeFactoryCarrier(legacyCarrier); err != nil {
 		return err
 	}
-	defer func() { _ = os.Remove(archive) }()
 	root, relative, cleanup, err := helmPackageTree(ctx, inputs[0])
 	if err != nil {
 		return err
@@ -73,7 +72,11 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	if err != nil {
 		return err
 	}
-	archive = filepath.Join(root, "bundle.tar")
+	// archive is a carrier inside root, a fresh MkdirTemp directory helmPackageTree
+	// owns and cleanup() above removes wholesale; it needs no reclaim-on-rerun
+	// logic or defer of its own (unlike legacyCarrier above, which sits beside
+	// the graph output and outlives any one run).
+	archive := filepath.Join(root, "bundle.tar")
 	if err := transportarchive.Pack(ctx, archive, root, []string{relative}); err != nil {
 		return err
 	}
@@ -268,8 +271,9 @@ func rerootHelmChartLayer(source, destination, wrapperRoot, prefix, chartName st
 			names = append(names, name)
 		}
 		sort.Strings(names)
-		return e.New(e.CodeVerifyFailed,
-			"Helm source archive carries unpublished content outside the bound chart %q: %s", chartName, strings.Join(names, ", "))
+		return e.New(e.CodeInvalidCatalog,
+			"Helm source archive carries unpublished content outside the bound chart %q: %s; split it into separate Definition outputs",
+			chartName, strings.Join(names, ", "))
 	}
 	if err := tw.Close(); err != nil {
 		_ = gz.Close()

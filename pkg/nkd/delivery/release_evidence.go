@@ -71,7 +71,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 				binding.SubjectKind = "oci-manifest"
 				binding.SubjectDigest = o.DescriptorDigest
 				binding.InspectionInputDigest = subject
-			case "helm-oci":
+			case outputFormatHelm:
 				binding.Stage = "source-build"
 				binding.SubjectKind = "source-archive"
 			case "executable", "apt-repository":
@@ -80,7 +80,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			}
 			expected[o.Name+"/"+binding.Stage+"/"+binding.Component] = binding
 		}
-		if output.Format == "helm-oci" {
+		if output.Format == outputFormatHelm {
 			binding := EvidenceBinding{Outputs: []string{o.Name}, Component: o.Name, Stage: "packaging", SubjectKind: "helm-bundle",
 				SubjectDigest: o.DescriptorDigest, InspectionInputDigest: o.BlobDigest}
 			expected[o.Name+"/"+binding.Stage+"/"+binding.Component] = binding

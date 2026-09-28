@@ -480,10 +480,21 @@ func validateTransportEntryUnchanged(expected transportEntry, observed securepat
 // decompression exposure and its budget do not silently apply to Packer,
 // APT, or the generic `nkdctl transport` carriers.
 //
-// The returned reader carries a single aggregate maxTransportBytes budget over
-// the decompressed stream. A compressed carrier passes only its on-disk size
-// through the caller's size precondition, so without this budget a small
-// decompression bomb could expand without bound; the budget is charged for every
+// maxHelmTransportDecompressedBytes bounds the decompressed size of the one
+// gzip-compressed transport lane (a real `helm package` .tgz, read via
+// DetectTransportChartRoot / DetectAndUnpackChartRoot). Unlike
+// maxTransportBytes — sized for the full uncompressed workspace/VM carriers
+// this package also transports — this lane's on-disk (compressed) size can
+// be tens of MB while still decompressing to many times that (a
+// "decompression bomb"), so it gets its own, Helm-chart-sized decompressed
+// ceiling instead of inheriting the much larger aggregate budget.
+const maxHelmTransportDecompressedBytes = 512 << 20
+
+// The returned reader carries a single aggregate decompressed-byte budget: the
+// gzip lane gets maxHelmTransportDecompressedBytes, every other (plain tar)
+// lane keeps the full maxTransportBytes its on-disk size precondition already
+// bounds 1:1. Without a smaller budget on the gzip lane, a small decompression
+// bomb could expand without bound; the budget is charged for every
 // decompressed byte, including data tar.Reader.Next skips between entries.
 func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, func(), error) {
 	buffered := bufio.NewReader(source)
@@ -499,9 +510,10 @@ func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, 
 		if err != nil {
 			return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed transport archive")
 		}
-		return &transportLimitReader{reader: gz, remaining: maxTransportBytes}, func() { _ = gz.Close() }, nil
+		return &transportLimitReader{reader: gz, remaining: maxHelmTransportDecompressedBytes, bound: maxHelmTransportDecompressedBytes},
+			func() { _ = gz.Close() }, nil
 	}
-	return &transportLimitReader{reader: buffered, remaining: maxTransportBytes}, func() {}, nil
+	return &transportLimitReader{reader: buffered, remaining: maxTransportBytes, bound: maxTransportBytes}, func() {}, nil
 }
 
 // transportLimitReader fails closed once an untrusted stream has yielded more
@@ -513,6 +525,7 @@ func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, 
 type transportLimitReader struct {
 	reader    io.Reader
 	remaining int64
+	bound     int64
 }
 
 func (reader *transportLimitReader) Read(p []byte) (int, error) {
@@ -520,7 +533,7 @@ func (reader *transportLimitReader) Read(p []byte) (int, error) {
 		probe := make([]byte, 1)
 		n, err := reader.reader.Read(probe)
 		if n > 0 {
-			return 0, fmt.Errorf("transport archive exceeds its %d-byte decompressed bound", maxTransportBytes)
+			return 0, fmt.Errorf("transport archive exceeds its %d-byte decompressed bound", reader.bound)
 		}
 		return 0, err
 	}

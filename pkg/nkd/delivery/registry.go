@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -93,11 +94,25 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 			return "", err
 		}
 		defer cleanup()
+		isHelm := object.Output != nil && object.Output.Format == outputFormatHelm
+		var discoveryTag, contentTag name.Tag
+		if isHelm {
+			// Derive and validate both Helm tags before the manifest write below:
+			// helmChartTags reads only the already-built local img (no registry
+			// I/O), so a chart whose derived tag can never be valid (e.g. an
+			// over-length version) fails closed here instead of after an
+			// otherwise-successful manifest publication leaves a chart reachable
+			// only by digest.
+			discoveryTag, contentTag, err = helmChartTags(child, img, parseOptions...)
+			if err != nil {
+				return "", err
+			}
+		}
 		if err := remote.Write(child, img, remoteOptions...); err != nil {
 			return "", e.Wrap(e.CodeUnavailable, err, "publishing deliverable %q", object.Name)
 		}
-		if object.Output != nil && object.Output.Format == "helm-oci" {
-			if err := tagHelmChart(ctx, child, img, object.Name, parseOptions, remoteOptions); err != nil {
+		if isHelm {
+			if err := tagHelmChart(ctx, img, discoveryTag, contentTag, object.Name, remoteOptions); err != nil {
 				return "", err
 			}
 		}
@@ -246,15 +261,10 @@ func ResolveDigest(ctx context.Context, reference string, options RegistryOption
 // tagHelmChart pushes both the plain-version discovery tag and the digest-
 // suffixed content tag for a published Helm chart manifest (see
 // helmChartTags), after the manifest itself is already durably published at
-// its digest (remote.Write, called by the caller before this). options
-// carries the same transport settings (StrictValidation plus, for a plain-
-// HTTP registry, name.Insecure) used to parse ref, so a plain-HTTP chart
-// cannot silently default to https tag resolution.
-func tagHelmChart(ctx context.Context, ref name.Reference, img v1.Image, chart string, options []name.Option, remoteOptions []remote.Option) error {
-	discovery, content, err := helmChartTags(ref, img, options...)
-	if err != nil {
-		return err
-	}
+// its digest (remote.Write, called by the caller before this). discovery and
+// content are derived and validated by the caller before that write, so a
+// chart whose tag can never be valid fails before any bytes are published.
+func tagHelmChart(ctx context.Context, img v1.Image, discovery, content name.Tag, chart string, remoteOptions []remote.Option) error {
 	manifestDigest, err := img.Digest()
 	if err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "digesting Helm chart manifest")
@@ -262,24 +272,52 @@ func tagHelmChart(ctx context.Context, ref name.Reference, img v1.Image, chart s
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "tagging Helm chart %q", chart)
 	}
-	// The content tag is a pure function of the chart's own bytes, so a rerun
-	// that already tagged the same content is a no-op rather than a re-push;
-	// this keeps reruns working against a registry that forbids overwriting
-	// an existing tag (e.g. ECR IMMUTABLE, Harbor/Artifactory immutable-tag
-	// rules), which would otherwise reject every rerun after the first. The
-	// discovery tag is intentionally mutable (it mirrors real Helm's own
-	// `<version>` tag) and is always re-pushed, matching normal Helm publish
-	// semantics; only the content tag gets this idempotent skip.
-	existing, headErr := remote.Head(content, remoteOptions...)
-	if headErr != nil || existing.Digest != manifestDigest {
-		if err := remote.Tag(content, img, remoteOptions...); err != nil {
-			return helmTagPublishError(err, content, chart)
-		}
+	// Both tags are pure functions of the chart's own bytes and version, so a
+	// rerun that finds either tag already resolved to this manifest's digest
+	// is a no-op rather than a re-push; this keeps reruns working against a
+	// registry that forbids overwriting an existing tag (e.g. ECR IMMUTABLE,
+	// Harbor/Artifactory immutable-tag rules), which would otherwise reject
+	// every rerun after the first. The discovery tag is still re-pushed (and
+	// re-pointed) when it currently resolves to a different manifest, so a
+	// later publication under the same nominal version still moves it,
+	// matching normal mutable Helm publish semantics.
+	if err := publishHelmTag(content, img, manifestDigest, chart, remoteOptions); err != nil {
+		return err
 	}
-	if err := remote.Tag(discovery, img, remoteOptions...); err != nil {
-		return helmTagPublishError(err, discovery, chart)
+	if err := publishHelmTag(discovery, img, manifestDigest, chart, remoteOptions); err != nil {
+		return err
 	}
 	return nil
+}
+
+// publishHelmTag skips the PUT when tag already resolves to manifestDigest.
+// A definitive not-found Head means the tag must be written; any other Head
+// failure (5xx, timeout, throttling) is inconclusive and reported as an
+// availability error rather than risking a re-push into a registry that
+// forbids overwriting an existing immutable tag because of a transient hiccup.
+func publishHelmTag(tag name.Tag, img v1.Image, manifestDigest v1.Hash, chart string, remoteOptions []remote.Option) error {
+	existing, headErr := remote.Head(tag, remoteOptions...)
+	switch {
+	case headErr == nil:
+		if existing.Digest == manifestDigest {
+			return nil
+		}
+	case isNotFoundError(headErr):
+		// The tag does not exist yet; proceed to write it below.
+	default:
+		return e.Wrap(e.CodeUnavailable, headErr, "checking Helm chart tag %q for %q", tag.TagStr(), chart)
+	}
+	if err := remote.Tag(tag, img, remoteOptions...); err != nil {
+		return helmTagPublishError(err, tag, chart)
+	}
+	return nil
+}
+
+// isNotFoundError reports whether err is a definitive registry 404, as
+// opposed to a transient or ambiguous Head failure.
+func isNotFoundError(err error) bool {
+	var transportErr *transport.Error
+	return errors.As(err, &transportErr) && transportErr.StatusCode == http.StatusNotFound
 }
 
 // helmTagPublishError distinguishes a permanent, registry-side rejection (a
@@ -287,10 +325,14 @@ func tagHelmChart(ctx context.Context, ref name.Reference, img v1.Image, chart s
 // enforces beyond this package's own local name.NewTag validation) from a
 // transient failure. A caller or retry policy that treats every tagging
 // failure as CodeUnavailable would keep retrying a chart that can never
-// succeed instead of surfacing a coded input error.
+// succeed instead of surfacing a coded input error. 408 and 429 are
+// transient in the pinned registry transport even though they are 4xx
+// responses, so both are reported as CodeUnavailable rather than a
+// permanent catalog error.
 func helmTagPublishError(err error, tag name.Tag, chart string) error {
 	var transportErr *transport.Error
-	if errors.As(err, &transportErr) && transportErr.StatusCode >= 400 && transportErr.StatusCode < 500 {
+	if errors.As(err, &transportErr) && transportErr.StatusCode >= 400 && transportErr.StatusCode < 500 &&
+		transportErr.StatusCode != http.StatusRequestTimeout && transportErr.StatusCode != http.StatusTooManyRequests {
 		return e.Wrap(e.CodeInvalidCatalog, err, "registry rejected Helm chart tag %q for %q", tag.TagStr(), chart)
 	}
 	return e.Wrap(e.CodeUnavailable, err, "tagging Helm chart %q", chart)

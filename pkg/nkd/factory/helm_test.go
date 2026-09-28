@@ -261,7 +261,7 @@ func TestHelmPackageFailsClosedOnUnpublishedSiblingContent(t *testing.T) {
 		plan.Graph.Artifacts = append(plan.Graph.Artifacts, artifact)
 	}
 	err := executePackage(ctx, plan, node, artifacts, io.Discard)
-	if e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
+	if e.ExitCode(err) != e.ExitCode(e.New(e.CodeInvalidCatalog, "expected")) {
 		t.Fatalf("expected a fail-closed error naming the dropped sibling, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "sidecar") {
