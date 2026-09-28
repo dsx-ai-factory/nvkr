@@ -12,17 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Public intake uses the three issue forms and the security reporting link.
+# Questions and support routes remain in SUPPORT.md and GitHub Discussions.
 blank_issues_enabled: false
 contact_links:
-  - name: 🔒 Security Issue
+  - name: Report a security vulnerability
     url: https://github.com/dsx-ai-factory/nke-recipes/blob/main/SECURITY.md
     about: Read the private NVIDIA PSIRT reporting instructions; do not file a public issue
-  - name: 💬 Questions
-    url: https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/q-a
-    about: Ask usage questions and browse answers in GitHub Discussions
-  - name: 🤝 Getting Help
-    url: https://github.com/dsx-ai-factory/nke-recipes/blob/main/SUPPORT.md
-    about: Review support channels and what to include in a report
-  - name: 📖 Documentation
-    url: https://github.com/dsx-ai-factory/nke-recipes/blob/main/README.md
-    about: Read the documentation and guides
