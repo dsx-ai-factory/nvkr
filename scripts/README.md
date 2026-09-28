@@ -36,6 +36,9 @@ Use a different immutable attempt name for each run. The Podman path has one rec
 Docker is contract-tested but has not completed a recorded full image build. See the
 [Definition guide](../definitions/nke-os/README.md) and
 [local execution evidence](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
+Set `NKE_LOCAL_CLONE` to reuse an exact local NKE checkout. On macOS the same
+path must be visible inside the Podman machine; the wrapper forwards it and
+fails before the build if the checkout is unavailable there.
 
 Local attempts deliberately retain their frozen inputs, bootstrap runner and Run outputs. After reviewing an
 attempt, archive those three attempt-scoped directories together instead of reusing its name:

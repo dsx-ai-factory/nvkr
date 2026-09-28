@@ -18,6 +18,9 @@ is a development bootstrap route, not a production runner profile.
 
 Set CONTAINER_RUNTIME=podman or CONTAINER_RUNTIME=docker. Podman is the default.
 Set NKE_OS_ARCH=amd64 or NKE_OS_ARCH=arm64. ARM64 is the compatibility default.
+Set NKE_LOCAL_CLONE to a local NKE Git checkout when replacing the pinned
+repository fetch. On macOS, that path must also be visible inside the Podman
+machine; the script checks it there before building.
 EOF
 }
 

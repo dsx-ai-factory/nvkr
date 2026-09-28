@@ -329,16 +329,6 @@ in-process cleanup cannot run after `SIGKILL`, a process crash or host loss. Cro
 deferred until NKD has an authenticated owner-liveness protocol; a label-only startup sweep must not delete volumes
 that may belong to another live attempt.
 
-The local lifecycle issues an opaque diagnostic sink only after reserving the immutable attempt directory and
-passes that capability through the factory's private direct-Packer dispatch. The exact material manifest is
-retained before external runtime execution. If the source declares its build-log directory binding, bounded
-regular files from that directory are retained after the build returns, including a returned build failure, and
-before the cleanup above. A failure before that directory exists leaves the retained manifest without a log set.
-Diagnostic retention is closed before the immutable Run record is written; a retention failure is recorded as a
-failed Run and does not mask a primary build error. The retained manifest and logs are diagnostic only and grant
-no execution, Artifact, evidence or qualification authority. FDE and any secret-bearing route remain rejected.
-This behavior is contract-tested locally; generated upload wiring or a hosted upload is not execution evidence.
-
 This is current-availability authority for the current local direct-Packer VM adapter, not a resource reservation, authenticated
 provider allocation, cross-process receipt, or qualification evidence. Holding the validated KVM descriptor
 proves availability through the callback lifetime; it does not prove Packer or QEMU consumed that exact

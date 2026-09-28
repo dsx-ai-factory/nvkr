@@ -149,6 +149,12 @@ composer, installer patcher and guest-memory input in NKE source. The recorded P
 evidence for the newer pin. Approved published per-host toolchain image digests and a current committed-head rerun
 remain absent; the development pin is not a maintained release or production-acceptance claim.
 
+The repository-owned NKE OS validation workflow in row 18 is separate from generated hosted Run CI. PR branches
+may run native toolchain diagnostics without KVM or private NKE source. A full KVM image validation is admitted
+only for an exact commit reachable from main, with the NKE source credential referenced by a separate fetch job.
+That credential remains repository-scoped; the workflow does not establish an organization-level secret boundary.
+Neither native Docker toolchain reproduction nor a full hosted QCOW2 build has completed successfully.
+
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 01–03 Identity and errors | Canonical integer-only codec, frozen families, strict decoding, transport-free build identity, explicit execution-metadata exclusion, whole-graph admission, stable coded errors | Independent-language corpus for every signed family; external failures need continuing contract coverage |
