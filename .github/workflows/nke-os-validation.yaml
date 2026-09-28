@@ -245,20 +245,18 @@ jobs:
             .nkd/evidence/evidence-scope
             .nkd/evidence/toolchain-${{ matrix.arch }}.*
 
-  validate-full:
-    name: NKE OS full validation (${{ matrix.arch }})
+  fetch-nke-source:
+    name: Fetch exact NKE source
     needs: select
     if: needs.select.outputs.mode == 'full'
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.select.outputs.legs) }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      archive_digest: ${{ steps.package.outputs.archive_digest }}
     steps:
-      # Both secret-bearing steps run from the trusted main workflow before
-      # any code from the selected candidate commit.
-      - name: Check out exact pinned NKE source without persisted credentials
+      # This job contains no checkout or executable code from the selected
+      # candidate. Its NKE credential never enters either build runner job.
+      - name: Check out exact pinned NKE source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: dsx-ai-factory/nke
@@ -268,18 +266,75 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Authenticate pinned NKE source and remove credential state
+      - name: Authenticate and package credential-free source
+        id: package
+        env:
+          NKE_COMMIT: ${{ needs.select.outputs.nke_commit }}
+          NKE_TREE: ${{ needs.select.outputs.nke_tree }}
         run: |
           set -euo pipefail
-          test "$(git -C .trusted/nke rev-parse HEAD)" = '${{ needs.select.outputs.nke_commit }}'
-          test "$(git -C .trusted/nke rev-parse 'HEAD^{tree}')" = '${{ needs.select.outputs.nke_tree }}'
-          if git -C .trusted/nke config --local --get-regexp \
-            '^(http\..*\.extraheader|credential\..*|credential\.helper)$'; then
-            echo "pinned NKE checkout retained credential configuration" >&2
-            exit 1
-          fi
+          test "$(git -C .trusted/nke rev-parse HEAD)" = "${NKE_COMMIT}"
+          test "$(git -C .trusted/nke rev-parse 'HEAD^{tree}')" = "${NKE_TREE}"
+          mkdir -p .handoff
+          git clone --quiet --no-local --no-hardlinks .trusted/nke .handoff/nke
+          git -C .handoff/nke checkout --quiet --detach "${NKE_COMMIT}"
+          git -C .handoff/nke remote remove origin
+          test "$(git -C .handoff/nke rev-parse HEAD)" = "${NKE_COMMIT}"
+          test "$(git -C .handoff/nke rev-parse 'HEAD^{tree}')" = "${NKE_TREE}"
+          config_keys="$(git -C .handoff/nke config --local --name-only --list)"
+          while IFS= read -r key; do
+            case "${key}" in
+              core.repositoryformatversion|core.filemode|core.bare|core.logallrefupdates|core.ignorecase|core.precomposeunicode) ;;
+              *) echo "source handoff contains unexpected Git configuration key" >&2; exit 1 ;;
+            esac
+          done <<<"${config_keys}"
+          tar -C .handoff -cf .handoff/nke-source.tar nke
+          digest="$(sha256sum .handoff/nke-source.tar | cut -d' ' -f1)"
+          echo "archive_digest=${digest}" >>"${GITHUB_OUTPUT}"
 
-      - name: Check out the selected NKD candidate after credential removal
+      - name: Upload one-day NKE source handoff
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nke-os-source-${{ github.run_id }}
+          path: .handoff/nke-source.tar
+          if-no-files-found: error
+          include-hidden-files: true
+          compression-level: 0
+          retention-days: 1
+
+  validate-full:
+    name: NKE OS full validation (${{ matrix.arch }})
+    needs: [select, fetch-nke-source]
+    if: needs.select.outputs.mode == 'full'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.legs) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - name: Download exact NKE source handoff
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: nke-os-source-${{ github.run_id }}
+          path: .trusted-transfer
+
+      - name: Authenticate and unpack pinned NKE source
+        env:
+          NKE_COMMIT: ${{ needs.select.outputs.nke_commit }}
+          NKE_TREE: ${{ needs.select.outputs.nke_tree }}
+          SOURCE_ARCHIVE_DIGEST: ${{ needs.fetch-nke-source.outputs.archive_digest }}
+        run: |
+          set -euo pipefail
+          [[ "${SOURCE_ARCHIVE_DIGEST}" =~ ^[0-9a-f]{64}$ ]]
+          printf '%s  %s\n' "${SOURCE_ARCHIVE_DIGEST}" .trusted-transfer/nke-source.tar \
+            | sha256sum -c -
+          mkdir -p .trusted
+          tar -xf .trusted-transfer/nke-source.tar -C .trusted
+          test "$(git -C .trusted/nke rev-parse HEAD)" = "${NKE_COMMIT}"
+          test "$(git -C .trusted/nke rev-parse 'HEAD^{tree}')" = "${NKE_TREE}"
+
+      - name: Check out the selected NKD candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select.outputs.commit }}
