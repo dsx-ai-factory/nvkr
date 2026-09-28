@@ -36,10 +36,6 @@ if [[ ! "${jobs}" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 input_root=".nkd/inputs/${attempt}"
-if [[ -e "${input_root}" || -L "${input_root}" ]]; then
-  echo "frozen input already exists: ${input_root}" >&2
-  exit 1
-fi
 runtime="${CONTAINER_RUNTIME:-podman}"
 arch="${NKE_OS_ARCH:-arm64}"
 case "${runtime}" in
@@ -69,8 +65,8 @@ if [[ "${host_os}" == Darwin ]]; then
   # evaluates them. Pass one shell-escaped command so paths and values retain
   # their argument boundaries inside the Linux VM.
   printf -v remote_command \
-    'cd %q && exec env CONTAINER_RUNTIME=podman NKE_OS_ARCH=arm64 ./scripts/nke-os-local.sh %q %q' \
-    "${repo_root}" "${attempt}" "${jobs}"
+    'cd %q && exec env CONTAINER_RUNTIME=podman NKE_OS_ARCH=arm64 NKE_LOCAL_CLONE=%q ./scripts/nke-os-local.sh %q %q' \
+    "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${attempt}" "${jobs}"
   exec podman machine ssh "${remote_command}"
 fi
 if [[ "${host_os}" != Linux ]]; then
@@ -128,6 +124,12 @@ for required_input in "${required_inputs[@]}"; do
     exit 1
   fi
 done
+
+mkdir -p .nkd/inputs
+if ! mkdir "${input_root}"; then
+  echo "frozen input already exists or cannot be reserved: ${input_root}" >&2
+  exit 1
+fi
 
 CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
 

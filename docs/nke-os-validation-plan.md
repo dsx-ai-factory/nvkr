@@ -11,24 +11,23 @@ because the generated hosted adapter still rejects requirement-bearing VM jobs a
 The credential-free toolchain pass may be manually dispatched from a PR branch at its exact head or from the trusted
 workflow on `main`. It uses GitHub-hosted native AMD64 and ARM64 runners, has no KVM or private-source access, and
 records the exact native toolchain image IDs. A branch dispatch must select that branch's dispatch SHA and cannot
-request a full build. A `main` dispatch naming a same-repository PR authenticates its current API head, fetches the
-branch, and compares the fetched object with the dispatch SHA. Toolchain mode does not require a copy-pr-bot mirror.
+request a full build.
 
-Full image validation is also manual-only and never uses `pull_request_target`. Its selector authenticates either a
-commit reachable from `main` or the exact tip of a named same-repository copy-pr-bot mirror and current open PR.
-The mirror remains a separate gate before private NKE source is handed to candidate code. The workflow definition
-itself is dispatched from `main`. The AMD64 leg retains the NKE workflow's verified runner label. The ARM64 leg uses the
+Full image validation is also manual-only and never uses `pull_request_target`. It only accepts a commit reachable
+from `main` while the workflow itself is dispatched from `main`. No pre-merge code receives private NKE source.
+The AMD64 leg retains the NKE workflow's verified runner label. The ARM64 leg uses the
 repository-specific 16-vCPU, 64-GiB KVM scale set defined by `NVIDIA-dev/nke-gha-runners` at `488424d`. Those VMs are
 single-use and must expose `/dev/kvm` to the runner identity; NKD performs the runtime admission before build work.
 
-Full validation uses the existing repository secret `NKE_SOURCE_TOKEN`, which must provide read-only Contents access
-to `dsx-ai-factory/nke`. Only the trusted default-branch workflow receives it. The trusted selector reads the `nke-os`
-commit and tree from the selected Recipe catalog lock; the workflow does not own or hardcode an NKE version. Before
-the credential is used, the trusted operator must independently enter that exact NKE commit in the dispatch, and the
-selector rejects a mismatch. The checkout fetches that authorized commit into a clean staging path before the candidate
-checkout, does not persist credentials, and is followed by explicit commit, tree and credential-state checks. The
-selected candidate receives the private source bytes and declared outbound build network, but not the source credential
-itself. NKD uses the local checkout through a process-scoped Git transport override.
+Full validation's separate trusted fetch job references the repository-scoped `NKE_SOURCE_TOKEN`, which must provide
+read-only Contents access to `dsx-ai-factory/nke`. The secret is not restricted to this workflow by GitHub policy;
+other workflows with sufficient permission could reference it. The trusted selector reads the `nke-os` commit and tree
+from the selected Recipe catalog lock; the workflow does not own or hardcode an NKE version. The dispatcher enters
+that exact NKE commit as a second value, and the selector rejects a mismatch. This is a consistency check, not
+independent human approval. The checkout fetches that commit into a clean staging path before the build job, does not
+persist credentials, and is followed by explicit commit, tree and credential-state checks. The build job receives the
+source bytes and declared outbound build network, but not the source credential itself. NKD uses the local checkout
+through a process-scoped Git transport override.
 
 ## Two-pass AMD64 gate
 
