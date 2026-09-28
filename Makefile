@@ -74,7 +74,7 @@ shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 
 .PHONY: vulncheck
 vulncheck: ## Check reachable Go vulnerabilities using the pinned upstream scanner.
-	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
 .PHONY: test
 test: ## Unit tests with race + coverage (pure logic; no docker required).
