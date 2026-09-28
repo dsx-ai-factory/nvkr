@@ -113,6 +113,39 @@ func (workspace *packerContainerWorkspace) path() string {
 	return fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), workspace.root.Fd())
 }
 
+// dockerBindPath projects the held workspace as an ordinary host pathname.
+// Docker's daemon cannot bind a client's /proc/<pid>/fd magic link reliably.
+// Keep the descriptor for NKD's own I/O and authenticate the projected path
+// against it before handing that path to the daemon.
+func (workspace *packerContainerWorkspace) dockerBindPath() (string, error) {
+	if workspace == nil || workspace.root == nil {
+		return "", e.New(e.CodeEngineCapability, "Docker identity projection requires a held Packer workspace")
+	}
+	root, err := os.Readlink(workspace.path())
+	if err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "resolving held Packer workspace for Docker")
+	}
+	if !filepath.IsAbs(root) {
+		return "", e.New(e.CodeEngineCapability, "held Packer workspace has no absolute Docker host path")
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "resolving Docker host workspace path")
+	}
+	heldInfo, err := workspace.root.Stat()
+	if err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "statting held Packer workspace")
+	}
+	pathInfo, err := os.Stat(root)
+	if err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "statting Docker host workspace path")
+	}
+	if !heldInfo.IsDir() || !os.SameFile(heldInfo, pathInfo) {
+		return "", e.New(e.CodeEngineCapability, "Docker host workspace path differs from held Packer workspace")
+	}
+	return root, nil
+}
+
 func (workspace *packerContainerWorkspace) cleanup() error {
 	if workspace == nil {
 		return nil

@@ -91,6 +91,81 @@ func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) 
 	}
 }
 
+func TestPackerWorkspaceDockerBindPath(t *testing.T) {
+	parent, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parent.Close()
+	workspace, err := createPackerWorkspaceRoot(parent, "host-path-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := workspace.cleanup(); err != nil {
+			t.Errorf("cleaning Packer workspace: %v", err)
+		}
+	}()
+	root, err := workspace.dockerBindPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.HasPrefix(root, "/proc/") {
+		t.Fatalf("Docker bind root must be an ordinary host path: %q", root)
+	}
+	heldInfo, err := workspace.root.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pathInfo, err := os.Stat(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(heldInfo, pathInfo) {
+		t.Fatalf("Docker bind root %q differs from the held workspace", root)
+	}
+}
+
+func TestDockerPackerIdentityBind(t *testing.T) {
+	image := os.Getenv("NKD_TEST_DOCKER_TOOLCHAIN_IMAGE")
+	if image == "" {
+		t.Skip("set NKD_TEST_DOCKER_TOOLCHAIN_IMAGE to prove the bind against a native Docker daemon")
+	}
+	workspaceRoot, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer workspaceRoot.Close()
+	workspace, err := createPackerWorkspaceRoot(workspaceRoot, "docker-bind-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := workspace.cleanup(); err != nil {
+			t.Errorf("cleaning Docker identity workspace: %v", err)
+		}
+	}()
+	bindRoot, err := workspace.dockerBindPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := preparePackerContainerIdentity(bindRoot, "docker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, "docker", "run", "--rm", "--pull=never",
+		"--network=none", "--read-only", "--cap-drop=ALL",
+		"--security-opt=no-new-privileges", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"--mount", "type=bind,src="+identity.passwdPath+",dst=/etc/passwd,readonly",
+		"--mount", "type=bind,src="+identity.groupPath+",dst=/etc/group,readonly",
+		"--entrypoint", "sh", image, "-ec", `test "$(id -un)" = nkd`)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("Docker could not start with the projected identity: %v: %s", err, output)
+	}
+}
+
 func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	node := testPackerContainerNode()
 	node.Network = ir.NetworkDefault

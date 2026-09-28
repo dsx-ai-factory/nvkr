@@ -223,6 +223,15 @@ jobs:
           toolchains/nkd-packer/build.sh --arch '${{ matrix.arch }}' \
             2>&1 | tee ".nkd/evidence/toolchain-${{ matrix.arch }}.log"
 
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+
+      - name: Prove Docker identity bind on native daemon
+        env:
+          NKD_TEST_DOCKER_TOOLCHAIN_IMAGE: localhost/nkd-packer-toolchain:dev-${{ matrix.arch }}
+        run: go test ./pkg/nkd/pipeline -run '^TestDockerPackerIdentityBind$' -count=1
+
       # This observation is candidate-influenced diagnostic output. It never
       # authorizes a lock update or a release identity.
       - name: Record exact native toolchain image ID
@@ -296,6 +305,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nke-os-source-${{ github.run_id }}
+          overwrite: true
           path: .handoff/nke-source.tar
           if-no-files-found: error
           include-hidden-files: true
@@ -438,7 +448,7 @@ jobs:
           qcow=".nkd/runs/${attempt}/outputs/nke-node-image-${ARCH}.qcow2"
           image="$(jq -er --arg arch "${ARCH}" '.localImages[$arch]' toolchains/nkd-packer/toolchain.lock.json)"
           mkdir -p ".nkd/boot-smoke/${ARCH}"
-          identity_dir="${PWD}/.nkd/boot-smoke/${ARCH}/identity"
+          identity_dir="${PWD}/.nkd/boot-smoke-identity/${ARCH}"
           install -d -m 0700 "${identity_dir}"
           printf 'nkd:x:%s:%s:NKD Builder:/work:/bin/sh\n' "$(id -u)" "$(id -g)" \
             >"${identity_dir}/passwd"
