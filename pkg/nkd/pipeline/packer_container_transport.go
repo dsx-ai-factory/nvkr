@@ -10,20 +10,25 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 	"golang.org/x/sys/unix"
 )
 
 const packerArtifactCollectionCopies int64 = 3
 
-func preparePackerContainerIdentity(root, runtimeName string) (packerContainerIdentity, error) {
+func preparePackerContainerIdentity(ctx context.Context, root, runtimeName string) (packerContainerIdentity, error) {
 	if runtimeName != "docker" {
 		return packerContainerIdentity{}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return packerContainerIdentity{}, e.Wrap(e.CodeTimeout, err, "preparing Docker identity projection")
 	}
 	identityRoot := filepath.Join(root, "identity")
 	if err := os.Mkdir(identityRoot, 0o700); err != nil {
@@ -35,17 +40,20 @@ func preparePackerContainerIdentity(root, runtimeName string) (packerContainerId
 		passwdPath: filepath.Join(identityRoot, "passwd"),
 		groupPath:  filepath.Join(identityRoot, "group"),
 	}
-	if err := writePackerIdentityFile(identity.passwdPath,
+	if err := writePackerIdentityFile(ctx, identity.passwdPath,
 		fmt.Sprintf("nkd:x:%d:%d:NKD Builder:%s/home:/bin/sh\n", uid, gid, packerContainerWorkRoot)); err != nil {
 		return packerContainerIdentity{}, err
 	}
-	if err := writePackerIdentityFile(identity.groupPath, fmt.Sprintf("nkd:x:%d:\n", gid)); err != nil {
+	if err := writePackerIdentityFile(ctx, identity.groupPath, fmt.Sprintf("nkd:x:%d:\n", gid)); err != nil {
 		return packerContainerIdentity{}, err
 	}
 	return identity, nil
 }
 
-func writePackerIdentityFile(name, content string) error {
+func writePackerIdentityFile(ctx context.Context, name, content string) error {
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "creating Docker identity projection")
+	}
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
 	if err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "creating Docker identity projection")
@@ -55,6 +63,9 @@ func writePackerIdentityFile(name, content string) error {
 	closeErr := file.Close()
 	if err := errors.Join(writeErr, syncErr, closeErr); err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "persisting Docker identity projection")
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "persisting Docker identity projection")
 	}
 	return nil
 }
@@ -117,7 +128,10 @@ func (workspace *packerContainerWorkspace) path() string {
 // Docker's daemon cannot bind a client's /proc/<pid>/fd magic link reliably.
 // Keep the descriptor for NKD's own I/O and authenticate the projected path
 // against it before handing that path to the daemon.
-func (workspace *packerContainerWorkspace) dockerBindPath() (string, error) {
+func (workspace *packerContainerWorkspace) dockerBindPath(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", e.Wrap(e.CodeTimeout, err, "resolving Docker host workspace path")
+	}
 	if workspace == nil || workspace.root == nil {
 		return "", e.New(e.CodeEngineCapability, "Docker identity projection requires a held Packer workspace")
 	}
@@ -132,6 +146,9 @@ func (workspace *packerContainerWorkspace) dockerBindPath() (string, error) {
 	if err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "resolving Docker host workspace path")
 	}
+	if !safetext.Valid(root, 4096, false) || strings.ContainsAny(root, ",\"") {
+		return "", e.New(e.CodeEngineCapability, "Docker host workspace path is unsafe for a bind mount")
+	}
 	heldInfo, err := workspace.root.Stat()
 	if err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "statting held Packer workspace")
@@ -143,7 +160,51 @@ func (workspace *packerContainerWorkspace) dockerBindPath() (string, error) {
 	if !heldInfo.IsDir() || !os.SameFile(heldInfo, pathInfo) {
 		return "", e.New(e.CodeEngineCapability, "Docker host workspace path differs from held Packer workspace")
 	}
+	if err := ctx.Err(); err != nil {
+		return "", e.Wrap(e.CodeTimeout, err, "resolving Docker host workspace path")
+	}
 	return root, nil
+}
+
+// prepareDockerIdentity writes through the held workspace and projects only
+// verified host paths to Docker. No path-controlled write follows the host
+// path check.
+func (workspace *packerContainerWorkspace) prepareDockerIdentity(ctx context.Context) (packerContainerIdentity, error) {
+	if _, err := workspace.dockerBindPath(ctx); err != nil {
+		return packerContainerIdentity{}, err
+	}
+	heldIdentity, err := preparePackerContainerIdentity(ctx, workspace.path(), "docker")
+	if err != nil {
+		return packerContainerIdentity{}, err
+	}
+	hostRoot, err := workspace.dockerBindPath(ctx)
+	if err != nil {
+		return packerContainerIdentity{}, err
+	}
+	hostIdentity := packerContainerIdentity{
+		passwdPath: filepath.Join(hostRoot, "identity", "passwd"),
+		groupPath:  filepath.Join(hostRoot, "identity", "group"),
+	}
+	for _, pair := range [][2]string{
+		{heldIdentity.passwdPath, hostIdentity.passwdPath},
+		{heldIdentity.groupPath, hostIdentity.groupPath},
+	} {
+		heldInfo, err := os.Stat(pair[0])
+		if err != nil {
+			return packerContainerIdentity{}, e.Wrap(e.CodeEngineCapability, err, "statting held Docker identity file")
+		}
+		hostInfo, err := os.Stat(pair[1])
+		if err != nil {
+			return packerContainerIdentity{}, e.Wrap(e.CodeEngineCapability, err, "statting Docker host identity file")
+		}
+		if !heldInfo.Mode().IsRegular() || !os.SameFile(heldInfo, hostInfo) {
+			return packerContainerIdentity{}, e.New(e.CodeEngineCapability, "Docker host identity file differs from held projection")
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return packerContainerIdentity{}, e.Wrap(e.CodeTimeout, err, "preparing Docker identity projection")
+	}
+	return hostIdentity, nil
 }
 
 func (workspace *packerContainerWorkspace) cleanup() error {

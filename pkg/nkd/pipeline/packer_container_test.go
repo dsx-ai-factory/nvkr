@@ -27,19 +27,28 @@ import (
 
 func TestPreparePackerContainerIdentity(t *testing.T) {
 	tests := []struct {
-		name    string
-		runtime string
-		created bool
+		name     string
+		runtime  string
+		created  bool
+		cancel   bool
+		wantCode e.Code
 	}{
 		{name: "docker projection", runtime: "docker", created: true},
 		{name: "podman native entries", runtime: "podman"},
+		{name: "canceled Docker projection", runtime: "docker", cancel: true, wantCode: e.CodeTimeout},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
-			identity, err := preparePackerContainerIdentity(root, test.runtime)
-			if err != nil {
-				t.Fatal(err)
+			ctx := t.Context()
+			if test.cancel {
+				canceled, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = canceled
+			}
+			identity, err := preparePackerContainerIdentity(ctx, root, test.runtime)
+			if code(err) != test.wantCode {
+				t.Fatalf("Docker identity error = %v, want %s", err, test.wantCode)
 			}
 			if !test.created {
 				if identity != (packerContainerIdentity{}) {

@@ -100,14 +100,11 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	}
 	resources.workspace = workspace
 	runRoot := workspace.path()
-	identityRoot := runRoot
 	if request.runtime.RuntimeName() == "docker" {
-		identityRoot, err = workspace.dockerBindPath()
-		if err != nil {
-			return nil, err
-		}
+		request.identity, err = workspace.prepareDockerIdentity(ctx)
+	} else {
+		request.identity, err = preparePackerContainerIdentity(ctx, runRoot, request.runtime.RuntimeName())
 	}
-	request.identity, err = preparePackerContainerIdentity(identityRoot, request.runtime.RuntimeName())
 	if err != nil {
 		return nil, err
 	}
