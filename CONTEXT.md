@@ -47,6 +47,13 @@ that root's material closure. The disk format and encryption metadata describe t
 of the builder that produces them.
 _Avoid_: Container image, builder type, running node
 
+**Configuration output**:
+A named output producing environment-bound values (e.g. a Helm values file) instead of a reproducible artifact,
+rendered from a catalog component's inline `files` map against the admitted Environment only — it has no access
+to any other output's identity. Excluded from Build Digest, signing, SBOM, and the qualified lane; still a
+required, published Definition output. See ADR-23.
+_Avoid_: Deployment topology, injected output identity, secret material
+
 **Aggregate OS producer**:
 A catalog producer that emits one baked disk containing several stack layers. Embedded components retain
 their own material identities and evidence relationships; one disk does not establish independent production
