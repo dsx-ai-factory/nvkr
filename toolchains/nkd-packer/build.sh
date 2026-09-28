@@ -86,8 +86,10 @@ jq -e '
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
   )) and
-  (.localImages | keys | sort) == ["amd64", "arm64"] and
-  all(.localImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
+  (.localPodmanImages | keys | sort) == ["amd64", "arm64"] and
+  all(.localPodmanImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
+  (.localDockerImages | keys | sort) == ["amd64", "arm64"] and
+  all(.localDockerImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
   (.images | keys | sort) == ["amd64", "arm64"] and
   all(.images[]; . == null or test("^.+@sha256:[0-9a-f]{64}$"))
 ' "${lock}" >/dev/null
@@ -227,7 +229,11 @@ image_id="$("${runtime}" image inspect --format '{{.Id}}' "${tag}")"
 if [[ "${image_id}" =~ ^[0-9a-f]{64}$ ]]; then
   image_id="sha256:${image_id}"
 fi
-expected_local_image="$(jq -r --arg arch "${arch}" '.localImages[$arch] // empty' "${lock}")"
+case "${runtime##*/}" in
+  podman) pin_family=localPodmanImages ;;
+  docker) pin_family=localDockerImages ;;
+esac
+expected_local_image="$(jq -r --arg arch "${arch}" --arg family "${pin_family}" '.[$family][$arch] // empty' "${lock}")"
 if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" ]]; then
   echo "local toolchain image ID ${image_id} does not match locked ${arch} ID ${expected_local_image}" >&2
   exit 1

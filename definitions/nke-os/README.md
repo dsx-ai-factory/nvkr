@@ -11,10 +11,10 @@ Two thin ARM64 Definitions select execution behavior from that shared graph:
 - `definition-arm64-tcg.yaml` preserves the macOS Apple M4 Pro Podman path and its proven `cortex-a57` TCG setting.
 
 The AMD64 graph is deliberately not authored yet. `toolchains/nkd-packer/toolchain.lock.json` has no native-validated
-AMD64 local image ID, and an exact toolchain identity is required before the catalog can select that execution
-architecture. The repository workflow provides the credential-free first pass that produces the ID. The same change
-must then record that ID and add the thin AMD64 Definition and installer supplier selection before full AMD64 execution
-can pass. Do not copy the ARM64 ID or patch frozen inputs at runtime.
+AMD64 Docker image ID, and an exact toolchain identity is required before the catalog can select that execution
+architecture. The repository workflow provides the credential-free first pass that observes the ID. A repeat native
+build must agree before the Docker pin is recorded and the thin AMD64 Definition and installer supplier selection
+are added. Do not copy a Podman ID or patch frozen inputs at runtime.
 
 The architecture-generic wrapper defaults to the existing ARM64 compatibility behavior:
 

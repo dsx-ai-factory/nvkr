@@ -100,7 +100,11 @@ command -v jq >/dev/null 2>&1 || {
   echo "jq is required to read the locked local toolchain identity" >&2
   exit 1
 }
-toolchain_image="$(jq -r --arg arch "${arch}" '.localImages[$arch] // empty' toolchains/nkd-packer/toolchain.lock.json)"
+case "${runtime}" in
+  podman) pin_family=localPodmanImages ;;
+  docker) pin_family=localDockerImages ;;
+esac
+toolchain_image="$(jq -r --arg arch "${arch}" --arg family "${pin_family}" '.[$family][$arch] // empty' toolchains/nkd-packer/toolchain.lock.json)"
 if [[ ! "${toolchain_image}" =~ (^|@)sha256:[0-9a-f]{64}$ ]]; then
   echo "the Packer toolchain lock has no exact ${arch} local image ID" >&2
   exit 1

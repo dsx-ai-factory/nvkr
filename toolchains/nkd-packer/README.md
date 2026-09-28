@@ -47,11 +47,12 @@ creation metadata; Podman retains its existing build path and independent
 ARM64 local image pin. The fixed epoch does not itself prove identical image
 bytes. Repeat a native Docker build on fresh runners and compare the resulting
 image IDs before adding a Docker pin.
-There is no toolchain publication workflow in this repository. `localImages`
-records a validated content-addressed local image ID when one has been built
-and reproduced on its native architecture; `images` remains `null` because a
-local image ID is not an OCI repository digest. The build command fails if a
-rebuilt local image differs from a recorded local ID.
+`localPodmanImages` and `localDockerImages` keep the two runtime identities
+separate. A null entry permits a diagnostic build but cannot authorize NKD
+execution. There is no toolchain publication workflow in this repository.
+`images` remains `null` because a local image ID is not an OCI repository
+digest. The build command fails if a rebuilt image differs from its recorded
+runtime-specific local ID.
 After license approval and a vulnerability scan, the exact external publication
 sequence is:
 

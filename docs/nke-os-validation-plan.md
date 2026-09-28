@@ -8,11 +8,11 @@ because the generated hosted adapter still rejects requirement-bearing VM jobs a
 
 ## Trust boundary
 
-The credential-free toolchain pass is manually dispatched from the trusted workflow on `main` and uses GitHub-hosted
-native AMD64 and ARM64 runners. It checks out the exact selected implementation commit, has no KVM or private-source
-access, and records the exact native toolchain image IDs. For a named same-repository PR, this mode authenticates
-its current API head, fetches the branch, and compares the fetched object with the dispatch SHA. It does not require
-a copy-pr-bot mirror.
+The credential-free toolchain pass may be manually dispatched from a PR branch at its exact head or from the trusted
+workflow on `main`. It uses GitHub-hosted native AMD64 and ARM64 runners, has no KVM or private-source access, and
+records the exact native toolchain image IDs. A branch dispatch must select that branch's dispatch SHA and cannot
+request a full build. A `main` dispatch naming a same-repository PR authenticates its current API head, fetches the
+branch, and compares the fetched object with the dispatch SHA. Toolchain mode does not require a copy-pr-bot mirror.
 
 Full image validation is also manual-only and never uses `pull_request_target`. Its selector authenticates either a
 commit reachable from `main` or the exact tip of a named same-repository copy-pr-bot mirror and current open PR.
@@ -32,7 +32,7 @@ itself. NKD uses the local checkout through a process-scoped Git transport overr
 
 ## Two-pass AMD64 gate
 
-The source lock contains verified AMD64 tool binaries but `localImages.amd64` is intentionally null. The initial
+The source lock contains verified AMD64 tool binaries but `localDockerImages.amd64` is intentionally null. The initial
 toolchain dispatch builds natively and uploads its observed local image ID. Two runs from the same locked source
 must agree before recording a Docker pin; the first two native Docker runs on 2026-09-28 did not agree on either
 architecture. A fixed BuildKit source-date epoch is now under test, not accepted as reproduction evidence.
