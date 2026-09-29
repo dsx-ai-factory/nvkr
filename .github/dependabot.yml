@@ -10,6 +10,20 @@ updates:
       go-deps:
         patterns: ["*"]
 
+  # Keep the scanner out of NKD's production module graph while making its
+  # go.mod pin and go.sum visible to Dependabot. Go marks tool requirements as
+  # indirect, so opt in to updates for both the tool and its dependencies.
+  - package-ecosystem: gomod
+    directory: /toolchains/govulncheck
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    allow:
+      - dependency-type: all
+    groups:
+      govulncheck-tool:
+        patterns: ["*"]
+
   - package-ecosystem: github-actions
     directory: /
     # Generated workflow pins must change through NKD inputs and regeneration.
