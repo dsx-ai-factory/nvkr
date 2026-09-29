@@ -128,34 +128,13 @@ for required_input in "${required_inputs[@]}"; do
   fi
 done
 
-case "${NKE_OS_USE_PINNED_TOOLCHAIN:-0}" in
-  0) ;;
-  1)
-    if [[ "${runtime}" != docker ]]; then
-      echo "a preloaded toolchain is supported only with Docker" >&2
-      exit 1
-    fi
-    observed_image="$(docker image inspect --format '{{.Id}}' "localhost/nkd-packer-toolchain:dev-${arch}")" || {
-      echo "the exact native Docker toolchain is not loaded" >&2
-      exit 1
-    }
-    if [[ "${observed_image}" != "${toolchain_image}" ]]; then
-      echo "loaded Docker toolchain ${observed_image} does not match locked ${toolchain_image}" >&2
-      exit 1
-    fi
-    ;;
-  *) echo "NKE_OS_USE_PINNED_TOOLCHAIN must be 0 or 1" >&2; exit 2 ;;
-esac
-
 mkdir -p .nkd/inputs
 if ! mkdir "${input_root}"; then
   echo "frozen input already exists or cannot be reserved: ${input_root}" >&2
   exit 1
 fi
 
-if [[ "${NKE_OS_USE_PINNED_TOOLCHAIN:-0}" == 0 ]]; then
-  CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
-fi
+CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
 
 mkdir -p "${input_root}/catalog"
 cp "${definition_source}" "${input_root}/definition.yaml"

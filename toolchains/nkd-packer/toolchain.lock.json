@@ -78,10 +78,6 @@
     "amd64": null,
     "arm64": null
   },
-  "localDockerArchives": {
-    "amd64": null,
-    "arm64": null
-  },
   "images": {
     "amd64": null,
     "arm64": null
