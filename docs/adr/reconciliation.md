@@ -151,7 +151,9 @@ remain absent; the development pin is not a maintained release or production-acc
 
 The repository-owned NKE OS validation workflow in row 18 is separate from generated hosted Run CI. PR branches
 may run native toolchain diagnostics without KVM or private NKE source. A full KVM image validation is admitted
-only for an exact commit reachable from main, with the NKE source credential referenced by a separate fetch job.
+from the trusted main workflow for an exact main commit or a copy-pr-bot mirror matching a current, ready
+same-repository PR head after explicit `/ok to test` vetting. Candidate code receives the pinned private NKE source
+contents and network-capable KVM execution, but never the source credential; a separate fetch job alone holds it.
 That credential remains repository-scoped; the workflow does not establish an organization-level secret boundary.
 The local Docker authoring graph now includes AMD64 and ARM64 KVM Definitions and a source-locked toolchain
 bootstrap that freezes the observed image ID into an attempt-local catalog overlay before Plan compilation. The

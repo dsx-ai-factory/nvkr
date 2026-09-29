@@ -13,11 +13,14 @@ workflow on `main`. It uses GitHub-hosted native AMD64 and ARM64 runners, has no
 records the exact native toolchain image IDs. A branch dispatch must select that branch's dispatch SHA and cannot
 request a full build.
 
-Full image validation is also manual-only and never uses `pull_request_target`. It only accepts a commit reachable
-from `main` while the workflow itself is dispatched from `main`. No pre-merge code receives private NKE source.
+Full image validation is also manual-only and never uses `pull_request_target`. The workflow is dispatched from
+`main` and accepts an exact main commit or a copy-pr-bot mirror matching the current, ready same-repository PR
+head. The mirror requires explicit `/ok to test` vetting. Pre-merge candidate code receives the pinned private
+NKE source contents and a network-capable KVM runner, but not the source credential.
 The AMD64 leg retains the NKE workflow's verified runner label. The ARM64 leg uses the
-repository-specific 16-vCPU, 64-GiB KVM scale set defined by `NVIDIA-dev/nke-gha-runners` at `488424d`. Those VMs are
-single-use and must expose `/dev/kvm` to the runner identity; NKD performs the runtime admission before build work.
+repository-specific 16-vCPU, 64-GiB KVM scale set defined by `NVIDIA-dev/nke-gha-runners` at `488424d`. Single-use
+runner isolation remains a provider fact to verify; `/dev/kvm` must be available to the runner identity. NKD
+performs runtime admission before build work.
 
 Full validation's separate trusted fetch job references the repository-scoped `NKE_SOURCE_TOKEN`, which must provide
 read-only Contents access to `dsx-ai-factory/nke`. The secret is not restricted to this workflow by GitHub policy;

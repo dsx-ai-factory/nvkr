@@ -112,7 +112,11 @@ environment_source="definitions/nke-os/environment-local-macos-apple-m4-pro-podm
 overlay_source=""
 if [[ "${runtime}" == docker ]]; then
   environment_source="definitions/nke-os/environment-local-linux-${arch}-docker.yaml"
-  overlay_source="definitions/nke-os/${arch}-kvm.yaml"
+  # Only maintained Definitions that declare an architecture overlay need one.
+  # A missing declared overlay still fails when NKD loads the frozen Definition.
+  if [[ -f "definitions/nke-os/${arch}-kvm.yaml" ]]; then
+    overlay_source="definitions/nke-os/${arch}-kvm.yaml"
+  fi
 elif [[ "${arch}" == arm64 ]]; then
   definition_source="definitions/nke-os/definition-arm64-tcg.yaml"
 fi
