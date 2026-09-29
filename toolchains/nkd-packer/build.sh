@@ -90,6 +90,8 @@ jq -e '
   all(.localPodmanImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
   (.localDockerImages | keys | sort) == ["amd64", "arm64"] and
   all(.localDockerImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
+  (.localDockerArchives | keys | sort) == ["amd64", "arm64"] and
+  all(.localDockerArchives[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
   (.images | keys | sort) == ["amd64", "arm64"] and
   all(.images[]; . == null or test("^.+@sha256:[0-9a-f]{64}$"))
 ' "${lock}" >/dev/null
