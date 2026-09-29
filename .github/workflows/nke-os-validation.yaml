@@ -189,13 +189,23 @@ jobs:
           # main. The candidate may change local diagnostic image-ID fields;
           # unreviewed toolchain materials are tested without NKE credentials.
           jq -e --slurpfile reviewed toolchains/nkd-packer/toolchain.lock.json '
-            . as $candidate |
-            ($reviewed[0] | del(.localImages)) as $trusted |
-            ($candidate | del(.localPodmanImages, .localDockerImages)) == $trusted and
-            ([$candidate.localPodmanImages, $candidate.localDockerImages] | all(
+            def valid_ids:
+              type == "object" and
               (keys | sort) == ["amd64", "arm64"] and
-              all(.[]; . == null or (type == "string" and test("^sha256:[0-9a-f]{64}$")))
-            ))
+              all(.[]; . == null or (type == "string" and test("^sha256:[0-9a-f]{64}$")));
+            . as $candidate |
+            ($reviewed[0] | del(.localImages, .localPodmanImages, .localDockerImages)) as $trusted |
+            ($candidate | del(.localImages, .localPodmanImages, .localDockerImages)) == $trusted and
+            if $candidate | has("localImages") then
+              ($candidate | has("localPodmanImages") | not) and
+              ($candidate | has("localDockerImages") | not) and
+              ($candidate.localImages | valid_ids)
+            else
+              ($candidate | has("localPodmanImages")) and
+              ($candidate | has("localDockerImages")) and
+              ($candidate.localPodmanImages | valid_ids) and
+              ($candidate.localDockerImages | valid_ids)
+            end
           ' .candidate-inputs/toolchains/nkd-packer/toolchain.lock.json >/dev/null || {
             echo "candidate toolchain lock differs from the reviewed source closure" >&2
             exit 1
