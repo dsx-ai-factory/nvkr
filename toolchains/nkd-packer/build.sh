@@ -181,12 +181,15 @@ tag="${tag:-localhost/nkd-packer-toolchain:dev-${arch}}"
 
 build_command=("${runtime}" build)
 if [[ "${runtime##*/}" == docker ]]; then
-  # Buildx passes the fixed epoch into BuildKit's image config and history.
+  # Buildx passes the fixed epoch into BuildKit's image config and history,
+  # then rewrites image-layer file timestamps to the same epoch on export.
   # Keep the existing Podman path unchanged so its recorded ARM64 image ID
   # remains an independently checkable local development pin.
   "${runtime}" buildx version
   "${runtime}" version --format 'Docker server {{.Server.Version}}'
-  build_command=("${runtime}" buildx build --load --build-arg SOURCE_DATE_EPOCH=0)
+  build_command=("${runtime}" buildx build
+    --output "type=docker,rewrite-timestamp=true"
+    --build-arg SOURCE_DATE_EPOCH=0)
 fi
 
 "${build_command[@]}" \
