@@ -79,6 +79,134 @@ func TestCatalogStackReplacesOneProducerWithoutForkingCatalog(t *testing.T) {
 	}
 }
 
+func TestCatalogStackSubstitutesExactToolchainForSelectedProducers(t *testing.T) {
+	base, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseDigest, err := base.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := base.Components["kube-apiserver"].ToolchainImages["amd64"]
+	newImage := "nkd-toolchain-go@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	proxy := base.Components["kube-proxy"]
+	overlay := catalog.Overlay{
+		APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind,
+		Name: "native-docker-toolchain", RequiresCatalogDigest: baseDigest,
+		Components: map[string]catalog.ComponentReplacement{
+			"kube-proxy": {Component: &proxy},
+		},
+		ToolchainSubstitutions: []catalog.ToolchainSubstitution{{
+			Arch: "amd64", From: old, To: newImage,
+			Components: []string{"kube-apiserver", "kube-proxy"},
+		}},
+	}
+	stack, err := catalog.ApplyStack(base, overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stack.Digest == baseDigest || len(stack.Applied) != 1 {
+		t.Fatalf("toolchain substitution did not move stack identity: %#v", stack)
+	}
+	for _, name := range []string{"kube-apiserver", "kube-proxy"} {
+		if got := stack.Catalog.Components[name].ToolchainImages["amd64"]; got != newImage {
+			t.Fatalf("%s toolchain=%q, want %q", name, got, newImage)
+		}
+		if got := base.Components[name].ToolchainImages["amd64"]; got != old {
+			t.Fatalf("base component %s was mutated: %q", name, got)
+		}
+	}
+	if got := stack.Catalog.Components["kube-scheduler"].ToolchainImages["amd64"]; got != old {
+		t.Fatalf("unselected component changed toolchain: %q", got)
+	}
+	resolved, err := buildgraph.Resolve(stack.Catalog, buildgraph.Selection{
+		Components: []string{"kube-apiserver"}, Platform: "linux/amd64",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, err := buildgraph.Compile(resolved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, node := range graph.Nodes {
+		if node.Kind == ir.KindFetch && node.VendorImage == newImage {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("compiled fetch did not select substituted toolchain")
+	}
+	baseResolved, err := buildgraph.Resolve(base, buildgraph.Selection{
+		Components: []string{"kube-apiserver"}, Platform: "linux/amd64",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseGraph, err := buildgraph.Compile(baseResolved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseBuildDigest, err := baseGraph.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedBuildDigest, err := graph.Digest()
+	if err != nil || selectedBuildDigest == baseBuildDigest {
+		t.Fatalf("toolchain substitution did not change Build identity: %s, %s, %v",
+			baseBuildDigest, selectedBuildDigest, err)
+	}
+}
+
+func TestCatalogStackRejectsInvalidToolchainSubstitutions(t *testing.T) {
+	base, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseDigest, err := base.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := base.Components["kube-apiserver"].ToolchainImages["amd64"]
+	newImage := "nkd-toolchain-go@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	valid := catalog.ToolchainSubstitution{Arch: "amd64", From: old, To: newImage,
+		Components: []string{"kube-apiserver", "kube-proxy"}}
+	for _, test := range []struct {
+		name string
+		edit func(*catalog.Overlay)
+		code nkderr.Code
+	}{
+		{"stale pin", func(o *catalog.Overlay) {
+			o.ToolchainSubstitutions[0].From = "nkd-toolchain-go@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		}, nkderr.CodeUnverifiedRef},
+		{"unknown component", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].Components = []string{"missing"} }, nkderr.CodeUnverifiedRef},
+		{"unordered components", func(o *catalog.Overlay) {
+			o.ToolchainSubstitutions[0].Components = []string{"kube-proxy", "kube-apiserver"}
+		}, nkderr.CodeInvalidCatalog},
+		{"duplicate component", func(o *catalog.Overlay) {
+			o.ToolchainSubstitutions[0].Components = []string{"kube-proxy", "kube-proxy"}
+		}, nkderr.CodeInvalidCatalog},
+		{"invalid destination", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].To = "latest" }, nkderr.CodeInvalidCatalog},
+		{"duplicate substitution", func(o *catalog.Overlay) { o.ToolchainSubstitutions = append(o.ToolchainSubstitutions, valid) }, nkderr.CodeInvalidCatalog},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			overlay := catalog.Overlay{APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind,
+				Name: "invalid", RequiresCatalogDigest: baseDigest,
+				ToolchainSubstitutions: []catalog.ToolchainSubstitution{valid}}
+			test.edit(&overlay)
+			stack, err := catalog.ApplyStack(base, overlay)
+			if stack != nil || errorCode(err) != test.code {
+				t.Fatalf("stack=%#v, error=%v, want code %s", stack, err, test.code)
+			}
+			if after, err := base.SnapshotDigest(); err != nil || after != baseDigest {
+				t.Fatalf("failed substitution mutated base: %s, %v", after, err)
+			}
+		})
+	}
+}
+
 func TestCatalogStackRejectsReplayAndUnknownReplacement(t *testing.T) {
 	base, err := catalog.LoadContext(context.Background(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
 	if err != nil {

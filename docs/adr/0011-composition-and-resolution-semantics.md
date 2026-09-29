@@ -60,10 +60,12 @@ contract; a digest match alone cannot satisfy another output's required executio
 ### 3. Component catalog overlays and trust
 
 A separately referenced component catalog overlay is retained (ADR-22). It replaces a complete producer against
-an exact predecessor catalog digest and is applied in explicit order. It does not reintroduce Recipe
-inheritance, component-field deep merging or wildcard membership selection. Effective catalog snapshots bind
-all admitted producer declarations and supported platforms. Catalog and overlay v3 strictly reject removed
-classification and role fields.
+an exact predecessor catalog digest and is applied in explicit order. A narrow execution-toolchain substitution
+may instead name a sorted, explicit component set, host architecture, expected old digest pin and replacement
+digest pin. Every selected component must match the old pin, and the effective catalog and Build identities bind
+the replacement. This is not component-field deep merging or wildcard membership selection. Effective catalog
+snapshots bind all admitted producer declarations and supported platforms. Catalog and overlay v3 strictly reject
+removed classification and role fields.
 
 The former extension classifier based on authoring shape is removed. A catalog path, an overlay declaration,
 or a claim that a selection is published cannot establish trust. Consumer policy authenticates the exact

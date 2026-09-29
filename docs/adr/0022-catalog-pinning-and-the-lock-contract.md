@@ -42,10 +42,12 @@ not an implicit empty lock.
 
 Registry v3 contains producer components with explicit supported `platforms`.
 It contains no recipes, criteria, recipe layers, mixins, `versionFrom`, placement categories or node roles.
-Catalog overlay v3 can replace complete component producers under ADR-11; it is independent of the removed
-recipe merge system. Catalog snapshots use v3 and strict decoding rejects removed classification fields even
-when the caller supplies the current version. Lock v1 remains unchanged because its resolved source and
-artifact shape is unchanged.
+Catalog overlay v3 can replace complete component producers under ADR-11. Its only narrow field-level operation
+is an exact old-to-new digest-pinned execution-toolchain substitution for a named, sorted producer set and one
+host architecture. The predecessor catalog digest and every old component pin must match before the new catalog
+snapshot is admitted; there is no wildcard or general deep merge. Catalog snapshots use v3 and strict decoding
+rejects removed classification fields even when the caller supplies the current version. Lock v1 remains unchanged
+because its resolved source and artifact shape is unchanged.
 
 Multiple components may share one source and therefore **bump atomically** (e.g. the Kubernetes-core binaries
 move together on a single lock entry).
