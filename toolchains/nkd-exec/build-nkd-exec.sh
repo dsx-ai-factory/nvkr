@@ -8,7 +8,7 @@
 #   toolchains/nkd-exec/build-nkd-exec.sh --image    # also assemble the image (needs podman|docker)
 #
 # The binary digest is toolchain-specific: pin GO to the .go-version toolchain so ANY
-# builder reproduces the same bytes. GOTOOLCHAIN forces the exact minor.
+# builder reproduces the same bytes. GOTOOLCHAIN forces the exact patch.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -20,11 +20,11 @@ ARCHES=(amd64 arm64)
 GO="${GO:-go}"
 # The recorded binary digest is only meaningful for an EXACT Go version, so the canonical
 # builder must use .go-version's toolchain. Default GOTOOLCHAIN=local so this runs offline
-# with the host toolchain; publishers export GOTOOLCHAIN=go<.go-version>.0 to force the pin.
+# with the host toolchain; publishers export GOTOOLCHAIN=go<.go-version> to force the pin.
 export GOTOOLCHAIN="${GOTOOLCHAIN:-local}"
 CANONICAL_TOOLCHAIN="go$(cat "$repo/.go-version")"
 ACTUAL_TOOLCHAIN="$("$GO" version | awk '{print $3}')"
-if [ "${ACTUAL_TOOLCHAIN%.*}" != "$CANONICAL_TOOLCHAIN" ] && [ "$ACTUAL_TOOLCHAIN" != "$CANONICAL_TOOLCHAIN" ]; then
+if [ "$ACTUAL_TOOLCHAIN" != "$CANONICAL_TOOLCHAIN" ]; then
   echo "WARNING: building with $ACTUAL_TOOLCHAIN but the canonical pin is $CANONICAL_TOOLCHAIN;" >&2
   echo "         the recorded digest is a DEMO — publishers must build under $CANONICAL_TOOLCHAIN." >&2
 fi

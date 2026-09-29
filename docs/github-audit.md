@@ -1,10 +1,12 @@
 # GitHub configuration audit
 
-Layout updated 2026-09-18 against the current Definition → Run → Release lifecycle.
+Layout updated 2026-09-29 against the current Definition → Run → Release lifecycle.
 
 | File | Disposition |
 |---|---|
 | `.github/workflows/merge-gate.yaml` | Current handwritten repository formatting, analysis, race tests, build, and vulnerability checks. |
+| `.github/workflows/vulnerability-scan.yaml` | Daily recheck of the pinned Go vulnerability scan when advisories change without a commit. |
+| `.github/workflows/stale-issues.yaml` | Issue-only stale and close automation; accepted, assigned, or deferred work needs `lifecycle/frozen` to stay open. |
 | `.github/dependabot.yml` | Retain Go and action updates; exclude the renamed generated workflow because its pins are owned by generator inputs. |
 | `.github/workflows/nkd-run.yml` | Regenerate from the NKE Definition and GitHub Environment. Replaces `nkd-factory.yml`. |
 | `.github/nkd-run/manifest.json` | Generated file membership and byte digests. Replaces the old factory manifest. |

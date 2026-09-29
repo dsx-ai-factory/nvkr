@@ -37,9 +37,10 @@ At each review:
    reproduction or problem statement, and the affected component. Redirect
    security reports privately and avoid repeating sensitive details publicly.
 2. Assign the responsible PIC and use the central P0/P1/P2 definitions and
-   internal targets where applicable. Only people with repository write access
-   change GitHub labels; the issue forms do not assign priority. This
-   repository currently has no P0/P1/P2 labels or documented Project field.
+   internal targets where applicable. Collaborators with Triage or higher
+   access can apply labels; the issue forms apply type labels, not priority.
+   This repository currently has no P0/P1/P2 labels or documented Project
+   field.
    Record the policy priority in an authorized internal tracking item if one
    exists; otherwise flag that the assignment cannot yet be recorded and
    resolve the missing mechanism with the DGXC policy owner. A reporter's
@@ -74,8 +75,8 @@ operational prerequisites with the DGXC OSS working group.
 The [stale-issues workflow](../.github/workflows/stale-issues.yaml) marks an
 issue with no activity for 90 days as `lifecycle/stale`. If there is no further
 activity, it closes the issue after another 30 days. New activity removes the
-stale label. A designated writer can apply `lifecycle/frozen` to exempt an
-issue that must remain open. The workflow creates both policy labels if needed.
+stale label. A maintainer can apply `lifecycle/frozen` to exempt an issue that
+must remain open. The workflow creates both policy labels if needed.
 Maintainers should apply `lifecycle/frozen` to accepted, assigned, or deferred
 work that must remain open despite long periods without comments; assignment
 alone does not exempt an issue from automatic closure.

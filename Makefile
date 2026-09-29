@@ -15,8 +15,8 @@ LDFLAGS     := -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 
 # Authority-bearing build profiles pin their own toolchain identity. For the
 # repository dev loop, GOTOOLCHAIN=local prevents an implicit toolchain download;
-# .go-version records the supported major/minor used by CI, not an exact local
-# compiler-byte identity. Override to let `go` fetch that CI version explicitly.
+# .go-version pins the exact Go patch used by CI. Keep local builds and scans
+# on that patch without implicitly downloading a toolchain.
 GOTOOLCHAIN ?= local
 export GOTOOLCHAIN
 
@@ -36,7 +36,7 @@ info: ## Print version / toolchain info.
 # --- build ------------------------------------------------------------------
 
 .PHONY: build
-build: ## Compile the nkdctl binary.
+build: go-version-check ## Compile the nkdctl binary.
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nkdctl
 
 .PHONY: install
@@ -48,6 +48,11 @@ nkd-exec-helper: ## Reproducibly build the ADR-18 nkd-exec helper binaries + wri
 	@bash toolchains/nkd-exec/build-nkd-exec.sh $(ARGS)
 
 # --- quality ----------------------------------------------------------------
+
+.PHONY: go-version-check
+go-version-check: ## Require the exact Go patch pinned in .go-version.
+	@actual="$$(go env GOVERSION)"; expected="go$(GO_VERSION)"; \
+	  test "$$actual" = "$$expected" || { echo "Go $$actual does not match pinned $$expected" >&2; exit 1; }
 
 .PHONY: fmt
 fmt: ## Format code (gofmt -s -w).
@@ -73,7 +78,7 @@ shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	shellcheck -S warning scripts/*.sh toolchains/**/*.sh
 
 .PHONY: vulncheck
-vulncheck: ## Check reachable Go vulnerabilities using the pinned upstream scanner.
+vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinned upstream scanner.
 	GOBIN="$(CURDIR)/bin" go -C toolchains/govulncheck install tool
 	"$(CURDIR)/bin/govulncheck" ./...
 
@@ -115,7 +120,7 @@ workflows-check: ## Verify the committed Run generation matches the catalog (ADR
 		--root . --check
 
 .PHONY: check
-check: fmt-check vet lint shellcheck test vulncheck ## Full local gate — run before pushing.
+check: go-version-check fmt-check vet lint shellcheck test vulncheck ## Full local gate — run before pushing.
 
 # --- housekeeping -----------------------------------------------------------
 

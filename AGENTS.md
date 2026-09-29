@@ -211,13 +211,12 @@ make vulncheck
 git diff --check
 ```
 
-`make check` runs the repository gate, including shellcheck and the Go
-vulnerability scan. The direct commands above also include uncached tests and
-`git diff --check`. Tests that need local listeners may require execution
-outside a restricted sandbox. The `-race` gate has historically differed
-between macOS and Linux; when a change touches
-`pkg/nkd/sign` or `pkg/nkd/pipeline`, run it on Linux too. Record external operational evidence separately from
-the contract suite.
+`make check` runs the repository gate, including shellcheck and the Go vulnerability scan. The direct commands
+above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
+outside a restricted sandbox. `make vulncheck` needs access to the Go module proxy and vulnerability database;
+run it with network access or report it as unverified. The `-race` gate has historically differed between macOS
+and Linux; when a change touches `pkg/nkd/sign` or `pkg/nkd/pipeline`, run it on Linux too. Record external
+operational evidence separately from the contract suite.
 
 ## Troubleshooting
 
