@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 # Companion implementation: https://github.com/dsx-ai-factory/nke-recipes/pull/59
-# Merge this trusted workflow first; full mode remains fail-closed until #59 lands.
+# Full mode runs only from this trusted main workflow. The selected candidate
+# may be an exact open, same-repository PR head; its code never receives the
+# NKE source credential, which stays in the separate trusted fetch job.
 
 name: NKE OS validation
 
@@ -17,10 +19,8 @@ on:
         required: false
         type: string
       arch:
-        description: Native architecture; ARM64 is the default until maintained AMD64 inputs land
+        description: Native architecture for toolchain or full image validation
         required: true
-        # AMD64 remains an explicit selection until its maintained Definition
-        # and native toolchain identity land in the companion change.
         default: arm64
         type: choice
         options: [both, amd64, arm64]
@@ -30,8 +30,8 @@ on:
         default: toolchain
         type: choice
         options: [toolchain, full]
-      mirror_pr:
-        description: Optional PR number whose copy-pr-bot mirror and current PR head must equal commit_sha
+      pr_number:
+        description: Optional open same-repository PR whose exact head must equal commit_sha
         required: false
         type: string
       retain_qcow2:
@@ -68,7 +68,7 @@ jobs:
           DISPATCH_ARCH: ${{ inputs.arch }}
           DISPATCH_COMMIT: ${{ inputs.commit_sha }}
           DISPATCH_MODE: ${{ inputs.mode }}
-          DISPATCH_MIRROR_PR: ${{ inputs.mirror_pr }}
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
           DISPATCH_RETAIN_QCOW2: ${{ inputs.retain_qcow2 }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_REF: ${{ github.ref }}
@@ -83,7 +83,7 @@ jobs:
           commit="${DISPATCH_COMMIT}"
           arch="${DISPATCH_ARCH}"
           mode="${DISPATCH_MODE}"
-          mirror_pr="${DISPATCH_MIRROR_PR}"
+          pr_number="${DISPATCH_PR_NUMBER}"
           retain_qcow2="${DISPATCH_RETAIN_QCOW2}"
           if [[ ! "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "commit_sha must be one exact lowercase 40-character SHA" >&2
@@ -97,34 +97,31 @@ jobs:
             true|false) ;;
             *) echo "retain_qcow2 must be true or false" >&2; exit 1 ;;
           esac
-          if [[ -n "${mirror_pr}" ]]; then
-            if [[ ! "${mirror_pr}" =~ ^[1-9][0-9]*$ ]]; then
-              echo "mirror_pr must be a positive pull request number" >&2
+          if [[ -n "${pr_number}" ]]; then
+            if [[ ! "${pr_number}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "pr_number must be a positive pull request number" >&2
               exit 1
             fi
-            mirror_ref="refs/remotes/origin/pull-request/${mirror_pr}"
-            if ! git show-ref --verify --quiet "${mirror_ref}"; then
-              echo "copy-pr-bot mirror pull-request/${mirror_pr} is unavailable" >&2
-              exit 1
-            fi
-            mirror_commit="$(git rev-parse "${mirror_ref}^{commit}")"
-            IFS=$'\t' read -r pr_commit pr_state pr_repo < <(
-              gh api "repos/${REPOSITORY}/pulls/${mirror_pr}" \
-                --jq '[.head.sha, .state, .head.repo.full_name] | @tsv'
+            IFS=$'\t' read -r pr_commit pr_state pr_repo pr_base < <(
+              gh api "repos/${REPOSITORY}/pulls/${pr_number}" \
+                --jq '[.head.sha, .state, .head.repo.full_name, .base.ref] | @tsv'
             )
-            if [[ "${mirror_commit}" != "${commit}" || "${pr_commit}" != "${commit}" ||
-                  "${pr_state}" != open || "${pr_repo}" != "${REPOSITORY}" ]]; then
-              echo "commit_sha ${commit} is not the authenticated open in-repository PR ${mirror_pr} tip" >&2
-              echo "mirror=${mirror_commit} head=${pr_commit} state=${pr_state} repository=${pr_repo}" >&2
+            if [[ "${pr_commit}" != "${commit}" || "${pr_state}" != open ||
+                  "${pr_repo}" != "${REPOSITORY}" || "${pr_base}" != main ]]; then
+              echo "commit_sha ${commit} is not the exact open in-repository PR ${pr_number} head targeting main" >&2
+              exit 1
+            fi
+            if [[ "$(gh api "repos/${REPOSITORY}/git/commits/${commit}" --jq .sha)" != "${commit}" ]]; then
+              echo "authenticated PR head ${commit} is not a repository commit" >&2
               exit 1
             fi
           else
             if ! git merge-base --is-ancestor "${commit}" origin/main; then
-              echo "commit_sha is not reachable from main; select its exact mirror_pr" >&2
+              echo "commit_sha is not reachable from main; select its exact pr_number" >&2
               exit 1
             fi
+            git cat-file -e "${commit}^{commit}"
           fi
-          git cat-file -e "${commit}^{commit}"
           if [[ "${mode}" == toolchain ]]; then
             amd64='{"arch":"amd64","runner":"ubuntu-24.04"}'
             arm64='{"arch":"arm64","runner":"ubuntu-24.04-arm"}'
@@ -168,8 +165,35 @@ jobs:
       - name: Resolve the recipe-owned NKE source pin
         id: source
         if: steps.select.outputs.mode == 'full'
+        env:
+          DISPATCH_ARCH: ${{ inputs.arch }}
         run: |
           set -euo pipefail
+          case "${DISPATCH_ARCH}" in
+            amd64|arm64) required_arches=("${DISPATCH_ARCH}") ;;
+            both) required_arches=(amd64 arm64) ;;
+            *) echo "unsupported architecture selection" >&2; exit 1 ;;
+          esac
+          for target_arch in "${required_arches[@]}"; do
+            input_dir=.candidate-inputs/definitions/nke-os
+            test -f "${input_dir}/definition-${target_arch}-kvm.yaml" || {
+              echo "missing maintained ${target_arch} KVM Definition" >&2
+              exit 1
+            }
+            test -f "${input_dir}/environment-local-linux-${target_arch}-docker.yaml" || {
+              echo "missing maintained ${target_arch} Docker Environment" >&2
+              exit 1
+            }
+            jq -e --arg arch "${target_arch}" '
+              .schemaVersion == "nkd.dev/packer-toolchain/v1" and
+              (.baseImage | strings | test("^ubuntu@sha256:[0-9a-f]{64}$")) and
+              (.packer.archives[$arch] | strings | test("^sha256:[0-9a-f]{64}$")) and
+              (.qemuPlugin.archives[$arch] | strings | test("^sha256:[0-9a-f]{64}$"))
+            ' .candidate-inputs/toolchains/nkd-packer/toolchain.lock.json >/dev/null || {
+              echo "missing source-locked ${target_arch} Packer toolchain inputs" >&2
+              exit 1
+            }
+          done
           pin="$(bin/nkdctl catalog source-pin \
             --data .candidate-inputs/definitions/nke-os/catalog nke-os)"
           {
@@ -177,9 +201,9 @@ jobs:
             echo "tree=$(jq -er '.treeHash' <<<"${pin}")"
           } >>"${GITHUB_OUTPUT}"
 
-      # The candidate recipe remains authoritative for the exact NKE pin. This
-      # independent dispatch value makes the trusted operator authorize that pin
-      # before the repository credential can be used to acquire it.
+      # The candidate recipe owns the exact NKE pin. The dispatch value must
+      # match it before the separate source-fetch job receives its credential;
+      # this check is not an independent authorization of candidate code.
       - name: Authorize the NKE source pin
         if: steps.select.outputs.mode == 'full'
         env:
@@ -322,7 +346,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.select.outputs.legs) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
+    timeout-minutes: 420
     steps:
       - name: Download exact NKE source handoff
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -447,7 +471,11 @@ jobs:
           set -euo pipefail
           attempt="$(cat ".nkd/evidence/attempt-${ARCH}")"
           qcow=".nkd/runs/${attempt}/outputs/nke-node-image-${ARCH}.qcow2"
-          image="$(jq -er --arg arch "${ARCH}" '.localImages[$arch]' toolchains/nkd-packer/toolchain.lock.json)"
+          image="$(cat ".nkd/evidence/toolchain-${ARCH}.image-id")"
+          [[ "${image}" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "missing exact observed ${ARCH} Packer toolchain image ID" >&2
+            exit 1
+          }
           mkdir -p ".nkd/boot-smoke/${ARCH}"
           identity_dir="${PWD}/.nkd/boot-smoke-identity/${ARCH}"
           install -d -m 0700 "${identity_dir}"
@@ -462,11 +490,11 @@ jobs:
             --mount "type=bind,src=${identity_dir}/passwd,dst=/etc/passwd,readonly" \
             --mount "type=bind,src=${identity_dir}/group,dst=/etc/group,readonly" \
             --volume "${GITHUB_WORKSPACE}/.trusted/nke:/nke:ro" \
-            --volume "${PWD}/${qcow}:/artifact.qcow2:ro" \
+            --volume "${PWD}/${qcow}:/nke-node-image-${ARCH}.qcow2:ro" \
             --volume "${PWD}/.nkd/boot-smoke/${ARCH}:/work:rw" \
             --env ARCH="${ARCH}" --entrypoint bash "${image}" -ec '
               ssh-keygen -q -t ed25519 -N "" -f /work/id_ed25519
-              QCOW=/artifact.qcow2 SSH_KEY=/work/id_ed25519 REQUIRE_ACCELERATION=1 \
+              QCOW=/nke-node-image-${ARCH}.qcow2 SSH_KEY=/work/id_ed25519 REQUIRE_ACCELERATION=1 \
                 /nke/os-image/packer/scripts/boot-smoke.sh
             ' 2>&1 | tee ".nkd/evidence/boot-smoke-${ARCH}.log"
 
