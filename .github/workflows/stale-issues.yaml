@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: stale-issues-${{ github.ref }}
+  group: stale-issues
   cancel-in-progress: false
 
 jobs:
@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      # actions/stale persists its pagination state in the Actions cache.
       actions: write
       issues: write
     steps:
@@ -31,10 +32,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh label create 'lifecycle/stale' --repo "$GITHUB_REPOSITORY" \
-            --color 'EDEDED' --description 'Inactive issue awaiting response' --force
-          gh label create 'lifecycle/frozen' --repo "$GITHUB_REPOSITORY" \
-            --color '5319E7' --description 'Exempt from automated stale-issue closure' --force
+          if ! gh label list --repo "$GITHUB_REPOSITORY" --search 'lifecycle/stale' \
+            --json name --jq '.[].name' | grep -Fxq 'lifecycle/stale'; then
+            gh label create 'lifecycle/stale' --repo "$GITHUB_REPOSITORY" \
+              --color 'EDEDED' --description 'Inactive issue awaiting response'
+          fi
+          if ! gh label list --repo "$GITHUB_REPOSITORY" --search 'lifecycle/frozen' \
+            --json name --jq '.[].name' | grep -Fxq 'lifecycle/frozen'; then
+            gh label create 'lifecycle/frozen' --repo "$GITHUB_REPOSITORY" \
+              --color '5319E7' --description 'Exempt from automated stale-issue closure'
+          fi
 
       - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
         with:

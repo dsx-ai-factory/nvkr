@@ -94,11 +94,11 @@ body:
     id: requester_impact
     attributes:
       label: Impact to you
-      description: Describe your impact; maintainers assign official priority during triage.
+      description: Choose the option closest to your situation. Maintainers assess priority during triage.
       options:
-        - Nice to have
-        - Important (would improve my workflow)
         - Blocking adoption or a major use case
+        - Important (would improve my workflow)
+        - Nice to have
     validations:
       required: true
 

@@ -19,6 +19,7 @@ go test -race ./... -count=1
 go vet ./...
 golangci-lint run
 make shellcheck
+make vulncheck
 git diff --check
 ```
 

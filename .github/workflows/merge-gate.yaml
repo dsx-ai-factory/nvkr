@@ -49,8 +49,8 @@ name: Merge Gate
 # touch. The push run is that watchdog, and it forces every check-paths output
 # true because a merged commit has no base to diff against.
 #
-# (The `Protect main` ruleset currently has no bypass actors, so this is not
-# about bypassed merges. Revisit if bypass is ever granted.)
+# This workflow does not establish who can bypass live repository rules; verify
+# bypass grants in repository settings when evaluating merge policy.
 on:
   pull_request:
     branches:
@@ -194,6 +194,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
+          check-latest: true
           cache: true
 
       - name: fmt-check
@@ -215,11 +216,11 @@ jobs:
       - name: test (race + coverage)
         run: make test
 
-      - name: Go vulnerability check
-        run: make vulncheck
-
       - name: build
         run: make build
+
+      - name: Go vulnerability check
+        run: make vulncheck
 
   check-skip:
     needs: [check-paths]

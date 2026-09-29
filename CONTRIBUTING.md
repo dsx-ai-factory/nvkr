@@ -28,7 +28,7 @@ make check         # the full local gate, including the Go vulnerability check
 ## Local development equals CI
 
 CI (`.github/workflows/merge-gate.yaml`) runs the same format, vet, lint,
-race-test, and Go vulnerability checks as `make check`, then also compiles the
+shellcheck, race-test, and Go vulnerability checks as `make check`, then also compiles the
 binary. Run `make check` and `make build` before opening a PR. The vulnerability
 check needs access to the Go vulnerability database; see the
 [maintainer procedure](docs/cve-management.md) for triage and scope.

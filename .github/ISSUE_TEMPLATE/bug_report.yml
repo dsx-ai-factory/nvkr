@@ -39,13 +39,13 @@ body:
   - type: dropdown
     id: impact
     attributes:
-      label: Impact
-      description: How severe is this issue for you?
+      label: Impact to you
+      description: Choose the option closest to your situation. Maintainers assess priority during triage.
       options:
-        - Blocking (cannot proceed)
-        - High (major functionality broken)
-        - Medium (workaround exists)
-        - Low (minor issue)
+        - Cannot proceed
+        - Major functionality unavailable
+        - Workaround needed
+        - Minor inconvenience
     validations:
       required: true
 
