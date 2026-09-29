@@ -184,16 +184,22 @@ jobs:
               echo "missing maintained ${target_arch} Docker Environment" >&2
               exit 1
             }
-            jq -e --arg arch "${target_arch}" '
-              .schemaVersion == "nkd.dev/packer-toolchain/v1" and
-              (.baseImage | strings | test("^ubuntu@sha256:[0-9a-f]{64}$")) and
-              (.packer.archives[$arch] | strings | test("^sha256:[0-9a-f]{64}$")) and
-              (.qemuPlugin.archives[$arch] | strings | test("^sha256:[0-9a-f]{64}$"))
-            ' .candidate-inputs/toolchains/nkd-packer/toolchain.lock.json >/dev/null || {
-              echo "missing source-locked ${target_arch} Packer toolchain inputs" >&2
-              exit 1
-            }
           done
+          # A secret-backed run admits only the toolchain closure reviewed on
+          # main. The candidate may change local diagnostic image-ID fields;
+          # unreviewed toolchain materials are tested without NKE credentials.
+          jq -e --slurpfile reviewed toolchains/nkd-packer/toolchain.lock.json '
+            . as $candidate |
+            ($reviewed[0] | del(.localImages)) as $trusted |
+            ($candidate | del(.localPodmanImages, .localDockerImages)) == $trusted and
+            ([$candidate.localPodmanImages, $candidate.localDockerImages] | all(
+              (keys | sort) == ["amd64", "arm64"] and
+              all(.[]; . == null or (type == "string" and test("^sha256:[0-9a-f]{64}$")))
+            ))
+          ' .candidate-inputs/toolchains/nkd-packer/toolchain.lock.json >/dev/null || {
+            echo "candidate toolchain lock differs from the reviewed source closure" >&2
+            exit 1
+          }
           pin="$(bin/nkdctl catalog source-pin \
             --data .candidate-inputs/definitions/nke-os/catalog nke-os)"
           {
