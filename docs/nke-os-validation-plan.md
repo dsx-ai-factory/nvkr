@@ -29,16 +29,20 @@ persist credentials, and is followed by explicit commit, tree and credential-sta
 source bytes and declared outbound build network, but not the source credential itself. NKD uses the local checkout
 through a process-scoped Git transport override.
 
-## Two-pass AMD64 gate
+## Attempt-bound Docker toolchain
 
-The source lock contains verified AMD64 tool binaries but `localDockerImages.amd64` is intentionally null. The initial
-toolchain dispatch builds natively and uploads its observed local image ID. Two runs from the same locked source
-must agree before recording a Docker pin; the first two native Docker runs on 2026-09-28 did not agree on either
-architecture. A fixed BuildKit source-date epoch is now under test, not accepted as reproduction evidence.
-Once a stable Docker ID is observed, a follow-up change must record a separate Docker pin, extend the shared
-catalog platforms and toolchain map, and add the thin AMD64 Definition, installer supplier selection and
-Environment. The existing ARM64 Podman pin is not a Docker pin. Runtime mutation of authored inputs or reuse of
-the Podman ID for Docker are forbidden.
+The source lock pins the AMD64 and ARM64 toolchain materials, but its native Docker image IDs are null. The first
+two native Docker diagnostic runs on 2026-09-28 did not produce identical image IDs, so the workflow must not claim
+byte-reproduced toolchain images or invent stable Docker pins. The full build instead checks the source lock, builds
+the toolchain natively, and freezes the observed exact image ID into an immutable attempt-specific catalog overlay
+before compiling the executable Plan. NKD authenticates the loaded image against that Plan at execution. The
+catalog's AMD64 baseline is a previously observed diagnostic ID, not an approved maintained toolchain identity.
+The existing ARM64 Podman pin remains separate. Neither runtime's image is a published, approved toolchain.
+
+The native AMD64 Definition, installer supplier and local Docker Environment are authored. The full workflow still
+requires the trusted `main` dispatch and an exact main-reachable commit or copy-pr-bot mirror; PR-branch dispatch is
+toolchain-only. A successful full run, not compilation or unit tests, is required to establish that the build works
+on the selected KVM runners.
 
 ## Acceptance
 

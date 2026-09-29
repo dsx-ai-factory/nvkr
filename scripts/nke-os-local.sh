@@ -96,17 +96,16 @@ if [[ -n "${NKE_LOCAL_CLONE:-}" ]]; then
   export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nke"
 fi
 command -v jq >/dev/null 2>&1 || {
-  echo "jq is required to read the locked local toolchain identity" >&2
+  echo "jq is required to validate and freeze the toolchain identity" >&2
   exit 1
 }
-case "${runtime}" in
-  podman) pin_family=localPodmanImages ;;
-  docker) pin_family=localDockerImages ;;
-esac
-toolchain_image="$(jq -r --arg arch "${arch}" --arg family "${pin_family}" '.[$family][$arch] // empty' toolchains/nkd-packer/toolchain.lock.json)"
-if [[ ! "${toolchain_image}" =~ (^|@)sha256:[0-9a-f]{64}$ ]]; then
-  echo "the Packer toolchain lock has no exact ${arch} local image ID" >&2
-  exit 1
+toolchain_image=""
+if [[ "${runtime}" == podman ]]; then
+  toolchain_image="$(jq -r --arg arch "${arch}" '.localPodmanImages[$arch] // empty' toolchains/nkd-packer/toolchain.lock.json)"
+  if [[ ! "${toolchain_image}" =~ (^|@)sha256:[0-9a-f]{64}$ ]]; then
+    echo "the Packer toolchain lock has no exact ${arch} Podman image ID" >&2
+    exit 1
+  fi
 fi
 definition_source="definitions/nke-os/definition-${arch}-kvm.yaml"
 environment_source="definitions/nke-os/environment-local-macos-apple-m4-pro-podman.yaml"
@@ -135,6 +134,13 @@ if ! mkdir "${input_root}"; then
 fi
 
 CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
+if [[ "${runtime}" == docker ]]; then
+  toolchain_image="$(docker image inspect --format '{{.Id}}' "localhost/nkd-packer-toolchain:dev-${arch}")"
+  if [[ ! "${toolchain_image}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "the native Docker build did not produce an exact local image ID" >&2
+    exit 1
+  fi
+fi
 
 mkdir -p "${input_root}/catalog"
 cp "${definition_source}" "${input_root}/definition.yaml"
@@ -174,8 +180,55 @@ if [[ ! -x "${runner}" ]]; then
   exit 1
 fi
 
+frozen_definition="${input_root}/definition.yaml"
+if [[ "${runtime}" == docker ]]; then
+  # The native Docker build is an attempt input, not a maintained release pin.
+  # Freeze its observed exact ID through the existing catalog overlay contract
+  # before compiling the executable Plan. The Packer runtime rechecks the ID.
+  root_component=nke-node-image
+  if [[ "${arch}" == amd64 ]]; then
+    root_component=nke-node-image-amd64
+  fi
+  plan="$("${runner}" run plan --definition "${frozen_definition}" \
+    --environment "${input_root}/environment-local.yaml" --json)"
+  baseline="$(jq -er --arg root "${root_component}" --arg arch "${arch}" \
+    '.builds[0].catalogSnapshot.Components[$root].toolchainImages[$arch]' <<<"${plan}")"
+  if [[ "${baseline}" != "${toolchain_image}" ]]; then
+    catalog_digest="$(jq -er '.builds[0].catalogDigest' <<<"${plan}")"
+    components="$(jq -c --arg arch "${arch}" --arg baseline "${baseline}" '
+      .builds[0].components as $selected |
+      [.builds[0].catalogSnapshot.Components | to_entries[] |
+        select(.key as $name | $selected | index($name)) |
+        select(.value.fromSource == true and .value.toolchainImages[$arch] == $baseline) | .key] | sort
+    ' <<<"${plan}")"
+    if [[ "$(jq 'length' <<<"${components}")" -eq 0 ]]; then
+      echo "no catalog components use the selected ${arch} toolchain baseline" >&2
+      exit 1
+    fi
+    jq -n --arg arch "${arch}" --arg from "${baseline}" --arg to "${toolchain_image}" \
+      --arg digest "${catalog_digest}" --argjson components "${components}" '
+      {apiVersion:"nkd.dev/catalog-overlay/v3", kind:"CatalogOverlay",
+       name:("nke-os-local-toolchain-" + $arch), requiresCatalogDigest:$digest,
+       toolchainSubstitutions:[{arch:$arch, from:$from, to:$to, components:$components}]}
+    ' >"${input_root}/toolchain-attempt.json"
+    "${runner}" definition inspect --definition "${frozen_definition}" |
+      jq '.catalog.overlays = ((.catalog.overlays // []) + ["toolchain-attempt.json"])' \
+      >"${input_root}/definition-attempt.json"
+    frozen_definition="${input_root}/definition-attempt.json"
+  fi
+  final_plan="$("${runner}" run plan --definition "${frozen_definition}" \
+    --environment "${input_root}/environment-local.yaml" --json)"
+  if ! jq -e --arg root "${root_component}" --arg image "${toolchain_image}" '
+    [.builds[0].executionGraph.nodes[] |
+      select(.kind == "build" and .component == $root and .toolchain == $image)] | length == 1
+  ' <<<"${final_plan}" >/dev/null; then
+    echo "the frozen ${arch} Plan does not bind the observed Packer toolchain" >&2
+    exit 1
+  fi
+fi
+
 exec "${runner}" run local \
-  --definition "${input_root}/definition.yaml" \
+  --definition "${frozen_definition}" \
   --environment "${input_root}/environment-local.yaml" \
   --attempt "${attempt}" \
   --attempts-root .nkd/runs \

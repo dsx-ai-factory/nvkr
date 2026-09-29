@@ -6,11 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-func TestMaintainedNKEOSARM64ExecutionModesShareArchitectureRenderedGraph(t *testing.T) {
+func TestNKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.T) {
 	repositoryRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -20,13 +21,25 @@ func TestMaintainedNKEOSARM64ExecutionModesShareArchitectureRenderedGraph(t *tes
 		name        string
 		definition  string
 		environment string
+		arch        string
+		root        string
+		installer   string
+		patched     string
 		wantKVM     bool
 		wantCPU     string
 	}{
 		{name: "native KVM", definition: "definition-arm64-kvm.yaml",
-			environment: "environment-local-linux-arm64-docker.yaml", wantKVM: true},
+			environment: "environment-local-linux-arm64-docker.yaml", arch: "arm64",
+			root: "nke-node-image", installer: "ubuntu-installer-iso",
+			patched: "nke-patched-installer-iso", wantKVM: true},
 		{name: "macOS Podman TCG", definition: "definition-arm64-tcg.yaml",
-			environment: "environment-local-macos-apple-m4-pro-podman.yaml", wantCPU: "cortex-a57"},
+			environment: "environment-local-macos-apple-m4-pro-podman.yaml", arch: "arm64",
+			root: "nke-node-image", installer: "ubuntu-installer-iso",
+			patched: "nke-patched-installer-iso", wantCPU: "cortex-a57"},
+		{name: "amd64 native KVM", definition: "definition-amd64-kvm.yaml",
+			environment: "environment-local-linux-amd64-docker.yaml", arch: "amd64",
+			root: "nke-node-image-amd64", installer: "ubuntu-installer-iso-amd64",
+			patched: "nke-patched-installer-iso-amd64", wantKVM: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := filepath.Join("definitions", "nke-os")
@@ -43,15 +56,15 @@ func TestMaintainedNKEOSARM64ExecutionModesShareArchitectureRenderedGraph(t *tes
 				if node.Kind == ir.KindFetch && strings.Contains(strings.Join(node.VendorCmd, "\n"), "{{.Arch}}") {
 					t.Fatalf("fetch node %q retained an architecture placeholder", node.ID)
 				}
-				if node.Component == "nke-node-image" {
+				if node.Component == test.root {
 					producer = node
 				}
 			}
 			if producer.Packer == nil || producer.ExecutionBinding == nil {
 				t.Fatal("NKE node-image producer lost Packer or execution binding")
 			}
-			if producer.ToolchainPlatform != "linux/arm64" {
-				t.Fatalf("toolchain platform = %q, want linux/arm64", producer.ToolchainPlatform)
+			if producer.ToolchainPlatform != "linux/"+test.arch {
+				t.Fatalf("toolchain platform = %q, want linux/%s", producer.ToolchainPlatform, test.arch)
 			}
 			if len(producer.ExecutionBinding.Capabilities) != 1 ||
 				producer.ExecutionBinding.Capabilities[0].Name != execution.CapabilityKVM ||
@@ -68,10 +81,35 @@ func TestMaintainedNKEOSARM64ExecutionModesShareArchitectureRenderedGraph(t *tes
 			}
 			if !slices.Equal(plan.Builds[0].Components, []string{
 				"nke-agent", "nke-cni-calico", "nke-cni-ovn", "nke-image-inputs", "nke-kubeadm-distro",
-				"nke-node-image", "nke-patched-installer-iso", "nke-spire-agent", "ovn-kube-ubuntu",
-				"ovn-kubernetes-chart", "ubuntu-installer-iso",
+				test.root, test.patched, "nke-spire-agent", "ovn-kube-ubuntu",
+				"ovn-kubernetes-chart", test.installer,
 			}) {
 				t.Fatalf("selected component graph = %v", plan.Builds[0].Components)
+			}
+			if test.wantKVM {
+				baseline := plan.Builds[0].CatalogSnapshot.Components[test.root].ToolchainImages[test.arch]
+				attemptID := "sha256:" + strings.Repeat("e", 64)
+				var components []string
+				for _, name := range plan.Builds[0].Components {
+					component := plan.Builds[0].CatalogSnapshot.Components[name]
+					if component.FromSource && component.ToolchainImages[test.arch] == baseline {
+						components = append(components, name)
+					}
+				}
+				overlay := catalog.Overlay{
+					APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind,
+					Name: "local-toolchain-" + test.arch, RequiresCatalogDigest: plan.Builds[0].CatalogDigest,
+					ToolchainSubstitutions: []catalog.ToolchainSubstitution{{
+						Arch: test.arch, From: baseline, To: attemptID, Components: components,
+					}},
+				}
+				stack, err := catalog.ApplyStack(plan.Builds[0].CatalogSnapshot, overlay)
+				if err != nil {
+					t.Fatalf("attempt-frozen toolchain overlay: %v", err)
+				}
+				if got := stack.Catalog.Components[test.root].ToolchainImages[test.arch]; got != attemptID {
+					t.Fatalf("disk toolchain after attempt binding = %q, want %q", got, attemptID)
+				}
 			}
 		})
 	}

@@ -9,6 +9,7 @@ sources:
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
@@ -21,6 +22,7 @@ sources:
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
@@ -32,12 +34,14 @@ sources:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
   nke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nke
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
@@ -50,6 +54,7 @@ sources:
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
@@ -59,7 +64,7 @@ sources:
           ARCH={{.Arch}} BIN_DIR=/usr/local/bin
 components:
   nke-agent:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-os
     cgo: true
@@ -75,7 +80,7 @@ components:
     writeDir: agent/bin
     artifactPath: agent/bin/nke-agent.deb
   nke-cni-calico:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-cni-calico-source
     outputType: tarball
@@ -98,7 +103,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/nke-cni-calico.tar
   nke-cni-ovn:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-os
     builderType: oci-hermetic
@@ -131,7 +136,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/nke-cni-ovn.tar
   ovn-kube-ubuntu:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
     builderType: buildkit-rootless
@@ -163,7 +168,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/ovn-kube-ubuntu.oci.tar
   ovn-kubernetes-chart:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
     outputType: tarball
@@ -194,7 +199,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/ovn-kubernetes-chart.tar
   nke-image-inputs:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-os
     builderType: oci-hermetic
@@ -217,7 +222,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/image-inputs.tar
   nke-kubeadm-distro:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-kubeadm-distro-source
     outputType: tarball
@@ -289,6 +294,50 @@ components:
       image-inputs: nke-image-inputs
       installer-iso: nke-patched-installer-iso
     artifactPath: non-fde/nke-node.qcow2
+  nke-node-image-amd64:
+    platforms: [linux/amd64]
+    fromSource: true
+    source: nke-os
+    builderType: vm-image
+    buildNetwork: default
+    outputType: disk-image
+    disk:
+      format: qcow2
+      encryption: none
+    buildRequirements:
+      resources:
+        cpuMillis: 8000
+        memoryMiB: 10240
+        ephemeralStorageMiB: 65536
+      allowedHostPlatforms: [linux/amd64]
+      capabilities:
+        - name: kvm
+          policy: required
+      timeoutSeconds: 21600
+    packer:
+      projectPath: os-image/packer
+      packerVersion: 1.15.4
+      buildName: nke-node-non-fde.qemu.nke-non-fde
+      architectureVariable: architecture
+      acceleratorVariable: accelerator
+      materialManifestVariable: material_manifest
+      materialManifest:
+        schemaVersion: nke.dev/os-image-materials/v1
+        kinds:
+          image-inputs: archive
+          installer-iso: disk-image
+      outputDirectoryVariable: output_directory
+      sshPrivateKeyVariable: ssh_private_key_file
+      sshPublicKeyVariable: ssh_public_key_file
+      buildLogDirectoryVariable: build_log_directory
+      variables:
+        efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
+        efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
+        ssh_timeout: 180m
+    materials:
+      image-inputs: nke-image-inputs
+      installer-iso: nke-patched-installer-iso-amd64
+    artifactPath: non-fde/nke-node.qcow2
   nke-patched-installer-iso:
     platforms: [linux/arm64]
     fromSource: true
@@ -305,7 +354,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/installer.iso
   nke-spire-agent:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-spire-agent-source
     outputType: tarball
@@ -334,3 +383,26 @@ components:
       url: https://cdimage.ubuntu.com/ubuntu/releases/26.04.1/release/ubuntu-26.04.1-live-server-arm64.iso
       evidence:
         none: true
+  ubuntu-installer-iso-amd64:
+    platforms: [linux/amd64]
+    source: nke-os
+    outputType: raw
+    prebuilt:
+      url: https://releases.ubuntu.com/26.04/ubuntu-26.04.1-live-server-amd64.iso
+      evidence:
+        none: true
+  nke-patched-installer-iso-amd64:
+    platforms: [linux/amd64]
+    fromSource: true
+    source: nke-os
+    builderType: oci-hermetic
+    outputType: raw
+    materials:
+      installer-source: ubuntu-installer-iso-amd64
+    buildCommand:
+      - bash
+      - /src/os-image/packer/scripts/patch-installer-iso.sh
+      - /nkd/inputs/materials/installer-source
+      - /src/nkd-output/installer.iso
+    writeDir: nkd-output
+    artifactPath: nkd-output/installer.iso

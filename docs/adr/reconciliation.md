@@ -153,7 +153,11 @@ The repository-owned NKE OS validation workflow in row 18 is separate from gener
 may run native toolchain diagnostics without KVM or private NKE source. A full KVM image validation is admitted
 only for an exact commit reachable from main, with the NKE source credential referenced by a separate fetch job.
 That credential remains repository-scoped; the workflow does not establish an organization-level secret boundary.
-Neither native Docker toolchain reproduction nor a full hosted QCOW2 build has completed successfully.
+The local Docker authoring graph now includes AMD64 and ARM64 KVM Definitions and a source-locked toolchain
+bootstrap that freezes the observed image ID into an attempt-local catalog overlay before Plan compilation. The
+workflow's full-build selector checks the source-lock inputs rather than requiring a falsely stable Docker ID.
+Neither native Docker toolchain reproduction nor a full hosted QCOW2 build has completed successfully; the selected
+runner pools and boot path remain unproven.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
