@@ -121,6 +121,10 @@ direct-Packer runtime enforce the admitted mode. A Linux ARM64 Podman execution 
 non-FDE QCOW2 and recorded its digest and size. Docker and hosted execution remain unexercised, and FDE remains
 unsupported.
 
+The hand-authored NKE OS validation workflow now selects NKE's exercised `arc-amd64-kvm` and `arc-arm64-kvm`
+scale sets for full validation and checks `/dev/kvm` before accepting a build leg. The NKE jobs do not prove
+that these scale sets are available to `nke-recipes`; no full-mode job here has exercised the new route yet.
+
 The historical NKE direct-Packer source contract merged at commit
 `5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2`, tree
 `7d9b93c65c3cc8c2317b2953bca638c2203701e9`. The current development catalog instead pins NKE PR head

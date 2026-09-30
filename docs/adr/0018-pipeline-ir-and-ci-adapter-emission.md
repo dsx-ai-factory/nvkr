@@ -129,14 +129,15 @@ Missing prerequisites fail capability admission. No bespoke/self-hosted runner l
 
 The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
 a hosted VM adapter. It is manually dispatched from the default-branch workflow and may select only the declared
-`linux-amd64-gpu-l4-latest-1` or `nke-recipes-arm64-16c64g` KVM pool after an exact main commit or copy-pr-bot
+`arc-amd64-kvm` or `arc-arm64-kvm` KVM scale set after an exact main commit or copy-pr-bot
 mirror is authenticated. The cross-repository source credential must not share a job with candidate code; the
 trusted source-fetch job alone receives it. That job verifies the selected commit and tree, makes a fresh
 credential-free Git checkout, and uploads it as a one-day internal artifact with an exact SHA-256 passed as a
 job output. The build job verifies the archive digest and Git commit/tree before candidate code runs. Candidate
 code receives no authority-bearing evidence role. Its logs, image observations, QCOW2 digest and boot result are explicitly
-unqualified diagnostic output. Runner labels, availability and isolation remain provider facts that require an
-actual successful run; this exception grants no pipeline-attested or qualified claim and changes no generated
+unqualified diagnostic output. NKE's successful ARC jobs do not establish access from `nke-recipes`; runner
+routing, availability and isolation remain provider facts that require an actual successful run here. This
+exception grants no pipeline-attested or qualified claim and changes no generated
 adapter rule.
 
 Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
