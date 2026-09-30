@@ -132,8 +132,9 @@ jobs:
             amd64='{"arch":"amd64","runner":"ubuntu-24.04"}'
             arm64='{"arch":"arm64","runner":"ubuntu-24.04-arm"}'
           else
-            # NKE has exercised these native ARC KVM scale sets. A successful
-            # job here is still required to prove access from this repository.
+            # NKE main uses arc-arm64-kvm; NKE PR #1100 selects
+            # arc-amd64-kvm. Neither establishes access from nke-recipes;
+            # verify both scale sets are granted before a full dispatch.
             amd64='{"arch":"amd64","runner":"arc-amd64-kvm"}'
             arm64='{"arch":"arm64","runner":"arc-arm64-kvm"}'
           fi
@@ -394,10 +395,14 @@ jobs:
             exit 1
           fi
           # ARC runs in a container without udev. Match the NKE OS workflow's
-          # device preparation before NKD checks the KVM API and held device.
+          # fallback, which changes the host-bind-mounted device beyond this
+          # pod. Grant KVM group access or use a device plugin in the scale set.
           if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
             sudo chmod 666 /dev/kvm
           fi
+          # This only proves the runner can open KVM. NKD passes its held fd
+          # through Docker as /proc/<runner-pid>/fd/<fd>; the first full build
+          # must prove the daemon can resolve that path on this ARC topology.
           exec 3<>/dev/kvm
           exec 3>&-
 
