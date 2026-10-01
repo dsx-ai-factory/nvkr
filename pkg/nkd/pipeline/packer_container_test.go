@@ -411,29 +411,31 @@ func TestCreatePackerContainerRejectsMissingDockerIdentityBeforeWork(t *testing.
 	}
 }
 
-func TestPackerVolumeBootstrapIsTheOnlyRootContainer(t *testing.T) {
+func TestPackerInputStageIsTheOnlyRootContainer(t *testing.T) {
 	base := packerContainerCreateRequest{
-		name: "stage", image: "registry.example/packer@sha256:" + repeatHex("a"), platform: "linux/amd64",
+		name: "consumer", image: "registry.example/packer@sha256:" + repeatHex("a"), platform: "linux/amd64",
 		input: "nkd-input", work: "nkd-work", project: "/nkd/work", entrypoint: "sh",
 		packerArgs: []string{"-ec", "true"},
 		identity:   packerContainerIdentity{passwdPath: "/private/passwd", groupPath: "/private/group"},
 	}
 	consumer := packerContainerCreateArgs("docker", base)
 	if !slices.Contains(consumer, fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())) ||
-		slices.Contains(consumer, "--user=0:0") || slices.Contains(consumer, "--cap-add=CHOWN") {
+		slices.Contains(consumer, "--user=0:0") || slices.Contains(consumer, "--cap-add=CHOWN") ||
+		slices.Contains(consumer, "--cap-add=DAC_OVERRIDE") {
 		t.Fatalf("consumer identity/capabilities = %#v", consumer)
 	}
-	base.name, base.user, base.allowChown = "bootstrap", "0:0", true
-	bootstrap := packerContainerCreateArgs("docker", base)
-	if !slices.Contains(bootstrap, "--user=0:0") || !slices.Contains(bootstrap, "--cap-add=CHOWN") {
-		t.Fatalf("bootstrap identity/capabilities = %#v", bootstrap)
+	base.name, base.user, base.allowChown, base.allowDAC = "stage", "0:0", true, true
+	stage := packerContainerCreateArgs("docker", base)
+	if !slices.Contains(stage, "--user=0:0") || !slices.Contains(stage, "--cap-add=CHOWN") ||
+		!slices.Contains(stage, "--cap-add=DAC_OVERRIDE") {
+		t.Fatalf("stage identity/capabilities = %#v", stage)
 	}
-	if slices.ContainsFunc(bootstrap, func(arg string) bool {
+	if slices.ContainsFunc(stage, func(arg string) bool {
 		return strings.Contains(arg, "dst=/etc/passwd") || strings.Contains(arg, "dst=/etc/group")
 	}) {
-		t.Fatalf("root bootstrap received unnecessary host identity mounts: %#v", bootstrap)
+		t.Fatalf("root stage received unnecessary host identity mounts: %#v", stage)
 	}
-	for _, args := range [][]string{consumer, bootstrap} {
+	for _, args := range [][]string{consumer, stage} {
 		for _, required := range []string{"--network=none", "--read-only", "--no-healthcheck", "--hostname=nkd-packer", "--cap-drop=ALL"} {
 			if !slices.Contains(args, required) {
 				t.Fatalf("container args %#v omit %q", args, required)

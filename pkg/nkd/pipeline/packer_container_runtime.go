@@ -144,7 +144,7 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		entrypoint: "sh", packerArgs: []string{
 			"-ec", packerInputExtractScript, "nkd-extract-input",
 			strings.TrimPrefix(staged.inputArchiveDigest, "sha256:"), packerContainerWorkRoot + "/stage/input.tar",
-			packerContainerInputRoot, strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()),
+			packerContainerInputRoot, strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()), packerContainerWorkRoot,
 		},
 		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=stage"},
 		user:   "0:0", allowChown: true, allowDAC: true,
@@ -162,27 +162,9 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err := staged.verify(ctx); err != nil {
 		return nil, err
 	}
-	bootstrapName := "nkd-packer-" + attempt + "-bootstrap"
-	bootstrap := packerContainerCreateRequest{
-		name: bootstrapName, image: request.node.Toolchain, platform: request.node.ToolchainPlatform,
-		input: inputVolume, work: workVolume, project: packerContainerWorkRoot,
-		entrypoint: "sh", packerArgs: []string{
-			"-ec", packerVolumeBootstrapScript, "nkd-bootstrap-volumes",
-			strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()),
-		},
-		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=bootstrap"}, user: "0:0", allowChown: true,
-	}
-	resources.containers = append(resources.containers, bootstrapName)
-	if err := createPackerContainer(ctx, request.runtime, bootstrap); err != nil {
-		return nil, err
-	}
-	if err := startPackerContainer(ctx, request.runtime, bootstrapName, io.Discard, io.Discard); err != nil {
-		return nil, e.Wrap(e.CodeEngineCapability, err,
-			"initializing private Packer volume ownership")
-	}
-	if err := resources.removeContainer(ctx, bootstrapName); err != nil {
-		return nil, err
-	}
+	// The fixed extraction stage owns both fresh volumes until it has verified
+	// the archive and assigned their ownership to the invoking user. Its existing
+	// DAC override permits traversal of sealed directories during ownership changes.
 	if err := startPackerContainer(ctx, request.runtime, stageName, io.Discard, io.Discard); err != nil {
 		return nil, e.Wrap(e.CodeUnverifiedRef, err,
 			"pinned toolchain could not authenticate and extract the Packer input closure")

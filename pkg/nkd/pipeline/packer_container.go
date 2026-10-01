@@ -33,8 +33,7 @@ const (
 printf '%s  %s\n' "$1" /proc/self/fd/3 | sha256sum -c - >/dev/null
 install -d -m 0700 "$3/config" "$3/inputs" "$3/source"
 tar --no-same-owner --no-overwrite-dir -xf /proc/self/fd/3 -C "$3"
-chown -R "$4:$5" "$3"`
-	packerVolumeBootstrapScript = `chown -R "$1:$2" /nkd/input /nkd/work`
+chown -R "$4:$5" "$3" "$6"`
 )
 
 type packerContainerRuntime interface {

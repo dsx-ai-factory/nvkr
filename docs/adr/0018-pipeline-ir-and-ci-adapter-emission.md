@@ -286,7 +286,7 @@ material, toolchain or VM work until a typed non-public secret channel exists.
 Direct-Packer execution authenticates one already-local digest-pinned OCI toolchain for the selected host platform;
 it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NKD
 overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
-Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, disabled health check, read-only
+Every consumer container after input extraction has a fixed hostname, the host UID/GID, disabled health check, read-only
 root, no new privileges and all capabilities dropped. OpenSSH must be able to resolve that numeric identity.
 Podman therefore generates exact passwd/group rows for the invoking UID/GID. Docker receives read-only mounts of
 attempt-owned public passwd/group projections containing only that numeric identity, so it does not depend on the
@@ -312,12 +312,14 @@ is an explicit limitation of the unqualified local lane, not an accepted hosted 
 A hosted or qualified adapter must authenticate and enforce a subordinate identity, user namespace or stronger
 provider sandbox and record real interoperability evidence before it may admit this producer.
 
-Fresh Docker volumes and `docker cp` content are root-owned. One fixed ownership-bootstrap container therefore runs
-as root with only `CAP_CHOWN`, mounts only the attempt's input and work volumes, changes their ownership to the
-observed host UID/GID, and is removed before consumer execution. It performs no input
-authentication, extraction, Packer operation or network access. Extraction, version checking, SSH-key generation,
-validation and build all run as the host UID/GID. Only the build receives the admitted network mode, KVM device and its observed
-supplemental group when the exact binding enables KVM.
+Fresh Docker volumes and `docker cp` content are root-owned. One fixed input-extraction container runs as root
+with only `CAP_CHOWN` and `CAP_DAC_OVERRIDE`, mounts only the attempt's input and work volumes, and has no network
+or KVM device. It authenticates the held inner archive before extraction, preserves sealed directory modes, then
+assigns both volumes to the observed host UID/GID. DAC override permits traversal and population of sealed
+directories; it is not passed to consumers. This container executes no source-owned command or Packer operation
+and is removed before consumer execution. Version checking, SSH-key generation, validation and build all run as
+the host UID/GID with all capabilities dropped. Only the build receives the admitted network mode, KVM device and
+its observed supplemental group when the exact binding enables KVM.
 
 The runtime sets a fixed `PACKER_PLUGIN_PATH`, requires the exact Plan-authored Packer version, generates and checks
 an attempt-local SSH key pair when the source contract declares its variables, runs `packer validate` with the exact
@@ -347,13 +349,13 @@ command.
 
 VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, nested virtualization, NUMA,
 accelerators, requirements on non-build nodes, hosted adapter integration, qualified runtime authentication, and
-provider-specific lowering remain deferred. The narrowly scoped volume-ownership bootstrap above is the only local
+provider-specific lowering remain deferred. The narrowly scoped input-extraction stage above is the only local
 direct-Packer root exception; it grants no general privileged producer lane. Produced-artifact size remains an
 artifact and transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or
 weaken a request; a grouped provider job must satisfy every member node.
 
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the local
-runner's ownership contract. The direct-Packer ownership bootstrap is the sole exception and is constrained as
+runner's ownership contract. The direct-Packer input-extraction stage is the sole exception and is constrained as
 specified above. Private package layouts must remain reopenable by later host transport steps. Rootless Podman's
 existing user mapping is retained; the rootless BuildKit build container keeps its separate fixed UID and private
 output-promotion contract.

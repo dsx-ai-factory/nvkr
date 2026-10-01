@@ -107,9 +107,20 @@ printf '%s|%s|%s|%s|%s|%s' "${LD_PRELOAD-unset}" "${LD_LIBRARY_PATH-unset}" "$PA
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "unset|unset|/nonexistent|/dev/null|" + qualifiedRuntimeEndpoint + "|/dev/null"
+	want := "unset|unset|/nonexistent|/dev/null|" + qualifiedRuntimeEndpoint + "|/proc/self/fd"
 	if string(out) != want {
 		t.Fatalf("qualified runtime inherited ambient execution controls: got %q want %q", out, want)
+	}
+}
+
+func TestDockerRuntimeConfigHasNoAmbientFiles(t *testing.T) {
+	for _, name := range []string{"config.json", "contexts", "cli-plugins"} {
+		t.Run(name, func(t *testing.T) {
+			_, err := os.Stat(filepath.Join("/proc/self/fd", name))
+			if !os.IsNotExist(err) {
+				t.Fatalf("Docker configuration entry %s: %v, want not-exist (not ENOTDIR)", name, err)
+			}
+		})
 	}
 }
 

@@ -820,7 +820,7 @@ availability through the callback lifetime; it does not prove that Packer or QEM
 The driver enforces whether the selected device is exposed but does not promote that into consumption proof. No
 real Docker/Packer/NKE bake has yet established external interoperability. Hosted admission, provider proof, and VM
 topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
-the scoped ownership bootstrap, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
+the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
 deferred.
 Produced-artifact size remains an artifact and transport budget.
 

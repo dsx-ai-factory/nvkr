@@ -96,9 +96,32 @@ func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) 
 	digest := sha256.Sum256(archiveBytes)
 	destination := t.TempDir()
 	t.Cleanup(func() { _ = removePrivateTree(destination) })
+	work := t.TempDir()
+	if err := os.Mkdir(filepath.Join(work, "stage"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	chown, err := exec.LookPath("chown")
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := t.TempDir()
+	// Check both ownership operands, then use the real chown. Without this
+	// assertion an unprivileged test would miss an untouched, already-owned work root.
+	if err := os.WriteFile(filepath.Join(commands, "chown"), []byte(`#!/bin/sh
+set -eu
+test "$#" -eq 4
+test "$1" = -R
+test "$3" = "$NKD_TEST_INPUT"
+test "$4" = "$NKD_TEST_WORK"
+exec "$NKD_TEST_CHOWN" "$@"
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	command := exec.CommandContext(t.Context(), "sh", "-ec", packerInputExtractScript,
 		"nkd-extract-input", fmt.Sprintf("%x", digest), archive, destination,
-		fmt.Sprint(os.Getuid()), fmt.Sprint(os.Getgid()))
+		fmt.Sprint(os.Getuid()), fmt.Sprint(os.Getgid()), work)
+	command.Env = append(os.Environ(), "PATH="+commands+":"+os.Getenv("PATH"),
+		"NKD_TEST_CHOWN="+chown, "NKD_TEST_INPUT="+destination, "NKD_TEST_WORK="+work)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("extracting sealed Packer input closure: %v: %s", err, output)
 	}
@@ -327,7 +350,7 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	}
 
 	validateIndex, buildIndex, sshContainers, networkedContainers := -1, -1, 0, 0
-	workCopyIndex, carrierCopyIndex, bootstrapStartIndex, stageStartIndex := -1, -1, -1, -1
+	workCopyIndex, carrierCopyIndex, stageStartIndex := -1, -1, -1
 	hostUser := fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())
 	for index, call := range fake.calls {
 		joined := strings.Join(call, " ")
@@ -348,17 +371,14 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			} else if !slices.Contains(call, "--network=none") || slices.Contains(call, "--network=bridge") {
 				t.Fatalf("Packer preparation container received network access: %#v", call)
 			}
-			if strings.Contains(joined, "nkd.dev/role=bootstrap") {
-				if !slices.Contains(call, "--user=0:0") || !slices.Contains(call, "--cap-add=CHOWN") {
-					t.Fatalf("volume bootstrap lacks its narrow root/CHOWN authority: %#v", call)
-				}
-			} else if strings.Contains(joined, "nkd.dev/role=stage") {
+			if strings.Contains(joined, "nkd.dev/role=stage") {
 				if !slices.Contains(call, "--user=0:0") || !slices.Contains(call, "--cap-add=CHOWN") ||
 					!slices.Contains(call, "--cap-add=DAC_OVERRIDE") {
 					t.Fatalf("authenticated input stage lacks its narrow extraction authority: %#v", call)
 				}
-			} else if !slices.Contains(call, hostUser) || slices.Contains(call, "--cap-add=CHOWN") {
-				t.Fatalf("non-bootstrap container does not use the host identity without CHOWN: %#v", call)
+			} else if !slices.Contains(call, hostUser) || slices.Contains(call, "--cap-add=CHOWN") ||
+				slices.Contains(call, "--cap-add=DAC_OVERRIDE") {
+				t.Fatalf("consumer container does not use the host identity without extra capabilities: %#v", call)
 			}
 			if strings.Contains(joined, "nkd.dev/role=ssh-") {
 				sshContainers++
@@ -387,9 +407,6 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			}
 		}
 		if len(call) > 2 && call[0] == "start" {
-			if strings.Contains(call[2], "-bootstrap") {
-				bootstrapStartIndex = index
-			}
 			if strings.Contains(call[2], "-stage") {
 				stageStartIndex = index
 			}
@@ -404,10 +421,10 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	if networkedContainers != 1 {
 		t.Fatalf("networked Packer containers = %d, want only the build container", networkedContainers)
 	}
-	if workCopyIndex < 0 || carrierCopyIndex <= workCopyIndex || bootstrapStartIndex <= carrierCopyIndex ||
-		stageStartIndex <= bootstrapStartIndex || validateIndex <= stageStartIndex {
-		t.Fatalf("authenticated staging order is invalid: work=%d carrier=%d bootstrap=%d stage=%d validate=%d",
-			workCopyIndex, carrierCopyIndex, bootstrapStartIndex, stageStartIndex, validateIndex)
+	if workCopyIndex < 0 || carrierCopyIndex <= workCopyIndex ||
+		stageStartIndex <= carrierCopyIndex || validateIndex <= stageStartIndex {
+		t.Fatalf("authenticated staging order is invalid: work=%d carrier=%d stage=%d validate=%d",
+			workCopyIndex, carrierCopyIndex, stageStartIndex, validateIndex)
 	}
 	if len(fake.cleanups) < 3 {
 		t.Fatalf("cleanup calls = %#v, want build container and two volumes", fake.cleanups)
