@@ -164,7 +164,7 @@ func (definition Definition) Validate() error {
 		}
 		if output.Format == OutputHelm {
 			if len(output.Components) != 1 {
-				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires exactly one source archive component", output.Name)
+				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires exactly one source archive or acquired chart component", output.Name)
 			}
 		} else if len(output.Components) == 0 {
 			return e.New(e.CodeInvalidCatalog, "definition output %q requires components", output.Name)

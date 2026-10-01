@@ -12,9 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/helmarchive"
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"sigs.k8s.io/yaml"
 )
 
@@ -42,6 +45,9 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	}
 	if len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", node.ID)
+	}
+	if inputs[0].Kind == "raw" {
+		return executeAcquiredHelmPackage(ctx, plan, output, inputs[0], artifacts)
 	}
 	// legacyCarrier is not written by this function itself; it reclaims a
 	// same-named carrier a prior interrupted run (or an older build of this
@@ -296,4 +302,42 @@ func topLevelHelmEntry(name, base string) string {
 		trimmed = trimmed[:idx]
 	}
 	return trimmed
+}
+
+// executeAcquiredHelmPackage preserves the original compressed bytes. The result
+// record is checked against the exact pull instruction, then a held snapshot is
+// rechecked against that digest so pathname replacement cannot change the layer.
+func executeAcquiredHelmPackage(ctx context.Context, plan *Plan, output, input Artifact, artifacts map[string]Artifact) error {
+	producer := planNode(plan, input.Producer)
+	_, instruction, err := plan.producerInstruction(producer)
+	if err != nil {
+		return err
+	}
+	if instruction.Kind != ir.KindPull || instruction.OutputType != "raw" {
+		return e.New(e.CodeInvalidCatalog, "acquired Helm input %q requires a raw pull producer", input.ID)
+	}
+	result, err := observeProducerPayload(ctx, plan, input, artifacts)
+	if err != nil {
+		return err
+	}
+	held, err := heldfile.OpenContext(ctx, input.Path, heldfile.Options{Label: "acquired-helm", MaxBytes: helmarchive.MaxPackageBytes, ExpectedDigest: instruction.Digest})
+	if err != nil {
+		if ctx.Err() != nil {
+			return e.Wrap(e.CodeTimeout, ctx.Err(), "holding acquired Helm package")
+		}
+		return e.Wrap(e.CodeVerifyFailed, err, "holding acquired Helm package")
+	}
+	defer func() { _ = held.Close() }()
+	if held.Size() != result.Size {
+		return e.New(e.CodeVerifyFailed, "acquired Helm package size differs from observed producer")
+	}
+	raw, err := held.ReadAllContext(ctx, helmarchive.MaxPackageBytes)
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "reading held Helm package")
+	}
+	if _, err := helmarchive.Inspect(ctx, raw); err != nil {
+		return err
+	}
+	_, err = delivery.BuildHelmChartArtifact(ctx, output.Path, output.MediaType, raw)
+	return err
 }

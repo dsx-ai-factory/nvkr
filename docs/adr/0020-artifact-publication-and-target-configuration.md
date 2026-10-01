@@ -236,6 +236,15 @@ requires a plain rendered `templates/controller.yaml` and an image values mappin
 pre-existing templates. Other chart shapes require a separate adapter. This does not establish external chart
 dependency availability or successful deployment.
 
+A Helm output may instead select one acquired `raw` chart package. The compiler requires an acquisition
+producer and transports its result explicitly. Packaging checks the result and a bounded, no-follow held
+snapshot against the pinned pull digest, validates the chart archive, and wraps the exact compressed bytes
+as the OCI chart layer. The layer digest therefore remains the upstream package pin; the enclosing manifest
+has its own digest. Acquired charts cannot be repacked or image-bound. Lifecycle observation independently
+reproduces the wrapper and checks its manifest. This path is exercised by a
+[local four-chart NKE Run](../evidence/2026-10-01-acquired-helm-packaging.md); it establishes neither upstream
+signature verification nor qualification. Dependency scanning of acquired `raw` charts remains unsupported.
+
 Push, sign and pull-back verification are separate effects: later failure may leave bytes or partial evidence in
 the registry. No atomic remote rollback or cross-run resume is claimed. A complete local Run does not establish
 the deferred qualification/manifest acceptance in ADR-16. Retention and recovery require deployment ownership.

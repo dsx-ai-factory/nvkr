@@ -1,9 +1,7 @@
 package catalog
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,12 +10,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/helmarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -30,10 +27,8 @@ import (
 
 const (
 	maxHelmIndexBytes   = 16 << 20
-	maxHelmPackageBytes = 64 << 20
-	maxHelmArchiveBytes = 256 << 20
-	maxHelmChartBytes   = 1 << 20
-	maxHelmFiles        = 10000
+	maxHelmPackageBytes = helmarchive.MaxPackageBytes
+	maxHelmFiles        = helmarchive.MaxEntries
 	helmConfigType      = types.MediaType("application/vnd.cncf.helm.config.v1+json")
 	helmContentType     = types.MediaType("application/vnd.cncf.helm.chart.content.v1.tar+gzip")
 )
@@ -281,114 +276,17 @@ func decodeHelmYAML(raw []byte, target any) error {
 }
 
 func validateHelmArchive(ctx context.Context, archive []byte, chartName, version string) error {
-	zipped, err := gzip.NewReader(bytes.NewReader(archive))
+	identity, err := helmarchive.Inspect(ctx, archive)
 	if err != nil {
-		return e.Wrap(e.CodeInvalidCatalog, err, "invalid Helm gzip archive")
+		if ctx != nil && ctx.Err() != nil {
+			return pinContextError(ctx)
+		}
+		return e.Wrap(e.CodeInvalidCatalog, err, "invalid Helm package")
 	}
-	defer func() { _ = zipped.Close() }()
-	limited := &io.LimitedReader{R: zipped, N: maxHelmArchiveBytes + 1}
-	reader := tar.NewReader(limited)
-	seen := map[string]helmArchiveRecord{}
-	found := false
-	for count := 0; ; count++ {
-		if err := pinContextError(ctx); err != nil {
-			return err
-		}
-		header, err := reader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return e.Wrap(e.CodeInvalidCatalog, err, "invalid Helm tar archive")
-		}
-		if count >= maxHelmFiles || limited.N <= 0 {
-			return e.New(e.CodeInvalidCatalog, "Helm archive exceeds bounds")
-		}
-		entry := strings.TrimSuffix(header.Name, "/")
-		if entry == "" || path.IsAbs(entry) || path.Clean(entry) != entry || strings.ContainsAny(entry, "\\\x00") || (entry != chartName && !strings.HasPrefix(entry, chartName+"/")) {
-			return e.New(e.CodeInvalidCatalog, "unsafe Helm archive path %q", header.Name)
-		}
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir {
-			return e.New(e.CodeInvalidCatalog, "Helm archive entry %q is not a regular file or directory", header.Name)
-		}
-		if header.Size < 0 || header.Size > maxHelmArchiveBytes || (header.Typeflag == tar.TypeDir && header.Size != 0) {
-			return e.New(e.CodeInvalidCatalog, "invalid Helm archive entry size")
-		}
-		previous, repeated := seen[entry]
-		if repeated && (!helmRepeatedSubchartFile(chartName, entry) || header.Typeflag != tar.TypeReg ||
-			previous.header.Typeflag != tar.TypeReg || !reflect.DeepEqual(previous.header, header)) {
-			return e.New(e.CodeInvalidCatalog, "duplicate Helm archive path %q is not an identical regular subchart record", header.Name)
-		}
-		var digest [sha256.Size]byte
-		if entry == chartName+"/Chart.yaml" {
-			if header.Typeflag != tar.TypeReg || header.Size > maxHelmChartBytes {
-				return e.New(e.CodeInvalidCatalog, "invalid Helm Chart.yaml type or size")
-			}
-			raw, err := io.ReadAll(reader)
-			if err != nil {
-				return e.Wrap(e.CodeInvalidCatalog, err, "reading Helm Chart.yaml")
-			}
-			var metadata struct {
-				Name    string `json:"name"`
-				Version string `json:"version"`
-			}
-			if err := decodeHelmYAML(raw, &metadata); err != nil {
-				return e.Wrap(e.CodeInvalidCatalog, err, "invalid Helm Chart.yaml")
-			}
-			if metadata.Name != chartName || metadata.Version != version {
-				return e.New(e.CodeInvalidCatalog, "Helm package identity %s@%s does not match %s@%s", metadata.Name, metadata.Version, chartName, version)
-			}
-			digest = sha256.Sum256(raw)
-			found = true
-		} else {
-			hash := sha256.New()
-			if _, err := io.Copy(hash, reader); err != nil || limited.N <= 0 {
-				return e.New(e.CodeInvalidCatalog, "Helm archive file is truncated or exceeds expanded size bound: %v", err)
-			}
-			copy(digest[:], hash.Sum(nil))
-		}
-		if repeated && digest != previous.digest {
-			return e.New(e.CodeInvalidCatalog, "duplicate Helm subchart record %q has conflicting content", header.Name)
-		}
-		seen[entry] = helmArchiveRecord{header: header, digest: digest}
-	}
-	// Consume gzip through its checksum, also bounding data after the tar terminator.
-	if _, err := io.Copy(helmPaddingWriter{}, limited); err != nil || limited.N <= 0 {
-		return e.New(e.CodeInvalidCatalog, "Helm archive checksum invalid or expanded size exceeds bound: %v", err)
-	}
-	if !found {
-		return e.New(e.CodeInvalidCatalog, "Helm package lacks root Chart.yaml")
+	if identity.Name != chartName || identity.Version != version {
+		return e.New(e.CodeInvalidCatalog, "Helm package identity %s@%s does not match %s@%s", identity.Name, identity.Version, chartName, version)
 	}
 	return nil
-}
-
-type helmArchiveRecord struct {
-	header *tar.Header
-	digest [sha256.Size]byte
-}
-
-// Some published charts repeat vendored subchart records. Only regular files
-// below charts/<subchart>/ may repeat, with all decoded tar metadata and payload
-// bytes identical. Root metadata, directories, and other chart files stay unique.
-// Every repeated record still consumes the ordinary entry and expanded-byte limits.
-func helmRepeatedSubchartFile(chartName, entry string) bool {
-	relative, ok := strings.CutPrefix(entry, chartName+"/charts/")
-	if !ok {
-		return false
-	}
-	subchart, file, ok := strings.Cut(relative, "/")
-	return ok && file != "" && helmChartName.MatchString(subchart)
-}
-
-type helmPaddingWriter struct{}
-
-func (helmPaddingWriter) Write(p []byte) (int, error) {
-	for _, b := range p {
-		if b != 0 {
-			return 0, fmt.Errorf("non-padding data after Helm tar terminator")
-		}
-	}
-	return len(p), nil
 }
 
 // The registry client may otherwise fall back to plain HTTP for local names.

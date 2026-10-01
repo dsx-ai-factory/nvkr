@@ -438,7 +438,9 @@ versions from bounded YAML/JSON in the pinned upstream tree; provenance annotati
 agreement. Re-pinning updates the declared set atomically. Unknown or missing records in selected collections
 fail closed. The NKE deploy adapter adds explicit deploy-item accounting and exact Helm package pins from
 HTTPS or anonymous OCI repositories; installation stays with NKE. Catalogs with pin sets require access
-to pinned Git objects when loaded.
+to pinned Git objects when loaded. A `helm-oci` output can wrap an acquired `raw` chart without changing
+its compressed bytes or pinned layer digest. The wrapper has its own manifest digest; image binding
+remains source-only (ADR-20).
 
 `curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
 An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate

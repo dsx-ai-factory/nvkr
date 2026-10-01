@@ -45,7 +45,7 @@ func TestCompilerPackageAndRouteAdmissionRejectsWrongRepresentations(t *testing.
 		count                 int
 	}{
 		{"APT needs Debian", PackageAPT, "raw", 1},
-		{"Helm needs source", PackageHelm, "raw", 1},
+		{"Helm rejects binary", PackageHelm, "host-package", 1},
 		{"Helm unary", PackageHelm, "tarball", 2},
 		{"image needs OCI", PackageImage, "raw", 1},
 		{"image unary", PackageImage, "oci-image", 2},

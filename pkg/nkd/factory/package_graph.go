@@ -249,8 +249,8 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 				return e.New(e.CodeInvalidCatalog, "APT package %q input %s has kind %q, want host-package", spec.Name, id, artifact.Kind)
 			}
 		case PackageHelm:
-			if artifact.Kind != "tarball" || artifact.BuildTarget == "" {
-				return e.New(e.CodeInvalidCatalog, "Helm package %q input %s requires a build source archive", spec.Name, id)
+			if (artifact.Kind != "tarball" && artifact.Kind != "raw") || artifact.BuildTarget == "" {
+				return e.New(e.CodeInvalidCatalog, "Helm package %q input %s requires a source archive or acquired chart", spec.Name, id)
 			}
 		}
 	}

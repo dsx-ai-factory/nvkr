@@ -1,0 +1,24 @@
+apiVersion: nkd.dev/definition/v4
+kind: Definition
+metadata:
+  name: nke-acquired-charts
+  description: Preserve NKE's pinned external chart archives as Helm OCI outputs.
+catalog:
+  base: .
+outputs:
+  - name: postgresql
+    format: helm-oci
+    platform: linux/amd64
+    components: [postgresql-chart]
+  - name: spire
+    format: helm-oci
+    platform: linux/amd64
+    components: [spire-chart]
+  - name: spire-crds
+    format: helm-oci
+    platform: linux/amd64
+    components: [spire-crds-chart]
+  - name: temporal
+    format: helm-oci
+    platform: linux/amd64
+    components: [temporal-chart]

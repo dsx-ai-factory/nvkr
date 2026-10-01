@@ -84,6 +84,24 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		if spec.Kind == PackageImage && nodes[artifacts[inputs[0]].Producer].Kind != NodeBuild {
 			return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q currently requires a built OCI export; acquired layouts need a separate adapter", spec.Name)
 		}
+		if spec.Kind == PackageHelm {
+			for _, id := range inputs {
+				input := artifacts[id]
+				producer := nodes[input.Producer]
+				if input.Kind == "raw" && producer.Kind != NodeAcquire {
+					return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "Helm package %q requires acquired chart bytes for raw input", spec.Name)
+				}
+				if input.Kind == "tarball" && producer.Kind != NodeBuild {
+					return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "Helm package %q requires a source build for repackaging or image binding", spec.Name)
+				}
+			}
+			// Acquired packaging authenticates its exact producer result before
+			// creating output. Transport it explicitly on every execution engine.
+			if artifacts[inputs[0]].Kind == "raw" {
+				input := artifacts[inputs[0]]
+				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
+			}
+		}
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.
 		inputs = append(inputs, observationInputs(inputs, artifacts)...)

@@ -1,4 +1,4 @@
-# Pin NKE deploy chart versions
+# Pin and package NKE deploy charts
 
 NKD can derive external chart pins from NKE's `controller/deploy/nke-sbom/nke-deploy.yaml` and the
 `release.yaml` of each Helm item. The `nke-deploy-v1` adapter reads those files from the exact pinned Git tree.
@@ -34,6 +34,35 @@ go run ./cmd/nkdctl catalog validate --data /tmp/nke-chart-catalog
 The resulting lock records the NKE commit/tree/epoch, each chart version, its acquisition identity, package
 digest and `derivedFrom: nke-controller@<commit>`. Helm packages are platform-independent: both declared
 architectures record the same archive digest. OCI pins identify the chart layer bytes, not the manifest.
+
+## Package locally
+
+The [Definition](examples/nke-pin-set/definition.yaml) selects the four acquired charts as `helm-oci`
+outputs. Packaging verifies each locked digest and wraps the original `.tgz` bytes in an OCI layout.
+The chart layer retains its pinned digest; the enclosing OCI manifest has a separate digest.
+
+With Docker running and the pinned Go toolchain available:
+
+```sh
+mkdir -p .nkd/acquired-charts
+cp docs/examples/nke-pin-set/*.yaml .nkd/acquired-charts/
+# On ARM64, set utilityPlatform to linux/arm64 in environment-local.yaml.
+go run ./cmd/nkdctl catalog pin --dir .nkd/acquired-charts \
+  --tag controller/v0.1.1-rc.9 nke-controller
+go run ./cmd/nkdctl run local \
+  --definition .nkd/acquired-charts/definition.yaml \
+  --environment .nkd/acquired-charts/environment-local.yaml \
+  --attempt acquired-helm-01 --runner-source .
+```
+
+Packages are under `.nkd/runs/acquired-helm-01/packages/`; `lifecycle.json` records the observed
+manifest digests. Choose a new attempt name for each run. Source access uses your Git credentials;
+a local NKE clone can be selected with Git's `url.<clone-path>.insteadOf` override without changing the catalog.
+
+[Recorded local execution](evidence/2026-10-01-acquired-helm-packaging.md) packaged all four real charts
+and checked their layers against the lock and downloaded bytes. This example performs no publication,
+signing or installation. Its SBOMs record composition only; dependency scanning of acquired `raw` charts
+is not supported. Acquired charts cannot use image binding, because that would change their pinned bytes.
 
 ## Explicit membership
 
