@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/versionpolicy"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -40,7 +41,6 @@ const (
 
 var (
 	helmChartName = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
-	helmVersion   = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 )
 
 // HelmChart selects an external chart repository. Its exact version comes from
@@ -90,7 +90,7 @@ func resolveHelmChartWith(ctx context.Context, chart HelmChart, version string, 
 	if err := validateHelmChart(chart); err != nil {
 		return "", "", err
 	}
-	if !helmVersion.MatchString(version) {
+	if !versionpolicy.Helm(version) {
 		return "", "", e.New(e.CodeInvalidCatalog, "Helm chart %q requires an exact version, got %q", chart.Name, version)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
