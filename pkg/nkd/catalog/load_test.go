@@ -160,10 +160,37 @@ func TestBuilderTypeValidation(t *testing.T) {
 
 func TestArchTokenAccepted(t *testing.T) {
 	c := goodComponent()
+	c.VendorCommand = []string{"fetch", "{{.Arch}}"}
 	c.BuildCommand = []string{"make", "KUBE_BUILD_PLATFORMS=linux/{{.Arch}}"}
 	c.ArtifactPath = "_output/local/bin/linux/{{.Arch}}/kubectl"
 	if err := base(c).Validate(); err != nil {
 		t.Fatalf("{{.Arch}} token must validate: %v", err)
+	}
+}
+
+func TestVendorArchTokensAtSourceAndComponentBoundaries(t *testing.T) {
+	for _, token := range []string{"{{.Arch}}", "{{.Ach}}", "{{ .Arch }}"} {
+		for _, boundary := range []string{"source", "component"} {
+			t.Run(boundary+"/"+token, func(t *testing.T) {
+				var err error
+				if boundary == "source" {
+					err = validateRegistryDeclarations(&registryDoc{Sources: map[string]Source{
+						"source": {Repo: "https://example.com/source", VendorCommand: []string{"fetch", token}},
+					}})
+				} else {
+					component := goodComponent()
+					component.VendorCommand = []string{"fetch", token}
+					err = base(component).Validate()
+				}
+				want := nkderr.CodeInvalidCatalog
+				if token == "{{.Arch}}" {
+					want = ""
+				}
+				if codeOf(err) != want {
+					t.Fatalf("vendor token %q: error=%v, want %s", token, err, want)
+				}
+			})
+		}
 	}
 }
 

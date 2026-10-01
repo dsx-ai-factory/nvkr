@@ -208,15 +208,15 @@ contract-tested. Before the first external runtime command, the driver uses a li
 for the immutable attempt directory to retain and recheck the exact material-manifest bytes. When the source
 contract declares `buildLogDirectoryVariable`, the driver also copies only regular files from that source-owned
 directory after the build returns and before private containers, volumes and workspace state are reaped. Entry,
-file and aggregate byte counts are bounded; absolute or traversing paths, links, devices, duplicate paths and
+file and aggregate byte counts are bounded. Missing, timed-out or oversized log collection records an incomplete
+diagnostic marker without discarding a separately verified successful disk. Absolute or traversing paths, links, devices, duplicate paths and
 replacement of an existing diagnostic set fail closed. These files are non-authoritative diagnostics, not Build,
 Artifact or qualification evidence. The supported route supplies no secret channel and rejects FDE before work;
 the adapter does not retain the generated SSH key, environment, home, configuration, cache, HTTP or output
-directories. This retention boundary is contract-tested but has no hosted execution evidence. One attempt-frozen
-draft Podman/Packer/NKE ARM64 execution and boot smoke is recorded, but it was
-not run from the current committed NKD head and exact current NKE pin. That committed-head repeat, Docker and hosted
-execution remain required before maintained NKE support, product acceptance, or any pipeline-attested or qualified
-production claim; the recorded local result stays unqualified. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
+directories. The [2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
+Docker/Packer/NKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
+adapter on ARC, not generated hosted VM execution. Generated execution, maintained release acceptance and
+pipeline-attested or qualified production claims remain unproven. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
 (`sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80`) and QEMU plugin 1.1.6
 (`sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6`), both matching HashiCorp's
 published `SHA256SUMS`. A minimal exact-version QEMU source returned exit zero, the single 28-byte success line

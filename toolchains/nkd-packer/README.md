@@ -54,7 +54,8 @@ image IDs before adding a Docker pin.
 separate. A null Docker entry permits a diagnostic build but is not itself an
 execution pin. The local Docker wrapper freezes the exact observed image ID
 into an attempt-specific catalog overlay before compiling the Plan; NKD
-rechecks that ID before execution. This does not make the image an approved
+rechecks that ID before execution. This binds loaded image bytes to the attempt Plan, not toolchain provenance,
+and does not make the image an approved
 maintained toolchain. There is no toolchain publication workflow in this repository.
 `images` remains `null` because a local image ID is not an OCI repository
 digest. The build command fails if a rebuilt image differs from its recorded

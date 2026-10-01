@@ -207,7 +207,8 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
 		// than assume a preinstalled Go, and pin the version to the repo's .go-version so the
 		// toolchain and setup-go cannot drift.
-		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != ".go-version" {
+		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != ".go-version" ||
+			job.Steps[1].With["cache"] != "false" {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain from .go-version", jobID)
 		}
 		bootstrapRuns := joinRuns(job.Steps)

@@ -866,6 +866,100 @@ func TestRunPackerContainerReapsResourcesWhenBuildStartFails(t *testing.T) {
 	}
 }
 
+func TestRunPackerContainerDiagnosticFailures(t *testing.T) {
+	copyFailure := errors.New("log copy unavailable")
+	buildFailure := errors.New("build failed")
+	for _, test := range []struct {
+		name       string
+		buildErr   error
+		copyErr    error
+		entries    []packerDiagnosticTarEntry
+		wantCode   e.Code
+		incomplete bool
+	}{
+		{name: "missing logs after success", copyErr: copyFailure, incomplete: true},
+		{name: "missing logs after build failure", buildErr: buildFailure, copyErr: copyFailure, wantCode: e.CodeBuildFailed, incomplete: true},
+		{name: "oversized log after success", entries: []packerDiagnosticTarEntry{{name: "large.log", typeflag: tar.TypeReg, payload: bytes.Repeat([]byte("x"), int(maxPackerDiagnosticFileBytes)+1)}}, incomplete: true},
+		{name: "unsafe logs remain fatal", entries: []packerDiagnosticTarEntry{{name: "../escape", typeflag: tar.TypeReg, payload: []byte("x")}}, wantCode: e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n", "The configuration is valid.\n", "", nil)
+			request.bindings.buildLogDirectoryVariable = "build_logs"
+			var archive bytes.Buffer
+			writer := tar.NewWriter(&archive)
+			for _, entry := range test.entries {
+				if err := writer.WriteHeader(&tar.Header{Name: entry.name, Typeflag: entry.typeflag, Mode: 0o600, Size: int64(len(entry.payload))}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := writer.Write(entry.payload); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			fallback := runtime.run
+			runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+				if len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-build") {
+					return test.buildErr
+				}
+				if len(args) > 2 && args[0] == "cp" && strings.Contains(args[1], packerContainerBuildLogPath) {
+					if test.copyErr != nil {
+						return test.copyErr
+					}
+					_, err := stdout.Write(archive.Bytes())
+					return err
+				}
+				return fallback(stdin, stdout, stderr, args)
+			}
+			artifact, err := runPackerContainer(testContext(t), request)
+			if test.wantCode == "" {
+				if err != nil || artifact == nil {
+					t.Fatalf("successful disk lost to diagnostics: artifact=%v, error=%v", artifact, err)
+				}
+				defer artifact.Close()
+			} else if artifact != nil || code(err) != test.wantCode {
+				t.Fatalf("artifact=%v, error=%v, want nil/%s", artifact, err, test.wantCode)
+			}
+			if test.buildErr != nil && (!errors.Is(err, test.buildErr) || !errors.Is(err, test.copyErr)) {
+				t.Fatalf("lost primary or diagnostic failure: %v", err)
+			}
+			markers, globErr := filepath.Glob(filepath.Join(request.workspace.Name(), packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*", "logs-incomplete.json"))
+			if globErr != nil || (len(markers) == 1) != test.incomplete {
+				t.Fatalf("markers=%v, error=%v, want incomplete=%v", markers, globErr, test.incomplete)
+			}
+			if test.incomplete {
+				raw, err := os.ReadFile(markers[0])
+				if err != nil || string(raw) != `{"status":"incomplete","code":"NKD-E-VERIFY-FAILED"}` {
+					t.Fatalf("incomplete marker=%q, error=%v", raw, err)
+				}
+			}
+			buildRemoved, volumesRemoved := false, 0
+			for _, call := range runtime.cleanups {
+				if len(call) > 2 && call[0] == "rm" && strings.Contains(call[2], "-build") {
+					buildRemoved = true
+				}
+				if len(call) > 3 && call[0] == "volume" && call[1] == "rm" {
+					volumesRemoved++
+				}
+			}
+			if !buildRemoved || volumesRemoved != 2 {
+				t.Fatalf("incomplete cleanup: %v", runtime.cleanups)
+			}
+			assertNoPackerDiagnosticStages(t, request.workspace.Name())
+		})
+	}
+}
+
+func TestRunPackerContainerMissingDiagnosticsBeforeRuntime(t *testing.T) {
+	request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n", "The configuration is valid.\n", "", nil)
+	request.diagnostics = nil
+	artifact, err := runPackerContainer(testContext(t), request)
+	if artifact != nil || code(err) != e.CodeEngineCapability || len(runtime.calls) != 0 {
+		t.Fatalf("artifact=%v, error=%v, runtime calls=%v", artifact, err, runtime.calls)
+	}
+}
+
 func TestRunPackerContainerPreservesRuntimeCleanupFailure(t *testing.T) {
 	cleanupFailure := errors.New("runtime cleanup failed")
 	for _, test := range []struct {
@@ -1047,6 +1141,31 @@ func TestNodeSessionCloseReleasesPackerRuntime(t *testing.T) {
 	}}, nil, "docker")
 	if code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed session admission error = %v, want %s", err, e.CodeEngineCapability)
+	}
+}
+
+func TestVMImagePackerExecutorMissingDiagnosticsBeforeRuntime(t *testing.T) {
+	node := testPackerContainerNode()
+	raw, err := canonical.Marshal(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := NewNodeSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(session.Close)
+	runtime := &recordingPackerRuntime{}
+	executor := &VMImagePackerExecutor{session: session.state, runtime: runtime, nodes: map[string][]byte{node.ID: raw}}
+	t.Cleanup(func() { _ = executor.Close() })
+	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("{}\n"), heldfile.Options{Label: "material-manifest", MaxBytes: maxBuildMaterialManifestBytes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.Close()
+	artifact, result, err := executor.Run(t.Context(), node.ID, node, VMImagePackerRun{Manifest: manifest, Runtime: &execution.LocalVMRuntime{}})
+	if artifact != nil || result != nil || code(err) != e.CodeEngineCapability || len(runtime.calls) != 0 {
+		t.Fatalf("artifact=%v result=%v error=%v runtime calls=%v", artifact, result, err, runtime.calls)
 	}
 }
 

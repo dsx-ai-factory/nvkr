@@ -189,6 +189,20 @@ func TestCatalogStackRejectsInvalidToolchainSubstitutions(t *testing.T) {
 			o.ToolchainSubstitutions[0].Components = []string{"kube-proxy", "kube-proxy"}
 		}, nkderr.CodeInvalidCatalog},
 		{"invalid destination", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].To = "latest" }, nkderr.CodeInvalidCatalog},
+		{"invalid architecture", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].Arch = "bogus" }, nkderr.CodeInvalidCatalog},
+		{"unchanged pin", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].To = old }, nkderr.CodeInvalidCatalog},
+		{"empty components", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].Components = nil }, nkderr.CodeInvalidCatalog},
+		{"invalid from scheme", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].From = "docker://" + old }, nkderr.CodeInvalidCatalog},
+		{"invalid to scheme", func(o *catalog.Overlay) { o.ToolchainSubstitutions[0].To = "docker://" + newImage }, nkderr.CodeInvalidCatalog},
+		{"empty overlay", func(o *catalog.Overlay) { o.ToolchainSubstitutions = nil }, nkderr.CodeInvalidCatalog},
+		{"prebuilt target", func(o *catalog.Overlay) {
+			o.Components = map[string]catalog.ComponentReplacement{"kube-apiserver": {
+				Version: "1", SourceDateEpoch: 1, OutputType: base.Components["kube-apiserver"].OutputType,
+				Prebuilt: &catalog.Prebuilt{Image: "supplier.example/component", Digests: map[string]string{
+					"amd64": "sha256:" + strings.Repeat("a", 64), "arm64": "sha256:" + strings.Repeat("b", 64),
+				}, Evidence: &catalog.ExternalEvidence{None: true}},
+			}}
+		}, nkderr.CodeUnverifiedRef},
 		{"duplicate substitution", func(o *catalog.Overlay) { o.ToolchainSubstitutions = append(o.ToolchainSubstitutions, valid) }, nkderr.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -204,6 +218,32 @@ func TestCatalogStackRejectsInvalidToolchainSubstitutions(t *testing.T) {
 				t.Fatalf("failed substitution mutated base: %s, %v", after, err)
 			}
 		})
+	}
+}
+
+func TestToolchainSubstitutionJSONContract(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../testdata/catalogs/kubernetes-layered"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../testdata/catalogs/toolchain-substitution.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The fixture exercises the script's wire shape; bind its predecessor to this
+	// test catalog rather than duplicating that catalog's changing identity.
+	overlay.RequiresCatalogDigest, err = base.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(base, overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"kube-apiserver", "kube-proxy"} {
+		if stack.Catalog.Components[name].ToolchainImages["amd64"] != overlay.ToolchainSubstitutions[0].To {
+			t.Fatalf("%s did not receive JSON-authored toolchain substitution", name)
+		}
 	}
 }
 

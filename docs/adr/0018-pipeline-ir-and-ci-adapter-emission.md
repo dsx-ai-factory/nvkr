@@ -134,11 +134,14 @@ mirror is authenticated. The cross-repository source credential must not share a
 trusted source-fetch job alone receives it. That job verifies the selected commit and tree, makes a fresh
 credential-free Git checkout, and uploads it as a one-day internal artifact with an exact SHA-256 passed as a
 job output. The build job verifies the archive digest and Git commit/tree before candidate code runs. Candidate
-code receives no authority-bearing evidence role. Its logs, image observations, QCOW2 digest and boot result are explicitly
-unqualified diagnostic output. NKE's successful ARC jobs do not establish access from `nke-recipes`; runner
-routing, availability and isolation remain provider facts that require an actual successful run here. This
-exception grants no pipeline-attested or qualified claim and changes no generated
-adapter rule.
+code receives no authority-bearing evidence role. The build job's logs, image observations, QCOW2 digest and boot
+result are explicitly unqualified diagnostic output. The [2026-10-01 runs](../evidence/2026-10-01-nke-arc-os-builds.md) exercise both
+ARC pools from `nke-recipes`; they do not establish lasting availability or provider isolation. Shared Actions
+caches are disabled for the trusted bootstrap and generated helper so candidate cache writes are not restored
+into those trusted binaries. Mirror selection checks an open, non-draft same-repository PR head, not a human
+approval. `/ok to test` is procedural vetting; branch equality does not authenticate the mirror's writer. The
+repository-scoped source secret remains a separate policy gap. This exception grants no pipeline-attested or
+qualified claim and changes no generated adapter rule.
 
 Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.

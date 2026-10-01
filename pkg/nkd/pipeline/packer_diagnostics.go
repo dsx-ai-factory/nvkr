@@ -7,12 +7,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -46,6 +48,8 @@ var defaultPackerDiagnosticLimits = packerDiagnosticLimits{
 	entries: maxPackerDiagnosticEntries, files: maxPackerDiagnosticFiles,
 	fileBytes: maxPackerDiagnosticFileBytes, payloadBytes: maxPackerDiagnosticPayloadBytes,
 }
+
+var errPackerDiagnosticsIncomplete = errors.New("packer diagnostics are incomplete")
 
 // PackerDiagnosticSink is a process-local capability for retaining bounded,
 // non-authoritative Packer diagnostics beneath one already-held lifecycle
@@ -202,7 +206,7 @@ func writePackerDiagnosticManifest(ctx context.Context, root *os.File, manifest 
 	}
 	defer func() {
 		if err := held.Close(); err != nil {
-			returnErr = joinPackerDiagnosticError(returnErr,
+			returnErr = errors.Join(returnErr,
 				e.Wrap(e.CodeInternal, err, "closing held Packer diagnostic material manifest"))
 		}
 	}()
@@ -268,7 +272,7 @@ func writePackerDiagnosticManifest(ctx context.Context, root *os.File, manifest 
 }
 
 func collectPackerContainerBuildLogs(ctx context.Context, runtime packerContainerRuntime,
-	container, privateRoot string, target *packerDiagnosticTarget,
+	container string, target *packerDiagnosticTarget,
 ) (returnErr error) {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "collecting Packer build logs requires a non-nil context")
@@ -276,48 +280,66 @@ func collectPackerContainerBuildLogs(ctx context.Context, runtime packerContaine
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "collecting Packer build logs")
 	}
-	if runtime == nil || container == "" || privateRoot == "" || target == nil {
+	if runtime == nil || container == "" || target == nil {
 		return e.New(e.CodeEngineCapability,
 			"collecting Packer build logs requires held runtime, container, workspace and diagnostic capabilities")
 	}
-	archivePath := filepath.Join(privateRoot, "diagnostic-logs.tar")
-	archive, err := os.OpenFile(archivePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	archive, err := heldfile.NewOutput("packer-build-log-transport", maxPackerDiagnosticArchiveBytes)
 	if err != nil {
 		return e.Wrap(e.CodeImmutableViolation, err,
 			"creating private Packer build-log transport")
 	}
-	limited := &packerContainerLimitWriter{writer: archive, remaining: maxPackerDiagnosticArchiveBytes}
+	defer func() {
+		if err := archive.Close(); err != nil {
+			returnErr = errors.Join(returnErr, e.Wrap(e.CodeInternal, err, "closing private Packer build-log transport"))
+		}
+	}()
+	limited := &packerContainerLimitWriter{writer: archive.OSFile(), remaining: maxPackerDiagnosticArchiveBytes}
 	var stderr bytes.Buffer
 	runErr := runtime.Run(ctx, nil, limited, &stderr, "cp",
 		container+":"+packerContainerBuildLogPath+"/.", "-")
-	syncErr := archive.Sync()
-	closeErr := archive.Close()
-	if err := errors.Join(runErr, syncErr, closeErr); err != nil {
-		_ = os.Remove(archivePath)
-		return runtimeCommandError(ctx, err, stderr.String(), e.CodeVerifyFailed,
+	if runErr != nil {
+		return runtimeCommandError(ctx, errors.Join(runErr, errPackerDiagnosticsIncomplete), stderr.String(), e.CodeVerifyFailed,
 			"collecting bounded Packer build logs")
 	}
-	held, err := heldfile.OpenContext(ctx, archivePath, heldfile.Options{
-		Label: "packer-build-log-transport", MaxBytes: maxPackerDiagnosticArchiveBytes,
-	})
+	held, err := archive.SealContext(ctx)
 	if err != nil {
-		_ = os.Remove(archivePath)
 		return e.Wrap(e.CodeVerifyFailed, err, "holding Packer build-log transport")
 	}
 	defer func() {
 		if err := held.Close(); err != nil {
-			returnErr = joinPackerDiagnosticError(returnErr,
+			returnErr = errors.Join(returnErr,
 				e.Wrap(e.CodeInternal, err, "closing held Packer build-log transport"))
 		}
 	}()
-	if err := os.Remove(archivePath); err != nil {
-		return e.Wrap(e.CodeInternal, err, "unlinking Packer build-log transport path")
-	}
 	return target.retainBuildLogs(ctx, held)
 }
 
 func (target *packerDiagnosticTarget) retainBuildLogs(ctx context.Context, archive *heldfile.File) error {
 	return target.retainBuildLogsWithLimits(ctx, archive, defaultPackerDiagnosticLimits)
+}
+
+// recordIncomplete records only a stable code, never subprocess text or secrets.
+// Missing/oversized logs do not invalidate a separately verified disk payload.
+func (target *packerDiagnosticTarget) recordIncomplete(ctx context.Context, cause error) error {
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	if target.closed || target.root == nil {
+		return e.New(e.CodeEngineCapability, "Packer diagnostic target is closed")
+	}
+	code := e.CodeVerifyFailed
+	var coded *e.Error
+	if errors.As(cause, &coded) {
+		code = coded.Code
+	}
+	raw, err := json.Marshal(struct {
+		Status string `json:"status"`
+		Code   e.Code `json:"code"`
+	}{Status: "incomplete", Code: code})
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "encoding incomplete diagnostic marker")
+	}
+	return writePackerDiagnosticFile(ctx, target.root, "logs-incomplete.json", bytes.NewReader(raw), int64(len(raw)))
 }
 
 func (target *packerDiagnosticTarget) retainBuildLogsWithLimits(ctx context.Context, archive *heldfile.File,
@@ -379,7 +401,7 @@ func (target *packerDiagnosticTarget) retainBuildLogsWithLimits(ctx context.Cont
 	if files == 0 {
 		return nil
 	}
-	if err := stage.Chmod(0o555); err != nil {
+	if err := sealPackerDiagnosticDirectories(stage); err != nil {
 		return e.Wrap(e.CodeImmutableViolation, err, "protecting retained Packer build logs")
 	}
 	if err := stage.Sync(); err != nil {
@@ -398,6 +420,34 @@ func (target *packerDiagnosticTarget) retainBuildLogsWithLimits(ctx context.Cont
 		return e.Wrap(e.CodeImmutableViolation, err, "persisting published Packer build logs")
 	}
 	return nil
+}
+
+// Seal children through their held directory capabilities before publishing the
+// root. The extractor has already rejected links, devices and unsafe paths.
+func sealPackerDiagnosticDirectories(root *os.File) error {
+	names, err := root.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		entry, err := securepath.InspectChild(root, name, name)
+		if err != nil {
+			return err
+		}
+		if entry.Kind == "directory" {
+			err = sealPackerDiagnosticDirectories(entry.File)
+		} else if entry.Kind != "file" {
+			err = errors.New("retained diagnostic entry is not a regular file or directory")
+		}
+		if entry.File != nil {
+			err = errors.Join(err, entry.File.Close())
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return errors.Join(root.Chmod(0o555), root.Sync())
 }
 
 func extractPackerDiagnosticArchive(ctx context.Context, reader *tar.Reader, root *os.File,
@@ -419,7 +469,7 @@ func extractPackerDiagnosticArchive(ctx context.Context, reader *tar.Reader, roo
 		}
 		entries++
 		if entries > limits.entries {
-			return 0, e.New(e.CodeVerifyFailed,
+			return 0, e.Wrap(e.CodeVerifyFailed, errPackerDiagnosticsIncomplete,
 				"Packer build-log archive exceeds its %d-entry bound", limits.entries)
 		}
 		name, rootEntry, ok := cleanPackerDiagnosticArchiveName(header.Name, header.Typeflag == tar.TypeDir)
@@ -449,11 +499,14 @@ func extractPackerDiagnosticArchive(ctx context.Context, reader *tar.Reader, roo
 		}
 		files++
 		if files > limits.files {
-			return 0, e.New(e.CodeVerifyFailed,
+			return 0, e.Wrap(e.CodeVerifyFailed, errPackerDiagnosticsIncomplete,
 				"Packer build-log archive exceeds its %d-file bound", limits.files)
 		}
-		if header.Size < 0 || header.Size > limits.fileBytes || total > limits.payloadBytes-header.Size {
-			return 0, e.New(e.CodeVerifyFailed,
+		if header.Size < 0 {
+			return 0, e.New(e.CodeVerifyFailed, "Packer build-log archive has a negative file size")
+		}
+		if header.Size > limits.fileBytes || total > limits.payloadBytes-header.Size {
+			return 0, e.Wrap(e.CodeVerifyFailed, errPackerDiagnosticsIncomplete,
 				"Packer build-log archive path %q exceeds diagnostic byte bounds", name)
 		}
 		total += header.Size
@@ -505,7 +558,7 @@ func writePackerDiagnosticFile(ctx context.Context, root *os.File, relative stri
 		_ = unix.Unlinkat(int(parent.Fd()), name, 0)
 		return e.New(e.CodeInternal, "holding Packer build-log output")
 	}
-	written, copyErr := copyPackerDiagnosticExact(ctx, file, reader, size)
+	written, copyErr := transportarchive.CopyExact(ctx, file, reader, size)
 	if copyErr == nil && written != size {
 		copyErr = io.ErrUnexpectedEOF
 	}
@@ -534,37 +587,6 @@ func writePackerDiagnosticFile(ctx context.Context, root *os.File, relative stri
 	return nil
 }
 
-func copyPackerDiagnosticExact(ctx context.Context, destination io.Writer, source io.Reader,
-	size int64,
-) (int64, error) {
-	buffer := make([]byte, 128*1024)
-	limited := &io.LimitedReader{R: source, N: size}
-	var written int64
-	for limited.N > 0 {
-		if err := ctx.Err(); err != nil {
-			return written, err
-		}
-		read, readErr := limited.Read(buffer)
-		if read > 0 {
-			count, writeErr := destination.Write(buffer[:read])
-			written += int64(count)
-			if writeErr != nil {
-				return written, writeErr
-			}
-			if count != read {
-				return written, io.ErrShortWrite
-			}
-		}
-		if readErr != nil {
-			if readErr == io.EOF && limited.N == 0 {
-				break
-			}
-			return written, readErr
-		}
-	}
-	return written, nil
-}
-
 func newPackerDiagnosticStageName() (string, error) {
 	var token [12]byte
 	if _, err := rand.Read(token[:]); err != nil {
@@ -579,6 +601,11 @@ func removePackerDiagnosticTree(parent *os.File, name string) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
+		return err
+	}
+	// Failed publication may leave fully sealed descendants to roll back.
+	if err := child.Chmod(0o700); err != nil {
+		_ = child.Close()
 		return err
 	}
 	names, readErr := child.Readdirnames(-1)
@@ -679,20 +706,4 @@ func packerDiagnosticError(ctx context.Context, code e.Code, err error, message 
 		return e.Wrap(e.CodeTimeout, errors.Join(err, ctx.Err()), "%s", message)
 	}
 	return e.Wrap(code, err, "%s", message)
-}
-
-func joinPackerDiagnosticError(primary, diagnostic error) error {
-	if diagnostic == nil {
-		return primary
-	}
-	if primary == nil {
-		return diagnostic
-	}
-	code := e.CodeInternal
-	var coded *e.Error
-	if errors.As(primary, &coded) {
-		code = coded.Code
-	}
-	return e.Wrap(code, errors.Join(primary, diagnostic),
-		"Packer execution failed and diagnostic retention also failed")
 }

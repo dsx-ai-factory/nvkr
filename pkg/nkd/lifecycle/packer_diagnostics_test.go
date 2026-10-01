@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -15,7 +16,7 @@ import (
 
 func TestExecuteLocalCreatesForwardsAndClosesDiagnosticsBeforeFailureRecord(t *testing.T) {
 	t.Chdir(t.TempDir())
-	prepared, _ := diskLifecycleFixture(t, "diagnostic-lifecycle")
+	prepared, _ := diskLifecycleFixtureWithProducer(t, "diagnostic-lifecycle", true)
 	workspace := filepath.Join(".nkd", "runs", "diagnostic-lifecycle")
 	record := filepath.Join(workspace, "lifecycle.json")
 	var capability *pipeline.PackerDiagnosticSink
@@ -84,7 +85,7 @@ func TestExecuteLocalDiagnosticCloseFailureIsRecordedWithoutMaskingBuildFailure(
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			prepared, exporter := diskLifecycleFixture(t, "diagnostic-close-failure")
+			prepared, exporter := diskLifecycleFixtureWithProducer(t, "diagnostic-close-failure", true)
 			closeFailure := errors.New("synthetic diagnostic close failure")
 			closeCalls := 0
 			failed, err := executeLocalWithDependencies(t.Context(), prepared,
@@ -136,5 +137,74 @@ func TestExecuteLocalDiagnosticCloseFailureIsRecordedWithoutMaskingBuildFailure(
 				t.Fatalf("failed lifecycle record missing: %v", statErr)
 			}
 		})
+	}
+}
+
+func TestExecuteLocalDiagnosticAdmissionFailures(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		partial bool
+		code    nkderr.Code
+	}{
+		{"open failed", false, nkderr.CodeImmutableViolation},
+		{"partial capability", true, nkderr.CodeInternal},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			prepared, _ := diskLifecycleFixtureWithProducer(t, "diagnostic-open-failure", true)
+			factoryCalled, partialClosed := false, false
+			failed, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{}, localExecutionDependencies{
+				admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+				openDiagnostics: func(context.Context, string) (*localPackerDiagnostics, error) {
+					if test.partial {
+						return &localPackerDiagnostics{close: func() error { partialClosed = true; return nil }}, nil
+					}
+					return nil, nkderr.New(test.code, "cannot open diagnostics")
+				},
+				runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
+					factoryCalled = true
+					return nil, nil
+				},
+				writeRecordState: writeRunRecordState, beginDiskCommit: beginDiskAttemptTransaction,
+			})
+			assertCode(t, err, test.code)
+			if factoryCalled || failed == nil || failed.Status != RunFailed || failed.Failure.Code != string(test.code) || partialClosed != test.partial {
+				t.Fatalf("factory=%t partialClosed=%t failed=%+v", factoryCalled, partialClosed, failed)
+			}
+			raw, err := os.ReadFile(filepath.Join(".nkd", "runs", prepared.run.Attempt, "lifecycle.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var persisted Run
+			if err := canonical.UnmarshalExact(raw, &persisted); err != nil {
+				t.Fatal(err)
+			}
+			if persisted.Status != RunFailed || persisted.Failure.Code != string(test.code) {
+				t.Fatalf("persisted Run=%+v", persisted)
+			}
+		})
+	}
+}
+
+func TestExecuteLocalNonPackerDoesNotOpenPackerDiagnostics(t *testing.T) {
+	t.Chdir(t.TempDir())
+	prepared, _ := diskLifecycleFixture(t, "not-packer")
+	failure := nkderr.New(nkderr.CodeBuildFailed, "stop command build")
+	_, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{}, localExecutionDependencies{
+		admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+		openDiagnostics: func(context.Context, string) (*localPackerDiagnostics, error) {
+			t.Fatal("opened Packer diagnostics for command producer")
+			return nil, nil
+		},
+		runFactory: func(_ context.Context, _ *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
+			if options.Diagnostics != nil {
+				t.Fatal("command producer received Packer diagnostics")
+			}
+			return nil, failure
+		},
+		writeRecordState: writeRunRecordState, beginDiskCommit: beginDiskAttemptTransaction,
+	})
+	if !errors.Is(err, failure) {
+		t.Fatal(err)
 	}
 }

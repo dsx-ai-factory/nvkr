@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
@@ -30,7 +31,11 @@ type LocalOptions struct {
 func ExecuteLocal(ctx context.Context, prepared *PreparedRun, options LocalOptions) (*Run, error) {
 	return executeLocalWithFactoryRunner(ctx, prepared, options,
 		func(ctx context.Context, plan *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
-			return factory.RunLocal(ctx, plan, options)
+			result, err := factory.RunLocal(ctx, plan, options)
+			if result == nil {
+				return nil, err
+			}
+			return result, err
 		})
 }
 
@@ -109,21 +114,33 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 			return nil, e.Wrap(e.CodeImmutableViolation, err, "reserving run attempt storage")
 		}
 	}
-	diagnostics, err := deps.openDiagnostics(ctx, workspace)
-	if err != nil {
-		return recordRunFailure(ctx, recordPath, prepared.run, err,
-			"recording failed run attempt after diagnostic admission")
+	var diagnostics *localPackerDiagnostics
+	if localPlanUsesPacker(prepared.plan) {
+		var err error
+		diagnostics, err = deps.openDiagnostics(ctx, workspace)
+		if err != nil {
+			return recordRunFailure(ctx, recordPath, prepared.run, err,
+				"recording failed run attempt after diagnostic admission")
+		}
+		if diagnostics == nil || diagnostics.capability == nil || diagnostics.close == nil {
+			if diagnostics != nil && diagnostics.close != nil {
+				_ = diagnostics.close()
+			}
+			return recordRunFailure(ctx, recordPath, prepared.run,
+				e.New(e.CodeInternal, "local Packer diagnostic admission returned an incomplete capability"),
+				"recording failed run attempt after diagnostic admission")
+		}
 	}
-	if diagnostics == nil || diagnostics.capability == nil || diagnostics.close == nil {
-		return recordRunFailure(ctx, recordPath, prepared.run,
-			e.New(e.CodeInternal, "local Packer diagnostic admission returned an incomplete capability"),
-			"recording failed run attempt after diagnostic admission")
+	if diagnostics != nil {
+		factoryOptions.Diagnostics = diagnostics.capability
 	}
-	factoryOptions.Diagnostics = diagnostics.capability
 	result, err := deps.runFactory(ctx, prepared.plan, factoryOptions)
-	diagnosticCloseErr := diagnostics.close()
+	var diagnosticCloseErr error
+	if diagnostics != nil {
+		diagnosticCloseErr = diagnostics.close()
+	}
 	if err != nil {
-		err = joinLocalDiagnosticError(err, diagnosticCloseErr)
+		err = errors.Join(err, diagnosticCloseErr)
 		return recordRunFailure(ctx, recordPath, prepared.run, err, "recording failed run attempt")
 	}
 	if diagnosticCloseErr != nil {
@@ -233,29 +250,24 @@ func newLocalPackerDiagnosticSink(ctx context.Context, workspace string) (*local
 	sink, sinkErr := pipeline.NewPackerDiagnosticSink(ctx, root)
 	closeErr := root.Close()
 	if sinkErr != nil {
-		return nil, joinLocalDiagnosticError(sinkErr, closeErr)
+		return nil, errors.Join(sinkErr, closeErr)
 	}
 	if closeErr != nil {
-		return nil, joinLocalDiagnosticError(e.Wrap(e.CodeImmutableViolation, closeErr,
+		return nil, errors.Join(e.Wrap(e.CodeImmutableViolation, closeErr,
 			"closing local attempt diagnostic directory"), sink.Close())
 	}
 	return &localPackerDiagnostics{capability: sink, close: sink.Close}, nil
 }
 
-func joinLocalDiagnosticError(primary, diagnostic error) error {
-	if diagnostic == nil {
-		return primary
+func localPlanUsesPacker(plan *factory.Plan) bool {
+	for _, build := range plan.Builds {
+		for _, node := range build.Graph.Nodes {
+			if node.Kind == ir.KindBuild && node.Packer != nil {
+				return true
+			}
+		}
 	}
-	if primary == nil {
-		return diagnostic
-	}
-	code := e.CodeInternal
-	var coded *e.Error
-	if errors.As(primary, &coded) {
-		code = coded.Code
-	}
-	return e.Wrap(code, errors.Join(primary, diagnostic),
-		"local Run failed and Packer diagnostic retention also failed")
+	return false
 }
 
 func closeLocalExecutionResult(result localExecutionResult, cause error) error {

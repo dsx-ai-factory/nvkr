@@ -87,7 +87,7 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		if diagnosticTarget != nil {
 			diagnosticErr = diagnosticTarget.close()
 		}
-		returnErr = joinPackerDiagnosticError(returnErr, diagnosticErr)
+		returnErr = errors.Join(returnErr, diagnosticErr)
 		returnErr = finalizePackerContainerRun(&artifact, returnErr, resources.cleanup())
 	}()
 	diagnosticTarget, err = request.diagnostics.start(ctx, request.subject, request.manifest, request.digest)
@@ -230,11 +230,23 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if request.bindings.buildLogDirectoryVariable != "" {
 		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), packerContainerCleanupTimeout)
 		diagnosticErr = collectPackerContainerBuildLogs(diagnosticCtx, request.runtime, buildName,
-			runRoot, diagnosticTarget)
+			diagnosticTarget)
 		cancel()
 	}
+	if diagnosticErr != nil && (errors.Is(diagnosticErr, errPackerDiagnosticsIncomplete) ||
+		errors.Is(diagnosticErr, context.DeadlineExceeded)) {
+		markerCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), packerContainerCleanupTimeout)
+		markerErr := diagnosticTarget.recordIncomplete(markerCtx, diagnosticErr)
+		cancel()
+		if buildErr == nil && markerErr == nil {
+			// Operational log loss is visible in the attempt, not a disk failure.
+			diagnosticErr = nil
+		} else {
+			diagnosticErr = errors.Join(diagnosticErr, markerErr)
+		}
+	}
 	if buildErr != nil {
-		return nil, joinPackerDiagnosticError(buildErr, diagnosticErr)
+		return nil, errors.Join(buildErr, diagnosticErr)
 	}
 	if diagnosticErr != nil {
 		return nil, diagnosticErr

@@ -156,6 +156,7 @@ jobs:
         if: steps.select.outputs.mode == 'full'
         with:
           go-version-file: .go-version
+          cache: false
 
       - name: Build trusted catalog reader
         if: steps.select.outputs.mode == 'full'
@@ -235,6 +236,25 @@ jobs:
           }
           pin="$(bin/nkdctl catalog source-pin \
             --data .candidate-inputs/definitions/nke-os/catalog nke-os)"
+          # One lock entry cannot establish the full component/overlay closure.
+          # New input schemas must land in main before this trusted reader.
+          for target_arch in "${required_arches[@]}"; do
+            input_dir=.candidate-inputs/definitions/nke-os
+            plan="$(bin/nkdctl run plan \
+              --definition "${input_dir}/definition-${target_arch}-kvm.yaml" \
+              --environment "${input_dir}/environment-local-linux-${target_arch}-docker.yaml" --json)"
+            jq -e --argjson pin "${pin}" '
+              [.builds[].executionGraph.nodes[] |
+                select(.kind == "fetch" and
+                  (.repo == "https://github.com/dsx-ai-factory/nke" or
+                   .repo == "https://github.com/dsx-ai-factory/nke.git"))] as $sources |
+              ($sources | length) > 0 and
+              all($sources[]; .commit == $pin.commit and .treeHash == $pin.treeHash)
+            ' <<<"${plan}" >/dev/null || {
+              echo "selected ${target_arch} NKE source closure disagrees with the approved pin" >&2
+              exit 1
+            }
+          done
           {
             echo "commit=$(jq -er '.commit' <<<"${pin}")"
             echo "tree=$(jq -er '.treeHash' <<<"${pin}")"
@@ -525,11 +545,19 @@ jobs:
       - name: Record exact native toolchain image ID
         if: always()
         working-directory: .candidate
+        env:
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          docker image inspect --format '{{.Id}}' \
-            "localhost/nkd-packer-toolchain:dev-${{ matrix.arch }}" \
-            | tee ".nkd/evidence/toolchain-${{ matrix.arch }}.image-id"
+          attempt="$(cat ".nkd/evidence/attempt-${ARCH}")"
+          image="$(jq -er '
+            [.builds[].executionGraph.nodes[] |
+              select(.kind == "build" and .builderType == "vm-image") | .toolchain] |
+            if length == 1 then .[0] else error("expected exactly one disk toolchain") end
+          ' ".nkd/runs/${attempt}/.runner/plan.json")"
+          # Select the smoke image from the Plan, not a mutable development tag.
+          test "$(docker image inspect --format '{{.Id}}' "${image}")" = "${image}"
+          printf '%s\n' "${image}" | tee ".nkd/evidence/toolchain-${ARCH}.image-id"
 
       - name: Run source-owned boot smoke
         working-directory: .candidate

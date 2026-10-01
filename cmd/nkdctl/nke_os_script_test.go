@@ -14,6 +14,33 @@ import (
 	"time"
 )
 
+func TestNKETransportOverrideDoesNotRewriteSiblingRepository(t *testing.T) {
+	source, err := os.ReadFile(demoScript(t, "nke-os-local.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const repository = "https://github.com/dsx-ai-factory/nke.git"
+	if !strings.Contains(string(source), `export GIT_CONFIG_VALUE_0="`+repository+`"`) {
+		t.Fatal("bootstrap does not use the canonical NKE transport URL")
+	}
+	checkout := t.TempDir()
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "url."+checkout+".insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_0", repository)
+	for _, test := range []struct{ name, repository, want string }{
+		{name: "NKE", repository: repository, want: checkout},
+		{name: "sibling", repository: "https://github.com/dsx-ai-factory/nke-recipes.git", want: "https://github.com/dsx-ai-factory/nke-recipes.git"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), "git", "ls-remote", "--get-url", test.repository)
+			output, err := cmd.CombinedOutput()
+			if err != nil || strings.TrimSpace(string(output)) != test.want {
+				t.Fatalf("transport URL=%q, error=%v, want %q", output, err, test.want)
+			}
+		})
+	}
+}
+
 func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("OS wrapper requires jq")

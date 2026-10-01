@@ -36,6 +36,11 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 			return e.New(e.CodeInvalidCatalog, "catalog source name %q is empty or has surrounding whitespace", sourceName)
 		}
 		src := reg.Sources[sourceName]
+		for _, argument := range src.VendorCommand {
+			if err := checkArchTokens(sourceName, "vendorCommand", argument); err != nil {
+				return err
+			}
+		}
 		if err := validateSourceKind(src); err != nil {
 			return err
 		}
@@ -147,6 +152,11 @@ func validateComponentTargets(name string, platforms []string) error {
 func validateComponent(name string, c Component) error {
 	if err := validateComponentTargets(name, c.Platforms); err != nil {
 		return err
+	}
+	for _, argument := range c.VendorCommand {
+		if err := checkArchTokens(name, "vendorCommand", argument); err != nil {
+			return err
+		}
 	}
 
 	if c.BuildRequirements != nil {

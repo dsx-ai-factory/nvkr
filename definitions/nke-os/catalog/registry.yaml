@@ -5,10 +5,12 @@ metadata:
   description: Non-FDE NKE node image from explicit authenticated component outputs.
 sources:
   nke-os:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      # Substitution-only baseline, not a maintained or reproducible Docker pin.
+      # Each Docker attempt freezes its own observed ID before Plan execution.
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
@@ -18,7 +20,7 @@ sources:
         cd agent
         GOWORK=off go mod vendor
   nke-cni-calico-source:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
@@ -37,7 +39,7 @@ sources:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
   nke-kubeadm-distro-source:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
@@ -50,7 +52,7 @@ sources:
         make -C os-image/packages/kubeadm-distro bundle nfpm \
           ARCH={{.Arch}} BIN_DIR=/usr/local/bin
   nke-spire-agent-source:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
@@ -388,7 +390,7 @@ components:
     source: nke-os
     outputType: raw
     prebuilt:
-      url: https://releases.ubuntu.com/26.04/ubuntu-26.04.1-live-server-amd64.iso
+      url: https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso
       evidence:
         none: true
   nke-patched-installer-iso-amd64:

@@ -444,6 +444,7 @@ func TestLocalVMPackerResolverRejectsUnsupportedPlans(t *testing.T) {
 		{name: "nil context", plan: directPlan, session: session, code: e.CodeUsage},
 		{name: "nil plan", ctx: t.Context(), session: session, code: e.CodeEngineCapability},
 		{name: "nil session", ctx: t.Context(), plan: directPlan, code: e.CodeEngineCapability},
+		{name: "missing diagnostics", ctx: t.Context(), plan: directPlan, session: session, code: e.CodeEngineCapability},
 		{name: "command producer", ctx: t.Context(), plan: commandPlan, session: session, code: e.CodeEngineCapability},
 		{name: "encrypted producer", ctx: t.Context(), plan: encryptedPlan, session: session, code: e.CodeEngineCapability},
 		{name: "no VM producer", ctx: t.Context(), plan: ordinaryPlan, session: session, code: e.CodeEngineCapability},

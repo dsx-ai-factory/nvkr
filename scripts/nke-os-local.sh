@@ -93,7 +93,8 @@ if [[ -n "${NKE_LOCAL_CLONE:-}" ]]; then
   nke_local_clone="$(cd "${NKE_LOCAL_CLONE}" && pwd -P)"
   export GIT_CONFIG_COUNT=1
   export GIT_CONFIG_KEY_0="url.${nke_local_clone}.insteadOf"
-  export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nke"
+  # Use the catalog's canonical .git URL, not a prefix shared by nke-* repos.
+  export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nke.git"
 fi
 command -v jq >/dev/null 2>&1 || {
   echo "jq is required to validate and freeze the toolchain identity" >&2
@@ -198,12 +199,13 @@ if [[ "${runtime}" == docker ]]; then
   # The native Docker build is an attempt input, not a maintained release pin.
   # Freeze its observed exact ID through the existing catalog overlay contract
   # before compiling the executable Plan. The Packer runtime rechecks the ID.
-  root_component=nke-node-image
-  if [[ "${arch}" == amd64 ]]; then
-    root_component=nke-node-image-amd64
-  fi
   plan="$("${runner}" run plan --definition "${frozen_definition}" \
     --environment "${input_root}/environment-local.yaml" --json)"
+  root_component="$(jq -er '
+    [.builds[0].executionGraph.nodes[] |
+      select(.kind == "build" and .builderType == "vm-image") | .component] |
+    if length == 1 then .[0] else error("expected exactly one disk root") end
+  ' <<<"${plan}")"
   baseline="$(jq -er --arg root "${root_component}" --arg arch "${arch}" \
     '.builds[0].catalogSnapshot.Components[$root].toolchainImages[$arch]' <<<"${plan}")"
   if [[ "${baseline}" != "${toolchain_image}" ]]; then

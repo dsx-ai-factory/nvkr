@@ -60,7 +60,7 @@ func TestPackerDiagnosticSinkRetainsExactManifestAndRegularLogs(t *testing.T) {
 			t.Fatalf("retained log %s = %q, error=%v", relative, raw, err)
 		}
 	}
-	for _, relative := range []string{"", packerDiagnosticLogsName, packerDiagnosticManifestName} {
+	for _, relative := range []string{"", packerDiagnosticLogsName, packerDiagnosticLogsName + "/serial", packerDiagnosticManifestName} {
 		info, err := os.Stat(filepath.Join(routes[0], relative))
 		if err != nil {
 			t.Fatal(err)
@@ -125,9 +125,7 @@ func TestPackerDiagnosticArchiveRejectsUnsafeEntriesAndCleansStaging(t *testing.
 			_ = target.close()
 			_ = sink.Close()
 			assertNoPackerDiagnosticStages(t, root)
-			if _, statErr := os.Stat(filepath.Join(root, "escape")); statErr == nil {
-				t.Fatal("unsafe archive wrote outside its diagnostic route")
-			}
+			assertOnlyPackerDiagnosticManifests(t, root)
 		})
 	}
 }
@@ -192,8 +190,14 @@ func TestPackerDiagnosticRetentionHandlesCancellationNoLogsAndNoReplace(t *testi
 			_ = archive.Close()
 			assertNoPackerDiagnosticLogs(t, root)
 		}},
-		{name: "build failed before logs existed", run: func(t *testing.T, root string, _ *PackerDiagnosticSink, _ *packerDiagnosticTarget) {
+		{name: "build failed before logs existed", run: func(t *testing.T, root string, _ *PackerDiagnosticSink, target *packerDiagnosticTarget) {
+			archive := newHeldPackerDiagnosticArchive(t, []packerDiagnosticTarEntry{{name: "./", typeflag: tar.TypeDir}})
+			defer archive.Close()
+			if err := target.retainBuildLogs(t.Context(), archive); err != nil {
+				t.Fatal(err)
+			}
 			assertNoPackerDiagnosticLogs(t, root)
+			assertNoPackerDiagnosticStages(t, root)
 		}},
 		{name: "logs are no-replace", run: func(t *testing.T, root string, _ *PackerDiagnosticSink, target *packerDiagnosticTarget) {
 			first := newHeldPackerDiagnosticArchive(t, []packerDiagnosticTarEntry{{
@@ -241,6 +245,175 @@ func TestPackerDiagnosticRetentionHandlesCancellationNoLogsAndNoReplace(t *testi
 				t.Fatalf("retained exact manifest = %q, error=%v", raw, err)
 			}
 		})
+	}
+}
+
+func TestPackerDiagnosticSinkAdmissionFailures(t *testing.T) {
+	for _, name := range []string{"nil context", "canceled context", "nil root", "regular file", "closed root"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			directory, err := os.Open(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer directory.Close()
+			ctx := t.Context()
+			want := e.CodeEngineCapability
+			switch name {
+			case "nil context":
+				ctx = nil
+				want = e.CodeUsage
+			case "canceled context":
+				canceled, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = canceled
+				want = e.CodeTimeout
+			case "nil root":
+				_ = directory.Close()
+				directory = nil
+			case "regular file":
+				_ = directory.Close()
+				directory, err = os.Create(filepath.Join(root, "file"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer directory.Close()
+			case "closed root":
+				_ = directory.Close()
+			}
+			sink, err := NewPackerDiagnosticSink(ctx, directory)
+			if sink != nil || code(err) != want {
+				t.Fatalf("sink=%v error=%v, want %s", sink, err, want)
+			}
+			if _, err := os.Stat(filepath.Join(root, packerDiagnosticDirectory)); !os.IsNotExist(err) {
+				t.Fatalf("failed admission created diagnostics: %v", err)
+			}
+		})
+	}
+}
+
+func TestPackerDiagnosticSinkRejectsConflictsAndClosedState(t *testing.T) {
+	for _, name := range []string{"nil sink", "closed sink", "duplicate subject", "existing directory", "existing file", "existing symlink"} {
+		t.Run(name, func(t *testing.T) {
+			root, sink, target, manifest := newPackerDiagnosticFixture(t, "plan/one")
+			defer sink.Close()
+			defer target.close()
+			want := e.CodeEngineCapability
+			subject := "plan/two"
+			selected := sink
+			switch name {
+			case "nil sink":
+				selected = nil
+			case "closed sink":
+				_ = sink.Close()
+			case "duplicate subject":
+				subject = "plan/one"
+				want = e.CodeImmutableViolation
+			default:
+				// Use a fresh held root so ensureRoots must handle the conflict.
+				other := t.TempDir()
+				path := filepath.Join(other, packerDiagnosticDirectory)
+				var err error
+				switch name {
+				case "existing directory":
+					err = os.Mkdir(path, 0o700)
+				case "existing file":
+					err = os.WriteFile(path, []byte("unchanged"), 0o600)
+				case "existing symlink":
+					err = os.Symlink(root, path)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				directory, err := os.Open(other)
+				if err != nil {
+					t.Fatal(err)
+				}
+				selected, err = NewPackerDiagnosticSink(t.Context(), directory)
+				_ = directory.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer selected.Close()
+				want = e.CodeImmutableViolation
+			}
+			got, err := selected.start(t.Context(), subject, manifest, fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)))
+			if got != nil || code(err) != want {
+				t.Fatalf("target=%v error=%v, want %s", got, err, want)
+			}
+			assertOnlyPackerDiagnosticManifests(t, root)
+		})
+	}
+}
+
+func TestPackerDiagnosticSinkRoutesDistinctSubjects(t *testing.T) {
+	root, sink, first, manifest := newPackerDiagnosticFixture(t, "plan/one")
+	defer sink.Close()
+	defer first.close()
+	second, err := sink.start(t.Context(), "plan/two", manifest, fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.close()
+	routes, err := filepath.Glob(filepath.Join(root, packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*"))
+	if err != nil || len(routes) != 2 {
+		t.Fatalf("routes=%v error=%v", routes, err)
+	}
+}
+
+type cancelAfterDiagnosticWrite struct {
+	context.Context
+	cancel context.CancelFunc
+	root   string
+}
+
+func (ctx cancelAfterDiagnosticWrite) Err() error {
+	files, _ := filepath.Glob(filepath.Join(ctx.root, packerDiagnosticDirectory, packerDiagnosticProducerDir,
+		"run-*", ".logs-*", "first.log"))
+	if len(files) == 1 {
+		if raw, err := os.ReadFile(files[0]); err == nil && string(raw) == "first\n" {
+			ctx.cancel()
+		}
+	}
+	return ctx.Context.Err()
+}
+
+func TestPackerDiagnosticCancellationDuringExtractionRemovesPartialLogs(t *testing.T) {
+	root, sink, target, _ := newPackerDiagnosticFixture(t, "plan/cancel-during-extraction")
+	defer sink.Close()
+	defer target.close()
+	archive := newHeldPackerDiagnosticArchive(t, []packerDiagnosticTarEntry{
+		{name: "first.log", typeflag: tar.TypeReg, payload: []byte("first\n")},
+		{name: "second.log", typeflag: tar.TypeReg, payload: []byte("second\n")},
+	})
+	defer archive.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	err := target.retainBuildLogs(cancelAfterDiagnosticWrite{Context: ctx, cancel: cancel, root: root}, archive)
+	if code(err) != e.CodeTimeout || ctx.Err() == nil {
+		t.Fatalf("mid-extraction cancellation error=%v", err)
+	}
+	assertNoPackerDiagnosticStages(t, root)
+	assertOnlyPackerDiagnosticManifests(t, root)
+}
+
+func assertOnlyPackerDiagnosticManifests(t *testing.T, root string) {
+	t.Helper()
+	files := 0
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			if entry.Name() != packerDiagnosticManifestName || !entry.Type().IsRegular() {
+				t.Errorf("unexpected retained entry outside manifest: %s", path)
+			}
+			files++
+		}
+		return nil
+	})
+	if err != nil || files != 1 {
+		t.Fatalf("retained files=%d error=%v, want one manifest", files, err)
 	}
 }
 

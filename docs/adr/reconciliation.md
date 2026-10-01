@@ -136,6 +136,18 @@ non-FDE QCOW2 and recorded its digest and size. Docker ARM64 and AMD64 on ARC su
 and source-owned boot smoke. Generated hosted VM execution remains unexercised, and FDE remains
 unsupported.
 
+Packer-only local Runs admit attempt-owned diagnostics; ordinary producers do not acquire that capability.
+Missing, timed-out or oversized build logs record `logs-incomplete.json` without discarding a separately verified
+successful QCOW2. Unsafe archive entries and immutable-path violations still fail closed. Manifest and nested
+log directories are sealed before Run recording; partial extraction is rolled back. These failure contracts are
+unit-tested; the existing ARC success evidence does not exercise each diagnostic failure mode.
+
+The trusted selector and generated helper disable shared Actions cache restoration. This prevents candidate-written
+main-scope caches from feeding those trusted binaries, but does not restrict the repository-scoped source secret.
+Full-mode source checks compile each selected Definition with main's reader; future schemas must land in main first.
+The mirror is required to equal an open, non-draft same-repository PR head. `/ok to test` is a maintainer convention,
+not a workflow-authenticated approval, and mirror equality alone does not prove who wrote that branch.
+
 The hand-authored NKE OS validation workflow selects `arc-amd64-kvm` and `arc-arm64-kvm` for full validation.
 At the 2026-09-30 review, NKE main used the ARM64 scale set and NKE PR #1100 selected the AMD64 set.
 Those declarations alone did not prove access. The 2026-10-01 runs recorded above exercised both pools from

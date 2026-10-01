@@ -14,8 +14,9 @@ records the exact native toolchain image IDs. A branch dispatch must select that
 request a full build.
 
 Full image validation is also manual-only and never uses `pull_request_target`. The workflow is dispatched from
-`main` and accepts an exact main commit or a copy-pr-bot mirror matching the current, ready same-repository PR
-head. The mirror requires explicit `/ok to test` vetting. Pre-merge candidate code receives the pinned private
+`main` and accepts an exact main commit or a copy-pr-bot mirror matching the current, open, non-draft same-repository PR
+head. Maintainers must vet the exact head before `/ok to test`; the workflow does not authenticate that comment
+or require PR approval. Pre-merge candidate code receives the pinned private
 NKE source contents and a network-capable KVM runner, but not the source credential.
 The AMD64 leg retains the NKE workflow's verified runner label. The ARM64 leg uses the
 repository-specific 16-vCPU, 64-GiB KVM scale set defined by `NVIDIA-dev/nke-gha-runners` at `488424d`. Single-use
@@ -25,7 +26,10 @@ performs runtime admission before build work.
 Full validation's separate trusted fetch job references the repository-scoped `NKE_SOURCE_TOKEN`, which must provide
 read-only Contents access to `dsx-ai-factory/nke`. The secret is not restricted to this workflow by GitHub policy;
 other workflows with sufficient permission could reference it. The trusted selector reads the `nke-os` commit and tree
-from the selected Recipe catalog lock; the workflow does not own or hardcode an NKE version. The dispatcher enters
+from the selected catalog lock and compiles every selected architecture's complete Plan with trusted main code,
+rejecting any selected NKE source node with a different commit or tree. The workflow does not own or hardcode an NKE
+version. A new input schema must land in main before this trusted reader can validate a candidate using it.
+The dispatcher enters
 that exact NKE commit as a second value, and the selector rejects a mismatch. This is a consistency check, not
 independent human approval. The checkout fetches that commit into a clean staging path before the build job, does not
 persist credentials, and is followed by explicit commit, tree and credential-state checks. The build job receives the
@@ -38,7 +42,8 @@ The source lock pins the AMD64 and ARM64 toolchain materials, but its native Doc
 two native Docker diagnostic runs on 2026-09-28 did not produce identical image IDs, so the workflow must not claim
 byte-reproduced toolchain images or invent stable Docker pins. The full build instead checks the source lock, builds
 the toolchain natively, and freezes the observed exact image ID into an immutable attempt-specific catalog overlay
-before compiling the executable Plan. NKD authenticates the loaded image against that Plan at execution. The
+before compiling the executable Plan. NKD checks the loaded image against that Plan at execution. That identity
+bind is not provenance authentication. The
 catalog's AMD64 baseline is a previously observed diagnostic ID, not an approved maintained toolchain identity.
 The existing ARM64 Podman pin remains separate. Neither runtime's image is a published, approved toolchain.
 
@@ -55,6 +60,12 @@ SHA-256 and size; and pass NKE's pinned source-owned boot smoke under KVM. Plan,
 logs produced before a failure are uploaded. A failure can occur before one or more of those records exists. QCOW2
 upload is an explicit short-retention option because the image is large. These results remain unqualified integration
 evidence and do not publish or sign an image.
+
+Unavailable or oversized build logs produce a bounded `logs-incomplete.json` marker without discarding a
+separately verified QCOW2. Unsafe paths, links, devices, duplicate entries or replacement attempts remain errors.
+The boot smoke selects the exact toolchain ID recorded in the executable Plan, not the mutable development tag.
+The [2026-10-01 evidence](evidence/2026-10-01-nke-arc-os-builds.md) records both successful native full builds;
+each subsequent execution-changing fix requires its own full-run validation.
 
 The workflow owns runner selection, credential-scoped source transport and artifact transport only. Catalog loading,
 source-pin validation, runtime admission, build execution, disk observation and lifecycle completeness remain in their

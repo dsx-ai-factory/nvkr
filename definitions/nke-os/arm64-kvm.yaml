@@ -1,7 +1,7 @@
 apiVersion: nkd.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:73c723e87cde1f6ceee07d04cbda658e165f91fd5bbc4ea22647f8c7d053dbf8
+requiresCatalogDigest: sha256:badff652708bf03bd1f109561634818873a9b56574ce587448c8f7a9678382d7
 components:
   nke-node-image:
     component:
@@ -9,7 +9,7 @@ components:
       fromSource: true
       builderType: vm-image
       buildNetwork: default
-      repo: https://github.com/dsx-ai-factory/nke
+      repo: https://github.com/dsx-ai-factory/nke.git
       tag: os-image/v0.1.0-rc.4-51-g726f7694
       commit: 726f76944404e1106626b8333d3576bdf67b575b
       treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
