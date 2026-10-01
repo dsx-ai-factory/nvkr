@@ -137,6 +137,17 @@ if ! mkdir "${input_root}"; then
   exit 1
 fi
 
+bootstrap_root=".nkd/bootstrap/${attempt}"
+mkdir -p "${bootstrap_root}/go-build" "${bootstrap_root}/go-mod" "${bootstrap_root}/home"
+if [[ "${runtime}" == docker ]]; then
+  # A containerized runner and its Docker daemon need not share /tmp. Keep
+  # host-side temporary bind sources in the already shared build workspace.
+  # Reserve a private directory per immutable attempt; do not reuse a caller's
+  # existing temporary tree or change the Podman compatibility path.
+  mkdir -m 0700 "${bootstrap_root}/tmp"
+  export TMPDIR="${repo_root}/${bootstrap_root}/tmp"
+fi
+
 CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
 if [[ "${runtime}" == docker ]]; then
   toolchain_image="$(docker image inspect --format '{{.Id}}' "localhost/nkd-packer-toolchain:dev-${arch}")"
@@ -158,8 +169,6 @@ fi
 # Build the bootstrap runner from this checkout in the exact pinned native
 # toolchain. The Podman machine intentionally has no ambient Go or Make
 # installation, and a pre-existing bin/nkdctl may belong to an older revision.
-bootstrap_root=".nkd/bootstrap/${attempt}"
-mkdir -p "${bootstrap_root}/go-build" "${bootstrap_root}/go-mod" "${bootstrap_root}/home"
 bootstrap_network=default
 if [[ "${runtime}" == docker ]]; then
   bootstrap_network=bridge

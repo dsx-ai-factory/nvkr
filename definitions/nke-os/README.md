@@ -37,7 +37,14 @@ workspace storage, KVM and producer-declared network access. NKD authenticates t
 
 The wrapper rebuilds the source-locked native toolchain and freezes the exact selected image ID with the authored
 inputs below `.nkd/inputs/<attempt>` before execution. Podman additionally requires its existing local lock ID.
-Attempt names are immutable. A successful attempt retains:
+Attempt names are immutable.
+
+For Docker, the checkout and `.nkd` workspace must be visible to the daemon at
+the same absolute paths. The wrapper sets `TMPDIR` to a private attempt directory
+under `.nkd/bootstrap/<attempt>/tmp`, so temporary bind sources do not depend on
+the runner and daemon sharing `/tmp`.
+
+A successful attempt retains:
 
 ```text
 .nkd/runs/<attempt>/outputs/nke-node-image-<arch>.qcow2
