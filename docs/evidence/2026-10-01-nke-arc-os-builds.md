@@ -112,6 +112,48 @@ Actions artifacts expire. Their ZIP download size is not the QCOW2 byte count ab
 The executable evidence applies to the exact candidate above, not automatically to a
 later commit or a differently pinned NKE source.
 
+## Review-fix runtime validation
+
+[Run 36878232719](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36878232719)
+completed successfully on both architectures for runtime commit
+`1f989e9dfed343258ae063867fb156f90cbcb9a4`, tree `05b20937a9ba856f14733938e1e5fc69b017f75c`.
+It used the same trusted main workflow and NKE source pin stated above.
+ARM64 ran on `arc-arm64-kvm-84grx-runner-hl8c6`; AMD64 ran on
+`arc-amd64-kvm-lfdl7-runner-psjbr`. Both jobs built one non-FDE disk, completed
+source-owned boot smoke and uploaded the QCOW2 and diagnostic evidence.
+
+| Recorded field | ARM64 | AMD64 |
+|---|---|---|
+| QCOW2 SHA-256 | `99c2358ef5d917135574616392aeec2a58370cf0714280317d251ad3efde2969` | `b7323b76e3227264cee84d8b5009625f21c7d559fd1b35d77e032c1be68e7509` |
+| QCOW2 size, bytes | `3331064320` | `3607953920` |
+| Plan digest | `sha256:4a1d663c3ab21cc96e0d21c8a8ec77b6cc64dd1e55d10aed43c9c2c8ed0e92a9` | `sha256:86622cbb6ad9ba35f226c2c4df3b68f72053b99a986e71857ae32a8cf5cf9125` |
+| Observed toolchain image ID | `sha256:980c1cdb69f7804743c07a3fbe81fe19b0b9d63034e016e66e70689f5f76c28e` | `sha256:888a6fb6748841ed29ed9a1e5cd1271771e7a22402a3e3e85adcb83d2945bfa4` |
+
+Downloaded evidence confirms that each Run is `complete` in `unqualified-local-execution`,
+with exactly one successful unencrypted QCOW2 observation. Its digest and size agree
+with the workflow metadata, and the recorded toolchain ID agrees with the executable Plan.
+Both boot logs confirm cloud-init completion, the image contract and root-filesystem growth.
+
+- [ARM64 QCOW2](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36878232719/artifacts/11171457907)
+- [AMD64 QCOW2](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36878232719/artifacts/11172165645)
+- [ARM64 evidence](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36878232719/artifacts/11171612009)
+- [AMD64 evidence](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36878232719/artifacts/11171229214)
+
+The runtime commit's first Linux test gate failed because a test helper used a direct
+type assertion on errors wrapped by `errors.Join`. Test-only commit `fa8cff9` changes
+that helper to `errors.As`, matching the public exit-code handler, without weakening
+the primary-code, cause or cleanup assertions. Its
+[Linux Merge Gate 36880164063](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36880164063)
+passed, including race tests, binary build and vulnerability scanning.
+
+Later documentation, test and workflow-transport changes do not alter this runtime code.
+The main-owned workflow edits in this PR, including Plan-derived boot-image selection,
+disabled trusted bootstrap caching and narrowed evidence upload paths, were not executed
+by this pre-merge run. They require validation after landing in main. The original main
+upload glob also included source-tree directories named `diagnostics`; the proposed
+transport correction restricts uploads to the selected attempt's own records and Packer logs.
+Repository-scoped source-credential policy, publication and qualification remain unresolved.
+
 ## Remaining proof
 
 FDE, full-disk SBOM, publication, qualified execution, and the generated hosted VM adapter remain outside
