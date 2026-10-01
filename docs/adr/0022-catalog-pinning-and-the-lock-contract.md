@@ -202,6 +202,8 @@ dependencies:
 Pinning `platform` resolves `controller/v0.9.3` and pins helper version `2.0.0` through its existing
 artifact-pin path, recording a digest for each declared architecture. Every resulting member pin records
 `derivedFrom: platform@<full-commit>`. The umbrella and all affected pins commit together.
+`catalog pin` and `catalog bump` accept `--runtime` for acquired image manifest inspection
+(default `docker`), including images whose versions come through derived sources.
 
 **Explicit membership.** Each member names exactly one source or acquired artifact, with a reciprocal
 `pinnedBy` declaration. An acquired member has no `source`. Every record in a selector-addressed collection

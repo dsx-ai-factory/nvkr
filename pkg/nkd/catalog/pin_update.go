@@ -19,6 +19,7 @@ type SourcePinRequest struct {
 	Directory string
 	Sources   []string
 	Tag       string
+	Runtime   string // Container executable for acquired image members; defaults to docker.
 	Bump      bool
 	All       bool
 	Check     bool
@@ -53,6 +54,9 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 ) (SourcePinUpdate, error) {
 	// Read one snapshot and select the independent sources to update.
 	var update SourcePinUpdate
+	if request.Runtime == "" {
+		request.Runtime = "docker"
+	}
 	reg, lock, err := pinUpdateInputs(ctx, request.Directory)
 	if err != nil {
 		return update, err
@@ -144,7 +148,7 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 				raw := reg.Components[member.Artifact]
 				versionPin := pin
 				versionPin.Tag = versions[key]
-				if err := updateDerivedArtifact(ctx, raw, member.Artifact, versionPin, provenance, lock, &update); err != nil {
+				if err := updateDerivedArtifact(ctx, raw, member.Artifact, versionPin, provenance, request.Runtime, lock, &update); err != nil {
 					return err
 				}
 			}
@@ -157,7 +161,7 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 				if raw.Source != name || raw.Prebuilt == nil {
 					continue
 				}
-				if err := updateDerivedArtifact(ctx, raw, component, pin, owner, lock, &update); err != nil {
+				if err := updateDerivedArtifact(ctx, raw, component, pin, owner, request.Runtime, lock, &update); err != nil {
 					return err
 				}
 			}
@@ -298,12 +302,12 @@ func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (Artifa
 	return update, WriteLockContext(ctx, request.Directory, lock)
 }
 
-func updateDerivedArtifact(ctx context.Context, raw rawComponent, name string, version Pin, provenance string, lock *PinLock, update *SourcePinUpdate) error {
+func updateDerivedArtifact(ctx context.Context, raw rawComponent, name string, version Pin, provenance, runtime string, lock *PinLock, update *SourcePinUpdate) error {
 	acquisition, err := prebuiltTargetFor(name, raw, version)
 	if err != nil {
 		return err
 	}
-	pin, err := resolvePrebuiltTarget(ctx, acquisition, "docker")
+	pin, err := resolvePrebuiltTarget(ctx, acquisition, runtime)
 	if err != nil {
 		return err
 	}
