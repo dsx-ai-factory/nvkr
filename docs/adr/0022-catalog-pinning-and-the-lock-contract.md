@@ -230,6 +230,22 @@ failure leaves the original lock intact. Full catalog loads and lock writes re-d
 Catalogs with pin sets therefore require access to pinned Git objects when loaded; ordinary catalogs retain
 local loading. Offline pin-set transport remains deferred.
 
+**NKE deploy adapter.** `format: nke-deploy-v1` reads `nke-deploy.yaml` and each Helm item's
+`release.yaml` from the same pinned tree. Every deploy item must appear in `members` or `accounted`;
+unknown, missing, duplicate or reclassified items fail before chart acquisition. External members bind the
+reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source). Accounted local
+charts bind their relative path and must match their `Chart.yaml` name/version. Order, values and installation
+remain NKE-owned. See the [example catalog](../examples/nke-pin-set/registry.yaml) and
+[usage guide](../nke-pin-set-usage.md). CycloneDX ingestion and qualified-set acceptance remain deferred.
+
+**Chart acquisition.** HTTPS Helm indexes and anonymous OCI repositories resolve one exact chart version.
+The lock records chart identity, transport URL and the SHA-256 of the unchanged chart archive, identical for
+every declared architecture. OCI pins identify the chart-content layer, not the manifest. Downloads and archive
+inspection are bounded; unsafe paths, links and conflicting duplicates fail. Identical regular-file duplicates
+under vendored `charts/` are allowed, with every record counted against the limits. Runtime OCI acquisition
+uses an explicit digest-only `oci-blob://` transport and preserves the compressed bytes. Private OCI credentials,
+chart dependency resolution and pins for images referenced inside charts are outside this contract.
+
 Direct output selection remains unchanged. `curatedBy` build-graph identity and aggregate SBOM curation edges
 remain follow-ups owned by ADR-11/13; this pinning contract does not implement them.
 

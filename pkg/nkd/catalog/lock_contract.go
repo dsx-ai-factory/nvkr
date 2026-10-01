@@ -3,6 +3,7 @@ package catalog
 import (
 	"crypto/sha256"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -185,6 +186,27 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 			}
 			continue
 		}
+		if raw.Prebuilt.Chart != nil {
+			var chartDigest string
+			for _, arch := range target.Arches() {
+				d := ap.Digests[arch]
+				if d == "" {
+					continue
+				}
+				if chartDigest != "" && d != chartDigest {
+					return e.New(e.CodeInvalidCatalog, "chart %q must pin the same package for every architecture", name)
+				}
+				chartDigest = d
+			}
+			if !reflect.DeepEqual(raw.Prebuilt.Chart, ap.Chart) {
+				return e.New(e.CodeInvalidCatalog, "chart %q acquisition changed; re-pin its owner", name)
+			}
+			if err := checkPrebuiltURLScheme(name, ap.URL); err != nil {
+				return err
+			}
+		} else if ap.URL != "" || ap.Chart != nil {
+			return e.New(e.CodeInvalidCatalog, "artifact %q has a chart URL without chart acquisition", name)
+		}
 		requiredArches := requiredArtifactArches(reg, name)
 		for _, arch := range target.Arches() {
 			_, required := requiredArches[arch]
@@ -200,7 +222,7 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 		}
 		// If acquisition is version-rendered from the source pin, its artifact pin must
 		// track that exact tag. Fixed independent refs may use their own component tag.
-		if raw.PinnedBy == "" && usesSourceVersionTemplate(raw.Prebuilt) {
+		if raw.PinnedBy == "" && (usesSourceVersionTemplate(raw.Prebuilt) || raw.Prebuilt.Chart != nil) {
 			pin := lock.Pins[raw.Source]
 			if ap.Tag != pin.Tag {
 				return e.New(e.CodeInvalidCatalog,
@@ -273,6 +295,10 @@ func clonePinLock(lock *PinLock) *PinLock {
 	if len(lock.Artifacts) > 0 {
 		out.Artifacts = make(map[string]ArtifactPin, len(lock.Artifacts))
 		for name, pin := range lock.Artifacts {
+			if pin.Chart != nil {
+				chart := *pin.Chart
+				pin.Chart = &chart
+			}
 			digests := make(map[string]string, len(pin.Digests))
 			for arch, digest := range pin.Digests {
 				digests[arch] = digest

@@ -12,17 +12,19 @@ import (
 // never runs source code or resolves dependencies. Every selected list record must
 // be explicitly mapped; new or missing records fail closed.
 type PinSet struct {
-	File    string                  `json:"file"`
-	Format  string                  `json:"format,omitempty"`
-	Members map[string]PinSetMember `json:"members"`
+	File      string                  `json:"file"`
+	Format    string                  `json:"format,omitempty"`
+	Members   map[string]PinSetMember `json:"members"`
+	Accounted map[string]PinSetItem   `json:"accounted,omitempty"`
 }
 
 // PinSetMember names exactly one existing source or acquired producer. Path is a
 // bounded field path with optional exact record selectors, not an expression.
 type PinSetMember struct {
-	Source   string `json:"source,omitempty"`
-	Artifact string `json:"artifact,omitempty"`
-	Path     string `json:"path"`
+	Source   string     `json:"source,omitempty"`
+	Artifact string     `json:"artifact,omitempty"`
+	Path     string     `json:"path,omitempty"`
+	Chart    *HelmChart `json:"chart,omitempty"`
 }
 
 func pinSetMemberNames(set *PinSet) []string {
@@ -49,7 +51,16 @@ func validatePinSets(reg *registryDoc) error {
 		if err := validatePinSetFilePath(set.File); err != nil {
 			return err
 		}
-		if set.Format != "" && set.Format != "values" {
+		switch set.Format {
+		case "", "values":
+			if len(set.Accounted) != 0 {
+				return e.New(e.CodeInvalidCatalog, "pin set %q: accounted items require nke-deploy-v1", name)
+			}
+		case "nke-deploy-v1":
+			if err := validateNKEPinSet(set); err != nil {
+				return err
+			}
+		default:
 			return e.New(e.CodeInvalidCatalog, "pin set %q: unsupported format %q", name, set.Format)
 		}
 		if len(set.Members) == 0 || len(set.Members) > 1024 {
@@ -60,8 +71,13 @@ func validatePinSets(reg *registryDoc) error {
 			if strings.TrimSpace(key) == "" || key != strings.TrimSpace(key) || (m.Source == "") == (m.Artifact == "") {
 				return e.New(e.CodeInvalidCatalog, "pin set %q member %q requires exactly one source or artifact", name, key)
 			}
-			if err := validatePinSetValuePath(m.Path); err != nil {
-				return err
+			if set.Format != "nke-deploy-v1" {
+				if m.Chart != nil {
+					return e.New(e.CodeInvalidCatalog, "pin set %q member %q: chart identity requires nke-deploy-v1", name, key)
+				}
+				if err := validatePinSetValuePath(m.Path); err != nil {
+					return err
+				}
 			}
 			if m.Source != "" {
 				member, ok := reg.Sources[m.Source]
@@ -105,7 +121,17 @@ func validatePinSets(reg *registryDoc) error {
 		if raw.PinnedBy != "" && artifactOwners[name] != raw.PinnedBy {
 			return e.New(e.CodeInvalidCatalog, "artifact %q pinnedBy %q has no matching member declaration", name, raw.PinnedBy)
 		}
-
+		if raw.Prebuilt != nil && raw.Prebuilt.OCIArchive != "" {
+			return e.New(e.CodeInvalidCatalog, "component %q authors resolved ociArchive; declare chart instead", name)
+		}
+		if raw.Prebuilt != nil && raw.Prebuilt.Chart != nil {
+			if raw.Prebuilt.URL != "" || raw.Prebuilt.Image != "" || raw.OutputType != "raw" {
+				return e.New(e.CodeInvalidCatalog, "chart %q requires outputType raw and no url/image", name)
+			}
+			if err := validateHelmChart(*raw.Prebuilt.Chart); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -126,6 +152,13 @@ func derivePinSet(ctx context.Context, reg *registryDoc, name string, pin Pin) (
 		return nil, err
 	}
 	defer func() { _ = tree.Close() }()
+	if src.PinSet.Format == "nke-deploy-v1" {
+		versions, err := deriveNKEPinSet(ctx, tree, reg, name)
+		if err != nil {
+			return nil, e.Wrap(e.CodePinSetMismatch, err, "pin set %q at %s", name, pin.Commit)
+		}
+		return versions, nil
+	}
 	raw, err := tree.ReadFile(ctx, src.PinSet.File)
 	if err != nil {
 		return nil, err

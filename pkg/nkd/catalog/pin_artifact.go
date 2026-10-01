@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -23,6 +24,7 @@ import (
 // resolved digests will correspond to.
 type PrebuiltTarget struct {
 	PinnedBy  string
+	Chart     *HelmChart
 	Platforms []string
 	Name      string
 	Tag       string
@@ -75,6 +77,7 @@ func prebuiltTargetFor(name string, raw rawComponent, pin Pin) (PrebuiltTarget, 
 		Platforms: append([]string(nil), raw.Platforms...),
 		URL:       url,
 		Image:     image,
+		Chart:     raw.Prebuilt.Chart,
 	}, nil
 }
 
@@ -83,6 +86,19 @@ func resolvePrebuiltTarget(ctx context.Context, selected PrebuiltTarget, runtime
 	arches := make([]string, 0, len(selected.Platforms))
 	for _, platform := range selected.Platforms {
 		arches = append(arches, target.Arch(platform))
+	}
+	if selected.Chart != nil {
+		chart := *selected.Chart
+		pin.Chart = &chart
+		url, digest, err := resolveHelmChart(ctx, *selected.Chart, NormalizeVersion(selected.Tag))
+		if err != nil {
+			return pin, err
+		}
+		pin.URL = url
+		for _, arch := range arches {
+			pin.Digests[arch] = digest
+		}
+		return pin, nil
 	}
 	if selected.Image != "" {
 		digests, err := resolveImageDigests(ctx, runtime, selected.Image, arches)
@@ -103,7 +119,10 @@ func resolvePrebuiltTarget(ctx context.Context, selected PrebuiltTarget, runtime
 var hex64 = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func artifactPinEqual(a, b ArtifactPin) bool {
-	if a.DerivedFrom != b.DerivedFrom || a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
+	if !reflect.DeepEqual(a.Chart, b.Chart) {
+		return false
+	}
+	if a.DerivedFrom != b.DerivedFrom || a.URL != b.URL || a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
 		return false
 	}
 	for k, v := range b.Digests {

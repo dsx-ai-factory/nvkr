@@ -28,8 +28,8 @@ import (
 // pull acquires one prebuilt artifact: an OCI image (pulled by digest) or an https
 // binary (downloaded and hash-verified).
 func (l Local) pull(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
-	if n.Digest == "" {
-		return nil, e.New(e.CodeUnpinnedSource, "pull %s: no pinned artifact digest", n.Component)
+	if err := n.Validate(); err != nil {
+		return nil, err
 	}
 	if n.OutputType == "oci-image" {
 		return l.pullImage(n, opts)
@@ -98,7 +98,13 @@ func (l Local) pullBinary(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		return nil, e.Wrap(e.CodeFetchFailed, err, "creating fetch dir for %s", n.Component)
 	}
 	fmt.Fprintf(opts.Stdout, "\n=== pull %s (%s) ===\n", n.Component, n.Artifact)
-	sum, size, err := downloadVerify(opts.ctx(), n.Artifact, dir, name, n.Digest)
+	var sum string
+	var size int64
+	if strings.HasPrefix(n.Artifact, ir.OCIBlobScheme) {
+		sum, size, err = downloadOCIBlobVerify(opts.ctx(), n.Artifact, dir, name, n.Digest)
+	} else {
+		sum, size, err = downloadVerify(opts.ctx(), n.Artifact, dir, name, n.Digest)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +138,6 @@ func downloadVerify(ctx context.Context, url, root, relative, want string) (stri
 	if err := ctx.Err(); err != nil {
 		return "", 0, e.Wrap(e.CodeTimeout, err, "downloading %s canceled", url)
 	}
-	dest := filepath.Join(root, relative)
 	client := &http.Client{Timeout: 10 * time.Minute}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -146,6 +151,17 @@ func downloadVerify(ctx context.Context, url, root, relative, want string) (stri
 	if resp.StatusCode != http.StatusOK {
 		return "", 0, e.New(e.CodeFetchFailed, "GET %s: HTTP %s", url, resp.Status)
 	}
+	return writeVerifiedDownload(ctx, resp.Body, url, root, relative, want, 0)
+}
+
+// writeVerifiedDownload is shared by HTTPS files and OCI archive blobs. It never
+// unpacks or transforms the stream; only the verified exact bytes are published.
+// A positive limit bounds the entire stream, including a lying Content-Length.
+func writeVerifiedDownload(ctx context.Context, source io.Reader, location, root, relative, want string, limit int64) (string, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return "", 0, e.Wrap(e.CodeTimeout, err, "downloading %s canceled", location)
+	}
+	dest := filepath.Join(root, relative)
 	parent, finalName, err := securepath.CreateParentBeneath(root, relative)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeFetchFailed, err, "resolving safe download destination %s", dest)
@@ -163,17 +179,23 @@ func downloadVerify(ctx context.Context, url, root, relative, want string) (stri
 		_ = unix.Unlinkat(int(parent.Fd()), temporaryName, 0)
 	}()
 	h := sha256.New()
-	size, copyErr := io.CopyBuffer(io.MultiWriter(f, h), pipelineContextReader{ctx: ctx, source: resp.Body}, make([]byte, 128<<10))
+	if limit > 0 {
+		source = io.LimitReader(source, limit+1)
+	}
+	size, copyErr := io.CopyBuffer(io.MultiWriter(f, h), pipelineContextReader{ctx: ctx, source: source}, make([]byte, 128<<10))
 	if copyErr != nil {
-		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeFetchFailed, copyErr, "downloading %s", url), "downloading "+url)
+		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeFetchFailed, copyErr, "downloading %s", location), "downloading "+location)
 	}
 	if err := ctx.Err(); err != nil {
-		return "", 0, e.Wrap(e.CodeTimeout, err, "downloading %s canceled", url)
+		return "", 0, e.Wrap(e.CodeTimeout, err, "downloading %s canceled", location)
+	}
+	if limit > 0 && size > limit {
+		return "", 0, e.New(e.CodeFetchFailed, "download %s exceeds the %d-byte limit", location, limit)
 	}
 	got := "sha256:" + hex.EncodeToString(h.Sum(nil))
 	if got != want {
 		return "", 0, e.New(e.CodeVerifyFailed,
-			"artifact digest mismatch for %s: expected %s, got %s (fail closed; the pinned artifact was not served)", url, want, got)
+			"artifact digest mismatch for %s: expected %s, got %s (fail closed; the pinned artifact was not served)", location, want, got)
 	}
 	if err := f.Chmod(0o755); err != nil {
 		return "", 0, e.Wrap(e.CodeFetchFailed, err, "setting verified download mode for %s", dest)
