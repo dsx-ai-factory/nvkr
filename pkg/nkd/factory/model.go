@@ -92,10 +92,16 @@ type packageSpec struct {
 	Component    string            `json:"component,omitempty"`
 }
 
+// HelmImage joins one output dependency with its catalog-owned chart mapping.
+type HelmImage struct {
+	From   string                  `json:"from"`
+	Values catalog.HelmImageValues `json:"values"`
+}
+
 // HelmImageBinding is compiler-owned package dataflow, not a publication route.
 type HelmImageBinding struct {
-	Image string `json:"image"`
-	Chart string `json:"chart"`
+	Chart  string               `json:"chart"`
+	Images map[string]HelmImage `json:"images"`
 }
 
 type Target struct {

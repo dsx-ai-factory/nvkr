@@ -17,8 +17,8 @@ outputs:
   - nke-helm
   format: helm-oci
   helm:
-    chart: 007-controller
-    imageOutput: cwe
+    images:
+      controller: cwe
   name: nke-helm
   platform: linux/amd64
 - components:

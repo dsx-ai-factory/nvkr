@@ -1,6 +1,10 @@
 package definition
 
-import "github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+import (
+	"maps"
+
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+)
 
 // Clone transfers ownership of every mutable authored value to its new owner.
 func (input Definition) Clone() Definition {
@@ -20,6 +24,7 @@ func (input Definition) Clone() Definition {
 		}
 		if out.Helm != nil {
 			value := *out.Helm
+			value.Images = maps.Clone(value.Images)
 			out.Helm = &value
 		}
 	}

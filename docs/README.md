@@ -13,6 +13,7 @@
 | Plan v1 delivery | [Milestones](milestones.md), [acceptance specification](epics-v1-spec.md) |
 | Build and verify the combined CLI, CWE image and Helm outputs | [Combined pipeline](combined-nke-pipeline.md), [hosted acceptance](evidence/2026-09-10-combined-run.md) |
 | Build or validate the NKE node image | [OS-image Definition](../definitions/nke-os/README.md), [validation plan](nke-os-validation-plan.md), [ARM64 execution evidence](evidence/2026-09-23-nke-arm64-local-os-build.md), [ARC ARM64/AMD64 evidence](evidence/2026-10-01-nke-arc-os-builds.md) |
+| Bind controller charts to image outputs without registry-specific bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Pin and package NKE's external charts locally | [Acquired chart guide](nke-pin-set-usage.md) |
 | Reproduce the local NKE demonstration | [NKE demo](demo-m1.md) |
 | Inspect actual past execution | Dated [evidence](evidence/) |

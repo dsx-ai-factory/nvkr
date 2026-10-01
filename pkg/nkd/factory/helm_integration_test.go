@@ -36,7 +36,8 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	}
 	defer cleanup()
 	tree := filepath.Join(root, relative)
-	if err := bindHelmImage(ctx, tree, "007-controller", image.ManifestDigest); err != nil {
+	binding := testHelmBinding("package/cwe", ".")
+	if err := bindHelmImages(ctx, tree, *binding, map[string]string{"controller": image.ManifestDigest}); err != nil {
 		t.Fatal(err)
 	}
 	checksums, err := os.ReadFile(filepath.Join(tree, "checksums.txt"))
@@ -60,24 +61,15 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chart := filepath.Join(tree, "007-controller")
-	if raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart).CombinedOutput(); err == nil || !strings.Contains(string(raw), "set image.repository") {
-		t.Fatalf("missing repository must fail: %v\n%s", err, raw)
-	}
+	chart := tree
 	for _, repository := range []string{"ghcr.io/nvidia/nke-recipes/cwe", "mirror.example.test/cwe"} {
-		raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart, "--set-string", "image.repository="+repository,
-			"--set-string", "image.digest=sha256:"+strings.Repeat("f", 64)).CombinedOutput()
+		raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart, "--set-string", "image.repository="+repository).CombinedOutput()
 		if err != nil {
 			t.Fatalf("Helm render: %v\n%s", err, raw)
 		}
-		if !strings.Contains(string(raw), repository+"@"+image.ManifestDigest) || strings.Contains(string(raw), "nke-controller:0.0.0-dev") {
+		if !strings.Contains(string(raw), "@"+image.ManifestDigest) || strings.Contains(string(raw), "nke-controller:0.0.0-dev") {
 			t.Fatalf("rendered image does not bind produced digest: %s", raw)
 		}
 	}
-	for _, local := range []string{"002-postgresql", "004-spire-crds-post"} {
-		if raw, err := exec.CommandContext(ctx, helm, "template", "fixture", filepath.Join(tree, local)).CombinedOutput(); err != nil {
-			t.Fatalf("rendering %s: %v\n%s", local, err, raw)
-		}
-	}
-	t.Logf("bound and rendered all three local charts; controller image %s; verified %d checksum entries", image.ManifestDigest, len(strings.Split(strings.TrimSpace(string(checksums)), "\n")))
+	t.Logf("rendered source chart with produced image digest %s", image.ManifestDigest)
 }

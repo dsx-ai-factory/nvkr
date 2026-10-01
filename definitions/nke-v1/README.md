@@ -1,6 +1,6 @@
 # `definitions/nke-v1` — Combined NKE Definition
 
-This Definition builds `nkectl`, the complete upstream CWE runtime image, and the quickstart Helm bundle from
+This Definition builds `nkectl`, the complete upstream CWE runtime image, and the source controller Helm chart from
 independently pinned CLI and controller module tags in NKE. It observes all three named outputs and generates one shared OCI release publication and signing
 jobs. Producer instructions remain catalog-owned; outputs select them directly. Runtime, destination, and signing choices live in independently selected
 Environments. The [combined hosted run and independent consumers](../../docs/evidence/2026-09-10-combined-run.md)
@@ -63,30 +63,21 @@ SBOMs emitted by earlier runs; existing signed publications are not modified.
 
 ## Helm image binding
 
-The bundle preserves the complete upstream quickstart tree: three local charts and versioned references to
-external charts. It does not vendor those external charts. Packaging binds `007-controller` to the native CWE
-manifest digest produced by the same graph and refreshes `checksums.txt`. The adapter currently requires the
-plain rendered, single-container Deployment in `templates/controller.yaml`; ambiguous or already-templated
-input fails closed.
+The producer packages `controller/deploy/charts/controller` from the pinned controller source. The Definition
+binds its `controller` image slot to `cwe`; the catalog maps that slot to `image.digest`. Packaging writes the
+verified native image manifest digest into `values.yaml` and refreshes checksums. Templates and other values
+remain unchanged. This chart must already support digest-based image selection.
 
-The chart source is the committed generated quickstart snapshot at the controller pin, not a fresh AICR
-generation. Upstream chart `version` and `appVersion` metadata are preserved; they are not the CWE binary's
-release version. The source commit and the bound image digest identify this packaged snapshot.
-
-After verifying and extracting the Release, supply its CWE repository as `image.repository` in deployment
-values. For this GitHub Environment that repository is `ghcr.io/nvidia/nke-recipes/cwe`. For example, rendering
-the extracted controller chart uses:
+After verifying and extracting the Release, supply the repository containing its CWE image:
 
 ```sh
-helm template controller ./helm/007-controller \
+helm template controller ./controller \
   --set-string image.repository=ghcr.io/nvidia/nke-recipes/cwe
 ```
 
-The immutable digest is embedded in the template; overriding `image.digest` cannot change it. The default
-repository is empty, so missing deployment configuration fails explicitly. When using the upstream `deploy.sh`,
-set the repository in the extracted controller `cluster-values.yaml` as a deployment overlay. Registry access
-for the target cluster remains deployment configuration. Rendering is not proof of service startup or a
-successful cluster deployment.
+Registry selection does not change the packaged chart bytes. Normal Helm values overrides still apply;
+overriding or clearing `image.digest` changes image selection. Deployment enforcement is outside NKD's
+packaging contract. A new complete build/publication using this source chart remains unexercised.
 
 ## Generate hosted CI
 
@@ -104,15 +95,14 @@ nkdctl run generate \
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
-The CLI source `nke` is pinned to `cli/v0.1.0-rc.2`. The CWE and Helm source `nke-controller` is pinned to
-`controller/v0.1.1-rc.1`. Both tags currently resolve to commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`,
-tree `309887e8cdb8ee24a39785b864390eda3afce5ec`; selecting the controller tag does not upgrade source bytes.
-CWE stamps `v0.1.1-rc.1` from that module tag, matching upstream's prefix stripping, instead of synthesizing
-a version from the commit. The sources can be repinned independently, while CWE and its chart snapshot move together:
+The CLI source `nke` is pinned to `cli/v0.1.0-rc.2`. CWE and the chart share `nke-controller`, pinned to
+`controller/v0.1.1-rc.9` (`340009f1e15d8e26940f1e03c9696f1ad251c0ae`). The controller pin supplies the
+source chart's existing digest support. CLI and controller can be repinned independently; CWE and its chart
+move together:
 
 ```sh
 nkdctl catalog pin --dir definitions/nke-v1/catalog --tag v0.1.0-rc.2 nke
-nkdctl catalog pin --dir definitions/nke-v1/catalog --tag v0.1.1-rc.1 nke-controller
+nkdctl catalog pin --dir definitions/nke-v1/catalog --tag v0.1.1-rc.9 nke-controller
 ```
 
 Repin only through `nkdctl catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.

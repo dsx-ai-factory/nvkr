@@ -68,11 +68,10 @@ type DefinitionOutput struct {
 	Helm       *HelmOutput `json:"helm,omitempty"`
 }
 
-// HelmOutput binds a rendered controller chart to another output's native image.
-// Chart names a direct child of the source archive's helm directory.
+// HelmOutput maps chart image slots to named OCI outputs. Repository locations
+// are supplied at deployment time and are never embedded from the Environment.
 type HelmOutput struct {
-	ImageOutput string `json:"imageOutput"`
-	Chart       string `json:"chart"`
+	Images map[string]string `json:"images"`
 }
 
 type APTOutput struct {
@@ -180,17 +179,24 @@ func (definition Definition) Validate() error {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has APT-only settings", output.Name)
 		}
 		if output.Helm != nil {
-			if output.Format != OutputHelm || len(output.Components) != 1 || !namePattern.MatchString(output.Helm.Chart) {
-				return e.New(e.CodeInvalidCatalog, "definition output %q requires a source Helm archive and chart for image binding", output.Name)
+			if output.Format != OutputHelm || len(output.Components) != 1 {
+				return e.New(e.CodeInvalidCatalog, "definition output %q requires a source Helm archive for image binding", output.Name)
 			}
-			found := false
-			for _, candidate := range definition.Outputs {
-				if candidate.Name == output.Helm.ImageOutput && candidate.Format == OutputOCI {
-					found = true
+
+			if err := output.Helm.ValidateBindings(); err != nil {
+				return err
+			}
+			for _, slot := range sortedImageSlots(output.Helm.Images) {
+				binding := output.Helm.Images[slot]
+				found := false
+				for _, candidate := range definition.Outputs {
+					if candidate.Name == binding && candidate.Format == OutputOCI && candidate.Platform == output.Platform {
+						found = true
+					}
 				}
-			}
-			if !found {
-				return e.New(e.CodeInvalidCatalog, "definition Helm output %q references an unknown image output", output.Name)
+				if !found {
+					return e.New(e.CodeInvalidCatalog, "Helm output %q slot %q references a missing or incompatible OCI output %q", output.Name, slot, binding)
+				}
 			}
 		}
 		if err := sortedUnique("output components", output.Components); err != nil {

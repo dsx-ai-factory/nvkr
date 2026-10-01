@@ -100,7 +100,7 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 	if err := plan.Qualification.ValidatePlanTier(plan.Environment.Signing); err != nil {
 		return nil, err
 	}
-	packages, targets, routes, err := derivePublication(plan.Definition, plan.Environment)
+	packages, targets, routes, err := derivePublication(plan.Definition, plan.Environment, plan.Builds)
 	if err != nil {
 		return nil, err
 	}

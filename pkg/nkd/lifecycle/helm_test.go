@@ -30,10 +30,10 @@ func TestHelmImageDependency(t *testing.T) {
 			charts = node
 		}
 	}
-	if charts.HelmImage == nil || charts.HelmImage.Image != "package/cwe" || !slices.Contains(charts.Inputs, "package/cwe") || !slices.Contains(charts.Inputs, "artifact/nke-helm/nke-helm") {
+	if charts.HelmImage == nil || charts.HelmImage.Images["controller"].From != "package/cwe" || !slices.Contains(charts.Inputs, "package/cwe") || !slices.Contains(charts.Inputs, "artifact/nke-helm/nke-helm") {
 		t.Fatalf("image dependency: %#v", charts)
 	}
-	definition.Outputs[1].Helm.ImageOutput = "missing"
+	definition.Outputs[1].Helm.Images["controller"] = "missing"
 	assertCode(t, definition.Validate(), e.CodeInvalidCatalog)
 }
 
@@ -63,19 +63,9 @@ func TestSourceHelmSelection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			plan, err := Compile(t.Context(), definitionPath, definition, "environment.yaml", testEnvironment(), "test")
-			if err != nil {
-				t.Fatal(err)
-			}
-			var charts factory.Node
-			for _, node := range plan.Graph.Nodes {
-				if node.ID == "package/charts" {
-					charts = node
-				}
-			}
-			if charts.PackageKind != factory.PackageHelm || charts.HelmImage != nil || !slices.Contains(charts.Inputs, "artifact/charts/nke-helm") {
-				t.Fatalf("source Helm selection lost: %#v", charts)
-			}
+			_, err = Compile(t.Context(), definitionPath, definition, "environment.yaml", testEnvironment(), "test")
+			// This producer declares a required image slot; omitting the relationship fails.
+			assertCode(t, err, e.CodeInvalidCatalog)
 		})
 	}
 }

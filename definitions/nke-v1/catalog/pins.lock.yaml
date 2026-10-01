@@ -30,10 +30,10 @@ pins:
     tag: cli/v0.1.0-rc.2
     treeHash: 309887e8cdb8ee24a39785b864390eda3afce5ec
   nke-controller:
-    commit: ed9fb09b04fd40bf331d25df2222206ffaca593e
-    sourceDateEpoch: 1787066575
-    tag: controller/v0.1.1-rc.1
-    treeHash: 309887e8cdb8ee24a39785b864390eda3afce5ec
+    commit: 340009f1e15d8e26940f1e03c9696f1ad251c0ae
+    sourceDateEpoch: 1790639334
+    tag: controller/v0.1.1-rc.9
+    treeHash: 95caaf5f49416cc676ff8d86f5a0417bdc655c30
   setup-go:
     commit: b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
     sourceDateEpoch: 1784170069

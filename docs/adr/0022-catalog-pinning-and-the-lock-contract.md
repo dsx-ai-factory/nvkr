@@ -215,7 +215,9 @@ object metadata is not membership. Nested sets require their own explicit declar
 ownership and nesting beyond 64 sources are rejected. Independent pin, bump or artifact-pin updates of a
 derived member fail with an error naming its umbrella.
 
-**Bounded extraction.** Paths use dotted fields and literal `[key=value]` selectors. Values must be exact
+**Bounded extraction.** Paths use dotted fields and literal `[key=value]` selectors. The shared
+`internal/documentpath` module also resolves declarative Helm values bindings (ADR-20); only pin sets
+require complete membership of each selected collection. Values must be exact
 semantic-version strings, optionally prefixed with `v`; ranges and numeric YAML scalars are rejected.
 Version syntax is owned by `internal/versionpolicy`, using pinned Masterminds SemVer. Pin sets require
 three numeric segments; Helm metadata uses Helm-compatible parsing. Validation never rewrites the input

@@ -440,7 +440,10 @@ fail closed. The NKE deploy adapter adds explicit deploy-item accounting and exa
 HTTPS or anonymous OCI repositories; installation stays with NKE. Catalogs with pin sets require access
 to pinned Git objects when loaded. A `helm-oci` output can wrap an acquired `raw` chart without changing
 its compressed bytes or pinned layer digest. The wrapper has its own manifest digest; image binding
-remains source-only (ADR-20).
+remains source-only (ADR-20). Definitions map named chart image slots to image outputs; catalog producers own the digest value paths.
+Pin sets and values bindings share strict document traversal. Packaging writes verified image digests to
+values without rewriting templates. Deployment values supply repositories, keeping chart bytes independent
+of Environment publication namespaces. Helm digest overrides remain possible; deployment enforcement is separate.
 
 `curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
 An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate

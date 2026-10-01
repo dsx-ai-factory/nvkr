@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -113,7 +115,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	if err := os.WriteFile(filepath.Join(chart, "templates", "controller.yaml"), []byte(helmDeploymentFixture), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(chart, "values.yaml"), []byte("image:\n  repository: old\n  tag: dev\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(chart, "values.yaml"), []byte("image:\n  repository: old\n  tag: dev\n  digest: ''\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	archive := filepath.Join(root, "source.tar")
@@ -161,7 +163,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		artifacts["package/image"] = Artifact{ID: "package/image", Name: "image", Kind: PackageImage, Producer: "package/image", Path: imagePath}
 		artifacts["rawimage"] = Artifact{ID: "rawimage", Kind: "oci-image", BuildTarget: "charts", Component: "image"}
 		plan.Graph.Nodes = append(plan.Graph.Nodes, Node{ID: "package/image", Kind: NodePackage, PackageKind: PackageImage, Inputs: []string{"rawimage"}, Outputs: []string{"package/image"}})
-		node.HelmImage = &HelmImageBinding{Image: "package/image", Chart: "controller"}
+		node.HelmImage = testHelmBinding("package/image", "controller")
 		node.Inputs = append(node.Inputs, "package/image")
 	}
 	plan.Graph.Nodes = append(plan.Graph.Nodes, node)
@@ -182,6 +184,27 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		}
 	} else if strings.Contains(log.String(), "Bound Helm") {
 		t.Fatalf("claimed an image binding without an image: %s", &log)
+	}
+	if binding {
+		first, err := digestFactoryPath(ctx, artifacts["package/charts"].Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		originalOutput := artifacts["package/charts"]
+		for i, prefix := range []string{"registry.operator-a.test/nke", "mirror.operator-b.test/platform"} {
+			alternate := originalOutput
+			alternate.Path = filepath.Join(root, fmt.Sprintf("mirror-%d", i))
+			artifacts["package/charts"] = alternate
+			plan.Environment.Publication = &definition.Publication{RepositoryPrefix: prefix}
+			if err := executePackage(ctx, plan, node, artifacts, &log); err != nil {
+				t.Fatal(err)
+			}
+			next, err := digestFactoryPath(ctx, artifacts["package/charts"].Path)
+			if err != nil || next != first {
+				t.Fatalf("Environment registry changed chart bytes: %s %s %v", first, next, err)
+			}
+		}
+		artifacts["package/charts"] = originalOutput
 	}
 	expected := LifecycleOutputPlan{Name: "charts", Kind: "helm-oci", ArtifactID: "package/charts", BuildDigest: buildDigest, Components: []string{"charts"}}
 	observed, err := ObserveLifecyclePayload(ctx, plan, expected, artifacts)
@@ -220,7 +243,7 @@ func TestHelmPackageFailsClosedOnUnpublishedSiblingContent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(chart, "templates", "controller.yaml"), []byte(helmDeploymentFixture), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(chart, "values.yaml"), []byte("image:\n  repository: old\n  tag: dev\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(chart, "values.yaml"), []byte("image:\n  repository: old\n  tag: dev\n  digest: ''\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// A sibling chart alongside the bound one, exactly like NKE's real wrapper
@@ -252,7 +275,7 @@ func TestHelmPackageFailsClosedOnUnpublishedSiblingContent(t *testing.T) {
 	}
 	node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm,
 		Inputs: []string{"source", "package/image"}, Outputs: []string{"package/charts"},
-		HelmImage: &HelmImageBinding{Image: "package/image", Chart: "controller"}}
+		HelmImage: testHelmBinding("package/image", "controller")}
 	buildDigest := "sha256:" + strings.Repeat("a", 64)
 	plan := &Plan{Builds: []BuildPlan{{Name: "charts", BuildDigest: buildDigest, Platform: "linux/amd64",
 		Graph: &ir.Graph{Nodes: []ir.Node{{Kind: ir.KindBuild, Component: "charts", OutputType: "tarball"}}}}}}

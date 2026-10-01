@@ -227,14 +227,31 @@ its name discovered from the archive itself rather than assumed, the same shape 
 — extracted through the bounded transport adapter and repacked deterministically, re-rooted onto the chart's
 own declared name exactly as `helm package` would produce it. Lifecycle observation checks the exact archive
 against its producer result and independently reproduces the publication payload. Optional Definition Helm
-settings select a chart and another named OCI output. The
-compiler adds that image package as an explicit dependency. The rendered-controller adapter checks the native
-image closure, embeds its manifest digest in the unique single-container Deployment, clears the default
-repository, and refreshes bundle checksums. The template requires a repository at deployment time, preserving
-artifact bytes across registry mirrors; a values override cannot replace its embedded digest. The adapter
-requires a plain rendered `templates/controller.yaml` and an image values mapping, rejecting ambiguity or
-pre-existing templates. Other chart shapes require a separate adapter. This does not establish external chart
-dependency availability or successful deployment.
+settings contain only a named relationship map: `helm.images: {controller: cwe}` binds a chart slot to an OCI
+output on the same platform. The selected source producer owns `helm.chart` (`.` for the archive root or a
+direct child directory) and each slot's `values.digest` path in `values.yaml`. Compilation joins the relationships with that output's resolved catalog,
+including catalog overrides. Every catalog slot must be bound exactly once; missing mappings, unbound slots
+and unknown slots fail. Mappings participate in catalog identity and are frozen in the plan, whose validation
+re-derives the package bindings. The compiler adds each distinct image package as an explicit dependency and
+checks exact typed source/image membership at execution. `imageOutput` is replaced by this relationship map;
+old Definitions and generated plans must be migrated/regenerated.
+
+Helm values and catalog pin sets share bounded dotted-field/literal `[key=value]` traversal in
+`internal/documentpath`. Pin sets require complete selected-list membership; Helm mappings select explicit
+values while permitting unrelated chart settings. All digest targets must exist as distinct string scalars.
+
+Packaging inspects each native image package, writes its manifest digest to the mapped values and refreshes
+checksums. Templates, repository and tag defaults remain unchanged. Source links and ambiguous value
+selections fail. No Environment publication prefix enters chart bytes. An operator supplies a repository
+containing the same image through deployment values. The source chart must already consume its digest
+value; NKD does not infer or rewrite template behavior. Normal Helm overrides remain possible, including
+changing or clearing the digest. Deployment-value enforcement is outside this packaging contract.
+Acquired charts remain immutable and cannot use these bindings.
+
+Contract tests cover multiple slots, admission, unchanged templates and identical package bytes across
+Environment repository choices. Opt-in real Helm tests render the pinned NKE controller chart for two
+repositories using the packaged digest value. This does not establish installation, signatures, runtime
+availability or a new full CWE-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
 
 A Helm output may instead select one acquired `raw` chart package. The compiler requires an acquisition
 producer and transports its result explicitly. Packaging checks the result and a bounded, no-follow held

@@ -21,12 +21,18 @@ components:
       GIT_VERSION: '{{.Commit}}'
     writeDir: bin
   nke-helm:
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
     artifactPath: bin/nke-helm.tar
     buildCommand:
     - sh
     - -ec
     - tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner
-      -C /src/generated/aicr/quickstart -cf /src/bin/nke-helm.tar helm
+      -C /src/controller/deploy/charts -cf /src/bin/nke-helm.tar controller
     fromSource: true
     outputType: tarball
     platforms:

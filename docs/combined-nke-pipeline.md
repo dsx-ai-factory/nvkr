@@ -1,7 +1,7 @@
 # Combined NKE pipeline
 
-One maintained Definition builds the NKE CLI, complete upstream CWE runtime image and quickstart Helm bundle
-from NKE commit `ed9fb09b04fd40bf331d25df2222206ffaca593e`. The generated workflow observes all three outputs,
+One maintained Definition builds the NKE CLI, complete upstream CWE runtime image and controller Helm chart
+from independently pinned NKE CLI and controller tags. The generated workflow observes all three outputs,
 publishes one release index to GHCR, signs and verifies that entry point and each deliverable manifest, and finalizes a Run only after its
 required checks pass. The [single-entry layout](publication-architecture.md) has been rehearsed locally with
 actual NVIDIA payloads; its new hosted signing/finalization path still needs an authorized run.
@@ -30,15 +30,12 @@ single-platform native image index, manifest, config, compressed layers and unco
 rejecting platform mismatches, ambiguity and unreachable blobs. Lifecycle observation independently reopens
 the producer archive. Publication preserves the runnable image manifest and consumer checks bind its platform.
 
-The Helm producer archives the complete pinned `generated/aicr/quickstart/helm` tree with sorted names, fixed
-timestamps and numeric ownership. Its 48 files contain three local charts and versioned external chart
-references; external charts are not vendored. The Definition declares `imageOutput: cwe` and
-`chart: 007-controller`, creating an explicit package dependency. Packaging binds the chart's unique controller
-Deployment to the verified native image manifest, removes the development tag/default repository and refreshes
-all 47 checksum entries. Missing, ambiguous or already-templated Deployment inputs fail closed.
-
-Consumers supply the verified CWE repository as `image.repository`. The manifest digest is embedded in the
-Deployment template and cannot be replaced through `image.digest`. Rendering without a repository fails.
+The maintained Helm producer archives `controller/deploy/charts/controller` at `controller/v0.1.1-rc.9`,
+with sorted names, fixed timestamps and numeric ownership. `helm.images: {controller: cwe}` creates an
+explicit package dependency. Packaging writes the verified image manifest digest to `image.digest` and
+refreshes checksums; templates and other values remain unchanged. Operators supply the image repository
+at deployment. Helm digest overrides remain possible. Historical runs below used the older quickstart
+wrapper and template-rewriting behavior; they do not validate these updated inputs.
 See the [Definition README](../definitions/nke-v1/README.md) for generation and consumption commands.
 
 Release metadata references the CLI, native CWE and Helm manifests in their own repositories. The release
@@ -61,12 +58,12 @@ byte-exact generation checks passed. The corrected graph's 35 artifact paths hav
 Current single-entry checks and real-output results are in the [publication validation summary](publication-architecture.md#local-validation).
 
 Contract tests cover native-image byte/platform/diff-ID validation, unsafe archives, substituted producer
-results, source Helm cardinality, image dependency lowering, Deployment ambiguity and checksum regeneration.
+results, source Helm cardinality, image dependency lowering, value-path ambiguity and checksum regeneration.
 A transport regression restores two independent source receipts into the same consumer workspace.
 
-The real-input Helm test rendered all three local charts, rejected a missing repository and proved that a
-values digest override cannot replace the image binding. `TestPinnedNKEHelmBinding` is opt-in through
-`NKD_HELM_ARCHIVE` and `NKD_CWE_IMAGE_LAYOUT`; a skipped invocation does not prove external acceptance.
+Real Helm rendering of the source controller chart and template preservation are recorded in the
+[values-binding validation](evidence/2026-10-01-declarative-helm-bindings.md). A new complete build and
+hosted publication of the updated inputs remain unexercised.
 
 ## Hosted attempts
 

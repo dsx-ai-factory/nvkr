@@ -5,13 +5,14 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // derivePublication creates package operations and one publication route from named
 // outputs. These are executable dataflow, never another authored document model.
-func derivePublication(definition authored.Definition, environment authored.Environment) ([]packageSpec, map[string]Target, []Route, error) {
+func derivePublication(definition authored.Definition, environment authored.Environment, builds []BuildPlan) ([]packageSpec, map[string]Target, []Route, error) {
 	if environment.Publication != nil {
 		for _, output := range definition.Outputs {
 			if output.Format == authored.OutputDiskImage {
@@ -43,10 +44,23 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 		case authored.OutputHelm:
 			spec.Kind = PackageHelm
 		}
-		if output.Helm != nil {
-			image := "package/" + output.Helm.ImageOutput
-			spec.HelmImage = &HelmImageBinding{Image: image, Chart: output.Helm.Chart}
-			spec.Inputs = append(spec.Inputs, image)
+
+		if output.Format == authored.OutputHelm {
+			binding, err := resolveHelmBinding(output, builds)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			spec.HelmImage = binding
+			if binding != nil {
+				seen := map[string]bool{}
+				for _, slot := range sortedKeys(binding.Images) {
+					from := binding.Images[slot].From
+					if !seen[from] {
+						spec.Inputs = append(spec.Inputs, from)
+						seen[from] = true
+					}
+				}
+			}
 		}
 		packages = append(packages, spec)
 		closureInputs = append(closureInputs, "package/"+output.Name)
@@ -214,21 +228,40 @@ func observationInputs(inputs []string, artifacts map[string]Artifact) []string 
 
 func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[string]Artifact) error {
 	if spec.HelmImage != nil {
-		if spec.Kind != PackageHelm || len(inputs) != 2 || !canonicalName.MatchString(spec.HelmImage.Chart) {
-			return e.New(e.CodeInvalidCatalog, "Helm image binding requires a source archive and one image package")
+		if spec.Kind != PackageHelm {
+			return e.New(e.CodeInvalidCatalog, "image bindings require Helm packaging")
 		}
-		image, source := false, false
+		h := spec.HelmImage
+		if err := h.ValidateBindings(); err != nil {
+			return err
+		}
+		expected := map[string]bool{}
+		for _, b := range h.Images {
+			expected[b.From] = true
+		}
+		if len(inputs) != len(expected)+1 {
+			return e.New(e.CodeInvalidCatalog, "Helm binding requires one source and the exact image packages")
+		}
+		source := false
+		seen := map[string]bool{}
 		for _, id := range inputs {
-			artifact := artifacts[id]
-			if id == spec.HelmImage.Image && artifact.Kind == PackageImage {
-				image = true
-			} else if artifact.Kind == "tarball" && artifact.BuildTarget != "" {
+			if seen[id] {
+				return e.New(e.CodeInvalidCatalog, "duplicate Helm input %q", id)
+			}
+			seen[id] = true
+			a := artifacts[id]
+			if expected[id] && a.Kind == PackageImage {
+				delete(expected, id)
+			} else if a.Kind == "tarball" && a.BuildTarget != "" && !source {
 				source = true
+			} else {
+				return e.New(e.CodeInvalidCatalog, "Helm binding has unexpected input %q", id)
 			}
 		}
-		if !image || !source {
-			return e.New(e.CodeInvalidCatalog, "Helm image binding does not select exact typed inputs")
+		if !source || len(expected) != 0 {
+			return e.New(e.CodeInvalidCatalog, "Helm binding omits a source or image")
 		}
+
 		return nil
 	}
 	if spec.Kind == PackageHelm && len(inputs) != 1 {
@@ -316,4 +349,50 @@ func (plan Plan) validatePublicationEvidence() error {
 		}
 	}
 	return nil
+}
+
+// resolveHelmBinding joins Definition relationships with this output's resolved
+// producer. Per-output catalog overrides are already frozen in BuildPlan.
+func resolveHelmBinding(output authored.DefinitionOutput, builds []BuildPlan) (*HelmImageBinding, error) {
+	var mapping *catalog.HelmPackaging
+	for _, build := range builds {
+		if build.Name != output.Name {
+			continue
+		}
+		for _, c := range build.ResolvedComponents {
+			if len(output.Components) == 1 && c.Name == output.Components[0] {
+				mapping = c.Helm
+			}
+		}
+	}
+	if mapping == nil && output.Helm == nil {
+		return nil, nil
+	}
+	if mapping == nil || output.Helm == nil || len(mapping.Images) != len(output.Helm.Images) {
+		return nil, e.New(e.CodeInvalidCatalog, "Helm output %q must bind every catalog image slot exactly once", output.Name)
+	}
+	if err := mapping.Validate(); err != nil {
+		return nil, err
+	}
+	binding := &HelmImageBinding{Chart: mapping.Chart, Images: map[string]HelmImage{}}
+	for _, slot := range sortedKeys(output.Helm.Images) {
+		image, ok := mapping.Images[slot]
+		if !ok {
+			return nil, e.New(e.CodeInvalidCatalog, "Helm output %q references unknown catalog image slot %q", output.Name, slot)
+		}
+		binding.Images[slot] = HelmImage{From: "package/" + output.Helm.Images[slot], Values: image.Values}
+	}
+	return binding, nil
+}
+
+func (h HelmImageBinding) ValidateBindings() error {
+	mapping := catalog.HelmPackaging{Chart: h.Chart, Images: map[string]catalog.HelmImage{}}
+	for _, slot := range sortedKeys(h.Images) {
+		image := h.Images[slot]
+		if image.From == "" {
+			return e.New(e.CodeInvalidCatalog, "Helm image slot %q omits its dependency", slot)
+		}
+		mapping.Images[slot] = catalog.HelmImage{Values: image.Values}
+	}
+	return mapping.Validate()
 }

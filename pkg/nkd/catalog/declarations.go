@@ -48,6 +48,7 @@ type registryDoc struct {
 // rawComponent is a component as authored: it references a source by name and
 // carries version-stamp templates, not resolved pins.
 type rawComponent struct {
+	Helm            *HelmPackaging     `json:"helm,omitempty"`
 	PinnedBy        string             `json:"pinnedBy,omitempty"`
 	Platforms       []string           `json:"platforms"`
 	FromSource      bool               `json:"fromSource"`

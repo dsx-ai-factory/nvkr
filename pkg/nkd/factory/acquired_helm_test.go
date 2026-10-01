@@ -267,7 +267,7 @@ func TestAcquiredHelmCompilerAndTransportAdmission(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := acquiredHelmPlan(t, acquiredChartBytes(t, false), false)
 			tc.mutate(plan)
-			specs, _, _, err := derivePublication(plan.Definition, plan.Environment)
+			specs, _, _, err := derivePublication(plan.Definition, plan.Environment, plan.Builds)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -293,7 +293,7 @@ func TestAcquiredHelmCompilerAndTransportAdmission(t *testing.T) {
 	})
 	t.Run("image rebinding", func(t *testing.T) {
 		artifacts := map[string]Artifact{"chart": {Kind: "raw", BuildTarget: "charts"}, "image": {Kind: PackageImage}}
-		err := validatePackageInputs(packageSpec{Kind: PackageHelm, HelmImage: &HelmImageBinding{Image: "image", Chart: "demo"}}, []string{"chart", "image"}, artifacts)
+		err := validatePackageInputs(packageSpec{Kind: PackageHelm, HelmImage: testHelmBinding("image", "demo")}, []string{"chart", "image"}, artifacts)
 		assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
 	})
 }

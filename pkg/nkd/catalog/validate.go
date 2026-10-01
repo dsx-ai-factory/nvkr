@@ -23,6 +23,9 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 	sort.Strings(componentNames)
 	for _, name := range componentNames {
 		c := reg.Components[name]
+		if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
+			return err
+		}
 		if strings.TrimSpace(name) == "" || name != strings.TrimSpace(name) {
 			return e.New(e.CodeInvalidCatalog, "component name %q is empty or non-canonical", name)
 		}
@@ -150,6 +153,9 @@ func validateComponentTargets(name string, platforms []string) error {
 }
 
 func validateComponent(name string, c Component) error {
+	if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
+		return err
+	}
 	if err := validateComponentTargets(name, c.Platforms); err != nil {
 		return err
 	}

@@ -113,16 +113,12 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 	if err != nil {
 		return nil, err
 	}
-	packageSpecs, targets, routes, err := derivePublication(definition, delivery)
-	if err != nil {
-		return nil, err
-	}
 	plan := &Plan{Actions: cloneActionPins(stack.Catalog.Actions), SchemaVersion: PlanSchemaVersion, Name: definition.Metadata.Name,
 		GeneratorVersion: generatorVersion, Qualification: planTier(delivery.Signing),
 		DefinitionDigest: definitionDigest, EnvironmentDigest: environmentDigest, Definition: definition, Environment: delivery,
 		DefinitionPath: definitionPath, EnvironmentPath: environmentPath,
 		CatalogDigest: stack.Digest, CatalogSnapshot: snapshot.Catalog, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),
-		Targets: targets, Routes: routes, Graph: ArtifactGraph{SchemaVersion: ArtifactGraphSchema}}
+		Graph: ArtifactGraph{SchemaVersion: ArtifactGraphSchema}}
 	for _, target := range definition.Outputs {
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "factory compilation canceled")
@@ -145,6 +141,11 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 			BuildDigest: build.BuildDigest, Components: append([]string(nil), target.Components...),
 		})
 	}
+	packageSpecs, targets, routes, err := derivePublication(definition, delivery, plan.Builds)
+	if err != nil {
+		return nil, err
+	}
+	plan.Targets, plan.Routes = targets, routes
 	plan.Graph, err = compileArtifactGraph(*plan, tools, packageSpecs)
 	if err != nil {
 		return nil, err

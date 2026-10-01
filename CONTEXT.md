@@ -8,7 +8,7 @@ vocabulary preserves the distinctions needed to authenticate them.
 
 **Definition**:
 Authored product intent declaring named outputs, their exact catalog producers, target platforms and packaging
-intent. An output directly selects components. Packaging intent may bind a Helm chart to a named image output; the resulting digest is content, while its
+intent. An output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
 deployment repository remains transport configuration.
 _Avoid_: Factory, FactoryDefinition, cluster definition
 

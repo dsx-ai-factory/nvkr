@@ -15,7 +15,7 @@ func TestGitHubOperationLabels(t *testing.T) {
 		want string
 	}{
 		{"image", Node{ID: "package/worker", Kind: NodePackage, PackageKind: PackageImage}, "Package container image: worker"},
-		{"helm binding", Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, HelmImage: &HelmImageBinding{Image: "package/worker"}}, "Bind image digest and package Helm: charts"},
+		{"helm binding", Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, HelmImage: testHelmBinding("package/worker", "controller")}, "Bind image digest and package Helm: charts"},
 		{"helm alone", Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm}, "Package Helm bundle: charts"},
 		{"binary", Node{ID: "package/cli", Kind: NodePackage, PackageKind: PackageBinaryBundle}, "Package binaries: cli"},
 		{"apt", Node{ID: "package/packages", Kind: NodePackage, PackageKind: PackageAPT}, "Package APT repository: packages"},
@@ -51,7 +51,7 @@ func TestGitHubOperationLogsPreserveExitStatus(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "nkd-exec"), []byte("#!/bin/sh\nprintf 'child output\\n'\nexit \"$TEST_STATUS\"\n"), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, Outputs: []string{"package/charts"}, HelmImage: &HelmImageBinding{Image: "package/image"}}
+			node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, Outputs: []string{"package/charts"}, HelmImage: testHelmBinding("package/image", "controller")}
 			commands := githubNodeCommands(node, &Plan{})
 			cmd := exec.CommandContext(t.Context(), "bash", "-c", strings.Join(commands, "\n"))
 			cmd.Dir = dir

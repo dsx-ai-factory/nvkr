@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 )
 
 const helmDeploymentFixture = `# License retained
@@ -22,39 +22,11 @@ spec:
     spec:
       containers:
         - name: controller
-          image: "registry.example.test/old:dev"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}@{{ .Values.image.digest }}"
 `
 
-func TestHelmDeploymentImageBinding(t *testing.T) {
-	digest := "sha256:" + strings.Repeat("a", 64)
-	for _, tc := range []struct {
-		name, raw string
-		reject    bool
-	}{
-		{"one deployment", helmDeploymentFixture, false},
-		{"missing deployment", "kind: Service\n", true},
-		{"two deployments", helmDeploymentFixture + "\n---\n" + helmDeploymentFixture, true},
-		{"commented separator", helmDeploymentFixture + "\n--- # another document\n" + helmDeploymentFixture, true},
-		{"two containers", helmDeploymentFixture + "        - name: sidecar\n          image: other:dev\n", true},
-		{"template input", strings.ReplaceAll(helmDeploymentFixture, "registry.example.test/old:dev", "{{ .Values.image }}"), true},
-		{"duplicate YAML key", helmDeploymentFixture + "          image: other:dev\n", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			bound, err := bindHelmDeployment([]byte(tc.raw), digest)
-			if tc.reject {
-				if e.ExitCode(err) != e.ExitCode(e.New(e.CodeVerifyFailed, "expected")) {
-					t.Fatalf("invalid binding: %v", err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(bound), digest) || !strings.Contains(string(bound), "# License retained") || strings.Contains(string(bound), "old:dev") || !strings.Contains(string(bound), "required") {
-				t.Fatalf("binding: %s", bound)
-			}
-		})
-	}
+func testHelmBinding(from, chart string) *HelmImageBinding {
+	return &HelmImageBinding{Chart: chart, Images: map[string]HelmImage{"controller": {From: from, Values: catalog.HelmImageValues{Digest: "image.digest"}}}}
 }
 
 func TestHelmImageBindingUpdatesChecksums(t *testing.T) {
@@ -74,7 +46,7 @@ func TestHelmImageBindingUpdatesChecksums(t *testing.T) {
 		}
 	}
 	digest := "sha256:" + strings.Repeat("a", 64)
-	if err := bindHelmImage(context.Background(), root, "007-controller", digest); err != nil {
+	if err := bindHelmImages(context.Background(), root, *testHelmBinding("package/cwe", "007-controller"), map[string]string{"controller": digest}); err != nil {
 		t.Fatal(err)
 	}
 	checksums, err := os.ReadFile(filepath.Join(root, "checksums.txt"))
@@ -97,7 +69,7 @@ func TestHelmImageBindingUpdatesChecksums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(values), "tag:") || !strings.Contains(string(values), `repository: ""`) || !strings.Contains(string(values), digest) {
+	if !strings.Contains(string(values), "tag: dev") || !strings.Contains(string(values), "repository: old") || !strings.Contains(string(values), digest) {
 		t.Fatalf("values: %s", values)
 	}
 }

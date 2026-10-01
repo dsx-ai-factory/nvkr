@@ -471,3 +471,13 @@ func code(err error) nkderr.Code {
 func fixtureProducers() []string {
 	return []string{"cni-plugins", "containerd", "coredns", "crictl", "etcd", "helm", "kube-apiserver", "kube-controller-manager", "kube-proxy", "kube-scheduler", "kubeadm", "kubectl", "kubelet", "pause", "runc"}
 }
+
+func TestClonePreservesHelmMappingOwnership(t *testing.T) {
+	original := catalog.Component{Helm: &catalog.HelmPackaging{Chart: ".", Images: map[string]catalog.HelmImage{"controller": {Values: catalog.HelmImageValues{Digest: "image.digest"}}}}}
+	cloned := cloneComponent(original)
+	cloned.Helm.Chart = "other"
+	delete(cloned.Helm.Images, "controller")
+	if original.Helm.Chart != "." || original.Helm.Images["controller"].Values.Digest != "image.digest" {
+		t.Fatal("resolved chart mappings alias the caller's catalog")
+	}
+}
