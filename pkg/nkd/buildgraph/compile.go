@@ -91,7 +91,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			if nc.Prebuilt.OCIArchive != "" {
 				ref = ir.OCIBlobScheme + nc.Prebuilt.OCIArchive
 			} else if ref == "" {
-				ref = nc.Prebuilt.Image
+				ref = strings.TrimPrefix(nc.Prebuilt.Image, "oci://")
 			}
 			pid := "pull-" + nc.Name
 			verifyNeeds = append(verifyNeeds, pid)
