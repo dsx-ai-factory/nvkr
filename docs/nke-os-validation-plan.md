@@ -17,6 +17,11 @@ Manual dispatch from the trusted workflow on `main` remains available for either
 toolchain-only or full mode. The credential-free toolchain pass uses GitHub-hosted native AMD64 and ARM64
 runners, has no KVM or private-source access, and records the exact native toolchain image IDs.
 
+The secret-free `preflight` mode can be dispatched from a branch at that workflow's exact commit. It runs the
+same no-chmod admission step as full validation on either ARC architecture or both, without fetching NKE,
+building an image or exposing a source credential. This permits pre-merge runner-permission validation;
+toolchain and full modes still require the trusted workflow on `main`.
+
 Full image validation never uses `pull_request_target`. Manual dispatch accepts an exact main commit or a
 copy-pr-bot mirror matching the current, open, non-draft same-repository PR
 head. Maintainers must vet the exact head before `/ok to test`; the workflow does not authenticate that comment

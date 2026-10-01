@@ -147,6 +147,11 @@ approval. `/ok to test` is procedural vetting; branch equality does not authenti
 repository-scoped source secret remains a separate policy gap. This exception grants no pipeline-attested or
 qualified claim and changes no generated adapter rule.
 
+A secret-free manual `preflight` mode may execute a branch workflow at its exact dispatched commit to test
+the same no-chmod KVM-access step used by full validation on either ARC pool. It has no source checkout on
+the KVM runner, private-source fetch, image build or source credential. This branch exception is diagnostic
+only; toolchain and full validation remain restricted to the default-branch workflow.
+
 Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.
 Prebuilt helper-image qualification stays disabled until that admission contract exists. Runtime/helper changes
