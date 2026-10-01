@@ -194,3 +194,69 @@ func TestCatalogArtifactPinCommandRejectsArchitectureSubset(t *testing.T) {
 		t.Fatal("invalid command produced output or changed lock")
 	}
 }
+
+func TestCatalogDerivedImageRuntimeAndNoOpOutput(t *testing.T) {
+	repo, data := t.TempDir(), t.TempDir()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "url."+repo+".insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_0", "https://example.invalid/pin-runtime")
+	if err := os.WriteFile(filepath.Join(repo, "versions.yaml"), []byte("tool: 1.2.3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=Pin Test", "-c", "user.email=pin@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "fixture"}, {"tag", "v1.0.0"}} {
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git: %s: %v", out, err)
+		}
+	}
+	registry := `apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+sources:
+  umbrella:
+    repo: https://example.invalid/pin-runtime
+    constraint: 1.x
+    pinSet:
+      file: versions.yaml
+      members:
+        tool: {artifact: tool, path: tool}
+components:
+  tool:
+    platforms: [linux/amd64]
+    pinnedBy: umbrella
+    outputType: oci-image
+    prebuilt:
+      image: example.invalid/tool:{{.Version}}
+      evidence: {none: true}
+`
+	if err := os.WriteFile(filepath.Join(data, catalog.RegistryFile), []byte(registry), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runtime := filepath.Join(t.TempDir(), "podman")
+	script := "#!/bin/sh\n[ \"$#\" = 3 ] && [ \"$1\" = manifest ] && [ \"$2\" = inspect ] && [ \"$3\" = example.invalid/tool:1.2.3 ] || exit 91\nprintf '%s' '{\"manifests\":[{\"digest\":\"sha256:" + strings.Repeat("a", 64) + "\",\"platform\":{\"os\":\"linux\",\"architecture\":\"amd64\"}}]}'\n"
+	if err := os.WriteFile(runtime, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		command string
+		check   bool
+		changed bool
+	}{{"pin", false, true}, {"pin", false, false}, {"pin", true, false}, {"bump", false, false}, {"bump", true, false}} {
+		args := []string{"nkdctl", "catalog", tc.command, "--dir", data, "--runtime", runtime}
+		if tc.check {
+			args = append(args, "--check")
+		}
+		out, err := runCLIWithCapturedStdout(t, newApp(), append(args, "umbrella")...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tc.changed {
+			if !strings.Contains(string(out), "artifact tool: (none) -> 1.2.3") {
+				t.Fatalf("missing initial change: %s", out)
+			}
+		} else if !strings.Contains(string(out), "artifact tool: already at 1.2.3") || strings.Contains(string(out), " -> ") || !strings.Contains(string(out), "no changes") {
+			t.Fatalf("misleading no-op output: %s", out)
+		}
+	}
+}

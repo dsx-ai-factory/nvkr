@@ -107,6 +107,7 @@ func cmdCatalog() *cli.Command {
 					&cli.StringFlag{Name: "tag", Usage: "tag to pin (default: newest matching the source constraint)"},
 					&cli.BoolFlag{Name: "check", Usage: "resolve and show the complete pin update without writing"},
 					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
+					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "container runtime for acquired image member manifest inspection"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
 				Action: func(c *cli.Context) error { return pinSources(c, false) },
@@ -119,6 +120,7 @@ func cmdCatalog() *cli.Command {
 					&cli.BoolFlag{Name: "all", Usage: "bump every source"},
 					&cli.BoolFlag{Name: "check", Usage: "dry-run: print the lockfile diff, write nothing (ADR-22 §4)"},
 					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
+					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "container runtime for acquired image member manifest inspection"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
 				Action: func(c *cli.Context) error { return pinSources(c, true) },
@@ -158,7 +160,7 @@ func pinSources(c *cli.Context, bump bool) error {
 	defer cancel()
 	update, err := catalog.UpdateSourcePins(ctx, catalog.SourcePinRequest{
 		Directory: c.String("dir"), Sources: c.Args().Slice(), Tag: c.String("tag"),
-		Bump: bump, All: c.Bool("all"), Check: c.Bool("check"),
+		Bump: bump, All: c.Bool("all"), Check: c.Bool("check"), Runtime: c.String("runtime"),
 	})
 	for _, change := range update.Pins {
 		if !change.Changed {
@@ -169,6 +171,10 @@ func pinSources(c *cli.Context, bump bool) error {
 	}
 	var coded *e.Error
 	for _, change := range update.Artifacts {
+		if !change.Changed {
+			fmt.Printf("  artifact %s: already at %s (derived from %s)\n", change.Name, change.After.Tag, change.After.DerivedFrom)
+			continue
+		}
 		fmt.Printf("  artifact %s: %s -> %s (derived from %s)\n", change.Name, orNone(change.Before.Tag), change.After.Tag, change.After.DerivedFrom)
 		arches := make([]string, 0, len(change.After.Digests))
 		for arch := range change.After.Digests {
