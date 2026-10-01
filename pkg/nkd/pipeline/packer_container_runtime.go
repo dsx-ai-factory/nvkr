@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"strconv"
@@ -31,6 +32,12 @@ const (
 )
 
 func runPackerContainer(ctx context.Context, request packerContainerRunRequest) (artifact *PackerArtifact, returnErr error) {
+	return runPackerContainerWithDiagnosticTimeout(ctx, request, packerContainerCleanupTimeout)
+}
+
+func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packerContainerRunRequest,
+	diagnosticTimeout time.Duration,
+) (artifact *PackerArtifact, returnErr error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "running containerized Packer requires a non-nil context")
 	}
@@ -225,10 +232,10 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err := createPackerContainer(ctx, request.runtime, build); err != nil {
 		return nil, err
 	}
-	buildErr := startPackerContainer(ctx, request.runtime, buildName, request.stdout, request.stderr)
+	buildErr := startPackerBuildContainer(ctx, request.runtime, buildName, request.stdout, request.stderr, kvmProjection != nil)
 	var diagnosticErr error
 	if request.bindings.buildLogDirectoryVariable != "" {
-		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), packerContainerCleanupTimeout)
+		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), diagnosticTimeout)
 		diagnosticErr = collectPackerContainerBuildLogs(diagnosticCtx, request.runtime, buildName,
 			diagnosticTarget)
 		cancel()
@@ -432,6 +439,17 @@ func startPackerContainer(ctx context.Context, runtime packerContainerRuntime, n
 			"running Packer container %q", name)
 	}
 	return nil
+}
+
+func startPackerBuildContainer(ctx context.Context, runtime packerContainerRuntime, name string,
+	stdout, stderr io.Writer, guarded bool,
+) error {
+	err := startPackerContainer(ctx, runtime, name, stdout, stderr)
+	var exit *exec.ExitError
+	if guarded && ctx.Err() == nil && errors.As(err, &exit) && exit.ExitCode() == 97 {
+		return e.Wrap(e.CodeEngineCapability, err, "Docker KVM projection was rejected before Packer")
+	}
+	return err
 }
 
 func preflightPackerVersion(ctx context.Context, runtime packerContainerRuntime,

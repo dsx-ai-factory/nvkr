@@ -37,7 +37,7 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 		}
 		src := reg.Sources[sourceName]
 		for _, argument := range src.VendorCommand {
-			if err := checkArchTokens(sourceName, "vendorCommand", argument); err != nil {
+			if err := checkArchTokens("catalog source", sourceName, "vendorCommand", argument); err != nil {
 				return err
 			}
 		}
@@ -154,7 +154,7 @@ func validateComponent(name string, c Component) error {
 		return err
 	}
 	for _, argument := range c.VendorCommand {
-		if err := checkArchTokens(name, "vendorCommand", argument); err != nil {
+		if err := checkArchTokens("component", name, "vendorCommand", argument); err != nil {
 			return err
 		}
 	}
@@ -344,14 +344,14 @@ func validateComponent(name string, c Component) error {
 		return e.New(e.CodeInvalidCatalog, "component %q: empty buildCommand", name)
 	}
 	for _, s := range c.BuildCommand {
-		if err := checkArchTokens(name, "buildCommand", s); err != nil {
+		if err := checkArchTokens("component", name, "buildCommand", s); err != nil {
 			return err
 		}
 	}
 	if c.ArtifactPath == "" {
 		return e.New(e.CodeInvalidCatalog, "component %q: missing artifactPath", name)
 	}
-	if err := checkArchTokens(name, "artifactPath", c.ArtifactPath); err != nil {
+	if err := checkArchTokens("component", name, "artifactPath", c.ArtifactPath); err != nil {
 		return err
 	}
 	if c.Packer != nil && (!validPackerTransportValue(c.ArtifactPath, maxPackerArtifactPathBytes) ||
@@ -435,7 +435,7 @@ func validatePrebuilt(name string, c Component) error {
 	if hasImg {
 		ref = p.Image
 	}
-	if err := checkArchTokens(name, "prebuilt ref", ref); err != nil {
+	if err := checkArchTokens("component", name, "prebuilt ref", ref); err != nil {
 		return err
 	}
 	// ADR-11 §4 scheme allowlist, per field role: a prebuilt download URL is
@@ -498,10 +498,10 @@ func validateExternalEvidence(name string, ev *ExternalEvidence) error {
 // compile time (model B — e.g. kubernetes' KUBE_BUILD_PLATFORMS and its output path);
 // a typo'd or unknown token must not silently reach a build as a literal, mirroring
 // the fail-closed toolchain-pinning discipline (NKD-FR-RC-024).
-func checkArchTokens(name, field, s string) error {
+func checkArchTokens(subject, name, field, s string) error {
 	if strings.Contains(strings.ReplaceAll(s, "{{.Arch}}", ""), "{{") {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: %s %q uses an unknown template token (only {{.Arch}} is supported)", name, field, s)
+			"%s %q: %s %q uses an unknown template token (only {{.Arch}} is supported)", subject, name, field, s)
 	}
 	return nil
 }

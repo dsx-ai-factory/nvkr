@@ -17,6 +17,31 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
+func TestAdaptLocalExecutionResult(t *testing.T) {
+	cause := nkderr.New(nkderr.CodeBuildFailed, "build failed")
+	result := &factory.LocalRunResult{}
+	for _, test := range []struct {
+		name   string
+		result *factory.LocalRunResult
+		err    error
+	}{
+		{name: "nil with error", err: cause},
+		{name: "nil without error"},
+		{name: "concrete result", result: result},
+		{name: "concrete result with error", result: result, err: cause},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := adaptLocalExecutionResult(test.result, test.err)
+			if err != test.err || (got == nil) != (test.result == nil) {
+				t.Fatalf("result=%v, error=%v, want result=%v, error=%v", got, err, test.result, test.err)
+			}
+			if test.result != nil && got != test.result {
+				t.Fatal("adapter replaced the concrete result")
+			}
+		})
+	}
+}
+
 func TestObserveAPTRejectsSubstitutedProducerBytes(t *testing.T) {
 	ctx := context.Background()
 	definition, environment := testDefinition(t), testEnvironment()

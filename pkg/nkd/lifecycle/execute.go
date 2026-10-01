@@ -32,11 +32,16 @@ func ExecuteLocal(ctx context.Context, prepared *PreparedRun, options LocalOptio
 	return executeLocalWithFactoryRunner(ctx, prepared, options,
 		func(ctx context.Context, plan *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
 			result, err := factory.RunLocal(ctx, plan, options)
-			if result == nil {
-				return nil, err
-			}
-			return result, err
+			return adaptLocalExecutionResult(result, err)
 		})
+}
+
+// Convert a nil concrete result to a nil interface, not a typed-nil observer.
+func adaptLocalExecutionResult(result *factory.LocalRunResult, err error) (localExecutionResult, error) {
+	if result == nil {
+		return nil, err
+	}
+	return result, err
 }
 
 type localExecutionResult interface {

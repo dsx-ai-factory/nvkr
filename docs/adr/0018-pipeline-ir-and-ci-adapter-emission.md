@@ -128,9 +128,13 @@ cgroups and the provider's nesting policy. A mounted privileged Docker socket re
 Missing prerequisites fail capability admission. No bespoke/self-hosted runner labels are emitted.
 
 The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
-a hosted VM adapter. It is manually dispatched from the default-branch workflow and may select only the declared
-`arc-amd64-kvm` or `arc-arm64-kvm` KVM scale set after an exact main commit or copy-pr-bot
-mirror is authenticated. The cross-repository source credential must not share a job with candidate code; the
+a hosted VM adapter. Each push to `main` selects that exact commit for full AMD64 and ARM64 builds, boot smoke,
+and short-retention QCOW2 uploads. Manual dispatch from the default-branch workflow remains available for
+toolchain-only or full validation of either architecture or both, after an exact main commit or copy-pr-bot
+mirror is authenticated. Runs are independent; newer pushes do not cancel earlier attempts. Both routes may
+select only the declared `arc-amd64-kvm` or `arc-arm64-kvm` KVM scale sets for full validation. Main pushes use
+the NKE pin from the merged catalog and validated Plans; manual full dispatch additionally checks the entered
+NKE commit against that pin. The cross-repository source credential must not share a job with candidate code; the
 trusted source-fetch job alone receives it. That job verifies the selected commit and tree, makes a fresh
 credential-free Git checkout, and uploads it as a one-day internal artifact with an exact SHA-256 passed as a
 job output. The build job verifies the archive digest and Git commit/tree before candidate code runs. Candidate

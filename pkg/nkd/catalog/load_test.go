@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/fs"
+	"strings"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -188,6 +189,10 @@ func TestVendorArchTokensAtSourceAndComponentBoundaries(t *testing.T) {
 				}
 				if codeOf(err) != want {
 					t.Fatalf("vendor token %q: error=%v, want %s", token, err, want)
+				}
+				if err != nil && boundary == "source" &&
+					(!strings.Contains(err.Error(), `catalog source "source"`) || strings.Contains(err.Error(), `component "source"`)) {
+					t.Fatalf("source token error has the wrong subject: %v", err)
 				}
 			})
 		}

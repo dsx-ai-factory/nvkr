@@ -5,9 +5,12 @@
 # requires an exact copy-pr-bot mirror. Candidate code receives the pinned
 # private NKE source and a network-capable KVM runner, but never its credential.
 
+---
 name: NKE OS validation
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       commit_sha:
@@ -73,19 +76,32 @@ jobs:
           DISPATCH_RETAIN_QCOW2: ${{ inputs.retain_qcow2 }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [[ "${EVENT_NAME}" != workflow_dispatch || "${EVENT_REF}" != refs/heads/main ]]; then
-            echo "NKE OS validation must be dispatched from the trusted main workflow" >&2
+          if [[ "${EVENT_REF}" != refs/heads/main ]]; then
+            echo "NKE OS validation must run from the trusted main workflow" >&2
             exit 1
           fi
-          commit="${DISPATCH_COMMIT}"
-          arch="${DISPATCH_ARCH}"
-          mode="${DISPATCH_MODE}"
-          mirror_pr="${DISPATCH_MIRROR_PR}"
-          retain_qcow2="${DISPATCH_RETAIN_QCOW2}"
+          case "${EVENT_NAME}" in
+            push)
+              commit="${EVENT_SHA}"
+              arch=both
+              mode=full
+              mirror_pr=''
+              retain_qcow2=true
+              ;;
+            workflow_dispatch)
+              commit="${DISPATCH_COMMIT}"
+              arch="${DISPATCH_ARCH}"
+              mode="${DISPATCH_MODE}"
+              mirror_pr="${DISPATCH_MIRROR_PR}"
+              retain_qcow2="${DISPATCH_RETAIN_QCOW2}"
+              ;;
+            *) echo "unsupported validation event: ${EVENT_NAME}" >&2; exit 1 ;;
+          esac
           if [[ ! "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "commit_sha must be one exact lowercase 40-character SHA" >&2
             exit 1
@@ -243,14 +259,8 @@ jobs:
             plan="$(bin/nkdctl run plan \
               --definition "${input_dir}/definition-${target_arch}-kvm.yaml" \
               --environment "${input_dir}/environment-local-linux-${target_arch}-docker.yaml" --json)"
-            jq -e --argjson pin "${pin}" '
-              [.builds[].executionGraph.nodes[] |
-                select(.kind == "fetch" and
-                  (.repo == "https://github.com/dsx-ai-factory/nke" or
-                   .repo == "https://github.com/dsx-ai-factory/nke.git"))] as $sources |
-              ($sources | length) > 0 and
-              all($sources[]; .commit == $pin.commit and .treeHash == $pin.treeHash)
-            ' <<<"${plan}" >/dev/null || {
+            jq -L scripts -e --argjson pin "${pin}" \
+              'include "nke-os-plan"; nke_source_closure($pin)' <<<"${plan}" >/dev/null || {
               echo "selected ${target_arch} NKE source closure disagrees with the approved pin" >&2
               exit 1
             }
@@ -260,11 +270,11 @@ jobs:
             echo "tree=$(jq -er '.treeHash' <<<"${pin}")"
           } >>"${GITHUB_OUTPUT}"
 
-      # The candidate recipe owns the exact NKE pin. The dispatch value must
-      # match it before the separate source-fetch job receives its credential;
-      # this check is not an independent authorization of candidate code.
-      - name: Authorize the NKE source pin
-        if: steps.select.outputs.mode == 'full'
+      # Main pushes use the pin from the merged catalog and validated Plans.
+      # Manual full runs additionally require the dispatch value to match it;
+      # this consistency check is not independent approval of candidate code.
+      - name: Check the manually selected NKE source pin
+        if: steps.select.outputs.mode == 'full' && github.event_name == 'workflow_dispatch'
         env:
           APPROVED_NKE_COMMIT: ${{ inputs.approved_nke_commit }}
           PINNED_NKE_COMMIT: ${{ steps.source.outputs.commit }}
@@ -414,15 +424,14 @@ jobs:
             echo "::error::Missing /dev/kvm for ${{ matrix.arch }}"
             exit 1
           fi
-          # ARC runs in a container without udev. Match the NKE OS workflow's
-          # fallback, which changes the host-bind-mounted device beyond this
-          # pod. Grant KVM group access or use a device plugin in the scale set.
+          # The scale set must provide access through its KVM group or device
+          # configuration. A build job must not change host device permissions.
           if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
-            sudo chmod 666 /dev/kvm
+            echo "::error::Runner identity needs read/write access to /dev/kvm; configure the runner's KVM group or device access"
+            exit 1
           fi
-          # This only proves the runner can open KVM. NKD passes its held fd
-          # through Docker as /proc/<runner-pid>/fd/<fd>; the first full build
-          # must prove the daemon can resolve that path on this ARC topology.
+          # This preflight only checks access. NKD independently admits KVM and
+          # guards Docker's device projection before invoking Packer.
           exec 3<>/dev/kvm
           exec 3>&-
 

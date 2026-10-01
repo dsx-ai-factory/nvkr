@@ -350,8 +350,10 @@ The commit references in this section have distinct roles. `6df693a9748a78aafdf9
 historical `NVIDIA/nke` Make-target example above; `5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2` is the
 `dsx-ai-factory/nke` merge that introduced the staged-material contract. The current development catalog pins
 `726f76944404e1106626b8333d3576bdf67b575b`, while the recorded 2026-09-23 Podman bake used the older
-`de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NKD bytes. A rerun from the current
-committed NKD head and exact current NKE pin remains owed.
+`de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NKD bytes. The
+[2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records committed NKD candidates
+`bb6e870` and `1f989e9` executing the current NKE pin on ARM64 and AMD64, with successful builds and boot
+smoke in the unqualified diagnostic lane. Later runtime and workflow changes require their own execution proof.
 
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
 seccomp/AppArmor/system paths for user-namespace operation, the overlayfs snapshotter, no host runtime socket

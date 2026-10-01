@@ -6,10 +6,11 @@ source-owned Packer project. Architecture-dependent build and vendor argv use th
 substitution. The AMD64 disk root and ARM64 execution overlay are explicit producer declarations, not one
 architecture-neutral root.
 
-Thin Definitions select execution behavior from the shared graph:
+Local development and CI are parallel supported paths sharing material producers, not substitutes for one another.
+Their Definitions select explicit execution behavior:
 
 - `definition-arm64-kvm.yaml` requires native Linux ARM64 KVM and uses source-owned Packer defaults for the host CPU.
-- `definition-arm64-tcg.yaml` preserves the macOS Apple M4 Pro Podman path and its proven `cortex-a57` TCG setting.
+- `definition-arm64-tcg.yaml` selects the macOS Apple M4 Pro Podman developer path, forbids KVM, and uses `cortex-a57` under TCG.
 - `definition-amd64-kvm.yaml` selects the native Linux AMD64 KVM route and its separate, digest-pinned Ubuntu installer ISO.
 
 The AMD64 graph is authored, but neither Docker architecture has a stable maintained image ID in
@@ -18,7 +19,7 @@ maintained pin or a claim that a subsequent build will reproduce it. For a local
 source-locked toolchain and freezes its observed exact ID into an attempt-local catalog overlay before compiling the
 executable Plan. The runtime independently checks that ID. This does not authorize publication or qualification.
 
-The architecture-generic wrapper defaults to the existing ARM64 compatibility behavior:
+The architecture-generic wrapper defaults to ARM64 Podman local development:
 
 ```sh
 CONTAINER_RUNTIME=podman scripts/nke-os-local.sh local-arm64-podman-001 1
@@ -36,7 +37,9 @@ Native Linux AMD64 uses the same wrapper with `NKE_OS_ARCH=amd64` and its AMD64 
 machine behind the local macOS host. The Docker Environment requires at least 8 CPUs, 10 GiB memory, 64 GiB free
 workspace storage, KVM and producer-declared network access. NKD authenticates those facts before starting QEMU.
 ARM64 Docker does not fall back to TCG when KVM is missing. The compatibility shim preserves the macOS/Podman
-TCG route, not a Docker TCG route.
+TCG route, not a Docker TCG route. The TCG Definition rejects a KVM-exposing execution class, and the
+KVM Definitions reject a TCG-only class. CI uses the native Docker/KVM Definitions; it does not replace
+the macOS developer path.
 
 The wrapper rebuilds the source-locked native toolchain and freezes the exact selected image ID with the authored
 inputs below `.nkd/inputs/<attempt>` before execution. Podman additionally requires its existing local lock ID.

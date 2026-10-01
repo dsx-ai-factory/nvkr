@@ -361,6 +361,18 @@ func TestPackerDiagnosticSinkRoutesDistinctSubjects(t *testing.T) {
 	}
 }
 
+func TestPackerDiagnosticClosedTargetCannotRecordIncomplete(t *testing.T) {
+	root, sink, target, _ := newPackerDiagnosticFixture(t, "plan/closed-marker")
+	defer sink.Close()
+	if err := target.close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := target.recordIncomplete(t.Context(), e.New(e.CodeVerifyFailed, "logs missing")); code(err) != e.CodeEngineCapability {
+		t.Fatalf("closed target marker error=%v, want %s", err, e.CodeEngineCapability)
+	}
+	assertOnlyPackerDiagnosticManifests(t, root)
+}
+
 type cancelAfterDiagnosticWrite struct {
 	context.Context
 	cancel context.CancelFunc

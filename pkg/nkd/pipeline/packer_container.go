@@ -36,12 +36,13 @@ tar --no-same-owner --no-overwrite-dir -xf /proc/self/fd/3 -C "$3"
 chown -R "$4:$5" "$3" "$6"`
 	// Docker resolves devices in its daemon namespace, not the client's procfs.
 	// Check the projected kernel/device pair in the same container that will exec
-	// Packer. No source-owned command runs before these checks.
+	// Packer. No source-owned command runs before these checks. Status 97 is
+	// reserved for projection failures in this guarded build invocation.
 	packerKVMProjectionScript = `test "$(cat /proc/sys/kernel/random/boot_id)" = "$1" || {
-  echo 'KVM projection belongs to a different kernel boot' >&2; exit 1;
+  echo 'KVM projection belongs to a different kernel boot' >&2; exit 97;
 }
 test -c "$3" && test "$(stat -L -c '%t:%T' "$3")" = "$2" || {
-  echo 'KVM projection differs from the admitted character device' >&2; exit 1;
+  echo 'KVM projection differs from the admitted character device' >&2; exit 97;
 }
 shift 3
 exec "$@"`

@@ -558,10 +558,7 @@ func writePackerDiagnosticFile(ctx context.Context, root *os.File, relative stri
 		_ = unix.Unlinkat(int(parent.Fd()), name, 0)
 		return e.New(e.CodeInternal, "holding Packer build-log output")
 	}
-	written, copyErr := transportarchive.CopyExact(ctx, file, reader, size)
-	if copyErr == nil && written != size {
-		copyErr = io.ErrUnexpectedEOF
-	}
+	_, copyErr := transportarchive.CopyExact(ctx, file, reader, size)
 	if copyErr == nil {
 		copyErr = file.Sync()
 	}

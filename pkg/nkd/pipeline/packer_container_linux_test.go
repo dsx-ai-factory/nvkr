@@ -622,6 +622,11 @@ func TestPackerKVMProjectionGuard(t *testing.T) {
 				}
 			} else if err == nil || strings.Contains(string(output), "executed") {
 				t.Fatalf("guard permitted mismatched projection: %q, %v", output, err)
+			} else {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || exit.ExitCode() != 97 {
+					t.Fatalf("projection rejection exit=%v, want reserved status 97", err)
+				}
 			}
 		})
 	}
@@ -870,14 +875,19 @@ func TestRunPackerContainerDiagnosticFailures(t *testing.T) {
 	copyFailure := errors.New("log copy unavailable")
 	buildFailure := errors.New("build failed")
 	for _, test := range []struct {
-		name       string
-		buildErr   error
-		copyErr    error
-		entries    []packerDiagnosticTarEntry
-		wantCode   e.Code
-		incomplete bool
+		name           string
+		buildErr       error
+		copyErr        error
+		entries        []packerDiagnosticTarEntry
+		wantCode       e.Code
+		incomplete     bool
+		timeout        bool
+		occupiedMarker bool
+		markerCode     e.Code
 	}{
 		{name: "missing logs after success", copyErr: copyFailure, incomplete: true},
+		{name: "log collection deadline after success", timeout: true, incomplete: true, markerCode: e.CodeTimeout},
+		{name: "marker cannot be recorded after success", copyErr: copyFailure, occupiedMarker: true, wantCode: e.CodeVerifyFailed},
 		{name: "missing logs after build failure", buildErr: buildFailure, copyErr: copyFailure, wantCode: e.CodeBuildFailed, incomplete: true},
 		{name: "oversized log after success", entries: []packerDiagnosticTarEntry{{name: "large.log", typeflag: tar.TypeReg, payload: bytes.Repeat([]byte("x"), int(maxPackerDiagnosticFileBytes)+1)}}, incomplete: true},
 		{name: "unsafe logs remain fatal", entries: []packerDiagnosticTarEntry{{name: "../escape", typeflag: tar.TypeReg, payload: []byte("x")}}, wantCode: e.CodeVerifyFailed},
@@ -899,11 +909,24 @@ func TestRunPackerContainerDiagnosticFailures(t *testing.T) {
 				t.Fatal(err)
 			}
 			fallback := runtime.run
-			runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+			runtime.runContext = func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args []string) error {
 				if len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-build") {
+					if test.occupiedMarker {
+						routes, err := filepath.Glob(filepath.Join(request.workspace.Name(), packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*"))
+						if err != nil || len(routes) != 1 {
+							t.Fatalf("diagnostic route=%v, error=%v", routes, err)
+						}
+						if err := os.Mkdir(filepath.Join(routes[0], "logs-incomplete.json"), 0o700); err != nil {
+							t.Fatal(err)
+						}
+					}
 					return test.buildErr
 				}
 				if len(args) > 2 && args[0] == "cp" && strings.Contains(args[1], packerContainerBuildLogPath) {
+					if test.timeout {
+						<-ctx.Done()
+						return ctx.Err()
+					}
 					if test.copyErr != nil {
 						return test.copyErr
 					}
@@ -912,7 +935,11 @@ func TestRunPackerContainerDiagnosticFailures(t *testing.T) {
 				}
 				return fallback(stdin, stdout, stderr, args)
 			}
-			artifact, err := runPackerContainer(testContext(t), request)
+			diagnosticTimeout := packerContainerCleanupTimeout
+			if test.timeout {
+				diagnosticTimeout = 50 * time.Millisecond
+			}
+			artifact, err := runPackerContainerWithDiagnosticTimeout(testContext(t), request, diagnosticTimeout)
 			if test.wantCode == "" {
 				if err != nil || artifact == nil {
 					t.Fatalf("successful disk lost to diagnostics: artifact=%v, error=%v", artifact, err)
@@ -924,13 +951,20 @@ func TestRunPackerContainerDiagnosticFailures(t *testing.T) {
 			if test.buildErr != nil && (!errors.Is(err, test.buildErr) || !errors.Is(err, test.copyErr)) {
 				t.Fatalf("lost primary or diagnostic failure: %v", err)
 			}
+			if test.occupiedMarker && !errors.Is(err, copyFailure) {
+				t.Fatalf("marker failure lost the log-copy cause: %v", err)
+			}
 			markers, globErr := filepath.Glob(filepath.Join(request.workspace.Name(), packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*", "logs-incomplete.json"))
-			if globErr != nil || (len(markers) == 1) != test.incomplete {
+			if globErr != nil || (len(markers) == 1) != (test.incomplete || test.occupiedMarker) {
 				t.Fatalf("markers=%v, error=%v, want incomplete=%v", markers, globErr, test.incomplete)
 			}
 			if test.incomplete {
+				markerCode := test.markerCode
+				if markerCode == "" {
+					markerCode = e.CodeVerifyFailed
+				}
 				raw, err := os.ReadFile(markers[0])
-				if err != nil || string(raw) != `{"status":"incomplete","code":"NKD-E-VERIFY-FAILED"}` {
+				if err != nil || string(raw) != fmt.Sprintf(`{"status":"incomplete","code":%q}`, markerCode) {
 					t.Fatalf("incomplete marker=%q, error=%v", raw, err)
 				}
 			}

@@ -201,11 +201,7 @@ if [[ "${runtime}" == docker ]]; then
   # before compiling the executable Plan. The Packer runtime rechecks the ID.
   plan="$("${runner}" run plan --definition "${frozen_definition}" \
     --environment "${input_root}/environment-local.yaml" --json)"
-  root_component="$(jq -er '
-    [.builds[0].executionGraph.nodes[] |
-      select(.kind == "build" and .builderType == "vm-image") | .component] |
-    if length == 1 then .[0] else error("expected exactly one disk root") end
-  ' <<<"${plan}")"
+  root_component="$(jq -L scripts -er 'include "nke-os-plan"; disk_root' <<<"${plan}")"
   baseline="$(jq -er --arg root "${root_component}" --arg arch "${arch}" \
     '.builds[0].catalogSnapshot.Components[$root].toolchainImages[$arch]' <<<"${plan}")"
   if [[ "${baseline}" != "${toolchain_image}" ]]; then
@@ -220,11 +216,10 @@ if [[ "${runtime}" == docker ]]; then
       echo "no catalog components use the selected ${arch} toolchain baseline" >&2
       exit 1
     fi
-    jq -n --arg arch "${arch}" --arg from "${baseline}" --arg to "${toolchain_image}" \
+    jq -L scripts -n --arg arch "${arch}" --arg from "${baseline}" --arg to "${toolchain_image}" \
       --arg digest "${catalog_digest}" --argjson components "${components}" '
-      {apiVersion:"nkd.dev/catalog-overlay/v3", kind:"CatalogOverlay",
-       name:("nke-os-local-toolchain-" + $arch), requiresCatalogDigest:$digest,
-       toolchainSubstitutions:[{arch:$arch, from:$from, to:$to, components:$components}]}
+      include "nke-os-plan";
+      toolchain_overlay($arch; $from; $to; $digest; $components)
     ' >"${input_root}/toolchain-attempt.json"
     "${runner}" definition inspect --definition "${frozen_definition}" |
       jq '.catalog.overlays = ((.catalog.overlays // []) + ["toolchain-attempt.json"])' \

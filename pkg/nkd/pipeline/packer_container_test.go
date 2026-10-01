@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -494,6 +495,29 @@ func TestStartPackerContainerReturnsBoundedRuntimeDiagnostic(t *testing.T) {
 	}
 	if forwarded.String() != "OCI runtime rejected device setup" {
 		t.Fatalf("forwarded stderr = %q", forwarded.String())
+	}
+}
+
+func TestStartPackerBuildContainerClassifiesProjectionFailure(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		status  string
+		guarded bool
+		want    e.Code
+	}{
+		{name: "successful guarded build", status: "0", guarded: true},
+		{name: "projection rejected", status: "97", guarded: true, want: e.CodeEngineCapability},
+		{name: "ordinary build failed", status: "1", guarded: true, want: e.CodeBuildFailed},
+		{name: "unguarded invocation", status: "97", want: e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cause := exec.CommandContext(t.Context(), "sh", "-c", "exit \"$1\"", "test", test.status).Run()
+			runtime := &recordingPackerRuntime{run: func(io.Reader, io.Writer, io.Writer, []string) error { return cause }}
+			err := startPackerBuildContainer(t.Context(), runtime, "build", nil, nil, test.guarded)
+			if code(err) != test.want || !errors.Is(err, cause) {
+				t.Fatalf("error=%v, want %s with the subprocess cause", err, test.want)
+			}
+		})
 	}
 }
 

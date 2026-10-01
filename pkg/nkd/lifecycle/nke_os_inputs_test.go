@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -63,6 +64,14 @@ func TestNKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.T
 			if producer.Packer == nil || producer.ExecutionBinding == nil {
 				t.Fatal("NKE node-image producer lost Packer or execution binding")
 			}
+			wantPolicy := execution.CapabilityForbidden
+			if test.wantKVM {
+				wantPolicy = execution.CapabilityRequired
+			}
+			if producer.Requirements == nil || len(producer.Requirements.Capabilities) != 1 ||
+				producer.Requirements.Capabilities[0].Policy != wantPolicy {
+				t.Fatalf("KVM requirement = %+v, want policy %q", producer.Requirements, wantPolicy)
+			}
 			if producer.ToolchainPlatform != "linux/"+test.arch {
 				t.Fatalf("toolchain platform = %q, want linux/%s", producer.ToolchainPlatform, test.arch)
 			}
@@ -110,6 +119,32 @@ func TestNKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.T
 				if got := stack.Catalog.Components[test.root].ToolchainImages[test.arch]; got != attemptID {
 					t.Fatalf("disk toolchain after attempt binding = %q, want %q", got, attemptID)
 				}
+			}
+		})
+	}
+}
+
+func TestNKEOSExecutionModesRejectCrossedEnvironments(t *testing.T) {
+	repositoryRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repositoryRoot)
+	for _, test := range []struct {
+		name, definition, environment string
+	}{
+		{name: "TCG cannot select KVM", definition: "definition-arm64-tcg.yaml",
+			environment: "environment-local-linux-arm64-docker.yaml"},
+		{name: "KVM cannot fall back to TCG", definition: "definition-arm64-kvm.yaml",
+			environment: "environment-local-macos-apple-m4-pro-podman.yaml"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := filepath.Join("definitions", "nke-os")
+			plan, err := CompileFiles(t.Context(), filepath.Join(root, test.definition),
+				filepath.Join(root, test.environment), "test")
+			assertCode(t, err, e.CodeEngineCapability)
+			if plan != nil {
+				t.Fatal("crossed execution mode returned a Plan")
 			}
 		})
 	}

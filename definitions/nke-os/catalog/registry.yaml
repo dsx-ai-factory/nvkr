@@ -264,7 +264,7 @@ components:
       allowedHostPlatforms: [linux/arm64]
       capabilities:
         - name: kvm
-          policy: preferred
+          policy: forbidden
       timeoutSeconds: 21600
     packer:
       projectPath: os-image/packer
