@@ -44,7 +44,7 @@ byte-reproduced toolchain images or invent stable Docker pins. The full build in
 the toolchain natively, and freezes the observed exact image ID into an immutable attempt-specific catalog overlay
 before compiling the executable Plan. NKD checks the loaded image against that Plan at execution. That identity
 bind is not provenance authentication. The
-catalog's AMD64 baseline is a previously observed diagnostic ID, not an approved maintained toolchain identity.
+catalog's AMD64 ID is a substitution-only baseline, not an approved maintained toolchain identity.
 The existing ARM64 Podman pin remains separate. Neither runtime's image is a published, approved toolchain.
 
 The native AMD64 Definition, installer supplier and local Docker Environment are authored. The full workflow still

@@ -41,9 +41,11 @@ owner-liveness protocol exists; the runtime does not perform an unsafe label-onl
 The same local lifecycle now issues an opaque attempt-directory diagnostic sink to the private direct-Packer
 dispatch. It retains and digest-rechecks the exact material manifest before external runtime execution, then, when
 the source contract declares a build-log directory, retains bounded regular files from only that directory on
-success or returned build failure before cleanup. Unsafe paths, links, devices, duplicates, replacement and
-count/size overflow fail closed. A failure before logs exist leaves the manifest only. The sink closes before the
-immutable Run record, retention failure cannot mask the primary build error, and no FDE secret channel is admitted.
+success or returned build failure before cleanup. Unsafe paths, links, devices, duplicate entries and
+immutable-path violations fail closed; operational log loss or count/size overflow records an incomplete marker
+without discarding a separately verified successful disk. A failure before the build starts leaves the manifest
+only. The sink closes before the immutable Run record, retention failure cannot mask the primary build error,
+and no FDE secret channel is admitted.
 These outputs are non-authoritative diagnostics. The boundary and lifecycle ordering are contract-tested.
 [ARC runs on both architectures](../evidence/2026-10-01-nke-arc-os-builds.md) uploaded failed-run diagnostics,
 including the material manifest after the corrected KVM check. The subsequent ARM64 and AMD64 runs also completed
@@ -173,9 +175,10 @@ release or production-acceptance claim.
 
 The repository-owned NKE OS validation workflow in row 18 is separate from generated hosted Run CI. PR branches
 may run native toolchain diagnostics without KVM or private NKE source. A full KVM image validation is admitted
-from the trusted main workflow for an exact main commit or a copy-pr-bot mirror matching a current, ready
-same-repository PR head after explicit `/ok to test` vetting. Candidate code receives the pinned private NKE source
-contents and network-capable KVM execution, but never the source credential; a separate fetch job alone holds it.
+from the trusted main workflow for an exact main commit or a mirror matching a current, open, non-draft
+same-repository PR head. `/ok to test` is a maintainer convention, not enforced approval or proof of who wrote
+the mirror. Candidate code receives the pinned private NKE source contents and network-capable KVM execution,
+but never the source credential; a separate fetch job alone holds it.
 That credential remains repository-scoped; the workflow does not establish an organization-level secret boundary.
 The local Docker authoring graph now includes AMD64 and ARM64 KVM Definitions and a source-locked toolchain
 bootstrap that freezes the observed image ID into an attempt-local catalog overlay before Plan compilation. The

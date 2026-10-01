@@ -24,18 +24,20 @@ scripts/demo-m1-local.sh --publish
 The demo uses the loopback registry on port 5000. It generates its own valid
 immutable attempt names.
 
-The non-FDE OS-image bootstrap uses one shared catalog. ARM64 Podman/TCG and native Linux Docker/KVM are the currently
-authored routes:
+The non-FDE OS-image bootstrap uses one shared catalog. Its authored routes are ARM64 Podman/TCG and native
+ARM64 and AMD64 Linux Docker/KVM:
 
 ```sh
 CONTAINER_RUNTIME=podman scripts/nke-os-local.sh local-arm64-podman-001 1
 CONTAINER_RUNTIME=docker NKE_OS_ARCH=arm64 scripts/nke-os-local.sh local-arm64-docker-001 1
+CONTAINER_RUNTIME=docker NKE_OS_ARCH=amd64 scripts/nke-os-local.sh local-amd64-docker-001 1
 ```
 
-Use a different immutable attempt name for each run. The Podman path has one recorded full build and boot smoke;
-Docker is contract-tested but has not completed a recorded full image build. See the
-[Definition guide](../definitions/nke-os/README.md) and
-[local execution evidence](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
+Use a different immutable attempt name for each run. The Podman path has a recorded
+[full build and boot smoke](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
+The [ARC evidence](../docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
+Docker/KVM builds and boot smoke at an earlier exact commit, not validation of the latest changes.
+See the [Definition guide](../definitions/nke-os/README.md) for route requirements and limitations.
 Set `NKE_LOCAL_CLONE` to reuse an exact local NKE checkout. On macOS the same
 path must be visible inside the Podman machine; the wrapper forwards it and
 fails before the build if the checkout is unavailable there.
@@ -54,7 +56,8 @@ for area in inputs bootstrap runs; do
 done
 ```
 
-The toolchain uses the stable local tag `localhost/nkd-packer-toolchain:dev-arm64`, not a per-attempt tag. Once no
+The toolchain uses `localhost/nkd-packer-toolchain:dev-arm64` or `localhost/nkd-packer-toolchain:dev-amd64`,
+according to the selected architecture, not a per-attempt tag. Once no
 build is running and no retained workflow needs the local image, remove that optional cache with
 `podman image rm localhost/nkd-packer-toolchain:dev-arm64` or the equivalent `docker image rm` command. Archiving or
 removing storage does not make an attempt name reusable; choose a new name for every Run.
