@@ -606,9 +606,9 @@ jobs:
           retention-days: 14
           path: |
             .candidate/.nkd/evidence/**
-            .candidate/.nkd/runs/**/.runner/plan.json
-            .candidate/.nkd/runs/**/diagnostics/**
-            .candidate/.nkd/runs/**/lifecycle.json
+            .candidate/.nkd/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/.runner/plan.json
+            .candidate/.nkd/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/diagnostics/packer/**
+            .candidate/.nkd/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/lifecycle.json
 
       - name: Upload retained QCOW2
         if: success() && needs.select.outputs.retain_qcow2 == 'true'
@@ -618,4 +618,4 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 3
-          path: .candidate/.nkd/runs/**/outputs/*.qcow2
+          path: .candidate/.nkd/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/outputs/nke-node-image-${{ matrix.arch }}.qcow2
