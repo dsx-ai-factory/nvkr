@@ -123,7 +123,9 @@ type Pin struct {
 // registry declares the acquisition URL/image template; the lock pins WHAT it must
 // hash to — the same sources+lock split the from-source lane uses (ADR-22 §1).
 type ArtifactPin struct {
+	Chart       *HelmChart        `json:"chart,omitempty"`
 	DerivedFrom string            `json:"derivedFrom,omitempty"`
+	URL         string            `json:"url,omitempty"` // resolved chart package transport; digest remains the byte identity
 	Tag         string            `json:"tag"`
 	Digests     map[string]string `json:"digests"` // arch -> sha256:<64-hex>
 }
@@ -175,9 +177,11 @@ type FlakePin struct {
 // authoritative source, avoiding duplicate semantic entries. A component is prebuilt XOR
 // from-source XOR an exclusion — declaring both fromSource and prebuilt fails closed.
 type Prebuilt struct {
-	URL     string            `json:"url,omitempty"`
-	Image   string            `json:"image,omitempty"`
-	Digests map[string]string `json:"digests,omitempty"` // arch -> sha256:<64-hex>
+	OCIArchive string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
+	Chart      *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
+	URL        string            `json:"url,omitempty"`
+	Image      string            `json:"image,omitempty"`
+	Digests    map[string]string `json:"digests,omitempty"` // arch -> sha256:<64-hex>
 	// Evidence is the upstream's external supply-chain reference (ADR-13 §2). A prebuilt
 	// component MUST declare it explicitly — either a verified reference (whose bytes
 	// hash to the declared digest, else resolution fails closed) or an explicit

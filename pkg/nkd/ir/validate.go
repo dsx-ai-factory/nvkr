@@ -701,6 +701,9 @@ func validatePullNode(n Node) error {
 	if !safeVersion(n.Version) {
 		return e.New(e.CodeInvalidCatalog, "pull node %q has no canonical component version", n.ID)
 	}
+	if err := validatePullArtifact(n); err != nil {
+		return err
+	}
 	switch n.OutputType {
 	case "oci-image":
 		if n.ArtifactPath != "" || len(n.Env) != 0 {

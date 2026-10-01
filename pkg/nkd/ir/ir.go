@@ -136,7 +136,7 @@ type Node struct {
 	// sha256 of the acquired artifact and is part of buildDigest (a repin is a build identity
 	// change, exactly as a source-commit bump is). Fail-closed: acquisition verifies the
 	// bytes against Digest and refuses a mismatch — no from-source guarantee is claimed.
-	Artifact string `json:"artifact,omitempty"` // https URL (binary) or OCI image name (pulled by @Digest); {{.Arch}} already resolved
+	Artifact string `json:"artifact,omitempty"` // HTTPS file URL, OCI image name, or oci-blob://repository@digest; transport only
 	Digest   string `json:"digest,omitempty"`   // pinned expected content digest, sha256:<64-hex>
 
 	// build

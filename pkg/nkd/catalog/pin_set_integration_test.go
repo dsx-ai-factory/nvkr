@@ -319,7 +319,7 @@ func TestPinSetIntegrationExplicitNestedSets(t *testing.T) {
 	}
 }
 
-func TestPinSetRejectsAdapterSchemaBeforeIO(t *testing.T) {
+func TestPinSetRejectsInvalidAdapterDeclarationsBeforeIO(t *testing.T) {
 	const registry = `apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
@@ -345,11 +345,11 @@ components:
 	for _, tc := range []struct {
 		name, old, replacement, diagnostic string
 	}{
-		{"NKE format", "format: values", "format: nke-deploy-v1", "unsupported format"},
-		{"accounted items", "      members:", "      accounted: {config: {type: manifest}}\n      members:", `unknown field "accounted"`},
-		{"member chart", "artifact: tool,", "chart: {name: tool, repository: https://example.invalid/charts}, artifact: tool,", `unknown field "chart"`},
-		{"prebuilt chart", "    prebuilt:", "    prebuilt:\n      chart: {name: tool, repository: https://example.invalid/charts}", `unknown field "chart"`},
-		{"resolved OCI archive", "    prebuilt:", "    prebuilt:\n      ociArchive: https://example.invalid/archive", `unknown field "ociArchive"`},
+		{"unknown format", "format: values", "format: unknown", "unsupported format"},
+		{"accounted items", "      members:", "      accounted: {config: {type: manifest}}\n      members:", "accounted items require nke-deploy-v1"},
+		{"member chart", "artifact: tool,", "chart: {name: tool, repository: https://example.invalid/charts}, artifact: tool,", "chart identity requires nke-deploy-v1"},
+		{"prebuilt chart", "    prebuilt:", "    prebuilt:\n      chart: {name: tool, repository: https://example.invalid/charts}", "requires outputType raw and no url/image"},
+		{"resolved OCI archive", "    prebuilt:", "    prebuilt:\n      ociArchive: https://example.invalid/archive", "authors resolved ociArchive"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Pure declaration admission has no upstream or lock I/O to perform.

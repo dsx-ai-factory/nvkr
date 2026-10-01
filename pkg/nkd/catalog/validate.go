@@ -411,10 +411,20 @@ func validateComponent(name string, c Component) error {
 // digests are checked in sorted order so the first error is deterministic.
 func validatePrebuilt(name string, c Component) error {
 	p := c.Prebuilt
+	if p.Chart != nil {
+		return e.New(e.CodeInvalidCatalog, "unresolved chart acquisition for %q", name)
+	}
 	hasURL, hasImg := p.URL != "", p.Image != ""
-	if hasURL == hasImg {
+	hasArchive := p.OCIArchive != ""
+	forms := 0
+	for _, present := range []bool{hasURL, hasImg, hasArchive} {
+		if present {
+			forms++
+		}
+	}
+	if forms != 1 {
 		return e.New(e.CodeInvalidCatalog,
-			"prebuilt component %q: set exactly one of prebuilt.url or prebuilt.image", name)
+			"prebuilt component %q: set exactly one of prebuilt.url, prebuilt.image or resolved prebuilt.ociArchive", name)
 	}
 	if c.OutputType == "" {
 		return e.New(e.CodeInvalidCatalog, "prebuilt component %q: missing outputType", name)
@@ -431,6 +441,20 @@ func validatePrebuilt(name string, c Component) error {
 		return e.New(e.CodeInvalidCatalog,
 			"prebuilt component %q: prebuilt.url cannot deliver an oci-image (use host-package, raw, or tarball)", name)
 	}
+
+	if hasArchive {
+		if c.OutputType != "raw" || !digestPinned.MatchString(p.OCIArchive) || !strings.Contains(p.OCIArchive, "@sha256:") {
+			return e.New(e.CodeInvalidCatalog, "OCI archive %q requires raw output and a digest reference", name)
+		}
+		if err := checkOCIRefScheme(name, "ociArchive", p.OCIArchive); err != nil {
+			return err
+		}
+		for _, d := range p.Digests {
+			if !strings.HasSuffix(p.OCIArchive, "@"+d) {
+				return e.New(e.CodeInvalidCatalog, "OCI archive %q digest does not match content pin", name)
+			}
+		}
+	}
 	ref := p.URL
 	if hasImg {
 		ref = p.Image
@@ -444,8 +468,10 @@ func validatePrebuilt(name string, c Component) error {
 		if err := checkPrebuiltURLScheme(name, p.URL); err != nil {
 			return err
 		}
-	} else if err := checkOCIRefScheme(name, "prebuilt.image", p.Image); err != nil {
-		return err
+	} else if hasImg {
+		if err := checkOCIRefScheme(name, "prebuilt.image", p.Image); err != nil {
+			return err
+		}
 	}
 	if len(p.Digests) == 0 {
 		return e.New(e.CodeUnpinnedSource,

@@ -1,0 +1,6 @@
+Upstream: https://github.com/dsx-ai-factory/nke
+Commit: b341d97b1ed9ac7cbaafaf57f887806b3e11309c
+Root tree: c037ae95d55befd3a6ef52386d55e7aa5f442706
+Files are exact Git blob bytes at the recorded commit.
+The tests interpret deploy membership and Helm chart identity/version only.
+No fixture claims installation, qualification, or successful upstream acquisition.
