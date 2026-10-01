@@ -248,6 +248,8 @@ remain NKE-owned. See the [example catalog](../examples/nke-pin-set/registry.yam
 [usage guide](../nke-pin-set-usage.md). CycloneDX ingestion and qualified-set acceptance remain deferred.
 
 **Chart acquisition.** HTTPS Helm indexes and anonymous OCI repositories resolve one exact chart version.
+Source-owned acquired charts use the exact declared chart version, including any leading `v`, for
+lookup and archive validation; their lock tag retains the source’s qualified Git tag.
 The lock records chart identity, transport URL and the SHA-256 of the unchanged chart archive, identical for
 every declared architecture. OCI pins identify the chart-content layer, not the manifest. Downloads and archive
 inspection are bounded; unsafe paths, links and conflicting duplicates fail. Identical regular-file duplicates

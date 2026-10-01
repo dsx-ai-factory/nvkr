@@ -96,8 +96,8 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 	}
 	// Resolve each source and its declared members into the candidate lock.
 	updated := map[string]bool{}
-	var apply func(string, string, string) error
-	apply = func(name, tag, owner string) error {
+	var apply func(string, string, string, string) error
+	apply = func(name, tag, owner, declaredVersion string) error {
 		if err := pinContextError(ctx); err != nil {
 			return err
 		}
@@ -140,7 +140,7 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 			for _, key := range pinSetMemberNames(src.PinSet) {
 				member := src.PinSet.Members[key]
 				if member.Source != "" {
-					if err := apply(member.Source, reg.Sources[member.Source].QualifiedTag(versions[key]), provenance); err != nil {
+					if err := apply(member.Source, reg.Sources[member.Source].QualifiedTag(versions[key]), provenance, versions[key]); err != nil {
 						return err
 					}
 					continue
@@ -148,7 +148,7 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 				raw := reg.Components[member.Artifact]
 				versionPin := pin
 				versionPin.Tag = versions[key]
-				if err := updateDerivedArtifact(ctx, raw, member.Artifact, versionPin, provenance, request.Runtime, lock, &update); err != nil {
+				if err := updateDerivedArtifact(ctx, raw, member.Artifact, versionPin, provenance, versions[key], request.Runtime, lock, &update); err != nil {
 					return err
 				}
 			}
@@ -161,7 +161,8 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 				if raw.Source != name || raw.Prebuilt == nil {
 					continue
 				}
-				if err := updateDerivedArtifact(ctx, raw, component, pin, owner, request.Runtime, lock, &update); err != nil {
+				raw.PinnedBy = src.PinnedBy
+				if err := updateDerivedArtifact(ctx, raw, component, pin, owner, declaredVersion, request.Runtime, lock, &update); err != nil {
 					return err
 				}
 			}
@@ -173,7 +174,7 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 		if request.Bump {
 			tag = ""
 		}
-		if err := apply(name, tag, ""); err != nil {
+		if err := apply(name, tag, "", ""); err != nil {
 			return update, err
 		}
 	}
@@ -302,15 +303,24 @@ func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (Artifa
 	return update, WriteLockContext(ctx, request.Directory, lock)
 }
 
-func updateDerivedArtifact(ctx context.Context, raw rawComponent, name string, version Pin, provenance, runtime string, lock *PinLock, update *SourcePinUpdate) error {
+func updateDerivedArtifact(ctx context.Context, raw rawComponent, name string, version Pin, provenance, chartVersion, runtime string, lock *PinLock, update *SourcePinUpdate) error {
 	acquisition, err := prebuiltTargetFor(name, raw, version)
 	if err != nil {
 		return err
+	}
+	// Source tags may include a module prefix. Chart lookup uses the exact
+	// upstream declaration; the artifact lock still tracks the source Git tag.
+	if acquisition.Chart != nil {
+		if !exactPinSetVersion(chartVersion) {
+			return e.New(e.CodeInvalidCatalog, "derived chart %q requires an exact declared version", name)
+		}
+		acquisition.Tag = chartVersion
 	}
 	pin, err := resolvePrebuiltTarget(ctx, acquisition, runtime)
 	if err != nil {
 		return err
 	}
+	pin.Tag = version.Tag
 	pin.DerivedFrom = provenance
 	change := ArtifactPinChange{Name: name, Before: lock.Artifacts[name], After: pin}
 	change.Changed = !artifactPinEqual(change.Before, pin)

@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 
@@ -152,22 +153,37 @@ func derivePinSet(ctx context.Context, reg *registryDoc, name string, pin Pin) (
 		return nil, err
 	}
 	defer func() { _ = tree.Close() }()
+	return derivePinSetTree(ctx, tree, reg, name, pin)
+}
+
+func derivePinSetTree(ctx context.Context, tree pinnedTree, reg *registryDoc, name string, pin Pin) (map[string]string, error) {
+	src := reg.Sources[name]
 	if src.PinSet.Format == "nke-deploy-v1" {
 		versions, err := deriveNKEPinSet(ctx, tree, reg, name)
 		if err != nil {
-			return nil, e.Wrap(e.CodePinSetMismatch, err, "pin set %q at %s", name, pin.Commit)
+			return nil, pinSetDerivationError(err, name, pin.Commit)
 		}
 		return versions, nil
 	}
 	raw, err := tree.ReadFile(ctx, src.PinSet.File)
 	if err != nil {
-		return nil, err
+		return nil, pinSetDerivationError(err, name, pin.Commit)
 	}
 	versions, err := extractPinSetVersions(raw, src.PinSet.Members)
 	if err != nil {
-		return nil, e.Wrap(e.CodePinSetMismatch, err, "pin set %q at %s", name, pin.Commit)
+		return nil, pinSetDerivationError(err, name, pin.Commit)
 	}
 	return versions, nil
+}
+
+// Only invalid declarations/content become mismatches. Operational failures
+// retain their original classification, including internal read timeouts.
+func pinSetDerivationError(err error, name, commit string) error {
+	var coded *e.Error
+	if errors.As(err, &coded) && coded.Code == e.CodeInvalidCatalog {
+		return e.Wrap(e.CodePinSetMismatch, err, "pin set %q at %s", name, commit)
+	}
+	return err
 }
 
 // validateDerivedPins re-reads the exact pinned tree; provenance strings cannot

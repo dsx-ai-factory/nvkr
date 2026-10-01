@@ -258,3 +258,33 @@ func TestNKEPinSetSchemaAndCancellationFailBeforeRead(t *testing.T) {
 		t.Fatal("read after cancellation")
 	}
 }
+
+type failedPinTree struct{ err error }
+
+func (tree failedPinTree) ReadFile(context.Context, string) ([]byte, error) { return nil, tree.err }
+func (failedPinTree) Close() error                                          { return nil }
+
+func TestPinSetDerivationPreservesOperationalErrors(t *testing.T) {
+	for _, format := range []string{"values", "nke-deploy-v1"} {
+		for _, tc := range []struct {
+			name        string
+			input, want e.Code
+		}{
+			{"missing file", e.CodeInvalidCatalog, e.CodePinSetMismatch},
+			{"internal timeout", e.CodeTimeout, e.CodeTimeout},
+			{"fetch failure", e.CodeFetchFailed, e.CodeFetchFailed},
+			{"verification failure", e.CodeVerifyFailed, e.CodeVerifyFailed},
+		} {
+			t.Run(format+"/"+tc.name, func(t *testing.T) {
+				reg, _ := nkePinFixture(t)
+				reg.Sources["nke"].PinSet.Format = format
+				input := e.New(tc.input, "read failure")
+				_, err := derivePinSetTree(t.Context(), failedPinTree{input}, reg, "nke", Pin{})
+				assertCatalogContractCode(t, err, tc.want)
+				if tc.input != e.CodeInvalidCatalog && err != input {
+					t.Fatal("operational error was replaced")
+				}
+			})
+		}
+	}
+}
