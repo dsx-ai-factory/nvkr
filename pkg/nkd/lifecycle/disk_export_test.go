@@ -730,6 +730,10 @@ func planArtifact(t *testing.T, plan *factory.Plan, id string) factory.Artifact 
 }
 
 func diskLifecycleFixture(t *testing.T, attempt string) (*PreparedRun, *fakeDiskExporter) {
+	return diskLifecycleFixtureWithProducer(t, attempt, false)
+}
+
+func diskLifecycleFixtureWithProducer(t *testing.T, attempt string, packer bool) (*PreparedRun, *fakeDiskExporter) {
 	t.Helper()
 	definition := diskDefinition(t)
 	definition.Catalog.Base = "catalog"
@@ -756,6 +760,14 @@ func diskLifecycleFixture(t *testing.T, attempt string) (*PreparedRun, *fakeDisk
 			"amd64": "example.test/vm@sha256:" + strings.Repeat("c", 64),
 		},
 		BuildCommand: []string{"make", "image", "ARCH={{.Arch}}"}, ArtifactPath: "out/node-amd64.qcow2", SourceDate: 1,
+	}
+	if packer {
+		component.BuildCommand = nil
+		component.Packer = &catalog.PackerConfig{
+			ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
+			ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator",
+			MaterialManifestVariable: "material_manifest", OutputDirectoryVariable: "output_directory",
+		}
 	}
 	stack, err := catalog.ApplyStack(&catalog.Catalog{Components: map[string]catalog.Component{
 		"nke-node-non-fde": component,

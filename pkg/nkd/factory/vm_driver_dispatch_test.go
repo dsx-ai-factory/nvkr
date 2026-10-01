@@ -444,6 +444,7 @@ func TestLocalVMPackerResolverRejectsUnsupportedPlans(t *testing.T) {
 		{name: "nil context", plan: directPlan, session: session, code: e.CodeUsage},
 		{name: "nil plan", ctx: t.Context(), session: session, code: e.CodeEngineCapability},
 		{name: "nil session", ctx: t.Context(), plan: directPlan, code: e.CodeEngineCapability},
+		{name: "missing diagnostics", ctx: t.Context(), plan: directPlan, session: session, code: e.CodeEngineCapability},
 		{name: "command producer", ctx: t.Context(), plan: commandPlan, session: session, code: e.CodeEngineCapability},
 		{name: "encrypted producer", ctx: t.Context(), plan: encryptedPlan, session: session, code: e.CodeEngineCapability},
 		{name: "no VM producer", ctx: t.Context(), plan: ordinaryPlan, session: session, code: e.CodeEngineCapability},
@@ -619,7 +620,23 @@ func TestRunLocalUnavailableVMExecutorFailsBeforeWorkspaceOrWork(t *testing.T) {
 	t.Chdir(t.TempDir())
 	plan, _ := compiledPackerVMNode(t)
 	workspace := ".nkd/vm-unavailable"
-	result, err := RunLocal(t.Context(), plan, LocalRunOptions{Workspace: workspace})
+	diagnosticRoot, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, err := pipeline.NewPackerDiagnosticSink(t.Context(), diagnosticRoot)
+	_ = diagnosticRoot.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := diagnostics.Close(); err != nil {
+			t.Errorf("closing Packer diagnostic sink: %v", err)
+		}
+	})
+	result, err := RunLocal(t.Context(), plan, LocalRunOptions{
+		Workspace: workspace, Diagnostics: diagnostics,
+	})
 	if result != nil || factoryErrorCode(err) != e.CodeEngineCapability {
 		t.Fatalf("local VM result/error = %#v/%v", result, err)
 	}

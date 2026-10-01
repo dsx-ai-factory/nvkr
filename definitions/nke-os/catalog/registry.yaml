@@ -1,14 +1,17 @@
 apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nke-os-arm64
-  description: ARM64 non-FDE NKE node image from explicit authenticated component outputs.
+  name: nke-os
+  description: Non-FDE NKE node image from explicit authenticated component outputs.
 sources:
   nke-os:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      # Substitution-only baseline, not a maintained or reproducible Docker pin.
+      # Each Docker attempt freezes its own observed ID before Plan execution.
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
@@ -17,49 +20,53 @@ sources:
         cd agent
         GOWORK=off go mod vendor
   nke-cni-calico-source:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
       - -ec
       - |
         make -C os-image/packages/cni-calico bundle nfpm \
-          ARCH=arm64 BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
   ovn-kubernetes:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
   nke-kubeadm-distro-source:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
       - -ec
       - |
         make -C os-image/packages/kubeadm-distro bundle nfpm \
-          ARCH=arm64 BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
   nke-spire-agent-source:
-    repo: https://github.com/dsx-ai-factory/nke
+    repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
     vendorCommand:
       - bash
       - -ec
       - |
         make -C os-image/packages/spire-agent bundle nfpm \
-          ARCH=arm64 BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
 components:
   nke-agent:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-os
     cgo: true
@@ -68,14 +75,14 @@ components:
       - bash
       - -ec
       - |
-        GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-arm64 \
+        GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
           VERSION=v0.2.1-rc.6-109-g726f7694 \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nke-agent.deb
     writeDir: agent/bin
     artifactPath: agent/bin/nke-agent.deb
   nke-cni-calico:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-cni-calico-source
     outputType: tarball
@@ -88,7 +95,7 @@ components:
           /src/nkd-output/work/
         CNI=cni-calico PRODUCT=Calico CONTENT_KIND=manifests \
           CONTENT_SPEC=/src/nkd-output/work/cni-calico/packaging/nfpm-manifests.yaml \
-          NFPM_BIN=/usr/local/bin/nfpm ARCH=arm64 DEB_REVISION=1 \
+          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
           /src/nkd-output/work/cni-common/build-deb.sh v3.30.1 \
           /src/os-image/packages/cni-calico/dist/v3.30.1 \
           /src/nkd-output/calico
@@ -98,7 +105,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/nke-cni-calico.tar
   nke-cni-ovn:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-os
     builderType: oci-hermetic
@@ -117,12 +124,12 @@ components:
           "${work}/"
         tar -xf /nkd/inputs/materials/ovn-chart -C "${stage}/charts"
         gzip -n -9 -c /nkd/inputs/materials/ovn-image >"${stage}/images.tgz"
-        printf '%s  ovn-images_1.4.0_linux_arm64.tgz\n' \
+        printf '%s  ovn-images_1.4.0_linux_{{.Arch}}.tgz\n' \
           "$(sha256sum "${stage}/images.tgz" | cut -d' ' -f1)" \
           >"${stage}/images.tgz.sha256"
         CNI=cni-ovn PRODUCT=OVN CONTENT_KIND=charts \
           CONTENT_SPEC="${work}/cni-ovn/packaging/nfpm-charts.yaml" \
-          NFPM_BIN=/usr/local/bin/nfpm ARCH=arm64 DEB_REVISION=1 \
+          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
           "${work}/cni-common/build-deb.sh" 1.4.0 "${stage}" \
           /src/nkd-output/ovn
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -131,7 +138,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/nke-cni-ovn.tar
   ovn-kube-ubuntu:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
     builderType: buildkit-rootless
@@ -149,7 +156,7 @@ components:
       - --opt
       - filename=Dockerfile.ubuntu
       - --opt
-      - platform=linux/arm64
+      - platform=linux/{{.Arch}}
       - --opt
       - build-arg:OVN_KUBERNETES_DIR=.
       - --opt
@@ -163,7 +170,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/ovn-kube-ubuntu.oci.tar
   ovn-kubernetes-chart:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
     outputType: tarball
@@ -194,7 +201,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/ovn-kubernetes-chart.tar
   nke-image-inputs:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-os
     builderType: oci-hermetic
@@ -217,7 +224,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/image-inputs.tar
   nke-kubeadm-distro:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-kubeadm-distro-source
     outputType: tarball
@@ -229,7 +236,7 @@ components:
         cp -a os-image/packages/kubeadm-distro /src/nkd-output/work/
         for version in v1.36.3 v1.35.3 v1.34.2; do
           PEER_VERSIONS='v1.36.3 v1.35.3 v1.34.2' DEB_REVISION=1 \
-            NFPM_BIN=/usr/local/bin/nfpm ARCH=arm64 \
+            NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} \
             /src/nkd-output/work/kubeadm-distro/packaging/build-deb.sh \
             "$version" "/src/os-image/packages/kubeadm-distro/dist/$version" \
             /src/nkd-output/kubeadm-distro
@@ -257,7 +264,7 @@ components:
       allowedHostPlatforms: [linux/arm64]
       capabilities:
         - name: kvm
-          policy: preferred
+          policy: forbidden
       timeoutSeconds: 21600
     packer:
       projectPath: os-image/packer
@@ -289,6 +296,50 @@ components:
       image-inputs: nke-image-inputs
       installer-iso: nke-patched-installer-iso
     artifactPath: non-fde/nke-node.qcow2
+  nke-node-image-amd64:
+    platforms: [linux/amd64]
+    fromSource: true
+    source: nke-os
+    builderType: vm-image
+    buildNetwork: default
+    outputType: disk-image
+    disk:
+      format: qcow2
+      encryption: none
+    buildRequirements:
+      resources:
+        cpuMillis: 8000
+        memoryMiB: 10240
+        ephemeralStorageMiB: 65536
+      allowedHostPlatforms: [linux/amd64]
+      capabilities:
+        - name: kvm
+          policy: required
+      timeoutSeconds: 21600
+    packer:
+      projectPath: os-image/packer
+      packerVersion: 1.15.4
+      buildName: nke-node-non-fde.qemu.nke-non-fde
+      architectureVariable: architecture
+      acceleratorVariable: accelerator
+      materialManifestVariable: material_manifest
+      materialManifest:
+        schemaVersion: nke.dev/os-image-materials/v1
+        kinds:
+          image-inputs: archive
+          installer-iso: disk-image
+      outputDirectoryVariable: output_directory
+      sshPrivateKeyVariable: ssh_private_key_file
+      sshPublicKeyVariable: ssh_public_key_file
+      buildLogDirectoryVariable: build_log_directory
+      variables:
+        efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
+        efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
+        ssh_timeout: 180m
+    materials:
+      image-inputs: nke-image-inputs
+      installer-iso: nke-patched-installer-iso-amd64
+    artifactPath: non-fde/nke-node.qcow2
   nke-patched-installer-iso:
     platforms: [linux/arm64]
     fromSource: true
@@ -305,7 +356,7 @@ components:
     writeDir: nkd-output
     artifactPath: nkd-output/installer.iso
   nke-spire-agent:
-    platforms: [linux/arm64]
+    platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: nke-spire-agent-source
     outputType: tarball
@@ -319,7 +370,7 @@ components:
         SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
           NFPM_BIN=/usr/local/bin/nfpm \
           /src/nkd-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
-          arm64 /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/arm64 \
+          {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \
           /src/nkd-output/spire-agent
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
           --numeric-owner -C /src/nkd-output/spire-agent \
@@ -334,3 +385,26 @@ components:
       url: https://cdimage.ubuntu.com/ubuntu/releases/26.04.1/release/ubuntu-26.04.1-live-server-arm64.iso
       evidence:
         none: true
+  ubuntu-installer-iso-amd64:
+    platforms: [linux/amd64]
+    source: nke-os
+    outputType: raw
+    prebuilt:
+      url: https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso
+      evidence:
+        none: true
+  nke-patched-installer-iso-amd64:
+    platforms: [linux/amd64]
+    fromSource: true
+    source: nke-os
+    builderType: oci-hermetic
+    outputType: raw
+    materials:
+      installer-source: ubuntu-installer-iso-amd64
+    buildCommand:
+      - bash
+      - /src/os-image/packer/scripts/patch-installer-iso.sh
+      - /nkd/inputs/materials/installer-source
+      - /src/nkd-output/installer.iso
+    writeDir: nkd-output
+    artifactPath: nkd-output/installer.iso

@@ -1,0 +1,62 @@
+apiVersion: nkd.dev/catalog-overlay/v3
+kind: CatalogOverlay
+name: nke-os-arm64-native-kvm
+requiresCatalogDigest: sha256:20ad684b3d72b3c87299b2c47c8d6f89d0cad447d737fbbb0dc55eab57772ceb
+components:
+  nke-node-image:
+    component:
+      platforms: [linux/arm64]
+      fromSource: true
+      builderType: vm-image
+      buildNetwork: default
+      repo: https://github.com/dsx-ai-factory/nke.git
+      tag: os-image/v0.1.0-rc.4-51-g726f7694
+      commit: 726f76944404e1106626b8333d3576bdf67b575b
+      treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+      toolchainImages:
+        arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+      vendorCommand:
+        - bash
+        - -ec
+        - |
+          cd agent
+          GOWORK=off go mod vendor
+      sourceDateEpoch: 1790192178
+      outputType: disk-image
+      disk:
+        format: qcow2
+        encryption: none
+      buildRequirements:
+        resources:
+          cpuMillis: 8000
+          memoryMiB: 10240
+          ephemeralStorageMiB: 65536
+        allowedHostPlatforms: [linux/arm64]
+        capabilities:
+          - name: kvm
+            policy: required
+        timeoutSeconds: 21600
+      packer:
+        projectPath: os-image/packer
+        packerVersion: 1.15.4
+        buildName: nke-node-non-fde.qemu.nke-non-fde
+        architectureVariable: architecture
+        acceleratorVariable: accelerator
+        materialManifestVariable: material_manifest
+        materialManifest:
+          schemaVersion: nke.dev/os-image-materials/v1
+          kinds:
+            image-inputs: archive
+            installer-iso: disk-image
+        outputDirectoryVariable: output_directory
+        sshPrivateKeyVariable: ssh_private_key_file
+        sshPublicKeyVariable: ssh_public_key_file
+        buildLogDirectoryVariable: build_log_directory
+        variables:
+          efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
+          efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
+          ssh_timeout: 180m
+      materials:
+        image-inputs: nke-image-inputs
+        installer-iso: nke-patched-installer-iso
+      artifactPath: non-fde/nke-node.qcow2

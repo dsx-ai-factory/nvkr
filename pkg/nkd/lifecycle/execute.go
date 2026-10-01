@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 type LocalOptions struct {
@@ -28,8 +31,17 @@ type LocalOptions struct {
 func ExecuteLocal(ctx context.Context, prepared *PreparedRun, options LocalOptions) (*Run, error) {
 	return executeLocalWithFactoryRunner(ctx, prepared, options,
 		func(ctx context.Context, plan *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
-			return factory.RunLocal(ctx, plan, options)
+			result, err := factory.RunLocal(ctx, plan, options)
+			return adaptLocalExecutionResult(result, err)
 		})
+}
+
+// Convert a nil concrete result to a nil interface, not a typed-nil observer.
+func adaptLocalExecutionResult(result *factory.LocalRunResult, err error) (localExecutionResult, error) {
+	if result == nil {
+		return nil, err
+	}
+	return result, err
 }
 
 type localExecutionResult interface {
@@ -40,9 +52,15 @@ type localExecutionResult interface {
 
 type localFactoryRunner func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error)
 
+type localPackerDiagnostics struct {
+	capability *pipeline.PackerDiagnosticSink
+	close      func() error
+}
+
 type localExecutionDependencies struct {
 	admitLocal       func(context.Context, *factory.Plan, factory.LocalRunOptions) error
 	runFactory       localFactoryRunner
+	openDiagnostics  func(context.Context, string) (*localPackerDiagnostics, error)
 	writeRecordState func(context.Context, string, *Run) (bool, error)
 	beginDiskCommit  func(string) (*diskAttemptTransaction, error)
 }
@@ -51,7 +69,8 @@ func executeLocalWithFactoryRunner(ctx context.Context, prepared *PreparedRun, o
 	runFactory localFactoryRunner,
 ) (*Run, error) {
 	return executeLocalWithDependencies(ctx, prepared, options, localExecutionDependencies{
-		admitLocal: factory.AdmitLocal, runFactory: runFactory, writeRecordState: writeRunRecordState,
+		admitLocal: factory.AdmitLocal, runFactory: runFactory,
+		openDiagnostics: newLocalPackerDiagnosticSink, writeRecordState: writeRunRecordState,
 		beginDiskCommit: beginDiskAttemptTransaction,
 	})
 }
@@ -64,6 +83,9 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	}
 	if deps.admitLocal == nil || deps.runFactory == nil || deps.writeRecordState == nil || deps.beginDiskCommit == nil {
 		return nil, e.New(e.CodeInternal, "local execution dependencies are incomplete")
+	}
+	if deps.openDiagnostics == nil {
+		deps.openDiagnostics = newLocalPackerDiagnosticSink
 	}
 	root := options.AttemptsRoot
 	if root == "" {
@@ -97,9 +119,41 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 			return nil, e.Wrap(e.CodeImmutableViolation, err, "reserving run attempt storage")
 		}
 	}
+	var diagnostics *localPackerDiagnostics
+	if localPlanUsesPacker(prepared.plan) {
+		var err error
+		diagnostics, err = deps.openDiagnostics(ctx, workspace)
+		if err != nil {
+			return recordRunFailure(ctx, recordPath, prepared.run, err,
+				"recording failed run attempt after diagnostic admission")
+		}
+		if diagnostics == nil || diagnostics.capability == nil || diagnostics.close == nil {
+			if diagnostics != nil && diagnostics.close != nil {
+				_ = diagnostics.close()
+			}
+			return recordRunFailure(ctx, recordPath, prepared.run,
+				e.New(e.CodeInternal, "local Packer diagnostic admission returned an incomplete capability"),
+				"recording failed run attempt after diagnostic admission")
+		}
+	}
+	if diagnostics != nil {
+		factoryOptions.Diagnostics = diagnostics.capability
+	}
 	result, err := deps.runFactory(ctx, prepared.plan, factoryOptions)
+	var diagnosticCloseErr error
+	if diagnostics != nil {
+		diagnosticCloseErr = diagnostics.close()
+	}
 	if err != nil {
+		err = errors.Join(err, diagnosticCloseErr)
 		return recordRunFailure(ctx, recordPath, prepared.run, err, "recording failed run attempt")
+	}
+	if diagnosticCloseErr != nil {
+		if result != nil {
+			diagnosticCloseErr = closeLocalExecutionResult(result, diagnosticCloseErr)
+		}
+		return recordRunFailure(ctx, recordPath, prepared.run, diagnosticCloseErr,
+			"recording failed run attempt after diagnostic retention")
 	}
 	if result == nil {
 		return recordRunFailure(ctx, recordPath, prepared.run, e.New(e.CodeInternal, "local executor returned no run record"), "recording failed run attempt")
@@ -190,6 +244,35 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	// close cannot change the completed outcome after it.
 	releaseDiskExportHandles(diskExports.stages)
 	return bound, nil
+}
+
+func newLocalPackerDiagnosticSink(ctx context.Context, workspace string) (*localPackerDiagnostics, error) {
+	root, _, err := securepath.OpenDirectory(workspace)
+	if err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err,
+			"holding local attempt directory for Packer diagnostics")
+	}
+	sink, sinkErr := pipeline.NewPackerDiagnosticSink(ctx, root)
+	closeErr := root.Close()
+	if sinkErr != nil {
+		return nil, errors.Join(sinkErr, closeErr)
+	}
+	if closeErr != nil {
+		return nil, errors.Join(e.Wrap(e.CodeImmutableViolation, closeErr,
+			"closing local attempt diagnostic directory"), sink.Close())
+	}
+	return &localPackerDiagnostics{capability: sink, close: sink.Close}, nil
+}
+
+func localPlanUsesPacker(plan *factory.Plan) bool {
+	for _, build := range plan.Builds {
+		for _, node := range build.Graph.Nodes {
+			if node.Kind == ir.KindBuild && node.Packer != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func closeLocalExecutionResult(result localExecutionResult, cause error) error {

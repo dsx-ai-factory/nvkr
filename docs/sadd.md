@@ -808,9 +808,9 @@ named volumes, mounts consumer inputs read-only, fixes environment/hostname/user
 network-none except for an independently authorized direct-Packer build container. It never runs
 `packer init`, validates the exact selector, builds it once and returns one held QCOW2. For an Environment-authorized
 networked producer, only the build container uses default networking; preparation and validation remain offline.
-A one-shot root container
-with only `CAP_CHOWN` bootstraps the two fresh attempt volumes to the host UID/GID; every consumer operation runs as
-that host identity. The material manifest is derived from authenticated producer observations; an authored
+The authenticated extraction stage runs as root with only `CAP_CHOWN` and `CAP_DAC_OVERRIDE`, then assigns
+both fresh attempt volumes to the host UID/GID; every consumer operation runs as that host identity.
+The material manifest is derived from authenticated producer observations; an authored
 projection can change only its schema and per-binding kind vocabulary. Bounded in-process cleanup owns ordinary
 completion and cancellation; authenticated
 cross-process orphan recovery after a hard process or host failure remains deferred. Command/Make, encrypted-disk,
@@ -825,10 +825,14 @@ or stronger provider sandbox plus recorded interoperability evidence.
 The local capability and driver result are unqualified current-availability evidence, not authenticated provider
 allocation, reservation, pipeline attestation or qualification evidence. Holding a validated KVM descriptor proves
 availability through the callback lifetime; it does not prove that Packer or QEMU consumed that exact descriptor.
-The driver enforces whether the selected device is exposed but does not promote that into consumption proof. No
-real Docker/Packer/NKE bake has yet established external interoperability. Hosted admission, provider proof, and VM
+The driver enforces whether the selected device is exposed but does not promote that into consumption proof.
+For Docker's separate daemon namespace, a fixed device projection additionally checks the kernel boot ID and
+admitted character-device numbers before Packer runs. Committed-head Docker/Packer/NKE ARM64 and AMD64 bakes and
+source-owned boot smoke passed through the local adapter on ARC, as recorded in
+[the 2026-10-01 evidence](evidence/2026-10-01-nke-arc-os-builds.md). This diagnostic execution does not establish
+generated hosted VM admission or qualification. Hosted admission, provider proof, and VM
 topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
-the scoped ownership bootstrap, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
+the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
 deferred.
 Produced-artifact size remains an artifact and transport budget.
 

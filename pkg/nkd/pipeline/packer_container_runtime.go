@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"strconv"
@@ -31,6 +32,12 @@ const (
 )
 
 func runPackerContainer(ctx context.Context, request packerContainerRunRequest) (artifact *PackerArtifact, returnErr error) {
+	return runPackerContainerWithDiagnosticTimeout(ctx, request, packerContainerCleanupTimeout)
+}
+
+func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packerContainerRunRequest,
+	diagnosticTimeout time.Duration,
+) (artifact *PackerArtifact, returnErr error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "running containerized Packer requires a non-nil context")
 	}
@@ -71,11 +78,32 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err := validatePackerContainerKVM(request.runtime, request.kvm, kvmEnabled); err != nil {
 		return nil, err
 	}
+	kvmProjection, err := observePackerKVMProjection(ctx, request.kvm,
+		kvmEnabled && request.runtime.RuntimeName() == "docker")
+	if err != nil {
+		return nil, err
+	}
 	kvmGroup, err := packerKVMGroup(request.kvm, kvmEnabled)
 	if err != nil {
 		return nil, err
 	}
-	// Fresh daemon and image observations happen before the first mutable Docker
+	resources := &packerContainerResources{runtime: request.runtime}
+	var diagnosticTarget *packerDiagnosticTarget
+	defer func() {
+		var diagnosticErr error
+		if diagnosticTarget != nil {
+			diagnosticErr = diagnosticTarget.close()
+		}
+		returnErr = errors.Join(returnErr, diagnosticErr)
+		returnErr = finalizePackerContainerRun(&artifact, returnErr, resources.cleanup())
+	}()
+	diagnosticTarget, err = request.diagnostics.start(ctx, request.subject, request.manifest, request.digest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Manifest retention precedes the first external runtime command. Fresh
+	// daemon and image observations still happen before the first mutable Docker
 	// object exists. They do not mint qualification; the outer verified execution
 	// capability remains the authority for the held executable identity.
 	if err := observePackerRuntimeFreshness(ctx, request.runtime); err != nil {
@@ -89,11 +117,6 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "allocating Packer attempt identity")
 	}
-	resources := &packerContainerResources{runtime: request.runtime}
-	defer func() {
-		returnErr = finalizePackerContainerRun(&artifact, returnErr, resources.cleanup())
-	}()
-
 	workspace, err := createPackerWorkspaceRoot(request.workspace, attempt)
 	if err != nil {
 		return nil, err
@@ -133,7 +156,7 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 		entrypoint: "sh", packerArgs: []string{
 			"-ec", packerInputExtractScript, "nkd-extract-input",
 			strings.TrimPrefix(staged.inputArchiveDigest, "sha256:"), packerContainerWorkRoot + "/stage/input.tar",
-			packerContainerInputRoot, strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()),
+			packerContainerInputRoot, strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()), packerContainerWorkRoot,
 		},
 		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=stage"},
 		user:   "0:0", allowChown: true, allowDAC: true,
@@ -151,27 +174,9 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err := staged.verify(ctx); err != nil {
 		return nil, err
 	}
-	bootstrapName := "nkd-packer-" + attempt + "-bootstrap"
-	bootstrap := packerContainerCreateRequest{
-		name: bootstrapName, image: request.node.Toolchain, platform: request.node.ToolchainPlatform,
-		input: inputVolume, work: workVolume, project: packerContainerWorkRoot,
-		entrypoint: "sh", packerArgs: []string{
-			"-ec", packerVolumeBootstrapScript, "nkd-bootstrap-volumes",
-			strconv.Itoa(os.Getuid()), strconv.Itoa(os.Getgid()),
-		},
-		labels: []string{nodeLabel, attemptLabel, "nkd.dev/role=bootstrap"}, user: "0:0", allowChown: true,
-	}
-	resources.containers = append(resources.containers, bootstrapName)
-	if err := createPackerContainer(ctx, request.runtime, bootstrap); err != nil {
-		return nil, err
-	}
-	if err := startPackerContainer(ctx, request.runtime, bootstrapName, io.Discard, io.Discard); err != nil {
-		return nil, e.Wrap(e.CodeEngineCapability, err,
-			"initializing private Packer volume ownership")
-	}
-	if err := resources.removeContainer(ctx, bootstrapName); err != nil {
-		return nil, err
-	}
+	// The fixed extraction stage owns both fresh volumes until it has verified
+	// the archive and assigned their ownership to the invoking user. Its existing
+	// DAC override permits traversal of sealed directories during ownership changes.
 	if err := startPackerContainer(ctx, request.runtime, stageName, io.Discard, io.Discard); err != nil {
 		return nil, e.Wrap(e.CodeUnverifiedRef, err,
 			"pinned toolchain could not authenticate and extract the Packer input closure")
@@ -221,13 +226,37 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 
 	build := packerBuildContainerRequest(request, inputVolume, workVolume, project,
 		nodeLabel, attemptLabel, attempt, kvmGroup, kvmEnabled)
+	build.kvmProjection = kvmProjection
 	buildName := build.name
 	resources.containers = append(resources.containers, buildName)
 	if err := createPackerContainer(ctx, request.runtime, build); err != nil {
 		return nil, err
 	}
-	if err := startPackerContainer(ctx, request.runtime, buildName, request.stdout, request.stderr); err != nil {
-		return nil, err
+	buildErr := startPackerBuildContainer(ctx, request.runtime, buildName, request.stdout, request.stderr, kvmProjection != nil)
+	var diagnosticErr error
+	if request.bindings.buildLogDirectoryVariable != "" {
+		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), diagnosticTimeout)
+		diagnosticErr = collectPackerContainerBuildLogs(diagnosticCtx, request.runtime, buildName,
+			diagnosticTarget)
+		cancel()
+	}
+	if diagnosticErr != nil && (errors.Is(diagnosticErr, errPackerDiagnosticsIncomplete) ||
+		errors.Is(diagnosticErr, context.DeadlineExceeded)) {
+		markerCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), packerContainerCleanupTimeout)
+		markerErr := diagnosticTarget.recordIncomplete(markerCtx, diagnosticErr)
+		cancel()
+		if buildErr == nil && markerErr == nil {
+			// Operational log loss is visible in the attempt, not a disk failure.
+			diagnosticErr = nil
+		} else {
+			diagnosticErr = errors.Join(diagnosticErr, markerErr)
+		}
+	}
+	if buildErr != nil {
+		return nil, errors.Join(buildErr, diagnosticErr)
+	}
+	if diagnosticErr != nil {
+		return nil, diagnosticErr
 	}
 	artifact, err = collectPackerContainerArtifact(ctx, request.runtime, buildName,
 		path.Join(packerContainerOutputPath, path.Clean(request.node.ArtifactPath)), runRoot,
@@ -343,33 +372,7 @@ func validatePackerContainerKVM(runtime packerContainerRuntime, kvm *os.File, en
 		}
 		return nil
 	}
-	if runtime.Endpoint() != qualifiedRuntimeEndpoint || kvm == nil {
-		return e.New(e.CodeEngineCapability, "Packer KVM resolution requires a held device on the local runtime")
-	}
-	info, err := kvm.Stat()
-	if err != nil || info.Mode()&os.ModeDevice == 0 || info.Mode()&os.ModeCharDevice == 0 {
-		if err == nil {
-			err = errors.New("descriptor is not a character device")
-		}
-		return e.Wrap(e.CodeEngineCapability, err, "validating admitted KVM device")
-	}
-	procPath := fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), kvm.Fd())
-	target, err := os.Readlink(procPath)
-	if err != nil || target != "/dev/kvm" {
-		if err == nil {
-			err = fmt.Errorf("held device resolves to %q", target)
-		}
-		return e.Wrap(e.CodeEngineCapability, err,
-			"validating local Docker KVM device handoff")
-	}
-	version, err := unix.IoctlGetInt(int(kvm.Fd()), 0xAE00)
-	if err != nil || version != 12 {
-		if err == nil {
-			err = fmt.Errorf("KVM API version is %d", version)
-		}
-		return e.Wrap(e.CodeEngineCapability, err, "revalidating admitted KVM capability")
-	}
-	return nil
+	return validateEnabledPackerContainerKVM(runtime, kvm)
 }
 
 func createPackerVolume(ctx context.Context, runtime packerContainerRuntime, name string, labels []string) error {
@@ -389,6 +392,14 @@ func createPackerVolume(ctx context.Context, runtime packerContainerRuntime, nam
 }
 
 func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, request packerContainerCreateRequest) error {
+	if runtime.RuntimeName() == "docker" && request.kvm != nil && request.kvmProjection == nil {
+		return e.New(e.CodeEngineCapability, "Docker KVM handoff requires an observed kernel/device projection")
+	}
+	if projection := request.kvmProjection; projection != nil &&
+		(runtime.RuntimeName() != "docker" || request.kvm == nil || projection.device != request.kvm ||
+			projection.bootID == "" || projection.deviceNumber == "") {
+		return e.New(e.CodeEngineCapability, "Packer KVM projection does not bind the held device")
+	}
 	switch runtime.RuntimeName() {
 	case "docker", "podman":
 	default:
@@ -428,6 +439,17 @@ func startPackerContainer(ctx context.Context, runtime packerContainerRuntime, n
 			"running Packer container %q", name)
 	}
 	return nil
+}
+
+func startPackerBuildContainer(ctx context.Context, runtime packerContainerRuntime, name string,
+	stdout, stderr io.Writer, guarded bool,
+) error {
+	err := startPackerContainer(ctx, runtime, name, stdout, stderr)
+	var exit *exec.ExitError
+	if guarded && ctx.Err() == nil && errors.As(err, &exit) && exit.ExitCode() == 97 {
+		return e.Wrap(e.CodeEngineCapability, err, "Docker KVM projection was rejected before Packer")
+	}
+	return err
 }
 
 func preflightPackerVersion(ctx context.Context, runtime packerContainerRuntime,

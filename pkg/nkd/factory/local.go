@@ -47,6 +47,9 @@ type LocalRunOptions struct {
 	DryRun       bool
 	Stdout       io.Writer
 	Stderr       io.Writer
+	// Diagnostics is an opaque lifecycle-issued attempt-directory capability.
+	// A path or serialized description cannot substitute for it.
+	Diagnostics  *pipeline.PackerDiagnosticSink
 	producers    *pipeline.NodeSession
 	vmResolver   vmDriverResolver
 	vmDrivers    vmDriverExecutor
@@ -249,6 +252,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}
 		options.vmDrivers, err = options.vmResolver.Admit(ctx, relocated, options.producers, vmDriverRunConfig{
 			Runtime: options.Runtime, Stdout: options.Stdout, Stderr: options.Stderr,
+			Diagnostics: options.Diagnostics,
 		})
 		if err != nil {
 			return nil, err

@@ -162,7 +162,9 @@ platforms it supports. It carries build or acquisition instructions, never a dep
 _Avoid_: Named output, artifact, authored build group
 
 **Component catalog overlay**:
-An ordered, predecessor-bound catalog change replacing a complete component producer.
+An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact
+toolchain-pin substitution for an explicit sorted component set and host architecture. Substitution fails if
+any selected producer does not carry the expected old pin; it is not a partial producer merge.
 _Avoid_: Output selection group, mixin, deployment topology
 
 **Derived pin set**:

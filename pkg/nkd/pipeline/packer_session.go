@@ -53,12 +53,13 @@ type VMImagePackerSelection struct {
 // be package-held observations derived from that Plan; paths and digest strings
 // do not authorize inputs at this boundary.
 type VMImagePackerRun struct {
-	SourceRoot string
-	Manifest   *heldfile.File
-	Materials  []PackerMaterialInput
-	Runtime    *execution.LocalVMRuntime
-	Stdout     io.Writer
-	Stderr     io.Writer
+	SourceRoot  string
+	Manifest    *heldfile.File
+	Materials   []PackerMaterialInput
+	Runtime     *execution.LocalVMRuntime
+	Diagnostics *PackerDiagnosticSink
+	Stdout      io.Writer
+	Stderr      io.Writer
 }
 
 // AdmitVMImagePacker performs the runtime and toolchain-image admission phase.
@@ -229,9 +230,9 @@ func (executor *VMImagePackerExecutor) Run(
 	if err := executor.requiresExactNode(subject, node); err != nil {
 		return nil, nil, err
 	}
-	if input.Manifest == nil || input.Runtime == nil {
+	if input.Manifest == nil || input.Runtime == nil || input.Diagnostics == nil {
 		return nil, nil, e.New(e.CodeEngineCapability,
-			"VM-image Packer execution requires held manifest and VM runtime capabilities")
+			"VM-image Packer execution requires held manifest, VM runtime and diagnostic capabilities")
 	}
 	if node.Disk == nil || node.Disk.Encryption != "none" {
 		return nil, nil, e.New(e.CodeEngineCapability,
@@ -332,8 +333,8 @@ func (executor *VMImagePackerExecutor) Run(
 	}
 	artifact, err = runPackerContainer(runCtx, packerContainerRunRequest{
 		runtime: executor.runtime, source: source,
-		node: node, manifest: manifest, digest: input.Manifest.Digest(), materials: input.Materials,
-		workspace: workspace, kvm: kvm, bindings: bindings,
+		node: node, subject: subject, manifest: manifest, digest: input.Manifest.Digest(), materials: input.Materials,
+		workspace: workspace, kvm: kvm, diagnostics: input.Diagnostics, bindings: bindings,
 		stdout: options.Stdout, stderr: options.Stderr,
 	})
 	if err != nil {

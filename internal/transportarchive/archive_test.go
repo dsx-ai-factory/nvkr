@@ -19,6 +19,46 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func TestCopyExact(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		source   string
+		size     int64
+		cancel   bool
+		want     string
+		wantCode nkderr.Code
+	}{
+		{name: "exact", source: "payload", size: 7, want: "payload"},
+		{name: "leaves trailing bytes", source: "payload-next", size: 7, want: "payload"},
+		{name: "empty", size: 0},
+		{name: "short", source: "x", size: 2, want: "x", wantCode: nkderr.CodeVerifyFailed},
+		{name: "negative", size: -1, wantCode: nkderr.CodeVerifyFailed},
+		{name: "canceled", source: "payload", size: 7, cancel: true, wantCode: nkderr.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if test.cancel {
+				cancel()
+			}
+			source := strings.NewReader(test.source)
+			var destination bytes.Buffer
+			written, err := CopyExact(ctx, &destination, source, test.size)
+			var coded *nkderr.Error
+			if test.wantCode == "" {
+				if err != nil || written != test.size || int64(source.Len()) != int64(len(test.source))-test.size {
+					t.Fatalf("written=%d remaining=%d error=%v", written, source.Len(), err)
+				}
+			} else if !errors.As(err, &coded) || coded.Code != test.wantCode {
+				t.Fatalf("error=%v, want %s", err, test.wantCode)
+			}
+			if destination.String() != test.want {
+				t.Fatalf("copied=%q, want %q", destination.String(), test.want)
+			}
+		})
+	}
+}
+
 func TestTransportArchiveRoundTripIsDeterministicAndExact(t *testing.T) {
 	producer := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(producer, ".nkd/work/out/tool/bin"), 0o755); err != nil {

@@ -337,7 +337,9 @@ func (actions githubActionRefs) writeCheckoutStep(out *bytes.Buffer) {
 // ubuntu-latest, but not on a minimal or self-hosted runner). The version is read from the
 // checked-out repo's .go-version, so setup-go and the actual build toolchain cannot drift.
 func (actions githubActionRefs) writeSetupGoStep(out *bytes.Buffer) {
-	fmt.Fprintf(out, "      - name: Set up Go\n        uses: %s\n        with:\n          go-version-file: '.go-version'\n", actions.SetupGo)
+	// Candidate diagnostic jobs can write the main branch's Actions cache. Do
+	// not restore executable build inputs from that cache into a trusted helper.
+	fmt.Fprintf(out, "      - name: Set up Go\n        uses: %s\n        with:\n          go-version-file: '.go-version'\n          cache: 'false'\n", actions.SetupGo)
 }
 
 // prepareHelperStepName and prepareHelperRun are the ONE definition of the helper

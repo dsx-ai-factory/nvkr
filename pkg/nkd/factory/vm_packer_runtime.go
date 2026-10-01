@@ -21,6 +21,7 @@ type localVMPackerExecutor struct {
 	sourceRoots map[string]string
 	stdout      io.Writer
 	stderr      io.Writer
+	diagnostics *pipeline.PackerDiagnosticSink
 }
 
 func (localVMPackerResolver) Admit(
@@ -87,6 +88,10 @@ func (localVMPackerResolver) Admit(
 		return nil, e.New(e.CodeEngineCapability,
 			"local Packer resolver found no direct-Packer VM-image producer")
 	}
+	if config.Diagnostics == nil {
+		return nil, e.New(e.CodeEngineCapability,
+			"local Packer resolver requires an attempt-owned diagnostic capability")
+	}
 	networkAdmission, err := pipeline.AuthorizeVMImagePackerNetwork(
 		plan.Environment, plan.EnvironmentDigest, selections,
 	)
@@ -99,7 +104,7 @@ func (localVMPackerResolver) Admit(
 	}
 	return &localVMPackerExecutor{
 		inner: admitted, subjects: subjects, sourceRoots: sourceRoots,
-		stdout: config.Stdout, stderr: config.Stderr,
+		stdout: config.Stdout, stderr: config.Stderr, diagnostics: config.Diagnostics,
 	}, nil
 }
 
@@ -165,12 +170,13 @@ func (executor *localVMPackerExecutor) RunPacker(
 			"local Packer subject %q has no admitted source route", subject)
 	}
 	return executor.inner.Run(ctx, subject, node, pipeline.VMImagePackerRun{
-		SourceRoot: sourceRoot,
-		Manifest:   materials.manifest,
-		Materials:  materials.inputs,
-		Runtime:    runtime.inner,
-		Stdout:     executor.stdout,
-		Stderr:     executor.stderr,
+		SourceRoot:  sourceRoot,
+		Manifest:    materials.manifest,
+		Materials:   materials.inputs,
+		Runtime:     runtime.inner,
+		Diagnostics: executor.diagnostics,
+		Stdout:      executor.stdout,
+		Stderr:      executor.stderr,
 	})
 }
 

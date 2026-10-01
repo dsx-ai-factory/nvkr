@@ -204,10 +204,19 @@ success line only after diagnostic handling returns zero, and its
 exactly `The configuration is valid.` plus a newline while demonstrating that warnings can precede that line on
 stdout with exit status zero. The connected local OCI driver therefore accepts only that clean line (ignoring
 surrounding whitespace) with empty stderr; any other output fails closed. Driver admission and lifecycle are
-contract-tested. One attempt-frozen draft Podman/Packer/NKE ARM64 execution and boot smoke is recorded, but it was
-not run from the current committed NKD head and exact current NKE pin. That committed-head repeat, Docker and hosted
-execution remain required before maintained NKE support, product acceptance, or any pipeline-attested or qualified
-production claim; the recorded local result stays unqualified. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
+contract-tested. Before the first external runtime command, the driver uses a lifecycle-issued opaque capability
+for the immutable attempt directory to retain and recheck the exact material-manifest bytes. When the source
+contract declares `buildLogDirectoryVariable`, the driver also copies only regular files from that source-owned
+directory after the build returns and before private containers, volumes and workspace state are reaped. Entry,
+file and aggregate byte counts are bounded. Missing, timed-out or oversized log collection records an incomplete
+diagnostic marker without discarding a separately verified successful disk. Absolute or traversing paths, links, devices, duplicate paths and
+replacement of an existing diagnostic set fail closed. These files are non-authoritative diagnostics, not Build,
+Artifact or qualification evidence. The supported route supplies no secret channel and rejects FDE before work;
+the adapter does not retain the generated SSH key, environment, home, configuration, cache, HTTP or output
+directories. The [2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
+Docker/Packer/NKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
+adapter on ARC, not generated hosted VM execution. Generated execution, maintained release acceptance and
+pipeline-attested or qualified production claims remain unproven. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
 (`sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80`) and QEMU plugin 1.1.6
 (`sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6`), both matching HashiCorp's
 published `SHA256SUMS`. A minimal exact-version QEMU source returned exit zero, the single 28-byte success line
@@ -341,8 +350,10 @@ The commit references in this section have distinct roles. `6df693a9748a78aafdf9
 historical `NVIDIA/nke` Make-target example above; `5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2` is the
 `dsx-ai-factory/nke` merge that introduced the staged-material contract. The current development catalog pins
 `726f76944404e1106626b8333d3576bdf67b575b`, while the recorded 2026-09-23 Podman bake used the older
-`de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NKD bytes. A rerun from the current
-committed NKD head and exact current NKE pin remains owed.
+`de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NKD bytes. The
+[2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records committed NKD candidates
+`bb6e870` and `1f989e9` executing the current NKE pin on ARM64 and AMD64, with successful builds and boot
+smoke in the unqualified diagnostic lane. Later runtime and workflow changes require their own execution proof.
 
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
 seccomp/AppArmor/system paths for user-namespace operation, the overlayfs snapshotter, no host runtime socket

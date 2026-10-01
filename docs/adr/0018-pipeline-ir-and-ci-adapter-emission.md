@@ -128,17 +128,33 @@ cgroups and the provider's nesting policy. A mounted privileged Docker socket re
 Missing prerequisites fail capability admission. No bespoke/self-hosted runner labels are emitted.
 
 The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
-a hosted VM adapter. It is manually dispatched from the default-branch workflow and may select only the declared
-`arc-amd64-kvm` or `arc-arm64-kvm` KVM scale set after an exact main commit or copy-pr-bot
-mirror is authenticated. The cross-repository source credential must not share a job with candidate code; the
+a hosted VM adapter. Each push to `main` selects that exact commit for full AMD64 and ARM64 builds, boot smoke,
+and short-retention QCOW2 uploads. Manual dispatch from the default-branch workflow remains available for
+toolchain-only or full validation of either architecture or both, after an exact main commit or copy-pr-bot
+mirror is authenticated. Runs are independent; newer pushes do not cancel earlier attempts. Both routes may
+select only the declared `arc-amd64-kvm` or `arc-arm64-kvm` KVM scale sets for full validation. Main pushes use
+the NKE pin from the merged catalog and validated Plans; manual full dispatch additionally checks the entered
+NKE commit against that pin. The cross-repository source credential must not share a job with candidate code; the
 trusted source-fetch job alone receives it. That job verifies the selected commit and tree, makes a fresh
 credential-free Git checkout, and uploads it as a one-day internal artifact with an exact SHA-256 passed as a
 job output. The build job verifies the archive digest and Git commit/tree before candidate code runs. Candidate
-code receives no authority-bearing evidence role. Its logs, image observations, QCOW2 digest and boot result are explicitly
-unqualified diagnostic output. NKE's successful ARC jobs do not establish access from `nke-recipes`; runner
-routing, availability and isolation remain provider facts that require an actual successful run here. This
-exception grants no pipeline-attested or qualified claim and changes no generated
-adapter rule.
+code receives no authority-bearing evidence role. The build job's logs, image observations, QCOW2 digest and boot
+result are explicitly unqualified diagnostic output. The [2026-10-01 runs](../evidence/2026-10-01-nke-arc-os-builds.md) exercise both
+ARC pools from `nke-recipes`; they do not establish lasting availability or provider isolation. Shared Actions
+caches are disabled for the trusted bootstrap and generated helper so candidate cache writes are not restored
+into those trusted binaries. Mirror selection checks an open, non-draft same-repository PR head, not a human
+approval. `/ok to test` is procedural vetting; branch equality does not authenticate the mirror's writer. The
+repository-scoped source secret remains a separate policy gap. This exception grants no pipeline-attested or
+qualified claim and changes no generated adapter rule.
+
+A secret-free manual `preflight` mode may execute a branch workflow at its exact dispatched commit to test
+the same no-chmod KVM-access step used by full validation on either ARC pool. It has no source checkout on
+the KVM runner, private-source fetch, image build or source credential. This branch exception is diagnostic
+only; this workflow's selection step requires toolchain and full validation to run from the default branch.
+That self-check is not GitHub-enforced authorization: the recorded branch probe reached both ARC KVM pools,
+and a different branch-authored workflow can omit the check. The repository-scoped source secret is likewise
+not restricted to this workflow. Restricting runner-group access to selected workflows/refs and moving the
+secret into a main-restricted environment remain separate provider and repository configuration follow-ups.
 
 Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.
@@ -286,7 +302,7 @@ material, toolchain or VM work until a typed non-public secret channel exists.
 Direct-Packer execution authenticates one already-local digest-pinned OCI toolchain for the selected host platform;
 it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NKD
 overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
-Every non-bootstrap consumer container has a fixed hostname, the host UID/GID, disabled health check, read-only
+Every consumer container after input extraction has a fixed hostname, the host UID/GID, disabled health check, read-only
 root, no new privileges and all capabilities dropped. OpenSSH must be able to resolve that numeric identity.
 Podman therefore generates exact passwd/group rows for the invoking UID/GID. Docker receives read-only mounts of
 attempt-owned public passwd/group projections containing only that numeric identity, so it does not depend on the
@@ -312,12 +328,14 @@ is an explicit limitation of the unqualified local lane, not an accepted hosted 
 A hosted or qualified adapter must authenticate and enforce a subordinate identity, user namespace or stronger
 provider sandbox and record real interoperability evidence before it may admit this producer.
 
-Fresh Docker volumes and `docker cp` content are root-owned. One fixed ownership-bootstrap container therefore runs
-as root with only `CAP_CHOWN`, mounts only the attempt's input and work volumes, changes their ownership to the
-observed host UID/GID, and is removed before consumer execution. It performs no input
-authentication, extraction, Packer operation or network access. Extraction, version checking, SSH-key generation,
-validation and build all run as the host UID/GID. Only the build receives the admitted network mode, KVM device and its observed
-supplemental group when the exact binding enables KVM.
+Fresh Docker volumes and `docker cp` content are root-owned. One fixed input-extraction container runs as root
+with only `CAP_CHOWN` and `CAP_DAC_OVERRIDE`, mounts only the attempt's input and work volumes, and has no network
+or KVM device. It authenticates the held inner archive before extraction, preserves sealed directory modes, then
+assigns both volumes to the observed host UID/GID. DAC override permits traversal and population of sealed
+directories; it is not passed to consumers. This container executes no source-owned command or Packer operation
+and is removed before consumer execution. Version checking, SSH-key generation, validation and build all run as
+the host UID/GID with all capabilities dropped. Only the build receives the admitted network mode, KVM device and
+its observed supplemental group when the exact binding enables KVM.
 
 The runtime sets a fixed `PACKER_PLUGIN_PATH`, requires the exact Plan-authored Packer version, generates and checks
 an attempt-local SSH key pair when the source contract declares its variables, runs `packer validate` with the exact
@@ -336,6 +354,15 @@ descriptor. Driver dispatch must enforce the selected device mode and use the su
 or qualified adapter must independently authenticate its effective provider or cgroup allocation and outer
 deadline before it can admit work.
 
+For the local Docker adapter, the daemon may occupy a different PID/mount namespace from NKD. A client-side
+`/proc/<pid>/fd/<fd>` therefore is not a portable daemon device path. The adapter retains and API-validates the
+admitted KVM descriptor, observes its character-device major/minor numbers and the caller's procfs kernel boot ID,
+and requests only the daemon's fixed `/dev/kvm` with read/write access. A fixed guard in the pinned build container
+requires the same kernel boot ID and device numbers before it execs Packer. Missing or mismatched observations
+fail closed; no source-owned command runs in that build container before the guard. This is a same-kernel device projection, not transfer
+of the open descriptor or qualified consumption evidence. It adds no privilege, host PID namespace, arbitrary
+device selection or network grant. The local Podman route retains its existing procfs descriptor path.
+
 `vm-image` execution dispatches the typed producer driver owned by ADR-10. The connected `packer` driver invokes the
 authenticated containerized Packer against the selected source-owned HCL project without parsing or generating
 HCL. A future `command` driver will execute the exact authored argument vector and can therefore invoke Make after
@@ -347,13 +374,13 @@ command.
 
 VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, nested virtualization, NUMA,
 accelerators, requirements on non-build nodes, hosted adapter integration, qualified runtime authentication, and
-provider-specific lowering remain deferred. The narrowly scoped volume-ownership bootstrap above is the only local
+provider-specific lowering remain deferred. The narrowly scoped input-extraction stage above is the only local
 direct-Packer root exception; it grants no general privileged producer lane. Produced-artifact size remains an
 artifact and transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or
 weaken a request; a grouped provider job must satisfy every member node.
 
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the local
-runner's ownership contract. The direct-Packer ownership bootstrap is the sole exception and is constrained as
+runner's ownership contract. The direct-Packer input-extraction stage is the sole exception and is constrained as
 specified above. Private package layouts must remain reopenable by later host transport steps. Rootless Podman's
 existing user mapping is retained; the rootless BuildKit build container keeps its separate fixed UID and private
 output-promotion contract.

@@ -71,6 +71,10 @@ func writePackerIdentityFile(ctx context.Context, name, content string) error {
 }
 
 func validatePackerContainerRequest(request packerContainerRunRequest, kvmEnabled bool) error {
+	if request.diagnostics == nil || request.subject == "" {
+		return e.New(e.CodeEngineCapability,
+			"containerized Packer requires an attempt-owned diagnostic capability bound to its Plan subject")
+	}
 	if request.workspace == nil {
 		return e.New(e.CodeEngineCapability, "containerized Packer requires the admitted workspace capability")
 	}

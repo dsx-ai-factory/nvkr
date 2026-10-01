@@ -11,6 +11,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	"sigs.k8s.io/yaml"
 )
 
@@ -22,14 +23,25 @@ const (
 
 // Overlay is one independently versioned, ordered mutation of a resolved catalog.
 // RequiresCatalogDigest pins the exact input state, so reordering, omission, or
-// replay against another base fails closed. Component replacements are deliberately
-// whole-producer substitutions: no source-only fields can leak into a supplier lane.
+// replay against another base fails closed. Producer replacements are complete;
+// toolchain substitutions are the narrow, exact-pin execution-profile exception.
 type Overlay struct {
-	APIVersion            string                          `json:"apiVersion"`
-	Kind                  string                          `json:"kind"`
-	Name                  string                          `json:"name"`
-	RequiresCatalogDigest string                          `json:"requiresCatalogDigest"`
-	Components            map[string]ComponentReplacement `json:"components"`
+	APIVersion             string                          `json:"apiVersion"`
+	Kind                   string                          `json:"kind"`
+	Name                   string                          `json:"name"`
+	RequiresCatalogDigest  string                          `json:"requiresCatalogDigest"`
+	Components             map[string]ComponentReplacement `json:"components,omitempty"`
+	ToolchainSubstitutions []ToolchainSubstitution         `json:"toolchainSubstitutions,omitempty"`
+}
+
+// ToolchainSubstitution changes one exact execution image pin for an explicit
+// sorted set of resolved producers. Both pins and the predecessor catalog are
+// checked before any replacement can enter the resulting catalog identity.
+type ToolchainSubstitution struct {
+	Arch       string   `json:"arch"`
+	From       string   `json:"from"`
+	To         string   `json:"to"`
+	Components []string `json:"components"`
 }
 
 // ComponentReplacement replaces one producer while retaining its logical component
@@ -96,8 +108,8 @@ func (overlay Overlay) Validate() error {
 	if !canonical.IsDigest(overlay.RequiresCatalogDigest) {
 		return e.New(e.CodeUnpinnedSource, "catalog overlay %q requires invalid catalog digest %q", overlay.Name, overlay.RequiresCatalogDigest)
 	}
-	if len(overlay.Components) == 0 {
-		return e.New(e.CodeInvalidCatalog, "catalog overlay %q replaces no components", overlay.Name)
+	if len(overlay.Components) == 0 && len(overlay.ToolchainSubstitutions) == 0 {
+		return e.New(e.CodeInvalidCatalog, "catalog overlay %q has no producer or toolchain substitution", overlay.Name)
 	}
 	for _, name := range sortedReplacementNames(overlay.Components) {
 		if strings.TrimSpace(name) == "" || name != strings.TrimSpace(name) {
@@ -113,6 +125,34 @@ func (overlay Overlay) Validate() error {
 		}
 		if forms != 1 {
 			return e.New(e.CodeInvalidCatalog, "catalog overlay %q component %q requires exactly one of prebuilt or component", overlay.Name, name)
+		}
+	}
+	seen := make(map[string]struct{})
+	for i, substitution := range overlay.ToolchainSubstitutions {
+		if !target.ValidArch(substitution.Arch) || substitution.From == substitution.To ||
+			!digestPinned.MatchString(substitution.From) || !digestPinned.MatchString(substitution.To) ||
+			len(substitution.Components) == 0 {
+			return e.New(e.CodeInvalidCatalog, "catalog overlay %q has invalid toolchain substitution %d", overlay.Name, i)
+		}
+		if err := checkOCIRefScheme(overlay.Name, "toolchainSubstitutions.from", substitution.From); err != nil {
+			return err
+		}
+		if err := checkOCIRefScheme(overlay.Name, "toolchainSubstitutions.to", substitution.To); err != nil {
+			return err
+		}
+		previous := ""
+		for _, component := range substitution.Components {
+			if strings.TrimSpace(component) == "" || component <= previous {
+				return e.New(e.CodeInvalidCatalog,
+					"catalog overlay %q substitution %d components must be sorted and duplicate-free", overlay.Name, i)
+			}
+			previous = component
+			key := substitution.Arch + "/" + component
+			if _, duplicate := seen[key]; duplicate {
+				return e.New(e.CodeInvalidCatalog,
+					"catalog overlay %q substitutes component %q on %q more than once", overlay.Name, component, substitution.Arch)
+			}
+			seen[key] = struct{}{}
 		}
 	}
 	return nil
@@ -193,6 +233,19 @@ func ApplyStack(base *Catalog, overlays ...Overlay) (*Stack, error) {
 				return nil, e.Wrap(e.CodeInvalidCatalog, err, "catalog overlay %q", overlay.Name)
 			}
 			current.Components[name] = replacement
+		}
+		for _, substitution := range overlay.ToolchainSubstitutions {
+			for _, name := range substitution.Components {
+				component, ok := current.Components[name]
+				if !ok || !component.FromSource || component.ToolchainImages[substitution.Arch] != substitution.From {
+					return nil, e.New(e.CodeUnverifiedRef,
+						"catalog overlay %q component %q has no expected %s toolchain pin %q",
+						overlay.Name, name, substitution.Arch, substitution.From)
+				}
+				component.ToolchainImages = cloneStringMap(component.ToolchainImages)
+				component.ToolchainImages[substitution.Arch] = substitution.To
+				current.Components[name] = component
+			}
 		}
 		if err := current.Validate(); err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "catalog overlay %q result", overlay.Name)

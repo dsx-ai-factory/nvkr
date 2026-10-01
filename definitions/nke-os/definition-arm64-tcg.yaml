@@ -1,0 +1,23 @@
+apiVersion: nkd.dev/definition/v4
+kind: Definition
+metadata:
+  name: nke-os-arm64-tcg
+  description: Build the ARM64 non-FDE NKE node QCOW2 with QEMU TCG for local development.
+catalog:
+  base: ./catalog
+outputs:
+  - name: nke-node-image-arm64
+    platform: linux/arm64
+    format: disk-image
+    components:
+      - nke-agent
+      - nke-cni-calico
+      - nke-cni-ovn
+      - nke-image-inputs
+      - nke-kubeadm-distro
+      - nke-node-image
+      - nke-patched-installer-iso
+      - nke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso

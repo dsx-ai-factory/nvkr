@@ -1132,6 +1132,19 @@ func copyTransportExact(ctx context.Context, destination io.Writer, source io.Re
 	return written, nil
 }
 
+// CopyExact reuses the carrier's bounded, context-aware copy primitive. It copies
+// only size bytes and rejects a short source; it grants no filesystem authority.
+func CopyExact(ctx context.Context, destination io.Writer, source io.Reader, size int64) (int64, error) {
+	if err := requireTransportContext(ctx, "copying bounded transport bytes"); err != nil {
+		return 0, err
+	}
+	written, err := copyTransportExact(ctx, destination, source, size)
+	if err != nil {
+		return written, transportError(ctx, e.CodeVerifyFailed, err, "copying bounded transport bytes")
+	}
+	return written, nil
+}
+
 func noSymlinkParents(root, destination string) error {
 	relative, err := filepath.Rel(root, filepath.Dir(destination))
 	if err != nil {

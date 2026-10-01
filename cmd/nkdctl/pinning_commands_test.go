@@ -63,6 +63,11 @@ func TestCatalogSourcePinProjection(t *testing.T) {
 			args:     []string{"nkdctl", "catalog", "source-pin", "--data", data, "kubernetes", "extra"},
 			wantCode: e.CodeUsage,
 		},
+		{
+			name:     "catalog load failure",
+			args:     []string{"nkdctl", "catalog", "source-pin", "--data", filepath.Join(t.TempDir(), "missing"), "kubernetes"},
+			wantCode: e.CodeInvalidCatalog,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

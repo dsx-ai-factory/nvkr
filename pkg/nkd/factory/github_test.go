@@ -49,6 +49,7 @@ func TestRenderGitHubProducesStaticallyValidCompleteBundle(t *testing.T) {
 		// than assuming a preinstalled toolchain.
 		[]byte("uses: " + plan.Actions["setup-go"].Uses()),
 		[]byte("go-version-file: '.go-version'"),
+		[]byte("cache: 'false'"),
 		// IR build/fetch nodes are isolated by the helper orchestrating their pinned
 		// container itself (ADR-18 §8), sharing the pipeline emitter's per-node primitive.
 		[]byte("factory execute-node --plan"),
@@ -88,6 +89,8 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 		{name: "network", old: []byte("--network none"), new: []byte("--network bridge")},
 		{name: "node-dispatch", old: []byte("factory execute-node --plan"), new: []byte("exec-node --nodes")},
 		{name: "setup-go-version", old: []byte("go-version-file: '.go-version'"), new: []byte("go-version-file: 'go.mod'")},
+		{name: "setup-go-cache", code: e.CodeInvalidCatalog, old: []byte("cache: 'false'"), new: []byte("cache: 'true'")},
+		{name: "setup-go-cache-removed", code: e.CodeInvalidCatalog, old: []byte("cache: 'false'"), new: nil},
 		{name: "output", old: []byte("if-no-files-found: error"), new: []byte("if-no-files-found: ignore")},
 		{name: "checkout-credential", old: []byte("persist-credentials: 'false'"), new: []byte("persist-credentials: 'true'")},
 		{name: "pull-request-trigger", code: e.CodeEngineCapability, old: []byte("workflow_dispatch: {}"), new: []byte("workflow_dispatch: {}\n  pull_request: {}")},

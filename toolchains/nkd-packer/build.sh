@@ -86,8 +86,10 @@ jq -e '
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
   )) and
-  (.localImages | keys | sort) == ["amd64", "arm64"] and
-  all(.localImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
+  (.localPodmanImages | keys | sort) == ["amd64", "arm64"] and
+  all(.localPodmanImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
+  (.localDockerImages | keys | sort) == ["amd64", "arm64"] and
+  all(.localDockerImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
   (.images | keys | sort) == ["amd64", "arm64"] and
   all(.images[]; . == null or test("^.+@sha256:[0-9a-f]{64}$"))
 ' "${lock}" >/dev/null
@@ -177,7 +179,23 @@ nfpm_digest="$(jq -r --arg arch "${arch}" '.nfpm.archives[$arch]' "${lock}")"
 nfpm_binary_digest="$(jq -r --arg arch "${arch}" '.nfpm.binaries[$arch]' "${lock}")"
 tag="${tag:-localhost/nkd-packer-toolchain:dev-${arch}}"
 
-"${runtime}" build \
+build_command=("${runtime}" build)
+if [[ "${runtime##*/}" == docker ]]; then
+  # Buildx passes the fixed epoch into BuildKit's image config and history,
+  # then rewrites image-layer file timestamps to the same epoch on export.
+  # Explicit stdout export avoids the Docker driver's automatic image-store
+  # unpack, which cannot be combined with timestamp rewriting. Load the
+  # archive separately below; pipefail preserves failures from either stage.
+  # Keep the existing Podman path unchanged so its recorded ARM64 image ID
+  # remains an independently checkable local development pin.
+  "${runtime}" buildx version
+  "${runtime}" version --format 'Docker server {{.Server.Version}}'
+  build_command=("${runtime}" buildx build
+    --output "type=docker,dest=-,rewrite-timestamp=true"
+    --build-arg SOURCE_DATE_EPOCH=0)
+fi
+
+build_command+=(
   --platform "linux/${arch}" \
   --build-arg "TARGETARCH=${arch}" \
   --build-arg "BASE_IMAGE=${base_image}" \
@@ -199,7 +217,13 @@ tag="${tag:-localhost/nkd-packer-toolchain:dev-${arch}}"
   --build-arg "NFPM_BINARY_SHA256=${nfpm_binary_digest#sha256:}" \
   --file "${here}/Dockerfile" \
   --tag "${tag}" \
-  "${here}"
+  "${here}")
+
+if [[ "${runtime##*/}" == docker ]]; then
+  "${build_command[@]}" | "${runtime}" image load
+else
+  "${build_command[@]}"
+fi
 
 inspection="$("${runtime}" image inspect "${tag}")"
 if ! jq -e --arg arch "${arch}" '
@@ -217,7 +241,11 @@ image_id="$("${runtime}" image inspect --format '{{.Id}}' "${tag}")"
 if [[ "${image_id}" =~ ^[0-9a-f]{64}$ ]]; then
   image_id="sha256:${image_id}"
 fi
-expected_local_image="$(jq -r --arg arch "${arch}" '.localImages[$arch] // empty' "${lock}")"
+case "${runtime##*/}" in
+  podman) pin_family=localPodmanImages ;;
+  docker) pin_family=localDockerImages ;;
+esac
+expected_local_image="$(jq -r --arg arch "${arch}" --arg family "${pin_family}" '.[$family][$arch] // empty' "${lock}")"
 if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" ]]; then
   echo "local toolchain image ID ${image_id} does not match locked ${arch} ID ${expected_local_image}" >&2
   exit 1

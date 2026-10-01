@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -353,23 +354,33 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		t.Fatalf("Podman container args do not use its named-volume nocopy syntax: %#v", podman)
 	}
 	request.kvm, request.groupAdd = kvm, "123"
+	request.kvmProjection = &packerKVMProjection{device: kvm, bootID: "test-boot", deviceNumber: "a:e8"}
 	withKVM := packerContainerCreateArgs("docker", request)
-	if len(withKVM) != len(want)+3 || !slices.Contains(withKVM, "--group-add=123") ||
+	if !slices.Contains(withKVM, "--group-add=123") ||
 		!slices.Contains(withKVM, "--device") {
 		t.Fatalf("KVM container args do not add the admitted group and device: %#v", withKVM)
 	}
-	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
-	if !slices.Contains(withKVM, wantDevice) {
+	if !slices.Contains(withKVM, "/dev/kvm:/dev/kvm:rw") ||
+		!slices.Contains(withKVM, "--entrypoint=sh") || !slices.Contains(withKVM, packerKVMProjectionScript) {
 		t.Fatalf("KVM container args do not use the minimal rw device grant: %#v", withKVM)
+	}
+	if !reflect.DeepEqual(withKVM[len(withKVM)-10:], []string{"-ec", packerKVMProjectionScript,
+		"nkd-kvm-projection", "test-boot", "a:e8", "/dev/kvm", "packer", "build", "-only=build.qemu.node", "."}) {
+		t.Fatalf("Docker KVM projection does not guard the exact Packer argv: %#v", withKVM)
 	}
 	request.network = ir.NetworkDefault
 	withDockerNetwork := packerContainerCreateArgs("docker", request)
 	if !slices.Contains(withDockerNetwork, "--network=bridge") || slices.Contains(withDockerNetwork, "--network=none") {
 		t.Fatalf("networked Docker Packer build args = %#v", withDockerNetwork)
 	}
+	request.kvmProjection = nil
 	withPodmanNetwork := packerContainerCreateArgs("podman", request)
 	if !slices.Contains(withPodmanNetwork, "--network=default") || slices.Contains(withPodmanNetwork, "--network=none") {
 		t.Fatalf("networked Podman Packer build args = %#v", withPodmanNetwork)
+	}
+	if !slices.Contains(withPodmanNetwork, fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())) ||
+		slices.Contains(withPodmanNetwork, packerKVMProjectionScript) {
+		t.Fatalf("Podman descriptor handoff changed: %#v", withPodmanNetwork)
 	}
 }
 
@@ -411,29 +422,31 @@ func TestCreatePackerContainerRejectsMissingDockerIdentityBeforeWork(t *testing.
 	}
 }
 
-func TestPackerVolumeBootstrapIsTheOnlyRootContainer(t *testing.T) {
+func TestPackerInputStageIsTheOnlyRootContainer(t *testing.T) {
 	base := packerContainerCreateRequest{
-		name: "stage", image: "registry.example/packer@sha256:" + repeatHex("a"), platform: "linux/amd64",
+		name: "consumer", image: "registry.example/packer@sha256:" + repeatHex("a"), platform: "linux/amd64",
 		input: "nkd-input", work: "nkd-work", project: "/nkd/work", entrypoint: "sh",
 		packerArgs: []string{"-ec", "true"},
 		identity:   packerContainerIdentity{passwdPath: "/private/passwd", groupPath: "/private/group"},
 	}
 	consumer := packerContainerCreateArgs("docker", base)
 	if !slices.Contains(consumer, fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())) ||
-		slices.Contains(consumer, "--user=0:0") || slices.Contains(consumer, "--cap-add=CHOWN") {
+		slices.Contains(consumer, "--user=0:0") || slices.Contains(consumer, "--cap-add=CHOWN") ||
+		slices.Contains(consumer, "--cap-add=DAC_OVERRIDE") {
 		t.Fatalf("consumer identity/capabilities = %#v", consumer)
 	}
-	base.name, base.user, base.allowChown = "bootstrap", "0:0", true
-	bootstrap := packerContainerCreateArgs("docker", base)
-	if !slices.Contains(bootstrap, "--user=0:0") || !slices.Contains(bootstrap, "--cap-add=CHOWN") {
-		t.Fatalf("bootstrap identity/capabilities = %#v", bootstrap)
+	base.name, base.user, base.allowChown, base.allowDAC = "stage", "0:0", true, true
+	stage := packerContainerCreateArgs("docker", base)
+	if !slices.Contains(stage, "--user=0:0") || !slices.Contains(stage, "--cap-add=CHOWN") ||
+		!slices.Contains(stage, "--cap-add=DAC_OVERRIDE") {
+		t.Fatalf("stage identity/capabilities = %#v", stage)
 	}
-	if slices.ContainsFunc(bootstrap, func(arg string) bool {
+	if slices.ContainsFunc(stage, func(arg string) bool {
 		return strings.Contains(arg, "dst=/etc/passwd") || strings.Contains(arg, "dst=/etc/group")
 	}) {
-		t.Fatalf("root bootstrap received unnecessary host identity mounts: %#v", bootstrap)
+		t.Fatalf("root stage received unnecessary host identity mounts: %#v", stage)
 	}
-	for _, args := range [][]string{consumer, bootstrap} {
+	for _, args := range [][]string{consumer, stage} {
 		for _, required := range []string{"--network=none", "--read-only", "--no-healthcheck", "--hostname=nkd-packer", "--cap-drop=ALL"} {
 			if !slices.Contains(args, required) {
 				t.Fatalf("container args %#v omit %q", args, required)
@@ -485,6 +498,29 @@ func TestStartPackerContainerReturnsBoundedRuntimeDiagnostic(t *testing.T) {
 	}
 }
 
+func TestStartPackerBuildContainerClassifiesProjectionFailure(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		status  string
+		guarded bool
+		want    e.Code
+	}{
+		{name: "successful guarded build", status: "0", guarded: true},
+		{name: "projection rejected", status: "97", guarded: true, want: e.CodeEngineCapability},
+		{name: "ordinary build failed", status: "1", guarded: true, want: e.CodeBuildFailed},
+		{name: "unguarded invocation", status: "97", want: e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cause := exec.CommandContext(t.Context(), "sh", "-c", "exit \"$1\"", "test", test.status).Run()
+			runtime := &recordingPackerRuntime{run: func(io.Reader, io.Writer, io.Writer, []string) error { return cause }}
+			err := startPackerBuildContainer(t.Context(), runtime, "build", nil, nil, test.guarded)
+			if code(err) != test.want || !errors.Is(err, cause) {
+				t.Fatalf("error=%v, want %s with the subprocess cause", err, test.want)
+			}
+		})
+	}
+}
+
 type recordingPackerRuntime struct {
 	name       string
 	endpoint   string
@@ -495,6 +531,18 @@ type recordingPackerRuntime struct {
 	run        func(io.Reader, io.Writer, io.Writer, []string) error
 	runContext func(context.Context, io.Reader, io.Writer, io.Writer, []string) error
 	cleanupErr error
+}
+
+func makePackerDiagnosticsRemovable(root string) {
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			_ = os.Chmod(path, 0o700)
+		}
+		return nil
+	})
 }
 
 type cleanupBudgetPackerRuntime struct {

@@ -27,6 +27,35 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
+func testPackerDiagnosticSink(t *testing.T, root *os.File) *PackerDiagnosticSink {
+	t.Helper()
+	sink, err := NewPackerDiagnosticSink(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { makePackerDiagnosticsRemovable(root.Name()) })
+	t.Cleanup(func() {
+		if err := sink.Close(); err != nil {
+			t.Errorf("closing test Packer diagnostic sink: %v", err)
+		}
+	})
+	return sink
+}
+
+func testPackerDiagnosticSinkAt(t *testing.T, root string) *PackerDiagnosticSink {
+	t.Helper()
+	directory, err := os.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := directory.Close(); err != nil {
+			t.Errorf("closing test Packer diagnostic root: %v", err)
+		}
+	}()
+	return testPackerDiagnosticSink(t, directory)
+}
+
 func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) {
 	root := t.TempDir()
 	t.Cleanup(func() { _ = removePrivateTree(root) })
@@ -67,9 +96,32 @@ func TestPackerInputExtractScriptHandlesSealedTopLevelDirectories(t *testing.T) 
 	digest := sha256.Sum256(archiveBytes)
 	destination := t.TempDir()
 	t.Cleanup(func() { _ = removePrivateTree(destination) })
+	work := t.TempDir()
+	if err := os.Mkdir(filepath.Join(work, "stage"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	chown, err := exec.LookPath("chown")
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := t.TempDir()
+	// Check both ownership operands, then use the real chown. Without this
+	// assertion an unprivileged test would miss an untouched, already-owned work root.
+	if err := os.WriteFile(filepath.Join(commands, "chown"), []byte(`#!/bin/sh
+set -eu
+test "$#" -eq 4
+test "$1" = -R
+test "$3" = "$NKD_TEST_INPUT"
+test "$4" = "$NKD_TEST_WORK"
+exec "$NKD_TEST_CHOWN" "$@"
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	command := exec.CommandContext(t.Context(), "sh", "-ec", packerInputExtractScript,
 		"nkd-extract-input", fmt.Sprintf("%x", digest), archive, destination,
-		fmt.Sprint(os.Getuid()), fmt.Sprint(os.Getgid()))
+		fmt.Sprint(os.Getuid()), fmt.Sprint(os.Getgid()), work)
+	command.Env = append(os.Environ(), "PATH="+commands+":"+os.Getenv("PATH"),
+		"NKD_TEST_CHOWN="+chown, "NKD_TEST_INPUT="+destination, "NKD_TEST_WORK="+work)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("extracting sealed Packer input closure: %v: %s", err, output)
 	}
@@ -238,6 +290,7 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	artifactCarrier := testQCOW2Carrier(t, "node.qcow2")
+	logCarrier := testPackerArtifactCarrier(t, "serial.log", []byte("serial console\n"))
 	fake := &recordingPackerRuntime{
 		endpoint: qualifiedRuntimeEndpoint, digest: runtimeDigest, identity: runtimeIdentity,
 	}
@@ -256,7 +309,11 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 		case len(args) > 1 && args[0] == "cp" && args[1] == "-":
 			_, _ = io.Copy(io.Discard, stdin)
 		case len(args) > 2 && args[0] == "cp" && args[len(args)-1] == "-":
-			_, _ = stdout.Write(artifactCarrier)
+			if strings.Contains(args[1], packerContainerBuildLogPath) {
+				_, _ = stdout.Write(logCarrier)
+			} else {
+				_, _ = stdout.Write(artifactCarrier)
+			}
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-version"):
 			_, _ = io.WriteString(stdout, "Packer v1.14.2\n")
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-ssh-verify-"):
@@ -269,14 +326,17 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	artifact, err := runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: fake, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: manifestDigest, workspace: workspace,
+		node: node, subject: "plan/node", manifest: manifest, digest: manifestDigest, workspace: workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
 		bindings: packerContainerBindings{
 			packerVersion: "1.14.2", acceleratorVariable: "accelerator",
-			sshPrivateKeyVariable: "ssh_private_key", sshPublicKeyVariable: "ssh_public_key",
+			buildLogDirectoryVariable: "build_logs",
+			sshPrivateKeyVariable:     "ssh_private_key", sshPublicKeyVariable: "ssh_public_key",
 		},
-	})
+	}
+	artifact, err := runPackerContainer(ctx, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +350,7 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	}
 
 	validateIndex, buildIndex, sshContainers, networkedContainers := -1, -1, 0, 0
-	workCopyIndex, carrierCopyIndex, bootstrapStartIndex, stageStartIndex := -1, -1, -1, -1
+	workCopyIndex, carrierCopyIndex, stageStartIndex := -1, -1, -1
 	hostUser := fmt.Sprintf("--user=%d:%d", os.Getuid(), os.Getgid())
 	for index, call := range fake.calls {
 		joined := strings.Join(call, " ")
@@ -311,17 +371,14 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			} else if !slices.Contains(call, "--network=none") || slices.Contains(call, "--network=bridge") {
 				t.Fatalf("Packer preparation container received network access: %#v", call)
 			}
-			if strings.Contains(joined, "nkd.dev/role=bootstrap") {
-				if !slices.Contains(call, "--user=0:0") || !slices.Contains(call, "--cap-add=CHOWN") {
-					t.Fatalf("volume bootstrap lacks its narrow root/CHOWN authority: %#v", call)
-				}
-			} else if strings.Contains(joined, "nkd.dev/role=stage") {
+			if strings.Contains(joined, "nkd.dev/role=stage") {
 				if !slices.Contains(call, "--user=0:0") || !slices.Contains(call, "--cap-add=CHOWN") ||
 					!slices.Contains(call, "--cap-add=DAC_OVERRIDE") {
 					t.Fatalf("authenticated input stage lacks its narrow extraction authority: %#v", call)
 				}
-			} else if !slices.Contains(call, hostUser) || slices.Contains(call, "--cap-add=CHOWN") {
-				t.Fatalf("non-bootstrap container does not use the host identity without CHOWN: %#v", call)
+			} else if !slices.Contains(call, hostUser) || slices.Contains(call, "--cap-add=CHOWN") ||
+				slices.Contains(call, "--cap-add=DAC_OVERRIDE") {
+				t.Fatalf("consumer container does not use the host identity without extra capabilities: %#v", call)
 			}
 			if strings.Contains(joined, "nkd.dev/role=ssh-") {
 				sshContainers++
@@ -350,9 +407,6 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 			}
 		}
 		if len(call) > 2 && call[0] == "start" {
-			if strings.Contains(call[2], "-bootstrap") {
-				bootstrapStartIndex = index
-			}
 			if strings.Contains(call[2], "-stage") {
 				stageStartIndex = index
 			}
@@ -367,13 +421,21 @@ func TestRunPackerContainerEndToEndFakeRuntime(t *testing.T) {
 	if networkedContainers != 1 {
 		t.Fatalf("networked Packer containers = %d, want only the build container", networkedContainers)
 	}
-	if workCopyIndex < 0 || carrierCopyIndex <= workCopyIndex || bootstrapStartIndex <= carrierCopyIndex ||
-		stageStartIndex <= bootstrapStartIndex || validateIndex <= stageStartIndex {
-		t.Fatalf("authenticated staging order is invalid: work=%d carrier=%d bootstrap=%d stage=%d validate=%d",
-			workCopyIndex, carrierCopyIndex, bootstrapStartIndex, stageStartIndex, validateIndex)
+	if workCopyIndex < 0 || carrierCopyIndex <= workCopyIndex ||
+		stageStartIndex <= carrierCopyIndex || validateIndex <= stageStartIndex {
+		t.Fatalf("authenticated staging order is invalid: work=%d carrier=%d stage=%d validate=%d",
+			workCopyIndex, carrierCopyIndex, stageStartIndex, validateIndex)
 	}
 	if len(fake.cleanups) < 3 {
 		t.Fatalf("cleanup calls = %#v, want build container and two volumes", fake.cleanups)
+	}
+	diagnosticLogs, err := filepath.Glob(filepath.Join(workspacePath, packerDiagnosticDirectory,
+		packerDiagnosticProducerDir, "run-*", packerDiagnosticLogsName, "serial.log"))
+	if err != nil || len(diagnosticLogs) != 1 {
+		t.Fatalf("retained diagnostic logs = %#v, error=%v", diagnosticLogs, err)
+	}
+	if raw, err := os.ReadFile(diagnosticLogs[0]); err != nil || string(raw) != "serial console\n" {
+		t.Fatalf("retained serial log = %q, error=%v", raw, err)
 	}
 }
 
@@ -412,13 +474,15 @@ func TestRunPackerContainerRejectsUnpairedSSHVariablesBeforeRuntimeWork(t *testi
 	runtime := &recordingPackerRuntime{endpoint: qualifiedRuntimeEndpoint}
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	artifact, err := runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: runtime, source: &materializedSource{Dir: t.TempDir(), InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)), workspace: workspace,
+		node: node, subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)), workspace: workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
 		bindings: packerContainerBindings{
 			packerVersion: "1.14.2", acceleratorVariable: "accelerator", sshPrivateKeyVariable: "ssh_private_key",
 		},
-	})
+	}
+	artifact, err := runPackerContainer(ctx, request)
 	if artifact != nil || code(err) != e.CodeInvalidCatalog {
 		t.Fatalf("unpaired SSH artifact/error = %#v/%v, want nil/%s", artifact, err, e.CodeInvalidCatalog)
 	}
@@ -472,11 +536,30 @@ func TestValidatePackerContainerKVMRejectsUnadmittedDevices(t *testing.T) {
 		!strings.Contains(err.Error(), "device handoff") {
 		t.Fatalf("wrong character device error = %v, want handoff %s", err, e.CodeEngineCapability)
 	}
-	if kvm, err := os.Open("/dev/kvm"); err == nil {
-		defer kvm.Close()
-		if err := validatePackerContainerKVM(runtime, kvm, true); err != nil {
-			t.Fatalf("available /dev/kvm failed API revalidation: %v", err)
-		}
+	if err := validatePackerContainerKVM(runtime, nil, true); code(err) != e.CodeEngineCapability {
+		t.Fatalf("missing KVM error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	if err := validatePackerContainerKVM(runtime, nullDevice, false); code(err) != e.CodeEngineCapability {
+		t.Fatalf("disabled KVM with device error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	if err := validatePackerContainerKVM(runtime, nil, false); err != nil {
+		t.Fatalf("disabled KVM without device: %v", err)
+	}
+}
+
+func TestValidatePackerContainerKVMWithRealDevice(t *testing.T) {
+	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+		t.Skipf("real KVM device is unavailable: %v", err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer kvm.Close()
+	// Exercise the real ioctl ABI, not an injected return value. This catches
+	// using a pointer-returning ioctl helper for KVM_GET_API_VERSION.
+	if err := validatePackerContainerKVM(&recordingPackerRuntime{endpoint: qualifiedRuntimeEndpoint}, kvm, true); err != nil {
+		t.Fatalf("available /dev/kvm failed API revalidation: %v", err)
 	}
 }
 
@@ -495,14 +578,92 @@ func TestPackerBuildContainerRequestThreadsKVMResolution(t *testing.T) {
 	}
 	build := packerBuildContainerRequest(request, "input", "work", "/nkd/input/source",
 		"nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc", "123", true)
+	build.kvmProjection = &packerKVMProjection{device: kvm, bootID: "test-boot", deviceNumber: "a:e8"}
 	args := packerContainerCreateArgs("docker", build)
 	if !slices.Contains(args, "accelerator=kvm") || !slices.Contains(args, "--group-add=123") ||
 		!slices.Contains(args, "--network=bridge") {
 		t.Fatalf("KVM build arguments do not preserve the resolved accelerator and device group: %#v", args)
 	}
-	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
-	if !slices.Contains(args, "--device") || !slices.Contains(args, wantDevice) {
-		t.Fatalf("KVM build arguments do not preserve the held device: %#v", args)
+	if !slices.Contains(args, "--device") || !slices.Contains(args, "/dev/kvm:/dev/kvm:rw") ||
+		!slices.Contains(args, packerKVMProjectionScript) {
+		t.Fatalf("KVM build arguments do not guard the device projection: %#v", args)
+	}
+}
+
+func TestPackerKVMProjectionGuard(t *testing.T) {
+	device, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer device.Close()
+	// /dev/null exercises the kernel/device equality guard without requiring
+	// KVM in unit CI. The separate admission tests reject /dev/null as KVM.
+	projection, err := observePackerKVMProjection(t.Context(), device, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, bootID, number, path string
+		wantSuccess                bool
+	}{
+		{"same kernel and device", projection.bootID, projection.deviceNumber, os.DevNull, true},
+		{"different kernel", "different-boot", projection.deviceNumber, os.DevNull, false},
+		{"different device", projection.bootID, "0:0", os.DevNull, false},
+		{"missing device", projection.bootID, projection.deviceNumber, filepath.Join(t.TempDir(), "missing"), false},
+		{"not a device", projection.bootID, projection.deviceNumber, t.TempDir(), false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), "sh", "-ec", packerKVMProjectionScript,
+				"nkd-kvm-projection", test.bootID, test.number, test.path, "printf", "%s", "executed")
+			output, err := cmd.CombinedOutput()
+			if test.wantSuccess {
+				if err != nil || string(output) != "executed" {
+					t.Fatalf("guarded execution = %q, %v", output, err)
+				}
+			} else if err == nil || strings.Contains(string(output), "executed") {
+				t.Fatalf("guard permitted mismatched projection: %q, %v", output, err)
+			} else {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || exit.ExitCode() != 97 {
+					t.Fatalf("projection rejection exit=%v, want reserved status 97", err)
+				}
+			}
+		})
+	}
+}
+
+func TestCreatePackerContainerRejectsUnboundKVMProjection(t *testing.T) {
+	device, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer device.Close()
+	other, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	valid := &packerKVMProjection{device: device, bootID: "test-boot", deviceNumber: "1:3"}
+	for _, test := range []struct {
+		name, runtime string
+		device        *os.File
+		projection    *packerKVMProjection
+	}{
+		{"missing projection", "docker", device, nil},
+		{"missing device", "docker", nil, valid},
+		{"substituted descriptor", "docker", other, valid},
+		{"wrong runtime", "podman", device, valid},
+		{"empty projection", "docker", device, &packerKVMProjection{device: device}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &recordingPackerRuntime{name: test.runtime}
+			err := createPackerContainer(t.Context(), runtime, packerContainerCreateRequest{
+				kvm: test.device, kvmProjection: test.projection,
+			})
+			if code(err) != e.CodeEngineCapability || len(runtime.calls) != 0 {
+				t.Fatalf("unbound projection caused runtime work: error=%v calls=%#v", err, runtime.calls)
+			}
+		})
 	}
 }
 
@@ -559,12 +720,14 @@ func TestRunPackerContainerRejectsMissingPluginBeforeBuild(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	_, err = runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: fake, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
-		workspace: workspace,
-		bindings:  packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
-	})
+		node: node, subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+		workspace:   workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
+		bindings:    packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+	}
+	_, err = runPackerContainer(ctx, request)
 	if code(err) != e.CodeBuildFailed {
 		t.Fatalf("missing plugin error = %v, want %s", err, e.CodeBuildFailed)
 	}
@@ -623,12 +786,14 @@ func TestRunPackerContainerRejectsCorruptedVolumeCarrierBeforePacker(t *testing.
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	_, err = runPackerContainer(ctx, packerContainerRunRequest{
+	request := packerContainerRunRequest{
 		runtime: fake, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: node, manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
-		workspace: workspace,
-		bindings:  packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
-	})
+		node: node, subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+		workspace:   workspace,
+		diagnostics: testPackerDiagnosticSink(t, workspace),
+		bindings:    packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+	}
+	_, err = runPackerContainer(ctx, request)
 	if code(err) != e.CodeUnverifiedRef {
 		t.Fatalf("corrupted carrier error = %v, want %s", err, e.CodeUnverifiedRef)
 	}
@@ -673,6 +838,7 @@ func TestRunPackerContainerFailsBeforeBuildOnVersionOrValidationDiagnostics(t *t
 func TestRunPackerContainerReapsResourcesWhenBuildStartFails(t *testing.T) {
 	request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n",
 		"The configuration is valid.\n", "", nil)
+	request.bindings.buildLogDirectoryVariable = "build_logs"
 	fallback := runtime.run
 	startFailure := errors.New("build start failed")
 	runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
@@ -697,6 +863,196 @@ func TestRunPackerContainerReapsResourcesWhenBuildStartFails(t *testing.T) {
 	}
 	if !buildRemoved || volumesRemoved != 2 {
 		t.Fatalf("build-start cleanup calls = %#v, want build container and two volumes reaped", runtime.cleanups)
+	}
+	logs, globErr := filepath.Glob(filepath.Join(request.workspace.Name(), packerDiagnosticDirectory,
+		packerDiagnosticProducerDir, "run-*", packerDiagnosticLogsName, "serial.log"))
+	if globErr != nil || len(logs) != 1 {
+		t.Fatalf("failed-build diagnostic logs = %#v, error=%v", logs, globErr)
+	}
+}
+
+func TestRunPackerContainerClassifiesBuildExit(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		status  string
+		guarded bool
+		want    e.Code
+	}{
+		{name: "projection rejected", status: "97", guarded: true, want: e.CodeEngineCapability},
+		{name: "ordinary guarded failure", status: "1", guarded: true, want: e.CodeBuildFailed},
+		{name: "unguarded exit 97", status: "97", want: e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, runtime, buildCreated := newPackerContainerTestRun(t, "Packer v1.14.2\n",
+				"The configuration is valid.\n", "", nil)
+			if test.guarded {
+				// Keep the real admission boundary intact: /dev/null cannot stand
+				// in for KVM because admission authenticates the path and ioctl ABI.
+				kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+				if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+					if os.Getenv("NKD_REQUIRE_KVM_TEST") == "1" {
+						t.Fatalf("guarded dispatch requires an accessible real KVM device: %v", err)
+					}
+					t.Skipf("guarded dispatch requires an accessible real KVM device: %v", err)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = kvm.Close() })
+				request.kvm = kvm
+				request.node.ExecutionBinding.Class.Capabilities = []execution.CapabilityName{execution.CapabilityKVM}
+				request.node.ExecutionBinding.Capabilities[0].Enabled = true
+			}
+			cause := exec.CommandContext(t.Context(), "sh", "-c", "exit \"$1\"", "test", test.status).Run()
+			var exit *exec.ExitError
+			if !errors.As(cause, &exit) {
+				t.Fatalf("fixture did not produce a subprocess exit: %v", cause)
+			}
+			fallback := runtime.run
+			runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+				if len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-build") {
+					return cause
+				}
+				return fallback(stdin, stdout, stderr, args)
+			}
+			artifact, err := runPackerContainer(testContext(t), request)
+			if artifact != nil || code(err) != test.want || !errors.Is(err, cause) || !*buildCreated {
+				t.Fatalf("build dispatch artifact=%#v, error=%v, created=%t; want nil/%s wrapping exit %s",
+					artifact, err, *buildCreated, test.want, test.status)
+			}
+			var projected bool
+			for _, call := range runtime.calls {
+				if len(call) > 0 && call[0] == "create" && slices.Contains(call, "build") {
+					projected = slices.Contains(call, packerKVMProjectionScript)
+				}
+			}
+			if projected != test.guarded {
+				t.Fatalf("build projection guard=%t, want %t", projected, test.guarded)
+			}
+		})
+	}
+}
+
+func TestRunPackerContainerDiagnosticFailures(t *testing.T) {
+	copyFailure := errors.New("log copy unavailable")
+	buildFailure := errors.New("build failed")
+	for _, test := range []struct {
+		name           string
+		buildErr       error
+		copyErr        error
+		entries        []packerDiagnosticTarEntry
+		wantCode       e.Code
+		incomplete     bool
+		timeout        bool
+		occupiedMarker bool
+		markerCode     e.Code
+	}{
+		{name: "missing logs after success", copyErr: copyFailure, incomplete: true},
+		{name: "log collection deadline after success", timeout: true, incomplete: true, markerCode: e.CodeTimeout},
+		{name: "marker cannot be recorded after success", copyErr: copyFailure, occupiedMarker: true, wantCode: e.CodeVerifyFailed},
+		{name: "missing logs after build failure", buildErr: buildFailure, copyErr: copyFailure, wantCode: e.CodeBuildFailed, incomplete: true},
+		{name: "oversized log after success", entries: []packerDiagnosticTarEntry{{name: "large.log", typeflag: tar.TypeReg, payload: bytes.Repeat([]byte("x"), int(maxPackerDiagnosticFileBytes)+1)}}, incomplete: true},
+		{name: "unsafe logs remain fatal", entries: []packerDiagnosticTarEntry{{name: "../escape", typeflag: tar.TypeReg, payload: []byte("x")}}, wantCode: e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n", "The configuration is valid.\n", "", nil)
+			request.bindings.buildLogDirectoryVariable = "build_logs"
+			var archive bytes.Buffer
+			writer := tar.NewWriter(&archive)
+			for _, entry := range test.entries {
+				if err := writer.WriteHeader(&tar.Header{Name: entry.name, Typeflag: entry.typeflag, Mode: 0o600, Size: int64(len(entry.payload))}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := writer.Write(entry.payload); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			fallback := runtime.run
+			runtime.runContext = func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+				if len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-build") {
+					if test.occupiedMarker {
+						routes, err := filepath.Glob(filepath.Join(request.workspace.Name(), packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*"))
+						if err != nil || len(routes) != 1 {
+							t.Fatalf("diagnostic route=%v, error=%v", routes, err)
+						}
+						if err := os.Mkdir(filepath.Join(routes[0], "logs-incomplete.json"), 0o700); err != nil {
+							t.Fatal(err)
+						}
+					}
+					return test.buildErr
+				}
+				if len(args) > 2 && args[0] == "cp" && strings.Contains(args[1], packerContainerBuildLogPath) {
+					if test.timeout {
+						<-ctx.Done()
+						return ctx.Err()
+					}
+					if test.copyErr != nil {
+						return test.copyErr
+					}
+					_, err := stdout.Write(archive.Bytes())
+					return err
+				}
+				return fallback(stdin, stdout, stderr, args)
+			}
+			diagnosticTimeout := packerContainerCleanupTimeout
+			if test.timeout {
+				diagnosticTimeout = 50 * time.Millisecond
+			}
+			artifact, err := runPackerContainerWithDiagnosticTimeout(testContext(t), request, diagnosticTimeout)
+			if test.wantCode == "" {
+				if err != nil || artifact == nil {
+					t.Fatalf("successful disk lost to diagnostics: artifact=%v, error=%v", artifact, err)
+				}
+				defer artifact.Close()
+			} else if artifact != nil || code(err) != test.wantCode {
+				t.Fatalf("artifact=%v, error=%v, want nil/%s", artifact, err, test.wantCode)
+			}
+			if test.buildErr != nil && (!errors.Is(err, test.buildErr) || !errors.Is(err, test.copyErr)) {
+				t.Fatalf("lost primary or diagnostic failure: %v", err)
+			}
+			if test.occupiedMarker && !errors.Is(err, copyFailure) {
+				t.Fatalf("marker failure lost the log-copy cause: %v", err)
+			}
+			markers, globErr := filepath.Glob(filepath.Join(request.workspace.Name(), packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*", "logs-incomplete.json"))
+			if globErr != nil || (len(markers) == 1) != (test.incomplete || test.occupiedMarker) {
+				t.Fatalf("markers=%v, error=%v, want incomplete=%v", markers, globErr, test.incomplete)
+			}
+			if test.incomplete {
+				markerCode := test.markerCode
+				if markerCode == "" {
+					markerCode = e.CodeVerifyFailed
+				}
+				raw, err := os.ReadFile(markers[0])
+				if err != nil || string(raw) != fmt.Sprintf(`{"status":"incomplete","code":%q}`, markerCode) {
+					t.Fatalf("incomplete marker=%q, error=%v", raw, err)
+				}
+			}
+			buildRemoved, volumesRemoved := false, 0
+			for _, call := range runtime.cleanups {
+				if len(call) > 2 && call[0] == "rm" && strings.Contains(call[2], "-build") {
+					buildRemoved = true
+				}
+				if len(call) > 3 && call[0] == "volume" && call[1] == "rm" {
+					volumesRemoved++
+				}
+			}
+			if !buildRemoved || volumesRemoved != 2 {
+				t.Fatalf("incomplete cleanup: %v", runtime.cleanups)
+			}
+			assertNoPackerDiagnosticStages(t, request.workspace.Name())
+		})
+	}
+}
+
+func TestRunPackerContainerMissingDiagnosticsBeforeRuntime(t *testing.T) {
+	request, runtime, _ := newPackerContainerTestRun(t, "Packer v1.14.2\n", "The configuration is valid.\n", "", nil)
+	request.diagnostics = nil
+	artifact, err := runPackerContainer(testContext(t), request)
+	if artifact != nil || code(err) != e.CodeEngineCapability || len(runtime.calls) != 0 {
+		t.Fatalf("artifact=%v, error=%v, runtime calls=%v", artifact, err, runtime.calls)
 	}
 }
 
@@ -805,6 +1161,7 @@ func newPackerContainerTestRun(
 		endpoint: qualifiedRuntimeEndpoint, digest: runtimeDigest, identity: runtimeIdentity, cleanupErr: cleanupErr,
 	}
 	carrier := testQCOW2Carrier(t, "node.qcow2")
+	logCarrier := testPackerArtifactCarrier(t, "serial.log", []byte("failed build serial\n"))
 	runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
 		switch {
 		case reflect.DeepEqual(args, []string{"version", "--format", "{{json .}}"}):
@@ -823,7 +1180,11 @@ func newPackerContainerTestRun(
 		case len(args) > 1 && args[0] == "cp" && args[1] == "-":
 			_, _ = io.Copy(io.Discard, stdin)
 		case len(args) > 2 && args[0] == "cp" && args[len(args)-1] == "-":
-			_, _ = stdout.Write(carrier)
+			if strings.Contains(args[1], packerContainerBuildLogPath) {
+				_, _ = stdout.Write(logCarrier)
+			} else {
+				_, _ = stdout.Write(carrier)
+			}
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-version"):
 			_, _ = io.WriteString(stdout, versionOutput)
 		case len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-validate"):
@@ -834,8 +1195,9 @@ func newPackerContainerTestRun(
 	}
 	return packerContainerRunRequest{
 		runtime: runtime, source: &materializedSource{Dir: sourceRoot, InputDigest: "sha256:" + repeatHex("8")},
-		node: testPackerContainerNode(), manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
-		workspace: workspace, bindings: packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
+		node: testPackerContainerNode(), subject: "plan/node", manifest: manifest, digest: fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+		workspace: workspace, diagnostics: testPackerDiagnosticSink(t, workspace),
+		bindings: packerContainerBindings{packerVersion: "1.14.2", acceleratorVariable: "accelerator"},
 	}, runtime, &buildCreated
 }
 
@@ -875,6 +1237,31 @@ func TestNodeSessionCloseReleasesPackerRuntime(t *testing.T) {
 	}}, nil, "docker")
 	if code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed session admission error = %v, want %s", err, e.CodeEngineCapability)
+	}
+}
+
+func TestVMImagePackerExecutorMissingDiagnosticsBeforeRuntime(t *testing.T) {
+	node := testPackerContainerNode()
+	raw, err := canonical.Marshal(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := NewNodeSession(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(session.Close)
+	runtime := &recordingPackerRuntime{}
+	executor := &VMImagePackerExecutor{session: session.state, runtime: runtime, nodes: map[string][]byte{node.ID: raw}}
+	t.Cleanup(func() { _ = executor.Close() })
+	manifest, err := heldfile.FromBytesContext(t.Context(), []byte("{}\n"), heldfile.Options{Label: "material-manifest", MaxBytes: maxBuildMaterialManifestBytes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.Close()
+	artifact, result, err := executor.Run(t.Context(), node.ID, node, VMImagePackerRun{Manifest: manifest, Runtime: &execution.LocalVMRuntime{}})
+	if artifact != nil || result != nil || code(err) != e.CodeEngineCapability || len(runtime.calls) != 0 {
+		t.Fatalf("artifact=%v result=%v error=%v runtime calls=%v", artifact, result, err, runtime.calls)
 	}
 }
 
@@ -920,6 +1307,7 @@ func TestVMImagePackerExecutorPreservesCallbackDeadline(t *testing.T) {
 	defer cancel()
 	_, _, err = executor.Run(ctx, node.ID, node, VMImagePackerRun{
 		SourceRoot: t.TempDir(), Manifest: manifest, Runtime: &execution.LocalVMRuntime{},
+		Diagnostics: testPackerDiagnosticSinkAt(t, t.TempDir()),
 	})
 	if code(err) != e.CodeEngineCapability || !errors.Is(err, runFailure) {
 		t.Fatalf("deadline observation error = %v, want %s wrapping runtime failure", err, e.CodeEngineCapability)
@@ -986,6 +1374,7 @@ func TestVMImagePackerExecutorCloseAndSessionCloseJoinActiveRun(t *testing.T) {
 	go func() {
 		_, _, runErr := executor.Run(t.Context(), node.ID, node, VMImagePackerRun{
 			SourceRoot: sourceRoot, Manifest: manifest, Runtime: &execution.LocalVMRuntime{},
+			Diagnostics: testPackerDiagnosticSinkAt(t, t.TempDir()),
 		})
 		runDone <- runErr
 	}()

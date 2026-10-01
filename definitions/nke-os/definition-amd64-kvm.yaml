@@ -1,13 +1,13 @@
 apiVersion: nkd.dev/definition/v4
 kind: Definition
 metadata:
-  name: nke-os-arm64
-  description: Build the ARM64 non-FDE NKE node QCOW2 from explicit component outputs.
+  name: nke-os-amd64-kvm
+  description: Build the AMD64 non-FDE NKE node QCOW2 on a native KVM host.
 catalog:
   base: ./catalog
 outputs:
-  - name: nke-node-image-arm64
-    platform: linux/arm64
+  - name: nke-node-image-amd64
+    platform: linux/amd64
     format: disk-image
     components:
       - nke-agent
@@ -15,9 +15,9 @@ outputs:
       - nke-cni-ovn
       - nke-image-inputs
       - nke-kubeadm-distro
-      - nke-node-image
-      - nke-patched-installer-iso
+      - nke-node-image-amd64
+      - nke-patched-installer-iso-amd64
       - nke-spire-agent
       - ovn-kube-ubuntu
       - ovn-kubernetes-chart
-      - ubuntu-installer-iso
+      - ubuntu-installer-iso-amd64

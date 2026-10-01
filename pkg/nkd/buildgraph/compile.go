@@ -145,7 +145,12 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			return nil, e.New(e.CodeUnpinnedSource,
 				"component %q has no toolchain pin for execution architecture %q", nc.Name, toolchainArch)
 		}
-		vendorSpecDigest, err := ir.VendorSpecIdentity(nc.VendorCommand, vendorImage)
+		// Vendoring is part of the per-target source closure. Render the same
+		// single architecture token admitted for build commands before deriving
+		// either the vendor identity or executable IR, so the identity always
+		// authenticates the exact argv the fetch node will execute.
+		vendorCommand := renderArchAll(nc.VendorCommand, arch)
+		vendorSpecDigest, err := ir.VendorSpecIdentity(vendorCommand, vendorImage)
 		if err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "component %q vendor specification", nc.Name)
 		}
@@ -182,7 +187,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				Commit:           nc.Commit,
 				TreeHash:         nc.TreeHash,
 				Dest:             dest,
-				VendorCmd:        nc.VendorCommand,
+				VendorCmd:        vendorCommand,
 				VendorImage:      vendorImage,
 				VendorSpecDigest: vendorSpecDigest,
 			})

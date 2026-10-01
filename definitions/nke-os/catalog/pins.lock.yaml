@@ -34,3 +34,7 @@ artifacts:
     tag: 26.04.1
     digests:
       arm64: sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168
+  ubuntu-installer-iso-amd64:
+    tag: 26.04.1
+    digests:
+      amd64: sha256:cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927

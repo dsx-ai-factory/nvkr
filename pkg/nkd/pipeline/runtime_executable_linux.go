@@ -21,7 +21,10 @@ var dockerRuntimeEnvironment = []string{
 	"LANG=C",
 	"LC_ALL=C",
 	"TZ=UTC",
-	"DOCKER_CONFIG=/dev/null",
+	// Procfs owns this directory and permits only numeric descriptor entries.
+	// config.json and contexts cannot exist here. Docker treats their absence as
+	// empty configuration, unlike /dev/null/config.json (ENOTDIR and a warning).
+	"DOCKER_CONFIG=/proc/self/fd",
 	"DOCKER_HOST=" + qualifiedRuntimeEndpoint,
 }
 
