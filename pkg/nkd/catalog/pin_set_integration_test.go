@@ -362,3 +362,47 @@ components:
 		})
 	}
 }
+
+func TestPinSetImageRuntimeSelection(t *testing.T) {
+	for _, sourceOwned := range []bool{false, true} {
+		for _, custom := range []bool{false, true} {
+			t.Run(fmt.Sprintf("source=%t/custom=%t", sourceOwned, custom), func(t *testing.T) {
+				fixture := newPinSetIntegrationFixture(t, "")
+				image := rawComponent{Platforms: []string{"linux/amd64"}, OutputType: "oci-image",
+					Prebuilt: &Prebuilt{Image: "example.invalid/tool:{{.Version}}", Evidence: &ExternalEvidence{None: true}}}
+				version := "1.2.3"
+				if sourceOwned {
+					image.Source = "cwe"
+				} else {
+					delete(fixture.registry.Sources, "cwe")
+					delete(fixture.registry.Components, "controller")
+					fixture.registry.Sources["umbrella"].PinSet.Members["a-cwe"] = PinSetMember{Artifact: "image", Path: "dependencies[name=cwe].version"}
+					image.PinnedBy = "umbrella"
+				}
+				fixture.registry.Components["image"] = image
+				fixture.writeRegistry(t)
+				bin := t.TempDir()
+				runtime := filepath.Join(bin, "docker")
+				if custom {
+					runtime = filepath.Join(bin, "podman")
+				}
+				digest := "sha256:" + strings.Repeat("a", 64)
+				script := "#!/bin/sh\n[ \"$#\" = 3 ] && [ \"$1\" = manifest ] && [ \"$2\" = inspect ] && [ \"$3\" = 'example.invalid/tool:" + version + "' ] || exit 91\nprintf '%s' '{\"manifests\":[{\"digest\":\"" + digest + "\",\"platform\":{\"os\":\"linux\",\"architecture\":\"amd64\"}}]}'\n"
+				if err := os.WriteFile(runtime, []byte(script), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+				request := SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.0.0"}
+				if custom {
+					request.Runtime = runtime
+				}
+				if _, err := UpdateSourcePins(t.Context(), request); err != nil {
+					t.Fatal(err)
+				}
+				if got := fixture.lock(t).Artifacts["image"].Digests["amd64"]; got != digest {
+					t.Fatalf("image digest = %s; want %s", got, digest)
+				}
+			})
+		}
+	}
+}
