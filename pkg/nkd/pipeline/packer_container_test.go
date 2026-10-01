@@ -353,23 +353,33 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		t.Fatalf("Podman container args do not use its named-volume nocopy syntax: %#v", podman)
 	}
 	request.kvm, request.groupAdd = kvm, "123"
+	request.kvmProjection = &packerKVMProjection{device: kvm, bootID: "test-boot", deviceNumber: "a:e8"}
 	withKVM := packerContainerCreateArgs("docker", request)
-	if len(withKVM) != len(want)+3 || !slices.Contains(withKVM, "--group-add=123") ||
+	if !slices.Contains(withKVM, "--group-add=123") ||
 		!slices.Contains(withKVM, "--device") {
 		t.Fatalf("KVM container args do not add the admitted group and device: %#v", withKVM)
 	}
-	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
-	if !slices.Contains(withKVM, wantDevice) {
+	if !slices.Contains(withKVM, "/dev/kvm:/dev/kvm:rw") ||
+		!slices.Contains(withKVM, "--entrypoint=sh") || !slices.Contains(withKVM, packerKVMProjectionScript) {
 		t.Fatalf("KVM container args do not use the minimal rw device grant: %#v", withKVM)
+	}
+	if !reflect.DeepEqual(withKVM[len(withKVM)-10:], []string{"-ec", packerKVMProjectionScript,
+		"nkd-kvm-projection", "test-boot", "a:e8", "/dev/kvm", "packer", "build", "-only=build.qemu.node", "."}) {
+		t.Fatalf("Docker KVM projection does not guard the exact Packer argv: %#v", withKVM)
 	}
 	request.network = ir.NetworkDefault
 	withDockerNetwork := packerContainerCreateArgs("docker", request)
 	if !slices.Contains(withDockerNetwork, "--network=bridge") || slices.Contains(withDockerNetwork, "--network=none") {
 		t.Fatalf("networked Docker Packer build args = %#v", withDockerNetwork)
 	}
+	request.kvmProjection = nil
 	withPodmanNetwork := packerContainerCreateArgs("podman", request)
 	if !slices.Contains(withPodmanNetwork, "--network=default") || slices.Contains(withPodmanNetwork, "--network=none") {
 		t.Fatalf("networked Podman Packer build args = %#v", withPodmanNetwork)
+	}
+	if !slices.Contains(withPodmanNetwork, fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())) ||
+		slices.Contains(withPodmanNetwork, packerKVMProjectionScript) {
+		t.Fatalf("Podman descriptor handoff changed: %#v", withPodmanNetwork)
 	}
 }
 

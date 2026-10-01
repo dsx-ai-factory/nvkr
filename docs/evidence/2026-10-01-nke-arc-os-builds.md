@@ -57,6 +57,22 @@ also exposed Docker's `/dev/null/config.json` warning. The scrubbed Linux client
 or CLI plugins. This preserves absence of ambient configuration without an `ENOTDIR`
 warning contaminating Packer's strict version/validation output checks.
 
+## Packer validation and namespace boundary
+
+[Run 36810552034](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36810552034)
+executed candidate `275068b49b0db97b1412ab9c1799f0e6b6780b3a`. Both architectures completed volume preparation,
+the exact Packer version check, generated-key validation and `packer validate`, which printed
+`The configuration is valid.` Docker then failed to start the build container because its daemon could not
+resolve the client's `/proc/359/fd/14` device path. No VM started on either job.
+
+The next adapter change projects the admitted character-device numbers through Docker's fixed `/dev/kvm`
+mapping. A guard compares the host's kernel boot ID and device numbers inside the build container before Packer
+runs. The held-device/API admission check remains. This follows the OCI device model, which represents device
+type, major and minor numbers rather than transferring a client file descriptor. See the
+[OCI Linux device contract](https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#devices)
+and [kernel boot ID documentation](https://docs.kernel.org/admin-guide/sysctl/kernel.html#random).
+The guard must be exercised on ARC before claiming cross-namespace KVM handoff works.
+
 ## Remaining proof
 
 No successful QCOW2 production or boot smoke is established by the completed run above.

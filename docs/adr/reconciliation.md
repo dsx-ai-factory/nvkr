@@ -135,11 +135,11 @@ The hand-authored NKE OS validation workflow selects `arc-amd64-kvm` and `arc-ar
 At the 2026-09-30 review, NKE main used the ARM64 scale set and NKE PR #1100 selected the AMD64 set.
 Those declarations alone did not prove access. The 2026-10-01 runs recorded above exercised both pools from
 `nke-recipes`, completed material builds and KVM revalidation, then failed at private-volume ownership setup.
-The preflight opens `/dev/kvm` in the runner container. NKD's Docker adapter
-passes its held descriptor as `/proc/<runner-pid>/fd/<fd>` to the daemon.
-A daemon in a different PID or mount namespace may be unable to resolve that
-path. No full-mode run has proved this Docker device handoff or built an image
-on either ARC route. The workflow's `chmod` fallback follows NKE's current
+The preflight opens `/dev/kvm` in the runner container. Run 36810552034 subsequently reached clean Packer
+validation on ARM64, but Docker could not resolve the client's `/proc/<runner-pid>/fd/<fd>` device path.
+The Docker adapter now uses a fixed daemon-side `/dev/kvm` projection with a same-kernel boot-ID and
+character-device-number guard before Packer, retaining the admitted descriptor and API check. This guard is
+contract-tested; a successful full-mode handoff and image build remain owed. The workflow's `chmod` fallback follows NKE's current
 practice, but changes a host-bind-mounted device beyond the runner pod. KVM
 group access or a device plugin belongs in the scale-set configuration.
 

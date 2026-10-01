@@ -338,6 +338,15 @@ descriptor. Driver dispatch must enforce the selected device mode and use the su
 or qualified adapter must independently authenticate its effective provider or cgroup allocation and outer
 deadline before it can admit work.
 
+For the local Docker adapter, the daemon may occupy a different PID/mount namespace from NKD. A client-side
+`/proc/<pid>/fd/<fd>` therefore is not a portable daemon device path. The adapter retains and API-validates the
+admitted KVM descriptor, observes its character-device major/minor numbers and the caller's procfs kernel boot ID,
+and requests only the daemon's fixed `/dev/kvm` with read/write access. A fixed guard in the pinned build container
+requires the same kernel boot ID and device numbers before it execs Packer. Missing or mismatched observations
+fail closed; no source-owned command runs in that build container before the guard. This is a same-kernel device projection, not transfer
+of the open descriptor or qualified consumption evidence. It adds no privilege, host PID namespace, arbitrary
+device selection or network grant. The local Podman route retains its existing procfs descriptor path.
+
 `vm-image` execution dispatches the typed producer driver owned by ADR-10. The connected `packer` driver invokes the
 authenticated containerized Packer against the selected source-owned HCL project without parsing or generating
 HCL. A future `command` driver will execute the exact authored argument vector and can therefore invoke Make after

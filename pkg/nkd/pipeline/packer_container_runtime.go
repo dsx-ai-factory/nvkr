@@ -71,6 +71,11 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 	if err := validatePackerContainerKVM(request.runtime, request.kvm, kvmEnabled); err != nil {
 		return nil, err
 	}
+	kvmProjection, err := observePackerKVMProjection(ctx, request.kvm,
+		kvmEnabled && request.runtime.RuntimeName() == "docker")
+	if err != nil {
+		return nil, err
+	}
 	kvmGroup, err := packerKVMGroup(request.kvm, kvmEnabled)
 	if err != nil {
 		return nil, err
@@ -214,6 +219,7 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 
 	build := packerBuildContainerRequest(request, inputVolume, workVolume, project,
 		nodeLabel, attemptLabel, attempt, kvmGroup, kvmEnabled)
+	build.kvmProjection = kvmProjection
 	buildName := build.name
 	resources.containers = append(resources.containers, buildName)
 	if err := createPackerContainer(ctx, request.runtime, build); err != nil {
@@ -367,6 +373,14 @@ func createPackerVolume(ctx context.Context, runtime packerContainerRuntime, nam
 }
 
 func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, request packerContainerCreateRequest) error {
+	if runtime.RuntimeName() == "docker" && request.kvm != nil && request.kvmProjection == nil {
+		return e.New(e.CodeEngineCapability, "Docker KVM handoff requires an observed kernel/device projection")
+	}
+	if projection := request.kvmProjection; projection != nil &&
+		(runtime.RuntimeName() != "docker" || request.kvm == nil || projection.device != request.kvm ||
+			projection.bootID == "" || projection.deviceNumber == "") {
+		return e.New(e.CodeEngineCapability, "Packer KVM projection does not bind the held device")
+	}
 	switch runtime.RuntimeName() {
 	case "docker", "podman":
 	default:

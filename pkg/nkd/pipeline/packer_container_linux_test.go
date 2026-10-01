@@ -578,14 +578,87 @@ func TestPackerBuildContainerRequestThreadsKVMResolution(t *testing.T) {
 	}
 	build := packerBuildContainerRequest(request, "input", "work", "/nkd/input/source",
 		"nkd.dev/node=build-node", "nkd.dev/attempt=abc", "abc", "123", true)
+	build.kvmProjection = &packerKVMProjection{device: kvm, bootID: "test-boot", deviceNumber: "a:e8"}
 	args := packerContainerCreateArgs("docker", build)
 	if !slices.Contains(args, "accelerator=kvm") || !slices.Contains(args, "--group-add=123") ||
 		!slices.Contains(args, "--network=bridge") {
 		t.Fatalf("KVM build arguments do not preserve the resolved accelerator and device group: %#v", args)
 	}
-	wantDevice := fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), kvm.Fd())
-	if !slices.Contains(args, "--device") || !slices.Contains(args, wantDevice) {
-		t.Fatalf("KVM build arguments do not preserve the held device: %#v", args)
+	if !slices.Contains(args, "--device") || !slices.Contains(args, "/dev/kvm:/dev/kvm:rw") ||
+		!slices.Contains(args, packerKVMProjectionScript) {
+		t.Fatalf("KVM build arguments do not guard the device projection: %#v", args)
+	}
+}
+
+func TestPackerKVMProjectionGuard(t *testing.T) {
+	device, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer device.Close()
+	// /dev/null exercises the kernel/device equality guard without requiring
+	// KVM in unit CI. The separate admission tests reject /dev/null as KVM.
+	projection, err := observePackerKVMProjection(t.Context(), device, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, bootID, number, path string
+		wantSuccess                bool
+	}{
+		{"same kernel and device", projection.bootID, projection.deviceNumber, os.DevNull, true},
+		{"different kernel", "different-boot", projection.deviceNumber, os.DevNull, false},
+		{"different device", projection.bootID, "0:0", os.DevNull, false},
+		{"missing device", projection.bootID, projection.deviceNumber, filepath.Join(t.TempDir(), "missing"), false},
+		{"not a device", projection.bootID, projection.deviceNumber, t.TempDir(), false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), "sh", "-ec", packerKVMProjectionScript,
+				"nkd-kvm-projection", test.bootID, test.number, test.path, "printf", "%s", "executed")
+			output, err := cmd.CombinedOutput()
+			if test.wantSuccess {
+				if err != nil || string(output) != "executed" {
+					t.Fatalf("guarded execution = %q, %v", output, err)
+				}
+			} else if err == nil || strings.Contains(string(output), "executed") {
+				t.Fatalf("guard permitted mismatched projection: %q, %v", output, err)
+			}
+		})
+	}
+}
+
+func TestCreatePackerContainerRejectsUnboundKVMProjection(t *testing.T) {
+	device, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer device.Close()
+	other, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	valid := &packerKVMProjection{device: device, bootID: "test-boot", deviceNumber: "1:3"}
+	for _, test := range []struct {
+		name, runtime string
+		device        *os.File
+		projection    *packerKVMProjection
+	}{
+		{"missing projection", "docker", device, nil},
+		{"missing device", "docker", nil, valid},
+		{"substituted descriptor", "docker", other, valid},
+		{"wrong runtime", "podman", device, valid},
+		{"empty projection", "docker", device, &packerKVMProjection{device: device}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &recordingPackerRuntime{name: test.runtime}
+			err := createPackerContainer(t.Context(), runtime, packerContainerCreateRequest{
+				kvm: test.device, kvmProjection: test.projection,
+			})
+			if code(err) != e.CodeEngineCapability || len(runtime.calls) != 0 {
+				t.Fatalf("unbound projection caused runtime work: error=%v calls=%#v", err, runtime.calls)
+			}
+		})
 	}
 }
 

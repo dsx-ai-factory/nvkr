@@ -34,7 +34,27 @@ printf '%s  %s\n' "$1" /proc/self/fd/3 | sha256sum -c - >/dev/null
 install -d -m 0700 "$3/config" "$3/inputs" "$3/source"
 tar --no-same-owner --no-overwrite-dir -xf /proc/self/fd/3 -C "$3"
 chown -R "$4:$5" "$3" "$6"`
+	// Docker resolves devices in its daemon namespace, not the client's procfs.
+	// Check the projected kernel/device pair in the same container that will exec
+	// Packer. No source-owned command runs before these checks.
+	packerKVMProjectionScript = `test "$(cat /proc/sys/kernel/random/boot_id)" = "$1" || {
+  echo 'KVM projection belongs to a different kernel boot' >&2; exit 1;
+}
+test -c "$3" && test "$(stat -L -c '%t:%T' "$3")" = "$2" || {
+  echo 'KVM projection differs from the admitted character device' >&2; exit 1;
+}
+shift 3
+exec "$@"`
 )
+
+// packerKVMProjection is issued from the already-admitted held device. It binds
+// Docker's fixed device path to the caller's kernel boot and device numbers.
+// It does not claim transfer of the open descriptor or qualified consumption.
+type packerKVMProjection struct {
+	device       *os.File
+	bootID       string
+	deviceNumber string
+}
 
 type packerContainerRuntime interface {
 	Endpoint() string
@@ -125,6 +145,7 @@ type packerContainerCreateRequest struct {
 	packerArgs    []string
 	labels        []string
 	kvm           *os.File
+	kvmProjection *packerKVMProjection
 	entrypoint    string
 	user          string
 	groupAdd      string
@@ -184,6 +205,12 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 	if entrypoint == "" {
 		entrypoint = "packer"
 	}
+	commandArgs := request.packerArgs
+	if request.kvmProjection != nil {
+		commandArgs = append([]string{"-ec", packerKVMProjectionScript, "nkd-kvm-projection",
+			request.kvmProjection.bootID, request.kvmProjection.deviceNumber, "/dev/kvm", entrypoint}, commandArgs...)
+		entrypoint = "sh"
+	}
 	switch runtimeName {
 	case "docker":
 		inputMount := "type=volume,src=" + request.input + ",dst=" + packerContainerInputRoot + ",volume-nocopy"
@@ -218,10 +245,14 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 		"--entrypoint="+entrypoint,
 	)
 	if request.kvm != nil {
-		args = append(args, "--device", fmt.Sprintf("/proc/%d/fd/%d:/dev/kvm:rw", os.Getpid(), request.kvm.Fd()))
+		devicePath := fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), request.kvm.Fd())
+		if request.kvmProjection != nil {
+			devicePath = "/dev/kvm"
+		}
+		args = append(args, "--device", devicePath+":/dev/kvm:rw")
 	}
 	args = append(args, request.image)
-	return append(args, request.packerArgs...)
+	return append(args, commandArgs...)
 }
 
 func packerContainerVariableArgs(node ir.Node, bindings packerContainerBindings, kvm bool) []string {
