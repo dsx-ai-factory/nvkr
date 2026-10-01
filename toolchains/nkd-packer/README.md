@@ -44,7 +44,9 @@ fixed Ubuntu snapshot and verifies every downloaded release archive before
 extracting them. The command does not push, sign, or write a transport digest.
 Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` and the Docker exporter's
 `rewrite-timestamp=true` option for deterministic image creation and layer-file
-timestamps; Podman retains its existing build path and independent
+timestamps. Docker explicitly streams the image archive to `docker image load`,
+separating timestamp rewriting from image-store unpacking; failure in either
+stage stops validation. Podman retains its existing build path and independent
 ARM64 local image pin. The fixed epoch does not itself prove identical image
 bytes. Repeat a native Docker build on fresh runners and compare the resulting
 image IDs before adding a Docker pin.

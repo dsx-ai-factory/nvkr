@@ -183,16 +183,19 @@ build_command=("${runtime}" build)
 if [[ "${runtime##*/}" == docker ]]; then
   # Buildx passes the fixed epoch into BuildKit's image config and history,
   # then rewrites image-layer file timestamps to the same epoch on export.
+  # Explicit stdout export avoids the Docker driver's automatic image-store
+  # unpack, which cannot be combined with timestamp rewriting. Load the
+  # archive separately below; pipefail preserves failures from either stage.
   # Keep the existing Podman path unchanged so its recorded ARM64 image ID
   # remains an independently checkable local development pin.
   "${runtime}" buildx version
   "${runtime}" version --format 'Docker server {{.Server.Version}}'
   build_command=("${runtime}" buildx build
-    --output "type=docker,rewrite-timestamp=true"
+    --output "type=docker,dest=-,rewrite-timestamp=true"
     --build-arg SOURCE_DATE_EPOCH=0)
 fi
 
-"${build_command[@]}" \
+build_command+=(
   --platform "linux/${arch}" \
   --build-arg "TARGETARCH=${arch}" \
   --build-arg "BASE_IMAGE=${base_image}" \
@@ -214,7 +217,13 @@ fi
   --build-arg "NFPM_BINARY_SHA256=${nfpm_binary_digest#sha256:}" \
   --file "${here}/Dockerfile" \
   --tag "${tag}" \
-  "${here}"
+  "${here}")
+
+if [[ "${runtime##*/}" == docker ]]; then
+  "${build_command[@]}" | "${runtime}" image load
+else
+  "${build_command[@]}"
+fi
 
 inspection="$("${runtime}" image inspect "${tag}")"
 if ! jq -e --arg arch "${arch}" '
