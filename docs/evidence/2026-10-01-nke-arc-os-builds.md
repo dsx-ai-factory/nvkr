@@ -71,11 +71,49 @@ runs. The held-device/API admission check remains. This follows the OCI device m
 type, major and minor numbers rather than transferring a client file descriptor. See the
 [OCI Linux device contract](https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#devices)
 and [kernel boot ID documentation](https://docs.kernel.org/admin-guide/sysctl/kernel.html#random).
-The guard must be exercised on ARC before claiming cross-namespace KVM handoff works.
+The subsequent run below exercised this guarded handoff on both ARC architectures.
+
+## Successful ARM64 and AMD64 images and boot smoke
+
+[Run 36812260448](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812260448)
+executed NKD candidate `bb6e870bb2477776a007acb3d35e6cbaaadeb16b`, tree
+`ebbc67c3a7d63d45ea714634ade6a95984c3713e`, with the exact workflow and NKE inputs above.
+[ARM64 job 110209980925](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812260448/job/110209980925)
+completed successfully on `arc-arm64-kvm-84grx-runner-bzhvk`.
+[AMD64 job 110209980960](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812260448/job/110209980960)
+completed successfully on `arc-amd64-kvm-lfdl7-runner-g22qw`. The full workflow concluded `success`.
+
+Each job built one non-FDE QCOW2 through the NKD lifecycle, independently measured its
+digest and size, passed NKE's source-owned boot smoke, and uploaded both diagnostics and
+the image. Each retained lifecycle record has `status: complete`, lane
+`unqualified-local-execution`, and exactly one observed `disk-image` output with
+`format: qcow2`, `encryption: none`, and `outcome: succeeded`.
+
+| Recorded field | ARM64 | AMD64 |
+|---|---|---|
+| Output | `nke-node-image-arm64` | `nke-node-image-amd64` |
+| QCOW2 SHA-256 | `e1dd5d3ba0dcd06fd66b790b81deca2cfa81f6d53bdabc884449011ce1f3cfff` | `a8bc3ddc29236131aefc2f51dc3dcf898af2db2a6c8e39a7b064fa3e8cbc61cb` |
+| QCOW2 size, bytes | `3300327424` | `3528363520` |
+| Plan digest | `sha256:a71ae57748a2b102e1d9cd58b6ae2f6bdeb9c52780e6ea8046ef2a6c24e87fff` | `sha256:73ba5c70944e70d33fa668cda5b96833d4b04a0d454cfa2795d9028ad04148f5` |
+| Observed toolchain image ID | `sha256:dcc2d031e4e074fa2079e87ba34e338b95eb7548f0a932528af765a406ad7fa2` | `sha256:27cf0f4524e993860a196b4eacdcc60b6d777e63c3fb0907e0bf452f0f5602b8` |
+
+For each architecture, the lifecycle observation and workflow `evidence/metadata.json`
+agree on the disk digest and byte count. Both boot logs report successful cloud-init, the NKE image contract, and
+root-filesystem growth. This is a boot smoke test, not a Kubernetes deployment or runtime
+qualification test.
+
+- [ARM64 QCOW2 artifact](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812260448/artifacts/11140737361)
+- [ARM64 evidence artifact](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812260448/artifacts/11140163996)
+- [AMD64 QCOW2 artifact](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812260448/artifacts/11140829417)
+- [AMD64 evidence artifact](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812260448/artifacts/11141240359)
+- [Successful Linux Merge Gate for the tested candidate](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36812207472)
+
+Actions artifacts expire. Their ZIP download size is not the QCOW2 byte count above.
+The executable evidence applies to the exact candidate above, not automatically to a
+later commit or a differently pinned NKE source.
 
 ## Remaining proof
 
-No successful QCOW2 production or boot smoke is established by the completed run above.
-The KVM handoff from the NKD process through Docker into QEMU, Packer execution, exact
-QCOW2 collection, and boot smoke still require a successful full run. FDE, full-disk
-SBOM, publication and qualified execution remain outside this record.
+FDE, full-disk SBOM, publication, qualified execution, and the generated hosted VM adapter remain outside
+this record. The diagnostic workflow invokes the local lifecycle on ARC; running on
+GitHub does not upgrade its evidence lane to `pipeline-attested`.
