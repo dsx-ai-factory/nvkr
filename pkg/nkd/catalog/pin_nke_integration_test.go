@@ -275,3 +275,56 @@ func TestNKEPinPreservesExactChartVersion(t *testing.T) {
 	}
 	fixture.assertLock(t, "v0.30.3")
 }
+
+func TestSourceOwnedAcquiredChartPreservesDeclaredVersion(t *testing.T) {
+	for _, tc := range []struct{ prefix, version string }{
+		{"", "v1.2.3"}, {"controller/", "v1.2.3"}, {"controller/v", "1.2.3"},
+	} {
+		t.Run(tc.prefix+tc.version, func(t *testing.T) {
+			fixture := newPinSetIntegrationFixture(t, fmt.Sprintf("dependencies: [{name: cwe, version: %q}]\n", tc.version))
+			src := fixture.registry.Sources["cwe"]
+			src.TagPrefix = tc.prefix
+			fixture.registry.Sources["cwe"] = src
+			tag := src.QualifiedTag(tc.version)
+			fixture.run("tag", "-f", tag)
+			payload := helmFixtureArchive(t, fmt.Sprintf("apiVersion: v2\nname: demo\nversion: %q\n", tc.version))
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/index.yaml":
+					fmt.Fprintf(w, "apiVersion: v1\nentries:\n  demo:\n  - name: demo\n    version: %q\n    urls: [demo.tgz]\n", tc.version)
+				case "/demo.tgz":
+					_, _ = w.Write(payload)
+				default:
+					t.Errorf("unexpected request: %s", r.URL.Path)
+					http.NotFound(w, r)
+				}
+			}))
+			t.Cleanup(server.Close)
+			original := http.DefaultTransport
+			http.DefaultTransport = server.Client().Transport
+			t.Cleanup(func() { http.DefaultTransport = original })
+			fixture.registry.Components["controller"] = rawComponent{Source: "cwe", Platforms: []string{"linux/amd64"}, OutputType: "raw", Prebuilt: &Prebuilt{Chart: &HelmChart{Name: "demo", Repository: server.URL}, Evidence: &ExternalEvidence{None: true}}}
+			fixture.writeRegistry(t)
+			fixture.pin(t, "1.0.0")
+			lock := fixture.lock(t)
+			artifact := lock.Artifacts["controller"]
+			if artifact.Tag != tag || artifact.Digests["amd64"] != pinFixtureDigest(string(payload)) || artifact.DerivedFrom != "umbrella@"+lock.Pins["umbrella"].Commit {
+				t.Fatalf("source/chart identities diverged: %+v", artifact)
+			}
+			if _, err := LoadContext(t.Context(), Dir(fixture.dir)); err != nil {
+				t.Fatal(err)
+			}
+			before := readPinFixtureLock(t, fixture.dir)
+			if update := fixture.pin(t, "1.0.0"); update.Changed != 0 {
+				t.Fatalf("repeat pin changed: %+v", update)
+			}
+			fixture.commitManifest(t, "dependencies: [{name: cwe, version: v1.2.4}]\n", "umbrella/v1.1.0")
+			fixture.run("tag", src.QualifiedTag("v1.2.4"))
+			_, err := UpdateSourcePins(t.Context(), SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.1.0"})
+			assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+			if !bytes.Equal(before, readPinFixtureLock(t, fixture.dir)) {
+				t.Fatal("failed chart lookup changed the lock")
+			}
+		})
+	}
+}
