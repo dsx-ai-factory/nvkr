@@ -3,6 +3,8 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,10 +108,39 @@ func TestMapCancellationPreservesRetryableTimeoutContract(t *testing.T) {
 }
 
 func code(err error) nkderr.Code {
-	if e, ok := err.(*nkderr.Error); ok {
+	var e *nkderr.Error
+	if errors.As(err, &e) {
 		return e.Code
 	}
 	return ""
+}
+
+func TestErrorCodeMatchesPublicExitStatusThroughWrapping(t *testing.T) {
+	primary := nkderr.New(nkderr.CodeBuildFailed, "build failed")
+	secondary := nkderr.New(nkderr.CodeVerifyFailed, "log collection failed")
+	for _, test := range []struct {
+		name string
+		err  error
+		want nkderr.Code
+		exit int
+	}{
+		{name: "nil", exit: 0},
+		{name: "uncoded", err: errors.New("uncoded"), exit: 1},
+		{name: "direct", err: primary, want: nkderr.CodeBuildFailed, exit: 21},
+		{name: "wrapped", err: fmt.Errorf("outer: %w", primary), want: nkderr.CodeBuildFailed, exit: 21},
+		{name: "joined nil", err: errors.Join(primary, nil), want: nkderr.CodeBuildFailed, exit: 21},
+		{name: "joined secondary", err: errors.Join(primary, secondary), want: nkderr.CodeBuildFailed, exit: 21},
+		{name: "nested join", err: errors.Join(errors.Join(primary, secondary), context.Canceled), want: nkderr.CodeBuildFailed, exit: 21},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := code(test.err); got != test.want {
+				t.Fatalf("code(%v) = %q, want %q", test.err, got, test.want)
+			}
+			if got := nkderr.ExitCode(test.err); got != test.exit {
+				t.Fatalf("ExitCode(%v) = %d, want %d", test.err, got, test.exit)
+			}
+		})
+	}
 }
 
 func TestQualifiedPackagingFailsBeforeGraphOrPathIO(t *testing.T) {
