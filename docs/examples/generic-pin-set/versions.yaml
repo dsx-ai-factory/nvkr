@@ -1,0 +1,6 @@
+# Commit this file in the upstream platform repository before tagging v1.4.0.
+dependencies:
+  - name: controller
+    version: "0.9.3"
+  - name: helper
+    version: "2.0.0"
