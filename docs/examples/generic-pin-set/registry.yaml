@@ -1,0 +1,28 @@
+apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+sources:
+  platform:
+    repo: https://example.invalid/platform
+    constraint: 1.4.x
+    pinSet:
+      file: versions.yaml
+      format: values
+      members:
+        controller:
+          source: controller
+          path: dependencies[name=controller].version
+        helper:
+          artifact: helper
+          path: dependencies[name=helper].version
+  controller:
+    repo: https://example.invalid/controller
+    tagPrefix: controller/v
+    pinnedBy: platform
+components:
+  helper:
+    platforms: [linux/amd64, linux/arm64]
+    pinnedBy: platform
+    outputType: raw
+    prebuilt:
+      url: https://downloads.example.invalid/helper/{{.Version}}/helper-{{.Arch}}
+      evidence: {none: true}
