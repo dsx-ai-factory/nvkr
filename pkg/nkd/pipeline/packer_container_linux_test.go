@@ -519,11 +519,30 @@ func TestValidatePackerContainerKVMRejectsUnadmittedDevices(t *testing.T) {
 		!strings.Contains(err.Error(), "device handoff") {
 		t.Fatalf("wrong character device error = %v, want handoff %s", err, e.CodeEngineCapability)
 	}
-	if kvm, err := os.Open("/dev/kvm"); err == nil {
-		defer kvm.Close()
-		if err := validatePackerContainerKVM(runtime, kvm, true); err != nil {
-			t.Fatalf("available /dev/kvm failed API revalidation: %v", err)
-		}
+	if err := validatePackerContainerKVM(runtime, nil, true); code(err) != e.CodeEngineCapability {
+		t.Fatalf("missing KVM error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	if err := validatePackerContainerKVM(runtime, nullDevice, false); code(err) != e.CodeEngineCapability {
+		t.Fatalf("disabled KVM with device error = %v, want %s", err, e.CodeEngineCapability)
+	}
+	if err := validatePackerContainerKVM(runtime, nil, false); err != nil {
+		t.Fatalf("disabled KVM without device: %v", err)
+	}
+}
+
+func TestValidatePackerContainerKVMWithRealDevice(t *testing.T) {
+	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+		t.Skipf("real KVM device is unavailable: %v", err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer kvm.Close()
+	// Exercise the real ioctl ABI, not an injected return value. This catches
+	// using a pointer-returning ioctl helper for KVM_GET_API_VERSION.
+	if err := validatePackerContainerKVM(&recordingPackerRuntime{endpoint: qualifiedRuntimeEndpoint}, kvm, true); err != nil {
+		t.Fatalf("available /dev/kvm failed API revalidation: %v", err)
 	}
 }
 
