@@ -73,6 +73,7 @@ func prebuiltTargetFor(name string, raw rawComponent, pin Pin) (PrebuiltTarget, 
 	}
 	return PrebuiltTarget{
 		Name:      name,
+		PinnedBy:  raw.PinnedBy,
 		Tag:       pin.Tag,
 		Platforms: append([]string(nil), raw.Platforms...),
 		URL:       url,
@@ -90,7 +91,11 @@ func resolvePrebuiltTarget(ctx context.Context, selected PrebuiltTarget, runtime
 	if selected.Chart != nil {
 		chart := *selected.Chart
 		pin.Chart = &chart
-		url, digest, err := resolveHelmChart(ctx, *selected.Chart, NormalizeVersion(selected.Tag))
+		version := NormalizeVersion(selected.Tag)
+		if selected.PinnedBy != "" {
+			version = selected.Tag
+		}
+		url, digest, err := resolveHelmChart(ctx, *selected.Chart, version)
 		if err != nil {
 			return pin, err
 		}

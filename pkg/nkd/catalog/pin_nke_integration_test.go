@@ -38,7 +38,7 @@ func newNKEPinIntegrationFixture(t *testing.T) *nkePinIntegrationFixture {
 		versions []string
 	}{
 		{"postgresql", []string{"18.5.15"}},
-		{"spire", []string{"0.30.1", "0.30.2"}},
+		{"spire", []string{"0.30.1", "0.30.2", "v0.30.3"}},
 		{"spire-crds", []string{"0.6.1"}},
 		{"temporal", []string{"0.74.0"}},
 	} {
@@ -264,4 +264,14 @@ func TestNKEPinSetExampleRegistryValidates(t *testing.T) {
 	if set == nil || set.Format != "nke-deploy-v1" || set.File != nkeFixtureDeploy {
 		t.Fatal("documented example does not select the NKE deploy adapter")
 	}
+}
+
+func TestNKEPinPreservesExactChartVersion(t *testing.T) {
+	fixture := newNKEPinIntegrationFixture(t)
+	replaceNKEFixture(t, fixture.tree, "controller/deploy/nke-sbom/spire/release.yaml", `version: "0.30.1"`, `version: "v0.30.3"`)
+	fixture.commit(t, "controller/v1.1.0")
+	if _, err := UpdateSourcePins(t.Context(), fixture.request("1.1.0")); err != nil {
+		t.Fatal(err)
+	}
+	fixture.assertLock(t, "v0.30.3")
 }

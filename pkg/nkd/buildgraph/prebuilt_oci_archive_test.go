@@ -31,3 +31,25 @@ func TestCompilePrebuiltOCIArchivePreservesBlobPin(t *testing.T) {
 		})
 	}
 }
+
+func TestCompilePrebuiltImageScheme(t *testing.T) {
+	for _, prefix := range []string{"", "oci://"} {
+		t.Run(prefix, func(t *testing.T) {
+			ref := "registry.example/images/tool:1.2.3"
+			cat := &catalog.Catalog{Components: map[string]catalog.Component{
+				"tool": {Platforms: []string{"linux/amd64"}, OutputType: "oci-image", Tag: "1.2.3", Prebuilt: &catalog.Prebuilt{
+					Image: prefix + ref, Digests: map[string]string{"amd64": digAmd}, Evidence: &catalog.ExternalEvidence{None: true},
+				}},
+			}}
+			selection, err := Resolve(cat, Selection{Components: []string{"tool"}, Platform: "linux/amd64"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			graph := mustCompile(t, selection)
+			node := graph.Nodes[0]
+			if node.Kind != ir.KindPull || node.Artifact != ref || node.Digest != digAmd || node.OutputType != "oci-image" {
+				t.Fatalf("incorrect OCI image acquisition: %+v", node)
+			}
+		})
+	}
+}
