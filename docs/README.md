@@ -2,6 +2,7 @@
 
 | Need | Read |
 |---|---|
+| Derive several pins from one upstream version file | [Generic pin-set example](generic-pin-set-example.md) |
 | Use Definition → Run → Release | [Lifecycle guide](lifecycle.md) |
 | Choose and run a demo | [Demo index](../scripts/README.md) |
 | Learn the six public objects | [Domain vocabulary](../CONTEXT.md) |
