@@ -1,0 +1,77 @@
+apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nke-controller
+  description: NKE controller containers and helm chart.
+components:
+  nke-controller-chart:
+    fromSource: true
+    source: nke-helm
+    artifactPath: charts/nke-controller-0.1.1.tgz
+    writeDir: charts
+    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.1.1', '--app-version=0.1.1', '--destination=charts/']
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+  nke-controller:
+    fromSource: true
+    source: nke
+    artifactPath: bin/nke-controller-image-{{.Arch}}.oci.tar
+    writeDir: bin
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    versionStamp:
+      BUILD_VERSION: '{{.ModuleTag}}'
+      GIT_VERSION: '{{.Commit}}'
+  cluster-api-provider-provisioned:
+    fromSource: true
+    source: nke
+    artifactPath: bin/cluster-api-provider-provisioned-image-{{.Arch}}.oci.tar
+    writeDir: bin
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src/cluster-api-provider-provisioned --opt platform=linux/{{.Arch}} --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --output type=oci,dest=/src/bin/cluster-api-provider-provisioned-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    versionStamp:
+      BUILD_VERSION: '{{.ModuleTag}}'
+sources:
+  nke:
+    repo: ssh://git@github.com/dsx-ai-factory/nke.git
+    constraint: v0.21.0
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  nke-helm:
+    repo: ssh://git@github.com/dsx-ai-factory/nke.git
+    constraint: v0.21.0
+    toolchainImage: alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2
+    vendorCommand: ['dependency', 'build', 'controller/deploy/charts/controller']
+  checkout:
+    kind: github-action
+    repo: https://github.com/actions/checkout
+    constraint: 7.x
+  download-artifact:
+    kind: github-action
+    repo: https://github.com/actions/download-artifact
+    constraint: 8.x
+  setup-go:
+    kind: github-action
+    repo: https://github.com/actions/setup-go
+    constraint: 7.x
+  upload-artifact:
+    kind: github-action
+    repo: https://github.com/actions/upload-artifact
+    constraint: 7.x

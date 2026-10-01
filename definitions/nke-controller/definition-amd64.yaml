@@ -1,0 +1,23 @@
+apiVersion: nkd.dev/definition/v4
+kind: Definition
+metadata:
+  name: nke-controller-amd64
+  description: NKE controller containers and helm chart.
+catalog:
+  base: ./catalog
+outputs:
+- name: cluster-api-provider-provisioned-amd64
+  components:
+  - cluster-api-provider-provisioned
+  format: oci
+  platform: linux/amd64
+- name: nke-controller-amd64
+  components:
+  - nke-controller
+  format: oci
+  platform: linux/amd64
+- name: nke-controller-chart-amd64
+  components:
+  - nke-controller-chart
+  format: helm-oci
+  platform: linux/amd64
