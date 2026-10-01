@@ -420,10 +420,12 @@ jobs:
       - name: Admit native KVM runner
         run: |
           set -euo pipefail
+          id
           if [[ ! -c /dev/kvm ]]; then
             echo "::error::Missing /dev/kvm for ${{ matrix.arch }}"
             exit 1
           fi
+          stat -c '%U:%G %a' /dev/kvm
           # The scale set must provide access through its KVM group or device
           # configuration. A build job must not change host device permissions.
           if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
@@ -503,6 +505,21 @@ jobs:
               runID:$runID, runAttempt:$runAttempt, targetArch:$targetArch,
               runner:{name:$runnerName, os:$runnerOS, arch:$runnerArch}}' \
             >.nkd/evidence/context.json
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .candidate/.go-version
+          cache: false
+
+      - name: Check guarded Packer dispatch on the admitted KVM runner
+        working-directory: .candidate
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          go test ./pkg/nkd/pipeline -run '^TestRunPackerContainerClassifiesBuildExit$' -count=1 -v \
+            2>&1 | tee ".nkd/evidence/packer-dispatch-${{ matrix.arch }}.log"
 
       - name: Build one QCOW2 through the NKD lifecycle
         working-directory: .candidate

@@ -871,6 +871,65 @@ func TestRunPackerContainerReapsResourcesWhenBuildStartFails(t *testing.T) {
 	}
 }
 
+func TestRunPackerContainerClassifiesBuildExit(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		status  string
+		guarded bool
+		want    e.Code
+	}{
+		{name: "projection rejected", status: "97", guarded: true, want: e.CodeEngineCapability},
+		{name: "ordinary guarded failure", status: "1", guarded: true, want: e.CodeBuildFailed},
+		{name: "unguarded exit 97", status: "97", want: e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, runtime, buildCreated := newPackerContainerTestRun(t, "Packer v1.14.2\n",
+				"The configuration is valid.\n", "", nil)
+			if test.guarded {
+				// Keep the real admission boundary intact: /dev/null cannot stand
+				// in for KVM because admission authenticates the path and ioctl ABI.
+				kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+				if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+					t.Skipf("guarded dispatch requires an accessible real KVM device: %v", err)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = kvm.Close() })
+				request.kvm = kvm
+				request.node.ExecutionBinding.Class.Capabilities = []execution.CapabilityName{execution.CapabilityKVM}
+				request.node.ExecutionBinding.Capabilities[0].Enabled = true
+			}
+			cause := exec.CommandContext(t.Context(), "sh", "-c", "exit \"$1\"", "test", test.status).Run()
+			var exit *exec.ExitError
+			if !errors.As(cause, &exit) {
+				t.Fatalf("fixture did not produce a subprocess exit: %v", cause)
+			}
+			fallback := runtime.run
+			runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+				if len(args) > 2 && args[0] == "start" && strings.Contains(args[2], "-build") {
+					return cause
+				}
+				return fallback(stdin, stdout, stderr, args)
+			}
+			artifact, err := runPackerContainer(testContext(t), request)
+			if artifact != nil || code(err) != test.want || !errors.Is(err, cause) || !*buildCreated {
+				t.Fatalf("build dispatch artifact=%#v, error=%v, created=%t; want nil/%s wrapping exit %s",
+					artifact, err, *buildCreated, test.want, test.status)
+			}
+			var projected bool
+			for _, call := range runtime.calls {
+				if len(call) > 0 && call[0] == "create" && slices.Contains(call, "build") {
+					projected = slices.Contains(call, packerKVMProjectionScript)
+				}
+			}
+			if projected != test.guarded {
+				t.Fatalf("build projection guard=%t, want %t", projected, test.guarded)
+			}
+		})
+	}
+}
+
 func TestRunPackerContainerDiagnosticFailures(t *testing.T) {
 	copyFailure := errors.New("log copy unavailable")
 	buildFailure := errors.New("build failed")

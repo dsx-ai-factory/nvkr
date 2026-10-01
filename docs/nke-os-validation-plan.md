@@ -27,6 +27,9 @@ repository-specific 16-vCPU, 64-GiB KVM scale set defined by `NVIDIA-dev/nke-gha
 runner isolation remains a provider fact to verify; `/dev/kvm` must be available to the runner identity. NKD
 performs runtime admission before build work.
 The workflow requires existing read/write access to `/dev/kvm` and does not change host device permissions.
+Runner identity and device ownership/mode are printed before the access check. Each full leg also runs the
+Packer dispatcher exit-status regression test with the admitted real KVM device and retains its output.
+That test uses a fake container runtime; it proves error classification, not a QEMU bake.
 The scale set must supply KVM group or device access. Local macOS/Podman TCG development remains a parallel
 supported path and is not selected by this native KVM validation workflow.
 

@@ -144,11 +144,14 @@ successful QCOW2. Unsafe archive entries and immutable-path violations still fai
 log directories are sealed before Run recording; partial extraction is rolled back. These failure contracts are
 unit-tested; the existing ARC success evidence does not exercise each diagnostic failure mode.
 
-The generated helper's shared-cache rejection is contract-tested. This change also disables the trusted
-selector's shared Actions cache restoration and checks each selected Definition's Plan-derived source closure
+The generated helper's shared-cache rejection is contract-tested. The trusted selector disables
+shared Actions cache restoration and checks each selected Definition's Plan-derived source closure
 with main's reader; future schemas must land in main first. These selector controls, Plan-derived boot-image
-selection and attempt-scoped uploads have not yet executed in a recorded run. They do not restrict the
-repository-scoped source secret.
+selection and attempt-scoped uploads have no recorded execution evidence. They do not restrict the
+repository-scoped source secret. Main-scope shared-cache risk remains: candidate jobs dispatched through main
+can populate caches subsequently restored by `merge-gate.yaml` and `vulnerability-scan.yaml`, whose
+`actions/setup-go` steps still enable caching. Disabling those consumers' shared-cache restoration is a
+separate main-workflow follow-up; the selector's disabled cache does not close that risk.
 The mirror is required to equal an open, non-draft same-repository PR head. `/ok to test` is a maintainer convention,
 not a workflow-authenticated approval, and mirror equality alone does not prove who wrote that branch.
 
@@ -176,10 +179,10 @@ release or production-acceptance claim.
 
 The repository-owned NKE OS validation workflow in row 18 is separate from generated hosted Run CI. Each main
 push selects its exact commit for full AMD64 and ARM64 KVM builds, boot smoke and QCOW2 uploads; automatic
-triggering remains unexercised until this workflow change lands. Manual dispatch remains available for native
+triggering has no recorded execution evidence. Manual dispatch remains available for native
 toolchain diagnostics or full image validation, on either architecture or both. The trusted main workflow defines
 admission for an exact main commit or a mirror matching a current, open, non-draft same-repository PR head.
-These updated admission paths remain unexercised at this head. `/ok to test` is a maintainer convention,
+These admission paths have no recorded execution evidence. `/ok to test` is a maintainer convention,
 not enforced approval or proof of who wrote
 the mirror. Candidate code receives the pinned private NKE source contents and network-capable KVM execution,
 but never the source credential; a separate fetch job alone holds it.

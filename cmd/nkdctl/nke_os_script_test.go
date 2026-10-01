@@ -141,10 +141,18 @@ func TestOSPlanSourceClosureRejectsAliasAndPinDrift(t *testing.T) {
 		{name: "without suffix", repo: "https://github.com/dsx-ai-factory/nke"},
 		{name: "case alias", repo: "HTTPS://GITHUB.COM/DSX-AI-FACTORY/NKE.git", drift: true},
 		{name: "trailing slash", repo: repository + "/", drift: true},
+		{name: "repeated trailing slash", repo: repository + "//", drift: true},
+		{name: "query suffix", repo: repository + "?x", drift: true},
+		{name: "fragment suffix", repo: repository + "#main", drift: true},
+		{name: "HTTPS port", repo: "https://github.com:443/dsx-ai-factory/nke.git", drift: true},
+		{name: "www host", repo: "https://www.github.com/dsx-ai-factory/nke.git", drift: true},
+		{name: "same project on another host", repo: "https://example.test/dsx-ai-factory/nke.git", drift: true},
 		{name: "ssh URL", repo: "ssh://git@github.com/dsx-ai-factory/nke.git", drift: true},
+		{name: "SSH port", repo: "ssh://git@github.com:22/dsx-ai-factory/nke.git", drift: true},
 		{name: "scp URL", repo: "git@github.com:dsx-ai-factory/nke.git", drift: true},
 		{name: "git URL", repo: "git://github.com/dsx-ai-factory/nke.git", drift: true},
 		{name: "unrelated source", repo: "https://github.com/ovn-kubernetes/ovn-kubernetes", drift: true, want: true},
+		{name: "sibling repository", repo: "https://github.com/dsx-ai-factory/nke-recipes.git", drift: true, want: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			graph := *plan.Builds[0].Graph
