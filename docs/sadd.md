@@ -351,7 +351,7 @@ This index locates design responsibility. Per-ADR maturity and remaining accepta
 | 19 | Artifact membership and downstream deployment ownership | Object relationships; qualified flow |
 | 20 | Environment, publication and deferred registration | Interfaces; recovery |
 | 21 | Definition selection and generated-bundle maintenance | Compilation and drift |
-| 22 | Pins, lock contract, proposed derived pin sets | Configuration Data; worked example |
+| 22 | Pins, lock contract, explicit derived pin sets | Configuration Data; worked example |
 
 ### Architecture drivers and validation
 
@@ -382,8 +382,9 @@ Independent consumers authenticated the same artifacts and content subject. Down
 and all three local chart renders passed, including exact CWE digest binding and updated checksums. This is
 pipeline-attested artifact-publication evidence for its then-current authoring and publication layout. It does
 not validate the direct-output migration or the current single-entry publication layout. Repository checks
-are recorded in reconciliation. Full v1 release qualification, fused large-output
-wrapped execution, derived pin sets, registration remains unimplemented; cluster qualification is outside NKD. Qualified
+are recorded in reconciliation. Explicit derived pin sets have catalog contract coverage for atomic updates
+and pinned-tree re-derivation. Full v1 release qualification, fused large-output wrapped execution and
+registration remain unimplemented; cluster qualification is outside NKD. Qualified
 release authorization, its receipt assembly and release-specific trusted time have no retained implementation.
 Authenticated document/status diagnostics remain, but do not supply clearance. Air-gap execution is outside
 scope and its dormant implementation has been removed.
@@ -432,11 +433,14 @@ binding of the requirements frozen before execution. Trust precedence is explici
 store, while catalog identities remain advisory. External utilities are subprocess capabilities rather than
 linked build engines; qualified tools require the corresponding pinned execution contract (ADR-04/05/07/17).
 
-Proposed configuration includes ADR-22 §7 derived pin sets and ADR-10's embedded-component declarations. Derived member pins must be
-re-derived from the pinned upstream tree at validation; an annotation alone cannot establish consistency.
-`embeds` describes components inside an external image and is checked against its pinned upstream manifest.
-The declaration alone cannot establish observed image contents. Disk inventory requires the separate deferred
-inspection and material-reconciliation contract; runtime correctness remains with NKE. Any deferred
+ADR-22 §7 implements explicit derived pin sets for source and acquired members. Loading re-derives member
+versions from bounded YAML/JSON in the pinned upstream tree; provenance annotations alone cannot establish
+agreement. Re-pinning updates the declared set atomically. Unknown or missing records in selected collections
+fail closed. Catalogs with pin sets require access to pinned Git objects when loaded.
+
+`curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
+An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate
+deferred inspection and material-reconciliation contract; runtime correctness remains with NKE. Any deferred
 registration transport must consume accepted artifact references without adding a topology model.
 
 ### External Interface and Specification {#external-interface-and-specification}
@@ -878,7 +882,7 @@ already obtained.
 | Live GitHub execution, source mirror access and protected environment | CI/release engineering and NKE source owners | M1 external acceptance |
 | Transparency disclosure, Fulcio/Rekor operations and deletion protection | Product security and service owners | First signed NKE run and sustainable consumer verification |
 | Wrapped-job isolation and capacity envelope | NKE build owner and CI engineering | Large OS-image delivery in M2 |
-| Derived pin sets and `embeds` consistency | Catalog/build owners | Checked upstream composition binding |
+| `curatedBy`, aggregate SBOM curation edges and `embeds` consistency | Catalog/build owners | Upstream composition binding beyond catalog pin validation |
 | M3 role policy and qualification implementation | Qualification owner | Build/evidence verdicts |
 | M4 concurrency, partial-write reconciliation, tag and retention protocol | Release engineering and registry owner | Reliable repeated and interrupted release publication |
 | Qualified provider observation, Nix, authority/discovery adapters and operational exercises | Qualified-lane module owners | Qualified production acceptance |

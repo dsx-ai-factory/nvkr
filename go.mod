@@ -3,10 +3,13 @@ module github.com/NVIDIA/nke-recipes
 go 1.27.0
 
 require (
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/google/go-containerregistry v0.22.1
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/urfave/cli/v2 v2.27.7
+	go.yaml.in/yaml/v3 v3.0.4
+	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.48.0
 	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/yaml v1.6.0
@@ -22,6 +25,5 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/sync v0.22.0 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 )

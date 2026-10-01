@@ -93,7 +93,7 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 			}
 		}
 	}
-	return nil
+	return validatePinSets(reg)
 }
 
 // Validate enforces the resolved-catalog invariants. It is deterministic:
