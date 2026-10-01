@@ -154,6 +154,24 @@ upload glob also included source-tree directories named `diagnostics`; the propo
 transport correction restricts uploads to the selected attempt's own records and Packer logs.
 Repository-scoped source-credential policy, publication and qualification remain unresolved.
 
+## No-chmod runner-access probe
+
+[Run 36929803967](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36929803967) completed successfully
+using the branch-owned workflow at exact commit `336e6d7fc95de297004ea656dcae38d6e25ef8ec`, after explicit
+authorization of this secret-free preflight. It executed the same YAML-anchored admission script used by
+full validation, without fetching NKE, running a toolchain/image build or changing device permissions.
+
+| Architecture | Job | Runner | Observed device ownership/mode | Result |
+|---|---|---|---|---|
+| ARM64 | [110596094638](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36929803967/job/110596094638) | `arc-arm64-kvm-84grx-runner-8jbdf` | `root:UNKNOWN 666` | Read/write check and open succeeded |
+| AMD64 | [110596094679](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36929803967/job/110596094679) | `arc-amd64-kvm-lfdl7-runner-6jhnn` | `root:UNKNOWN 666` | Read/write check and open succeeded |
+
+Both jobs ran as UID/GID 1001, with supplemental groups 27 (`sudo`), 100 (`users`) and 123 (`docker`).
+The source-fetch, toolchain and full-build jobs were skipped. This proves existing access without `chmod`
+on these observed runners. Mode 0666 permits access without KVM group membership; the logs do not establish
+whether it originated in scale-set configuration or an earlier host-device change. No durable permission
+baseline for newly provisioned hosts, new QCOW2 or boot test is established by this probe.
+
 ## Remaining proof
 
 FDE, full-disk SBOM, publication, qualified execution, and the generated hosted VM adapter remain outside

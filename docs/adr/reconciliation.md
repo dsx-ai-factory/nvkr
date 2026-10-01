@@ -164,8 +164,11 @@ adapter's fixed daemon-side `/dev/kvm` projection with a same-kernel boot-ID and
 before Packer, retaining the admitted descriptor and API check.
 The recorded workflow used a `chmod` fallback that changed a host-bind-mounted device beyond the runner pod.
 The updated preflight instead requires existing read/write access and never changes device permissions.
-KVM group access or a device plugin belongs in the scale-set configuration. The updated preflight still
-requires a real runner execution; the earlier successful builds do not prove this permission requirement.
+KVM group access or a device plugin belongs in the scale-set configuration. The secret-free preflight in
+[run 36929803967](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36929803967) executes the same
+admission script at `336e6d7` and passes on both ARC architectures without changing permissions. Both
+observed devices are mode 0666; this proves current access, not its configuration origin or a durable
+permission baseline for newly provisioned hosts. It is not another image build or boot test.
 
 The historical NKE direct-Packer source contract merged at commit
 `5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2`, tree
