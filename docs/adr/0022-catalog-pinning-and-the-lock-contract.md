@@ -214,12 +214,19 @@ derived member fail with an error naming its umbrella.
 
 **Bounded extraction.** Paths use dotted fields and literal `[key=value]` selectors. Values must be exact
 semantic-version strings, optionally prefixed with `v`; ranges and numeric YAML scalars are rejected.
+Version syntax is owned by `internal/versionpolicy`, using pinned Masterminds SemVer. Pin sets require
+three numeric segments; Helm metadata uses Helm-compatible parsing. Validation never rewrites the input
+string used for lookup or identity.
 Source tags use the declared `tagPrefix` without guessing a `v`: `0.9.3` with `controller/v` becomes
 `controller/v0.9.3`. Unsupported selectors, duplicate keys, extra documents, YAML anchors and aliases fail.
 Documents are limited to 4 MiB, 64 levels and 65,536 nodes; a set declares at most 1,024 members.
 
 **Pinned-tree validation.** NKD fetches the exact umbrella commit into a private bare Git repository and
-checks its tree hash and source date epoch against the lock. Only regular blobs at canonical relative paths
+checks its tree hash and source date epoch against the lock. Linux/macOS acquisition applies a kernel
+file-size ceiling of at most 64 MiB to Git and its children before fetching. Fetch retains packed objects,
+disables auxiliary pack downloads and automatic maintenance, and admits exactly one pack with its index
+within a 128 MiB object-store budget. Unrelated content counts toward the packed-byte ceiling, even
+when the selected version file is small. Other host platforms fail capability admission. Only regular blobs at canonical relative paths
 are readable; symlinks, submodules and path escapes are rejected. Reads are context-bound and limited to
 4 MiB per file, 32 MiB and 1,024 reads per tree. No checkout, source program, hook, template or dependency
 resolver runs. Extraction itself has no network access; obtaining pinned Git objects requires source access.

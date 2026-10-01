@@ -11,9 +11,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/versionpolicy"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -69,16 +69,6 @@ func (b *boundedGzipReader) Read(p []byte) (int, error) {
 	b.remaining -= int64(n)
 	return n, err
 }
-
-// helmChartSemVer is the strict SemVer 2.0.0 grammar
-// (https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string),
-// the same grammar Helm's own chart.Metadata.Validate applies to
-// Chart.yaml's version via Masterminds/semver's StrictNewVersion. Matched by
-// hand here rather than importing helm.sh/helm or Masterminds/semver, since
-// this is the entire authoritative rule this boundary needs.
-var helmChartSemVer = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)` +
-	`(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?` +
-	`(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
 
 // helmChartValidAPIVersions are the two Chart.yaml apiVersion values Helm's
 // own loader accepts: "v1" (legacy Helm 2 chart, still loadable by Helm 3)
@@ -208,7 +198,7 @@ func helmChartMetadata(chartData []byte) (helmChartConfig, error) {
 // chart.Metadata.Validate enforces before a chart can be loaded or pushed:
 // apiVersion, name and version are required, apiVersion must be a value
 // Helm's loader accepts, type (when set) must be a value Helm's loader
-// accepts, and version must be strict SemVer. Accepting a Chart.yaml that
+// accepts, and version must satisfy Helm-compatible SemVer. Accepting a Chart.yaml that
 // fails these rules would package it under the standard Helm media types
 // anyway, deferring the real failure to whatever consumer later runs the
 // authoritative Helm loader against it.
@@ -225,7 +215,7 @@ func validateHelmChartMetadata(config helmChartConfig) error {
 	if config.Type != "" && config.Type != "application" && config.Type != "library" {
 		return e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml type %q must be %q or %q", config.Type, "application", "library")
 	}
-	if !helmChartSemVer.MatchString(config.Version) {
+	if !versionpolicy.Helm(config.Version) {
 		return e.New(e.CodeVerifyFailed, "Helm chart Chart.yaml version %q is not a valid SemVer", config.Version)
 	}
 	return nil

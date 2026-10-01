@@ -3,9 +3,11 @@ package catalog
 import (
 	"bytes"
 	"context"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -270,4 +272,92 @@ func openTestPinnedTree(t *testing.T, repo string, pin Pin) pinnedTree {
 		}
 	})
 	return reader
+}
+
+func TestPinnedTreeBoundsUnrelatedObjectAcquisition(t *testing.T) {
+	for _, oversized := range []bool{false, true} {
+		t.Run(strconv.FormatBool(oversized), func(t *testing.T) {
+			files := map[string][]byte{"versions.yaml": []byte("version: 1.2.3\n")}
+			if oversized {
+				blob := make([]byte, 256<<10)
+				rng := rand.New(rand.NewPCG(1, 2))
+				for i := range blob {
+					blob[i] = byte(rng.Uint32())
+				}
+				files["unrelated.bin"] = blob
+			}
+			repo, pin, _ := pinTreeFixture(t, files)
+			reader, err := openPinnedTreeWithLimit(t.Context(), Source{Repo: repo}, pin, 64<<10)
+			if oversized {
+				assertCatalogContractCode(t, err, e.CodeFetchFailed)
+				if reader != nil {
+					t.Fatal("oversized repository was admitted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer reader.Close()
+			body, err := reader.ReadFile(t.Context(), "versions.yaml")
+			if err != nil || string(body) != "version: 1.2.3\n" {
+				t.Fatalf("read = %q, %v", body, err)
+			}
+		})
+	}
+}
+
+func TestPinTreeGitEnforcesLimitDuringWrite(t *testing.T) {
+	tools := t.TempDir()
+	output := filepath.Join(t.TempDir(), "oversized")
+	script := "#!/bin/sh\nexec /bin/dd if=/dev/zero of=\"$PIN_TREE_TEST_OUTPUT\" bs=1024 count=256\n"
+	if err := os.WriteFile(filepath.Join(tools, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tools)
+	t.Setenv("PIN_TREE_TEST_OUTPUT", output)
+	_, err := pinTreeGitWithLimit(t.Context(), t.TempDir(), 8192, 64<<10, "fetch")
+	assertCatalogContractCode(t, err, e.CodeFetchFailed)
+	info, err := os.Stat(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() == 0 || info.Size() > 64<<10 {
+		t.Fatalf("kernel write cap failed: %d bytes", info.Size())
+	}
+}
+
+func TestPinnedTreeStoreAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		files []string
+		ok    bool
+	}{
+		{"one pack", []string{"pack/a.pack", "pack/a.idx"}, true},
+		{"loose object", []string{"aa/object"}, false},
+		{"extra pack", []string{"pack/a.pack", "pack/a.idx", "pack/b.pack"}, false},
+		{"missing index", []string{"pack/a.pack"}, false},
+		{"auxiliary file", []string{"pack/a.pack", "pack/a.idx", "pack/a.rev"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for _, name := range tc.files {
+				name = filepath.Join(dir, "objects", name)
+				if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(name, nil, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := validatePinTreeStore(t.Context(), dir)
+			if tc.ok {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertCatalogContractCode(t, err, e.CodeFetchFailed)
+			}
+		})
+	}
 }
