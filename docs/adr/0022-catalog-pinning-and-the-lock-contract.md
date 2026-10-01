@@ -243,7 +243,7 @@ remain NKE-owned. See the [example catalog](../examples/nke-pin-set/registry.yam
 **Chart acquisition.** HTTPS Helm indexes and anonymous OCI repositories resolve one exact chart version.
 The lock records chart identity, transport URL and the SHA-256 of the unchanged chart archive, identical for
 every declared architecture. OCI pins identify the chart-content layer, not the manifest. Downloads and archive
-inspection are bounded; unsafe paths, links and conflicting duplicates fail. Identical regular-file duplicates
+inspection are bounded; unsafe paths, links and conflicting duplicates fail. Acquisition, packaging and publication SBOM inspection share the duplicate-record rule. Identical regular-file duplicates
 under vendored `charts/` are allowed, with every record counted against the limits. Runtime OCI acquisition
 uses an explicit digest-only `oci-blob://` transport and preserves the compressed bytes. Private OCI credentials,
 chart dependency resolution and pins for images referenced inside charts are outside this contract.

@@ -5,12 +5,14 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"io"
 	"net/url"
 	"path"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/helmarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"sigs.k8s.io/yaml"
 )
@@ -32,7 +34,7 @@ func inspectHelmArchive(ctx context.Context, source io.Reader) ([]Component, err
 	limited := &io.LimitedReader{R: expanded, N: (256 << 20) + 1}
 	reader := tar.NewReader(limited)
 	var components []Component
-	seen := map[string]bool{}
+	seen := helmarchive.Records{}
 	for entries := 0; ; entries++ {
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "inspecting Helm archive")
@@ -45,26 +47,35 @@ func inspectHelmArchive(ctx context.Context, source io.Reader) ([]Component, err
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "reading Helm archive")
 		}
 		name := strings.TrimSuffix(header.Name, "/")
-		if entries >= 65536 || path.IsAbs(name) || path.Clean(name) != name || strings.HasPrefix(name, "../") || seen[name] {
+		if entries >= 65536 || path.IsAbs(name) || path.Clean(name) != name || strings.HasPrefix(name, "../") {
 			return nil, e.New(e.CodeVerifyFailed, "unsafe or duplicate Helm archive member %q", name)
 		}
-		seen[name] = true
-		if header.Typeflag == tar.TypeDir {
-			continue
-		}
-		if header.Typeflag != tar.TypeReg {
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir {
 			return nil, e.New(e.CodeVerifyFailed, "unsupported Helm archive member %q", name)
 		}
 		base := path.Base(name)
-		if base != "Chart.yaml" && base != "Chart.lock" {
-			continue
-		}
-		if header.Size > 8<<20 {
+		metadata := header.Typeflag == tar.TypeReg && (base == "Chart.yaml" || base == "Chart.lock")
+		if header.Size < 0 || (metadata && header.Size > 8<<20) {
 			return nil, e.New(e.CodeVerifyFailed, "Helm dependency document is oversized")
 		}
-		raw, err := io.ReadAll(reader)
+		hash := sha256.New()
+		var raw []byte
+		if metadata {
+			raw, err = io.ReadAll(io.TeeReader(reader, hash))
+		} else {
+			_, err = io.Copy(hash, reader)
+		}
+		if err != nil || limited.N <= 0 {
+			return nil, e.New(e.CodeVerifyFailed, "Helm archive is truncated or exceeds byte limit: %v", err)
+		}
+		var digest [sha256.Size]byte
+		copy(digest[:], hash.Sum(nil))
+		repeated, err := seen.Add(strings.Split(name, "/")[0], header, digest)
 		if err != nil {
-			return nil, e.Wrap(e.CodeVerifyFailed, err, "reading Helm dependency document")
+			return nil, err
+		}
+		if repeated || !metadata {
+			continue
 		}
 		decoded, err := yaml.YAMLToJSONStrict(raw)
 		if err != nil {

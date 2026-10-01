@@ -212,3 +212,47 @@ func assertDependencyCode(t *testing.T, err error, code e.Code) {
 		t.Fatalf("want %s, got %v", code, err)
 	}
 }
+
+func TestHelmDependencyDuplicateRecordContract(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, first, second string
+		mode                      int64
+		good                      bool
+	}{
+		{"identical subchart metadata", "demo/charts/sub/Chart.yaml", "name: sub\nversion: 1.2.3\n", "name: sub\nversion: 1.2.3\n", 0o644, true},
+		{"conflicting body", "demo/charts/sub/templates/item.yaml", "one", "two", 0o644, false},
+		{"conflicting mode", "demo/charts/sub/templates/item.yaml", "one", "one", 0o600, false},
+		{"root metadata", "demo/Chart.yaml", "name: demo\nversion: 1.2.3\n", "name: demo\nversion: 1.2.3\n", 0o644, false},
+		{"root template", "demo/templates/item.yaml", "one", "one", 0o644, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			writer := tar.NewWriter(&output)
+			write := func(name, body string, mode int64) {
+				t.Helper()
+				if err := writer.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: mode, Size: int64(len(body))}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := writer.Write([]byte(body)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.path != "demo/Chart.yaml" {
+				write("demo/Chart.yaml", "name: demo\nversion: 1.2.3\n", 0o644)
+			}
+			write(tc.path, tc.first, 0o644)
+			write(tc.path, tc.second, tc.mode)
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			inventory, err := inspectHelmArchive(t.Context(), bytes.NewReader(output.Bytes()))
+			if tc.good {
+				if err != nil || len(inventory) != 2 {
+					t.Fatalf("duplicate inventory was not coalesced: %+v, %v", inventory, err)
+				}
+			} else {
+				assertDependencyCode(t, err, e.CodeVerifyFailed)
+			}
+		})
+	}
+}

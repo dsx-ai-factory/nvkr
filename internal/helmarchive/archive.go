@@ -65,7 +65,7 @@ func Inspect(ctx context.Context, archive []byte) (Identity, error) {
 	defer func() { _ = zipped.Close() }()
 	limited := &io.LimitedReader{R: zipped, N: maxHelmArchiveBytes + 1}
 	reader := tar.NewReader(limited)
-	seen := map[string]helmArchiveRecord{}
+	seen := Records{}
 	found := false
 	for count := 0; ; count++ {
 		if err := contextError(ctx); err != nil {
@@ -97,11 +97,6 @@ func Inspect(ctx context.Context, archive []byte) (Identity, error) {
 		if header.Size < 0 || header.Size > maxHelmArchiveBytes || (header.Typeflag == tar.TypeDir && header.Size != 0) {
 			return Identity{}, e.New(e.CodeVerifyFailed, "invalid Helm archive entry size")
 		}
-		previous, repeated := seen[entry]
-		if repeated && (!helmRepeatedSubchartFile(chartName, entry) || header.Typeflag != tar.TypeReg ||
-			previous.header.Typeflag != tar.TypeReg || !reflect.DeepEqual(previous.header, header)) {
-			return Identity{}, e.New(e.CodeVerifyFailed, "duplicate Helm archive path %q is not an identical regular subchart record", header.Name)
-		}
 		var digest [sha256.Size]byte
 		if entry == chartName+"/Chart.yaml" {
 			if header.Typeflag != tar.TypeReg || header.Size > maxHelmChartBytes {
@@ -126,10 +121,9 @@ func Inspect(ctx context.Context, archive []byte) (Identity, error) {
 			}
 			copy(digest[:], hash.Sum(nil))
 		}
-		if repeated && digest != previous.digest {
-			return Identity{}, e.New(e.CodeVerifyFailed, "duplicate Helm subchart record %q has conflicting content", header.Name)
+		if _, err := seen.Add(chartName, header, digest); err != nil {
+			return Identity{}, err
 		}
-		seen[entry] = helmArchiveRecord{header: header, digest: digest}
 	}
 	// Consume gzip through its checksum, also bounding data after the tar terminator.
 	if _, err := io.Copy(helmPaddingWriter{}, limited); err != nil || limited.N <= 0 {
@@ -139,6 +133,28 @@ func Inspect(ctx context.Context, archive []byte) (Identity, error) {
 		return Identity{}, e.New(e.CodeVerifyFailed, "Helm package lacks root Chart.yaml")
 	}
 	return identity, nil
+}
+
+// Records applies the shared duplicate-record contract to already path-checked
+// tar entries. Callers bound entry counts and bytes, and hash the complete body.
+// Its zero value is ready to use. Add reports an identical allowed repetition.
+type Records struct{ seen map[string]helmArchiveRecord }
+
+func (records *Records) Add(chartRoot string, header *tar.Header, digest [sha256.Size]byte) (bool, error) {
+	entry := strings.TrimSuffix(header.Name, "/")
+	previous, repeated := records.seen[entry]
+	if repeated {
+		if !helmRepeatedSubchartFile(chartRoot, entry) || header.Typeflag != tar.TypeReg ||
+			previous.header.Typeflag != tar.TypeReg || !reflect.DeepEqual(previous.header, header) || digest != previous.digest {
+			return false, e.New(e.CodeVerifyFailed, "duplicate Helm archive path %q is not an identical regular subchart record", header.Name)
+		}
+		return true, nil
+	}
+	if records.seen == nil {
+		records.seen = make(map[string]helmArchiveRecord)
+	}
+	records.seen[entry] = helmArchiveRecord{header: header, digest: digest}
+	return false, nil
 }
 
 type helmArchiveRecord struct {

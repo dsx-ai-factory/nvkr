@@ -19,6 +19,7 @@ import (
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 )
 
@@ -143,6 +144,27 @@ func TestAcquiredHelmPackagesExactPinnedBytes(t *testing.T) {
 			observed, err := ObserveLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], artifacts)
 			if err != nil || observed.Digest != im.Manifests[0].Digest.String() {
 				t.Fatalf("observation: %+v %v", observed, err)
+			}
+			// Exercise the publication package-inventory branch against the
+			// preserved archive. Producer inventory/evidence is a separate gate.
+			packagePlan := *plan
+			packageOutput := plan.LifecycleOutputs[0]
+			packageOutput.Components = nil
+			packagePlan.LifecycleOutputs = []LifecycleOutputPlan{packageOutput}
+			evidence, err := releaseEvidenceObjects(t.Context(), &packagePlan, Node{Inputs: []string{output.ID}}, artifacts)
+			if err != nil || len(evidence) != 1 {
+				t.Fatalf("publication package SBOM: %v, %v", evidence, err)
+			}
+			binding := evidence[0].Evidence
+			if binding.SubjectDigest != observed.Digest || binding.InspectionInputDigest != pipeline.FileDigest(body) {
+				t.Fatalf("SBOM lost exact subject: %+v", binding)
+			}
+			var bom sbom.BOM
+			if err := canonical.UnmarshalExact(bytes.TrimSpace(evidence[0].Bytes), &bom); err != nil {
+				t.Fatal(err)
+			}
+			if len(bom.Components) != 1 || bom.Components[0].Name != "demo" {
+				t.Fatalf("unexpected package inventory: %+v", bom.Components)
 			}
 			record, err := readProducerResult(t.Context(), artifacts["result/charts/chart"].Path)
 			if err != nil || record.EngineClass != "prebuilt-acquire" || record.SHA256 != digest.String() {
