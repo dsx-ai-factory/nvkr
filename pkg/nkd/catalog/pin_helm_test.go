@@ -321,6 +321,7 @@ func TestHelmAdmissionBeforeNetwork(t *testing.T) {
 		{"unsafe chart", "https://repo.example", "../demo", "1.2.3", false, e.CodeInvalidCatalog},
 		{"unsafe repository", "https://repo.example/a/../b", "demo", "1.2.3", false, e.CodeInvalidCatalog},
 		{"range", "https://repo.example", "demo", ">=1.2.3", false, e.CodeInvalidCatalog},
+		{"numeric prerelease zero", "https://repo.example", "demo", "1.2.3-beta.01", false, e.CodeInvalidCatalog},
 		{"wildcard", "https://repo.example", "demo", "1.2.x", false, e.CodeInvalidCatalog},
 		{"canceled", "https://repo.example", "demo", "1.2.3", true, e.CodeTimeout},
 	} {
@@ -389,5 +390,27 @@ func TestHelmHTTPBoundsAndTransport(t *testing.T) {
 	body := &helmBoundedBody{ReadCloser: io.NopCloser(strings.NewReader("12345")), remaining: 4}
 	if _, err := io.ReadAll(body); err == nil {
 		t.Fatal("unbounded OCI response")
+	}
+}
+
+func TestHelmVersionLookupPreservesOriginalText(t *testing.T) {
+	for _, version := range []string{"v1.2.3", "1.2.3-rc.1", "1.2.3+build.01", "1.2"} {
+		t.Run(version, func(t *testing.T) {
+			payload := helmFixtureArchive(t, fmt.Sprintf("apiVersion: v2\nname: demo\nversion: %q\n", version))
+			location := "https://repo.example/demo-" + version + ".tgz"
+			fetch := func(_ context.Context, url string, _ int64) ([]byte, error) {
+				if url == "https://repo.example/index.yaml" {
+					return []byte(fmt.Sprintf("apiVersion: v1\nentries:\n  demo:\n  - name: demo\n    version: %q\n    urls: [%q]\n", version, location)), nil
+				}
+				if url != location {
+					t.Fatalf("version changed in package URL: %s", url)
+				}
+				return payload, nil
+			}
+			got, digest, err := resolveHelmChartWith(t.Context(), HelmChart{Name: "demo", Repository: "https://repo.example"}, version, fetch, nil)
+			if err != nil || got != location || digest != pinFixtureDigest(string(payload)) {
+				t.Fatalf("pin = %q %q, %v", got, digest, err)
+			}
+		})
 	}
 }

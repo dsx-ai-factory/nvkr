@@ -21,6 +21,7 @@ Regenerate with `make notices`.
 
 | Module | Version | License (heuristic) |
 |---|---|---|
+| `github.com/Masterminds/semver/v3` | v3.5.0 | MIT |
 | `github.com/cpuguy83/go-md2man/v2` | v2.0.7 | MIT |
 | `github.com/docker/cli` | v29.7.2+incompatible | Apache-2.0 |
 | `github.com/docker/docker-credential-helpers` | v0.9.3 | MIT |
@@ -39,6 +40,34 @@ Regenerate with `make notices`.
 | `golang.org/x/sys` | v0.48.0 | BSD-3-Clause |
 | `oras.land/oras-go/v2` | v2.6.2 | Apache-2.0 |
 | `sigs.k8s.io/yaml` | v1.6.0 | MIT |
+
+---
+
+## github.com/Masterminds/semver/v3
+
+Version: v3.5.0
+
+```
+Copyright (C) 2014-2019, Matt Butcher and Matt Farina
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
 
 ---
 

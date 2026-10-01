@@ -218,7 +218,7 @@ func TestExactPinSetVersion(t *testing.T) {
 		{" 1.2.3", false}, {"1.2.3\n", false}, {"01.2.3", false},
 		{"1.2.3-01", false}, {"1.2.3-rc.01", false}, {"1.2.3-", false},
 		{"1.2.3+", false}, {"1.2.3-rc..1", false}, {"1.2.3+build..1", false},
-		{"1.2.3+" + strings.Repeat("a", maxPinSetVersionBytes), false},
+		{"1.2.3+" + strings.Repeat("a", 256), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.value, func(t *testing.T) {

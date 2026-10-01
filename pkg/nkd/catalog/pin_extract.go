@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/versionpolicy"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"go.yaml.in/yaml/v3"
 )
@@ -17,13 +18,11 @@ const (
 	maxPinSetMembers       = 1024
 	maxPinSetPathBytes     = 4096
 	maxPinSetPathSegments  = 32
-	maxPinSetVersionBytes  = 256
 )
 
 var (
-	pinSetFieldPattern   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
-	pinSetValuePattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+%-]*$`)
-	pinSetVersionPattern = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
+	pinSetFieldPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+	pinSetValuePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+%-]*$`)
 )
 
 type pinSetPathSegment struct {
@@ -144,19 +143,7 @@ func parsePinSetValuePath(path string) ([]pinSetPathSegment, error) {
 }
 
 func exactPinSetVersion(version string) bool {
-	if len(version) > maxPinSetVersionBytes {
-		return false
-	}
-	parts := pinSetVersionPattern.FindStringSubmatch(version)
-	if parts == nil {
-		return false
-	}
-	for _, identifier := range strings.Split(parts[4], ".") {
-		if len(identifier) > 1 && identifier[0] == '0' && strings.Trim(identifier, "0123456789") == "" {
-			return false
-		}
-	}
-	return true
+	return versionpolicy.PinSet(version)
 }
 
 func decodePinSetDocument(raw []byte) (*yaml.Node, error) {

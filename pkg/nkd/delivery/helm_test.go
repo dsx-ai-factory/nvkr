@@ -446,7 +446,7 @@ func TestBuildHelmChartArtifactValidatesAuthoritativeChartMetadata(t *testing.T)
 		{"invalid apiVersion", "apiVersion: v3\nname: demo\nversion: 1.0.0\n"},
 		{"invalid type", "apiVersion: v2\nname: demo\nversion: 1.0.0\ntype: library-x\n"},
 		{"non-semver version", "apiVersion: v2\nname: demo\nversion: not-a-version\n"},
-		{"semver missing patch", "apiVersion: v2\nname: demo\nversion: 1.0\n"},
+		{"invalid numeric prerelease", "apiVersion: v2\nname: demo\nversion: 1.0.0-beta.01\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			chartData := helmChartArchiveFixture(t, map[string]string{"demo/Chart.yaml": tc.chartYAML})
@@ -463,6 +463,8 @@ func TestBuildHelmChartArtifactAcceptsValidChartTypesAndAPIVersions(t *testing.T
 	t.Parallel()
 	ctx := context.Background()
 	for _, tc := range []struct{ name, chartYAML string }{
+		{"leading v", "apiVersion: v2\nname: demo\nversion: v1.0.0\n"},
+		{"abbreviated version", "apiVersion: v2\nname: demo\nversion: \"1.0\"\n"},
 		{"v1 legacy chart", "apiVersion: v1\nname: demo\nversion: 1.0.0\n"},
 		{"v2 application chart", "apiVersion: v2\nname: demo\nversion: 1.0.0\ntype: application\n"},
 		{"v2 library chart", "apiVersion: v2\nname: demo\nversion: 1.0.0\ntype: library\n"},
