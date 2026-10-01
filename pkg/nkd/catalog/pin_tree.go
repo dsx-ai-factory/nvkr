@@ -3,9 +3,12 @@ package catalog
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -17,10 +20,12 @@ import (
 )
 
 const (
-	pinTreeFileLimit  = 4 << 20
-	pinTreeTotalLimit = 32 << 20
-	pinTreeReadLimit  = 1024
-	pinTreeTimeout    = 2 * time.Minute
+	pinTreeFileLimit        = 4 << 20
+	pinTreeTotalLimit       = 32 << 20
+	pinTreeReadLimit        = 1024
+	pinTreeTimeout          = 2 * time.Minute
+	pinTreeObjectFileLimit  = 64 << 20
+	pinTreeObjectStoreLimit = 128 << 20
 )
 
 // pinnedTree exposes only bounded regular blobs from one authenticated Git tree.
@@ -40,6 +45,13 @@ type gitPinnedTree struct {
 }
 
 func openPinnedTree(ctx context.Context, src Source, pin Pin) (pinnedTree, error) {
+	return openPinnedTreeWithLimit(ctx, src, pin, pinTreeObjectFileLimit)
+}
+
+func openPinnedTreeWithLimit(ctx context.Context, src Source, pin Pin, fileLimit int64) (pinnedTree, error) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		return nil, e.New(e.CodeEngineCapability, "bounded pin-tree acquisition requires Linux or macOS")
+	}
 	if err := pinContextError(ctx); err != nil {
 		return nil, err
 	}
@@ -64,9 +76,12 @@ func openPinnedTree(ctx context.Context, src Source, pin Pin) (pinnedTree, error
 		{"init", "--bare", "--template=", "-q"},
 		{"fetch", "-q", "--depth=1", "--no-tags", "--recurse-submodules=no", "--no-write-fetch-head", "--", src.Repo, pin.Commit},
 	} {
-		if _, err := pinTreeGit(ctx, dir, 8192, args...); err != nil {
+		if _, err := pinTreeGitWithLimit(ctx, dir, 8192, fileLimit, args...); err != nil {
 			return nil, err
 		}
+	}
+	if err := validatePinTreeStore(ctx, dir); err != nil {
+		return nil, err
 	}
 	kind, err := pinTreeGit(ctx, dir, 128, "cat-file", "-t", pin.Commit)
 	if err != nil {
@@ -85,6 +100,54 @@ func openPinnedTree(ctx context.Context, src Source, pin Pin) (pinnedTree, error
 	}
 	ok = true
 	return tree, nil
+}
+
+// validatePinTreeStore admits only the bounded packed representation. Fetch is
+// forced to keep a pack; loose objects and extra packs are not admitted.
+func validatePinTreeStore(ctx context.Context, dir string) error {
+	var total int64
+	packs, indexes := 0, 0
+	err := filepath.WalkDir(filepath.Join(dir, "objects"), func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if err := pinContextError(ctx); err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return e.New(e.CodeFetchFailed, "nonregular pin-tree object store entry")
+		}
+		total += info.Size()
+		if total > pinTreeObjectStoreLimit {
+			return e.New(e.CodeFetchFailed, "pin-tree object store exceeds byte budget")
+		}
+		if filepath.Dir(name) != filepath.Join(dir, "objects", "pack") {
+			return e.New(e.CodeFetchFailed, "pin-tree fetch produced loose objects")
+		}
+		switch filepath.Ext(name) {
+		case ".pack":
+			packs++
+		case ".idx":
+			indexes++
+		default:
+			return e.New(e.CodeFetchFailed, "unexpected pin-tree object store file")
+		}
+		return nil
+	})
+	if err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "checking pin-tree object store")
+	}
+	if packs != 1 || indexes != 1 {
+		return e.New(e.CodeFetchFailed, "pin-tree fetch requires exactly one pack and index")
+	}
+	return nil
 }
 
 // validatePinSetFilePath admits canonical repository-relative paths, never host
@@ -178,6 +241,10 @@ func (tree *gitPinnedTree) Close() error {
 // pinTreeGit bounds both command duration and captured bytes. No checkout,
 // filter, hook, submodule traversal, replacement object or tag resolution runs.
 func pinTreeGit(ctx context.Context, dir string, limit int, args ...string) ([]byte, error) {
+	return pinTreeGitWithLimit(ctx, dir, limit, pinTreeObjectFileLimit, args...)
+}
+
+func pinTreeGitWithLimit(ctx context.Context, dir string, limit int, fileLimit int64, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, pinTreeTimeout)
 	defer cancel()
 	stdout := pinTreeBuffer{limit: limit, cancel: cancel}
@@ -190,11 +257,25 @@ func pinTreeGit(ctx context.Context, dir string, limit int, args ...string) ([]b
 		"-c", "protocol.file.allow=always", "-c", "protocol.https.allow=always",
 		"-c", "protocol.http.allow=always", "-c", "protocol.ssh.allow=always", "-c", "protocol.git.allow=always",
 		"-c", "protocol.ext.allow=never", "-c", "fetch.fsckObjects=true",
+		"-c", "fetch.unpackLimit=1", "-c", "fetch.uriprotocols=",
+		"-c", "fetch.writeCommitGraph=false", "-c", "pack.writeReverseIndex=false",
+		"-c", "gc.auto=0", "-c", "maintenance.auto=false",
 	}
-	cmd := exec.CommandContext(ctx, "git", append(gitArgs, args...)...)
+	// sh implementations use 512- or 1024-byte blocks; use 1024 so the
+	// effective cap never exceeds fileLimit on either platform. The kernel caps
+	// writes during transfer/indexing, before the post-fetch store admission.
+	// Fail if the cap cannot be installed. All arguments remain positional data.
+	git, err := exec.LookPath("git")
+	if err != nil {
+		return nil, e.Wrap(e.CodeFetchFailed, err, "finding git")
+	}
+	shellArgs := []string{"-c", `ulimit -f "$1" || exit 125; shift; exec "$@"`, "pin-tree", strconv.FormatInt(fileLimit/1024, 10), git}
+	shellArgs = append(shellArgs, gitArgs...)
+	shellArgs = append(shellArgs, args...)
+	cmd := exec.CommandContext(ctx, "/bin/sh", shellArgs...)
 	cmd.Env = pinTreeGitEnv()
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := ownedcmd.Run(ctx, cmd)
+	err = ownedcmd.Run(ctx, cmd)
 	if stdout.exceeded || stderr.exceeded {
 		return nil, e.New(e.CodeFetchFailed, "pin-set git %s exceeded its output limit", args[0])
 	}

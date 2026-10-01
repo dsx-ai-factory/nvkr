@@ -61,5 +61,9 @@ remove `--check` to apply them. The whole set updates together or the lock stays
 If the upstream list adds a third member, re-pinning fails until the catalog explicitly maps it.
 Changing a member pin by hand also fails validation against the pinned upstream file.
 
+A pin set does not discover runtime dependencies. Pinning a Helm chart does not pin its container images.
+Model each image as a separate acquired catalog member, with an explicit version field in the upstream
+version file. Nested pin sets work when a pinned source declares another explicit set.
+
 See [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#7-derived-pin-sets-one-source-may-curate-other-sources-pins)
 for the YAML/JSON selectors and limits.
