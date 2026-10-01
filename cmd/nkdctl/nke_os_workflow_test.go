@@ -59,17 +59,29 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 		workflow.Jobs["validate-full"].If != "needs.select.outputs.mode == 'full'" {
 		t.Fatal("preflight must not admit a source-credential job or image build")
 	}
-	gitRef := func(ref string) string {
+	// A PR-gating checkout can be shallow and have no origin/main. Model the
+	// selection history locally instead of depending on the caller's Git refs.
+	repo := t.TempDir()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	git := func(args ...string) string {
 		t.Helper()
-		cmd := exec.CommandContext(t.Context(), "git", "rev-parse", ref)
-		cmd.Dir = root
-		output, err := cmd.Output()
+		cmd := exec.CommandContext(t.Context(), "git", args...)
+		cmd.Dir = repo
+		output, err := cmd.CombinedOutput()
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("git %v: %v: %s", args, err, output)
 		}
 		return strings.TrimSpace(string(output))
 	}
-	head, main := gitRef("HEAD"), gitRef("origin/main")
+	git("init", "-q")
+	git("config", "user.name", "Workflow Test")
+	git("config", "user.email", "workflow@example.invalid")
+	git("-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "main fixture")
+	main := git("rev-parse", "HEAD")
+	git("update-ref", "refs/remotes/origin/main", main)
+	git("-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "candidate fixture")
+	head := git("rev-parse", "HEAD")
 	for _, test := range []struct {
 		name, mode, ref, commit, event, mirror, retain string
 		want                                           bool
@@ -98,7 +110,7 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 				eventSHA = main
 			}
 			cmd := exec.CommandContext(t.Context(), "bash", "-c", selection)
-			cmd.Dir = root
+			cmd.Dir = repo
 			cmd.Env = append(os.Environ(), "EVENT_NAME="+event, "EVENT_REF="+test.ref, "EVENT_SHA="+eventSHA,
 				"DISPATCH_COMMIT="+test.commit, "DISPATCH_MODE="+test.mode, "DISPATCH_ARCH=both",
 				"DISPATCH_MIRROR_PR="+test.mirror, "DISPATCH_RETAIN_QCOW2="+retain,
