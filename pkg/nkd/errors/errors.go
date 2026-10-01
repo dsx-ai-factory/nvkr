@@ -15,7 +15,7 @@
 //	10–19  Resolve / input / preflight / crypto        10–19
 //	20–29  Build / verify / trust-policy / disk        20–29
 //	30–31  Retryable / transient (32–39 reserved)      30–31
-//	40–53  Release / lifecycle                         40–53
+//	40–54  Release / lifecycle                         40–54
 package errors
 
 import (
@@ -61,7 +61,7 @@ const (
 	CodeUnavailable Code = "NKD-E-UNAVAILABLE" // a transient availability failure (network 5xx / dial / EOF)
 	CodeTimeout     Code = "NKD-E-TIMEOUT"     // a deadline or cancellation elapsed
 
-	// Band 40–53 — release / lifecycle.
+	// Band 40–54 — release / lifecycle.
 	CodeVectorUnpinned     Code = "NKD-E-VECTOR-UNPINNED"     // a validation vector / expected-digests ref is not pinned
 	CodeReleaseIncomplete  Code = "NKD-E-RELEASE-INCOMPLETE"  // a required member/artifact/evidence is missing (not promotable)
 	CodeGateUnmet          Code = "NKD-E-GATE-UNMET"          // an independent gate (e.g. conformance) has no matching passing result
@@ -75,6 +75,7 @@ const (
 	CodeMirrorMismatch     Code = "NKD-E-MIRROR-MISMATCH"     // a mirrored input did not hash to its declared identity
 	CodePipelineDrift      Code = "NKD-E-PIPELINE-DRIFT"      // a committed pipeline diverges from its IR (ADR-21)
 	CodeStatusCheckpoint   Code = "NKD-E-STATUS-CHECKPOINT"   // a signed lifecycle checkpoint is missing, stale, or rolled back
+	CodePinSetMismatch     Code = "NKD-E-PIN-SET-MISMATCH"    // derived member disagrees with its pinned umbrella
 	CodeWriteConflict      Code = "NKD-E-WRITE-CONFLICT"      // optimistic compare-and-swap lost to a concurrent writer
 )
 
@@ -115,7 +116,7 @@ var exitCodes = map[Code]int{
 	CodeUnavailable: 30,
 	CodeTimeout:     31,
 
-	// Band 40–53 — release / lifecycle.
+	// Band 40–54 — release / lifecycle.
 	CodeVectorUnpinned:     40,
 	CodeReleaseIncomplete:  41,
 	CodeGateUnmet:          42,
@@ -130,6 +131,7 @@ var exitCodes = map[Code]int{
 	CodePipelineDrift:      51,
 	CodeStatusCheckpoint:   52,
 	CodeWriteConflict:      53,
+	CodePinSetMismatch:     54,
 }
 
 // AllCodes is the canonical list of every declared Code, kept in exit-code order.
@@ -144,7 +146,7 @@ var AllCodes = []Code{
 	CodeUnavailable, CodeTimeout,
 	CodeVectorUnpinned, CodeReleaseIncomplete, CodeGateUnmet, CodeUnverifiedRef, CodeCompatMismatch,
 	CodeProvenanceMissing, CodeInventoryUnpinned, CodeImmutableViolation, CodeWithdrawn, CodeUnpinnedInput,
-	CodeMirrorMismatch, CodePipelineDrift, CodeStatusCheckpoint, CodeWriteConflict,
+	CodeMirrorMismatch, CodePipelineDrift, CodeStatusCheckpoint, CodeWriteConflict, CodePinSetMismatch,
 }
 
 // Error is a coded, wrappable error.

@@ -165,6 +165,12 @@ _Avoid_: Named output, artifact, authored build group
 An ordered, predecessor-bound catalog change replacing a complete component producer.
 _Avoid_: Output selection group, mixin, deployment topology
 
+**Derived pin set**:
+An explicit catalog mapping from one pinned upstream declaration to source or acquired-artifact versions.
+Re-pinning the umbrella updates its members atomically. Loading re-derives their versions from the pinned tree;
+unknown or missing members in selected collections fail closed. This checks declared version agreement.
+_Avoid_: Dynamic output selection, qualification record, independently bumpable member
+
 **Execution requirements**:
 A deterministic per-step request for minimum CPU, memory, and ephemeral storage, eligible runner-host
 platforms, typed host capabilities, and an executor wall-time budget. It is carried once in the full IR embedded

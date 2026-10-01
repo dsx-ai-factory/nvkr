@@ -79,6 +79,8 @@ type Metadata struct {
 // source's .go-version at the pinned tag, so the toolchain tracks the Go version a
 // bump requires without a hand edit (ADR-22 §2).
 type Source struct {
+	PinSet     *PinSet     `json:"pinSet,omitempty"`
+	PinnedBy   string      `json:"pinnedBy,omitempty"`
 	Kind       string      `json:"kind,omitempty"` // github-action for hosted workflow dependencies; empty for build sources
 	Tool       *ToolSource `json:"tool,omitempty"`
 	Repo       string      `json:"repo"`
@@ -104,6 +106,7 @@ type Source struct {
 // GoVersion and ToolchainImage are populated when the source resolves its toolchain
 // from .go-version.
 type Pin struct {
+	DerivedFrom     string   `json:"derivedFrom,omitempty"`
 	Tool            *ToolPin `json:"tool,omitempty"`
 	Tag             string   `json:"tag"`
 	Commit          string   `json:"commit"`
@@ -120,8 +123,9 @@ type Pin struct {
 // registry declares the acquisition URL/image template; the lock pins WHAT it must
 // hash to — the same sources+lock split the from-source lane uses (ADR-22 §1).
 type ArtifactPin struct {
-	Tag     string            `json:"tag"`
-	Digests map[string]string `json:"digests"` // arch -> sha256:<64-hex>
+	DerivedFrom string            `json:"derivedFrom,omitempty"`
+	Tag         string            `json:"tag"`
+	Digests     map[string]string `json:"digests"` // arch -> sha256:<64-hex>
 }
 
 // PinLock is the machine-generated lockfile: source name -> resolved pin, plus

@@ -58,7 +58,7 @@ func TestExitCodeContract(t *testing.T) {
 			return "build/verify/trust/disk"
 		case status >= 30 && status <= 31:
 			return "retryable"
-		case status >= 40 && status <= 53:
+		case status >= 40 && status <= 54:
 			return "release/lifecycle"
 		default:
 			return "OUT-OF-BAND"
@@ -87,7 +87,7 @@ func TestExitCodeContract(t *testing.T) {
 		CodeInventoryUnpinned: "release/lifecycle", CodeImmutableViolation: "release/lifecycle",
 		CodeWithdrawn: "release/lifecycle", CodeUnpinnedInput: "release/lifecycle",
 		CodeMirrorMismatch: "release/lifecycle", CodePipelineDrift: "release/lifecycle",
-		CodeStatusCheckpoint: "release/lifecycle", CodeWriteConflict: "release/lifecycle",
+		CodePinSetMismatch: "release/lifecycle", CodeStatusCheckpoint: "release/lifecycle", CodeWriteConflict: "release/lifecycle",
 	}
 	for c, status := range exitCodes {
 		got := band(status)

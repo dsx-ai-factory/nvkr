@@ -44,8 +44,9 @@ Registry v3 contains producer components with explicit supported `platforms`.
 It contains no recipes, criteria, recipe layers, mixins, `versionFrom`, placement categories or node roles.
 Catalog overlay v3 can replace complete component producers under ADR-11; it is independent of the removed
 recipe merge system. Catalog snapshots use v3 and strict decoding rejects removed classification fields even
-when the caller supplies the current version. Lock v1 remains unchanged because its resolved source and
-artifact shape is unchanged.
+when the caller supplies the current version. Registry v3 accepts the explicit pin-set declarations in §7.
+Lock v1 retains its version and adds optional `derivedFrom` provenance to source and artifact pins; older strict
+readers reject these new fields rather than ignoring them.
 
 Multiple components may share one source and therefore **bump atomically** (e.g. the Kubernetes-core binaries
 move together on a single lock entry).
@@ -63,9 +64,9 @@ than falling back to unprefixed tags.
 a monorepo's CLI module and its node-images module, or one repository deliberately pinned at two releases. The
 declared source key is the identity. The checkout/fetch node is therefore keyed by **commit, tree hash, and
 vendor spec**: distinct commits get distinct checkouts, identical commits share exactly one, and no de-duplication
-is attempted on the URL. In the other direction a **component has exactly one source** — one source closure per
-hermetic build. A component needing bytes from two repositories is two components, or one source that vendors
-the other.
+is attempted on the URL. In the other direction a **from-source component has exactly one source** — one source
+closure per hermetic build. A component needing bytes from two repositories is two components, or one source
+that vendors the other.
 
 ### 2. The lock feeds logical build identity for selected producers
 
@@ -90,10 +91,9 @@ and every per-arch entry, but fails closed on a tag. Completeness is an exact ke
 pins, artifacts for undeclared components/architectures, and duplicate semantic entries are rejected.
 Completeness is checked from actual producer platform declarations even when no Definition selects that producer. Stale data cannot silently survive a bump.
 
-In the deferred pin-set contract, a **derived member** (§7) whose lock pin disagrees with the version its umbrella declares **at the umbrella's
-pinned tree** is likewise an **under-resolved input**: resolution fails closed with a distinct coded error rather
-than preferring either value. Re-derivation, not the recorded `derivedFrom` string, is what makes the curated set
-a checked property.
+A **derived member** (§7) whose lock pin disagrees with the version its umbrella declares **at the umbrella's
+pinned tree** is likewise an **under-resolved input**: resolution fails with `CodePinSetMismatch`
+(`NKD-E-PIN-SET-MISMATCH`, exit 54). Re-derivation, not the recorded `derivedFrom` string, checks this agreement.
 
 Authority-bearing catalog reads are context-aware and resource-bounded. The on-disk provider holds a real root
 and opens every component descriptor-relative with `O_NOFOLLOW`; it accepts regular files only, limits one file
@@ -111,15 +111,14 @@ later unknown source fails, but no partial update commits. Artifact selections a
 are admitted before upstream calls. No-op updates preserve existing lock bytes. Source check mode returns
 `CodeDiff` when changes are available without writing; artifact pinning does not acquire a new check mode.
 
-- `catalog pin <source> --tag vX.Y.Z` — resolve that tag → `{tag, commit, treeHash, sourceDateEpoch}` → write
-  the lock entry.
-- `catalog bump [--pins|--artifacts|--all]` — for each source, find the newest tag matching its `constraint`
-  (e.g. `1.32.x`), resolve it, and update the lock; `--artifacts` resolves per-arch prebuilt digests
-  (release `.sha256` sidecars / registry manifest inspect) into the `artifacts:` section. Bounded, intentional
-  churn.
-- `catalog bump --check` — **dry-run**: print the lockfile diff, write nothing (the ADR-21 doctrine's
-  `--check` twin, and the "show me what a bump would change" command).
-- **Deferred derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
+- `catalog pin --dir <catalog> --tag vX.Y.Z <source>` — resolve that tag to
+  `{tag, commit, treeHash, sourceDateEpoch}` and update the lock.
+- `catalog bump --dir <catalog> [--all] [source...]` — resolve the newest tag matching each selected source's
+  `constraint` (e.g. `1.32.x`). `--all` selects independent roots and visits each explicitly nested set once.
+- `catalog pin-artifacts --dir <catalog> [--all] [component...]` — resolve the complete declared architecture
+  set of prebuilt digests through the existing URL or image acquisition path.
+- `catalog pin` and `catalog bump` accept `--check`: resolve and print the complete update without writing.
+- **Derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
   error naming its umbrella; bumping the umbrella is **one operation** that re-derives and rewrites the umbrella
   entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
   prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
@@ -161,69 +160,78 @@ This boundary is load-bearing: changing a component toolchain is a reviewed cata
 Putting runner/bootstrap identity in the lock would corrupt logical build identity; putting a source/component-toolchain
 pin in the profile would make the definition overridable by its environment.
 
-### 7. Deferred derived pin sets: one source may curate other sources' pins
+### 7. Derived pin sets: one source may curate other sources' pins
 
-This section is a proposed future capability. Registry v2 does not accept `pinSet`, `pinnedBy` or
-`derivedFrom`, and no current pin/bump or composition behavior claims the derivation contract below.
-
-Upstreams increasingly ship a **curated set**: one repository states which versions of several other components
-belong together (a Helm umbrella chart's lock file, a platform manifest, a release matrix). Re-typing those
-versions into NKD's registry loses the curation — nothing then detects that a member drifted away from the set
-the upstream tested. So a source MAY declare a **pin set**:
+An upstream repository can declare exact versions that belong together. A catalog **pin set** maps that
+declaration to existing sources or acquired producers. The generic `values` format reads bounded YAML/JSON;
+it does not discover producers, select outputs or establish release qualification.
 
 ```yaml
-# registry.yaml (hand-authored)
+# registry.yaml fragment; ordinary source build/toolchain declarations omitted
 sources:
-  nke-platform:                                  # the umbrella
-    repo: https://github.com/NVIDIA/nke
-    tagPrefix: platform/
+  platform:
+    repo: https://github.com/example/platform
     constraint: 1.4.x
     pinSet:
-      file: charts/nke-platform/Chart.lock       # read from the PINNED tree only
+      file: versions.yaml                     # from platform's pinned tree
+      format: values                         # also the default
       members:
-        cwe-controller: { source: cwe,          path: dependencies[name=cwe].version }
-        spire-agent:    { artifact: spire-agent, path: dependencies[name=spire].version }
-  cwe:
-    repo: https://github.com/NVIDIA/cwe
-    tagPrefix: controller/
-    pinnedBy: nke-platform                       # refuses an independent bump
+        controller: {source: controller, path: 'dependencies[name=controller].version'}
+        helper: {artifact: helper, path: 'dependencies[name=helper].version'}
+  controller:
+    repo: https://github.com/example/controller
+    tagPrefix: controller/v
+    pinnedBy: platform
+components:
+  helper:
+    platforms: [linux/amd64, linux/arm64]
+    pinnedBy: platform
+    outputType: raw
+    prebuilt:
+      url: 'https://downloads.example/helper/{{.Version}}/helper-{{.Arch}}'
+      evidence: {none: true}
 ```
 
 ```yaml
-# pins.lock.yaml (machine-managed)
-sources:
-  nke-platform: { tag: platform/v1.4.2,   commit: 9f2c…, treeHash: 41ab… }
-  cwe:          { tag: controller/v0.9.3, commit: 7d10…, treeHash: c3e8…,
-                  derivedFrom: nke-platform@9f2c… }
+# versions.yaml in the upstream platform repository
+dependencies:
+  - {name: controller, version: "0.9.3"}
+  - {name: helper, version: "2.0.0"}
 ```
 
-Pinning the umbrella is one deterministic operation:
+Pinning `platform` resolves `controller/v0.9.3` and pins helper version `2.0.0` through its existing
+artifact-pin path, recording a digest for each declared architecture. Every resulting member pin records
+`derivedFrom: platform@<full-commit>`. The umbrella and all affected pins commit together.
 
-1. resolve the umbrella's own tag to `{commit, treeHash}` exactly as any other source;
-2. **read the member-version file from the pinned tree only** — no templating, no dependency resolution, no
-   dependency update, and no network. For a Helm umbrella this is the **lock file**, never the chart's declared
-   version *ranges*: a range is a constraint, and resolving it would re-decide what the upstream already decided;
-3. map each extracted member version to that member source's tag through its `tagPrefix`, resolve the tag to
-   `{commit, treeHash}`, and write the member's ordinary lock entry stamped `derivedFrom: <umbrella>@<commit>`.
-   A member in the **acquired** lane takes its content digests through the existing artifact-pin path instead —
-   the derivation supplies the version, not a new digest mechanism.
+**Explicit membership.** Each member names exactly one source or acquired artifact, with a reciprocal
+`pinnedBy` declaration. An acquired member has no `source`. Every record in a selector-addressed collection
+must be mapped; new, missing, duplicate or ambiguous records fail closed before a lock update. Unrelated
+object metadata is not membership. Nested sets require their own explicit declarations; cycles, repeated
+ownership and nesting beyond 64 sources are rejected. Independent pin, bump or artifact-pin updates of a
+derived member fail with an error naming its umbrella.
 
-The extractor is **data in the registry** (a file path plus a value path), so a new curated set is a reviewed
-registry edit, not new resolver code. It must be **pure**: no expression evaluation, no shell, no fetch, one
-bounded read inside the pinned tree, and a missing file or unmatched value path fails closed.
+**Bounded extraction.** Paths use dotted fields and literal `[key=value]` selectors. Values must be exact
+semantic-version strings, optionally prefixed with `v`; ranges and numeric YAML scalars are rejected.
+Source tags use the declared `tagPrefix` without guessing a `v`: `0.9.3` with `controller/v` becomes
+`controller/v0.9.3`. Unsupported selectors, duplicate keys, extra documents, YAML anchors and aliases fail.
+Documents are limited to 4 MiB, 64 levels and 65,536 nodes; a set declares at most 1,024 members.
 
-Three rules keep the set honest. Members marked **`pinnedBy` refuse an independent bump** — the only legal way to
-move them is to bump the umbrella, which regenerates the whole set at once (§4). **Lock validation re-derives**
-every member version from the umbrella's pinned tree and fails closed on any disagreement (§3); that check, not
-the `derivedFrom` string, is what turns "curated" into a **checked property**. And only **direct** members are
-derived: if a member is itself a pin set, it must be **declared explicitly** as its own umbrella, so the graph
-stays one level deep at each declaration and no implicit transitive closure is walked.
+**Pinned-tree validation.** NKD fetches the exact umbrella commit into a private bare Git repository and
+checks its tree hash and source date epoch against the lock. Only regular blobs at canonical relative paths
+are readable; symlinks, submodules and path escapes are rejected. Reads are context-bound and limited to
+4 MiB per file, 32 MiB and 1,024 reads per tree. No checkout, source program, hook, template or dependency
+resolver runs. Extraction itself has no network access; obtaining pinned Git objects requires source access.
 
-The curation is visible downstream as well as in the lock. A composition consuming a curated set binds the
-**umbrella's commit** (`curatedBy`), so the resolved graph records *which* curated set it came from and a set
-change moves `buildDigest` through the ordinary §2 path. The aggregate SBOM's dependency graph points from the
-umbrella to its members rather than presenting them as unrelated peers. Both are stated here as consequences of
-the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
+**Atomic updates and provenance.** The catalog extracts a complete member-version map before resolving that
+umbrella's members. Acquired producers whose version comes from a derived source move in the same transaction.
+It validates and serializes the complete candidate lock within the byte limit before `--check` or commit; any
+failure leaves the original lock intact. Full catalog loads and lock writes re-derive versions from pinned trees and check
+`derivedFrom`; provenance strings alone cannot authorize a stale member. A mismatch returns exit 54.
+Catalogs with pin sets therefore require access to pinned Git objects when loaded; ordinary catalogs retain
+local loading. Offline pin-set transport remains deferred.
+
+Direct output selection remains unchanged. `curatedBy` build-graph identity and aggregate SBOM curation edges
+remain follow-ups owned by ADR-11/13; this pinning contract does not implement them.
 
 ## Consequences
 
@@ -235,12 +243,13 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
   override one another.
 - A monorepo's modules pin independently without a source-per-repository fiction, and identical commits still
   share one checkout.
-- An upstream's curated set stays curated: drift between a member and the set the upstream tested is a
-  fail-closed validation error rather than an unnoticed lockfile edit.
+- Drift between a member and the upstream's declared set fails validation instead of surviving as an
+  unnoticed lockfile edit.
 
 **Negative / costs**
 - Two files to understand (declare vs. resolve) and a load-time resolution step.
-- `catalog bump` needs network + git to resolve tags/commits and prebuilt digests.
+- `catalog bump` needs network + git to resolve tags/commits and prebuilt digests; loading a pin set also
+  requires its pinned Git objects.
 - A shared source means a bump moves several components at once (atomicity is intended, but coarse).
 - A pin set is a second, coarser bump unit: an umbrella bump can move many members in one reviewed change, and a
   member cannot be patched alone without first changing the declaration.
@@ -268,9 +277,8 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
   instead (§1); the checkout node de-duplicates by commit anyway.
 - **A repository-level pin shared by every source naming that repository.** Rejected — it forces unrelated
   modules of a monorepo to move together and re-introduces the churn `tagPrefix` exists to avoid.
-- **Resolve the chart's declared version *ranges* at pin time.** Rejected — NKD would then re-decide what the
-  upstream already decided in its lock file, and two pins of the same tree could differ. The pin set reads the
-  upstream's resolved lock file from the pinned tree only (§7).
+- **Resolve upstream version ranges at pin time.** Rejected — NKD would re-decide what the upstream already
+  decided, and two pins of the same tree could differ. A pin set reads exact declared versions (§7).
 - **Hand-author each member pin and diff it against the upstream set by review.** Rejected — an unchecked
   convention. Re-derivation at validation time makes it a property the tooling enforces.
 
@@ -281,26 +289,22 @@ the pin model; their normative shape belongs to ADR-11 and ADR-13 (Follow-ups).
 - **ADR-15:** the lock and its pinned inputs are mirrorable for air-gap.
 - **ADR-21:** `catalog bump` → regen; the `--check` dry-run; the definition/environment boundary vs.
   `profile repin`.
-- **ADR-11:** a composition that consumes a curated set binds the umbrella's commit as `curatedBy`; the merge
-  algebra and conflict rules for a curated member are ADR-11's to state normatively.
+- **ADR-11 (deferred):** define `curatedBy` graph binding and its identity/conflict rules.
 - **ADR-12 §3:** a future curated set can inform explicit output membership; it must not introduce a selector
   axis, deployment topology or reusable recipe group.
-- **ADR-13:** the aggregate SBOM's dependency graph points from the umbrella to its members; the CycloneDX
-  representation of that edge is ADR-13's to fix.
-- **ADR-10:** the `embeds` of a wrapped build are **derived from the same pin set** when the upstream publishes
-  one, rather than hand-authored (ADR-10).
+- **ADR-13 (deferred):** define aggregate SBOM curation edges from an umbrella to its members.
+- **ADR-10 (deferred):** bind a wrapped build's `embeds` to its pinned upstream declaration.
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/catalog/load_test.go`, `provider_context_test.go`, `pin_context_test.go`,
-`prebuilt_test.go`, `lock_contract_test.go`, `pin_update_test.go`, `pin_artifact*_test.go`, and
-`client/v1/catalog_io*_test.go` covers strict schema/unknown
-fields, exact source/artifact key-set completeness, orphan and architecture rejection, deep-context admission,
-pre-canceled/no-I/O behavior, no-follow regular files, byte/count/depth limits, deterministic listings and
-canonical bytes, registry+lock snapshot CAS, one-winner concurrent writes, atomic replacement, and preservation
-of the prior lock on conflict. Operational acceptance still
-requires every documented bump mode against real upstreams, dry-run/write byte equality, process kill points on
-supported filesystems, and publication of a separately versioned catalog-data release.
+Contract evidence in `pkg/nkd/catalog/load_test.go`, `provider_context_test.go`, `pin_context_test.go`,
+`prebuilt_test.go`, `lock_contract_test.go`, `pin_update_test.go`, `pin_artifact*_test.go` and
+`client/v1/catalog_io*_test.go` covers strict schemas, complete source/artifact keys and architectures,
+bounded no-follow I/O, cancellation, deterministic output and atomic CAS writes. `pin_extract_test.go`,
+`pin_tree_test.go`, `pin_set_integration_test.go` and `pin_serialization_test.go` cover explicit source/acquired
+and nested sets, pinned-tree re-derivation, membership/drift rejection, rollback and shared check/write bounds.
+These are contract tests. Operational acceptance still requires real-upstream bump modes, process kill points
+on supported filesystems and publication of a separately versioned catalog-data release.
 
 ## Tool release assets
 

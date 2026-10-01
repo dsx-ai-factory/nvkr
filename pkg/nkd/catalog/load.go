@@ -18,11 +18,11 @@ func LoadContext(ctx context.Context, p DataProvider) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	loaded, err := load(bound)
+	loaded, err := load(ctx, bound)
 	return loaded, normalizeCatalogContextError(ctx, err, "catalog load")
 }
 
-func load(p DataProvider) (*Catalog, error) {
+func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 	reg, err := readRegistry(p)
 	if err != nil {
 		return nil, err
@@ -32,6 +32,10 @@ func load(p DataProvider) (*Catalog, error) {
 		return nil, err
 	}
 	if err := validateLockAgainstRegistry(reg, lock, true); err != nil {
+		return nil, err
+	}
+
+	if err := validateDerivedPins(ctx, reg, lock); err != nil {
 		return nil, err
 	}
 

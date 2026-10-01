@@ -2,13 +2,16 @@ package catalog
 
 import (
 	"context"
+	"crypto/sha256"
 	"reflect"
 	"sort"
-	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
+
+// Pin updates read one snapshot, resolve the requested pins, validate the complete
+// candidate, and save it atomically. Both source and artifact workflows live here.
 
 // SourcePinRequest selects one explicit source pin or a sequential source bump.
 // Check resolves the same changes but withholds the lock commit.
@@ -31,8 +34,9 @@ type SourcePinChange struct {
 }
 
 type SourcePinUpdate struct {
-	Pins    []SourcePinChange
-	Changed int
+	Pins      []SourcePinChange
+	Artifacts []ArtifactPinChange
+	Changed   int
 }
 
 // UpdateSourcePins owns source selection, upstream resolution and the lock CAS.
@@ -47,8 +51,9 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 	listTags func(context.Context, string) ([]string, error),
 	resolvePin func(context.Context, Source, string) (Pin, error),
 ) (SourcePinUpdate, error) {
+	// Read one snapshot and select the independent sources to update.
 	var update SourcePinUpdate
-	sources, err := ReadSourcesContext(ctx, Dir(request.Directory))
+	reg, lock, err := pinUpdateInputs(ctx, request.Directory)
 	if err != nil {
 		return update, err
 	}
@@ -62,41 +67,121 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 	case len(request.Sources) > 0:
 		targets = request.Sources
 	case request.All:
-		targets = SortedSourceNames(sources)
+		for _, n := range sortedSourceNames(reg.Sources) {
+			if reg.Sources[n].PinnedBy == "" {
+				targets = append(targets, n)
+			}
+		}
 	default:
 		return update, e.New(e.CodeUnsupported, "bump: name a source or pass --all")
 	}
-	lock, err := LoadLockContext(ctx, request.Directory)
-	if err != nil {
-		return update, err
+	// Member selections are admitted before any upstream lookup, including a mixed
+	// request naming the umbrella and one of its members.
+	selected := map[string]bool{}
+	for _, n := range targets {
+		if selected[n] {
+			return update, e.New(e.CodeUsage, "source %q selected more than once", n)
+		}
+		selected[n] = true
+		if src, ok := reg.Sources[n]; ok && src.PinnedBy != "" {
+			return update, pinSetMemberError(n, src.PinnedBy)
+		}
 	}
-	for _, name := range targets {
-		source, ok := sources[name]
+	if lock.Artifacts == nil {
+		lock.Artifacts = map[string]ArtifactPin{}
+	}
+	// Resolve each source and its declared members into the candidate lock.
+	updated := map[string]bool{}
+	var apply func(string, string, string) error
+	apply = func(name, tag, owner string) error {
+		if err := pinContextError(ctx); err != nil {
+			return err
+		}
+		if updated[name] {
+			return e.New(e.CodeInvalidCatalog, "source %q resolved twice", name)
+		}
+		updated[name] = true
+		src, ok := reg.Sources[name]
 		if !ok {
-			return update, e.New(e.CodeInvalidCatalog, "unknown source %q", name)
+			return e.New(e.CodeInvalidCatalog, "unknown source %q", name)
 		}
-		tag := request.Tag
-		if request.Bump || tag == "" {
-			tags, err := listTags(ctx, source.Repo)
+		if tag == "" {
+			tags, err := listTags(ctx, src.Repo)
 			if err != nil {
-				return update, err
+				return err
 			}
-			tag, err = SelectTagForSource(tags, source)
+			tag, err = SelectTagForSource(tags, src)
 			if err != nil {
-				return update, err
+				return err
 			}
 		}
-		pin, err := resolvePin(ctx, source, tag)
+		pin, err := resolvePin(ctx, src, tag)
 		if err != nil {
-			return update, err
+			return err
 		}
+		pin.DerivedFrom = owner
 		change := SourcePinChange{Name: name, Before: lock.Pins[name], After: pin}
 		change.Changed = !reflect.DeepEqual(change.Before, pin)
 		update.Pins = append(update.Pins, change)
 		if change.Changed {
-			lock.Pins[name] = pin
 			update.Changed++
 		}
+		lock.Pins[name] = pin
+		if src.PinSet != nil {
+			versions, err := derivePinSet(ctx, reg, name, pin)
+			if err != nil {
+				return err
+			}
+			provenance := name + "@" + pin.Commit
+			for _, key := range pinSetMemberNames(src.PinSet) {
+				member := src.PinSet.Members[key]
+				if member.Source != "" {
+					if err := apply(member.Source, reg.Sources[member.Source].QualifiedTag(versions[key]), provenance); err != nil {
+						return err
+					}
+					continue
+				}
+				raw := reg.Components[member.Artifact]
+				versionPin := pin
+				versionPin.Tag = versions[key]
+				if err := updateDerivedArtifact(ctx, raw, member.Artifact, versionPin, provenance, lock, &update); err != nil {
+					return err
+				}
+			}
+		}
+		// A source member may also provide versions for prebuilt producers. Those
+		// artifact pins belong to the same atomic update, rather than becoming stale.
+		if owner != "" {
+			for _, component := range sortedRawNames(reg.Components) {
+				raw := reg.Components[component]
+				if raw.Source != name || raw.Prebuilt == nil {
+					continue
+				}
+				if err := updateDerivedArtifact(ctx, raw, component, pin, owner, lock, &update); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	for _, name := range targets {
+		tag := request.Tag
+		if request.Bump {
+			tag = ""
+		}
+		if err := apply(name, tag, ""); err != nil {
+			return update, err
+		}
+	}
+	// Validate the whole candidate before either reporting a diff or saving it.
+	if err := validateLockAgainstRegistry(reg, lock, true); err != nil {
+		return update, err
+	}
+	if err := validateDerivedPins(ctx, reg, lock); err != nil {
+		return update, err
+	}
+	if _, err := serializePinLock(lock); err != nil {
+		return update, err
 	}
 	if update.Changed == 0 {
 		return update, nil
@@ -133,7 +218,14 @@ type ArtifactPinUpdate struct {
 // contacting an upstream and commits every resolved pin against one lock snapshot.
 func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (ArtifactPinUpdate, error) {
 	var update ArtifactPinUpdate
-	targets, err := ReadPrebuiltTargetsContext(ctx, Dir(request.Directory))
+	reg, lock, err := pinUpdateInputs(ctx, request.Directory)
+	if err != nil {
+		return update, err
+	}
+	if err := validateLockAgainstRegistry(reg, lock, false); err != nil {
+		return update, err
+	}
+	targets, err := prebuiltTargetsFrom(reg, lock)
 	if err != nil {
 		return update, err
 	}
@@ -163,6 +255,9 @@ func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (Artifa
 		if !request.All && !want[selected.Name] {
 			continue
 		}
+		if selected.PinnedBy != "" {
+			return update, pinSetMemberError(selected.Name, selected.PinnedBy)
+		}
 		if len(request.Architectures) > 0 {
 			declared := make([]string, 0, len(selected.Platforms))
 			for _, platform := range selected.Platforms {
@@ -175,8 +270,7 @@ func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (Artifa
 			}
 		}
 	}
-	lock, err := LoadLockContext(ctx, request.Directory)
-	if err != nil {
+	if err := validateDerivedPins(ctx, reg, lock); err != nil {
 		return update, err
 	}
 	if lock.Artifacts == nil {
@@ -186,26 +280,10 @@ func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (Artifa
 		if !request.All && !want[selected.Name] {
 			continue
 		}
-		arches := make([]string, 0, len(selected.Platforms))
-		for _, platform := range selected.Platforms {
-			arches = append(arches, target.Arch(platform))
+		pin, err := resolvePrebuiltTarget(ctx, selected, request.Runtime)
+		if err != nil {
+			return update, err
 		}
-		digests := map[string]string{}
-		if selected.Image != "" {
-			digests, err = resolveImageDigests(ctx, request.Runtime, selected.Image, arches)
-			if err != nil {
-				return update, err
-			}
-		} else {
-			for _, arch := range arches {
-				digest, err := resolveBinaryDigest(ctx, strings.ReplaceAll(selected.URL, "{{.Arch}}", arch))
-				if err != nil {
-					return update, err
-				}
-				digests[arch] = digest
-			}
-		}
-		pin := ArtifactPin{Tag: selected.Tag, Digests: digests}
 		change := ArtifactPinChange{Name: selected.Name, Before: lock.Artifacts[selected.Name], After: pin}
 		change.Changed = !artifactPinEqual(change.Before, pin)
 		update.Pins = append(update.Pins, change)
@@ -218,4 +296,46 @@ func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (Artifa
 		return update, nil
 	}
 	return update, WriteLockContext(ctx, request.Directory, lock)
+}
+
+func updateDerivedArtifact(ctx context.Context, raw rawComponent, name string, version Pin, provenance string, lock *PinLock, update *SourcePinUpdate) error {
+	acquisition, err := prebuiltTargetFor(name, raw, version)
+	if err != nil {
+		return err
+	}
+	pin, err := resolvePrebuiltTarget(ctx, acquisition, "docker")
+	if err != nil {
+		return err
+	}
+	pin.DerivedFrom = provenance
+	change := ArtifactPinChange{Name: name, Before: lock.Artifacts[name], After: pin}
+	change.Changed = !artifactPinEqual(change.Before, pin)
+	update.Artifacts = append(update.Artifacts, change)
+	if change.Changed {
+		update.Changed++
+	}
+	lock.Artifacts[name] = pin
+	return nil
+}
+
+// Read declarations from the same snapshot that authorizes the final CAS. A
+// registry edit between either read is a conflict, never a mixed-input update.
+func pinUpdateInputs(ctx context.Context, directory string) (*registryDoc, *PinLock, error) {
+	lock, err := LoadLockContext(ctx, directory)
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := BindContext(ctx, Dir(directory))
+	if err != nil {
+		return nil, nil, err
+	}
+	raw, err := provider.ReadFile(RegistryFile)
+	if err != nil {
+		return nil, nil, e.Wrap(e.CodeInvalidCatalog, err, "reading pin registry")
+	}
+	if sha256.Sum256(raw) != lock.revision.registryDigest {
+		return nil, nil, e.New(e.CodeWriteConflict, "registry changed while reading pin inputs")
+	}
+	reg, err := decodeRegistry(raw, RegistryFile)
+	return reg, lock, err
 }

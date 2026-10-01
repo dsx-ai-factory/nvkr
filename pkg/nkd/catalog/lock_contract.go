@@ -200,7 +200,7 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 		}
 		// If acquisition is version-rendered from the source pin, its artifact pin must
 		// track that exact tag. Fixed independent refs may use their own component tag.
-		if usesSourceVersionTemplate(raw.Prebuilt) {
+		if raw.PinnedBy == "" && usesSourceVersionTemplate(raw.Prebuilt) {
 			pin := lock.Pins[raw.Source]
 			if ap.Tag != pin.Tag {
 				return e.New(e.CodeInvalidCatalog,
@@ -218,7 +218,7 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 			return e.New(e.CodeInvalidCatalog, "lock has orphan artifact pin %q", name)
 		}
 	}
-	return nil
+	return validatePinProvenance(reg, lock)
 }
 
 // requiredArtifactArches derives lock completeness from explicit producer targets.

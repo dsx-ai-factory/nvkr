@@ -7,6 +7,7 @@ require (
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/urfave/cli/v2 v2.27.7
+	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/sys v0.48.0
 	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/yaml v1.6.0

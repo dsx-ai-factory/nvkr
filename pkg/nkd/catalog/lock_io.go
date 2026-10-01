@@ -81,6 +81,24 @@ func readOptionalProviderFile(provider DataProvider, name string) ([]byte, bool,
 	return raw, true, nil
 }
 
+// serializePinLock is shared by dry-run admission and the writer so both enforce
+// the size of the exact same machine-managed bytes, including their header.
+func serializePinLock(lock *PinLock) ([]byte, error) {
+	if err := validatePinLockShape(lock); err != nil {
+		return nil, err
+	}
+	body, err := yaml.Marshal(clonePinLock(lock))
+	if err != nil {
+		return nil, e.Wrap(e.CodeInvalidCatalog, err, "marshaling lock")
+	}
+	const header = "# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.\n"
+	out := append([]byte(header), body...)
+	if int64(len(out)) > MaxCatalogFileBytes {
+		return nil, e.New(e.CodeInvalidCatalog, "serialized %s exceeds the %d-byte bound", LockFile, MaxCatalogFileBytes)
+	}
+	return out, nil
+}
+
 // WriteLockContext atomically replaces the lock iff the exact bytes observed by
 // LoadLock are still current. It stages in the target directory, fsyncs file and
 // directory, and serializes same-checkout writers with an advisory lock. Cancellation
@@ -108,14 +126,9 @@ func WriteLockContext(ctx context.Context, dir string, lock *PinLock) error {
 		return err
 	}
 	candidate := clonePinLock(lock)
-	body, err := yaml.Marshal(candidate)
+	out, err := serializePinLock(candidate)
 	if err != nil {
-		return e.Wrap(e.CodeInvalidCatalog, err, "marshaling lock")
-	}
-	header := "# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.\n"
-	out := append([]byte(header), body...)
-	if int64(len(out)) > MaxCatalogFileBytes {
-		return e.New(e.CodeInvalidCatalog, "serialized %s exceeds the %d-byte bound", LockFile, MaxCatalogFileBytes)
+		return err
 	}
 	if err := requireCatalogContext(ctx, "catalog lock write"); err != nil {
 		return err
@@ -126,6 +139,25 @@ func WriteLockContext(ctx context.Context, dir string, lock *PinLock) error {
 		return err
 	}
 	if err := rejectLegacyComposition(bound); err != nil {
+		return err
+	}
+
+	// Potentially slow upstream reads precede the writer guard and final CAS.
+	registryBefore, err := bound.ReadFile(RegistryFile)
+	if err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err, "reading registry before pin verification")
+	}
+	if sha256.Sum256(registryBefore) != lock.revision.registryDigest {
+		return e.New(e.CodeWriteConflict, "registry changed before pin verification")
+	}
+	checkedRegistry, err := decodeRegistry(registryBefore, RegistryFile)
+	if err != nil {
+		return err
+	}
+	if err := validateLockAgainstRegistry(checkedRegistry, candidate, true); err != nil {
+		return err
+	}
+	if err := validateDerivedPins(ctx, checkedRegistry, candidate); err != nil {
 		return err
 	}
 

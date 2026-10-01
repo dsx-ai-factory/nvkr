@@ -45,14 +45,9 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 	// references a source for its version pin, so it tracks the same version bumps as a
 	// from-source component (a fromSource+prebuilt collision is caught by Validate).
 	if raw.Prebuilt != nil {
-		src, ok := sources[raw.Source]
-		if !ok {
-			return c, e.New(e.CodeInvalidCatalog, "prebuilt component %q references unknown source %q", name, raw.Source)
-		}
-		pin, ok := lock.Pins[raw.Source]
-		if !ok {
-			return c, e.New(e.CodeUnpinnedSource,
-				"prebuilt component %q: source %q has no pin in the lock (run: nkdctl catalog pin %s)", name, raw.Source, raw.Source)
+		src, pin, err := memberVersionPin(name, raw, sources, lock)
+		if err != nil {
+			return c, err
 		}
 		return resolvePrebuilt(name, raw, src, pin, lock, c)
 	}

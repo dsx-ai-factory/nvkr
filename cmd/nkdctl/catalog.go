@@ -105,6 +105,7 @@ func cmdCatalog() *cli.Command {
 				ArgsUsage: "<source>",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "tag", Usage: "tag to pin (default: newest matching the source constraint)"},
+					&cli.BoolFlag{Name: "check", Usage: "resolve and show the complete pin update without writing"},
 					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
@@ -167,6 +168,17 @@ func pinSources(c *cli.Context, bump bool) error {
 		}
 	}
 	var coded *e.Error
+	for _, change := range update.Artifacts {
+		fmt.Printf("  artifact %s: %s -> %s (derived from %s)\n", change.Name, orNone(change.Before.Tag), change.After.Tag, change.After.DerivedFrom)
+		arches := make([]string, 0, len(change.After.Digests))
+		for arch := range change.After.Digests {
+			arches = append(arches, arch)
+		}
+		sort.Strings(arches)
+		for _, arch := range arches {
+			fmt.Printf("    %s: %s -> %s\n", arch, orNone(change.Before.Digests[arch]), change.After.Digests[arch])
+		}
+	}
 	if errors.As(err, &coded) && coded.Code == e.CodeDiff {
 		fmt.Printf("(dry-run) %d pin(s) would change in %s/%s\n", update.Changed, c.String("dir"), catalog.LockFile)
 	}

@@ -30,7 +30,7 @@ codes slot in without renumbering, and they **never change meaning**. Shell comm
 | `10–19` | Resolve / input / preflight / crypto | `no-match`, `ambiguous`, `reserved-axis`, `unsupported`, `invalid-catalog`, `unpinned-source`, `tag-toolchain`, **`builder-not-provided`**, `preflight-failed` (including builder-version mismatch), `signature-invalid` |
 | `20–29` | Build / verify / trust-policy / disk | `fetch-failed`, `build-failed`, `verify-failed` (digest divergence), `untrusted-signer`, `trust-policy-missing`, `untrusted-profile`, `encrypted-artifact`, `envelope-decode`, `engine-capability` |
 | `30–31` | Retryable / transient | `unavailable`, `timeout` (`32–39` reserved) |
-| `40–53` | Release / lifecycle | `vector-unpinned`, `release-incomplete`, `gate-unmet`, `unverified-ref`, `compat-mismatch`, `provenance-missing`, `inventory-unpinned`, `immutable-violation`, `withdrawn`, `unpinned-input`, `mirror-mismatch`, `pipeline-drift`, `status-checkpoint`, `write-conflict` |
+| `40–54` | Release / lifecycle | `vector-unpinned`, `release-incomplete`, `gate-unmet`, `unverified-ref`, `compat-mismatch`, `provenance-missing`, `inventory-unpinned`, `immutable-violation`, `withdrawn`, `unpinned-input`, `mirror-mismatch`, `pipeline-drift`, `status-checkpoint`, `write-conflict`, `pin-set-mismatch` |
 
 Builder-preflight failures live in the resolve/preflight band. A profile that does not provide a required
 builder maps to `builder-not-provided`; a builder version, executable-identity, sandbox, or privilege mismatch
@@ -82,9 +82,9 @@ cancellation classifies as `timeout`. A gate retries the retryable class and fai
 - **ADR-04:** defines the trust-failure classes and their ordering (the signature/trust gate runs before the
   digest comparison).
 - **ADR-17:** the CLI maps a typed error to its process exit code and surfaces the retryable predicate.
-- **ADR-06 / ADR-18 / ADR-21:** the distinct `status-checkpoint` (52), `engine-capability` (29), and optimistic
-  `write-conflict` (53) codes are allocated. Existing numeric meanings remain frozen; these failures do not
-  overload `withdrawn`, `unsupported`, or `pipeline-drift`.
+- **ADR-06 / ADR-18 / ADR-21 / ADR-22:** `status-checkpoint` (52), `engine-capability` (29), optimistic
+  `write-conflict` (53), and `pin-set-mismatch` (54) are allocated. The last reports disagreement with a pinned
+  umbrella's member declaration or provenance. Existing numeric meanings remain frozen.
 
 ## Acceptance evidence
 

@@ -8,18 +8,102 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
+
+// PrebuiltTarget is a prebuilt component's acquisition, resolved against its version
+// pin for `catalog pin-artifacts`: URL/Image are version-rendered (a binary URL still
+// carries the {{.Arch}} token; an image ref does not), and Tag records the version the
+// resolved digests will correspond to.
+type PrebuiltTarget struct {
+	PinnedBy  string
+	Platforms []string
+	Name      string
+	Tag       string
+	URL       string
+	Image     string
+}
+
+func prebuiltTargetsFrom(reg *registryDoc, lock *PinLock) ([]PrebuiltTarget, error) {
+	names := make([]string, 0, len(reg.Components))
+	for n := range reg.Components {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	var out []PrebuiltTarget
+	for _, name := range names {
+		raw := reg.Components[name]
+		if raw.Prebuilt == nil {
+			continue
+		}
+		_, pin, err := memberVersionPin(name, raw, reg.Sources, lock)
+		if err != nil {
+			return nil, err
+		}
+		owner := raw.PinnedBy
+		if owner == "" {
+			owner = reg.Sources[raw.Source].PinnedBy
+		}
+		selected, err := prebuiltTargetFor(name, raw, pin)
+		if err != nil {
+			return nil, err
+		}
+		selected.PinnedBy = owner
+		out = append(out, selected)
+	}
+	return out, nil
+}
+
+func prebuiltTargetFor(name string, raw rawComponent, pin Pin) (PrebuiltTarget, error) {
+	url, err := renderRef("prebuilt.url", raw.Prebuilt.URL, pin)
+	if err != nil {
+		return PrebuiltTarget{}, e.Wrap(e.CodeInvalidCatalog, err, "prebuilt component %q", name)
+	}
+	image, err := renderRef("prebuilt.image", raw.Prebuilt.Image, pin)
+	if err != nil {
+		return PrebuiltTarget{}, e.Wrap(e.CodeInvalidCatalog, err, "prebuilt component %q", name)
+	}
+	return PrebuiltTarget{
+		Name:      name,
+		Tag:       pin.Tag,
+		Platforms: append([]string(nil), raw.Platforms...),
+		URL:       url,
+		Image:     image,
+	}, nil
+}
+
+func resolvePrebuiltTarget(ctx context.Context, selected PrebuiltTarget, runtime string) (ArtifactPin, error) {
+	pin := ArtifactPin{Tag: selected.Tag, Digests: map[string]string{}}
+	arches := make([]string, 0, len(selected.Platforms))
+	for _, platform := range selected.Platforms {
+		arches = append(arches, target.Arch(platform))
+	}
+	if selected.Image != "" {
+		digests, err := resolveImageDigests(ctx, runtime, selected.Image, arches)
+		pin.Digests = digests
+		return pin, err
+	}
+	for _, arch := range arches {
+		digest, err := resolveBinaryDigest(ctx, strings.ReplaceAll(selected.URL, "{{.Arch}}", arch))
+		if err != nil {
+			return pin, err
+		}
+		pin.Digests[arch] = digest
+	}
+	return pin, nil
+}
 
 // hex64 matches a bare 64-hex sha256 body (e.g. a dl.k8s.io .sha256 sidecar).
 var hex64 = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func artifactPinEqual(a, b ArtifactPin) bool {
-	if a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
+	if a.DerivedFrom != b.DerivedFrom || a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
 		return false
 	}
 	for k, v := range b.Digests {
