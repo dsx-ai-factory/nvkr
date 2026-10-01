@@ -23,13 +23,17 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 		Jobs map[string]struct {
 			If          string
 			Permissions map[string]string
-			Steps       []struct{ Name, Run, Uses string }
+			Steps       []struct {
+				Name, Run, Uses string
+				Env             map[string]string
+			}
 		}
 	}
 	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
 	var selection, preflight, full string
+	var requiresKVMTest bool
 	for _, step := range workflow.Jobs["select"].Steps {
 		if step.Name == "Validate selection" {
 			selection = step.Run
@@ -47,9 +51,16 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 		if step.Name == "Admit native KVM runner" {
 			full = step.Run
 		}
+		if step.Name == "Check guarded Packer dispatch on the admitted KVM runner" {
+			requiresKVMTest = step.Env["NKD_REQUIRE_KVM_TEST"] == "1" &&
+				strings.Contains(step.Run, "^TestRunPackerContainerClassifiesBuildExit$")
+		}
 	}
 	if selection == "" || preflight == "" || preflight != full {
 		t.Fatal("probe and full build must execute the same KVM admission script")
+	}
+	if !requiresKVMTest {
+		t.Fatal("full validation must require the guarded Packer dispatch cases to execute")
 	}
 	probe := workflow.Jobs["validate-kvm"]
 	if probe.If != "needs.select.outputs.mode == 'preflight'" || probe.Permissions == nil || len(probe.Permissions) != 0 {

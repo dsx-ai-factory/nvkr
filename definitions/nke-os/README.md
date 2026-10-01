@@ -17,7 +17,8 @@ The AMD64 graph is authored, but neither Docker architecture has a stable mainta
 `toolchains/nkd-packer/toolchain.lock.json`. The catalog's AMD64 ID is a substitution-only baseline, not a
 maintained pin or a claim that a subsequent build will reproduce it. For a local Docker attempt, the wrapper builds the
 source-locked toolchain and freezes its observed exact ID into an attempt-local catalog overlay before compiling the
-executable Plan. The runtime independently checks that ID. This does not authorize publication or qualification.
+executable Plan. The runtime re-checks that the loaded image equals that frozen ID, a bind rather than provenance
+authentication. This does not authorize publication or qualification.
 
 The architecture-generic wrapper defaults to ARM64 Podman local development:
 

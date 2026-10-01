@@ -150,7 +150,11 @@ qualified claim and changes no generated adapter rule.
 A secret-free manual `preflight` mode may execute a branch workflow at its exact dispatched commit to test
 the same no-chmod KVM-access step used by full validation on either ARC pool. It has no source checkout on
 the KVM runner, private-source fetch, image build or source credential. This branch exception is diagnostic
-only; toolchain and full validation remain restricted to the default-branch workflow.
+only; this workflow's selection step requires toolchain and full validation to run from the default branch.
+That self-check is not GitHub-enforced authorization: the recorded branch probe reached both ARC KVM pools,
+and a different branch-authored workflow can omit the check. The repository-scoped source secret is likewise
+not restricted to this workflow. Restricting runner-group access to selected workflows/refs and moving the
+secret into a main-restricted environment remain separate provider and repository configuration follow-ups.
 
 Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.

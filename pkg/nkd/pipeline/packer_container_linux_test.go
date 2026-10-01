@@ -890,6 +890,9 @@ func TestRunPackerContainerClassifiesBuildExit(t *testing.T) {
 				// in for KVM because admission authenticates the path and ioctl ABI.
 				kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
 				if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+					if os.Getenv("NKD_REQUIRE_KVM_TEST") == "1" {
+						t.Fatalf("guarded dispatch requires an accessible real KVM device: %v", err)
+					}
 					t.Skipf("guarded dispatch requires an accessible real KVM device: %v", err)
 				}
 				if err != nil {

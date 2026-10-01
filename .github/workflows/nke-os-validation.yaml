@@ -550,6 +550,7 @@ jobs:
         env:
           GOTOOLCHAIN: local
           CGO_ENABLED: '0'
+          NKD_REQUIRE_KVM_TEST: '1'
         run: |
           set -euo pipefail
           go test ./pkg/nkd/pipeline -run '^TestRunPackerContainerClassifiesBuildExit$' -count=1 -v \

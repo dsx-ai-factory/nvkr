@@ -154,6 +154,9 @@ can populate caches subsequently restored by `merge-gate.yaml` and `vulnerabilit
 separate main-workflow follow-up; the selector's disabled cache does not close that risk.
 The mirror is required to equal an open, non-draft same-repository PR head. `/ok to test` is a maintainer convention,
 not a workflow-authenticated approval, and mirror equality alone does not prove who wrote that branch.
+Default-branch selection is a workflow-local self-check, not runner-group authorization. The recorded branch
+probe reached both ARC KVM pools. Restricting those pools to selected workflows/refs and moving the source
+secret into a main-restricted environment remain configuration follow-ups.
 
 The hand-authored NKE OS validation workflow selects `arc-amd64-kvm` and `arc-arm64-kvm` for full validation.
 At the 2026-09-30 review, NKE main used the ARM64 scale set and NKE PR #1100 selected the AMD64 set.

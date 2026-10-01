@@ -20,7 +20,11 @@ runners, has no KVM or private-source access, and records the exact native toolc
 The secret-free `preflight` mode can be dispatched from a branch at that workflow's exact commit. It runs the
 same no-chmod admission step as full validation on either ARC architecture or both, without fetching NKE,
 building an image or exposing a source credential. This permits pre-merge runner-permission validation;
-toolchain and full modes still require the trusted workflow on `main`.
+the selection step requires toolchain and full modes to run from `main`. This is a workflow-local self-check,
+not GitHub-enforced authorization. The recorded branch probe reached both ARC KVM pools; branch-authored
+workflows can omit the selection check and reference the repository-scoped source secret. Restricting the
+runner group to selected workflows/refs and moving the secret into a main-restricted environment remain
+configuration follow-ups, not controls established by this PR.
 
 Full image validation never uses `pull_request_target`. Manual dispatch accepts an exact main commit or a
 copy-pr-bot mirror matching the current, open, non-draft same-repository PR
@@ -34,6 +38,7 @@ performs runtime admission before build work.
 The workflow requires existing read/write access to `/dev/kvm` and does not change host device permissions.
 Runner identity and device ownership/mode are printed before the access check. Each full leg also runs the
 Packer dispatcher exit-status regression test with the admitted real KVM device and retains its output.
+The step sets `NKD_REQUIRE_KVM_TEST=1`, so unavailable KVM fails rather than skipping the guarded cases.
 That test uses a fake container runtime; it proves error classification, not a QEMU bake.
 The scale set must supply KVM group or device access. Local macOS/Podman TCG development remains a parallel
 supported path and is not selected by this native KVM validation workflow.
