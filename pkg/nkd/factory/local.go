@@ -19,6 +19,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -49,11 +50,12 @@ type LocalRunOptions struct {
 	Stderr       io.Writer
 	// Diagnostics is an opaque lifecycle-issued attempt-directory capability.
 	// A path or serialized description cannot substitute for it.
-	Diagnostics  *pipeline.PackerDiagnosticSink
-	producers    *pipeline.NodeSession
-	vmResolver   vmDriverResolver
-	vmDrivers    vmDriverExecutor
-	vmAdmissions map[string]vmAdmission
+	Diagnostics   *pipeline.PackerDiagnosticSink
+	producers     *pipeline.NodeSession
+	vmResolver    vmDriverResolver
+	vmDrivers     vmDriverExecutor
+	vmAdmissions  map[string]vmAdmission
+	materialOwner *LocalRunResult
 }
 
 // LocalNodeResult is a deterministic, unqualified execution observation.
@@ -73,10 +75,11 @@ type LocalRunResult struct {
 	Workspace     string            `json:"workspace"`
 	Nodes         []LocalNodeResult `json:"nodes"`
 
-	diskMu          sync.Mutex
-	diskPermit      chan struct{}
-	diskClosed      bool
-	diskCompletions []diskProducerCompletion
+	diskMu               sync.Mutex
+	diskPermit           chan struct{}
+	diskClosed           bool
+	diskCompletions      []diskProducerCompletion
+	materialConsumptions map[string]producerConsumption
 }
 
 // QualificationLane returns the evidence lane recorded by this local execution.
@@ -213,6 +216,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		Qualification: TierLocalExecution, PlanDigest: planDigest,
 		Workspace: filepath.ToSlash(options.Workspace)}
 	owner := result
+	if hasLocalVMBuild(plan) {
+		options.materialOwner = owner
+	}
 	completed := false
 	defer func() {
 		returnErr = finishLocalRun(owner, options.producers, completed, returnErr)
@@ -395,7 +401,7 @@ func admittedLocalDiskProducer(plan *Plan, options *LocalRunOptions) diskProduce
 			return nil, nil, e.New(e.CodeEngineCapability,
 				"local VM node %q has no pre-execution runtime admission", selected.ID)
 		}
-		return dispatchAdmittedVMProducer(ctx, admission, relocated, selected, options.vmDrivers)
+		return dispatchAdmittedVMProducerOwned(ctx, admission, relocated, selected, options.vmDrivers, options.materialOwner)
 	}
 }
 
@@ -730,7 +736,13 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		if options.producers != nil {
 			run = options.producers.ExecNode
 		}
-		return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, run)
+		var materialOwner *LocalRunResult
+		for _, output := range plan.LifecycleOutputs {
+			if output.Name == node.BuildTarget && output.Kind == authored.OutputDiskImage {
+				materialOwner = options.materialOwner
+			}
+		}
+		return executeProducerOwned(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, run, materialOwner)
 	}
 
 	if node.Network == ir.NetworkNone {

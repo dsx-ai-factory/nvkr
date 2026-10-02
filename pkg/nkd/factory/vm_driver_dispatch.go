@@ -61,6 +61,13 @@ func dispatchAdmittedVMProducer(
 	node Node,
 	executor vmDriverExecutor,
 ) (artifact *pipeline.PackerArtifact, result *pipeline.ArtifactResult, returnErr error) {
+	return dispatchAdmittedVMProducerOwned(ctx, admission, plan, node, executor, nil)
+}
+
+func dispatchAdmittedVMProducerOwned(
+	ctx context.Context, admission vmAdmission, plan *Plan, node Node,
+	executor vmDriverExecutor, owner *LocalRunResult,
+) (artifact *pipeline.PackerArtifact, result *pipeline.ArtifactResult, returnErr error) {
 	if ctx == nil {
 		return nil, nil, e.New(e.CodeUsage, "VM driver dispatch requires a context")
 	}
@@ -111,6 +118,9 @@ func dispatchAdmittedVMProducer(
 			return materialErr
 		}
 		artifact, result, err = executor.RunPacker(runCtx, runtime, request.Subject, instruction, materials)
+		if err == nil && owner != nil {
+			err = owner.recordProducerConsumption(runCtx, plan, node, instruction, result, materials.observedProducerMaterials)
+		}
 		err = joinFactoryCleanupError(err, materials.Close(), "closing VM Packer material capabilities")
 		if err != nil {
 			return err
