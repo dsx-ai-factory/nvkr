@@ -18,7 +18,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
-// The same ELF test binary stands in for both tools. Unlike a fake callback,
+// Byte-distinct copies of the same ELF test program stand in for both tools. Unlike a fake callback,
 // this exercises production descriptor execution without adding a tool lookup,
 // ambient helper environment variable or a new compiled fixture program.
 func TestMain(m *testing.M) {
@@ -106,6 +106,15 @@ func TestDiskInspectorProductionProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	toolDigest := rawDigest(raw)
+	codecBytes := append(bytes.Clone(raw), 0)
+	codecPath := filepath.Join(t.TempDir(), "codec-fixture")
+	if err := os.WriteFile(codecPath, codecBytes, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	codecToolDigest := rawDigest(codecBytes)
+	if codecToolDigest == toolDigest {
+		t.Fatal("fixture tool identities must differ")
+	}
 	for _, tc := range []struct {
 		name, subject string
 		closed        bool
@@ -119,7 +128,7 @@ func TestDiskInspectorProductionProcess(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
-			codec, err := assemble.OpenQemuImgCodec(ctx, path, toolDigest)
+			codec, err := assemble.OpenQemuImgCodec(ctx, codecPath, codecToolDigest)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -166,12 +175,12 @@ func TestDiskInspectorProductionProcess(t *testing.T) {
 				t.Fatal(err)
 			}
 			digest, size, inspectorDigest, codecDigest := inventory.Binding()
-			if digest != subject.Digest() || size != subject.Size() || inspectorDigest != toolDigest || codecDigest != toolDigest {
+			if digest != subject.Digest() || size != subject.Size() || inspectorDigest != toolDigest || codecDigest != codecToolDigest {
 				t.Fatalf("inventory binding=%s/%d/%s/%s", digest, size, inspectorDigest, codecDigest)
 			}
 		})
 	}
-	codec, err := assemble.OpenQemuImgCodec(t.Context(), path, toolDigest)
+	codec, err := assemble.OpenQemuImgCodec(t.Context(), codecPath, codecToolDigest)
 	if err != nil {
 		t.Fatal(err)
 	}

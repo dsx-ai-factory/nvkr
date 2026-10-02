@@ -1,0 +1,3 @@
+=== RUN   TestDiskInspectorRejectsRootBeforeWork
+--- PASS: TestDiskInspectorRejectsRootBeforeWork (0.00s)
+PASS

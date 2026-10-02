@@ -161,3 +161,23 @@ to less than ten seconds; the source-lock
 test checks the exact AMD64 and ARM64 case mappings. These are diagnostic
 regressions and ARM64 runtime evidence, not an AMD64 appliance result, a new
 OS-image build, full CycloneDX or enclosing-runtime authentication.
+
+## Root admission negative
+
+The retained SBOM fixture binary `f3cc083b82b0f345daa7a9bb5ce7b671cb31816721887093f2779e7eb712a1f1`
+also ran the existing `TestDiskInspectorRejectsRootBeforeWork` under UID/GID
+`0:0` in the rebuilt image `sha256:f79899c06f1af1044a40ad996f2519f8a01789e82ee12d42b56e1bcb8541fcf6`.
+Its root guard and test retain the production/source identities from the checked
+inventory follow-up: `disk_inspect.go` blob `0846943246521cbf2cdb518a4214b387dcf7787a`
+and process-test blob `c6c714837c510d971537c2cc33aca6df55633697`. This separate
+negative does not claim that later test-fixture edits were in that binary.
+
+The invocation used `podman run --rm --init --network=none --cap-drop=ALL
+--security-opt=no-new-privileges --user=0:0 --read-only --tmpfs=/tmp:rw,size=256m
+-v <retained-binary>:/test:ro <exact-image> /test
+-test.run '^TestDiskInspectorRejectsRootBeforeWork$' -test.v -test.timeout 30s`.
+It passed without a skip and with exit 0. The test requires the root-specific
+diagnostic before a nil subject can reach filesystem or child work.
+[The complete capture](2026-10-02-nke-os-root-admission.log), SHA-256
+`e6dd80e88131c7824fe6d4d40ff02997de09c86411a8ffbe84a82083169c520a`,
+records only that admission negative, not an image scan or authenticated sandbox capability.

@@ -25,6 +25,7 @@ not an absent field or another extent type.
 
 The replay used base candidate `84898d837da11ee273407dfac851a30499927005`
 with these Git blob identities. They identify source bytes, not NKD Build identities.
+This is the earlier replay, not proof that later revisions used identical test bytes.
 
 | File | Tested Git blob |
 | --- | --- |
@@ -52,12 +53,19 @@ RAW SHA-256 `f32c846a3dd3cfaa09dbd7f75cb9d33d46129721912f7336955f219287eb65e4`,
 `1048576` bytes. Text and zero-capacity binary descriptors referencing an existing
 external file were rejected. Ungated real QEMU first accepted both descriptor
 fixtures and reported that exact private external extent and its complete size,
-so the negatives were not merely malformed images. NKD then returned the specific
-pre-probe header admission diagnostic as well as `CodeEnvelopeDecode` for each
-fixture. Controlled probe/conversion markers additionally proved invalid prefixes
-never launch QEMU and invalid extent metadata never starts conversion; admitted
-prefixes and extents created their respective markers as positive controls.
+so the negatives were not merely malformed images. NKD returned
+`CodeEnvelopeDecode` for each fixture. Controlled probe/conversion markers
+proved invalid prefixes never launch QEMU and invalid extent metadata never
+starts conversion.
 Legacy VMDK3, truncated headers and empty inputs fail closed.
+
+The [checked inventory follow-up](2026-10-02-nke-os-disk-inspection.md#checked-inventory-follow-up)
+records the later `codec.go` blob `daff29aa2ffe01a4d1defd5ad009be48039f865a`
+and `vmdk_real_test.go` blob `0f1dcb773327d87ec5fe45ce18473de57b5463b8`,
+fixture binary `d6a995807548e3d2b2fee605a5c09d44440247377e6cb5f1e91722e704adf133`
+and rebuilt runtime image. That replay adds specific pre-probe diagnostic assertions
+and admitted-prefix/extent marker positive controls; its complete capture is
+[the follow-up log](2026-10-02-nke-os-disk-replay-follow-up.log).
 
 The complete terminal output is committed as
 [2026-10-02-vmdk-codec-admission.log](2026-10-02-vmdk-codec-admission.log),
