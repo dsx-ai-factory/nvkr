@@ -2,8 +2,6 @@ package factory
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,23 +37,6 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	binding := testHelmBinding("package/cwe", ".")
 	if err := bindHelmImages(ctx, tree, *binding, map[string]string{"controller": image.ManifestDigest}); err != nil {
 		t.Fatal(err)
-	}
-	checksums, err := os.ReadFile(filepath.Join(tree, "checksums.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, line := range strings.Split(strings.TrimSpace(string(checksums)), "\n") {
-		fields := strings.SplitN(line, "  ", 2)
-		if len(fields) != 2 {
-			t.Fatalf("invalid checksum line %q", line)
-		}
-		raw, err := os.ReadFile(filepath.Join(tree, fields[1]))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if fmt.Sprintf("%x", sha256.Sum256(raw)) != fields[0] {
-			t.Fatalf("stale checksum: %s", fields[1])
-		}
 	}
 	helm, err := exec.LookPath("helm")
 	if err != nil {

@@ -241,7 +241,8 @@ Helm values and catalog pin sets share bounded dotted-field/literal `[key=value]
 values while permitting unrelated chart settings. All digest targets must exist as distinct string scalars.
 
 Packaging inspects each native image package, writes its manifest digest to the mapped values and refreshes
-checksums. Templates, repository and tag defaults remain unchanged. Source links and ambiguous value
+wrapper-level checksums when the chart is nested. With `chart: "."`, no bookkeeping is written
+inside the chart; any upstream `checksums.txt` remains chart content. Templates, repository and tag defaults remain unchanged. Source links and ambiguous value
 selections fail. No Environment publication prefix enters chart bytes. An operator supplies a repository
 containing the same image through deployment values. The source chart must already consume its digest
 value; NKD does not infer or rewrite template behavior. Normal Helm overrides remain possible, including

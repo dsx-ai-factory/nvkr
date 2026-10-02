@@ -95,6 +95,11 @@ func bindHelmImages(ctx context.Context, root string, binding HelmImageBinding, 
 	if err := os.WriteFile(valuesPath, encoded, 0o644); err != nil {
 		return e.Wrap(e.CodeInternal, err, "writing Helm values")
 	}
+	// Only a wrapper owns binder bookkeeping. When the source root is the
+	// chart itself, every file (including checksums.txt) belongs to upstream.
+	if binding.Chart == "." {
+		return nil
+	}
 	var checksums strings.Builder
 	for _, path := range files {
 		if path == filepath.Join(root, "checksums.txt") {

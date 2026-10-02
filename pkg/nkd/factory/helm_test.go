@@ -179,7 +179,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(log.String(), image.ManifestDigest) || !strings.Contains(log.String(), "checksums refreshed") {
+		if !strings.Contains(log.String(), image.ManifestDigest) || !strings.Contains(log.String(), `Bound Helm chart "controller" to 1 image slots`) {
 			t.Fatalf("missing exact binding log: %s", &log)
 		}
 	} else if strings.Contains(log.String(), "Bound Helm") {
