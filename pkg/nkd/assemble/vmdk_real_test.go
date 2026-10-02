@@ -33,7 +33,11 @@ func TestQualifiedVMDKRealQEMU(t *testing.T) {
 	}
 	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(executable))
 	t.Logf("actual qemu-img executable=%s", digest)
-	codec, err := OpenQemuImgCodec(t.Context(), qemu, os.Getenv("NKD_TEST_QEMU_IMG_DIGEST"))
+	pin := os.Getenv("NKD_TEST_QEMU_IMG_DIGEST")
+	if pin == "" {
+		t.Fatalf("set NKD_TEST_QEMU_IMG_DIGEST; actual qemu-img digest is %s", digest)
+	}
+	codec, err := OpenQemuImgCodec(t.Context(), qemu, pin)
 	if err != nil {
 		t.Fatal(err)
 	}

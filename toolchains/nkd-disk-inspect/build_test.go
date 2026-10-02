@@ -46,7 +46,12 @@ func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
 	dockerfile := string(data)
 	for _, text := range []string{"FROM " + lock.BaseImage, "FROM " + lock.DownloadImage,
 		"https://snapshot.ubuntu.com/ubuntu/" + lock.UbuntuSnapshot,
+		"amd64) qemu_package=qemu-system-x86 ;;",
+		"arm64) qemu_package=qemu-system-arm ;;",
 		"chmod 0644 /boot/vmlinuz-*;",
+		"dpkg-query -W -f='${Package}\\t${Version}\\t${Architecture}\\n' \\\n      > /usr/share/nkd-disk-inspect/packages.unsorted.tsv;",
+		"LC_ALL=C sort /usr/share/nkd-disk-inspect/packages.unsorted.tsv \\\n      > /usr/share/nkd-disk-inspect/packages.tsv;",
+		"rm /usr/share/nkd-disk-inspect/packages.unsorted.tsv;",
 		"/etc/apt/sources.list.d/ubuntu.sources /etc/ssl/certs/ca-certificates.crt"} {
 		if !strings.Contains(dockerfile, text) {
 			t.Fatalf("Dockerfile does not match lock/cleanup: %q", text)

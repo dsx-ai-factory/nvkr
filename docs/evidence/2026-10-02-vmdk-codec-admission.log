@@ -1,0 +1,52 @@
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/external_descriptor
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/binary_descriptor_redirect
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/legacy_sparse
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/truncated_sparse
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/empty
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/admitted_prefix_reaches_probe
+--- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe (0.01s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/external_descriptor (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/binary_descriptor_redirect (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/legacy_sparse (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/truncated_sparse (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/empty (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/admitted_prefix_reaches_probe (0.01s)
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/monolithic_sparse
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/native_empty_extent_label
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_label
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/stream_optimized
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_metadata
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/wrong_specific_type
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/descriptor_create_type
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/external_extent
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/wrong_extent_format
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/incomplete_extent
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/multiple_extents
+--- PASS: TestQualifiedVMDKRequiresHeldSparseExtent (0.02s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/monolithic_sparse (0.01s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/native_empty_extent_label (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_label (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/stream_optimized (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_metadata (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/wrong_specific_type (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/descriptor_create_type (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/external_extent (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/wrong_extent_format (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/incomplete_extent (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/multiple_extents (0.00s)
+=== RUN   TestQualifiedVMDKRealQEMU
+    vmdk_real_test.go:35: actual qemu-img executable=sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e
+=== RUN   TestQualifiedVMDKRealQEMU/monolithicSparse
+    vmdk_real_test.go:62: held monolithicSparse reproduced RAW=sha256:f32c846a3dd3cfaa09dbd7f75cb9d33d46129721912f7336955f219287eb65e4 bytes=1048576
+=== RUN   TestQualifiedVMDKRealQEMU/streamOptimized
+    vmdk_real_test.go:62: held streamOptimized reproduced RAW=sha256:f32c846a3dd3cfaa09dbd7f75cb9d33d46129721912f7336955f219287eb65e4 bytes=1048576
+=== RUN   TestQualifiedVMDKRealQEMU/text_descriptor
+=== RUN   TestQualifiedVMDKRealQEMU/binary_descriptor_redirect
+--- PASS: TestQualifiedVMDKRealQEMU (0.05s)
+    --- PASS: TestQualifiedVMDKRealQEMU/monolithicSparse (0.03s)
+    --- PASS: TestQualifiedVMDKRealQEMU/streamOptimized (0.01s)
+    --- PASS: TestQualifiedVMDKRealQEMU/text_descriptor (0.00s)
+    --- PASS: TestQualifiedVMDKRealQEMU/binary_descriptor_redirect (0.00s)
+PASS

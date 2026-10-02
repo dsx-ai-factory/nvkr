@@ -63,8 +63,9 @@ APT source file are removed after acquisition; runtime inspection does not
 require network package access.
 
 Source `toolchain.lock.json` pins the frozen acquisition inputs, not an image
-digest or runtime closure. `go test ./toolchains/nkd-disk-inspect` checks them
-against the Dockerfile. No AMD64 executable measurements are invented. Executable
+digest or runtime closure. `go test ./toolchains/nkd-disk-inspect` checks the
+declared pins and architecture mappings against the Dockerfile, not its complete
+grammar or runtime closure. No AMD64 executable measurements are invented. Executable
 hashes generated inside a local image are descriptive, not independent evidence.
 
 Installed-package inventory is not a complete disk SBOM. It excludes uninstalled

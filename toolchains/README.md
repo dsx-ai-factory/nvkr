@@ -10,7 +10,8 @@ catalog-eligible until both platform variants are published and pinned by their
 immutable repository digests.
 
 `nkd-disk-inspect/` supplies the staged installed-package diagnostic API's
-libguestfs runtime. Its source pins are checked by repository tests. The image is
+libguestfs runtime. Repository tests compare declared pin and architecture-mapping
+strings, not the Dockerfile's complete grammar or runtime closure. The image is
 unpublished, unqualified, and not a maintained lifecycle toolchain. See its README
 for the mandatory non-root, credential-free and network-less execution boundary.
 

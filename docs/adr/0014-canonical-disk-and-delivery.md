@@ -104,14 +104,16 @@ to the decoded stream rather than to conversion, and the **ext4 full-rootfs resi
 
 The shared probe passes the declared driver explicitly (`vhd` maps to QEMU's `vpc`), never auto-detects or
 requests `--backing-chain`, and rejects encryption, backing files and QCOW2 external data-file metadata before
-decoding. Explicit `vpc` selection permits fixed VHDs that auto-detection would classify as RAW; this is format
+decoding. The shared probe pin must carry the [CVE-2024-4467 fix](https://ubuntu.com/security/CVE-2024-4467)
+that prevents opening QCOW2 data files under `BDRV_O_NO_IO`; a digest pin alone does not establish that patch.
+Explicit `vpc` selection permits fixed VHDs that auto-detection would classify as RAW; this is format
 admission, not evidence of decode determinism. VMDK admission is limited to the single-file VMDK4 sparse
 branch: before launching QEMU, a bounded binary first-sector check requires `KDMV` magic and nonzero
 little-endian capacity. QEMU's descriptor-backed layouts open extent files even during `info` with `NO_IO`,
 so text descriptors, legacy VMDK3 and zero-capacity binary descriptor redirects are rejected before the probe.
 This is a subset admission check, not a VMDK descriptor parser. QEMU validates the remaining format, including
 grain tables and any stream-optimized footer. Its QAPI result must report `monolithicSparse` or
-`streamOptimized` with exactly one extent naming the held input descriptor and covering the full
+`streamOptimized` with exactly one extent naming the held input file (`/proc/self/fd/N`) and covering the full
 virtual size before conversion. Other VMDK layouts require separately admitted material closures.
 The separate diagnostic installed-package gate remains QCOW2-only. Complete QCOW2 incompatible-feature
 admission in the lifecycle's bounded header check remains unresolved; the header observer is not a
@@ -212,7 +214,8 @@ deployment. No provisioning bundle or node-SKU interface is retained without a s
 Current contract evidence in `pkg/nkd/assemble/*_test.go` covers canonical RAW and ISO identities, per-block
 manifests, strict legacy-role rejection, pre-encryption rejection, qualified exact held `qemu` executable, input,
 and output capabilities, exact explicit probe argv including `vhd` to `vpc`, format/encryption/backing/data-file
-probes, QCOW2-only diagnostic admission, decoded logical identity, no-follow regular-file
+probes, QCOW2-only diagnostic admission, VMDK single-file sparse pre-probe and extent-binding negatives
+using a controlled probe, decoded logical identity, no-follow regular-file
 capture, platform fail-closed behavior, bounded block-manifest allocations, and mutation or subject-substitution
 negatives. CLI and local-runner admission tests prove unsupported producer, boot, encryption, qualified-package,
 and removed staging interfaces fail before catalog, graph, input, output, or subprocess I/O, while
@@ -220,6 +223,9 @@ existing-byte `DiskManifest` emission and ordinary unqualified development packa
 regions deliberately remain unsupported. Factory/lifecycle/delivery contracts additionally cover the
 process-local exact-QCOW2 observation described above. They use a controlled producer callback and do not
 establish production VM execution, NKE disk production, full-disk evidence, compatibility, or publication.
+The real-QEMU VMDK fixture replay is opt-in through `NKD_TEST_QEMU_IMG` and its exact executable pin;
+ordinary CI does not run it. Its [ARM64 replay evidence](../evidence/2026-10-02-vmdk-codec-admission.md)
+is recorded separately from the contract suite and does not establish qualified reproduction.
 
 End-to-end acceptance requires real pinned `qemu` versions decoding `qcow2`, `vmdk`, and `vhd` fixtures to the
 same logical stream, a post-attestation encryption handoff, reproducible ISO and package fixtures, and a delivery

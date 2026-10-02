@@ -80,6 +80,9 @@ func diskInspectorProcessHelper() error {
 	if err != nil {
 		return err
 	}
+	if bytes.Equal(raw, []byte("external")) {
+		return fmt.Errorf("inspector helper received an externally dependent subject")
+	}
 	if bytes.Equal(raw, []byte("wait")) {
 		time.Sleep(time.Minute)
 	}
@@ -141,9 +144,16 @@ func TestDiskInspectorProductionProcess(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
 				defer cancel()
 			}
+			started := time.Now()
 			inventory, err := inspector.InspectHeldInstalledPackages(ctx, subject, "qcow2", "none")
 			if tc.code != "" {
 				assertDependencyCode(t, err, tc.code)
+				if tc.name == "canceled subprocess" && time.Since(started) >= 10*time.Second {
+					t.Fatal("cancellation did not promptly join the sixty-second inspector helper")
+				}
+				if tc.subject == "external" && !strings.Contains(err.Error(), "not self-contained") {
+					t.Fatalf("external subject was not rejected by the envelope gate: %v", err)
+				}
 				if tc.name == "empty subject" && !strings.Contains(err.Error(), "must be nonempty and within its diagnostic byte budget") {
 					t.Fatalf("empty subject diagnostic describes the wrong admission failure: %v", err)
 				}

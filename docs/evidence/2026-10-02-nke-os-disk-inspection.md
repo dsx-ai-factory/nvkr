@@ -61,8 +61,8 @@ authority.
 
 The command `/test -test.run TestDiskInspectionReal -test.v -test.timeout 15m`
 completed with exit 0 and produced the following excerpts. Complete terminal
-output is retained locally as
-`pr75-final-appliance.log`, SHA-256
+output is committed as
+[2026-10-02-nke-os-disk-inspection.log](2026-10-02-nke-os-disk-inspection.log), SHA-256
 `339589ff4f64eb3744c84793da78da7c4c508b39501afcf56f0f6f03d9b8e4d6`.
 The raw output ends with `PASS`; these excerpts omit the full process listings:
 
@@ -110,3 +110,54 @@ source table remains the identity of what was exercised. The separate
 [VMDK codec admission replay](2026-10-02-vmdk-codec-admission.md) records that
 subsequent correction. The pre-existing lifecycle QCOW2 incompatible-feature/header
 admission gap remains separately tracked in ADR-14.
+
+## Checked inventory follow-up
+
+A later replay used candidate `462cced6dd079854cc622a7d49183eff8d663322`
+with the following source replacements; other compiled sources stayed at that
+candidate. The earlier replay above retains its original source identity.
+
+| File | Tested Git blob |
+| --- | --- |
+| `pkg/nkd/sbom/disk_inspect.go` | `0846943246521cbf2cdb518a4214b387dcf7787a` |
+| `pkg/nkd/sbom/disk_inspect_process_test.go` | `c6c714837c510d971537c2cc33aca6df55633697` |
+| `pkg/nkd/assemble/codec.go` | `daff29aa2ffe01a4d1defd5ad009be48039f865a` |
+| `pkg/nkd/assemble/codec_test.go` | `966268424fbb3406d58ed3c9eb5438940c50227e` |
+| `pkg/nkd/assemble/vmdk_real_test.go` | `0f1dcb773327d87ec5fe45ce18473de57b5463b8` |
+| `toolchains/nkd-disk-inspect/Dockerfile` | `1c7a3cdb9badef3357937d6552f80ba930b1c37d` |
+| `toolchains/nkd-disk-inspect/build_test.go` | `0c71318d50bb63715d72658be66dee243dff4172` |
+
+The Dockerfile now checks `dpkg-query` before sorting its output, then removes the
+temporary unsorted inventory. The actual ARM64 rebuild completed from the pinned
+inputs as local image
+`sha256:f79899c06f1af1044a40ad996f2519f8a01789e82ee12d42b56e1bcb8541fcf6`.
+Its measured inspector, probe and installed-package index hashes equal those
+listed above. Non-root checks verified sorted inventory, temporary-file removal,
+kernel readability and acquisition-file removal. A controlled invalid-option
+`dpkg-query` call under the same checked shell sequence exited 2 before sorting
+and produced no final inventory. This exercises the failure mechanism, not an
+actual failure of the successful image build.
+
+The new ARM64 SBOM test binary SHA-256 was
+`f3cc083b82b0f345daa7a9bb5ce7b671cb31816721887093f2779e7eb712a1f1`.
+The same four real appliance tests passed under the original non-root,
+network-less, capability-free, read-only settings and private 12 GiB tmpfs:
+the unchanged retained QCOW2 yielded 730 packages, the encrypted whole-device
+fixture remained unsupported, external references were rejected, and the actual
+QEMU process group was absent after joined cancellation. The subject digest
+matched the earlier record both before and after the replay. Complete terminal
+captures from this appliance replay and the following VMDK replay are concatenated
+without edits in [2026-10-02-nke-os-disk-replay-follow-up.log](2026-10-02-nke-os-disk-replay-follow-up.log).
+That committed capture's SHA-256 is
+`c50177e5ca038848c2d06da7b5fbb0ac1726d0004ae90262a66380a700c1b4d8`.
+
+The updated VMDK fixture binary, SHA-256
+`d6a995807548e3d2b2fee605a5c09d44440247377e6cb5f1e91722e704adf133`,
+also passed against the rebuilt image with its unchanged exact QEMU pin.
+Native `make check build workflows-check notices-check` and non-root Linux
+race tests with atomic coverage passed. The strengthened process fixture now
+distinguishes envelope rejection from an inspector failure and bounds cancellation
+to less than ten seconds; the source-lock
+test checks the exact AMD64 and ARM64 case mappings. These are diagnostic
+regressions and ARM64 runtime evidence, not an AMD64 appliance result, a new
+OS-image build, full CycloneDX or enclosing-runtime authentication.

@@ -17,7 +17,7 @@ owns full format validation.
 
 The subsequent [QAPI extent metadata](https://github.com/qemu/qemu/blob/v8.2.2/qapi/block-core.json)
 must identify one admitted create type and one extent covering the full logical
-size through the exact held input descriptor. The native QEMU branch leaves the
+size through the exact held input file (`/proc/self/fd/N`). The native QEMU branch leaves the
 extent's explicit format string empty; NKD accepts that native label or `SPARSE`,
 not an absent field or another extent type.
 
@@ -59,7 +59,8 @@ never launch QEMU and invalid extent metadata never starts conversion; admitted
 prefixes and extents created their respective markers as positive controls.
 Legacy VMDK3, truncated headers and empty inputs fail closed.
 
-The complete terminal output is retained locally as `nkd-pr75-vmdk-panel-fixed-replay.log`,
+The complete terminal output is committed as
+[2026-10-02-vmdk-codec-admission.log](2026-10-02-vmdk-codec-admission.log),
 SHA-256 `260cc1e380270411f284f9c5897f67030cdb4788a870f05ce26f4d2a11d29090`.
 This small ARM64 fixture replay does not establish cross-version decode
 determinism, an AMD64 runtime result or qualified reproduction of an NKE image.

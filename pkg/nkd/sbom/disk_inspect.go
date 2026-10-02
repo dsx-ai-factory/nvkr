@@ -129,8 +129,9 @@ func diskInspectorELF(image *elf.File) bool {
 	if image.Entry == 0 || (image.Type != elf.ET_EXEC && image.Type != elf.ET_DYN) {
 		return false
 	}
-	// Entry and Machine come from debug/elf, not a partial header parser. ET_DYN
-	// admits PIE executables; an entry-less shared library is not executable.
+	// This is a native ELF sanity check, not proof that an ELF is virt-inspector
+	// or excludes every shared library. ET_DYN admits PIE; the exact digest pin
+	// identifies the selected tool, and its enclosing runtime still needs review.
 	switch runtime.GOARCH {
 	case "amd64":
 		return image.Machine == elf.EM_X86_64
@@ -168,6 +169,9 @@ func (inspector *DiskInspector) Close() error {
 // Callers MUST provide a non-root, network-less, credential-free container or
 // equivalent sandbox before calling this API. This capability does not admit or
 // authenticate containment; direct libguestfs execution is not a host sandbox.
+// The sandbox must supply writable /tmp for the short private workspace, up to
+// 8 GiB for the held input and another 8 GiB copy plus appliance/cache storage.
+// TMPDIR does not redirect that workspace; memory-backed /tmp consumes RAM.
 func (inspector *DiskInspector) InspectHeldInstalledPackages(ctx context.Context,
 	subject *heldfile.File, format, encryption string,
 ) (*DiskInstalledInventory, error) {

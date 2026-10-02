@@ -1,0 +1,80 @@
+=== RUN   TestDiskInspectionRealQCOW2
+    disk_inspect_test.go:164: diagnostic only: QCOW2 sha256:8150fa1bc3606c54ba1bbe73573d3bdfd357467ffbd2c685ae160125220302e0 bytes=2853175296 installed-packages=730
+--- PASS: TestDiskInspectionRealQCOW2 (35.83s)
+=== RUN   TestDiskInspectionRealEncryptedWholeDevice
+    disk_inspect_test.go:216: encrypted whole-device rejection, not a partition-key EOF proof: [NKD-E-ENGINE-CAPABILITY] disk inspection requires one operating system
+--- PASS: TestDiskInspectionRealEncryptedWholeDevice (15.38s)
+=== RUN   TestDiskInspectionRealExternalReferences
+=== RUN   TestDiskInspectionRealExternalReferences/data
+=== RUN   TestDiskInspectionRealExternalReferences/backing
+--- PASS: TestDiskInspectionRealExternalReferences (0.02s)
+    --- PASS: TestDiskInspectionRealExternalReferences/data (0.01s)
+    --- PASS: TestDiskInspectionRealExternalReferences/backing (0.01s)
+=== RUN   TestDiskInspectionRealCancellation
+    disk_inspect_test.go:329: appliance process groups before cancel:
+            PID    PGID STAT COMMAND
+              1       1 Ss   /run/podman-init -- /test -test.run TestDiskInspectionReal -test.v -test.timeout 15m
+              2       2 Sl   /test -test.run TestDiskInspectionReal -test.v -test.timeout 15m
+           1259    1259 S    /proc/self/fd/3 --format=qcow2 --keys-from-stdin --no-icon -a /tmp/nkd-di-252437334/subject.qcow2
+           1531    1259 Rl   /usr/bin/qemu-system-aarch64 -global virtio-blk-pci.scsi=off -no-user-config -nodefaults -display none -machine virt,accel=tcg -cpu cortex-a57 -m 1280 -no-reboot -kernel /tmp/nkd-di-252437334/.guestfs-1000/appliance.d/kernel -initrd /tmp/nkd-di-252437334/.guestfs-1000/appliance.d/initrd -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 -device virtio-scsi-pci,id=scsi -drive file.file.filename=/tmp/nkd-di-252437334/libguestfseQL956/overlay1.qcow2,file.driver=qcow2,file.backing.file.locking=off,cache=unsafe,id=hd0,if=none -device scsi-hd,drive=hd0 -drive file=/tmp/nkd-di-252437334/.guestfs-1000/appliance.d/root,snapshot=on,id=appliance,cache=unsafe,if=none,format=raw -device scsi-hd,drive=appliance -device virtio-serial-pci -serial stdio -chardev socket,path=/tmp/nkd-di-252437334/libguestfsRY5Kyn/guestfsd.sock,id=channel0 -device virtserialport,chardev=channel0,name=org.libguestfs.channel.0 -append panic=1 console=ttyAMA0 earlyprintk=pl011,,0x9000000 ignore_loglevel efi-rtc=noprobe edd=off udevtimeout=6000 udev.event-timeout=6000 no_timer_check printk.time=1 cgroup_disable=memory usbcore.nousb cryptomgr.notests tsc=reliable 8250.nr_uarts=1 root=UUID=305df32e-4f1a-41bb-94cd-b6aa0c9509c6 selinux=0 quiet TERM=linux
+           1532    1259 S    /proc/self/fd/3 --format=qcow2 --keys-from-stdin --no-icon -a /tmp/nkd-di-252437334/subject.qcow2
+           1535       2 R    /bin/ps -eo pid,pgid,stat,args
+    disk_inspect_test.go:355: process groups after joined cancellation:
+            PID    PGID STAT COMMAND
+              1       1 Ss   podman-init
+              2       2 Sl   test
+           1536       2 R    ps
+--- PASS: TestDiskInspectionRealCancellation (0.41s)
+PASS
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/external_descriptor
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/binary_descriptor_redirect
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/legacy_sparse
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/truncated_sparse
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/empty
+=== RUN   TestQualifiedVMDKRejectsDescriptorBeforeProbe/admitted_prefix_reaches_probe
+--- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe (0.02s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/external_descriptor (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/binary_descriptor_redirect (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/legacy_sparse (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/truncated_sparse (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/empty (0.00s)
+    --- PASS: TestQualifiedVMDKRejectsDescriptorBeforeProbe/admitted_prefix_reaches_probe (0.01s)
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/monolithic_sparse
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/native_empty_extent_label
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_label
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/stream_optimized
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_metadata
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/wrong_specific_type
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/descriptor_create_type
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/external_extent
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/wrong_extent_format
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/incomplete_extent
+=== RUN   TestQualifiedVMDKRequiresHeldSparseExtent/multiple_extents
+--- PASS: TestQualifiedVMDKRequiresHeldSparseExtent (0.02s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/monolithic_sparse (0.01s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/native_empty_extent_label (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_label (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/stream_optimized (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/missing_extent_metadata (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/wrong_specific_type (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/descriptor_create_type (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/external_extent (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/wrong_extent_format (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/incomplete_extent (0.00s)
+    --- PASS: TestQualifiedVMDKRequiresHeldSparseExtent/multiple_extents (0.00s)
+=== RUN   TestQualifiedVMDKRealQEMU
+    vmdk_real_test.go:35: actual qemu-img executable=sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e
+=== RUN   TestQualifiedVMDKRealQEMU/monolithicSparse
+    vmdk_real_test.go:66: held monolithicSparse reproduced RAW=sha256:f32c846a3dd3cfaa09dbd7f75cb9d33d46129721912f7336955f219287eb65e4 bytes=1048576
+=== RUN   TestQualifiedVMDKRealQEMU/streamOptimized
+    vmdk_real_test.go:66: held streamOptimized reproduced RAW=sha256:f32c846a3dd3cfaa09dbd7f75cb9d33d46129721912f7336955f219287eb65e4 bytes=1048576
+=== RUN   TestQualifiedVMDKRealQEMU/text_descriptor
+=== RUN   TestQualifiedVMDKRealQEMU/binary_descriptor_redirect
+--- PASS: TestQualifiedVMDKRealQEMU (0.06s)
+    --- PASS: TestQualifiedVMDKRealQEMU/monolithicSparse (0.04s)
+    --- PASS: TestQualifiedVMDKRealQEMU/streamOptimized (0.01s)
+    --- PASS: TestQualifiedVMDKRealQEMU/text_descriptor (0.00s)
+    --- PASS: TestQualifiedVMDKRealQEMU/binary_descriptor_redirect (0.00s)
+PASS

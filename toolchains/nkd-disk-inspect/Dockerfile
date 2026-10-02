@@ -29,7 +29,10 @@ RUN set -eux; \
     chmod 0644 /boot/vmlinuz-*; \
     mkdir -p /usr/share/nkd-disk-inspect; \
     dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' \
-      | LC_ALL=C sort > /usr/share/nkd-disk-inspect/packages.tsv; \
+      > /usr/share/nkd-disk-inspect/packages.unsorted.tsv; \
+    LC_ALL=C sort /usr/share/nkd-disk-inspect/packages.unsorted.tsv \
+      > /usr/share/nkd-disk-inspect/packages.tsv; \
+    rm /usr/share/nkd-disk-inspect/packages.unsorted.tsv; \
     sha256sum /usr/bin/virt-inspector /usr/bin/qemu-img \
       > /usr/share/nkd-disk-inspect/executables.sha256; \
     rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/99bootstrap-ca \

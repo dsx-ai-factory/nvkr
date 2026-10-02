@@ -293,8 +293,9 @@ func (codec *QemuImgCodec) probe(ctx context.Context, format string, input *held
 	var stdout, stderr bytes.Buffer
 	err = heldfile.RunContext(ctx, codec.executable,
 		// QEMU opens info inputs with BDRV_O_NO_BACKING | BDRV_O_NO_IO. VMDK
-		// descriptors can still open extents, so admit their binary subset first. Never
-		// request --backing-chain: backing names are metadata to reject, not
+		// descriptors can still open extents, so admit their binary subset first.
+		// QCOW2 probe pins must carry the CVE-2024-4467 data-file NO_IO fix.
+		// Never request --backing-chain: backing names are metadata to reject, not
 		// paths to open. The explicit format also prevents format autodetection.
 		[]string{"info", "-f", qemuFormat(format), "--output=json", inputPath},
 		heldfile.RunOptions{Stdout: &stdout, Stderr: &stderr}, input)
