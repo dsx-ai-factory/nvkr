@@ -250,59 +250,60 @@ func TestDiskMaterialTraceRetainsActualTransitiveConsumption(t *testing.T) {
 
 func TestDiskMaterialTraceRejectsIncompleteOrSubstitutedInvocations(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		mutate func(*LocalRunResult)
+		name     string
+		mutate   func(*LocalRunResult)
+		wantText string
 	}{
-		{"missing root", func(owner *LocalRunResult) { delete(owner.materialConsumptions, "node-image/build-image") }},
-		{"missing transitive", func(owner *LocalRunResult) { delete(owner.materialConsumptions, "node-image/pull-runtime") }},
+		{"missing root", func(owner *LocalRunResult) { delete(owner.materialConsumptions, "node-image/build-image") }, "disk root has no exact consumed material manifest"},
+		{"missing transitive", func(owner *LocalRunResult) { delete(owner.materialConsumptions, "node-image/pull-runtime") }, "has no exact retained invocation"},
 		{"changed acquisition", func(owner *LocalRunResult) {
 			receipt := owner.materialConsumptions["node-image/pull-runtime"]
 			receipt.digest = "sha256:" + strings.Repeat("f", 64)
 			owner.materialConsumptions["node-image/pull-runtime"] = receipt
-		}},
+		}, "has no exact retained invocation"},
 		{"changed plan", func(owner *LocalRunResult) {
 			receipt := owner.materialConsumptions["node-image/build-agent"]
 			receipt.planDigest = "sha256:" + strings.Repeat("f", 64)
 			owner.materialConsumptions["node-image/build-agent"] = receipt
-		}},
+		}, "has no exact retained invocation"},
 		{"missing input", func(owner *LocalRunResult) {
 			receipt := owner.materialConsumptions["node-image/build-agent"]
 			receipt.materials = nil
 			owner.materialConsumptions["node-image/build-agent"] = receipt
-		}},
+		}, "consumption set differs from its Plan"},
 		{"substituted binding", func(owner *LocalRunResult) {
 			owner.materialConsumptions["node-image/build-agent"].materials[0].Binding = "other"
-		}},
+		}, "consumed a substituted material"},
 		{"substituted component", func(owner *LocalRunResult) {
 			owner.materialConsumptions["node-image/build-agent"].materials[0].Component = "other"
-		}},
+		}, "consumed a substituted material"},
 		{"substituted kind", func(owner *LocalRunResult) {
 			owner.materialConsumptions["node-image/build-agent"].materials[0].Kind = "raw"
-		}},
+		}, "consumed a substituted material"},
 		{"substituted architecture", func(owner *LocalRunResult) {
 			owner.materialConsumptions["node-image/build-agent"].materials[0].Architecture = "arm64"
-		}},
+		}, "consumed a substituted material"},
 		{"root size", func(owner *LocalRunResult) {
 			record := owner.materialConsumptions["node-image/build-image"]
 			record.size++
 			owner.materialConsumptions["node-image/build-image"] = record
-		}},
+		}, "has no exact retained invocation"},
 		{"duplicate binding", func(owner *LocalRunResult) {
 			receipt := owner.materialConsumptions["node-image/build-image"]
 			receipt.materials[1] = receipt.materials[0]
 			owner.materialConsumptions["node-image/build-image"] = receipt
-		}},
+		}, "repeats a consumed binding"},
 		{"root manifest", func(owner *LocalRunResult) {
 			receipt := owner.materialConsumptions["node-image/build-image"]
 			receipt.manifestDigest = "sha256:" + strings.Repeat("f", 64)
 			owner.materialConsumptions["node-image/build-image"] = receipt
-		}},
+		}, "disk root has no exact consumed material manifest"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan, owner := diskMaterialTraceFixture(t)
 			test.mutate(owner)
 			trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
-			if trace != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
+			if trace != nil || factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), test.wantText) {
 				t.Fatalf("trace/error = %#v/%v", trace, err)
 			}
 		})
@@ -438,6 +439,42 @@ func TestRecordProducerConsumptionRejectsWrongManifest(t *testing.T) {
 	}
 }
 
+func TestRecordProducerConsumptionRejectsUndeclaredMaterials(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*pipeline.ArtifactResult, *observedProducerMaterials)
+	}{
+		{"manifest identity", func(result *pipeline.ArtifactResult, _ *observedProducerMaterials) {
+			result.MaterialManifestDigest = "sha256:" + strings.Repeat("f", 64)
+		}},
+		{"consumption observation", func(_ *pipeline.ArtifactResult, materials *observedProducerMaterials) {
+			materials.observations = []material.Observation{{Binding: "undeclared"}}
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, operation := compiledPackerVMNode(t)
+			owner := localDiskRunResult(t, plan)
+			defer owner.Close()
+			_, instruction, err := plan.producerInstruction(operation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(instruction.Materials) != 0 {
+				t.Fatal("fixture declares material inputs")
+			}
+			result := &pipeline.ArtifactResult{Component: instruction.Component, OutputType: instruction.OutputType}
+			materials := &observedProducerMaterials{}
+			test.mutate(result, materials)
+			if err := owner.recordProducerConsumption(t.Context(), plan, operation, instruction, result, materials); factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), "recorded undeclared material inputs") {
+				t.Fatalf("record error = %v", err)
+			}
+			if len(owner.materialConsumptions) != 0 {
+				t.Fatal("undeclared inputs retained consumption observations")
+			}
+		})
+	}
+}
+
 type tracingVMExecutor struct{ fakeVMDriverExecutor }
 
 func (executor *tracingVMExecutor) RunPacker(ctx context.Context, runtime *VMRuntime, subject string,
@@ -544,44 +581,45 @@ func TestProducerConsumptionRejectsDuplicateAndClosedOwner(t *testing.T) {
 
 func TestRecordProducerConsumptionRejectsInvalidInputs(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		mutate func(context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult)
-		code   e.Code
+		name     string
+		mutate   func(context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult)
+		code     e.Code
+		wantText string
 	}{
 		{"nil context", func(_ context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			return nil, p, o, r
-		}, e.CodeUsage},
+		}, e.CodeUsage, "recording producer consumption requires a context"},
 		{"canceled", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			ctx, cancel := context.WithCancel(ctx)
 			cancel()
 			return ctx, p, o, r
-		}, e.CodeTimeout},
+		}, e.CodeTimeout, "recording producer consumption"},
 		{"nil plan", func(ctx context.Context, _ *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			return ctx, nil, o, r
-		}, e.CodeVerifyFailed},
+		}, e.CodeVerifyFailed, "requires a successful live result"},
 		{"nil owner", func(ctx context.Context, p *Plan, _ *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			return ctx, p, nil, r
-		}, e.CodeVerifyFailed},
+		}, e.CodeVerifyFailed, "requires a successful live result"},
 		{"nil result", func(ctx context.Context, p *Plan, o *LocalRunResult, _ *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			return ctx, p, o, nil
-		}, e.CodeVerifyFailed},
+		}, e.CodeVerifyFailed, "requires a successful live result"},
 		{"different plan identity", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			changed := *p
 			changed.GeneratorVersion += "-different"
 			return ctx, &changed, o, r
-		}, e.CodeVerifyFailed},
+		}, e.CodeVerifyFailed, "changes its Plan or output"},
 		{"invalid plan identity", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			p.SchemaVersion = ""
 			return ctx, p, o, r
-		}, e.CodeInvalidCatalog},
+		}, e.CodeInvalidCatalog, "run plan schema/name is invalid"},
 		{"misbound component", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			r.Component = "other"
 			return ctx, p, o, r
-		}, e.CodeVerifyFailed},
+		}, e.CodeVerifyFailed, "changes its Plan or output"},
 		{"misbound output type", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			r.OutputType = "raw"
 			return ctx, p, o, r
-		}, e.CodeVerifyFailed},
+		}, e.CodeVerifyFailed, "changes its Plan or output"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan, node := compiledPackerVMNode(t)
@@ -593,7 +631,7 @@ func TestRecordProducerConsumptionRejectsInvalidInputs(t *testing.T) {
 			}
 			result := &pipeline.ArtifactResult{Component: instruction.Component, OutputType: instruction.OutputType}
 			ctx, p, o, r := test.mutate(t.Context(), plan, owner, result)
-			if err := o.recordProducerConsumption(ctx, p, node, instruction, r, nil); factoryErrorCode(err) != test.code {
+			if err := o.recordProducerConsumption(ctx, p, node, instruction, r, nil); factoryErrorCode(err) != test.code || !strings.Contains(err.Error(), test.wantText) {
 				t.Fatalf("record error = %v, want %s", err, test.code)
 			}
 			if len(owner.materialConsumptions) != 0 {
@@ -604,8 +642,14 @@ func TestRecordProducerConsumptionRejectsInvalidInputs(t *testing.T) {
 }
 
 func TestRecordProducerConsumptionRejectsChangedBytes(t *testing.T) {
-	for _, name := range []string{"payload", "result file", "returned digest", "returned size", "held manifest"} {
-		t.Run(name, func(t *testing.T) {
+	for _, test := range []struct{ name, wantText string }{
+		{"payload", "bytes differ from its recorded digest or size"},
+		{"result file", "decoding producer result"},
+		{"returned digest", "changed its successful output"},
+		{"returned size", "changed its successful output"},
+		{"held manifest", "rechecking consumed material manifest"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			fixture := newVMPackerMaterialFixture(t)
 			owner := localDiskRunResult(t, fixture.plan)
 			defer owner.Close()
@@ -620,7 +664,7 @@ func TestRecordProducerConsumptionRejectsChangedBytes(t *testing.T) {
 				t.Fatal(err)
 			}
 			var materials *observedProducerMaterials
-			switch name {
+			switch test.name {
 			case "payload":
 				if err := os.WriteFile(fixture.payloads["runtime"], []byte("substituted"), 0o600); err != nil {
 					t.Fatal(err)
@@ -649,7 +693,7 @@ func TestRecordProducerConsumptionRejectsChangedBytes(t *testing.T) {
 				}
 				t.Cleanup(func() { _ = observed.Close() })
 			}
-			if err := owner.recordProducerConsumption(t.Context(), fixture.plan, operation, instruction, &result, materials); factoryErrorCode(err) != e.CodeVerifyFailed {
+			if err := owner.recordProducerConsumption(t.Context(), fixture.plan, operation, instruction, &result, materials); factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), test.wantText) {
 				t.Fatalf("record error = %v", err)
 			}
 			if len(owner.materialConsumptions) != 0 {

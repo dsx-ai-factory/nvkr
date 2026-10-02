@@ -255,6 +255,7 @@ func (owner *LocalRunResult) observeDiskMaterials(ctx context.Context, plan *Pla
 		case ir.KindPull:
 			production = diskMaterialProductionAcquired
 		default:
+			// Exhaustiveness guard: the producer map currently admits only build and pull nodes.
 			return e.New(e.CodeVerifyFailed, "disk material producer %q has unsupported production kind %q", id, node.Kind)
 		}
 		seen[id] = true
