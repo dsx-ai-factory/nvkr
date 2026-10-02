@@ -20,6 +20,7 @@
 | Understand code organization findings and their implementation | [Codebase organization audit](codebase-organization-audit.md) |
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
 | Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
+| Inspect installed package metadata in a held non-FDE disk, without claiming a full SBOM | [Diagnostic inspector runtime](../toolchains/nkd-disk-inspect/README.md), [local inspection evidence](evidence/2026-10-01-nke-os-disk-inspection.md) |
 | Build or contribute | [Development](../DEVELOPMENT.md), [contribution guide](../CONTRIBUTING.md) |
 | Triage repository vulnerabilities | [CVE management](cve-management.md), [security reporting](../SECURITY.md) |
 | Manage GitHub issues, discussions, and pull requests | [GitHub issue and PR management](github-issue-pr-management.md) |

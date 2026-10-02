@@ -227,12 +227,46 @@ func (codec *QemuImgCodec) envelopeLogicalDigest(ctx context.Context, format str
 	return sealed.Digest(), sealed.Size(), nil
 }
 
+// ValidateHeldEnvelope checks one existing immutable envelope without decoding
+// it or granting reproduction authority. The exact held qemu-img probe enforces
+// format, virtual-size bounds, no encryption and no backing-file references.
+// Downstream inspectors must use this gate before exposing an image to an
+// appliance. The loader/library closure remains the enclosing runtime's TCB.
+func (codec *QemuImgCodec) ValidateHeldEnvelope(ctx context.Context, format string, input *heldfile.File) error {
+	if codec == nil {
+		return e.New(e.CodeEngineCapability, "disk inspection requires a pinned qemu-img codec")
+	}
+	if ctx == nil {
+		return e.New(e.CodeUsage, "validating a held envelope requires context")
+	}
+	if !validEnvelopeFormat(format) || input == nil {
+		return e.New(e.CodeEnvelopeDecode, "validating a held envelope requires a supported format and held input")
+	}
+	if err := codec.lockContext(ctx, "validating held disk envelope"); err != nil {
+		return err
+	}
+	defer codec.mu.Unlock()
+	if err := codec.requireSnapshotContext(ctx); err != nil {
+		return err
+	}
+	if err := assertHeldPreEncryption(ctx, input, "inspection subject"); err != nil {
+		return err
+	}
+	_, err := codec.probe(ctx, format, input)
+	return err
+}
+
 type qemuInfo struct {
 	Format              string `json:"format"`
 	VirtualSize         int64  `json:"virtual-size"`
 	Encrypted           bool   `json:"encrypted"`
 	BackingFilename     string `json:"backing-filename"`
 	FullBackingFilename string `json:"full-backing-filename"`
+	FormatSpecific      struct {
+		Data struct {
+			DataFile string `json:"data-file"`
+		} `json:"data"`
+	} `json:"format-specific"`
 }
 
 func (codec *QemuImgCodec) probe(ctx context.Context, format string, input *heldfile.File) (int64, error) {
@@ -242,7 +276,10 @@ func (codec *QemuImgCodec) probe(ctx context.Context, format string, input *held
 	}
 	var stdout, stderr bytes.Buffer
 	err = heldfile.RunContext(ctx, codec.executable,
-		[]string{"info", "--output=json", inputPath},
+		// QEMU opens info inputs with BDRV_O_NO_BACKING | BDRV_O_NO_IO. Never
+		// request --backing-chain: backing names are metadata to reject, not
+		// paths to open. The explicit format also prevents format autodetection.
+		[]string{"info", "-f", qemuFormat(format), "--output=json", inputPath},
 		heldfile.RunOptions{Stdout: &stdout, Stderr: &stderr}, input)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -271,6 +308,12 @@ func (codec *QemuImgCodec) probe(ctx context.Context, format string, input *held
 	if info.BackingFilename != "" || info.FullBackingFilename != "" {
 		return 0, e.New(e.CodeEnvelopeDecode,
 			"held %s envelope depends on a backing file and is not self-contained", format)
+	}
+	// QEMU's ImageInfoSpecificQCow2 reports external data-file references even
+	// under NO_IO. Reject them before a consumer opens the image for actual I/O.
+	if info.FormatSpecific.Data.DataFile != "" {
+		return 0, e.New(e.CodeEnvelopeDecode,
+			"held %s envelope depends on an external data file and is not self-contained", format)
 	}
 	return info.VirtualSize, nil
 }

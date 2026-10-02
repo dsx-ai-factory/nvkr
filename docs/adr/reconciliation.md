@@ -50,6 +50,15 @@ These outputs are non-authoritative diagnostics. The boundary and lifecycle orde
 [ARC runs on both architectures](../evidence/2026-10-01-nke-arc-os-builds.md) uploaded failed-run diagnostics,
 including the material manifest after the corrected KVM check. The subsequent ARM64 and AMD64 runs also completed
 QCOW2 collection, boot smoke and image upload. Earlier failures remain scoped to their exact candidates.
+A separate diagnostic installed-package inspector now binds held QCOW2 and exact inspector/QEMU executable
+bytes, rejects encrypted or externally dependent envelopes, and uses a private read-only libguestfs copy with
+explicit TCG execution. It rechecks the copy and held subject before returning an immutable installed-metadata
+inventory. One retained ARM64 non-FDE disk yielded 730 installed packages in the
+[local inspection evidence](../evidence/2026-10-01-nke-os-disk-inspection.md). This is not full-disk inspection or
+CycloneDX: staged package/image archives and loose files, the factory-owned material-trace handoff, complete
+acquisition records and semantic reconciliation remain absent. The enclosing loader, libraries and appliance
+remain diagnostic runtime TCB, not an authenticated production closure. Public lifecycle SBOM/publication and
+qualified admission are not enabled by this API.
 The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
 producer evidence verdict, performs content validation, or claims qualified disk reproduction. Reproduced or
 digest-verified materials cannot upgrade a future wrapped aggregate disk; its exact QCOW2 digest would identify

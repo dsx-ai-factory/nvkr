@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
 func code(err error) nkderr.Code {
@@ -109,6 +110,7 @@ func TestQualifiedCodecRejectsEncryptedBackingAndFormatConfusion(t *testing.T) {
 	for name, info := range map[string]string{
 		"encrypted": `{"format":"qcow2","virtual-size":12,"encrypted":true}`,
 		"backing":   `{"format":"qcow2","virtual-size":12,"backing-filename":"base.raw"}`,
+		"data file": `{"format":"qcow2","virtual-size":12,"format-specific":{"type":"qcow2","data":{"data-file":"external.raw"}}}`,
 		"format":    `{"format":"vmdk","virtual-size":12}`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -142,5 +144,55 @@ func TestCodecFailClosedBoundaries(t *testing.T) {
 	cancel()
 	if _, err := OpenQemuImgCodec(ctx, "qemu-img", "sha256:"+strings.Repeat("a", 64)); code(err) != nkderr.CodeTimeout {
 		t.Fatalf("canceled open code = %q (%v)", code(err), err)
+	}
+}
+
+func TestValidateHeldEnvelope(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held executable inspection is Linux-only")
+	}
+	path := filepath.Join(t.TempDir(), "disk.qcow2")
+	if err := os.WriteFile(path, []byte("hello world!"), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	input, err := heldfile.OpenContext(t.Context(), path, heldfile.Options{Label: "test envelope", MaxBytes: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer input.Close()
+	qemu, digest := fakeQemuImg(t, `{"format":"qcow2","virtual-size":12}`)
+	codec, err := OpenQemuImgCodec(t.Context(), qemu, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer codec.Close()
+	for _, tc := range []struct {
+		name   string
+		codec  *QemuImgCodec
+		format string
+		input  *heldfile.File
+		code   nkderr.Code
+	}{
+		{"valid", codec, "qcow2", input, ""},
+		{"nil codec", nil, "qcow2", input, nkderr.CodeEngineCapability},
+		{"unsupported format", codec, "raw", input, nkderr.CodeEnvelopeDecode},
+		{"missing input", codec, "qcow2", nil, nkderr.CodeEnvelopeDecode},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.codec.ValidateHeldEnvelope(t.Context(), tc.format, tc.input); code(err) != tc.code {
+				t.Fatalf("validation = %v, want %s", err, tc.code)
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := codec.ValidateHeldEnvelope(ctx, "qcow2", input); code(err) != nkderr.CodeTimeout {
+		t.Fatalf("canceled validation = %v", err)
+	}
+	if err := codec.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := codec.ValidateHeldEnvelope(t.Context(), "qcow2", input); code(err) != nkderr.CodeTrustPolicyMissing {
+		t.Fatalf("closed validation = %v", err)
 	}
 }
