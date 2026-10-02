@@ -79,6 +79,7 @@ type fakeVMDriverExecutor struct {
 	subject              string
 	err                  error
 	missing              bool
+	missingResult        bool
 	artifactOnError      bool
 	corruptMaterialClose bool
 	closeErr             error
@@ -161,6 +162,9 @@ func (artifact *fakeVMArtifactCloser) Close() error {
 func (executor *fakeVMDriverExecutor) result() (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 	if executor.err != nil || executor.missing {
 		return nil, nil, executor.err
+	}
+	if executor.missingResult {
+		return &pipeline.PackerArtifact{}, nil, nil
 	}
 	return &pipeline.PackerArtifact{}, &pipeline.ArtifactResult{}, nil
 }
@@ -531,16 +535,24 @@ func TestAdmittedVMDispatchRejectsIncompleteBoundary(t *testing.T) {
 		admission vmAdmission
 		executor  vmDriverExecutor
 		code      e.Code
+		wantText  string
 	}{
 		{name: "nil context", admission: new(fakeVMAdmission), executor: new(fakeVMDriverExecutor), code: e.CodeUsage},
 		{name: "nil admission", ctx: t.Context(), executor: new(fakeVMDriverExecutor), code: e.CodeEngineCapability},
 		{name: "nil executor", ctx: t.Context(), admission: new(fakeVMAdmission), code: e.CodeEngineCapability},
 		{name: "missing artifact", ctx: t.Context(), admission: new(fakeVMAdmission), executor: &fakeVMDriverExecutor{missing: true}, code: e.CodeVerifyFailed},
+		{name: "missing result with present artifact", ctx: t.Context(), admission: new(fakeVMAdmission), executor: &fakeVMDriverExecutor{missingResult: true}, code: e.CodeVerifyFailed, wantText: "no descriptive result"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			artifact, description, err := dispatchAdmittedVMProducer(test.ctx, test.admission, plan, node, test.executor, nil)
-			if artifact != nil || description != nil || factoryErrorCode(err) != test.code {
+			owner := localDiskRunResult(t, plan)
+			defer owner.Close()
+			artifact, description, err := dispatchAdmittedVMProducer(test.ctx, test.admission, plan, node, test.executor, owner)
+			if artifact != nil || description != nil || factoryErrorCode(err) != test.code ||
+				(test.wantText != "" && !strings.Contains(err.Error(), test.wantText)) {
 				t.Fatalf("dispatch artifact/error = %#v/%v, want %s", artifact, err, test.code)
+			}
+			if len(owner.materialConsumptions) != 0 {
+				t.Fatal("rejected dispatch retained consumption observations")
 			}
 		})
 	}

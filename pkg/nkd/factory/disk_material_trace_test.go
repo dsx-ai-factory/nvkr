@@ -551,6 +551,23 @@ func TestRecordProducerConsumptionRejectsInvalidInputs(t *testing.T) {
 		{"nil result", func(ctx context.Context, p *Plan, o *LocalRunResult, _ *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
 			return ctx, p, o, nil
 		}, e.CodeVerifyFailed},
+		{"different plan identity", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			changed := *p
+			changed.GeneratorVersion += "-different"
+			return ctx, &changed, o, r
+		}, e.CodeVerifyFailed},
+		{"invalid plan identity", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			p.SchemaVersion = ""
+			return ctx, p, o, r
+		}, e.CodeInvalidCatalog},
+		{"misbound component", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			r.Component = "other"
+			return ctx, p, o, r
+		}, e.CodeVerifyFailed},
+		{"misbound output type", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			r.OutputType = "raw"
+			return ctx, p, o, r
+		}, e.CodeVerifyFailed},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan, node := compiledPackerVMNode(t)
