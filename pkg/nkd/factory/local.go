@@ -551,6 +551,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if err := rejectUnsupportedLocalPlanRequirements(plan, "local factory execution"); err != nil {
 		return err
 	}
+	if len(plan.Environment.GitHubDispatchBranches) > 0 {
+		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubDispatchBranches")
+	}
 	if len(plan.Environment.SourceAccess) != 0 {
 		return e.New(e.CodeEngineCapability,
 			"local execution does not support Environment.sourceAccess authentication")

@@ -191,7 +191,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				"GitHub job %q timeout is %d minutes; expected %d",
 				jobID, job.TimeoutMinutes, wantTimeout)
 		}
-		if jobID == "nkd-lifecycle-run" && job.If != "${{ always() && "+githubExecutionCondition+" }}" {
+		if jobID == "nkd-lifecycle-run" && job.If != "${{ always() && "+githubDispatchCondition(plan)+" }}" {
 			return e.New(e.CodeEngineCapability, "GitHub Run finalization must follow the admitted execution event even after failure")
 		}
 		// An OIDC identity token is the credential a keyless signature is minted from.
@@ -220,7 +220,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		job, ok := document.Jobs[jobID]
 		wantCondition := ""
 		if len(catalogEnv) > 0 {
-			wantCondition = "${{ " + githubExecutionCondition + " }}"
+			wantCondition = "${{ " + githubDispatchCondition(plan) + " }}"
 		}
 		if !ok || job.RunsOn != runner || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
@@ -295,9 +295,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub container job %q does not bind its target platform", jobID)
 			}
 		}
-		wantCondition := stage.condition()
+		wantCondition := stage.condition(plan)
 		if job.If != wantCondition {
-			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on the default branch", jobID)
+			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on an admitted branch", jobID)
 		}
 		if node.Kind == NodePublish {
 			target := plan.Targets[node.Target]

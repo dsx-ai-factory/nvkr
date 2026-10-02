@@ -189,8 +189,8 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			if step.ID != "validate-catalog" && step.ID != "finalize-catalog" {
 				t.Fatalf("credential leaked to %s", step.Name)
 			}
-			if !strings.Contains(job.If, githubExecutionCondition) {
-				t.Fatal("catalog credential exposed outside default-branch dispatch")
+			if !strings.Contains(job.If, githubDispatchCondition(plan)) {
+				t.Fatal("catalog credential exposed outside admitted branch dispatch")
 			}
 			if strings.Contains(step.Run, "secrets.") {
 				t.Fatal("credential embedded in command")

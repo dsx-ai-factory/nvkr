@@ -31,6 +31,8 @@ const (
 	BuildNetworkProducerDeclared = "producer-declared"
 )
 
+var dispatchBranchPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
+
 var namePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 var containerPinPattern = regexp.MustCompile(`(?:@|^)sha256:[0-9a-f]{64}$`)
 
@@ -82,13 +84,15 @@ type APTOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
-	APIVersion       string            `json:"apiVersion"`
-	Kind             string            `json:"kind"`
-	Metadata         Metadata          `json:"metadata"`
-	RunsOn           string            `json:"runsOn,omitempty"`
-	ExecutionClasses []execution.Class `json:"executionClasses,omitempty"`
-	UtilityContainer string            `json:"utilityContainer"`
-	UtilityPlatform  string            `json:"utilityPlatform"`
+	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
+	GitHubDispatchBranches []string          `json:"githubDispatchBranches,omitempty"`
+	APIVersion             string            `json:"apiVersion"`
+	Kind                   string            `json:"kind"`
+	Metadata               Metadata          `json:"metadata"`
+	RunsOn                 string            `json:"runsOn,omitempty"`
+	ExecutionClasses       []execution.Class `json:"executionClasses,omitempty"`
+	UtilityContainer       string            `json:"utilityContainer"`
+	UtilityPlatform        string            `json:"utilityPlatform"`
 
 	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
 	Publication  *Publication            `json:"publication,omitempty"`
@@ -228,6 +232,21 @@ func (environment Environment) Validate() error {
 	}
 	if strings.ContainsAny(environment.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "environment runner contains control characters")
+	}
+	if len(environment.GitHubDispatchBranches) > 32 {
+		return e.New(e.CodeInvalidCatalog, "too many GitHub dispatch branches")
+	}
+	previousBranch := ""
+	for _, branch := range environment.GitHubDispatchBranches {
+		if !dispatchBranchPattern.MatchString(branch) || branch <= previousBranch || strings.HasPrefix(branch, "refs/") || strings.Contains(branch, "..") || strings.Contains(branch, "//") || strings.HasSuffix(branch, "/") || strings.HasSuffix(branch, ".") {
+			return e.New(e.CodeInvalidCatalog, "GitHub dispatch branches must be sorted, unique exact branch names")
+		}
+		for _, part := range strings.Split(branch, "/") {
+			if strings.HasPrefix(part, ".") || strings.HasSuffix(part, ".lock") {
+				return e.New(e.CodeInvalidCatalog, "invalid GitHub dispatch branch %q", branch)
+			}
+		}
+		previousBranch = branch
 	}
 	if err := execution.ValidateClasses(environment.ExecutionClasses); err != nil {
 		return err

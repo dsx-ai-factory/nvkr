@@ -127,11 +127,11 @@ func (stage githubStage) needs(artifacts map[string]Artifact, nodeJobs map[strin
 	return uniqueSorted(needs)
 }
 
-func (stage githubStage) condition() string {
+func (stage githubStage) condition(plan *Plan) string {
 	for _, node := range stage.Nodes {
 		if node.Kind == NodeVerify {
-			return "${{ always() && " + githubExecutionCondition + " }}"
+			return "${{ always() && " + githubDispatchCondition(plan) + " }}"
 		}
 	}
-	return "${{ " + githubExecutionCondition + " }}"
+	return "${{ " + githubDispatchCondition(plan) + " }}"
 }

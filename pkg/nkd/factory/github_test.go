@@ -203,3 +203,43 @@ func testActionRefs(t *testing.T, plan *Plan) githubActionRefs {
 	}
 	return refs
 }
+
+func TestGitHubExplicitDispatchBranchPolicy(t *testing.T) {
+	plan := githubTestPlan(t)
+	oldDigest := plan.EnvironmentDigest
+	plan.Environment.GitHubDispatchBranches = []string{"feat/release"}
+	digest, err := plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.EnvironmentDigest = digest
+	if digest == oldDigest {
+		t.Fatal("branch authority missing from Environment identity")
+	}
+	want := "github.event_name == 'workflow_dispatch' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || github.ref == 'refs/heads/feat/release')"
+	if got := githubDispatchCondition(plan); got != want {
+		t.Fatalf("unexpected branch guard: %s", got)
+	}
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	for name, job := range document.Jobs {
+		if strings.HasPrefix(name, "build-runner-") {
+			continue
+		}
+		if !strings.Contains(job.If, want) {
+			t.Fatalf("job %s lost exact dispatch policy: %s", name, job.If)
+		}
+	}
+	changed := *bundle
+	changed.Files = map[string][]byte{}
+	for name, raw := range bundle.Files {
+		changed.Files[name] = raw
+	}
+	changed.Files[GitHubWorkflowPath] = bytes.ReplaceAll(bundle.Files[GitHubWorkflowPath], []byte("refs/heads/feat/release"), []byte("refs/heads/other"))
+	changed.WorkflowDigest = pipeline.FileDigest(changed.Files[GitHubWorkflowPath])
+	assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+	assertFactoryErrorCode(t, AdmitLocal(t.Context(), plan, LocalRunOptions{}), e.CodeEngineCapability)
+}

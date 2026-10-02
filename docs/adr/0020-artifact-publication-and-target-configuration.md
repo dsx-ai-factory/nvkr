@@ -72,7 +72,7 @@ Environment may also map a canonical source URL to an HTTPS fetch mirror and a G
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
 commit/tree, or build identity. The current adapter binds credentials to the matching GitHub fetch execution step and, for private
 pin-set sources, the bootstrap regeneration and Run finalization steps that re-read pinned Git trees.
-Those jobs require default-branch dispatch. Git configuration is transient and repository-scoped. Secret values never enter a remote URL,
+Those jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18). Git configuration is transient and repository-scoped. Secret values never enter a remote URL,
 serialized plan or transported source tree. Local and GitLab execution reject this configuration until those
 adapters support equivalent credential isolation.
 

@@ -96,7 +96,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runner))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		if len(githubCatalogSourceEnvironment(plan)) > 0 {
-			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubExecutionCondition)
+			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
 		}
 		fmt.Fprintf(&body, "    steps:\n")
 		actions.writeCheckoutStep(&body)
@@ -133,7 +133,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			}
 		}
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(needs, ", "))
-		fmt.Fprintf(&body, "    if: %s\n", stage.condition())
+		fmt.Fprintf(&body, "    if: %s\n", stage.condition(plan))
 		if githubProtectedPublication(plan, node) {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
 		}
@@ -243,7 +243,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runners[0]))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
-		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubExecutionCondition)
+		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))
 		fmt.Fprintln(&body, "    steps:")
 		actions.writeCheckoutStep(&body)
 		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runners[0]), ".")
@@ -448,4 +448,17 @@ func sortedFileNames(files map[string][]byte) []string {
 func githubProtectedPublication(plan *Plan, node Node) bool {
 	return plan.Environment.Signing != nil && plan.Environment.Signing.Mode == SigningModeCosign &&
 		(node.Kind == NodePublish || signFamilyNode(node.Kind))
+}
+
+// The default branch is admitted unless an explicit Environment adds exact
+// branch refs. Tags, pull requests, wildcards and arbitrary dispatch refs stay closed.
+func githubDispatchCondition(plan *Plan) string {
+	if len(plan.Environment.GitHubDispatchBranches) == 0 {
+		return githubExecutionCondition
+	}
+	refs := []string{"github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"}
+	for _, branch := range plan.Environment.GitHubDispatchBranches {
+		refs = append(refs, "github.ref == 'refs/heads/"+branch+"'")
+	}
+	return "github.event_name == 'workflow_dispatch' && (" + strings.Join(refs, " || ") + ")"
 }

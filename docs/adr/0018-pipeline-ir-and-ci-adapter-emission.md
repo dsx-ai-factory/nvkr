@@ -434,21 +434,27 @@ Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selec
 | Fork pull request | Regeneration/schema checks; no credentials |
 | In-repository pull request | Build/package; read-only mirror credential on fetch steps only; no OIDC, push or environment access |
 | Default-branch push or manual dispatch on that ref | Publish/sign/attest/verify inside a protected environment; phase-scoped registry and OIDC credentials |
+| Explicitly allowed branch manual dispatch | Same publication lane; exact Environment allowlist, deployment policy and signing identity must admit the branch |
 | Git tag | No signing trigger |
 
-The current generated Run workflow is manual-only, and execution requires dispatch on the default branch.
+The current generated Run workflow is manual-only. Execution admits the default branch plus exact branch
+names explicitly listed in `Environment.githubDispatchBranches`. The optional list is sorted and unique;
+wildcards, tag/PR refs and expression syntax are rejected. It is bound into Environment and Plan identity,
+cloned with its owner, and enforced in source access, execution and finalization guards. Local execution
+rejects this GitHub-only option. Omitting it preserves default-branch-only execution.
 Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
 or outputs change. Default-branch push
 publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
 `nkd-release` GitHub deployment environment; operators must configure its deployment policy to admit only
-the default branch. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
+the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
+recognize those exact workflow refs. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
 The SBOM job receives no registry credentials or package permissions. The verifier needs registry read
 access and obtains no identity token. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
 finalization still run after failures within an admitted execution. The generated Run workflow does not
 start on pull requests.
 
-Identity is one committed workflow path and default ref; verification rejects PR refs. Protect workflow,
+Identity is one committed workflow path and explicitly admitted branch refs; verification rejects PR refs. Protect workflow,
 generator, helper and signing code with branch protection and code ownership. Hosted source access uses a mirror
 with vendored inputs. The renderer must reject guards it cannot express, including OIDC outside the signing job
 family or credentials in build phases. These are testable contracts; current rendering is not proof that a

@@ -1,5 +1,7 @@
 apiVersion: nkd.dev/environment/v1
 kind: Environment
+githubDispatchBranches:
+  - feat/nke-deploy-pipeline
 metadata:
   name: nke-deploy-github
 publication:
@@ -8,7 +10,7 @@ publication:
 runtime:
   runtime: docker
 signing:
-  identity: ^https://github\.com/dsx-ai-factory/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/main$
+  identity: ^https://github\.com/dsx-ai-factory/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/(main|feat/nke-deploy-pipeline)$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
 sourceAccess:

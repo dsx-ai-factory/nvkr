@@ -147,3 +147,40 @@ func TestEnvironmentBuildNetworkPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestGitHubDispatchBranchAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		branches []string
+		valid    bool
+	}{
+		{"default", nil, true}, {"exact", []string{"feat/nke-deploy-pipeline"}, true},
+		{"multiple", []string{"feat/a", "feat/b"}, true}, {"wildcard", []string{"feat/*"}, false},
+		{"expression", []string{"x' || true"}, false}, {"ref", []string{"refs/tags/v1"}, false},
+		{"duplicate", []string{"a", "a"}, false}, {"unsorted", []string{"b", "a"}, false},
+		{"dotdot", []string{"a..b"}, false}, {"lock", []string{"a.lock/b"}, false},
+		{"empty part", []string{"a//b"}, false}, {"hidden part", []string{"a/.b"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "fixture"}, UtilityContainer: "busybox@sha256:" + strings.Repeat("a", 64), UtilityPlatform: "linux/amd64", GitHubDispatchBranches: tc.branches}
+			err := env.Validate()
+			if tc.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+				cloned := env.Clone()
+				if len(tc.branches) > 0 {
+					cloned.GitHubDispatchBranches[0] = "changed"
+					if env.GitHubDispatchBranches[0] == "changed" {
+						t.Fatal("clone aliases branch policy")
+					}
+				}
+				return
+			}
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeInvalidCatalog {
+				t.Fatalf("expected coded rejection, got %v", err)
+			}
+		})
+	}
+}
