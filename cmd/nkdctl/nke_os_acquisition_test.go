@@ -210,14 +210,16 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 				"agent/go.mod":  pinnedMod,
 				"agent/go.sum":  pinned,
 				"agent/main.go": "package agent\nimport \"" + module + "\"\nvar Value = material.Value\n",
-				"go-env":        "GOFLAGS=-mod=bogus\n",
+				// Empty process GOPRIVATE falls through to this file unless the
+				// authored GOENV=off prevents Go from bypassing the fixture proxy.
+				"go-env": "GOPRIVATE=github.com/nkd-fixture\n",
 				// Pin checks must not depend on Git's checkout ownership rules.
 				"bin/git": "#!/bin/sh\necho 'unexpected Git call during acquisition' >&2\nexit 94\n",
 				// The host may not have timeout (macOS). Assert its exact argv
 				// here; bound all real fixture Go commands with the test context.
 				"bin/timeout": `#!/bin/sh
 printf '%s\n' "$*" >>"$TIMEOUT_CALLS"
-test "$GOENV" = off && test "$GOWORK" = off && test "$GOTOOLCHAIN" = local && test -z "$GOFLAGS" || exit 99
+test "$GOWORK" = off && test "$GOTOOLCHAIN" = local && test -z "$GOFLAGS" || exit 99
 shift 2
 phase=$3
 if test "$phase" != download; then test "$GOPROXY" = off || exit 98; fi
