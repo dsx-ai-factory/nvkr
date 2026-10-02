@@ -213,6 +213,11 @@ func TestDiskMaterialTraceRetainsActualTransitiveConsumption(t *testing.T) {
 		description.Edges[0].Producer != "pull-runtime" {
 		t.Fatalf("unordered or flattened trace = %#v", description)
 	}
+	for index, want := range []diskMaterialProduction{diskMaterialProductionBuilt, diskMaterialProductionBuilt, diskMaterialProductionAcquired} {
+		if got := description.Members[index].Production; got != want {
+			t.Fatalf("member %q production = %q, want %q", description.Members[index].Producer, got, want)
+		}
+	}
 	wantEdges := []diskMaterialEdge{
 		{Consumer: "build-agent", Binding: "runtime", Producer: "pull-runtime", ManifestDigest: owner.materialConsumptions["node-image/build-agent"].manifestDigest},
 		{Consumer: "build-image", Binding: "a-agent", Producer: "build-agent", ManifestDigest: owner.materialConsumptions["node-image/build-image"].manifestDigest},
@@ -396,7 +401,8 @@ func TestVMDispatchRetainsZeroMaterialConsumption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := trace.Description(); len(got.Members) != 1 || len(got.Edges) != 0 {
+	if got := trace.Description(); len(got.Members) != 1 || len(got.Edges) != 0 ||
+		got.Coverage != diskMaterialCoverageStagedOutputs || got.Members[0].Production != diskMaterialProductionBuilt {
 		t.Fatalf("zero-material trace = %#v", got)
 	}
 }

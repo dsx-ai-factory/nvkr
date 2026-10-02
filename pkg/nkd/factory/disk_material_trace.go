@@ -10,10 +10,22 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
+// diskMaterialCoverage describes the inventory scope, not an evidence lane.
+type diskMaterialCoverage string
+
 // diskMaterialCoverageStagedOutputs is deliberately narrower than complete
 // acquisition coverage. Neither private source vendoring nor downloads made by
-// a network-enabled producer or its guest are inventoried by these receipts.
-const diskMaterialCoverageStagedOutputs = "staged-producer-outputs"
+// a network-enabled producer or its guest are inventoried by these observations.
+const diskMaterialCoverageStagedOutputs diskMaterialCoverage = "staged-producer-outputs"
+
+// diskMaterialProduction describes how the observed output was supplied, without
+// exposing the IR's execution-node vocabulary to the trace's consumers.
+type diskMaterialProduction string
+
+const (
+	diskMaterialProductionBuilt    diskMaterialProduction = "built"
+	diskMaterialProductionAcquired diskMaterialProduction = "acquired"
+)
 
 // producerConsumption is retained only by a live local Run after an actual
 // producer invocation succeeds. The material observations come from the held
@@ -35,7 +47,7 @@ type diskMaterialMember struct {
 	Producer   string
 	Component  string
 	Kind       string
-	Production string
+	Production diskMaterialProduction
 	Digest     string
 	Size       int64
 }
@@ -58,7 +70,7 @@ type diskMaterialTraceDescription struct {
 	Subject    DiskPayloadObservation
 	Members    []diskMaterialMember
 	Edges      []diskMaterialEdge
-	Coverage   string
+	Coverage   diskMaterialCoverage
 	// Only build invocations are listed. Source-fetch vendoring and guest
 	// acquisitions are outside this staged-output trace even when this is empty.
 	UntracedNetworkBuilds []string
@@ -236,9 +248,18 @@ func (owner *LocalRunResult) observeDiskMaterials(ctx context.Context, plan *Pla
 		if seen[id] {
 			return nil
 		}
+		var production diskMaterialProduction
+		switch node.Kind {
+		case ir.KindBuild:
+			production = diskMaterialProductionBuilt
+		case ir.KindPull:
+			production = diskMaterialProductionAcquired
+		default:
+			return e.New(e.CodeVerifyFailed, "disk material producer %q has unsupported production kind %q", id, node.Kind)
+		}
 		seen[id] = true
 		description.Members = append(description.Members, diskMaterialMember{Producer: id, Component: node.Component,
-			Kind: node.OutputType, Production: node.Kind, Digest: receipt.digest, Size: receipt.size})
+			Kind: node.OutputType, Production: production, Digest: receipt.digest, Size: receipt.size})
 		if node.Kind == ir.KindBuild && node.Network != ir.NetworkNone {
 			description.UntracedNetworkBuilds = append(description.UntracedNetworkBuilds, id)
 		}
