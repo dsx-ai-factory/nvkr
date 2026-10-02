@@ -55,7 +55,7 @@ func acquiredChartBytes(t *testing.T, invalid bool) []byte {
 	return b.Bytes()
 }
 
-func acquiredHelmPlan(t *testing.T, body []byte, oci bool) *Plan {
+func acquiredHelmPlan(t *testing.T, body []byte, oci bool, inspect ...bool) *Plan {
 	t.Helper()
 	digest := pipeline.FileDigest(body)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,6 +88,16 @@ func acquiredHelmPlan(t *testing.T, body []byte, oci bool) *Plan {
 	}
 	definition := authored.Definition{APIVersion: authored.DefinitionAPIVersion, Kind: authored.DefinitionKind, Metadata: authored.Metadata{Name: "acquired-helm"}, Catalog: authored.Catalog{Base: "catalog"}, Outputs: []authored.DefinitionOutput{{Name: "charts", Platform: "linux/amd64", Format: authored.OutputHelm, Components: []string{"chart"}}}}
 	environment := authored.Environment{APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind, Metadata: authored.Metadata{Name: "local"}, UtilityContainer: fixtureUtilityContainer, UtilityPlatform: "linux/amd64"}
+	if len(inspect) > 0 && inspect[0] {
+		// The chart reader never executes Syft. The exact tool selection remains a
+		// graph dependency; this fixture tests the metadata inspection path offline.
+		stack.Catalog.Tools = map[string]catalog.ToolPin{"syft": {Format: "raw", URL: "https://example.com/syft", Platform: "linux/amd64", ExecutablePath: "syft", ArchiveDigest: digest, ExecutableDigest: digest}}
+		stack, err = catalog.ApplyStack(stack.Catalog)
+		if err != nil {
+			t.Fatal(err)
+		}
+		definition.SBOMTool = "syft"
+	}
 	plan, err := Compile(t.Context(), definition, environment, stack, "test")
 	if err != nil {
 		t.Fatal(err)
@@ -296,4 +306,73 @@ func TestAcquiredHelmCompilerAndTransportAdmission(t *testing.T) {
 		err := validatePackageInputs(packageSpec{Kind: PackageHelm, HelmImage: testHelmBinding("image", "demo")}, []string{"chart", "image"}, artifacts)
 		assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
 	})
+}
+
+func TestAcquiredHelmDependencyEvidence(t *testing.T) {
+	for _, oci := range []bool{false, true} {
+		t.Run(map[bool]string{false: "HTTPS", true: "OCI"}[oci], func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			body := acquiredChartBytes(t, false)
+			plan := acquiredHelmPlan(t, body, oci, true)
+			for _, node := range topologicalFactoryNodes(plan.Graph) {
+				if node.ID == "tool/syft" {
+					continue
+				} // Helm inspection uses the internal metadata reader.
+				if err := ExecuteNode(t.Context(), plan, node.ID, io.Discard, io.Discard); err != nil {
+					t.Fatalf("%s: %v", node.ID, err)
+				}
+			}
+			_, artifacts := planIndex(plan)
+			for _, artifact := range artifacts {
+				if artifact.Kind != "sbom-set" {
+					continue
+				}
+				objects, err := sbomPublicationObjects(t.Context(), plan, artifact, artifacts, func(p string) (string, error) { return p, nil })
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(objects) != 2 {
+					t.Fatalf("expected index and dependency SBOM, got %d", len(objects))
+				}
+				var bom sbom.BOM
+				if err := canonical.UnmarshalExact(bytes.TrimSpace(objects[1].Bytes), &bom); err != nil {
+					t.Fatal(err)
+				}
+				if len(bom.Components) != 1 || bom.Components[0].Name != "demo" || "sha256:"+bom.Metadata.Component.Hashes[0].Content != pipeline.FileDigest(body) {
+					t.Fatalf("wrong acquired chart inventory: %+v", bom)
+				}
+				return
+			}
+			t.Fatal("no SBOM produced")
+		})
+	}
+}
+
+func TestRawSBOMRequiresExactAcquiredHelmSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Plan, *Artifact)
+	}{
+		{"valid", func(*Plan, *Artifact) {}},
+		{"different output", func(_ *Plan, a *Artifact) { a.BuildTarget = "other" }},
+		{"different component", func(_ *Plan, a *Artifact) { a.Component = "other" }},
+		{"different producer", func(_ *Plan, a *Artifact) { a.Producer = "other" }},
+		{"raw image", func(p *Plan, _ *Artifact) { p.Definition.Outputs[0].Format = authored.OutputOCI }},
+		{"source build", func(p *Plan, _ *Artifact) { p.Builds[0].ResolvedComponents[0].FromSource = true }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := acquiredHelmPlan(t, acquiredChartBytes(t, false), false)
+			_, a := planIndex(p)
+			payload := a["artifact/charts/chart"]
+			tc.mutate(p, &payload)
+			kind, err := p.sbomPayloadKind(payload)
+			if tc.name == "valid" {
+				if err != nil || kind != "tarball" {
+					t.Fatalf("%q: %v", kind, err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			}
+		})
+	}
 }

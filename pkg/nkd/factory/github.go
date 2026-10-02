@@ -95,12 +95,14 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle("Prepare NKD runner ("+runner+")"))
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runner))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
+		if len(githubCatalogSourceEnvironment(plan)) > 0 {
+			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubExecutionCondition)
+		}
 		fmt.Fprintf(&body, "    steps:\n")
 		actions.writeCheckoutStep(&body)
 		actions.writeSetupGoStep(&body)
 		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: CGO_ENABLED=0 go build -trimpath -ldflags %s -o nkd-exec ./cmd/nkdctl\n", shellQuote(linkerFlags))
-		fmt.Fprintf(&body, "      - name: Verify committed Run generation is current\n        run: %s\n",
-			generationCommand(plan, EngineGitHub))
+		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", generationCommand(plan, EngineGitHub))
 		actions.writeUploadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runner), "nkd-exec")
 	}
 	for _, stage := range stages {
@@ -249,8 +251,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if err := writeGitHubFinalizerRestoreSteps(&body, plan, nodeJobs); err != nil {
 			return nil, err
 		}
-		fmt.Fprintf(&body, "      - name: Finalize Run and check completeness\n        run: ./nkd-exec run finalize --definition %s --environment %s --plan %s --attempt \"${{ github.run_id }}-${{ github.run_attempt }}\" --workspace .nkd/factory --out .nkd/run.json\n",
-			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(FactoryPlanPath))
+		writeCatalogValidationStep(&body, plan, "Finalize Run and check completeness", "finalize-catalog", fmt.Sprintf("./nkd-exec run finalize --definition %s --environment %s --plan %s --attempt \"${{ github.run_id }}-${{ github.run_attempt }}\" --workspace .nkd/factory --out .nkd/run.json",
+			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(FactoryPlanPath)))
 		fmt.Fprintf(&body, "      - name: Upload final Run record\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nkd-lifecycle-run\n          path: .nkd/run.json\n          if-no-files-found: error\n", actions.Upload)
 	}
 	workflow := body.Bytes()

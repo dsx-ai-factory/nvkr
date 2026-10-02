@@ -153,11 +153,13 @@ isolated. The report is projected into deterministic component names, versions a
 records, temporary paths, timestamps and scanner-generated IDs are excluded. Scanner executable identity is
 recorded separately. Unknown versions remain unknown; they are never filled from unrelated module tags.
 
-For Helm source archives, a generic manifest reader inventories bundled `Chart.yaml` declarations and chart
+For Helm source archives and exact acquired archives selected as Helm outputs, a generic manifest reader inventories bundled `Chart.yaml` declarations and chart
 dependency declarations/locks. It never executes
 installation scripts or fetches external charts. Bundled charts and locked references are
 distinguished; a locked reference does not establish the referenced chart's transitive contents. These
-documents describe the observed source archive before image-binding/package transformations.
+documents describe the observed archive before image-binding/package transformations. Raw artifacts
+are admitted to this reader only when the compiled output, acquisition producer, and resolved component
+all identify the same acquired Helm chart; other raw formats remain unsupported.
 
 Per-artifact documents keep the subject in `metadata.component` and use `components` for discovered packages
 or declared chart dependencies. Stable `bom-ref` values distinguish versions with the same name. Root dependency

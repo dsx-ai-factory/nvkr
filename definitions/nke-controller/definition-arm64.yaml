@@ -20,4 +20,7 @@ outputs:
   components:
   - nke-controller-chart
   format: helm-oci
+  helm:
+    images:
+      controller: nke-controller-arm64
   platform: linux/arm64

@@ -327,7 +327,26 @@ jobs:
           go-version-file: .go-version
           cache: true
 
+      # Catalog validation re-reads the pinned NKE tree. Acquire it with a
+      # fixed action before running checkout code; never pass this token to
+      # the generator or persist credentials. Forks fail closed without source
+      # access; do not use pull_request_target to bypass that boundary.
+      - name: Fetch private NKE validation inputs
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nke
+          ref: 33fb71b2f4224b470ebc628a9165fc4b92870406 # v0.21.0
+          fetch-depth: 0
+          path: .nkd-inputs/nke
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
+          persist-credentials: false
+
       - name: Verify committed Run generation is current
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nkd-inputs/nke/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/dsx-ai-factory/nke
         run: make workflows-check
 
   workflows-regen-skip:

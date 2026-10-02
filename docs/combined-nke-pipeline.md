@@ -1,6 +1,9 @@
 # Combined NKE pipeline
 
-One maintained Definition builds the NKE CLI, complete upstream CWE runtime image and controller Helm chart
+The committed workflow now uses the [NKE v0.21.0 deploy Definition](nke-deploy-pipeline.md).
+This guide describes the retained three-output alternative and its earlier evidence.
+
+The `nke-v1` Definition builds the NKE CLI, complete upstream CWE runtime image and controller Helm chart
 from independently pinned NKE CLI and controller tags. The generated workflow observes all three outputs,
 publishes one release index to GHCR, signs and verifies that entry point and each deliverable manifest, and finalizes a Run only after its
 required checks pass. The [single-entry layout](publication-architecture.md) has been rehearsed locally with

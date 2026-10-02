@@ -112,7 +112,11 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			for _, inputID := range node.Inputs {
 				input := artifacts[inputID]
 				if input.Component == entry.Artifact && input.Kind != "producer-result" {
-					kind = input.Kind
+					var err error
+					kind, err = plan.sbomPayloadKind(input)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 			if (kind == "tarball" && method != "helm-manifests/v1") || (kind != "tarball" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.Definition.SBOMTool))) {

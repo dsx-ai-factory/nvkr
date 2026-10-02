@@ -454,7 +454,7 @@ registration transport must consume accepted artifact references without adding 
 
 | Interface | Producer → consumer | Contract and failure boundary |
 |---|---|---|
-| Git/source transport | Upstream or mirror → fetch step | Retrieve pinned source and check commit/tree before build; credentials limited to fetching |
+| Git/source transport | Upstream or mirror → source fetch or pin-set revalidation step | Retrieve pinned Git trees and check commit/tree; repository-scoped credentials limited to source retrieval and pin-set revalidation |
 | Container runtime | Helper → pinned toolchain container | Apply declared platform/network/privilege; qualified execution additionally requires runtime receipts |
 | CI artifact transport | Producer job → dependent job | Carry declared artifact edges; graph admission and identity checks remain NKD responsibilities |
 | OCI distribution | Packager/publisher ↔ registry | Content selected by digest; layout/manifest integrity checked; remote failure cannot imply successful publication |

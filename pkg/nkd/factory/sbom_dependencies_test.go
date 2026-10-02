@@ -22,7 +22,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 	}{
 		{"complete", "", ""},
 		{"missing scanner", "tool/syft", e.CodeEngineCapability},
-		{"missing payload", "artifact/cwe/cwe", e.CodeProvenanceMissing},
+		{"missing payload", "artifact/cwe/nke-controller", e.CodeProvenanceMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")

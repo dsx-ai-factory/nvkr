@@ -82,6 +82,10 @@ packaging contract. A new complete build/publication using this source chart rem
 
 ## Generate hosted CI
 
+The repository now commits the [NKE v0.21.0 deploy pipeline](../../docs/nke-deploy-pipeline.md).
+The commands below replace it with this older three-output Definition; use a separate checkout
+when exploring this alternative.
+
 ```sh
 nkdctl run generate \
   --definition definitions/nke-v1/definition.yaml \

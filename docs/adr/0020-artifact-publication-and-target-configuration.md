@@ -70,8 +70,9 @@ identity; evidence tools affect catalog/plan/evidence identity without changing 
 
 Environment may also map a canonical source URL to an HTTPS fetch mirror and a GitHub secret reference
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
-commit/tree, or build identity. The current adapter binds the credential only to the matching GitHub fetch
-execution step using transient, repository-scoped Git configuration. Secret values never enter a remote URL,
+commit/tree, or build identity. The current adapter binds credentials to the matching GitHub fetch execution step and, for private
+pin-set sources, the bootstrap regeneration and Run finalization steps that re-read pinned Git trees.
+Those jobs require default-branch dispatch. Git configuration is transient and repository-scoped. Secret values never enter a remote URL,
 serialized plan or transported source tree. Local and GitLab execution reject this configuration until those
 adapters support equivalent credential isolation.
 

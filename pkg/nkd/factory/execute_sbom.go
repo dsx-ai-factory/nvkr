@@ -89,7 +89,11 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			if payload.ID == "" {
 				return e.New(e.CodeProvenanceMissing, "missing SBOM payload for %q", entry.Artifact)
 			}
-			inventory, err := sbom.InspectDependencies(ctx, payload.Path, entry.ArtifactSHA, payload.Kind, scanner)
+			kind, err := plan.sbomPayloadKind(payload)
+			if err != nil {
+				return err
+			}
+			inventory, err := sbom.InspectDependencies(ctx, payload.Path, entry.ArtifactSHA, kind, scanner)
 			if err != nil {
 				return err
 			}
@@ -172,7 +176,11 @@ func (plan *Plan) validateSBOMGraph() error {
 			for _, candidateID := range node.Inputs {
 				candidate := artifacts[candidateID]
 				if candidate.Component == result.Component && candidate.BuildTarget == node.BuildTarget && candidate.Kind != "producer-result" {
-					if candidate.Kind != "host-package" && candidate.Kind != "oci-image" && candidate.Kind != "tarball" {
+					kind, err := plan.sbomPayloadKind(candidate)
+					if err != nil {
+						return err
+					}
+					if kind != "host-package" && kind != "oci-image" && kind != "tarball" {
 						return e.New(e.CodeEngineCapability, "SBOM dependency inspection does not support %q", candidate.Kind)
 					}
 					matches++
@@ -250,4 +258,35 @@ func readProducerResult(ctx context.Context, path string) (pipeline.ArtifactResu
 		return pipeline.ArtifactResult{}, e.Wrap(e.CodePipelineDrift, err, "decoding producer result %s", path)
 	}
 	return result, nil
+}
+
+// sbomPayloadKind admits raw bytes to the Helm metadata reader only when the
+// complete plan selects that exact acquired component as a Helm output.
+func (plan *Plan) sbomPayloadKind(payload Artifact) (string, error) {
+	if payload.Kind != "raw" {
+		return payload.Kind, nil
+	}
+	selected := false
+	for _, output := range plan.Definition.Outputs {
+		if output.Name == payload.BuildTarget && output.Format == authored.OutputHelm && len(output.Components) == 1 && output.Components[0] == payload.Component {
+			selected = true
+		}
+	}
+	acquired := false
+	for _, node := range plan.Graph.Nodes {
+		if node.ID == payload.Producer && node.Kind == NodeAcquire && node.BuildTarget == payload.BuildTarget && containsString(node.Outputs, payload.ID) {
+			acquired = true
+		}
+	}
+	for _, build := range plan.Builds {
+		if build.Name != payload.BuildTarget {
+			continue
+		}
+		for _, component := range build.ResolvedComponents {
+			if selected && acquired && component.Name == payload.Component && !component.FromSource && component.Prebuilt != nil && component.OutputType == "raw" {
+				return "tarball", nil
+			}
+		}
+	}
+	return "", e.New(e.CodeEngineCapability, "raw SBOM payload %q is not an acquired Helm output", payload.ID)
 }

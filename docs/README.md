@@ -2,6 +2,7 @@
 
 | Need | Read |
 |---|---|
+| Build the NKE v0.21.0 deploy release | [NKE deploy pipeline](nke-deploy-pipeline.md) |
 | Derive several pins from one upstream version file | [Generic pin-set example](generic-pin-set-example.md) |
 | Use Definition → Run → Release | [Lifecycle guide](lifecycle.md) |
 | Choose and run a demo | [Demo index](../scripts/README.md) |

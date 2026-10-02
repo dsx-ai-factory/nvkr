@@ -102,9 +102,9 @@ func TestMaintainedWorkflowMakesImageBindingVisible(t *testing.T) {
 			if step.Name == "" {
 				t.Errorf("unnamed step in %s", job.Name)
 			}
-			if step.ID == githubJobID("package/nke-helm") {
+			if step.ID == githubJobID("package/controller-chart") {
 				found = true
-				if !strings.Contains(job.Name, "Helm image binding") || step.Name != "Bind image digest and package Helm: nke-helm" {
+				if !strings.Contains(job.Name, "Helm image binding") || step.Name != "Bind image digest and package Helm: controller-chart" {
 					t.Fatalf("binding hidden: %s / %s", job.Name, step.Name)
 				}
 			}
