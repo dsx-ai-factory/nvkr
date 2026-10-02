@@ -2,6 +2,8 @@ package factory
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,8 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	"github.com/google/go-containerregistry/pkg/name"
+	"go.yaml.in/yaml/v3"
 )
 
 // This opt-in integration test uses real produced inputs and a local Helm binary.
@@ -44,13 +48,88 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	}
 	chart := tree
 	for _, repository := range []string{"ghcr.io/nvidia/nke-recipes/cwe", "mirror.example.test/cwe"} {
-		raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart, "--set-string", "image.repository="+repository).CombinedOutput()
+		raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart, "--set-string", "image.repository="+repository, "--set-string", "nameOverride=nkd-binding-controller", "--set-string", "nodeAgent.spireAttestationMethod=tpm").CombinedOutput()
 		if err != nil {
 			t.Fatalf("Helm render: %v\n%s", err, raw)
 		}
-		if !strings.Contains(string(raw), "@"+image.ManifestDigest) || strings.Contains(string(raw), "nke-controller:0.0.0-dev") {
-			t.Fatalf("rendered image does not bind produced digest: %s", raw)
+		if err := verifyRenderedControllerImage(raw, repository, image.ManifestDigest); err != nil {
+			t.Fatal(err)
 		}
 	}
 	t.Logf("rendered source chart with produced image digest %s", image.ManifestDigest)
+}
+
+// verifyRenderedControllerImage checks the selected container, not unrelated YAML fields.
+func verifyRenderedControllerImage(raw []byte, repository, digest string) error {
+	decoder := yaml.NewDecoder(strings.NewReader(string(raw)))
+	count := 0
+	for {
+		var workload struct {
+			Kind string `yaml:"kind"`
+			Spec struct {
+				Template struct {
+					Spec struct {
+						Containers []struct {
+							Name  string `yaml:"name"`
+							Image string `yaml:"image"`
+						} `yaml:"containers"`
+					} `yaml:"spec"`
+				} `yaml:"template"`
+			} `yaml:"spec"`
+		}
+		err := decoder.Decode(&workload)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("decode rendered workload: %w", err)
+		}
+		if workload.Kind != "Deployment" {
+			continue
+		}
+		for _, container := range workload.Spec.Template.Spec.Containers {
+			if container.Name != "nkd-binding-controller" {
+				continue
+			}
+			count++
+			ref, err := name.NewDigest(container.Image, name.StrictValidation)
+			if err != nil {
+				return fmt.Errorf("controller image is not digest-pinned: %q: %w", container.Image, err)
+			}
+			if ref.Context().Name() != repository || ref.DigestStr() != digest {
+				return fmt.Errorf("controller image %q does not match %s@%s", container.Image, repository, digest)
+			}
+		}
+	}
+	if count != 1 {
+		return fmt.Errorf("found %d controller containers, want exactly one", count)
+	}
+	return nil
+}
+
+func TestRenderedControllerImage(t *testing.T) {
+	repository := "registry.example.test/nke/cwe"
+	digest := "sha256:" + strings.Repeat("a", 64)
+	fixture := func(image string) string {
+		return fmt.Sprintf("apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  annotations:\n    expected: '%s@%s'\nspec:\n  template:\n    spec:\n      containers:\n      - name: nkd-binding-controller\n        image: %s\n", repository, digest, image)
+	}
+	for _, tc := range []struct {
+		name, raw string
+		valid     bool
+	}{
+		{"tag and digest", fixture(repository + ":dev@" + digest), true},
+		{"digest only", fixture(repository + "@" + digest), true},
+		{"digest only in annotation", fixture(repository + ":dev"), false},
+		{"wrong repository", fixture("other.example.test/cwe@" + digest), false},
+		{"wrong digest", fixture(repository + "@sha256:" + strings.Repeat("b", 64)), false},
+		{"missing controller", strings.ReplaceAll(fixture(repository+"@"+digest), "nkd-binding-controller", "sidecar"), false},
+		{"ambiguous controller", fixture(repository+"@"+digest) + "---\n" + fixture(repository+"@"+digest), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := verifyRenderedControllerImage([]byte(tc.raw), repository, digest)
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%t, error=%v", tc.valid, err)
+			}
+		})
+	}
 }

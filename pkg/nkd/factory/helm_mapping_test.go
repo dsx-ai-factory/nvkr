@@ -219,12 +219,12 @@ func TestNKEDeclarativeBindingWithHelm(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, repository := range []string{"registry.operator-a.test/nke/cwe", "mirror.operator-b.test/platform/cwe"} {
-		out, err := exec.CommandContext(t.Context(), helm, "template", "controller", chart, "--set-string", "nodeAgent.spireAttestationMethod=tpm", "--set-string", "image.repository="+repository).CombinedOutput()
+		out, err := exec.CommandContext(t.Context(), helm, "template", "controller", chart, "--set-string", "nodeAgent.spireAttestationMethod=tpm", "--set-string", "image.repository="+repository, "--set-string", "nameOverride=nkd-binding-controller").CombinedOutput()
 		if err != nil {
 			t.Fatalf("rendering pinned NKE chart: %v\n%s", err, out)
 		}
-		if !strings.Contains(string(out), repository+":") || !strings.Contains(string(out), "@"+digest) {
-			t.Fatal("NKE controller image was not digest bound")
+		if err := verifyRenderedControllerImage(out, repository, digest); err != nil {
+			t.Fatal(err)
 		}
 	}
 	after, err := digestFactoryPath(t.Context(), chart)

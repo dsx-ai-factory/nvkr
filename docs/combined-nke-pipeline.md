@@ -32,8 +32,9 @@ the producer archive. Publication preserves the runnable image manifest and cons
 
 The maintained Helm producer archives `controller/deploy/charts/controller` at `controller/v0.1.1-rc.9`,
 with sorted names, fixed timestamps and numeric ownership. `helm.images: {controller: cwe}` creates an
-explicit package dependency. Packaging writes the verified image manifest digest to `image.digest` and
-refreshes checksums; templates and other values remain unchanged. Operators supply the image repository
+explicit package dependency. Packaging writes the verified image manifest digest to `image.digest`.
+Root charts preserve upstream checksum files; nested wrappers refresh binder-owned checksums outside
+the chart. Templates and other values remain unchanged. Operators supply the image repository
 at deployment. Helm digest overrides remain possible. Historical runs below used the older quickstart
 wrapper and template-rewriting behavior; they do not validate these updated inputs.
 See the [Definition README](../definitions/nke-v1/README.md) for generation and consumption commands.

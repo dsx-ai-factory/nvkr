@@ -31,7 +31,8 @@ helm:
         digest: image.digest
 ```
 
-NKD writes the verified CWE image digest to `image.digest` and refreshes checksums. Templates, repository
+NKD writes the verified CWE image digest to `image.digest`. For root charts, upstream checksum files
+are preserved; nested wrappers refresh binder-owned checksums outside the chart. Templates, repository
 and tag defaults stay unchanged. Unknown or unbound slots and missing or ambiguous value paths fail.
 
 ## Registry choice

@@ -65,8 +65,9 @@ SBOMs emitted by earlier runs; existing signed publications are not modified.
 
 The producer packages `controller/deploy/charts/controller` from the pinned controller source. The Definition
 binds its `controller` image slot to `cwe`; the catalog maps that slot to `image.digest`. Packaging writes the
-verified native image manifest digest into `values.yaml` and refreshes checksums. Templates and other values
-remain unchanged. This chart must already support digest-based image selection.
+verified native image manifest digest into `values.yaml`. Root charts preserve upstream checksum files;
+nested wrappers refresh binder-owned checksums outside the chart. Templates and other values remain
+unchanged. This chart must already support digest-based image selection.
 
 After verifying and extracting the Release, supply the repository containing its CWE image:
 
