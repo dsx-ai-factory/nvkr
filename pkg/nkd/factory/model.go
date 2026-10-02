@@ -98,6 +98,13 @@ type HelmImageBinding struct {
 	Chart string `json:"chart"`
 }
 
+// HelmValueOverride is one rendered values.yaml override, bound to the Environment
+// it was rendered against. Overrides are sorted by Path.
+type HelmValueOverride struct {
+	Path  string `json:"path"`
+	Value string `json:"value"`
+}
+
 type Target struct {
 	Kind          string `json:"kind"`
 	Ref           string `json:"ref"`
@@ -183,26 +190,27 @@ type ArtifactGraph struct {
 }
 
 type Node struct {
-	HelmImage        *HelmImageBinding `json:"helmImage,omitempty"`
-	ID               string            `json:"id"`
-	Kind             string            `json:"kind"`
-	BuildTarget      string            `json:"buildTarget,omitempty"`
-	IRNode           string            `json:"irNode,omitempty"`
-	PackageKind      string            `json:"packageKind,omitempty"`
-	Distribution     string            `json:"distribution,omitempty"`
-	PackageComponent string            `json:"packageComponent,omitempty"`
-	Target           string            `json:"target,omitempty"`
-	RunsOn           string            `json:"runsOn,omitempty"`
-	Network          string            `json:"network,omitempty"`
-	Container        string            `json:"container,omitempty"`
-	Platform         string            `json:"platform,omitempty"`
-	URL              string            `json:"url,omitempty"`
-	Digest           string            `json:"digest,omitempty"`
-	Executable       string            `json:"executable,omitempty"`
-	ExecutableDigest string            `json:"executableDigest,omitempty"`
-	ToolFormat       string            `json:"toolFormat,omitempty"`
-	Inputs           []string          `json:"inputs,omitempty"`
-	Outputs          []string          `json:"outputs,omitempty"`
+	HelmImage        *HelmImageBinding   `json:"helmImage,omitempty"`
+	HelmValues       []HelmValueOverride `json:"helmValues,omitempty"`
+	ID               string              `json:"id"`
+	Kind             string              `json:"kind"`
+	BuildTarget      string              `json:"buildTarget,omitempty"`
+	IRNode           string              `json:"irNode,omitempty"`
+	PackageKind      string              `json:"packageKind,omitempty"`
+	Distribution     string              `json:"distribution,omitempty"`
+	PackageComponent string              `json:"packageComponent,omitempty"`
+	Target           string              `json:"target,omitempty"`
+	RunsOn           string              `json:"runsOn,omitempty"`
+	Network          string              `json:"network,omitempty"`
+	Container        string              `json:"container,omitempty"`
+	Platform         string              `json:"platform,omitempty"`
+	URL              string              `json:"url,omitempty"`
+	Digest           string              `json:"digest,omitempty"`
+	Executable       string              `json:"executable,omitempty"`
+	ExecutableDigest string              `json:"executableDigest,omitempty"`
+	ToolFormat       string              `json:"toolFormat,omitempty"`
+	Inputs           []string            `json:"inputs,omitempty"`
+	Outputs          []string            `json:"outputs,omitempty"`
 
 	Requirements     *execution.Requirements `json:"requirements,omitempty"`
 	ExecutionBinding *execution.Binding      `json:"executionBinding,omitempty"`

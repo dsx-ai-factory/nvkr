@@ -236,6 +236,16 @@ requires a plain rendered `templates/controller.yaml` and an image values mappin
 pre-existing templates. Other chart shapes require a separate adapter. This does not establish external chart
 dependency availability or successful deployment.
 
+A source-built chart component may declare `helm.values` in the source registry: dotted `path` entries, each overriding
+one existing scalar in the chart's `values.yaml` with a Go template rendered at compile against a closed context
+(`Environment.Name`, `Environment.Publication.RepositoryPrefix` when the Environment publishes, `Arch`, `Platform`,
+`Output`). A missing field, unknown path, missing parent mapping, mapping-valued target, duplicate path or a source
+that is not a from-source tarball is a coded error before output; image-bound charts additionally reject `image.digest`
+and `image.tag`. Rendered overrides are recorded on the package node in sorted order, so the Plan and lifecycle
+reproduction cover them. The chart payload is therefore Environment-bound: the same Definition under two Environments
+publishes different chart bytes, while the producer Build Digest, which excludes packaging, is unchanged. Acquired
+charts accept no overrides. This is contract-tested only; no hosted Run has exercised it.
+
 A Helm output may instead select one acquired `raw` chart package. The compiler requires an acquisition
 producer and transports its result explicitly. Packaging checks the result and a bounded, no-follow held
 snapshot against the pinned pull digest, validates the chart archive, and wraps the exact compressed bytes

@@ -36,7 +36,7 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	}
 	defer cleanup()
 	tree := filepath.Join(root, relative)
-	if err := bindHelmImage(ctx, tree, "007-controller", image.ManifestDigest); err != nil {
+	if err := bindHelmImage(ctx, tree, "007-controller", image.ManifestDigest, nil); err != nil {
 		t.Fatal(err)
 	}
 	checksums, err := os.ReadFile(filepath.Join(tree, "checksums.txt"))

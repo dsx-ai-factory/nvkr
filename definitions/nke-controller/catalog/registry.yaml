@@ -14,6 +14,10 @@ components:
     platforms:
     - linux/amd64
     - linux/arm64
+    helm:
+      values:
+      - path: image.repository
+        value: '{{.Environment.Publication.RepositoryPrefix}}/nke-controller-{{.Arch}}'
   nke-controller:
     fromSource: true
     source: nke

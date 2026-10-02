@@ -261,8 +261,27 @@ type Component struct {
 	// Digests is copied from the lock-pinned per-arch artifact entry.
 	Prebuilt *Prebuilt `json:"prebuilt,omitempty"`
 
+	// Helm declares values.yaml overrides applied when a Helm output packages this
+	// chart. Templates are rendered at compile against the selected Environment, so
+	// the packaged chart bytes are Environment-bound.
+	Helm *HelmSpec `json:"helm,omitempty"`
+
 	// exclusion (required when neither FromSource nor Prebuilt)
 	ExclusionReason string `json:"exclusionReason,omitempty"`
+}
+
+// HelmSpec is the authored Helm packaging configuration of a source-built chart.
+type HelmSpec struct {
+	Values []HelmValue `json:"values,omitempty"`
+}
+
+// HelmValue overrides one existing scalar in the chart's values.yaml. Path is a
+// dotted key path; Value is a Go text/template over a closed context (Environment,
+// Arch, Platform, Output) that renders to a string. It is rendered by the compiler,
+// never at catalog load, because the Environment is not a catalog input.
+type HelmValue struct {
+	Path  string `json:"path"`
+	Value string `json:"value"`
 }
 
 // Catalog is the loaded, fully resolved registry and lock. Producer selection is

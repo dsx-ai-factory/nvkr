@@ -73,9 +73,14 @@ func bindHelmDeployment(raw []byte, digest string) ([]byte, error) {
 
 // bindHelmImage operates only on the private extracted source tree. The caller
 // derives digest from the verified image package in the same compiled graph.
-func bindHelmImage(ctx context.Context, root, chart, digest string) error {
+func bindHelmImage(ctx context.Context, root, chart, digest string, overrides []HelmValueOverride) error {
 	if !canonicalName.MatchString(chart) || !canonical.IsDigest(digest) {
 		return e.New(e.CodeInvalidCatalog, "Helm image binding requires a chart directory and image digest")
+	}
+	for _, override := range overrides {
+		if override.Path == "image.digest" || override.Path == "image.tag" {
+			return e.New(e.CodeInvalidCatalog, "Helm values cannot override the verified image binding %q", override.Path)
+		}
 	}
 	// Reject links before any mutation, including contained aliases that could
 	// make one selected file overwrite another member of the source bundle.
@@ -127,6 +132,9 @@ func bindHelmImage(ctx context.Context, root, chart, digest string) error {
 	}
 	image["digest"], image["repository"] = digest, ""
 	delete(image, "tag")
+	if err := setHelmValues(values, overrides); err != nil {
+		return err
+	}
 	encoded, err := yaml.Marshal(values)
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "encoding Helm values")

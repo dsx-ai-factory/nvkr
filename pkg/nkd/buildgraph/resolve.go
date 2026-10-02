@@ -195,6 +195,7 @@ func cloneComponent(component catalog.Component) catalog.Component {
 	component.VersionStamp = maps.Clone(component.VersionStamp)
 	component.Patches = slices.Clone(component.Patches)
 	component.BuildRequirements = execution.Clone(component.BuildRequirements)
+	component.Helm = catalog.CloneHelmSpec(component.Helm)
 	if component.Flake != nil {
 		copy := *component.Flake
 		component.Flake = &copy

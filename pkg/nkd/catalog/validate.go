@@ -3,8 +3,10 @@ package catalog
 import (
 	"crypto/sha256"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -200,6 +202,9 @@ func validateComponent(name string, c Component) error {
 			"component %q: packer producer requires builderType vm-image", name)
 	}
 	if err := validateMaterialBindings(name, c); err != nil {
+		return err
+	}
+	if err := validateHelmSpec(name, c); err != nil {
 		return err
 	}
 	if c.BuilderType == BuilderVMImage && !c.FromSource {
@@ -528,6 +533,36 @@ func checkArchTokens(subject, name, field, s string) error {
 	if strings.Contains(strings.ReplaceAll(s, "{{.Arch}}", ""), "{{") {
 		return e.New(e.CodeInvalidCatalog,
 			"%s %q: %s %q uses an unknown template token (only {{.Arch}} is supported)", subject, name, field, s)
+	}
+	return nil
+}
+
+var helmValuePath = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$`)
+
+// validateHelmSpec admits Helm values overrides only on a source-built chart
+// archive. Acquired charts are byte-exact upstream packages and are never repacked.
+func validateHelmSpec(name string, c Component) error {
+	if c.Helm == nil {
+		return nil
+	}
+	if !c.FromSource || c.OutputType != "tarball" {
+		return e.New(e.CodeInvalidCatalog, "component %q: helm values require a from-source tarball chart", name)
+	}
+	if len(c.Helm.Values) == 0 {
+		return e.New(e.CodeInvalidCatalog, "component %q: helm declares no values", name)
+	}
+	seen := make(map[string]bool, len(c.Helm.Values))
+	for i, value := range c.Helm.Values {
+		if !helmValuePath.MatchString(value.Path) {
+			return e.New(e.CodeInvalidCatalog, "component %q: helm.values[%d] path %q is not a dotted key path", name, i, value.Path)
+		}
+		if seen[value.Path] {
+			return e.New(e.CodeInvalidCatalog, "component %q: helm.values path %q appears more than once", name, value.Path)
+		}
+		seen[value.Path] = true
+		if _, err := template.New(value.Path).Option("missingkey=error").Parse(value.Value); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "component %q: helm.values[%d] value is not a valid template", name, i)
+		}
 	}
 	return nil
 }

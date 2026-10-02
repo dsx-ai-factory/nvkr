@@ -110,10 +110,17 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			inputs = append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...)
 		}
 		inputs = uniqueSorted(inputs)
+		var helmValues []HelmValueOverride
+		if spec.Kind == PackageHelm {
+			helmValues, err = renderHelmValues(plan.Environment, builds[spec.Name], inputs, artifacts)
+			if err != nil {
+				return ArtifactGraph{}, err
+			}
+		}
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
-			HelmImage:    spec.HelmImage,
+			HelmImage: spec.HelmImage, HelmValues: helmValues,
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
 			Inputs: inputs, Outputs: []string{artifactID}, Network: ir.NetworkNone, RunsOn: runsOn,
 			Container: delivery.UtilityContainer, Platform: delivery.UtilityPlatform}

@@ -67,6 +67,7 @@ type rawComponent struct {
 	VersionStamp    map[string]string  `json:"versionStamp,omitempty"` // Go text/template values
 	Patches         []patchDeclaration `json:"patches,omitempty"`
 	Prebuilt        *Prebuilt          `json:"prebuilt,omitempty"` // the no-compile lane
+	Helm            *HelmSpec          `json:"helm,omitempty"`     // values.yaml overrides for a source-built chart
 	ExclusionReason string             `json:"exclusionReason,omitempty"`
 
 	BuildRequirements *execution.Requirements `json:"buildRequirements,omitempty"` // generic build-step runner request

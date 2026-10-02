@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/fs"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -33,6 +34,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		ArtifactPath:    raw.ArtifactPath,
 		WriteDir:        raw.WriteDir,
 		ExclusionReason: raw.ExclusionReason,
+		Helm:            CloneHelmSpec(raw.Helm),
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
 	}
@@ -297,4 +299,12 @@ func splitVersion(tag string) (maj, min, pat string) {
 		return ""
 	}
 	return get(0), get(1), get(2)
+}
+
+// CloneHelmSpec returns an independent copy of spec.
+func CloneHelmSpec(spec *HelmSpec) *HelmSpec {
+	if spec == nil {
+		return nil
+	}
+	return &HelmSpec{Values: slices.Clone(spec.Values)}
 }

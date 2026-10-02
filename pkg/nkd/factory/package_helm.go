@@ -68,11 +68,13 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	// by node.HelmImage.Chart.
 	chartPrefix := relative
 	if node.HelmImage != nil {
-		if err := bindHelmImage(ctx, filepath.Join(root, relative), node.HelmImage.Chart, imageDigest); err != nil {
+		if err := bindHelmImage(ctx, filepath.Join(root, relative), node.HelmImage.Chart, imageDigest, node.HelmValues); err != nil {
 			return err
 		}
 		fmt.Fprintf(stdout, "Bound Helm chart %q to image %q at %s; checksums refreshed\n", node.HelmImage.Chart, artifacts[node.HelmImage.Image].Name, imageDigest)
 		chartPrefix = filepath.Join(relative, node.HelmImage.Chart)
+	} else if err := rewriteHelmValues(ctx, filepath.Join(root, relative), node.HelmValues); err != nil {
+		return err
 	}
 	chartName, err := readHelmChartName(filepath.Join(root, chartPrefix, "Chart.yaml"))
 	if err != nil {
