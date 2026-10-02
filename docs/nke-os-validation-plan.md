@@ -107,7 +107,8 @@ Plan, mismatched image ID, or successful lifecycle without a Plan remains an err
 The toolchain-only job records an image only after successful toolchain construction/validation, even if a
 later identity test fails. The regression suite exercises the actual authored Go command against a fixture
 module proxy: metadata/ZIP 503s, interrupted ZIP transport, non-retried checksum/corrupt-archive failures,
-module-file drift, differing Git ownership, conflicting Go settings and offline verification/vendoring.
+module-file drift, acquisition without Git, conflicting Go settings and offline verification/vendoring.
+The fixture rejects any Git invocation; it does not simulate container UID mapping or differing file owners.
 Timeout tests assert the authored budgets and preservation of simulated timeout status, not real kill timing.
 Workflow tests execute the authored snippets and assert specific diagnostics and retained image IDs.
 These tests do not prove ARC availability or full NKE acquisition.

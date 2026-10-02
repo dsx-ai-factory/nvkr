@@ -191,6 +191,8 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 				"agent/go.mod":  "module example.com/agent\n\ngo 1.27.0\n\nrequire " + module + " " + version + "\n",
 				"agent/go.sum":  pinned,
 				"agent/main.go": "package agent\nimport \"" + module + "\"\nvar Value = material.Value\n",
+				// Pin checks must not depend on Git's checkout ownership rules.
+				"bin/git": "#!/bin/sh\necho 'unexpected Git call during acquisition' >&2\nexit 94\n",
 				// The host may not have timeout (macOS). Assert its exact argv
 				// here; bound all real fixture Go commands with the test context.
 				"bin/timeout": `#!/bin/sh
@@ -216,25 +218,16 @@ if test "$phase" = "$PIN_DRIFT"; then printf '\n' >>go.sum; fi
 				}
 			}
 			env := append(cacheEnv(t, dir),
-				"PATH="+filepath.Join(dir, "bin")+":"+os.Getenv("PATH"), "TIMEOUT_CALLS="+filepath.Join(dir, "timeouts"),
-				"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
-			for _, args := range [][]string{{"init", "-q"}, {"add", "agent"},
-				{"-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "pinned fixture"}} {
-				cmd := exec.CommandContext(t.Context(), "git", args...)
-				cmd.Dir, cmd.Env = dir, env
-				if out, err := cmd.CombinedOutput(); err != nil {
-					t.Fatalf("fixture git: %v: %s", err, out)
-				}
-			}
+				"PATH="+filepath.Join(dir, "bin")+":"+os.Getenv("PATH"), "TIMEOUT_CALLS="+filepath.Join(dir, "timeouts"))
 			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 			defer cancel()
 			// Substitute only the public proxy URL with the fixture, retaining
 			// the exact authored fallback syntax, verification and vendoring.
 			cmd := exec.CommandContext(ctx, command[0], command[1], strings.ReplaceAll(command[2], "https://proxy.golang.org", server.URL))
 			cmd.Dir = dir
-			// Ownership and conflicting host settings apply only to acquisition,
-			// not to fixture creation or Go's own cache cleaner.
-			cmd.Env = append(env, "GIT_TEST_ASSUME_DIFFERENT_OWNER=1", "GOWORK=auto", "GOTOOLCHAIN=unavailable",
+			// Conflicting host settings apply only to acquisition, not to Go's
+			// own cache cleaner. The PATH fixture rejects any Git invocation.
+			cmd.Env = append(env, "GOWORK=auto", "GOTOOLCHAIN=unavailable",
 				"GOFLAGS=-mod=bogus", "PIN_DRIFT="+test.driftPhase, "TIMEOUT_PHASE="+test.timeoutPhase,
 				"OFFLINE_MARKER="+filepath.Join(dir, "offline"))
 			out, err := cmd.CombinedOutput()
