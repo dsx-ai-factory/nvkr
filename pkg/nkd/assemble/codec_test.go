@@ -31,13 +31,16 @@ func fakeQemuImgDriver(t *testing.T, infoJSON, driver string) (string, string) {
 	path := filepath.Join(t.TempDir(), "qemu-img")
 	script := "#!/bin/sh\n" +
 		"if [ \"$1\" = info ]; then " +
+		"if [ -n \"${NKD_CODEC_PROBE_MARKER:-}\" ]; then : > \"$NKD_CODEC_PROBE_MARKER\"; fi; " +
 		"[ \"$#\" -eq 5 ] && [ \"$2\" = -f ] && [ \"$3\" = '" + driver + "' ] && [ \"$4\" = --output=json ] && [ \"$5\" = /proc/self/fd/4 ] || exit 8; " +
 		"if [ -n \"${NKD_RENAME_RESTORE_ENVELOPE:-}\" ]; then " +
 		"mv \"$NKD_RENAME_RESTORE_ENVELOPE\" \"$NKD_RENAME_RESTORE_ENVELOPE.before-attack\"; " +
 		"printf 'mutated-after-snapshot' > \"$NKD_RENAME_RESTORE_ENVELOPE\"; " +
 		"if [ -n \"${NKD_ENVELOPE_ATTACK_MARKER:-}\" ]; then : > \"$NKD_ENVELOPE_ATTACK_MARKER\"; fi; fi; " +
 		"printf '%s' '" + infoJSON + "'; exit 0; fi\n" +
-		"if [ \"$1\" = convert ]; then cp \"$6\" \"$7\"; result=$?; " +
+		"if [ \"$1\" = convert ]; then " +
+		"if [ -n \"${NKD_CODEC_CONVERT_MARKER:-}\" ]; then : > \"$NKD_CODEC_CONVERT_MARKER\"; fi; " +
+		"cp \"$6\" \"$7\"; result=$?; " +
 		"if [ -n \"${NKD_RENAME_RESTORE_ENVELOPE:-}\" ] && [ -e \"$NKD_RENAME_RESTORE_ENVELOPE.before-attack\" ]; then " +
 		"rm -f \"$NKD_RENAME_RESTORE_ENVELOPE\"; mv \"$NKD_RENAME_RESTORE_ENVELOPE.before-attack\" \"$NKD_RENAME_RESTORE_ENVELOPE\"; fi; " +
 		"exit $result; fi\n" +

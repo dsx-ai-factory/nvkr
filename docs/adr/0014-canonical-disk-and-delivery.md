@@ -105,9 +105,17 @@ to the decoded stream rather than to conversion, and the **ext4 full-rootfs resi
 The shared probe passes the declared driver explicitly (`vhd` maps to QEMU's `vpc`), never auto-detects or
 requests `--backing-chain`, and rejects encryption, backing files and QCOW2 external data-file metadata before
 decoding. Explicit `vpc` selection permits fixed VHDs that auto-detection would classify as RAW; this is format
-admission, not evidence of decode determinism. The separate diagnostic installed-package gate admits QCOW2
-only. VMDK extent containment and complete QCOW2 incompatible-feature admission in the lifecycle's bounded
-header check remain unresolved; the header observer is not a self-contained-image or full decoder verdict.
+admission, not evidence of decode determinism. VMDK admission is limited to the single-file VMDK4 sparse
+branch: before launching QEMU, a bounded binary first-sector check requires `KDMV` magic and nonzero
+little-endian capacity. QEMU's descriptor-backed layouts open extent files even during `info` with `NO_IO`,
+so text descriptors, legacy VMDK3 and zero-capacity binary descriptor redirects are rejected before the probe.
+This is a subset admission check, not a VMDK descriptor parser. QEMU validates the remaining format, including
+grain tables and any stream-optimized footer. Its QAPI result must report `monolithicSparse` or
+`streamOptimized` with exactly one extent naming the held input descriptor and covering the full
+virtual size before conversion. Other VMDK layouts require separately admitted material closures.
+The separate diagnostic installed-package gate remains QCOW2-only. Complete QCOW2 incompatible-feature
+admission in the lifecycle's bounded header check remains unresolved; the header observer is not a
+self-contained-image or full decoder verdict.
 
 The implemented command surface is deliberately narrower than the target delivery model. It can measure an
 existing RAW or ISO into a typed `DiskManifest`, and Linux can verify an existing `qcow2` envelope through the

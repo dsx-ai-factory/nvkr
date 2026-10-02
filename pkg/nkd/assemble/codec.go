@@ -267,20 +267,33 @@ type qemuInfo struct {
 	BackingFilename     string `json:"backing-filename"`
 	FullBackingFilename string `json:"full-backing-filename"`
 	FormatSpecific      struct {
+		Type string `json:"type"`
 		Data struct {
-			DataFile string `json:"data-file"`
+			DataFile   string `json:"data-file"`
+			CreateType string `json:"create-type"`
+			Extents    []struct {
+				Filename    string  `json:"filename"`
+				Format      *string `json:"format"`
+				VirtualSize int64   `json:"virtual-size"`
+			} `json:"extents"`
 		} `json:"data"`
 	} `json:"format-specific"`
 }
 
 func (codec *QemuImgCodec) probe(ctx context.Context, format string, input *heldfile.File) (int64, error) {
+	if format == "vmdk" {
+		if err := admitVMDKSparseInput(ctx, input); err != nil {
+			return 0, err
+		}
+	}
 	inputPath, err := heldfile.ChildPath(1)
 	if err != nil {
 		return 0, e.Wrap(e.CodeEngineCapability, err, "mapping held disk envelope for qemu-img info")
 	}
 	var stdout, stderr bytes.Buffer
 	err = heldfile.RunContext(ctx, codec.executable,
-		// QEMU opens info inputs with BDRV_O_NO_BACKING | BDRV_O_NO_IO. Never
+		// QEMU opens info inputs with BDRV_O_NO_BACKING | BDRV_O_NO_IO. VMDK
+		// descriptors can still open extents, so admit their binary subset first. Never
 		// request --backing-chain: backing names are metadata to reject, not
 		// paths to open. The explicit format also prevents format autodetection.
 		[]string{"info", "-f", qemuFormat(format), "--output=json", inputPath},
@@ -318,6 +331,22 @@ func (codec *QemuImgCodec) probe(ctx context.Context, format string, input *held
 	if info.FormatSpecific.Data.DataFile != "" {
 		return 0, e.New(e.CodeEnvelopeDecode,
 			"held %s envelope depends on an external data file and is not self-contained", format)
+	}
+	if format == "vmdk" {
+		data := info.FormatSpecific.Data
+		if info.FormatSpecific.Type != "vmdk" ||
+			(data.CreateType != "monolithicSparse" && data.CreateType != "streamOptimized") ||
+			len(data.Extents) != 1 {
+			return 0, e.New(e.CodeEnvelopeDecode, "held VMDK must report one admitted sparse extent")
+		}
+		extent := data.Extents[0]
+		// QEMU 8.2.2 leaves the native binary extent type empty; descriptor
+		// extents carry labels such as SPARSE or FLAT. Require the QAPI field,
+		// allowing only the native empty label or its explicit sparse equivalent.
+		if extent.Filename != inputPath || extent.Format == nil ||
+			(*extent.Format != "" && *extent.Format != "SPARSE") || extent.VirtualSize != info.VirtualSize {
+			return 0, e.New(e.CodeEnvelopeDecode, "held VMDK extent is not bound to its complete held input")
+		}
 	}
 	return info.VirtualSize, nil
 }

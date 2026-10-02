@@ -60,8 +60,11 @@ acquisition records and semantic reconciliation remain absent. The enclosing loa
 emulator, appliance `qemu-img`, supermin and kernel remain diagnostic runtime TCB, not an authenticated
 production closure. A non-root caller is enforced; credential-free, network-less sandboxing remains a caller
 requirement, not an authenticated NKD capability. The shared codec probe explicitly selects the driver and
-rejects backing/data-file references; diagnostic admission is QCOW2-only. The qualified VMDK extent layout and
-the local lifecycle's bounded QCOW2 header handling still require separate external-data/feature admission.
+rejects backing/data-file references; diagnostic admission is QCOW2-only. Shared VMDK decoding rejects
+descriptor layouts before the probe and admits only single-file VMDK4 sparse inputs whose QAPI extent binds
+the held descriptor and full virtual size, with an [actual ARM64 QEMU fixture replay](../evidence/2026-10-02-vmdk-codec-admission.md).
+The local lifecycle's bounded QCOW2 header handling still requires
+separate external-data/feature admission.
 Public lifecycle SBOM/publication and
 qualified admission are not enabled by this API.
 The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
