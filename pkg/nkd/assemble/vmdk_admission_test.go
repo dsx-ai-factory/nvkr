@@ -29,14 +29,16 @@ func TestQualifiedVMDKRejectsDescriptorBeforeProbe(t *testing.T) {
 	legacy := vmdkSparseHeader()
 	copy(legacy, "COWD")
 	for _, tc := range []struct {
-		name string
-		data []byte
+		name        string
+		data        []byte
+		probeCalled bool
 	}{
-		{"external descriptor", []byte("# Disk DescriptorFile\nversion=1\ncreateType=\"monolithicFlat\"\nRW 1 FLAT \"/etc/passwd\" 0\n")},
-		{"binary descriptor redirect", redirect},
-		{"legacy sparse", legacy},
-		{"truncated sparse", vmdkSparseHeader()[:511]},
-		{"empty", nil},
+		{"external descriptor", []byte("# Disk DescriptorFile\nversion=1\ncreateType=\"monolithicFlat\"\nRW 1 FLAT \"/etc/passwd\" 0\n"), false},
+		{"binary descriptor redirect", redirect, false},
+		{"legacy sparse", legacy, false},
+		{"truncated sparse", vmdkSparseHeader()[:511], false},
+		{"empty", nil, false},
+		{"admitted prefix reaches probe", vmdkSparseHeader(), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			marker := filepath.Join(t.TempDir(), "probe-called")
@@ -54,7 +56,11 @@ func TestQualifiedVMDKRejectsDescriptorBeforeProbe(t *testing.T) {
 			if _, _, err := codec.EnvelopeLogicalDigest(t.Context(), "vmdk", path); code(err) != e.CodeEnvelopeDecode {
 				t.Fatalf("unadmitted layout returned %v", err)
 			}
-			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+			if _, err := os.Stat(marker); tc.probeCalled {
+				if err != nil {
+					t.Fatalf("admitted prefix did not create probe marker: %v", err)
+				}
+			} else if !os.IsNotExist(err) {
 				t.Fatalf("unadmitted VMDK started probe: %v", err)
 			}
 		})
@@ -103,6 +109,9 @@ func TestQualifiedVMDKRequiresHeldSparseExtent(t *testing.T) {
 			if tc.code == "" {
 				if size != 512 {
 					t.Fatalf("decoded size=%d", size)
+				}
+				if _, err := os.Stat(marker); err != nil {
+					t.Fatalf("admitted extent did not create conversion marker: %v", err)
 				}
 				return
 			}

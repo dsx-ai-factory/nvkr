@@ -54,7 +54,8 @@ A staged diagnostic installed-package inspector binds held QCOW2 and exact `virt
 bytes, rejects encrypted or externally dependent envelopes, and uses a private read-only libguestfs copy with
 explicit TCG execution. It rechecks the copy and held subject before returning an immutable installed-metadata
 inventory. One retained ARM64 non-FDE disk yielded 730 installed packages in the
-[exact-source non-root local replay](../evidence/2026-10-02-nke-os-disk-inspection.md). This is not full-disk inspection or
+[non-root local replay of its recorded source blobs](../evidence/2026-10-02-nke-os-disk-inspection.md), before the later
+shared VMDK codec and ELF test-helper corrections. This is not full-disk inspection or
 CycloneDX: staged package/image archives and loose files, the factory-owned material-trace handoff, complete
 acquisition records and semantic reconciliation remain absent. The enclosing loader, libraries, `qemu-system`
 emulator, appliance `qemu-img`, supermin and kernel remain diagnostic runtime TCB, not an authenticated
@@ -371,7 +372,7 @@ Earlier verification does not transfer by renaming or reinterpreting records.
 
 | Record | What actually ran | Limit |
 |---|---|---|
-| [Corrected local installed-package inspection, 2026-10-02](../evidence/2026-10-02-nke-os-disk-inspection.md) | Exact-source ARM64 ELF contract tests and non-root libguestfs scan, external-reference rejection and actual appliance cancellation | Source replacements and test-binary digest recorded; terminal excerpts are transcriptions, not a complete raw appliance log. Diagnostic installed metadata only, not full SBOM, runtime authentication or qualified reproduction |
+| [Corrected local installed-package inspection, 2026-10-02](../evidence/2026-10-02-nke-os-disk-inspection.md) | ARM64 ELF contract tests and non-root libguestfs scan, external-reference rejection and actual appliance cancellation at the listed source blobs | Source replacements, test-binary digest and complete retained terminal-log SHA-256 recorded; predates the later shared VMDK codec and ELF test-helper corrections. Diagnostic installed metadata only, not full SBOM, runtime authentication or qualified reproduction |
 | [Local installed-package inspection, 2026-10-01](../evidence/2026-10-01-nke-os-disk-inspection.md) | Historical ARM64 libguestfs diagnostic scan of a retained non-FDE disk, external-reference negatives and cancellation | Exact draft tree was not retained; not committed-candidate acceptance, full-disk SBOM, publication or qualified reproduction |
 | [Acquired NKE Helm charts, 2026-10-01](../evidence/2026-10-01-acquired-helm-packaging.md) | Local CLI acquired and packaged four real charts; each OCI chart layer equals the downloaded bytes and lock digest | Unqualified local execution; no publication, signing, installation or acquired-chart dependency scan |
 | [Cosign discovery failure, 2026-09-11](../evidence/2026-09-11-cosign-discovery-fix.md) | Run 34631274098 created SBOM bundles, published and signed the single-entry layout, then failed provenance verification; cosign 2.6.3 reproduced the exact error locally; cosign 3.1.3 passed standard bundle verification | Local-key interoperability and repository contracts; updated hosted keyless verification/finalization and independent GHCR acceptance remain unexercised |

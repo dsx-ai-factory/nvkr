@@ -104,6 +104,9 @@ envelope rejection, close and cancellation. `git diff --check` passed.
 Installed-package metadata excludes uninstalled `.deb` archives, staged OCI
 images and loose files. Full material closure, acquisition/consumption
 reconciliation, lifecycle inspection, full CycloneDX, FDE and qualified
-reproduction remain absent. The new diagnostic envelope gate is QCOW2-only;
-pre-existing qualified VMDK extent handling and lifecycle QCOW2 incompatible
-feature/header admission remain separately tracked in ADR-14.
+reproduction remain absent. The new diagnostic envelope gate is QCOW2-only. This
+replay predates the later shared VMDK codec and ELF test-helper corrections; its
+source table remains the identity of what was exercised. The separate
+[VMDK codec admission replay](2026-10-02-vmdk-codec-admission.md) records that
+subsequent correction. The pre-existing lifecycle QCOW2 incompatible-feature/header
+admission gap remains separately tracked in ADR-14.

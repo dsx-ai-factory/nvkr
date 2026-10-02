@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,9 +70,13 @@ func TestQualifiedVMDKRealQEMU(t *testing.T) {
 	binary.LittleEndian.PutUint64(redirect[28:36], 1)
 	redirect = append(redirect, descriptor...)
 	for _, tc := range []struct {
-		name string
-		data []byte
-	}{{"text descriptor", descriptor}, {"binary descriptor redirect", redirect}} {
+		name      string
+		data      []byte
+		admission string
+	}{
+		{"text descriptor", descriptor, "reading complete held VMDK sparse header"},
+		{"binary descriptor redirect", redirect, "held VMDK requires a single-file VMDK4 sparse header with nonzero capacity"},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(root, tc.name+".vmdk")
 			if err := os.WriteFile(path, tc.data, 0o400); err != nil {
@@ -93,7 +98,7 @@ func TestQualifiedVMDKRealQEMU(t *testing.T) {
 			if len(extents) != 1 || extents[0].Filename != raw || extents[0].VirtualSize != int64(len(content)) {
 				t.Fatalf("real QEMU did not open the known external RAW extent: %s", output)
 			}
-			if _, _, err := codec.EnvelopeLogicalDigest(ctx, "vmdk", path); code(err) != e.CodeEnvelopeDecode {
+			if _, _, err := codec.EnvelopeLogicalDigest(ctx, "vmdk", path); code(err) != e.CodeEnvelopeDecode || !strings.Contains(err.Error(), tc.admission) {
 				t.Fatalf("real external-extent fixture returned %v", err)
 			}
 		})
