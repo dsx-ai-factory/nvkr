@@ -127,15 +127,15 @@ func parse(path string) ([]segment, error) {
 
 func Decode(raw []byte) (*yaml.Node, error) {
 	if len(raw) == 0 || int64(len(raw)) > MaxBytes {
-		return nil, e.New(e.CodeInvalidCatalog, "document document must contain 1 to %d bytes", MaxBytes)
+		return nil, e.New(e.CodeInvalidCatalog, "document must contain 1 to %d bytes", MaxBytes)
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(raw))
 	var document yaml.Node
 	if err := decoder.Decode(&document); err != nil {
-		return nil, e.Wrap(e.CodeInvalidCatalog, err, "parsing document document")
+		return nil, e.Wrap(e.CodeInvalidCatalog, err, "parsing document")
 	}
 	if document.Kind != yaml.DocumentNode || len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
-		return nil, e.New(e.CodeInvalidCatalog, "document document must be an object")
+		return nil, e.New(e.CodeInvalidCatalog, "document must be an object")
 	}
 	var extra yaml.Node
 	if err := decoder.Decode(&extra); err != io.EOF {
@@ -151,39 +151,39 @@ func Decode(raw []byte) (*yaml.Node, error) {
 func validateNode(node *yaml.Node, depth int, count *int) error {
 	*count++
 	if depth > MaxDepth || *count > MaxNodes {
-		return e.New(e.CodeInvalidCatalog, "document document exceeds depth or node limit")
+		return e.New(e.CodeInvalidCatalog, "document exceeds depth or node limit")
 	}
 	if node.Kind == yaml.AliasNode || node.Anchor != "" {
-		return e.New(e.CodeInvalidCatalog, "document document cannot contain YAML anchors or aliases")
+		return e.New(e.CodeInvalidCatalog, "document cannot contain YAML anchors or aliases")
 	}
 	switch node.Kind {
 	case yaml.MappingNode:
 		if node.Tag != "!!map" {
-			return e.New(e.CodeInvalidCatalog, "document document has unsupported mapping tag %q", node.Tag)
+			return e.New(e.CodeInvalidCatalog, "document has unsupported mapping tag %q", node.Tag)
 		}
 		seen := make(map[string]bool, len(node.Content)/2)
 		for index := 0; index < len(node.Content); index += 2 {
 			key := node.Content[index]
 			if key.Kind != yaml.ScalarNode || key.Tag != "!!str" {
-				return e.New(e.CodeInvalidCatalog, "document document requires string object keys")
+				return e.New(e.CodeInvalidCatalog, "document requires string object keys")
 			}
 			if seen[key.Value] {
-				return e.New(e.CodeInvalidCatalog, "document document has duplicate key %q", key.Value)
+				return e.New(e.CodeInvalidCatalog, "document has duplicate key %q", key.Value)
 			}
 			seen[key.Value] = true
 		}
 	case yaml.SequenceNode:
 		if node.Tag != "!!seq" {
-			return e.New(e.CodeInvalidCatalog, "document document has unsupported sequence tag %q", node.Tag)
+			return e.New(e.CodeInvalidCatalog, "document has unsupported sequence tag %q", node.Tag)
 		}
 	case yaml.ScalarNode:
 		switch node.Tag {
 		case "!!str", "!!bool", "!!int", "!!float", "!!null", "!!timestamp":
 		default:
-			return e.New(e.CodeInvalidCatalog, "document document has unsupported scalar tag %q", node.Tag)
+			return e.New(e.CodeInvalidCatalog, "document has unsupported scalar tag %q", node.Tag)
 		}
 	default:
-		return e.New(e.CodeInvalidCatalog, "document document has unsupported YAML node")
+		return e.New(e.CodeInvalidCatalog, "document has unsupported YAML node")
 	}
 	for _, child := range node.Content {
 		if err := validateNode(child, depth+1, count); err != nil {

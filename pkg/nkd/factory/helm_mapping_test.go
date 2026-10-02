@@ -198,7 +198,18 @@ func TestNKEDeclarativeBindingWithHelm(t *testing.T) {
 	if err := yaml.Unmarshal(rawRegistry, &registry); err != nil {
 		t.Fatal(err)
 	}
-	binding, err := resolveHelmBinding(def.Outputs[0], []BuildPlan{{Name: def.Outputs[0].Name, ResolvedComponents: []catalog.NamedComponent{{Name: "controller-chart", Component: catalog.Component{Helm: registry.Components["controller-chart"].Helm}}}}})
+	outputIndex := -1
+	for i, output := range def.Outputs {
+		if output.Name == "controller-chart" {
+			outputIndex = i
+			break
+		}
+	}
+	if outputIndex < 0 {
+		t.Fatal("example is missing the controller-chart output")
+	}
+	output := def.Outputs[outputIndex]
+	binding, err := resolveHelmBinding(output, []BuildPlan{{Name: output.Name, ResolvedComponents: []catalog.NamedComponent{{Name: "controller-chart", Component: catalog.Component{Helm: registry.Components["controller-chart"].Helm}}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
