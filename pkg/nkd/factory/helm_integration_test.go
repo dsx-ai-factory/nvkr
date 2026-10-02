@@ -59,8 +59,12 @@ func TestPinnedNKEHelmBinding(t *testing.T) {
 	t.Logf("rendered source chart with produced image digest %s", image.ManifestDigest)
 }
 
-// verifyRenderedControllerImage checks the selected container, not unrelated YAML fields.
 func verifyRenderedControllerImage(raw []byte, repository, digest string) error {
+	return verifyRenderedContainerImage(raw, "nkd-binding-controller", repository, digest)
+}
+
+// verifyRenderedContainerImage checks the named container, not unrelated YAML fields.
+func verifyRenderedContainerImage(raw []byte, containerName, repository, digest string) error {
 	decoder := yaml.NewDecoder(strings.NewReader(string(raw)))
 	count := 0
 	for {
@@ -88,7 +92,7 @@ func verifyRenderedControllerImage(raw []byte, repository, digest string) error 
 			continue
 		}
 		for _, container := range workload.Spec.Template.Spec.Containers {
-			if container.Name != "nkd-binding-controller" {
+			if container.Name != containerName {
 				continue
 			}
 			count++

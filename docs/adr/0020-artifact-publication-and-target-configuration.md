@@ -243,7 +243,8 @@ values while permitting unrelated chart settings. All digest targets must exist 
 Packaging inspects each native image package, writes its manifest digest to the mapped values and refreshes
 wrapper-level checksums when the chart is nested. With `chart: "."`, no bookkeeping is written
 inside the chart; any upstream `checksums.txt` remains chart content. Templates, repository and tag defaults remain unchanged. Source links and ambiguous value
-selections fail. No Environment publication prefix enters chart bytes. An operator supplies a repository
+selections fail. Values serialization preserves semantic values, not exact formatting; document-level
+comments separated from the root mapping may be omitted. Template bytes remain unchanged. No Environment publication prefix enters chart bytes. An operator supplies a repository
 containing the same image through deployment values. The source chart must already consume its digest
 value; NKD does not infer or rewrite template behavior. Normal Helm overrides remain possible, including
 changing or clearing the digest. Deployment-value enforcement is outside this packaging contract.

@@ -108,12 +108,14 @@ func TestHelmMappedBindings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			selected, err := documentpath.Select(doc, []string{"controller.repository", "helper.repository", "images[name=controller].digest", "images[name=helper].digest"}, true)
+			selected, err := documentpath.Select(doc, []string{"controller.repository", "controller.tag", "helper.repository", "helper.tag", "images[name=controller].digest", "images[name=helper].digest"}, true)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if selected["controller.repository"].Value != "upstream/controller" || selected["images[name=helper].digest"].Value != d["helper"] {
-				t.Fatal("incorrect value binding")
+			for _, slot := range []string{"controller", "helper"} {
+				if selected[slot+".repository"].Value != "upstream/"+slot || selected[slot+".tag"].Value != "dev" || selected["images[name="+slot+"].digest"].Value != d[slot] {
+					t.Fatalf("incorrect value binding for %s", slot)
+				}
 			}
 		})
 	}
@@ -146,8 +148,8 @@ func TestMappedBindingsWithHelm(t *testing.T) {
 			if slot == "controller" {
 				name = "cwe"
 			}
-			if !strings.Contains(string(out), registry+"/"+name+"@"+digest) {
-				t.Fatalf("missing bound image %s: %s", slot, out)
+			if err := verifyRenderedContainerImage(out, slot, registry+"/"+name, digest); err != nil {
+				t.Fatal(err)
 			}
 		}
 	}
@@ -243,4 +245,17 @@ func TestNKEDeclarativeBindingWithHelm(t *testing.T) {
 		t.Fatal("registry overrides changed the chart")
 	}
 	t.Logf("real NKE chart rendered for two repositories with values digest; bound tree %s", before)
+}
+
+func TestMappedImageRejectsDecoyDigest(t *testing.T) {
+	for _, slot := range []string{"controller", "helper"} {
+		t.Run(slot, func(t *testing.T) {
+			repository := "registry.example.test/" + slot
+			digest := "sha256:" + strings.Repeat("a", 64)
+			raw := "kind: Deployment\nmetadata:\n  annotations:\n    expected: '" + repository + "@" + digest + "'\nspec:\n  template:\n    spec:\n      containers:\n      - name: " + slot + "\n        image: " + repository + ":dev\n"
+			if err := verifyRenderedContainerImage([]byte(raw), slot, repository, digest); err == nil {
+				t.Fatal("digest in annotation accepted as container image")
+			}
+		})
+	}
 }
