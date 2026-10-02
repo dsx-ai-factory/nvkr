@@ -157,15 +157,29 @@ func TestOSWorkflowRetainsPrimaryLifecycleFailure(t *testing.T) {
 	if build.ID != "lifecycle" || record.If != "always() && (steps.lifecycle.outcome == 'success' || steps.lifecycle.outcome == 'failure')" {
 		t.Fatal("toolchain recording must run only after an executed lifecycle step")
 	}
+	var toolchainID, recordCondition string
+	for _, step := range osValidationWorkflow(t)["validate-toolchain"].Steps {
+		switch step.Name {
+		case "Build and validate pinned native toolchain":
+			toolchainID = step.ID
+		case "Record exact native toolchain image ID":
+			recordCondition = step.If
+		}
+	}
+	if toolchainID != "toolchain" || recordCondition != "always() && steps.toolchain.outcome == 'success'" {
+		t.Fatal("toolchain-only recording must not mask a failed or skipped toolchain build")
+	}
 	for _, test := range []struct {
 		name, plan, outcome, image string
 		wantError                  bool
+		wantOutput                 string
 	}{
-		{name: "failure before Plan", outcome: "failure", image: "sha256:observed"},
+		{name: "failure before Plan", outcome: "failure", image: "sha256:observed", wantOutput: "No executable Plan"},
 		{name: "failure after Plan", outcome: "failure", image: "sha256:observed", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`},
-		{name: "invalid Plan remains an error", outcome: "failure", plan: `{}`, wantError: true},
-		{name: "successful lifecycle requires Plan", outcome: "success", wantError: true},
-		{name: "mismatched toolchain remains an error", outcome: "failure", image: "sha256:substituted", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`, wantError: true},
+		{name: "successful lifecycle retains image ID", outcome: "success", image: "sha256:observed", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`},
+		{name: "invalid Plan remains an error", outcome: "failure", plan: `{}`, wantError: true, wantOutput: "Cannot iterate over null"},
+		{name: "successful lifecycle requires Plan", outcome: "success", wantError: true, wantOutput: "Successful lifecycle did not retain its executable Plan"},
+		{name: "mismatched toolchain remains an error", outcome: "failure", image: "sha256:substituted", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`, wantError: true, wantOutput: "Observed toolchain image does not match"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -207,8 +221,14 @@ func TestOSWorkflowRetainsPrimaryLifecycleFailure(t *testing.T) {
 			if (err != nil) != test.wantError {
 				t.Fatalf("toolchain recording error=%v, want error=%t: %s", err, test.wantError, output)
 			}
-			if test.plan == "" && !test.wantError && !strings.Contains(string(output), "No executable Plan") {
-				t.Fatalf("missing Plan was not reported: %s", output)
+			if test.wantOutput != "" && !strings.Contains(string(output), test.wantOutput) {
+				t.Fatalf("missing expected diagnostic %q: %s", test.wantOutput, output)
+			}
+			if test.plan != "" && !test.wantError {
+				imageID, err := os.ReadFile(filepath.Join(root, ".nkd/evidence/toolchain-arm64.image-id"))
+				if err != nil || string(imageID) != test.image+"\n" {
+					t.Fatalf("retained image ID=%q, error=%v, want %q", imageID, err, test.image)
+				}
 			}
 		})
 	}

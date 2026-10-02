@@ -1,7 +1,7 @@
 apiVersion: nkd.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:d6b67d97f2879301ddd8dda4093896b269dcd7a25e5f362409c163a09215ee03
+requiresCatalogDigest: sha256:f8e56164bab7d5169bcb8389303c759f975a46bb7b75f7799785f8c3e01e7863
 components:
   nke-node-image:
     component:
@@ -20,17 +20,29 @@ components:
         - -ec
         - |
           cd agent
-          export GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly
-          # Go retries transport through its proxy fallback, not checksum failures.
-          # Keep the existing direct fallback only for a missing proxy module.
+          export GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+          pins="$(sha256sum go.mod go.sum)"
+          # Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.
+          # Go owns transport fallback; checksum failures never select another proxy.
+          # Keep direct fallback limited to a missing proxy module (404/410).
           proxy=https://proxy.golang.org
-          GOPROXY="${proxy}|${proxy}|${proxy},direct" \
-            timeout --kill-after=10s 540s go mod download
-          git diff --exit-code HEAD -- go.mod go.sum
+          GOPROXY="${proxy}|${proxy}/|${proxy}//,direct" \
+            timeout --kill-after=10s 540s go mod download || {
+              status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit "$status";
+            }
+          printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+            echo 'agent module pins changed during download' >&2; exit 1;
+          }
           # Offline verification and vendoring run once, after acquisition succeeds.
-          GOPROXY=off timeout --kill-after=10s 60s go mod verify
-          GOPROXY=off timeout --kill-after=10s 180s go mod vendor
-          git diff --exit-code HEAD -- go.mod go.sum
+          GOPROXY=off timeout --kill-after=10s 60s go mod verify || {
+            status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit "$status";
+          }
+          GOPROXY=off timeout --kill-after=10s 180s go mod vendor || {
+            status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit "$status";
+          }
+          printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+            echo 'agent module pins changed during vendoring' >&2; exit 1;
+          }
       sourceDateEpoch: 1790192178
       outputType: disk-image
       disk:

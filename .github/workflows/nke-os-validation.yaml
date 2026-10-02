@@ -358,6 +358,7 @@ jobs:
           persist-credentials: false
 
       - name: Build and validate pinned native toolchain
+        id: toolchain
         env:
           CONTAINER_RUNTIME: docker
         run: |
@@ -380,7 +381,7 @@ jobs:
       # This observation is candidate-influenced diagnostic output. It never
       # authorizes a lock update or a release identity.
       - name: Record exact native toolchain image ID
-        if: always()
+        if: always() && steps.toolchain.outcome == 'success'
         run: |
           set -euo pipefail
           docker image inspect --format '{{.Id}}' \
@@ -628,7 +629,10 @@ jobs:
             if length == 1 then .[0] else error("expected exactly one disk toolchain") end
           ' "${plan}")"
           # Select the smoke image from the Plan, not a mutable development tag.
-          test "$(docker image inspect --format '{{.Id}}' "${image}")" = "${image}"
+          test "$(docker image inspect --format '{{.Id}}' "${image}")" = "${image}" || {
+            echo "::error::Observed toolchain image does not match the executable Plan"
+            exit 1
+          }
           printf '%s\n' "${image}" | tee ".nkd/evidence/toolchain-${ARCH}.image-id"
 
       - name: Run source-owned boot smoke

@@ -196,6 +196,25 @@ smoke and image upload were skipped. This is acquisition failure evidence, not a
 These observations were rechecked through GitHub's run/job records and the failed ARM64 log. They establish
 automatic triggering at those exact heads, not successful execution of subsequent reliability changes.
 
+## Reliability candidate regression
+
+[Push run 36944892985](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36944892985) completed
+successfully on both full architecture legs at main commit
+`91567c2717dd195829d6a88a19a6d6e4baec3dd9`. This is successful base-code execution, not validation of
+the later reliability candidate.
+
+[Dispatch run 36958996866](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36958996866) executed
+candidate `db4b8d92d2da31e9be18064a9ab4681277f8550f` through the trusted workflow at that main commit.
+It used the NKE pin recorded above. Both full legs failed in the new module-file Git guard after download:
+the rootful vendor container could not use the differently owned checkout, so `git diff` emitted its
+`--no-index` usage and exited 129. The lifecycle returned `NKD-E-FETCH-FAILED` before Packer/QEMU.
+The main-owned toolchain-recording step also failed on the absent attempt file. Neither leg produced a QCOW2.
+
+The corrected command compares exact module-file checksums instead of invoking Git. Local fault tests cover
+metadata/ZIP transport and guard behavior, not a real NKE image bake. The candidate dispatch cannot exercise
+the reordered attempt recording and outcome guards in candidate workflow YAML; their acceptance requires the
+first post-merge main push and a clean rerun. No successful full run of the corrected candidate is yet recorded.
+
 ## Remaining proof
 
 FDE, full-disk SBOM, publication, qualified execution, and the generated hosted VM adapter remain outside

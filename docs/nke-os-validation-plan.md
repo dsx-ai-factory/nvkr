@@ -12,7 +12,11 @@ Every push to `main`, including a merged PR, selects the exact pushed commit and
 Docker/KVM image builds and boot smoke. Both QCOW2s are uploaded after successful validation. No path filter
 skips merges, and newer pushes do not cancel earlier runs. The automatic post-merge run at `156d32c` passed
 both full builds; the following run at `53ba88b` passed AMD64 but failed ARM64 during module acquisition.
-Those runs do not validate the reliability edits below at a new head.
+The later base run [36944892985](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36944892985)
+at `91567c2` passed both full legs. Candidate run
+[36958996866](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36958996866) used the same main
+workflow with source `db4b8d9` and failed both legs at its ownership-sensitive Git module-file guard.
+The guard is replaced below; no successful full run of the corrected command is yet recorded.
 
 Manual dispatch from the trusted workflow on `main` remains available for either architecture or both, in
 toolchain-only or full mode. The credential-free toolchain pass uses GitHub-hosted native AMD64 and ARM64
@@ -77,14 +81,19 @@ that the build works on the selected KVM runners.
 
 ### Dependency preparation and early failures
 
-The agent fetch command uses Go's existing module downloader and checksum verification. Three entries for the
-same public module proxy use Go's `|` transport fallback; checksum verification happens after transport and
-does not select another supplier. The existing direct-source fallback remains limited to proxy 404/410 responses.
+The agent fetch command uses Go's existing module downloader and checksum verification. Three distinct but
+equivalent URLs for the same public module proxy use Go's `|` transport fallback. Their different URL identities
+avoid reuse of Go's cached metadata errors. The official proxy was checked to serve identical `.info`, `.mod`
+and `.zip` bytes through these equivalent paths. Checksum verification happens after transport and does not
+select another supplier. The existing direct-source fallback remains limited to proxy 404/410 responses.
 The complete download is bounded to 540 seconds with a 10-second kill grace. Completed modules remain in the
-same attempt-local container cache, not a shared Actions cache. Verification is bounded to 60 seconds and
-offline vendoring to 180 seconds, each with the same grace; neither command is retried. `GOWORK=off`,
-`GOTOOLCHAIN=local` and readonly module flags are explicit. Pinned `go.mod` and `go.sum` must remain unchanged
-after acquisition and vendoring. No Packer or component build is retried.
+vendor container's ephemeral module cache, not a shared Actions cache. Verification is bounded to 60 seconds
+and offline vendoring to 180 seconds, each with the same grace; neither command is retried. `GOWORK=off`,
+`GOTOOLCHAIN=local` and empty `GOFLAGS` override ambient build settings. Exact SHA-256 checks enforce unchanged
+`go.mod` and `go.sum` after acquisition and vendoring, without requiring Git or matching checkout ownership.
+Both files must already exist. Download verifies the locked module checksums; offline `go mod verify` checks
+same-run cache consistency. Each failed phase names its budget and retains the underlying exit status.
+No Packer or component build is retried.
 
 The existing source-closure receipt is issued after successful vendoring and hashing. Source commit/tree and
 material checks remain unchanged. Architecture jobs still acquire separate closures: their source receipts bind
@@ -92,14 +101,21 @@ the exact architecture-selected vendor specification and image. Sharing a vendor
 authenticated transport contract, not merely copying one job's directory or adding an Actions cache.
 
 The workflow records its attempt name before starting the lifecycle and preserves the primary exit status with
-`pipefail`. Toolchain recording runs only after an executed lifecycle step. A failed lifecycle without a Plan
+`pipefail`. Full-validation toolchain recording runs only after an executed lifecycle step. A failed lifecycle without a Plan
 reports an unavailable toolchain observation rather than a spurious missing-file failure. A malformed existing
 Plan, mismatched image ID, or successful lifecycle without a Plan remains an error. Available logs are retained.
-The regression suite exercises the actual authored Go command against a fixture module proxy and executes the
-authored workflow snippets; it does not prove ARC availability or full NKE acquisition.
+The toolchain-only job records an image only after successful toolchain construction/validation, even if a
+later identity test fails. The regression suite exercises the actual authored Go command against a fixture
+module proxy: metadata/ZIP 503s, interrupted ZIP transport, non-retried checksum/corrupt-archive failures,
+module-file drift, differing Git ownership, conflicting Go settings and offline verification/vendoring.
+Timeout tests assert the authored budgets and preservation of simulated timeout status, not real kill timing.
+Workflow tests execute the authored snippets and assert specific diagnostics and retained image IDs.
+These tests do not prove ARC availability or full NKE acquisition.
 
-Acceptance for these reliability edits requires a fresh AMD64 and ARM64 full build and boot smoke at the exact
-reviewed head, then one clean rerun. Contract tests alone cannot satisfy that external gate.
+Pre-merge acceptance requires a fresh AMD64 and ARM64 full build and boot smoke at the exact reviewed candidate
+through the trusted main workflow. That tests candidate source/catalog changes, not the candidate workflow YAML.
+After merge, the automatic push run and one clean rerun must exercise the changed workflow steps on both
+architectures. Contract tests alone cannot satisfy either external gate.
 
 ### Full build
 
