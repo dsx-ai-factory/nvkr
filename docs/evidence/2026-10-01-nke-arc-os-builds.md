@@ -211,9 +211,39 @@ the rootful vendor container could not use the differently owned checkout, so `g
 The main-owned toolchain-recording step also failed on the absent attempt file. Neither leg produced a QCOW2.
 
 The corrected command compares exact module-file checksums instead of invoking Git. Local fault tests cover
-metadata/ZIP transport and guard behavior, not a real NKE image bake. The candidate dispatch cannot exercise
-the reordered attempt recording and outcome guards in candidate workflow YAML; their acceptance requires the
-first post-merge main push and a clean rerun. No successful full run of the corrected candidate is yet recorded.
+metadata/ZIP transport and guard behavior. The corrected candidate's full bake is recorded below. Candidate
+dispatch cannot exercise the reordered attempt recording and outcome guards in candidate workflow YAML;
+their acceptance still requires the first post-merge main push and a clean rerun.
+
+## Corrected reliability candidate, 2026-10-02
+
+[Run 37043068395](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395) completed successfully
+with both full architecture jobs. It executed NKD candidate
+`d1e28cec8d66a4aa1def782bedf88392a73cc4b2`, tree `0c0984cee6cfc78384e6405d45459e4bd08fa619`, through the
+trusted main workflow at `91567c2717dd195829d6a88a19a6d6e4baec3dd9`, using the exact NKE commit and tree
+recorded above. [ARM64 job 110958231126](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/job/110958231126)
+and [AMD64 job 110958231246](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/job/110958231246)
+passed acquisition, the lifecycle QCOW2 build, identity recording, source-owned boot smoke and image upload.
+
+| Recorded field | ARM64 | AMD64 |
+|---|---|---|
+| QCOW2 SHA-256 | `d31c8c53ccac6cc4b4a0593a45b52e94660a47e9cd7e1272323cfbbfef5bac14` | `1b8dd35744c328bc0d9dcc5ee281cc6491601fb51ea8d3bd43880a4f3de1d9b6` |
+| QCOW2 size, bytes | `3350724608` | `3622699008` |
+| Plan digest | `sha256:da34e35b1dbe41f47f0655806a5e97790e5b9ba44e1e095ffba3ca6bd717f34b` | `sha256:0570e594c997aeba57ee5ec4b7b22ad1ab7d695491d3fcafe1e454eedfafbb02` |
+| Observed toolchain image ID | `sha256:2dd4c0502dde289d10842f354cd9e860d0d468d2823a0bf80987c3af6483123c` | `sha256:782a1e6444618f86b62180b097c3f3f503eede2e8cffc201b94d9b859539e81d` |
+
+Downloaded evidence binds the candidate, trusted workflow and NKE identities separately. Each retained lifecycle
+record is `complete` in `unqualified-local-execution`, with exactly one successful, unencrypted QCOW2 observation.
+Its digest and size agree with the workflow metadata. Both boot logs confirm cloud-init completion, the NKE
+image contract and root-filesystem growth. The workflow labels these artifacts `unqualified-diagnostic`.
+
+- [ARM64 QCOW2](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11244063827), [ARM64 evidence](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11244300302)
+- [AMD64 QCOW2](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11245430043), [AMD64 evidence](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11244441294)
+
+This proves the corrected candidate's native Docker/KVM bake and boot path. It does not exercise its changed
+workflow YAML, a later documentation-only commit, generated hosted execution, publication or qualification.
+The post-merge workflow validation remains pending. Actions artifacts expire; their compressed transport sizes
+are not the QCOW2 byte counts above.
 
 ## Remaining proof
 

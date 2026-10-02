@@ -16,7 +16,9 @@ The later base run [36944892985](https://github.com/dsx-ai-factory/nke-recipes/a
 at `91567c2` passed both full legs. Candidate run
 [36958996866](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36958996866) used the same main
 workflow with source `db4b8d9` and failed both legs at its ownership-sensitive Git module-file guard.
-The guard is replaced below; no successful full run of the corrected command is yet recorded.
+The corrected candidate `d1e28ce` subsequently passed both full builds, boot smoke and image uploads in
+[run 37043068395](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395). This dispatch used
+trusted main workflow `91567c2`, so it validates the candidate's catalog/source changes, not its workflow edits.
 
 Manual dispatch from the trusted workflow on `main` remains available for either architecture or both, in
 toolchain-only or full mode. The credential-free toolchain pass uses GitHub-hosted native AMD64 and ARM64
@@ -114,9 +116,11 @@ Workflow tests execute the authored snippets and assert specific diagnostics and
 These tests do not prove ARC availability or full NKE acquisition.
 
 Pre-merge acceptance requires a fresh AMD64 and ARM64 full build and boot smoke at the exact reviewed candidate
-through the trusted main workflow. That tests candidate source/catalog changes, not the candidate workflow YAML.
+through the trusted main workflow. Run `37043068395` satisfies that gate for `d1e28ce`; its exact inputs and
+image identities are in the [dated evidence](evidence/2026-10-01-nke-arc-os-builds.md#corrected-reliability-candidate-2026-10-02).
+That tests candidate source/catalog changes, not the candidate workflow YAML or a later documentation-only head.
 After merge, the automatic push run and one clean rerun must exercise the changed workflow steps on both
-architectures. Contract tests alone cannot satisfy either external gate.
+architectures; that workflow acceptance remains pending. Contract tests alone cannot satisfy either external gate.
 
 ### Full build
 
