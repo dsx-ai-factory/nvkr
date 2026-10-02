@@ -15,9 +15,9 @@ documentation and commit message.
 
 | File | Tested Git blob |
 | --- | --- |
-| `pkg/nkd/sbom/disk_inspect.go` | `261564b0a1ad5e653e118c25bb20d01df55ddcdc` |
+| `pkg/nkd/sbom/disk_inspect.go` | `c62d22c2d6c5b1e8709d44dea4d144bbc904f554` |
 | `pkg/nkd/sbom/disk_inspect_test.go` | `8b167c8814e59aaf0c7cec345d1fe9272c51f172` |
-| `pkg/nkd/sbom/disk_inspect_process_test.go` | `2b7aa42f0f9bbab96399daeb7eae73e8442d5cbd` |
+| `pkg/nkd/sbom/disk_inspect_process_test.go` | `b503964e5d9f945c41905bf3ec7384612e075acb` |
 | `pkg/nkd/assemble/codec.go` | `6fdee53fa17dac4427694b394de37c01bb8c708d` |
 | `pkg/nkd/assemble/codec_test.go` | `84a4dc0196c0459c540781314ac10522af756e23` |
 | `go.mod` | `330df898c1808f4433f1db219f7b01f0d58c1a11` |
@@ -26,7 +26,7 @@ documentation and commit message.
 | `toolchains/nkd-disk-inspect/toolchain.lock.json` | `4b65ada6474f5d7b4654bd4bd9c56c5764645c6e` |
 
 The Linux ARM64 test binary, compiled with `CGO_ENABLED=0`, had SHA-256
-`4595dc1d92a3724cd9a95934bacb367160b23712ef8b652d59e04a22d6973b97`.
+`7e434ec8dee5bac3514c1ca82341d32d94582b5ccbe10add0455a2e10ba0afcc`.
 The newly built local runtime image was
 `sha256:2440b6a89c13b4ee3ce0e9a1fc173eb7ff0fb728e80488e8f92d51a0226f0cbd`,
 not a published registry manifest. Its measured `virt-inspector` and `qemu-img`
@@ -60,27 +60,30 @@ workspace. Its enclosing sandbox is caller-owned, not authenticated NKD runtime
 authority.
 
 The command `/test -test.run TestDiskInspectionReal -test.v -test.timeout 15m`
-completed with exit 0. These are transcribed excerpts from terminal output,
-not a complete raw appliance log:
+completed with exit 0 and produced the following excerpts. Complete terminal
+output is retained locally as
+`pr75-final-appliance.log`, SHA-256
+`339589ff4f64eb3744c84793da78da7c4c508b39501afcf56f0f6f03d9b8e4d6`.
+The raw output ends with `PASS`; these excerpts omit the full process listings:
 
 ```text
 === RUN   TestDiskInspectionRealQCOW2
 disk_inspect_test.go:164: diagnostic only: QCOW2 sha256:8150fa1bc3606c54ba1bbe73573d3bdfd357467ffbd2c685ae160125220302e0 bytes=2853175296 installed-packages=730
---- PASS: TestDiskInspectionRealQCOW2 (33.94s)
+--- PASS: TestDiskInspectionRealQCOW2 (35.95s)
 === RUN   TestDiskInspectionRealEncryptedWholeDevice
 disk_inspect_test.go:216: encrypted whole-device rejection, not a partition-key EOF proof: [NKD-E-ENGINE-CAPABILITY] disk inspection requires one operating system
---- PASS: TestDiskInspectionRealEncryptedWholeDevice (17.33s)
+--- PASS: TestDiskInspectionRealEncryptedWholeDevice (15.56s)
 === RUN   TestDiskInspectionRealExternalReferences
 --- PASS: TestDiskInspectionRealExternalReferences (0.02s)
 === RUN   TestDiskInspectionRealCancellation
---- PASS: TestDiskInspectionRealCancellation (0.46s)
+--- PASS: TestDiskInspectionRealCancellation (0.43s)
 PASS
 ```
 
 Both missing external data-file and backing-file fixtures were rejected before
 appliance execution. Cancellation observed the actual `-kernel` QEMU process,
-not just a QMP capability probe: inspector PID1348, emulator PID1622 and recovery
-child PID1623 shared PGID1348. After joined cancellation only init, the test
+not just a QMP capability probe: inspector PID1274, emulator PID1547 and recovery
+child PID1548 shared PGID1274. After joined cancellation only init, the test
 process and `ps` remained. The encrypted whole-device fixture produced no
 inventory; the error denotes the unsupported no-OS layout, not proof of a
 partition key-reading EOF branch.

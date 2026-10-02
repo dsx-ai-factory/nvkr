@@ -187,7 +187,7 @@ func (inspector *DiskInspector) InspectHeldInstalledPackages(ctx context.Context
 		return nil, e.New(e.CodeEngineCapability, "held disk and pinned inspector are required")
 	}
 	if subject.Size() <= 0 || subject.Size() > MaxDiagnosticDiskBytes {
-		return nil, e.New(e.CodeEngineCapability, "disk inspection subject exceeds its diagnostic byte budget")
+		return nil, e.New(e.CodeEngineCapability, "disk inspection subject must be nonempty and within its diagnostic byte budget")
 	}
 	if err := heldfile.RequireExecutableSupport(); err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "executing held disk inspector")

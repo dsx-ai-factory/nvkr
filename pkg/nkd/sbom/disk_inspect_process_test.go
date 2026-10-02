@@ -136,6 +136,9 @@ func TestDiskInspectorProductionProcess(t *testing.T) {
 			inventory, err := inspector.InspectHeldInstalledPackages(ctx, subject, "qcow2", "none")
 			if tc.code != "" {
 				assertDependencyCode(t, err, tc.code)
+				if tc.name == "empty subject" && !strings.Contains(err.Error(), "must be nonempty and within its diagnostic byte budget") {
+					t.Fatalf("empty subject diagnostic describes the wrong admission failure: %v", err)
+				}
 				if inventory != nil {
 					t.Fatal("failed production path issued inventory")
 				}
