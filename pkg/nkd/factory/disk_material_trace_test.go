@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -645,19 +646,19 @@ func TestDiskMaterialTraceRejectsInvalidOwnerSchemaAndTier(t *testing.T) {
 
 func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
 	for _, test := range []struct {
-		name               string
-		disk, build, owner bool
+		name            string
+		disk, build, vm bool
 	}{
-		{name: "disk acquisition", disk: true, owner: true},
-		{name: "disk build", disk: true, build: true, owner: true},
-		{name: "non-disk sibling build", build: true, owner: true},
+		{name: "disk acquisition", disk: true, vm: true},
+		{name: "disk build", disk: true, build: true, vm: true},
+		{name: "non-disk sibling acquisition", vm: true},
 		{name: "no VM owner", build: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			var plan *Plan
 			var operation Node
-			if test.disk {
+			if test.vm {
 				fixture := newVMPackerMaterialFixture(t)
 				plan = fixture.plan
 				if test.build {
@@ -680,9 +681,26 @@ func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
+				if !test.disk {
+					definition := plan.Definition
+					definition.Outputs = append(definition.Outputs, authored.DefinitionOutput{
+						Name: "runtime-copy", Platform: "linux/amd64", Format: authored.OutputExecutable,
+						Components: []string{"runtime"},
+					})
+					stack, err := catalog.ApplyStack(plan.CatalogSnapshot)
+					if err != nil {
+						t.Fatal(err)
+					}
+					plan, err = Compile(t.Context(), definition, plan.Environment, stack, "test")
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
 				id := "node-image/pull-runtime"
 				if test.build {
 					id = "node-image/build-runtime"
+				} else if !test.disk {
+					id = "runtime-copy/pull-runtime"
 				}
 				operation = planNode(plan, id)
 			} else {
@@ -694,15 +712,11 @@ func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
 					}
 				}
 			}
-			owner := localDiskRunResult(t, plan)
-			defer owner.Close()
-			options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/record-filter"})
-			if test.owner {
-				options.materialOwner = owner
-			}
+			options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/record-filter", Jobs: len(plan.Graph.Nodes),
+				vmResolver: &fakeVMDriverResolver{executor: &fakeVMDriverExecutor{}}})
 			run := func(instruction ir.Node, call pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
 				if call.BuildMaterials != nil {
-					t.Fatal("fixture unexpectedly has material inputs")
+					return nil, e.New(e.CodeInternal, "fixture unexpectedly has material inputs")
 				}
 				relocated, err := relocateFactoryPlan(plan, options.Workspace)
 				if err != nil {
@@ -726,15 +740,60 @@ func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
 				}
 				return result, nil
 			}
-			if err := executeLocalProducer(t.Context(), plan, operation, options, run); err != nil {
-				t.Fatal(err)
+			// Exercise automatic scheduler ownership, not a manually supplied owner.
+			// Stop before the VM root: this partial-run contract is not a real bake
+			// or evidence of a complete, successfully observed NKE material trace.
+			stop := e.New(e.CodeBuildFailed, "stop after selected producer observation")
+			var owner *LocalRunResult
+			called := false
+			deps := localRunDeps{
+				admitVMBuilds: func(context.Context, *Plan, string) (map[string]vmAdmission, error) {
+					return nil, nil
+				},
+				admitRunners: func(context.Context, *Plan, LocalRunOptions, []string) error { return nil },
+				prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
+					return nil, nil
+				},
+				makeDisk: admittedLocalDiskProducer,
+				executeNode: func(ctx context.Context, scheduledPlan *Plan, node Node, scheduled LocalRunOptions, _ map[string]string) error {
+					if node.ID != operation.ID {
+						return nil
+					}
+					called = true
+					owner = scheduled.materialOwner
+					if (owner != nil) != test.vm || scheduled.producers == nil {
+						return e.New(e.CodeInternal, "scheduler did not thread the expected owner/session")
+					}
+					if err := executeLocalProducer(ctx, scheduledPlan, node, scheduled, run); err != nil {
+						return err
+					}
+					if owner != nil {
+						want := 0
+						if test.disk {
+							want = 1
+						}
+						if len(owner.materialConsumptions) != want {
+							return e.New(e.CodeInternal, "retained %d invocations, want %d", len(owner.materialConsumptions), want)
+						}
+						if test.disk {
+							if _, recorded := owner.materialConsumptions[node.ID]; !recorded {
+								return e.New(e.CodeInternal, "selected disk producer has no consumption observation")
+							}
+							trace, err := owner.observeDiskMaterials(ctx, scheduledPlan, scheduledPlan.LifecycleOutputs[0])
+							if trace != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
+								return e.New(e.CodeInternal, "partial run did not reject the absent disk producer outcome: %v", err)
+							}
+						}
+					}
+					return stop
+				},
 			}
-			want := 0
-			if test.disk && test.owner {
-				want = 1
+			result, err := runLocal(t.Context(), plan, options, deps)
+			if !called || result != nil || !errors.Is(err, stop) {
+				t.Fatalf("partial run = %#v, %v; selected producer called = %t", result, err, called)
 			}
-			if len(owner.materialConsumptions) != want {
-				t.Fatalf("retained %d invocations, want %d", len(owner.materialConsumptions), want)
+			if owner != nil && (!owner.diskClosed || len(owner.materialConsumptions) != 0) {
+				t.Fatal("failed partial run did not close and discard its material observations")
 			}
 		})
 	}
