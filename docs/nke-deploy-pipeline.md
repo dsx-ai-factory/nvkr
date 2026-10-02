@@ -67,22 +67,20 @@ The [GitHub Environment](../definitions/nke-deploy/environment-github.yaml) publ
 `ghcr.io/dsx-ai-factory/nke-recipes` and selects keyless signing. Configure:
 
 - `NKE_SOURCE_TOKEN`: read-only Contents access to `dsx-ai-factory/nke`.
-- The `nkd-release` deployment environment: admit `main` and `feat/nke-deploy-pipeline`.
+- The `nkd-release` deployment environment: admit only `main`.
 - GHCR package write access for this repository's `GITHUB_TOKEN`.
 
-The Environment explicitly adds `feat/nke-deploy-pipeline` through `githubDispatchBranches`, and its
-signing identity accepts that branch or `main`. The repository deployment policy must allow the same
-branches. Source-token permissions and GHCR access still need runtime verification.
+The Environment admits default-branch execution only, and its signing identity accepts `main`.
+The repository deployment policy must enforce the same restriction.
 
-Dispatch the full pipeline from the branch:
+Dispatch the full pipeline from `main`:
 
 ```sh
-gh workflow run nkd-run.yml --repo dsx-ai-factory/nke-recipes --ref feat/nke-deploy-pipeline
+gh workflow run nkd-run.yml --repo dsx-ai-factory/nke-recipes --ref main
 ```
 
 It builds, inventories, packages, publishes, signs, verifies, and finalizes the six required outputs.
-Branch dispatch is opt-in: remove the exception and narrow the signing/deployment policies when branch
-validation is finished. Generated wiring is not evidence of a completed release.
+Generated wiring is not evidence of a completed release.
 
 Catalog revalidation needs private Git access in bootstrap and finalization. Credentials are scoped to those
 steps and source fetches, with repository-specific Git helpers. The merge gate acquires a fixed NKE checkout
