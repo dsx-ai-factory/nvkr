@@ -50,14 +50,19 @@ These outputs are non-authoritative diagnostics. The boundary and lifecycle orde
 [ARC runs on both architectures](../evidence/2026-10-01-nke-arc-os-builds.md) uploaded failed-run diagnostics,
 including the material manifest after the corrected KVM check. The subsequent ARM64 and AMD64 runs also completed
 QCOW2 collection, boot smoke and image upload. Earlier failures remain scoped to their exact candidates.
-A separate diagnostic installed-package inspector now binds held QCOW2 and exact inspector/QEMU executable
+A staged diagnostic installed-package inspector binds held QCOW2 and exact `virt-inspector` and `qemu-img` probe executable
 bytes, rejects encrypted or externally dependent envelopes, and uses a private read-only libguestfs copy with
 explicit TCG execution. It rechecks the copy and held subject before returning an immutable installed-metadata
 inventory. One retained ARM64 non-FDE disk yielded 730 installed packages in the
-[local inspection evidence](../evidence/2026-10-01-nke-os-disk-inspection.md). This is not full-disk inspection or
+[exact-source non-root local replay](../evidence/2026-10-02-nke-os-disk-inspection.md). This is not full-disk inspection or
 CycloneDX: staged package/image archives and loose files, the factory-owned material-trace handoff, complete
-acquisition records and semantic reconciliation remain absent. The enclosing loader, libraries and appliance
-remain diagnostic runtime TCB, not an authenticated production closure. Public lifecycle SBOM/publication and
+acquisition records and semantic reconciliation remain absent. The enclosing loader, libraries, `qemu-system`
+emulator, appliance `qemu-img`, supermin and kernel remain diagnostic runtime TCB, not an authenticated
+production closure. A non-root caller is enforced; credential-free, network-less sandboxing remains a caller
+requirement, not an authenticated NKD capability. The shared codec probe explicitly selects the driver and
+rejects backing/data-file references; diagnostic admission is QCOW2-only. The qualified VMDK extent layout and
+the local lifecycle's bounded QCOW2 header handling still require separate external-data/feature admission.
+Public lifecycle SBOM/publication and
 qualified admission are not enabled by this API.
 The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
 producer evidence verdict, performs content validation, or claims qualified disk reproduction. Reproduced or
@@ -363,6 +368,8 @@ Earlier verification does not transfer by renaming or reinterpreting records.
 
 | Record | What actually ran | Limit |
 |---|---|---|
+| [Corrected local installed-package inspection, 2026-10-02](../evidence/2026-10-02-nke-os-disk-inspection.md) | Exact-source ARM64 ELF contract tests and non-root libguestfs scan, external-reference rejection and actual appliance cancellation | Source replacements and test-binary digest recorded; terminal excerpts are transcriptions, not a complete raw appliance log. Diagnostic installed metadata only, not full SBOM, runtime authentication or qualified reproduction |
+| [Local installed-package inspection, 2026-10-01](../evidence/2026-10-01-nke-os-disk-inspection.md) | Historical ARM64 libguestfs diagnostic scan of a retained non-FDE disk, external-reference negatives and cancellation | Exact draft tree was not retained; not committed-candidate acceptance, full-disk SBOM, publication or qualified reproduction |
 | [Acquired NKE Helm charts, 2026-10-01](../evidence/2026-10-01-acquired-helm-packaging.md) | Local CLI acquired and packaged four real charts; each OCI chart layer equals the downloaded bytes and lock digest | Unqualified local execution; no publication, signing, installation or acquired-chart dependency scan |
 | [Cosign discovery failure, 2026-09-11](../evidence/2026-09-11-cosign-discovery-fix.md) | Run 34631274098 created SBOM bundles, published and signed the single-entry layout, then failed provenance verification; cosign 2.6.3 reproduced the exact error locally; cosign 3.1.3 passed standard bundle verification | Local-key interoperability and repository contracts; updated hosted keyless verification/finalization and independent GHCR acceptance remain unexercised |
 | [Separated repositories, 2026-09-10](../publication-architecture.md#local-validation) | Actual NVIDIA deliverables published once into distinct loopback repositories, metadata/evidence root published last, full cross-repository pull and exact artifact reference projection; absent copies in the release repository confirmed | Local and unsigned; GHCR permissions and hosted signing/finalization for the new locations remain unexercised |

@@ -9,4 +9,9 @@ Packer/QEMU toolchain used by the local direct-Packer executor. Its image is not
 catalog-eligible until both platform variants are published and pinned by their
 immutable repository digests.
 
-Use `definitions/` and the demo index for current workflows. Wrapped OS-image integration remains deferred.
+`nkd-disk-inspect/` supplies the staged installed-package diagnostic API's
+libguestfs runtime. Its source pins are checked by repository tests. The image is
+unpublished, unqualified, and not a maintained lifecycle toolchain. See its README
+for the mandatory non-root, credential-free and network-less execution boundary.
+
+Use `definitions/` and the demo index for current workflows. Generated hosted OS-image integration remains deferred.

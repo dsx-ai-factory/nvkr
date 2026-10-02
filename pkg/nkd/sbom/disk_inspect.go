@@ -11,7 +11,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +32,7 @@ const (
 	MaxDiagnosticDiskBytes    = 8 << 30
 	maxDiskPackageReportBytes = 8 << 20
 	maxDiskInstalledPackages  = 16384
+	maxDiskDiagnosticBytes    = 4096
 )
 
 // DiskInspector holds one pinned virt-inspector executable. This diagnostic
@@ -115,13 +118,31 @@ func OpenDiskInspector(ctx context.Context, executablePath, digest string, codec
 	}
 	// debug/elf is the standard-library format owner; no approximate ELF grammar.
 	image, err := elf.NewFile(executable)
-	if err != nil || (image.Type != elf.ET_EXEC && image.Type != elf.ET_DYN) {
+	if err != nil || !diskInspectorELF(image) {
 		_ = executable.Close()
 		return nil, e.New(e.CodeEngineCapability, "disk inspector is not a Linux ELF executable")
 	}
 	return &DiskInspector{executable: executable, codec: codec}, nil
 }
 
+func diskInspectorELF(image *elf.File) bool {
+	if image.Entry == 0 || (image.Type != elf.ET_EXEC && image.Type != elf.ET_DYN) {
+		return false
+	}
+	// Entry and Machine come from debug/elf, not a partial header parser. ET_DYN
+	// admits PIE executables; an entry-less shared library is not executable.
+	switch runtime.GOARCH {
+	case "amd64":
+		return image.Machine == elf.EM_X86_64
+	case "arm64":
+		return image.Machine == elf.EM_AARCH64
+	default:
+		return false
+	}
+}
+
+// Close waits for an active inspection to finish. Cancel that inspection's
+// context first when immediate shutdown is required; its deadline is ten minutes.
 func (inspector *DiskInspector) Close() error {
 	if inspector == nil {
 		return nil
@@ -144,6 +165,9 @@ func (inspector *DiskInspector) Close() error {
 // which reopen disk paths rather than share NKD's inherited descriptor. Both the
 // copy and held source are rechecked before any inventory is returned. No host
 // mount, guest executable, decryption key, or network acquisition is requested.
+// Callers MUST provide a non-root, network-less, credential-free container or
+// equivalent sandbox before calling this API. This capability does not admit or
+// authenticate containment; direct libguestfs execution is not a host sandbox.
 func (inspector *DiskInspector) InspectHeldInstalledPackages(ctx context.Context,
 	subject *heldfile.File, format, encryption string,
 ) (*DiskInstalledInventory, error) {
@@ -155,6 +179,9 @@ func (inspector *DiskInspector) InspectHeldInstalledPackages(ctx context.Context
 	}
 	if format != "qcow2" {
 		return nil, e.New(e.CodeEngineCapability, "disk package inspection supports only QCOW2")
+	}
+	if os.Geteuid() == 0 {
+		return nil, e.New(e.CodeEngineCapability, "disk package inspection requires a non-root sandbox caller")
 	}
 	if inspector == nil || subject == nil {
 		return nil, e.New(e.CodeEngineCapability, "held disk and pinned inspector are required")
@@ -221,7 +248,8 @@ func diskInspectorEnvironment(workspace string) []string {
 	// No KVM capability is admitted; use the supported TCG setting. Nothing
 	// from the caller's ambient environment configures the appliance.
 	return []string{"PATH=/usr/bin:/bin", "HOME=" + workspace, "TMPDIR=" + workspace,
-		"XDG_CONFIG_HOME=" + workspace, "LC_ALL=C", "TZ=UTC", "LIBGUESTFS_BACKEND=direct",
+		"XDG_CONFIG_HOME=" + workspace, "XDG_RUNTIME_DIR=" + workspace,
+		"LIBGUESTFS_CACHEDIR=" + workspace, "LC_ALL=C", "TZ=UTC", "LIBGUESTFS_BACKEND=direct",
 		"LIBGUESTFS_BACKEND_SETTINGS=force_tcg"}
 }
 
@@ -247,9 +275,17 @@ func inspectHeldDiskPackages(ctx context.Context, subject *heldfile.File, inspec
 		return nil, e.New(e.CodeUnverifiedRef, "disk inspection requires exact nonempty subject and tool bytes")
 	}
 	if err := subject.AssertUnchangedContext(ctx); err != nil {
+		if ctx.Err() != nil {
+			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "disk inspection subject validation canceled")
+		}
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "rechecking held disk subject")
 	}
-	workspace, err := os.MkdirTemp("", "nkd-disk-inspect-*")
+	// libguestfs v1.52 puts non-root sockets beneath XDG_RUNTIME_DIR and adds
+	// /libguestfsXXXXXX/guestfsd.sock. A short /tmp parent keeps that pathname
+	// within Linux sockaddr_un's limit, regardless of the caller's TMPDIR.
+	// Root ignores XDG_RUNTIME_DIR upstream and is rejected at API admission.
+	// Cache, appliance temporary files and sockets share ownership.
+	workspace, err := os.MkdirTemp("/tmp", "nkd-di-*")
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "creating private disk inspection workspace")
 	}
@@ -272,7 +308,13 @@ func inspectHeldDiskPackages(ctx context.Context, subject *heldfile.File, inspec
 		if ctx.Err() != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "disk inspection canceled")
 		}
-		return nil, e.Wrap(e.CodeEnvelopeDecode, err, "disk inspector failed: %s", strings.TrimSpace(diagnostic.String()))
+		raw := diagnostic.Bytes()
+		truncated := len(raw) > maxDiskDiagnosticBytes
+		if truncated {
+			raw = raw[:maxDiskDiagnosticBytes]
+		}
+		return nil, e.Wrap(e.CodeEnvelopeDecode, err, "disk inspector failed: %s (truncated=%t)",
+			strconv.Quote(strings.TrimSpace(string(raw))), truncated)
 	}
 	if ctx.Err() != nil {
 		return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "disk inspection canceled before snapshot verification")
@@ -301,6 +343,9 @@ func inspectHeldDiskPackages(ctx context.Context, subject *heldfile.File, inspec
 		return nil, e.New(e.CodeVerifyFailed, "disk inspection snapshot bytes changed")
 	}
 	if err := subject.AssertUnchangedContext(ctx); err != nil {
+		if ctx.Err() != nil {
+			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "disk inspection subject revalidation canceled")
+		}
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "disk subject changed during inspection")
 	}
 	packages, err := installedPackagesFromXML(output.Bytes())
@@ -327,7 +372,7 @@ func installedPackagesFromXML(raw []byte) ([]InstalledDiskPackage, error) {
 			break
 		}
 		if err != nil {
-			return nil, e.Wrap(e.CodeEnvelopeDecode, err, "checking disk report resource budget")
+			return nil, diskXMLFailure(err, "checking disk report resource budget")
 		}
 		if element, ok := token.(xml.StartElement); ok {
 			if element.Name.Space != "" {
@@ -357,7 +402,7 @@ func installedPackagesFromXML(raw []byte) ([]InstalledDiskPackage, error) {
 	}
 	decoder := xml.NewDecoder(bytes.NewReader(raw))
 	if err := decoder.Decode(&report); err != nil {
-		return nil, e.Wrap(e.CodeEnvelopeDecode, err, "decoding disk installed-package report")
+		return nil, diskXMLFailure(err, "decoding disk installed-package report")
 	}
 	for {
 		token, err := decoder.Token()
@@ -365,20 +410,17 @@ func installedPackagesFromXML(raw []byte) ([]InstalledDiskPackage, error) {
 			break
 		}
 		if err != nil {
-			return nil, e.Wrap(e.CodeEnvelopeDecode, err, "checking disk report boundary")
+			return nil, diskXMLFailure(err, "checking disk report boundary")
 		}
 		text, ok := token.(xml.CharData)
 		if !ok || len(bytes.TrimSpace(text)) != 0 {
 			return nil, e.New(e.CodeEnvelopeDecode, "disk inspector returned trailing XML content")
 		}
 	}
-	if report.XMLName.Space != "" || len(report.Systems) != 1 {
-		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection requires one operating system")
+	if len(report.Systems) != 1 {
+		return nil, e.New(e.CodeEngineCapability, "disk inspection requires one operating system")
 	}
 	system := report.Systems[0]
-	if len(system.Apps) > maxDiskInstalledPackages {
-		return nil, e.New(e.CodeEnvelopeDecode, "disk installed-package inventory exceeds its package budget")
-	}
 	if len(system.Name) != 1 || system.Name[0] != "linux" || len(system.Format) != 1 || system.Format[0] != "deb" {
 		return nil, e.New(e.CodeEngineCapability, "disk installed-package inspection supports Linux Debian-package metadata")
 	}
@@ -415,6 +457,17 @@ func installedPackagesFromXML(raw []byte) ([]InstalledDiskPackage, error) {
 		}
 	}
 	return slices.Compact(packages), nil
+}
+
+// encoding/xml owns parsing. Its errors can include arbitrarily long tag names
+// from the report, so expose only a library-issued line number and static phase,
+// never the raw error as a wrapped cause that user-facing formatting can print.
+func diskXMLFailure(err error, phase string) error {
+	var syntax *xml.SyntaxError
+	if errors.As(err, &syntax) {
+		return e.New(e.CodeEnvelopeDecode, "%s: invalid XML at line %d", phase, syntax.Line)
+	}
+	return e.New(e.CodeEnvelopeDecode, "%s: invalid inspector XML", phase)
 }
 
 func oneDiskPackageField(values []string, required bool) (string, error) {

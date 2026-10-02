@@ -23,9 +23,15 @@ func code(err error) nkderr.Code {
 
 func fakeQemuImg(t *testing.T, infoJSON string) (string, string) {
 	t.Helper()
+	return fakeQemuImgDriver(t, infoJSON, "qcow2")
+}
+
+func fakeQemuImgDriver(t *testing.T, infoJSON, driver string) (string, string) {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "qemu-img")
 	script := "#!/bin/sh\n" +
 		"if [ \"$1\" = info ]; then " +
+		"[ \"$#\" -eq 5 ] && [ \"$2\" = -f ] && [ \"$3\" = '" + driver + "' ] && [ \"$4\" = --output=json ] && [ \"$5\" = /proc/self/fd/4 ] || exit 8; " +
 		"if [ -n \"${NKD_RENAME_RESTORE_ENVELOPE:-}\" ]; then " +
 		"mv \"$NKD_RENAME_RESTORE_ENVELOPE\" \"$NKD_RENAME_RESTORE_ENVELOPE.before-attack\"; " +
 		"printf 'mutated-after-snapshot' > \"$NKD_RENAME_RESTORE_ENVELOPE\"; " +
@@ -174,8 +180,10 @@ func TestValidateHeldEnvelope(t *testing.T) {
 		code   nkderr.Code
 	}{
 		{"valid", codec, "qcow2", input, ""},
-		{"nil codec", nil, "qcow2", input, nkderr.CodeEngineCapability},
-		{"unsupported format", codec, "raw", input, nkderr.CodeEnvelopeDecode},
+		{"nil codec", nil, "qcow2", input, nkderr.CodeTrustPolicyMissing},
+		{"unsupported format", codec, "raw", input, nkderr.CodeEngineCapability},
+		{"VMDK extent layouts not admitted", codec, "vmdk", input, nkderr.CodeEngineCapability},
+		{"VHD diagnostic capability not admitted", codec, "vhd", input, nkderr.CodeEngineCapability},
 		{"missing input", codec, "qcow2", nil, nkderr.CodeEnvelopeDecode},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -189,10 +197,45 @@ func TestValidateHeldEnvelope(t *testing.T) {
 	if err := codec.ValidateHeldEnvelope(ctx, "qcow2", input); code(err) != nkderr.CodeTimeout {
 		t.Fatalf("canceled validation = %v", err)
 	}
+	if err := codec.ValidateHeldEnvelope(nil, "qcow2", input); code(err) != nkderr.CodeUsage { //nolint:staticcheck // verifies nil context admission
+		t.Fatalf("nil-context validation=%v", err)
+	}
+	encrypted, err := heldfile.FromBytesContext(t.Context(), luksMagic, heldfile.Options{Label: "LUKS negative", MaxBytes: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer encrypted.Close()
+	if err := codec.ValidateHeldEnvelope(t.Context(), "qcow2", encrypted); code(err) != nkderr.CodeEncryptedArtifact {
+		t.Fatalf("LUKS validation=%v", err)
+	}
 	if err := codec.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := codec.ValidateHeldEnvelope(t.Context(), "qcow2", input); code(err) != nkderr.CodeTrustPolicyMissing {
 		t.Fatalf("closed validation = %v", err)
+	}
+}
+
+func TestQualifiedCodecExplicitDrivers(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("qualified descriptor execution requires Linux")
+	}
+	for _, tc := range []struct{ format, driver string }{{"qcow2", "qcow2"}, {"vhd", "vpc"}} {
+		t.Run(tc.format, func(t *testing.T) {
+			tool, digest := fakeQemuImgDriver(t, fmt.Sprintf(`{"format":%q,"virtual-size":12}`, tc.driver), tc.driver)
+			codec, err := OpenQemuImgCodec(t.Context(), tool, digest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer codec.Close()
+			path := filepath.Join(t.TempDir(), "subject")
+			if err := os.WriteFile(path, []byte("hello world!"), 0o400); err != nil {
+				t.Fatal(err)
+			}
+			_, size, err := codec.EnvelopeLogicalDigest(t.Context(), tc.format, path)
+			if err != nil || size != 12 {
+				t.Fatalf("explicit %s driver failed: %d, %v", tc.driver, size, err)
+			}
+		})
 	}
 }

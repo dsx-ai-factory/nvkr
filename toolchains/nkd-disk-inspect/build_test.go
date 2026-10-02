@@ -1,0 +1,67 @@
+package diskinspect_test
+
+import (
+	"encoding/json"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/google/go-containerregistry/pkg/name"
+)
+
+func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
+	raw, err := os.ReadFile("toolchain.lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lock struct {
+		SchemaVersion    string             `json:"schemaVersion"`
+		BaseImage        string             `json:"baseImage"`
+		DownloadImage    string             `json:"downloadImage"`
+		UbuntuSnapshot   string             `json:"ubuntuSnapshot"`
+		Packages         map[string]string  `json:"packages"`
+		Images           map[string]*string `json:"images"`
+		PublicationGates map[string]string  `json:"publicationGates"`
+	}
+	if err := json.Unmarshal(raw, &lock); err != nil {
+		t.Fatal(err)
+	}
+	if lock.SchemaVersion != "nkd.dev/disk-inspect-toolchain/v1" || len(lock.Packages) != 6 || len(lock.Images) != 2 || lock.Images["amd64"] != nil || lock.Images["arm64"] != nil || lock.PublicationGates["licenseApproval"] != "not-recorded" || lock.PublicationGates["vulnerabilityApproval"] != "not-recorded" {
+		t.Fatal("diagnostic source lock has an unexpected contract or publication claim")
+	}
+	for _, arch := range []string{"amd64", "arm64"} {
+		if _, ok := lock.Images[arch]; !ok {
+			t.Fatalf("missing diagnostic image slot %s", arch)
+		}
+	}
+	for _, image := range []string{lock.BaseImage, lock.DownloadImage} {
+		if _, err := name.NewDigest(image); err != nil {
+			t.Fatalf("source image is not digest-pinned: %v", err)
+		}
+	}
+	data, err := os.ReadFile("Dockerfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dockerfile := string(data)
+	for _, text := range []string{"FROM " + lock.BaseImage, "FROM " + lock.DownloadImage,
+		"https://snapshot.ubuntu.com/ubuntu/" + lock.UbuntuSnapshot,
+		"chmod 0644 /boot/vmlinuz-*;",
+		"/etc/apt/sources.list.d/ubuntu.sources /etc/ssl/certs/ca-certificates.crt"} {
+		if !strings.Contains(dockerfile, text) {
+			t.Fatalf("Dockerfile does not match lock/cleanup: %q", text)
+		}
+	}
+	for name, version := range lock.Packages {
+		text := name + "=" + version
+		if strings.HasPrefix(name, "qemu-system-") {
+			if !strings.Contains(dockerfile, "qemu_package="+name) {
+				t.Fatalf("missing architecture package %s", name)
+			}
+			text = "${qemu_package}=" + version
+		}
+		if !strings.Contains(dockerfile, text) {
+			t.Fatalf("missing locked package %s", text)
+		}
+	}
+}

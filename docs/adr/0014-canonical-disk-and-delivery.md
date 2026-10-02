@@ -102,6 +102,13 @@ bind the dynamic loader and library closure; that root-owned state remains part 
 hermetic `qemu` closure is specified. Two spikes remain (below): **decode determinism**, because trust attaches
 to the decoded stream rather than to conversion, and the **ext4 full-rootfs residual**.
 
+The shared probe passes the declared driver explicitly (`vhd` maps to QEMU's `vpc`), never auto-detects or
+requests `--backing-chain`, and rejects encryption, backing files and QCOW2 external data-file metadata before
+decoding. Explicit `vpc` selection permits fixed VHDs that auto-detection would classify as RAW; this is format
+admission, not evidence of decode determinism. The separate diagnostic installed-package gate admits QCOW2
+only. VMDK extent containment and complete QCOW2 incompatible-feature admission in the lifecycle's bounded
+header check remain unresolved; the header observer is not a self-contained-image or full decoder verdict.
+
 The implemented command surface is deliberately narrower than the target delivery model. It can measure an
 existing RAW or ISO into a typed `DiskManifest`, and Linux can verify an existing `qcow2` envelope through the
 exact held codec path. Script-backed RAW/ISO/`qcow2` production, ambient privileged rootfs production, boot
@@ -196,7 +203,8 @@ deployment. No provisioning bundle or node-SKU interface is retained without a s
 
 Current contract evidence in `pkg/nkd/assemble/*_test.go` covers canonical RAW and ISO identities, per-block
 manifests, strict legacy-role rejection, pre-encryption rejection, qualified exact held `qemu` executable, input,
-and output capabilities, format/encryption/backing-file probes, decoded logical identity, no-follow regular-file
+and output capabilities, exact explicit probe argv including `vhd` to `vpc`, format/encryption/backing/data-file
+probes, QCOW2-only diagnostic admission, decoded logical identity, no-follow regular-file
 capture, platform fail-closed behavior, bounded block-manifest allocations, and mutation or subject-substitution
 negatives. CLI and local-runner admission tests prove unsupported producer, boot, encryption, qualified-package,
 and removed staging interfaces fail before catalog, graph, input, output, or subprocess I/O, while

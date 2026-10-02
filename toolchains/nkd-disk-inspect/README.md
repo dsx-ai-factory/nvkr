@@ -29,15 +29,43 @@ Installed-package output follows
 omits empty optional version, release and architecture fields and zero epochs.
 NKD keeps those fields separate and does not guess missing versions.
 
-The diagnostic API holds exact executable and QCOW2 bytes, validates the
-self-contained unencrypted envelope with held QEMU, creates a private read-only
+The staged API has no lifecycle/CLI caller yet. It holds exact `virt-inspector`,
+`qemu-img` probe and QCOW2 bytes, validates the
+self-contained unencrypted envelope with held `qemu-img`, creates a private read-only
 snapshot and checks it after inspection. The diagnostic capability deliberately
 uses the upstream `force_tcg` backend setting and grants no KVM-device access.
 Libguestfs uses its appliance, not a
 host mount, and no guest executable, credentials or network are requested.
-Root-owned dynamic loaders, libraries, appliance and QEMU subprocesses remain the
+Dynamic loaders, libraries, `qemu-system-*`, appliance `qemu-img`, supermin and kernel remain the
 explicit enclosing runtime TCB. See upstream
 [security guidance](https://libguestfs.org/guestfs-security.1.html).
+
+Callers MUST supply an unprivileged, non-root, network-less, credential-free
+container or equivalent sandbox before calling the API. UID zero is rejected;
+the API does not authenticate the enclosing sandbox. Use a standard container
+init process to reap killed descendants, do not mount credentials or host
+devices, and remove all capabilities. The current exact probe pin must include
+the QEMU CVE-2024-4467 fix; an arbitrary caller pin is not security clearance.
+The API places its private snapshot, temporary appliance files, cache and socket
+directories beneath a short `/tmp` workspace. Budget up to 8 GiB for the held
+input and an additional 8 GiB copy, plus appliance/cache/overlay storage; `/tmp`
+may be memory-backed. Cancel inspection before `Close` when immediate shutdown
+is needed. Installed-package inspection currently supports one Linux Debian
+package-manager root; no-root or multi-root layouts return `engine-capability`.
+An encrypted guest volume can therefore be rejected as an unsupported layout,
+not necessarily a detected encryption marker.
+
+Ubuntu installs the appliance kernel with root-only read permissions. The image
+build makes only its packaged `/boot/vmlinuz-*` files readable (`0644`), so
+unprivileged supermin can construct its appliance. This does not grant root,
+device access, or write permission to the caller. The bootstrap CA bundle and
+APT source file are removed after acquisition; runtime inspection does not
+require network package access.
+
+Source `toolchain.lock.json` pins the frozen acquisition inputs, not an image
+digest or runtime closure. `go test ./toolchains/nkd-disk-inspect` checks them
+against the Dockerfile. No AMD64 executable measurements are invented. Executable
+hashes generated inside a local image are descriptive, not independent evidence.
 
 Installed-package inventory is not a complete disk SBOM. It excludes uninstalled
 Debian packages, staged OCI archives and loose files. Completing CycloneDX needs

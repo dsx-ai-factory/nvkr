@@ -3,6 +3,7 @@ package sbom
 import (
 	"bytes"
 	"context"
+	"debug/elf"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,7 @@ func TestDiskInspectorInvocation(t *testing.T) {
 		t.Fatalf("unexpected inspector arguments: %v", got)
 	}
 	want := []string{"PATH=/usr/bin:/bin", "HOME=/private", "TMPDIR=/private", "XDG_CONFIG_HOME=/private",
+		"XDG_RUNTIME_DIR=/private", "LIBGUESTFS_CACHEDIR=/private",
 		"LC_ALL=C", "TZ=UTC", "LIBGUESTFS_BACKEND=direct", "LIBGUESTFS_BACKEND_SETTINGS=force_tcg"}
 	if got := diskInspectorEnvironment("/private"); !slices.Equal(got, want) {
 		t.Fatalf("unexpected inspector environment: %v", got)
@@ -44,8 +46,8 @@ func TestDiskInstalledPackageProjection(t *testing.T) {
 		{"wrong root", "<other/>", e.CodeEnvelopeDecode},
 		{"namespaced root", strings.Replace(diskPackageXML, "<operatingsystems>", `<operatingsystems xmlns="other">`, 1), e.CodeEnvelopeDecode},
 		{"second document", diskPackageXML + diskPackageXML, e.CodeEnvelopeDecode},
-		{"no system", "<operatingsystems/>", e.CodeEnvelopeDecode},
-		{"two systems", strings.Replace(diskPackageXML, "</operatingsystems>", "<operatingsystem/></operatingsystems>", 1), e.CodeEnvelopeDecode},
+		{"no system", "<operatingsystems/>", e.CodeEngineCapability},
+		{"two systems", strings.Replace(diskPackageXML, "</operatingsystems>", "<operatingsystem/></operatingsystems>", 1), e.CodeEngineCapability},
 		{"unsupported OS", strings.Replace(diskPackageXML, "linux", "windows", 1), e.CodeEngineCapability},
 		{"unsupported package format", strings.Replace(diskPackageXML, "deb", "rpm", 1), e.CodeEngineCapability},
 		{"duplicate package field", strings.Replace(diskPackageXML, "<name>pkg</name>", "<name>pkg</name><name>other</name>", 1), e.CodeEnvelopeDecode},
@@ -56,7 +58,9 @@ func TestDiskInstalledPackageProjection(t *testing.T) {
 		{"empty optional field", strings.Replace(diskPackageXML, "<release>1ubuntu1</release>", "<release/>", 1), ""},
 		{"oversized report", strings.Repeat(" ", maxDiskPackageReportBytes+1), e.CodeEnvelopeDecode},
 		{"package allocation budget", "<operatingsystems>" + strings.Repeat("<application/>", maxDiskInstalledPackages+1) + "</operatingsystems>", e.CodeEnvelopeDecode},
-		{"empty inventory", strings.Replace(diskPackageXML, "<applications>", "<unused>", 1), e.CodeEnvelopeDecode},
+		{"empty inventory", strings.Replace(diskPackageXML, "<applications><application><name>pkg</name><version>2.0</version><release>1ubuntu1</release><arch>arm64</arch></application></applications>", "<applications/>", 1), e.CodeProvenanceMissing},
+		{"invalid optional field", strings.Replace(diskPackageXML, "<release>1ubuntu1</release>", "<release>bad&#10;</release>", 1), e.CodeEnvelopeDecode},
+		{"XML prolog", `<?xml version="1.0"?>` + diskPackageXML, ""},
 		{"no applications", "<operatingsystems><operatingsystem><name>linux</name><package_format>deb</package_format></operatingsystem></operatingsystems>", e.CodeProvenanceMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,6 +106,22 @@ func TestDiskInstalledPackageOrderingAndDuplicates(t *testing.T) {
 			}
 			if tc.name == "sorted metadata" && packages[0].Name != "pkg" {
 				t.Fatal("packages not sorted")
+			}
+		})
+	}
+}
+
+func TestDiskInspectorXMLFailureBounds(t *testing.T) {
+	for _, tc := range []struct{ name, report string }{
+		{"long mismatched tag", "<" + strings.Repeat("a", 65536) + "></other>"},
+		{"control in tag", "<operatingsystems\x1b/>"},
+		{"unsupported encoding", `<?xml version="1.0" encoding="` + strings.Repeat("a", 65536) + `"?><operatingsystems/>`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := installedPackagesFromXML([]byte(tc.report))
+			assertDependencyCode(t, err, e.CodeEnvelopeDecode)
+			if len(err.Error()) > 256 || strings.ContainsRune(err.Error(), '\x1b') {
+				t.Fatalf("unsafe XML diagnostic of %d bytes", len(err.Error()))
 			}
 		})
 	}
@@ -189,7 +209,7 @@ func TestDiskInspectionRealEncryptedWholeDevice(t *testing.T) {
 	}
 	defer subject.Close()
 	inventory, err := inspector.InspectHeldInstalledPackages(ctx, subject, "qcow2", "none")
-	assertDependencyCode(t, err, e.CodeEnvelopeDecode)
+	assertDependencyCode(t, err, e.CodeEngineCapability)
 	if inventory != nil {
 		t.Fatalf("encrypted whole device issued an inventory: %v", err)
 	}
@@ -400,6 +420,13 @@ func TestDiskInspectionSnapshotProtocol(t *testing.T) {
 			_, err := io.WriteString(out, diskPackageXML)
 			return err
 		}},
+		{"permissions-only mutation", e.CodeVerifyFailed, func(_ context.Context, path, _ string, out, _ io.Writer) error {
+			if err := os.Chmod(path, 0o600); err != nil {
+				return err
+			}
+			_, err := io.WriteString(out, diskPackageXML)
+			return err
+		}},
 		{"malformed report", e.CodeEnvelopeDecode, func(_ context.Context, _, _ string, out, _ io.Writer) error {
 			_, err := io.WriteString(out, "broken")
 			return err
@@ -456,8 +483,10 @@ func TestDiskInspectorAdmission(t *testing.T) {
 		format, encryption string
 		code               e.Code
 	}{{"qcow2", "luks2", e.CodeEncryptedArtifact}, {"raw", "none", e.CodeEngineCapability}, {"qcow2", "none", e.CodeEngineCapability}} {
-		_, err := inspector.InspectHeldInstalledPackages(t.Context(), nil, tc.format, tc.encryption)
-		assertDependencyCode(t, err, tc.code)
+		t.Run(tc.format+"-"+tc.encryption, func(t *testing.T) {
+			_, err := inspector.InspectHeldInstalledPackages(t.Context(), nil, tc.format, tc.encryption)
+			assertDependencyCode(t, err, tc.code)
+		})
 	}
 	if runtime.GOOS != "linux" {
 		return
@@ -481,4 +510,51 @@ func TestDiskInspectorAdmission(t *testing.T) {
 	}
 	_, err = OpenDiskInspector(t.Context(), script, rawDigest(data), codec)
 	assertDependencyCode(t, err, e.CodeEngineCapability)
+}
+
+func TestDiskInspectorELFAdmission(t *testing.T) {
+	machine := elf.EM_X86_64
+	if runtime.GOARCH == "arm64" {
+		machine = elf.EM_AARCH64
+	}
+	supportedHost := runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64"
+	for _, tc := range []struct {
+		name  string
+		image elf.FileHeader
+		want  bool
+	}{
+		{"executable", elf.FileHeader{Type: elf.ET_EXEC, Entry: 1, Machine: machine}, supportedHost},
+		{"PIE", elf.FileHeader{Type: elf.ET_DYN, Entry: 1, Machine: machine}, supportedHost},
+		{"shared library", elf.FileHeader{Type: elf.ET_DYN, Machine: machine}, false},
+		{"foreign architecture", elf.FileHeader{Type: elf.ET_EXEC, Entry: 1, Machine: elf.EM_386}, false},
+		{"relocatable", elf.FileHeader{Type: elf.ET_REL, Entry: 1, Machine: machine}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := diskInspectorELF(&elf.File{FileHeader: tc.image}); got != tc.want {
+				t.Fatalf("ELF admitted=%t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDiskInspectorDiagnosticBounds(t *testing.T) {
+	subject, err := heldfile.FromBytesContext(t.Context(), []byte("test subject"), heldfile.Options{Label: "diagnostic fixture", MaxBytes: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	var workspace string
+	_, err = inspectHeldDiskPackages(t.Context(), subject, "sha256:"+strings.Repeat("a", 64),
+		func(_ context.Context, _, dir string, _, diagnostic io.Writer) error {
+			workspace = dir
+			_, _ = io.WriteString(diagnostic, "\x1b[31m"+strings.Repeat("x", maxDiskDiagnosticBytes+1))
+			return fmt.Errorf("fixture failure")
+		})
+	assertDependencyCode(t, err, e.CodeEnvelopeDecode)
+	if len(err.Error()) > maxDiskDiagnosticBytes+512 || strings.ContainsRune(err.Error(), '\x1b') || !strings.Contains(err.Error(), "truncated=true") {
+		t.Fatalf("unsafe or unbounded diagnostic: bytes=%d", len(err.Error()))
+	}
+	if _, statErr := os.Stat(workspace); !os.IsNotExist(statErr) {
+		t.Fatalf("private workspace survived inspection: %v", statErr)
+	}
 }

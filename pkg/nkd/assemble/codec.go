@@ -229,18 +229,22 @@ func (codec *QemuImgCodec) envelopeLogicalDigest(ctx context.Context, format str
 
 // ValidateHeldEnvelope checks one existing immutable envelope without decoding
 // it or granting reproduction authority. The exact held qemu-img probe enforces
-// format, virtual-size bounds, no encryption and no backing-file references.
+// explicit QCOW2 format, virtual-size bounds, no encryption, no backing files
+// and no external data files. Other formats require separately admitted layouts.
 // Downstream inspectors must use this gate before exposing an image to an
 // appliance. The loader/library closure remains the enclosing runtime's TCB.
 func (codec *QemuImgCodec) ValidateHeldEnvelope(ctx context.Context, format string, input *heldfile.File) error {
 	if codec == nil {
-		return e.New(e.CodeEngineCapability, "disk inspection requires a pinned qemu-img codec")
+		return e.New(e.CodeTrustPolicyMissing, "disk inspection requires a pinned qemu-img codec")
 	}
 	if ctx == nil {
 		return e.New(e.CodeUsage, "validating a held envelope requires context")
 	}
-	if !validEnvelopeFormat(format) || input == nil {
-		return e.New(e.CodeEnvelopeDecode, "validating a held envelope requires a supported format and held input")
+	if format != "qcow2" {
+		return e.New(e.CodeEngineCapability, "diagnostic envelope inspection supports only QCOW2")
+	}
+	if input == nil {
+		return e.New(e.CodeEnvelopeDecode, "validating a held envelope requires held input")
 	}
 	if err := codec.lockContext(ctx, "validating held disk envelope"); err != nil {
 		return err

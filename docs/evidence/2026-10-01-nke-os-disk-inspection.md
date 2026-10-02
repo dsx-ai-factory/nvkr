@@ -1,8 +1,14 @@
 # Read-only NKE disk inspection, local diagnostic evidence
 
 This is installed-package diagnostic evidence, not full-disk CycloneDX,
-publication, reproduction or hosted-runner acceptance. Code is based on NKD
-`91567c2717dd195829d6a88a19a6d6e4baec3dd9` plus the Stream C working diff.
+publication, reproduction or hosted-runner acceptance. These historical draft
+runs were based on NKD `91567c2717dd195829d6a88a19a6d6e4baec3dd9` plus uncommitted
+disk-inspection changes. Their exact tested tree was not retained. The full log
+predates committed candidate `6e2b90b280846cf7ad21be987d645491bad6509e`; it does not
+establish acceptance of that candidate or subsequent corrections. The focused
+cancellation log matches a later test path, not an exact retained full tree.
+The [2026-10-02 replay](2026-10-02-nke-os-disk-inspection.md) records the corrected
+source blobs, binary and non-root runtime separately.
 
 ## Exact inputs and runtime
 
@@ -43,7 +49,7 @@ vulnerability gate is not an OS-package vulnerability clearance.
 
 ## Recorded real inspection
 
-Replay from the Stream C worktree after building the Dockerfile. The image ID
+Historical replay command from the disk-inspection worktree. The image ID
 below is local-only, not a published registry manifest. Compilation produces the
 Git-ignored `bin/nkd-disk-sbom-linux.test`; the source is the acceptance tests in
 `pkg/nkd/sbom/disk_inspect_test.go`.
@@ -53,7 +59,7 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
   go test -c ./pkg/nkd/sbom -o bin/nkd-disk-sbom-linux.test
 podman run --rm --init --network=none \
   -v "$PWD/bin/nkd-disk-sbom-linux.test:/test:ro" \
-  -v /Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/nke-os-integration/.nkd/runs/20260923-arm64-source-owned-02/outputs/nke-node-image-arm64.qcow2:/input/subject.qcow2:ro \
+  -v '<image-checkout>/.nkd/runs/20260923-arm64-source-owned-02/outputs/nke-node-image-arm64.qcow2:/input/subject.qcow2:ro' \
   -e NKD_DISK_INSPECT_SUBJECT=/input/subject.qcow2 \
   -e NKD_DISK_QEMU_PATH=/usr/bin/qemu-img \
   -e NKD_DISK_QEMU_DIGEST=sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e \
@@ -63,14 +69,14 @@ podman run --rm --init --network=none \
   /test -test.run TestDiskInspectionReal -test.v -test.timeout 15m
 ```
 
-The final runtime used `--network=none`, a read-only input bind, held exact
+The historical runtime used `--network=none`, a read-only input bind, held exact
 executables, a sealed input snapshot and a private read-only libguestfs copy.
 The implementation explicitly selects `LIBGUESTFS_BACKEND=direct` and the
 upstream `LIBGUESTFS_BACKEND_SETTINGS=force_tcg`; it does not admit a KVM device.
 The replay uses the engine's standard init process to forward signals and reap
 orphaned descendants; this is part of the enclosing diagnostic runtime TCB.
 
-The recorded terminal output was:
+The following excerpt is from an earlier draft run, not the committed candidate:
 
 ```text
 === RUN   TestDiskInspectionRealQCOW2
@@ -123,7 +129,7 @@ material trace bridge, guest acquisition closure and semantic reconciliation
 remain incomplete, so full-disk CycloneDX and publication admission stay closed.
 AMD64 runtime inspection, FDE and qualified reproduction were not accepted here.
 
-## Final acceptance and cancellation
+## Historical draft acceptance and cancellation
 
 The corrected full native suite exited 0. Its copied terminal output is in
 [the full native log](2026-10-01-nke-os-disk-inspection.log): 730 installed
@@ -137,12 +143,14 @@ The final assertion checks every process row against that exact captured group,
 including exited zombies, not only executable names. After joined cancellation,
 only the init process, test process and observation `ps` remained.
 
-The coordinator independently replayed the full final-code suite against the
+An unlogged coordinator observation replayed the full draft suite against the
 same exact runtime and read-only subject. It exited 0: 730 installed packages
 in 39.21 seconds, encrypted-whole-device rejection in 16.74 seconds, external
 reference rejection in 0.02 seconds and actual-appliance cancellation in 0.50
 seconds. Inspector PID1246, QEMU PID1522 and recovery PID1523 shared PGID1246;
-the joined cancellation left no row in that group. No test container remained.
+the joined cancellation left no row in that group. No retained log or exact
+tested-tree identity supports this observation, so it is not committed-candidate
+acceptance evidence.
 
 A diagnostic run without the engine init process confirmed `Z` exited zombies,
 not live children, under a Go test acting as PID1. The standard `--init` reaper
@@ -154,7 +162,7 @@ size `2853175296`, mode `0444`. The held source and private snapshot were also
 checked by the API. This proves no change to this retained input, not all runtime
 providers or future toolchains.
 
-The final exact-file macOS `make check build workflows-check notices-check`
+The draft macOS `make check build workflows-check notices-check`
 exited 0: formatting, vet, lint (zero issues), shellcheck, full race/coverage
 suite, Go vulnerability check, both builds, generated-bundle drift and notices.
 Coverage was 71.2%; the Go vulnerability check found no vulnerabilities.
@@ -163,3 +171,11 @@ also exited 0, using the existing exact local Go image
 `sha256:266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6`
 with no network. `git diff --check` passed. These are local contract gates,
 separate from the real appliance evidence and not full-disk SBOM acceptance.
+
+The old command ran as the container's default root user. It does not prove the
+new non-root admission or private socket/cache cleanup. Current replay must use
+a nonzero UID, `--network=none`, `--cap-drop=ALL`, a credential-free container,
+an init reaper and a read-only subject. The Dockerfile cleanup correction also
+changes its source; the old runtime image is not an image built from those new
+Dockerfile bytes. Exact-revision replay is required before claiming updated
+appliance acceptance.
