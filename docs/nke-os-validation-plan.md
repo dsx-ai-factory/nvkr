@@ -119,7 +119,9 @@ These tests do not prove ARC availability or full NKE acquisition.
 Pre-merge acceptance requires a fresh AMD64 and ARM64 full build and boot smoke at the exact reviewed candidate
 through the trusted main workflow. Run `37043068395` satisfies that gate for `d1e28ce`; its exact inputs and
 image identities are in the [dated evidence](evidence/2026-10-01-nke-arc-os-builds.md#corrected-reliability-candidate-2026-10-02).
-That tests candidate source/catalog changes, not the candidate workflow YAML or a later documentation-only head.
+That validates `d1e28ce`'s source/catalog inputs only, not the candidate workflow YAML or later execution inputs.
+The subsequent `GOENV=off` acquisition change and its catalog digest are contract-tested, but still require
+fresh full builds and boot smoke on both architectures; exact-candidate pre-merge acceptance remains pending.
 After merge, the automatic push run and one clean rerun must exercise the changed workflow steps on both
 architectures; that workflow acceptance remains pending. Contract tests alone cannot satisfy either external gate.
 

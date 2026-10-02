@@ -240,8 +240,9 @@ image contract and root-filesystem growth. The workflow labels these artifacts `
 - [ARM64 QCOW2](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11244063827), [ARM64 evidence](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11244300302)
 - [AMD64 QCOW2](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11245430043), [AMD64 evidence](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37043068395/artifacts/11244441294)
 
-This proves the corrected candidate's native Docker/KVM bake and boot path. It does not exercise its changed
-workflow YAML, a later documentation-only commit, generated hosted execution, publication or qualification.
+This proves `d1e28ce`'s exact native Docker/KVM bake and boot path. It does not exercise changed workflow YAML
+or later execution inputs, generated hosted execution, publication or qualification. The subsequent `GOENV=off`
+acquisition change and its catalog digest have no recorded full bake; both architectures still require validation.
 The post-merge workflow validation remains pending. Actions artifacts expire; their compressed transport sizes
 are not the QCOW2 byte counts above.
 
