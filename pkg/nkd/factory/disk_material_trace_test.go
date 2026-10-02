@@ -177,6 +177,9 @@ func TestDiskMaterialTraceCannotReuseEqualBuildSiblingObservations(t *testing.T)
 		t.Fatal(err)
 	}
 	owner.Nodes = append(owner.Nodes, LocalNodeResult{ID: operation.ID, Kind: NodeBuild, Status: "ok"})
+	if _, err := owner.ObserveDiskLifecyclePayload(t.Context(), plan, sibling); err != nil {
+		t.Fatalf("sibling held payload is not independently observable: %v", err)
+	}
 	if trace, err := owner.observeDiskMaterials(t.Context(), plan, sibling); trace != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
 		t.Fatalf("sibling reused another output's material handoff: %#v/%v", trace, err)
 	}
@@ -520,8 +523,13 @@ func TestProducerConsumptionRejectsDuplicateAndClosedOwner(t *testing.T) {
 	}
 	defer materials.Close()
 	result := owner.diskCompletions[0].Result
-	if err := owner.recordProducerConsumption(t.Context(), plan, operation, instruction, &result, materials.observedProducerMaterials); factoryErrorCode(err) != e.CodeVerifyFailed {
+	prior := owner.materialConsumptions[operation.ID]
+	prior.materials = append([]material.Observation(nil), prior.materials...)
+	if err := owner.recordProducerConsumption(t.Context(), plan, operation, instruction, &result, materials.observedProducerMaterials); factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), "duplicate consumption observations") {
 		t.Fatalf("duplicate invocation error = %v", err)
+	}
+	if !reflect.DeepEqual(prior, owner.materialConsumptions[operation.ID]) {
+		t.Fatal("duplicate invocation changed its original consumption observation")
 	}
 	if err := owner.Close(); err != nil {
 		t.Fatal(err)
