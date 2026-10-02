@@ -21,6 +21,7 @@
 | Understand code organization findings and their implementation | [Codebase organization audit](codebase-organization-audit.md) |
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
 | Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
+| Understand the internal staged disk-material tracing contract and its gaps | [Local disk material tracing](nke-os-material-trace.md) |
 | Build or contribute | [Development](../DEVELOPMENT.md), [contribution guide](../CONTRIBUTING.md) |
 | Triage repository vulnerabilities | [CVE management](cve-management.md), [security reporting](../SECURITY.md) |
 | Manage GitHub issues, discussions, and pull requests | [GitHub issue and PR management](github-issue-pr-management.md) |

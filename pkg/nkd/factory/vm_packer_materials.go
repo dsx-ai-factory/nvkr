@@ -36,8 +36,9 @@ var productionProducerMaterialLimits = producerMaterialLimits{
 // It owns immutable snapshots of every selected producer payload and the
 // canonical manifest passed to the selected consumer.
 type observedProducerMaterials struct {
-	manifest *heldfile.File
-	inputs   []pipeline.BuildMaterialInput
+	manifest     *heldfile.File
+	inputs       []pipeline.BuildMaterialInput
+	observations []material.Observation
 }
 
 func (materials *observedProducerMaterials) Close() error {
@@ -56,6 +57,7 @@ func (materials *observedProducerMaterials) Close() error {
 		}
 	}
 	materials.inputs = nil
+	materials.observations = nil
 	return errors.Join(errs...)
 }
 
@@ -240,5 +242,6 @@ func observeProducerMaterialsWithLimits(
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "holding producer material manifest")
 	}
+	result.observations = observations
 	return result, nil
 }

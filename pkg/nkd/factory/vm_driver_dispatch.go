@@ -55,11 +55,8 @@ func (unavailableVMDriverResolver) Admit(
 // and retained the exact runtime, daemon and OCI toolchain closure, but performs
 // source, material and output work only in this callback.
 func dispatchAdmittedVMProducer(
-	ctx context.Context,
-	admission vmAdmission,
-	plan *Plan,
-	node Node,
-	executor vmDriverExecutor,
+	ctx context.Context, admission vmAdmission, plan *Plan, node Node,
+	executor vmDriverExecutor, owner *LocalRunResult,
 ) (artifact *pipeline.PackerArtifact, result *pipeline.ArtifactResult, returnErr error) {
 	if ctx == nil {
 		return nil, nil, e.New(e.CodeUsage, "VM driver dispatch requires a context")
@@ -111,17 +108,20 @@ func dispatchAdmittedVMProducer(
 			return materialErr
 		}
 		artifact, result, err = executor.RunPacker(runCtx, runtime, request.Subject, instruction, materials)
+		if err == nil && artifact == nil {
+			err = e.New(e.CodeVerifyFailed,
+				"vm-image producer %q returned no held disk artifact", instruction.Component)
+		}
+		if err == nil && result == nil {
+			err = e.New(e.CodeVerifyFailed,
+				"vm-image producer %q returned no descriptive result", instruction.Component)
+		}
+		if err == nil && owner != nil {
+			err = owner.recordProducerConsumption(runCtx, plan, node, instruction, result, materials.observedProducerMaterials)
+		}
 		err = joinFactoryCleanupError(err, materials.Close(), "closing VM Packer material capabilities")
 		if err != nil {
 			return err
-		}
-		if artifact == nil {
-			return e.New(e.CodeVerifyFailed,
-				"vm-image producer %q returned no held disk artifact", instruction.Component)
-		}
-		if result == nil {
-			return e.New(e.CodeVerifyFailed,
-				"vm-image producer %q returned no descriptive result", instruction.Component)
 		}
 		return nil
 	})

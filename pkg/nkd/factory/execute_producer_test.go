@@ -61,7 +61,7 @@ func TestProducerExecutionBindsInstructionWorkspaceAndResult(t *testing.T) {
 				}
 				return r, nil
 			}
-			err = executeProducer(context.Background(), plan, selected, tc.runtime, 3, io.Discard, io.Discard, run)
+			err = executeProducer(context.Background(), plan, selected, tc.runtime, 3, io.Discard, io.Discard, run, nil)
 			if !called {
 				t.Fatal("producer was not invoked")
 			}
