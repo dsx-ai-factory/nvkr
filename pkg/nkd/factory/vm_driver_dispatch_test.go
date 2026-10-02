@@ -126,7 +126,7 @@ func (executor *fakeVMDriverExecutor) RunPacker(
 	_ context.Context,
 	_ *VMRuntime,
 	subject string,
-	_ ir.Node,
+	node ir.Node,
 	materials *vmPackerMaterials,
 ) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 	executor.packerCalls++
@@ -138,7 +138,14 @@ func (executor *fakeVMDriverExecutor) RunPacker(
 	if executor.artifactOnError {
 		return &pipeline.PackerArtifact{}, nil, executor.err
 	}
-	return executor.result()
+	artifact, result, err := executor.result()
+	if result != nil {
+		result.Component, result.OutputType = node.Component, node.OutputType
+		if len(node.Materials) != 0 {
+			result.MaterialManifestDigest = materials.manifest.Digest()
+		}
+	}
+	return artifact, result, err
 }
 
 type fakeVMArtifactCloser struct {
@@ -269,7 +276,7 @@ func TestAdmittedVMDispatchRunsExactPackerProducerInsideCallback(t *testing.T) {
 	packerPlan, packerNode := compiledPackerVMNode(t)
 	admission := new(fakeVMAdmission)
 	executor := new(fakeVMDriverExecutor)
-	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, packerPlan, packerNode, executor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, packerPlan, packerNode, executor, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +309,7 @@ func TestAdmittedVMDispatchRejectsPlanSubstitutionWithUnchangedIRNode(t *testing
 		candidate.GeneratorVersion = "changed-but-valid"
 	}}
 	executor := new(fakeVMDriverExecutor)
-	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor, nil)
 	if artifact != nil || description != nil || factoryErrorCode(err) != e.CodePipelineDrift {
 		t.Fatalf("substituted Plan artifact/result/error = %#v/%#v/%v", artifact, description, err)
 	}
@@ -322,7 +329,7 @@ func TestAdmittedVMDispatchRejectsCommandBeforeAdmission(t *testing.T) {
 	plan, node := compiledVMNode(t, execution.CapabilityPreferred)
 	admission := new(fakeVMAdmission)
 	executor := new(fakeVMDriverExecutor)
-	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor, nil)
 	if artifact != nil || description != nil || factoryErrorCode(err) != e.CodeEngineCapability ||
 		!strings.Contains(err.Error(), "held-output command adapter") {
 		t.Fatalf("command dispatch artifact/result/error = %#v/%#v/%v", artifact, description, err)
@@ -336,7 +343,7 @@ func TestAdmittedVMDispatchRejectsEncryptedCommandBeforeAdmission(t *testing.T) 
 	plan, node := compiledCommandVMNodeWithEncryption(t, "luks2")
 	admission := new(fakeVMAdmission)
 	executor := new(fakeVMDriverExecutor)
-	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor, nil)
 	if artifact != nil || description != nil || factoryErrorCode(err) != e.CodeEngineCapability ||
 		!strings.Contains(err.Error(), "encryption secret channel") {
 		t.Fatalf("encrypted command artifact/result/error = %#v/%#v/%v", artifact, description, err)
@@ -372,7 +379,7 @@ func TestAdmittedVMDispatchCleansRejectedArtifactAndMaterialCapabilities(t *test
 		t.Run(test.name, func(t *testing.T) {
 			plan, node := test.fixture(t)
 			artifact, result, err := dispatchAdmittedVMProducer(
-				t.Context(), new(fakeVMAdmission), plan, node, test.executor,
+				t.Context(), new(fakeVMAdmission), plan, node, test.executor, nil,
 			)
 			if artifact != nil || result != nil || factoryErrorCode(err) != test.wantCode ||
 				!errors.Is(err, driverFailure) || (test.wantText != "" && !strings.Contains(err.Error(), test.wantText)) {
@@ -399,7 +406,7 @@ func TestAdmittedVMDispatchFailsBeforeDriverWithoutAdmission(t *testing.T) {
 	admissionFailure := errors.New("admission denied")
 	admission := &fakeVMAdmission{err: admissionFailure}
 	executor := new(fakeVMDriverExecutor)
-	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor)
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), admission, plan, node, executor, nil)
 	if artifact != nil || description != nil || !errors.Is(err, admissionFailure) {
 		t.Fatalf("dispatch artifact/error = %#v/%v", artifact, err)
 	}
@@ -531,7 +538,7 @@ func TestAdmittedVMDispatchRejectsIncompleteBoundary(t *testing.T) {
 		{name: "missing artifact", ctx: t.Context(), admission: new(fakeVMAdmission), executor: &fakeVMDriverExecutor{missing: true}, code: e.CodeVerifyFailed},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			artifact, description, err := dispatchAdmittedVMProducer(test.ctx, test.admission, plan, node, test.executor)
+			artifact, description, err := dispatchAdmittedVMProducer(test.ctx, test.admission, plan, node, test.executor, nil)
 			if artifact != nil || description != nil || factoryErrorCode(err) != test.code {
 				t.Fatalf("dispatch artifact/error = %#v/%v, want %s", artifact, err, test.code)
 			}
@@ -542,7 +549,7 @@ func TestAdmittedVMDispatchRejectsIncompleteBoundary(t *testing.T) {
 func TestAdmittedVMDispatchRejectsNilPlanBeforeAdmission(t *testing.T) {
 	admission := new(fakeVMAdmission)
 	artifact, description, err := dispatchAdmittedVMProducer(
-		t.Context(), admission, nil, Node{}, new(fakeVMDriverExecutor),
+		t.Context(), admission, nil, Node{}, new(fakeVMDriverExecutor), nil,
 	)
 	if artifact != nil || description != nil || factoryErrorCode(err) != e.CodeUsage {
 		t.Fatalf("nil Plan artifact/result/error = %#v/%#v/%v", artifact, description, err)
@@ -695,7 +702,7 @@ func TestLocalVMAdmissionPrecedesRuntimePreparationAndNodeWork(t *testing.T) {
 		},
 	}
 	result, err := runLocal(t.Context(), plan, options, deps)
-	if result != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
+	if result != nil || factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), "invalid held disk payload identity") {
 		t.Fatalf("local VM result/error = %#v/%v", result, err)
 	}
 	wantPrefix := []string{"driver-admission", "vm-admission", "runner-admission", "runner-preparation", "node-work"}
@@ -755,7 +762,7 @@ func TestLocalVMResolverAndScheduledNodesShareLockedWriters(t *testing.T) {
 		},
 	}
 	result, err := runLocal(t.Context(), plan, options, deps)
-	if result != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
+	if result != nil || factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), "invalid held disk payload identity") {
 		t.Fatalf("parallel writer result/error = %#v/%v", result, err)
 	}
 	if underlying.overlap.Load() {

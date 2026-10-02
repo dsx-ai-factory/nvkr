@@ -10,10 +10,10 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
-// DiskMaterialCoverageStagedOutputs is deliberately narrower than complete
+// diskMaterialCoverageStagedOutputs is deliberately narrower than complete
 // acquisition coverage. Neither private source vendoring nor downloads made by
 // a network-enabled producer or its guest are inventoried by these receipts.
-const DiskMaterialCoverageStagedOutputs = "staged-producer-outputs"
+const diskMaterialCoverageStagedOutputs = "staged-producer-outputs"
 
 // producerConsumption is retained only by a live local Run after an actual
 // producer invocation succeeds. The material observations come from the held
@@ -28,10 +28,10 @@ type producerConsumption struct {
 	materials      []material.Observation
 }
 
-// DiskMaterialMember describes one observed producer output, including the disk
+// diskMaterialMember describes one observed producer output, including the disk
 // root. Kind is its output kind; Production distinguishes build from acquisition.
 // A member's archive digest is not an installed-file or package identity.
-type DiskMaterialMember struct {
+type diskMaterialMember struct {
 	Producer   string
 	Component  string
 	Kind       string
@@ -40,41 +40,45 @@ type DiskMaterialMember struct {
 	Size       int64
 }
 
-// DiskMaterialEdge describes one exact consumed input. ManifestDigest identifies
+// diskMaterialEdge describes one exact consumed input. ManifestDigest identifies
 // the serialized manifest actually supplied to Consumer, including any explicit
 // producer-owned projection. Producer names are scoped to the Subject's output.
-type DiskMaterialEdge struct {
+type diskMaterialEdge struct {
 	Consumer       string
 	Binding        string
 	Producer       string
 	ManifestDigest string
 }
 
-// DiskMaterialTraceDescription is a non-authoritative view for inspection and
+// diskMaterialTraceDescription is a non-authoritative view for inspection and
 // diagnostics. It has no wire schema or receipt constructor. Coverage never
 // asserts the complete fetched/transitive software closure or disk composition.
-type DiskMaterialTraceDescription struct {
-	OutputName               string
-	Subject                  DiskPayloadObservation
-	Members                  []DiskMaterialMember
-	Edges                    []DiskMaterialEdge
-	Coverage                 string
-	UntracedNetworkProducers []string
+type diskMaterialTraceDescription struct {
+	OutputName string
+	Subject    DiskPayloadObservation
+	Members    []diskMaterialMember
+	Edges      []diskMaterialEdge
+	Coverage   string
+	// Only build invocations are listed. Source-fetch vendoring and guest
+	// acquisitions are outside this staged-output trace even when this is empty.
+	UntracedNetworkBuilds []string
 }
 
-// DiskMaterialTrace is a factory-issued, process-local observation of a live
+// diskMaterialTrace is a factory-issued, process-local observation of a live
 // disk Run's staged producer graph. Public descriptions cannot reconstruct it.
 // It is not a signed provenance receipt, full-disk SBOM, or publication gate.
-type DiskMaterialTrace struct {
+type diskMaterialTrace struct {
 	issued      bool
-	description DiskMaterialTraceDescription
+	description diskMaterialTraceDescription
 }
 
 // ValidateSubject rejects unissued observations and substitution to another
 // named output, Plan, logical Build, or delivered QCOW2. Two outputs may share
 // Build and payload identities without sharing their invocation observations.
-// It grants no completeness claim.
-func (trace *DiskMaterialTrace) ValidateSubject(outputName, planDigest, buildDigest, diskDigest string) error {
+// It checks immutable subject identity, not the issuing Run's continued
+// lifetime or a unique attempt. It remains valid after that owner closes and
+// must never substitute for a still-held disk capability or execution receipt.
+func (trace *diskMaterialTrace) ValidateSubject(outputName, planDigest, buildDigest, diskDigest string) error {
 	if trace == nil || !trace.issued || trace.description.OutputName != outputName || trace.description.Subject.PlanDigest != planDigest ||
 		trace.description.Subject.BuildDigest != buildDigest || trace.description.Subject.Digest != diskDigest {
 		return e.New(e.CodeVerifyFailed, "disk material trace does not bind the exact output, Plan, Build and payload")
@@ -84,15 +88,15 @@ func (trace *DiskMaterialTrace) ValidateSubject(outputName, planDigest, buildDig
 
 // Description returns an independent view, not authority. Mutating it cannot
 // alter this observation or satisfy a later subject check.
-func (trace *DiskMaterialTrace) Description() DiskMaterialTraceDescription {
+func (trace *diskMaterialTrace) Description() diskMaterialTraceDescription {
 	if trace == nil || !trace.issued {
-		return DiskMaterialTraceDescription{}
+		return diskMaterialTraceDescription{}
 	}
 	description := trace.description
 	description.Subject.Components = append([]string(nil), description.Subject.Components...)
-	description.Members = append([]DiskMaterialMember(nil), description.Members...)
-	description.Edges = append([]DiskMaterialEdge(nil), description.Edges...)
-	description.UntracedNetworkProducers = append([]string(nil), description.UntracedNetworkProducers...)
+	description.Members = append([]diskMaterialMember(nil), description.Members...)
+	description.Edges = append([]diskMaterialEdge(nil), description.Edges...)
+	description.UntracedNetworkBuilds = append([]string(nil), description.UntracedNetworkBuilds...)
 	return description
 }
 
@@ -117,7 +121,13 @@ func (owner *LocalRunResult) recordProducerConsumption(ctx context.Context, plan
 	}
 	receipt := producerConsumption{planDigest: planDigest, nodeID: node.ID,
 		digest: result.SHA256, size: result.Size, manifestDigest: result.MaterialManifestDigest}
-	if materials != nil {
+	if len(instruction.Materials) == 0 {
+		// Packer still receives an empty manifest, but producer results record no
+		// manifest identity when the Plan declares no inputs (pipeline contract).
+		if receipt.manifestDigest != "" || (materials != nil && len(materials.observations) != 0) {
+			return e.New(e.CodeVerifyFailed, "producer %q recorded undeclared material inputs", node.ID)
+		}
+	} else if materials != nil {
 		if materials.manifest == nil || receipt.manifestDigest != materials.manifest.Digest() ||
 			len(materials.observations) != len(instruction.Materials) {
 			return e.New(e.CodeVerifyFailed, "producer %q did not record its actual material handoff", node.ID)
@@ -126,10 +136,13 @@ func (owner *LocalRunResult) recordProducerConsumption(ctx context.Context, plan
 			return e.Wrap(e.CodeVerifyFailed, err, "rechecking consumed material manifest")
 		}
 		receipt.materials = append([]material.Observation(nil), materials.observations...)
-	} else if len(instruction.Materials) != 0 || receipt.manifestDigest != "" {
+	} else {
 		return e.New(e.CodeVerifyFailed, "producer %q has no live material handoff", node.ID)
 	}
 	if instruction.BuilderType != ir.BuilderVMImage {
+		// This independent output/result recheck is intentionally additional I/O,
+		// including for large ISO inputs. Consumer-held hashes cannot prove the
+		// successful producer's own output/result pairing at recording time.
 		_, artifacts := planIndex(plan)
 		payload := artifacts["artifact/"+node.BuildTarget+"/"+instruction.Component]
 		record := artifacts["result/"+node.BuildTarget+"/"+instruction.Component]
@@ -156,14 +169,14 @@ func (owner *LocalRunResult) recordProducerConsumption(ctx context.Context, plan
 	return nil
 }
 
-// ObserveDiskMaterials composes only retained live invocation observations. It
+// observeDiskMaterials composes only retained live invocation observations. It
 // independently streams the held QCOW2 and follows the Plan's exact material
 // graph, refusing any missing producer or digest disagreement. Reopening result
 // JSON cannot create a missing consumption observation. Guest/network and private
 // fetched-software inventories remain explicit gaps even when this graph matches.
-func (owner *LocalRunResult) ObserveDiskMaterials(ctx context.Context, plan *Plan,
+func (owner *LocalRunResult) observeDiskMaterials(ctx context.Context, plan *Plan,
 	expected LifecycleOutputPlan,
-) (*DiskMaterialTrace, error) {
+) (*diskMaterialTrace, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "disk material tracing requires a context")
 	}
@@ -176,9 +189,13 @@ func (owner *LocalRunResult) ObserveDiskMaterials(ctx context.Context, plan *Pla
 	}
 	defer release()
 	owner.diskMu.Lock()
-	if owner.diskClosed || owner.SchemaVersion != LocalRunSchemaVersion || owner.Qualification != TierLocalExecution {
+	if owner.diskClosed {
 		owner.diskMu.Unlock()
 		return nil, e.New(e.CodeGateUnmet, "disk material tracing requires an open local execution record")
+	}
+	if owner.SchemaVersion != LocalRunSchemaVersion || owner.Qualification != TierLocalExecution {
+		owner.diskMu.Unlock()
+		return nil, e.New(e.CodeVerifyFailed, "disk material tracing requires the local execution schema and tier")
 	}
 	execution := diskExecutionState{PlanDigest: owner.PlanDigest, Nodes: append([]LocalNodeResult(nil), owner.Nodes...)}
 	completions := append([]diskProducerCompletion(nil), owner.diskCompletions...)
@@ -203,7 +220,7 @@ func (owner *LocalRunResult) ObserveDiskMaterials(ctx context.Context, plan *Pla
 			producers[node.ID] = node
 		}
 	}
-	description := DiskMaterialTraceDescription{OutputName: expected.Name, Subject: subject, Coverage: DiskMaterialCoverageStagedOutputs}
+	description := diskMaterialTraceDescription{OutputName: expected.Name, Subject: subject, Coverage: diskMaterialCoverageStagedOutputs}
 	seen := make(map[string]bool)
 	var visit func(string, string, int64) error
 	visit = func(id, digest string, size int64) error {
@@ -220,10 +237,10 @@ func (owner *LocalRunResult) ObserveDiskMaterials(ctx context.Context, plan *Pla
 			return nil
 		}
 		seen[id] = true
-		description.Members = append(description.Members, DiskMaterialMember{Producer: id, Component: node.Component,
+		description.Members = append(description.Members, diskMaterialMember{Producer: id, Component: node.Component,
 			Kind: node.OutputType, Production: node.Kind, Digest: receipt.digest, Size: receipt.size})
 		if node.Kind == ir.KindBuild && node.Network != ir.NetworkNone {
-			description.UntracedNetworkProducers = append(description.UntracedNetworkProducers, id)
+			description.UntracedNetworkBuilds = append(description.UntracedNetworkBuilds, id)
 		}
 		if len(receipt.materials) != len(node.Materials) {
 			return e.New(e.CodeVerifyFailed, "producer %q consumption set differs from its Plan", id)
@@ -242,7 +259,7 @@ func (owner *LocalRunResult) ObserveDiskMaterials(ctx context.Context, plan *Pla
 				"linux/"+observation.Architecture != node.Platform {
 				return e.New(e.CodeVerifyFailed, "producer %q consumed a substituted material %q", id, binding.Binding)
 			}
-			description.Edges = append(description.Edges, DiskMaterialEdge{Consumer: id, Binding: binding.Binding,
+			description.Edges = append(description.Edges, diskMaterialEdge{Consumer: id, Binding: binding.Binding,
 				Producer: binding.Producer, ManifestDigest: receipt.manifestDigest})
 			if err := visit(binding.Producer, observation.Digest, -1); err != nil {
 				return err
@@ -257,7 +274,12 @@ func (owner *LocalRunResult) ObserveDiskMaterials(ctx context.Context, plan *Pla
 	if err := visit(subject.Producer, subject.Digest, subject.Size); err != nil {
 		return nil, err
 	}
-	if len(seen) != len(expected.Components) {
+	components := make([]string, 0, len(description.Members))
+	for _, member := range description.Members {
+		components = append(components, member.Component)
+	}
+	sort.Strings(components)
+	if !equalFactoryStrings(components, expected.Components) {
 		return nil, e.New(e.CodeVerifyFailed, "disk material trace omits a selected producer")
 	}
 	sort.Slice(description.Members, func(i, j int) bool { return description.Members[i].Producer < description.Members[j].Producer })
@@ -268,6 +290,6 @@ func (owner *LocalRunResult) ObserveDiskMaterials(ctx context.Context, plan *Pla
 		}
 		return left.Binding < right.Binding
 	})
-	sort.Strings(description.UntracedNetworkProducers)
-	return &DiskMaterialTrace{issued: true, description: description}, nil
+	sort.Strings(description.UntracedNetworkBuilds)
+	return &diskMaterialTrace{issued: true, description: description}, nil
 }

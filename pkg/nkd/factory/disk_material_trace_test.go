@@ -5,11 +5,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
@@ -21,6 +23,10 @@ func diskMaterialTraceFixture(t *testing.T) (*Plan, *LocalRunResult) {
 }
 
 func diskMaterialTraceFixtureWithSibling(t *testing.T, sibling bool) (*Plan, *LocalRunResult) {
+	return diskMaterialTraceFixtureWithNetwork(t, sibling, false)
+}
+
+func diskMaterialTraceFixtureWithNetwork(t *testing.T, sibling, networked bool) (*Plan, *LocalRunResult) {
 	t.Helper()
 	fixture := newVMPackerMaterialFixture(t)
 	base := fixture.plan.CatalogSnapshot
@@ -35,6 +41,13 @@ func diskMaterialTraceFixtureWithSibling(t *testing.T, sibling bool) (*Plan, *Lo
 	agent.WriteDir = "out"
 	agent.Materials = map[string]string{"runtime": "runtime"}
 	base.Components["agent"] = agent
+	environment := fixture.plan.Environment
+	if networked {
+		image := base.Components["image"]
+		image.BuildNetwork = ir.NetworkDefault
+		base.Components["image"] = image
+		environment.Runtime.BuildNetworkPolicy = authored.BuildNetworkProducerDeclared
+	}
 	stack, err := catalog.ApplyStack(base)
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +58,7 @@ func diskMaterialTraceFixtureWithSibling(t *testing.T, sibling bool) (*Plan, *Lo
 		second.Name = "sibling-image"
 		definition.Outputs = append(definition.Outputs, second)
 	}
-	plan, err := Compile(t.Context(), definition, fixture.plan.Environment, stack, "test")
+	plan, err := Compile(t.Context(), definition, environment, stack, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +109,7 @@ func diskMaterialTraceFixtureWithSibling(t *testing.T, sibling bool) (*Plan, *Lo
 				t.Fatal(err)
 			}
 		}
-		if err := executeProducerOwned(t.Context(), plan, operation, "docker", 1, io.Discard, io.Discard,
+		if err := executeProducer(t.Context(), plan, operation, "docker", 1, io.Discard, io.Discard,
 			func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) { return &record, nil }, owner); err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +147,7 @@ func diskMaterialTraceFixtureWithSibling(t *testing.T, sibling bool) (*Plan, *Lo
 	return plan, owner
 }
 
-func TestDiskMaterialTraceCannotReuseEqualBuildSiblingReceipts(t *testing.T) {
+func TestDiskMaterialTraceCannotReuseEqualBuildSiblingObservations(t *testing.T) {
 	plan, owner := diskMaterialTraceFixtureWithSibling(t, true)
 	if plan.Builds[0].BuildDigest != plan.Builds[1].BuildDigest {
 		t.Fatal("fixture outputs do not share logical Build identity")
@@ -163,10 +176,10 @@ func TestDiskMaterialTraceCannotReuseEqualBuildSiblingReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner.Nodes = append(owner.Nodes, LocalNodeResult{ID: operation.ID, Kind: NodeBuild, Status: "ok"})
-	if trace, err := owner.ObserveDiskMaterials(t.Context(), plan, sibling); trace != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
+	if trace, err := owner.observeDiskMaterials(t.Context(), plan, sibling); trace != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
 		t.Fatalf("sibling reused another output's material handoff: %#v/%v", trace, err)
 	}
-	trace, err := owner.ObserveDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
+	trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,18 +199,26 @@ func TestDiskMaterialTraceRetainsActualTransitiveConsumption(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	trace, err := owner.ObserveDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
+	trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 	description := trace.Description()
-	if len(description.Members) != 3 || len(description.Edges) != 3 || description.Coverage != DiskMaterialCoverageStagedOutputs {
+	if len(description.Members) != 3 || len(description.Edges) != 3 || description.Coverage != diskMaterialCoverageStagedOutputs {
 		t.Fatalf("trace = %#v", description)
 	}
 	if description.Members[0].Producer != "build-agent" || description.Members[1].Producer != "build-image" ||
 		description.Members[2].Producer != "pull-runtime" || description.Edges[0].Consumer != "build-agent" ||
 		description.Edges[0].Producer != "pull-runtime" {
 		t.Fatalf("unordered or flattened trace = %#v", description)
+	}
+	wantEdges := []diskMaterialEdge{
+		{Consumer: "build-agent", Binding: "runtime", Producer: "pull-runtime", ManifestDigest: owner.materialConsumptions["node-image/build-agent"].manifestDigest},
+		{Consumer: "build-image", Binding: "a-agent", Producer: "build-agent", ManifestDigest: owner.materialConsumptions["node-image/build-image"].manifestDigest},
+		{Consumer: "build-image", Binding: "z-runtime", Producer: "pull-runtime", ManifestDigest: owner.materialConsumptions["node-image/build-image"].manifestDigest},
+	}
+	if !reflect.DeepEqual(description.Edges, wantEdges) {
+		t.Fatalf("sorted exact edges = %#v, want %#v", description.Edges, wantEdges)
 	}
 	if err := trace.ValidateSubject(description.OutputName, description.Subject.PlanDigest, description.Subject.BuildDigest, description.Subject.Digest); err != nil {
 		t.Fatal(err)
@@ -243,6 +264,20 @@ func TestDiskMaterialTraceRejectsIncompleteOrSubstitutedInvocations(t *testing.T
 		{"substituted binding", func(owner *LocalRunResult) {
 			owner.materialConsumptions["node-image/build-agent"].materials[0].Binding = "other"
 		}},
+		{"substituted component", func(owner *LocalRunResult) {
+			owner.materialConsumptions["node-image/build-agent"].materials[0].Component = "other"
+		}},
+		{"substituted kind", func(owner *LocalRunResult) {
+			owner.materialConsumptions["node-image/build-agent"].materials[0].Kind = "raw"
+		}},
+		{"substituted architecture", func(owner *LocalRunResult) {
+			owner.materialConsumptions["node-image/build-agent"].materials[0].Architecture = "arm64"
+		}},
+		{"root size", func(owner *LocalRunResult) {
+			record := owner.materialConsumptions["node-image/build-image"]
+			record.size++
+			owner.materialConsumptions["node-image/build-image"] = record
+		}},
 		{"duplicate binding", func(owner *LocalRunResult) {
 			receipt := owner.materialConsumptions["node-image/build-image"]
 			receipt.materials[1] = receipt.materials[0]
@@ -257,7 +292,7 @@ func TestDiskMaterialTraceRejectsIncompleteOrSubstitutedInvocations(t *testing.T
 		t.Run(test.name, func(t *testing.T) {
 			plan, owner := diskMaterialTraceFixture(t)
 			test.mutate(owner)
-			trace, err := owner.ObserveDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
+			trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
 			if trace != nil || factoryErrorCode(err) != e.CodeVerifyFailed {
 				t.Fatalf("trace/error = %#v/%v", trace, err)
 			}
@@ -267,7 +302,7 @@ func TestDiskMaterialTraceRejectsIncompleteOrSubstitutedInvocations(t *testing.T
 
 func TestDiskMaterialTraceRejectsOtherSubjectsAndLifecycle(t *testing.T) {
 	plan, owner := diskMaterialTraceFixture(t)
-	trace, err := owner.ObserveDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
+	trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,21 +320,83 @@ func TestDiskMaterialTraceRejectsOtherSubjectsAndLifecycle(t *testing.T) {
 			}
 		})
 	}
-	for _, unissued := range []*DiskMaterialTrace{nil, {}} {
+	for _, unissued := range []*diskMaterialTrace{nil, {}} {
 		if err := unissued.ValidateSubject(description.OutputName, subject.PlanDigest, subject.BuildDigest, subject.Digest); factoryErrorCode(err) != e.CodeVerifyFailed {
 			t.Fatalf("unissued error = %v", err)
+		}
+		if !reflect.DeepEqual(unissued.Description(), diskMaterialTraceDescription{}) {
+			t.Fatal("unissued trace returned a description")
 		}
 	}
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := owner.ObserveDiskMaterials(canceled, plan, plan.LifecycleOutputs[0]); factoryErrorCode(err) != e.CodeTimeout {
+	if _, err := owner.observeDiskMaterials(canceled, plan, plan.LifecycleOutputs[0]); factoryErrorCode(err) != e.CodeTimeout {
 		t.Fatalf("canceled error = %v", err)
 	}
 	if err := owner.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := owner.ObserveDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0]); factoryErrorCode(err) != e.CodeGateUnmet {
+	if _, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0]); factoryErrorCode(err) != e.CodeGateUnmet {
 		t.Fatalf("closed error = %v", err)
+	}
+}
+
+func TestDiskMaterialTraceDisclosesNetworkedBuilds(t *testing.T) {
+	for _, networked := range []bool{false, true} {
+		t.Run(map[bool]string{false: "offline", true: "networked"}[networked], func(t *testing.T) {
+			plan, owner := diskMaterialTraceFixtureWithNetwork(t, false, networked)
+			trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var want []string
+			if networked {
+				want = []string{"build-image"}
+			}
+			if got := trace.Description().UntracedNetworkBuilds; !reflect.DeepEqual(got, want) {
+				t.Fatalf("untraced network builds = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestVMDispatchRetainsZeroMaterialConsumption(t *testing.T) {
+	t.Chdir(t.TempDir())
+	plan, operation := compiledPackerVMNode(t)
+	owner := localDiskRunResult(t, plan)
+	defer owner.Close()
+	artifact, description, err := dispatchAdmittedVMProducer(t.Context(), new(fakeVMAdmission), plan,
+		operation, new(tracingVMExecutor), owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer artifact.Close()
+	record, ok := owner.materialConsumptions[operation.ID]
+	if !ok || description.MaterialManifestDigest != "" || record.manifestDigest != "" || len(record.materials) != 0 {
+		t.Fatalf("zero-material handoff = %#v, result %#v", record, description)
+	}
+	// Dispatch owns recording; factory's existing held-payload test seam supplies
+	// framing bytes without pretending a zero-valued PackerArtifact owns them.
+	payload := testQCOW2HeaderPayload()
+	held := &fakeDiskProducerResult{payload: payload, digest: pipeline.FileDigest(payload), size: int64(len(payload))}
+	_, instruction, err := plan.producerInstruction(operation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	description.Qualification, description.BuilderType, description.EngineClass = pipeline.ArtifactUnqualified, ir.BuilderVMImage, ir.BuilderVMImage
+	description.Toolchain, description.Path, description.InputDigest = instruction.Toolchain, instruction.ArtifactPath, "sha256:"+strings.Repeat("d", 64)
+	if err := populateHeldDiskProducerCompletion(t.Context(), plan, operation.ID, owner,
+		func(context.Context, ir.Node) (*diskPayload, *pipeline.ArtifactResult, error) {
+			return fakeDiskPayload(held), description, nil
+		}); err != nil {
+		t.Fatal(err)
+	}
+	trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := trace.Description(); len(got.Members) != 1 || len(got.Edges) != 0 {
+		t.Fatalf("zero-material trace = %#v", got)
 	}
 }
 
@@ -326,7 +423,7 @@ func TestRecordProducerConsumptionRejectsWrongManifest(t *testing.T) {
 	}
 	// Input descriptions cannot create a trace without the held disk completion.
 	owner.materialConsumptions = map[string]producerConsumption{fixture.node.ID: {materials: []material.Observation{}}}
-	if trace, err := owner.ObserveDiskMaterials(t.Context(), fixture.plan, fixture.plan.LifecycleOutputs[0]); trace != nil || factoryErrorCode(err) != e.CodeReleaseIncomplete {
+	if trace, err := owner.observeDiskMaterials(t.Context(), fixture.plan, fixture.plan.LifecycleOutputs[0]); trace != nil || factoryErrorCode(err) != e.CodeReleaseIncomplete {
 		t.Fatalf("trace/error = %#v/%v", trace, err)
 	}
 }
@@ -340,9 +437,13 @@ func (executor *tracingVMExecutor) RunPacker(ctx context.Context, runtime *VMRun
 	if err != nil {
 		return artifact, nil, err
 	}
+	manifestDigest := ""
+	if len(node.Materials) != 0 {
+		manifestDigest = materials.manifest.Digest()
+	}
 	return artifact, &pipeline.ArtifactResult{Component: node.Component, OutputType: node.OutputType,
 		SHA256: pipeline.FileDigest(testQCOW2HeaderPayload()), Size: int64(len(testQCOW2HeaderPayload())),
-		MaterialManifestDigest: materials.manifest.Digest()}, nil
+		MaterialManifestDigest: manifestDigest}, nil
 }
 
 func TestVMDispatchRetainsConsumptionBeforeClosingMaterials(t *testing.T) {
@@ -381,7 +482,7 @@ func TestVMDispatchRetainsConsumptionBeforeClosingMaterials(t *testing.T) {
 	defer owner.Close()
 	admission := new(fakeVMAdmission)
 	executor := new(tracingVMExecutor)
-	artifact, _, err := dispatchAdmittedVMProducerOwned(t.Context(), admission, relocated, fixture.node, executor, owner)
+	artifact, _, err := dispatchAdmittedVMProducer(t.Context(), admission, relocated, fixture.node, executor, owner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -423,5 +524,218 @@ func TestProducerConsumptionRejectsDuplicateAndClosedOwner(t *testing.T) {
 	}
 	if len(owner.materialConsumptions) != 0 {
 		t.Fatal("closed owner retained observations")
+	}
+}
+
+func TestRecordProducerConsumptionRejectsInvalidInputs(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult)
+		code   e.Code
+	}{
+		{"nil context", func(_ context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			return nil, p, o, r
+		}, e.CodeUsage},
+		{"canceled", func(ctx context.Context, p *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			ctx, cancel := context.WithCancel(ctx)
+			cancel()
+			return ctx, p, o, r
+		}, e.CodeTimeout},
+		{"nil plan", func(ctx context.Context, _ *Plan, o *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			return ctx, nil, o, r
+		}, e.CodeVerifyFailed},
+		{"nil owner", func(ctx context.Context, p *Plan, _ *LocalRunResult, r *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			return ctx, p, nil, r
+		}, e.CodeVerifyFailed},
+		{"nil result", func(ctx context.Context, p *Plan, o *LocalRunResult, _ *pipeline.ArtifactResult) (context.Context, *Plan, *LocalRunResult, *pipeline.ArtifactResult) {
+			return ctx, p, o, nil
+		}, e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, node := compiledPackerVMNode(t)
+			owner := localDiskRunResult(t, plan)
+			defer owner.Close()
+			_, instruction, err := plan.producerInstruction(node)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := &pipeline.ArtifactResult{Component: instruction.Component, OutputType: instruction.OutputType}
+			ctx, p, o, r := test.mutate(t.Context(), plan, owner, result)
+			if err := o.recordProducerConsumption(ctx, p, node, instruction, r, nil); factoryErrorCode(err) != test.code {
+				t.Fatalf("record error = %v, want %s", err, test.code)
+			}
+			if len(owner.materialConsumptions) != 0 {
+				t.Fatal("rejected invocation retained observations")
+			}
+		})
+	}
+}
+
+func TestRecordProducerConsumptionRejectsChangedBytes(t *testing.T) {
+	for _, name := range []string{"payload", "result file", "returned digest", "returned size", "held manifest"} {
+		t.Run(name, func(t *testing.T) {
+			fixture := newVMPackerMaterialFixture(t)
+			owner := localDiskRunResult(t, fixture.plan)
+			defer owner.Close()
+			operation := planNode(fixture.plan, "node-image/pull-runtime")
+			instruction := fixture.producer(t, "runtime")
+			raw, err := os.ReadFile(fixture.results["runtime"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var result pipeline.ArtifactResult
+			if err := canonical.UnmarshalExact(raw, &result); err != nil {
+				t.Fatal(err)
+			}
+			var materials *observedProducerMaterials
+			switch name {
+			case "payload":
+				if err := os.WriteFile(fixture.payloads["runtime"], []byte("substituted"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "result file":
+				if err := os.WriteFile(fixture.results["runtime"], []byte("{}"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "returned digest":
+				result.SHA256 = "sha256:" + strings.Repeat("f", 64)
+			case "returned size":
+				result.Size++
+			case "held manifest":
+				operation = fixture.node
+				instruction = fixture.producer(t, "image")
+				observed, err := observeVMPackerMaterials(t.Context(), fixture.plan, operation)
+				if err != nil {
+					t.Fatal(err)
+				}
+				materials = observed.observedProducerMaterials
+				result.Component, result.OutputType, result.MaterialManifestDigest = instruction.Component, instruction.OutputType, materials.manifest.Digest()
+				// Immutable snapshots reject writes; invalidate the underlying handle
+				// to prove that the live manifest recheck still fails closed.
+				if err := materials.manifest.OSFile().Close(); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = observed.Close() })
+			}
+			if err := owner.recordProducerConsumption(t.Context(), fixture.plan, operation, instruction, &result, materials); factoryErrorCode(err) != e.CodeVerifyFailed {
+				t.Fatalf("record error = %v", err)
+			}
+			if len(owner.materialConsumptions) != 0 {
+				t.Fatal("changed producer bytes retained observations")
+			}
+		})
+	}
+}
+
+func TestDiskMaterialTraceRejectsInvalidOwnerSchemaAndTier(t *testing.T) {
+	for _, name := range []string{"schema", "tier"} {
+		t.Run(name, func(t *testing.T) {
+			plan, owner := diskMaterialTraceFixture(t)
+			if name == "schema" {
+				owner.SchemaVersion = "invalid"
+			} else {
+				owner.Qualification = TierStaticUnqualified
+			}
+			if _, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0]); factoryErrorCode(err) != e.CodeVerifyFailed {
+				t.Fatalf("invalid owner error = %v", err)
+			}
+		})
+	}
+}
+
+func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
+	for _, test := range []struct {
+		name               string
+		disk, build, owner bool
+	}{
+		{name: "disk acquisition", disk: true, owner: true},
+		{name: "disk build", disk: true, build: true, owner: true},
+		{name: "non-disk sibling build", build: true, owner: true},
+		{name: "no VM owner", build: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			var plan *Plan
+			var operation Node
+			if test.disk {
+				fixture := newVMPackerMaterialFixture(t)
+				plan = fixture.plan
+				if test.build {
+					base := plan.CatalogSnapshot
+					component := base.Components["runtime"]
+					component.Prebuilt = nil
+					component.FromSource = true
+					component.BuilderType = catalog.BuilderOCIHermetic
+					component.Repo, component.Tag = "https://example.test/runtime", "v1.0.0"
+					component.Commit, component.TreeHash = strings.Repeat("a", 40), strings.Repeat("b", 40)
+					component.ToolchainImage = "example.test/runtime@sha256:" + strings.Repeat("c", 64)
+					component.BuildCommand, component.ArtifactPath, component.WriteDir = []string{"build-runtime"}, "out/runtime.deb", "out"
+					base.Components["runtime"] = component
+					stack, err := catalog.ApplyStack(base)
+					if err != nil {
+						t.Fatal(err)
+					}
+					plan, err = Compile(t.Context(), plan.Definition, plan.Environment, stack, "test")
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				id := "node-image/pull-runtime"
+				if test.build {
+					id = "node-image/build-runtime"
+				}
+				operation = planNode(plan, id)
+			} else {
+				plan = githubTestPlan(t)
+				for _, node := range plan.Graph.Nodes {
+					if node.Kind == NodeBuild && node.IRNode != "" {
+						operation = node
+						break
+					}
+				}
+			}
+			owner := localDiskRunResult(t, plan)
+			defer owner.Close()
+			options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/record-filter"})
+			if test.owner {
+				options.materialOwner = owner
+			}
+			run := func(instruction ir.Node, call pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
+				if call.BuildMaterials != nil {
+					t.Fatal("fixture unexpectedly has material inputs")
+				}
+				relocated, err := relocateFactoryPlan(plan, options.Workspace)
+				if err != nil {
+					return nil, err
+				}
+				_, artifacts := planIndex(relocated)
+				path := artifacts["artifact/"+operation.BuildTarget+"/"+instruction.Component].Path
+				payload := []byte("runtime package\n")
+				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+					return nil, err
+				}
+				if err := os.WriteFile(path, payload, 0o600); err != nil {
+					return nil, err
+				}
+				result := &pipeline.ArtifactResult{Component: instruction.Component, OutputType: instruction.OutputType,
+					SHA256: pipeline.FileDigest(payload), Size: int64(len(payload)), AbsPath: path,
+					Qualification: pipeline.ArtifactProfileFreeAcquisition, EngineClass: ir.EnginePrebuiltAcquire}
+				if instruction.Kind == ir.KindBuild {
+					result.Qualification, result.BuilderType, result.EngineClass = pipeline.ArtifactUnqualified, instruction.BuilderType, instruction.BuilderType
+					result.Toolchain, result.Path, result.InputDigest = instruction.Toolchain, instruction.ArtifactPath, "sha256:"+strings.Repeat("d", 64)
+				}
+				return result, nil
+			}
+			if err := executeLocalProducer(t.Context(), plan, operation, options, run); err != nil {
+				t.Fatal(err)
+			}
+			want := 0
+			if test.disk && test.owner {
+				want = 1
+			}
+			if len(owner.materialConsumptions) != want {
+				t.Fatalf("retained %d invocations, want %d", len(owner.materialConsumptions), want)
+			}
+		})
 	}
 }

@@ -15,11 +15,6 @@ import (
 // Local and hosted execution use this same operation. The Plan selects the exact
 // instruction, workspace and result slot; pipeline owns launching and collecting it.
 func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string, jobs int, stdout, stderr io.Writer,
-	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) (returnErr error) {
-	return executeProducerOwned(ctx, plan, node, runtime, jobs, stdout, stderr, run, nil)
-}
-
-func executeProducerOwned(ctx context.Context, plan *Plan, node Node, runtime string, jobs int, stdout, stderr io.Writer,
 	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error), owner *LocalRunResult) (returnErr error) {
 	_, instruction, err := plan.producerInstruction(node)
 	if err != nil {

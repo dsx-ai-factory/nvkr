@@ -401,7 +401,7 @@ func admittedLocalDiskProducer(plan *Plan, options *LocalRunOptions) diskProduce
 			return nil, nil, e.New(e.CodeEngineCapability,
 				"local VM node %q has no pre-execution runtime admission", selected.ID)
 		}
-		return dispatchAdmittedVMProducerOwned(ctx, admission, relocated, selected, options.vmDrivers, options.materialOwner)
+		return dispatchAdmittedVMProducer(ctx, admission, relocated, selected, options.vmDrivers, options.materialOwner)
 	}
 }
 
@@ -728,21 +728,11 @@ func copyCurrentRunner(ctx context.Context, destination string) error {
 
 func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string) error {
 	if node.IRNode != "" {
-		relocated, err := relocateFactoryPlan(plan, options.Workspace)
-		if err != nil {
-			return err
-		}
 		run := (pipeline.Local{}).ExecNode
 		if options.producers != nil {
 			run = options.producers.ExecNode
 		}
-		var materialOwner *LocalRunResult
-		for _, output := range plan.LifecycleOutputs {
-			if output.Name == node.BuildTarget && output.Kind == authored.OutputDiskImage {
-				materialOwner = options.materialOwner
-			}
-		}
-		return executeProducerOwned(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, run, materialOwner)
+		return executeLocalProducer(ctx, plan, node, options, run)
 	}
 
 	if node.Network == ir.NetworkNone {
@@ -781,6 +771,22 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		return err
 	}
 	return ExecuteNode(ctx, relocated, node.ID, options.Stdout, options.Stderr)
+}
+
+func executeLocalProducer(ctx context.Context, plan *Plan, node Node, options LocalRunOptions,
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error),
+) error {
+	relocated, err := relocateFactoryPlan(plan, options.Workspace)
+	if err != nil {
+		return err
+	}
+	var owner *LocalRunResult
+	for _, output := range plan.LifecycleOutputs {
+		if output.Name == node.BuildTarget && output.Kind == authored.OutputDiskImage {
+			owner = options.materialOwner
+		}
+	}
+	return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, run, owner)
 }
 
 func hasLocalVMBuild(plan *Plan) bool {
