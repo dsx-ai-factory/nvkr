@@ -137,6 +137,8 @@ kernel readability and acquisition-file removal. A controlled invalid-option
 `dpkg-query` call under the same checked shell sequence exited 2 before sorting
 and produced no final inventory. This exercises the failure mechanism, not an
 actual failure of the successful image build.
+The rebuild, measurements and controlled failure are operator observations from
+locally retained, uncommitted captures, not proof in the committed follow-up log.
 
 The new ARM64 SBOM test binary SHA-256 was
 `f3cc083b82b0f345daa7a9bb5ce7b671cb31816721887093f2779e7eb712a1f1`.
@@ -154,8 +156,10 @@ That committed capture's SHA-256 is
 The updated VMDK fixture binary, SHA-256
 `d6a995807548e3d2b2fee605a5c09d44440247377e6cb5f1e91722e704adf133`,
 also passed against the rebuilt image with its unchanged exact QEMU pin.
-Native `make check build workflows-check notices-check` and non-root Linux
-race tests with atomic coverage passed. The strengthened process fixture now
+Separate locally retained, uncommitted operator captures report that native
+`make check build workflows-check notices-check` and non-root Linux race tests
+with atomic coverage passed; those captures are not in the committed replay log.
+The strengthened process fixture now
 distinguishes envelope rejection from an inspector failure and bounds cancellation
 to less than ten seconds; the source-lock
 test checks the exact AMD64 and ARM64 case mappings. These are diagnostic
