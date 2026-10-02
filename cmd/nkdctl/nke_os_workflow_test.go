@@ -172,20 +172,23 @@ func TestOSWorkflowRetainsPrimaryLifecycleFailure(t *testing.T) {
 	for _, test := range []struct {
 		name, plan, outcome, image string
 		wantError                  bool
+		missingImage               bool
 		wantOutput                 string
 	}{
 		{name: "failure before Plan", outcome: "failure", image: "sha256:observed", wantOutput: "No executable Plan"},
 		{name: "failure after Plan", outcome: "failure", image: "sha256:observed", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`},
 		{name: "successful lifecycle retains image ID", outcome: "success", image: "sha256:observed", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`},
-		{name: "invalid Plan remains an error", outcome: "failure", plan: `{}`, wantError: true, wantOutput: "Cannot iterate over null"},
+		{name: "invalid Plan remains an error", outcome: "failure", plan: `{}`, wantError: true, wantOutput: "Executable Plan must identify exactly one vm-image toolchain"},
+		{name: "Plan without disk toolchain remains an error", outcome: "failure", plan: `{"builds":[{"executionGraph":{"nodes":[]}}]}`, wantError: true, wantOutput: "Executable Plan must identify exactly one vm-image toolchain"},
 		{name: "successful lifecycle requires Plan", outcome: "success", wantError: true, wantOutput: "Successful lifecycle did not retain its executable Plan"},
 		{name: "mismatched toolchain remains an error", outcome: "failure", image: "sha256:substituted", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`, wantError: true, wantOutput: "Observed toolchain image does not match"},
+		{name: "missing toolchain remains an error", outcome: "failure", missingImage: true, plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`, wantError: true, wantOutput: "Executable Plan toolchain image is not available locally"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
 			for path, body := range map[string]string{
 				"scripts/nke-os-local.sh": "#!/bin/sh\necho primary-fetch-error >&2\nexit 20\n",
-				"bin/docker":              "#!/bin/sh\nprintf '%s\\n' \"$OBSERVED_IMAGE\"\n",
+				"bin/docker":              "#!/bin/sh\nif test \"$MISSING_IMAGE\" = true; then echo 'No such image' >&2; exit 1; fi\nprintf '%s\\n' \"$OBSERVED_IMAGE\"\n",
 			} {
 				path = filepath.Join(root, path)
 				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -216,7 +219,12 @@ func TestOSWorkflowRetainsPrimaryLifecycleFailure(t *testing.T) {
 			}
 			cmd = exec.CommandContext(t.Context(), "bash", "-c", record.Run)
 			cmd.Dir = root
-			cmd.Env = append(os.Environ(), "ARCH=arm64", "LIFECYCLE_OUTCOME="+test.outcome, "OBSERVED_IMAGE="+test.image, "PATH="+filepath.Join(root, "bin")+":"+os.Getenv("PATH"))
+			missingImage := "false"
+			if test.missingImage {
+				missingImage = "true"
+			}
+			cmd.Env = append(os.Environ(), "ARCH=arm64", "LIFECYCLE_OUTCOME="+test.outcome, "OBSERVED_IMAGE="+test.image,
+				"MISSING_IMAGE="+missingImage, "PATH="+filepath.Join(root, "bin")+":"+os.Getenv("PATH"))
 			output, err = cmd.CombinedOutput()
 			if (err != nil) != test.wantError {
 				t.Fatalf("toolchain recording error=%v, want error=%t: %s", err, test.wantError, output)

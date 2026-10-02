@@ -85,13 +85,13 @@ that the build works on the selected KVM runners.
 
 The agent fetch command uses Go's existing module downloader and checksum verification. Three distinct but
 equivalent URLs for the same public module proxy use Go's `|` transport fallback. Their different URL identities
-avoid reuse of Go's cached metadata errors. The official proxy was checked to serve identical `.info`, `.mod`
-and `.zip` bytes through these equivalent paths. Checksum verification happens after transport and does not
+avoid reuse of Go's cached metadata errors. Go normalizes their request paths, so each variant sends the same
+`.info`, `.mod` and `.zip` paths; only the per-proxy cache identity differs. Checksum verification happens after transport and does not
 select another supplier. The existing direct-source fallback remains limited to proxy 404/410 responses.
 The complete download is bounded to 540 seconds with a 10-second kill grace. Completed modules remain in the
 vendor container's ephemeral module cache, not a shared Actions cache. Verification is bounded to 60 seconds
 and offline vendoring to 180 seconds, each with the same grace; neither command is retried. `GOWORK=off`,
-`GOTOOLCHAIN=local` and empty `GOFLAGS` override ambient build settings. Exact SHA-256 checks enforce unchanged
+`GOTOOLCHAIN=local`, `GOENV=off` and empty `GOFLAGS` override process and Go-environment-file settings. Exact SHA-256 checks enforce unchanged
 `go.mod` and `go.sum` after acquisition and vendoring, without requiring Git or matching checkout ownership.
 Both files must already exist. Download verifies the locked module checksums; offline `go mod verify` checks
 same-run cache consistency. Each failed phase names its budget and retains the underlying exit status.
@@ -109,7 +109,8 @@ Plan, mismatched image ID, or successful lifecycle without a Plan remains an err
 The toolchain-only job records an image only after successful toolchain construction/validation, even if a
 later identity test fails. The regression suite exercises the actual authored Go command against a fixture
 module proxy: metadata/ZIP 503s, interrupted ZIP transport, non-retried checksum/corrupt-archive failures,
-module-file drift, acquisition without Git, conflicting Go settings and offline verification/vendoring.
+`go.mod` and `go.sum` drift, acquisition without Git, conflicting process/file Go settings and offline verification/vendoring.
+Proxy 404/410 cases require Go's GOVCS denial to prove direct fallback was reached; exhausted 503s must not reach it.
 The fixture rejects any Git invocation; it does not simulate container UID mapping or differing file owners.
 Timeout tests assert the authored budgets and preservation of simulated timeout status, not real kill timing.
 Workflow tests execute the authored snippets and assert specific diagnostics and retained image IDs.

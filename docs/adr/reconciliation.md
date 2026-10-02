@@ -146,8 +146,9 @@ unit-tested; the existing ARC success evidence does not exercise each diagnostic
 
 The generated helper's shared-cache rejection is contract-tested. The trusted selector disables
 shared Actions cache restoration and checks each selected Definition's Plan-derived source closure
-with main's reader; future schemas must land in main first. These selector controls, Plan-derived boot-image
-selection and attempt-scoped uploads have no recorded execution evidence. They do not restrict the
+with main's reader; future schemas must land in main first. Run `37043068395` exercised these selector controls,
+Plan-derived boot-image selection and attempt-scoped uploads through trusted main workflow `91567c2`.
+This does not validate later candidate workflow edits or restrict the
 repository-scoped source secret. Main-scope shared-cache risk remains: candidate jobs dispatched through main
 can populate caches subsequently restored by `merge-gate.yaml` and `vulnerability-scan.yaml`, whose
 `actions/setup-go` steps still enable caching. Disabling those consumers' shared-cache restoration is a
@@ -199,7 +200,7 @@ validation of candidate workflow YAML or a later documentation-only head. Change
 the first post-merge push and a clean rerun. Manual dispatch remains available for native
 toolchain diagnostics or full image validation, on either architecture or both. The trusted main workflow defines
 admission for an exact main commit or a mirror matching a current, open, non-draft same-repository PR head.
-The candidate dispatch above exercised mirror admission. `/ok to test` is a maintainer convention,
+Candidate dispatches `36958996866` and `37043068395` exercised mirror admission. `/ok to test` is a maintainer convention,
 not enforced approval or proof of who wrote
 the mirror. Candidate code receives the pinned private NKE source contents and network-capable KVM execution,
 but never the source credential; a separate fetch job alone holds it.
@@ -207,7 +208,8 @@ That credential is a repository secret, not bound to a main-restricted deploymen
 The local Docker authoring graph now includes AMD64 and ARM64 KVM Definitions and a source-locked toolchain
 bootstrap that freezes the observed image ID into an attempt-local catalog overlay before Plan compilation. The
 workflow's full-build selector checks the source-lock inputs rather than requiring a falsely stable Docker ID.
-Both ARC jobs completed toolchain bootstrap, full QCOW2 build, boot smoke and image upload.
+Both ARC jobs in run `37043068395` completed toolchain bootstrap, full QCOW2 build, boot smoke and image upload
+at source candidate `d1e28ce` through trusted main workflow `91567c2`.
 These establish diagnostic executions, not native toolchain byte reproduction or the generated hosted VM adapter.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |

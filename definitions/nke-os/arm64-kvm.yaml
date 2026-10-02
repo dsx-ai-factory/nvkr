@@ -1,7 +1,7 @@
 apiVersion: nkd.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:f8e56164bab7d5169bcb8389303c759f975a46bb7b75f7799785f8c3e01e7863
+requiresCatalogDigest: sha256:afd3f61c3a39df36162c54759062032ccb4a774852434ba0e6d8887dc6eec853
 components:
   nke-node-image:
     component:
@@ -20,7 +20,7 @@ components:
         - -ec
         - |
           cd agent
-          export GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+          export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
           pins="$(sha256sum go.mod go.sum)"
           # Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.
           # Go owns transport fallback; checksum failures never select another proxy.

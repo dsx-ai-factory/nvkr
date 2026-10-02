@@ -18,7 +18,7 @@ sources:
       - -ec
       - |
         cd agent
-        export GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
         pins="$(sha256sum go.mod go.sum)"
         # Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.
         # Go owns transport fallback; checksum failures never select another proxy.
