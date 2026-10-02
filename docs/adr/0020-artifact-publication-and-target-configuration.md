@@ -237,13 +237,17 @@ pre-existing templates. Other chart shapes require a separate adapter. This does
 dependency availability or successful deployment.
 
 A source-built chart component may declare `helm.values` in the source registry: dotted `path` entries, each overriding
-one existing scalar in the chart's `values.yaml` with a Go template rendered at compile against a closed context
-(`Environment.Name`, `Environment.Publication.RepositoryPrefix` when the Environment publishes, `Arch`, `Platform`,
-`Output`). A missing field, unknown path, missing parent mapping, mapping-valued target, duplicate path or a source
-that is not a from-source tarball is a coded error before output; image-bound charts additionally reject `image.digest`
-and `image.tag`. Rendered overrides are recorded on the package node in sorted order, so the Plan and lifecycle
+one existing string scalar in the chart's `values.yaml` with a Go template rendered at compile against a closed context
+(`Environment.Publication.RepositoryPrefix` when the Environment publishes, `Arch`, `Platform`, `Output`). Each rendered
+value must be non-empty, free of control characters and at most 4 KiB. Compilation rejects a missing template field, an
+invalid template, a duplicate path, a source that is not a from-source tarball, a non-Helm output that selects a chart
+declaring `helm.values`, and, for image-bound charts, any path under `image`. Packaging, which needs the chart bytes,
+rejects an unknown path, a missing parent mapping and a non-string target (mapping, sequence, number, boolean or null)
+before writing output. Rendered overrides are recorded on the package node in sorted order, so the Plan and lifecycle
 reproduction cover them. The chart payload is therefore Environment-bound: the same Definition under two Environments
-publishes different chart bytes, while the producer Build Digest, which excludes packaging, is unchanged. Acquired
+publishes different chart bytes, while the producer Build Digest, which excludes packaging, is unchanged. Applying
+overrides re-serializes `values.yaml` through a structured encoder, which drops comments, sorts keys, widens integers
+beyond 2^53 to floating point and rejects duplicate keys; unbound charts without overrides keep their bytes. Acquired
 charts accept no overrides. This is contract-tested only; no hosted Run has exercised it.
 
 A Helm output may instead select one acquired `raw` chart package. The compiler requires an acquisition

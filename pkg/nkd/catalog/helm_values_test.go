@@ -42,3 +42,45 @@ func TestValidateHelmValues(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeRegistryLoadsHelmValues(t *testing.T) {
+	const registry = `apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: test
+components:
+  chart:
+    fromSource: true
+    source: src
+    artifactPath: charts/chart.tgz
+    writeDir: charts
+    buildCommand: ['package']
+    outputType: tarball
+    platforms: [linux/amd64]
+    helm:
+      values:
+      - path: image.repository
+        value: '{{.Environment.Publication.RepositoryPrefix}}/chart-{{.Arch}}'
+sources:
+  src:
+    repo: ssh://git@github.com/example/src.git
+    constraint: v1.0.0
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+`
+	reg, err := decodeRegistry([]byte(registry), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	helm := reg.Components["chart"].Helm
+	if helm == nil || len(helm.Values) != 1 || helm.Values[0].Path != "image.repository" {
+		t.Fatalf("helm = %+v", helm)
+	}
+	clone := CloneHelmSpec(helm)
+	clone.Values[0].Path = "changed"
+	if helm.Values[0].Path != "image.repository" {
+		t.Fatal("CloneHelmSpec shares the Values slice")
+	}
+	if CloneHelmSpec(nil) != nil {
+		t.Fatal("CloneHelmSpec(nil) must be nil")
+	}
+}

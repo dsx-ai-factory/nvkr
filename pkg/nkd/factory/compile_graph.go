@@ -116,6 +116,17 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			if err != nil {
 				return ArtifactGraph{}, err
 			}
+			if spec.HelmImage != nil {
+				for _, override := range helmValues {
+					if err := rejectBoundImageOverride(override.Path); err != nil {
+						return ArtifactGraph{}, err
+					}
+				}
+			}
+		} else if chart, err := chartHelmSpec(builds[spec.Name], inputs, artifacts); err != nil {
+			return ArtifactGraph{}, err
+		} else if chart != nil {
+			return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "package %q of kind %q selects a chart declaring helm.values, which only a Helm output applies", spec.Name, spec.Kind)
 		}
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name

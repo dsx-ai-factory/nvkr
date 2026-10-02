@@ -71,6 +71,16 @@ func bindHelmDeployment(raw []byte, digest string) ([]byte, error) {
 	}), nil
 }
 
+// rejectBoundImageOverride refuses the image subtree of an image-bound chart:
+// the digest is verified and the repository must stay a deploy-time input so
+// chart bytes remain portable across registry mirrors.
+func rejectBoundImageOverride(path string) error {
+	if path == "image" || strings.HasPrefix(path, "image.") {
+		return e.New(e.CodeInvalidCatalog, "Helm values cannot override the verified image binding %q", path)
+	}
+	return nil
+}
+
 // bindHelmImage operates only on the private extracted source tree. The caller
 // derives digest from the verified image package in the same compiled graph.
 func bindHelmImage(ctx context.Context, root, chart, digest string, overrides []HelmValueOverride) error {
@@ -78,8 +88,8 @@ func bindHelmImage(ctx context.Context, root, chart, digest string, overrides []
 		return e.New(e.CodeInvalidCatalog, "Helm image binding requires a chart directory and image digest")
 	}
 	for _, override := range overrides {
-		if override.Path == "image.digest" || override.Path == "image.tag" {
-			return e.New(e.CodeInvalidCatalog, "Helm values cannot override the verified image binding %q", override.Path)
+		if err := rejectBoundImageOverride(override.Path); err != nil {
+			return err
 		}
 	}
 	// Reject links before any mutation, including contained aliases that could

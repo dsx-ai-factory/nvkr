@@ -65,7 +65,7 @@ func TestHelmImageBindingUpdatesChecksums(t *testing.T) {
 	}
 	files := map[string]string{
 		"007-controller/templates/controller.yaml": helmDeploymentFixture,
-		"007-controller/values.yaml":               "image:\n  repository: old\n  tag: dev\n  digest: ''\n",
+		"007-controller/values.yaml":               "image:\n  repository: old\n  tag: dev\n  digest: ''\npullPolicy: Always\n",
 		"checksums.txt":                            "old\n",
 	}
 	for path, raw := range files {
@@ -109,25 +109,46 @@ func TestHelmImageBindingAppliesValuesBeforeChecksums(t *testing.T) {
 	}
 	for path, raw := range map[string]string{
 		"007-controller/templates/controller.yaml": helmDeploymentFixture,
-		"007-controller/values.yaml":               "image:\n  repository: old\n  tag: dev\n  digest: ''\n",
+		"007-controller/values.yaml":               "image:\n  repository: old\n  tag: dev\n  digest: ''\npullPolicy: Always\n",
 	} {
 		if err := os.WriteFile(filepath.Join(root, path), []byte(raw), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	digest := "sha256:" + strings.Repeat("a", 64)
-	overrides := []HelmValueOverride{{Path: "image.repository", Value: "registry.test/prefix/controller"}}
+	overrides := []HelmValueOverride{{Path: "pullPolicy", Value: "IfNotPresent"}}
 	if err := bindHelmImage(context.Background(), root, "007-controller", digest, overrides); err != nil {
 		t.Fatal(err)
 	}
-	values, _ := os.ReadFile(filepath.Join(root, "007-controller", "values.yaml"))
-	checksums, _ := os.ReadFile(filepath.Join(root, "checksums.txt"))
-	if !strings.Contains(string(values), "repository: registry.test/prefix/controller") || !strings.Contains(string(values), digest) ||
+	values, err := os.ReadFile(filepath.Join(root, "007-controller", "values.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checksums, err := os.ReadFile(filepath.Join(root, "checksums.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(values), "pullPolicy: IfNotPresent") || !strings.Contains(string(values), `repository: ""`) || !strings.Contains(string(values), digest) ||
 		!strings.Contains(string(checksums), fmt.Sprintf("%x  007-controller/values.yaml\n", sha256.Sum256(values))) {
 		t.Fatalf("values %s checksums %s", values, checksums)
 	}
-	for _, path := range []string{"image.digest", "image.tag"} {
+	for _, path := range []string{"image.digest", "image.tag", "image.repository"} {
 		err := bindHelmImage(context.Background(), root, "007-controller", digest, []HelmValueOverride{{Path: path, Value: "x"}})
 		assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+		assertErrorContains(t, err, "verified image binding")
+	}
+	before, err := os.ReadFile(filepath.Join(root, "007-controller", "values.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "007-controller", "templates", "controller.yaml"), []byte(helmDeploymentFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = bindHelmImage(context.Background(), root, "007-controller", digest, []HelmValueOverride{{Path: "unknown", Value: "x"}})
+	assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+	assertErrorContains(t, err, "does not exist")
+	after, err := os.ReadFile(filepath.Join(root, "007-controller", "values.yaml"))
+	if err != nil || string(before) != string(after) {
+		t.Fatalf("values changed on rejected binding: %v\n%s\n%s", err, before, after)
 	}
 }
