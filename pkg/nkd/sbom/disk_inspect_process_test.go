@@ -64,6 +64,14 @@ func diskInspectorProcessHelper() error {
 	if !slices.Equal(got, want) {
 		return fmt.Errorf("unexpected inspector environment: %q", got)
 	}
+	// Tool mode bypasses m.Run, so Go's coverage exit hooks need their own
+	// writable directory. Set it only after checking the exact inherited
+	// production environment, beneath the caller-owned private workspace.
+	if testing.CoverMode() != "" {
+		if err := os.Setenv("GOCOVERDIR", workspace); err != nil {
+			return err
+		}
+	}
 	stdin, err := io.ReadAll(os.Stdin)
 	if err != nil || len(stdin) != 0 {
 		return fmt.Errorf("key input not empty: %v", err)
