@@ -85,7 +85,7 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 		stderr = io.Discard
 	}
 	if node.IRNode != "" {
-		return executeProducer(ctx, plan, node, plan.Environment.RuntimeBinary(), 1, stdout, stderr, (pipeline.Local{}).ExecNode)
+		return executeProducer(ctx, plan, node, plan.Environment.RuntimeBinary(), 1, stdout, stderr, (pipeline.Local{}).ExecNode, nil)
 	}
 	switch node.Kind {
 	case NodeAcquire:

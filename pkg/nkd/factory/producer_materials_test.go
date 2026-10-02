@@ -150,7 +150,7 @@ func TestExecuteProducerPassesAuthenticatedOrdinaryMaterials(t *testing.T) {
 			Qualification: pipeline.ArtifactUnqualified, SHA256: "sha256:" + strings.Repeat("f", 64),
 		}, nil
 	}
-	if err := executeProducer(t.Context(), plan, consumer, "docker", 2, io.Discard, io.Discard, run); err != nil {
+	if err := executeProducer(t.Context(), plan, consumer, "docker", 2, io.Discard, io.Discard, run, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !called {

@@ -493,6 +493,7 @@ func (result *LocalRunResult) Close() error {
 	result.diskClosed = true
 	completions := result.diskCompletions
 	result.diskCompletions = nil
+	result.materialConsumptions = nil
 	result.diskMu.Unlock()
 	var closeErr error
 	for _, completion := range completions {

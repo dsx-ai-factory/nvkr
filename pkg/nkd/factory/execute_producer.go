@@ -15,7 +15,7 @@ import (
 // Local and hosted execution use this same operation. The Plan selects the exact
 // instruction, workspace and result slot; pipeline owns launching and collecting it.
 func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string, jobs int, stdout, stderr io.Writer,
-	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) (returnErr error) {
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error), owner *LocalRunResult) (returnErr error) {
 	_, instruction, err := plan.producerInstruction(node)
 	if err != nil {
 		return err
@@ -87,5 +87,11 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	if err != nil {
 		return err
 	}
-	return writeFactoryFile(ctx, artifacts["result/"+node.BuildTarget+"/"+instruction.Component].Path, raw, 0o644)
+	if err := writeFactoryFile(ctx, artifacts["result/"+node.BuildTarget+"/"+instruction.Component].Path, raw, 0o644); err != nil {
+		return err
+	}
+	if owner != nil {
+		return owner.recordProducerConsumption(ctx, plan, node, instruction, result, observedMaterials)
+	}
+	return nil
 }
