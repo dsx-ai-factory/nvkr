@@ -172,6 +172,30 @@ on these observed runners. Mode 0666 permits access without KVM group membership
 whether it originated in scale-set configuration or an earlier host-device change. No durable permission
 baseline for newly provisioned hosts, new QCOW2 or boot test is established by this probe.
 
+## Automatic post-merge validation
+
+[Run 36933187521](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36933187521) was triggered by a
+push at `156d32c51b43c2ae8ecbfc02da117ea9ab7e07a2`. Both full architecture jobs completed successfully,
+including lifecycle build, QCOW2 identity recording, source-owned boot smoke and image upload.
+
+[Run 36939569803](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36939569803) was triggered by a
+push at `53ba88b39b049afc0928a7303e5a7c4a4eee89d5`. Its
+[AMD64 job](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36939569803/job/110628080228) completed
+those same steps successfully. Its
+[ARM64 job](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/36939569803/job/110628080327) passed
+native KVM admission and the dispatcher regression, then failed while vendoring the agent's Go modules:
+
+```text
+google.golang.org/protobuf@v1.36.12: ... stream error: stream ID 31; INTERNAL_ERROR; received from peer
+```
+
+The lifecycle returned `NKD-E-FETCH-FAILED`, exit code 20, before Packer or QEMU started. Toolchain recording
+then failed because `.nkd/evidence/attempt-arm64` had not been written. Diagnostic upload succeeded; boot
+smoke and image upload were skipped. This is acquisition failure evidence, not a VM-build failure.
+
+These observations were rechecked through GitHub's run/job records and the failed ARM64 log. They establish
+automatic triggering at those exact heads, not successful execution of subsequent reliability changes.
+
 ## Remaining proof
 
 FDE, full-disk SBOM, publication, qualified execution, and the generated hosted VM adapter remain outside

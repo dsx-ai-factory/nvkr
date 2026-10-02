@@ -1,7 +1,7 @@
 apiVersion: nkd.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:20ad684b3d72b3c87299b2c47c8d6f89d0cad447d737fbbb0dc55eab57772ceb
+requiresCatalogDigest: sha256:d6b67d97f2879301ddd8dda4093896b269dcd7a25e5f362409c163a09215ee03
 components:
   nke-node-image:
     component:
@@ -20,7 +20,17 @@ components:
         - -ec
         - |
           cd agent
-          GOWORK=off go mod vendor
+          export GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly
+          # Go retries transport through its proxy fallback, not checksum failures.
+          # Keep the existing direct fallback only for a missing proxy module.
+          proxy=https://proxy.golang.org
+          GOPROXY="${proxy}|${proxy}|${proxy},direct" \
+            timeout --kill-after=10s 540s go mod download
+          git diff --exit-code HEAD -- go.mod go.sum
+          # Offline verification and vendoring run once, after acquisition succeeds.
+          GOPROXY=off timeout --kill-after=10s 60s go mod verify
+          GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+          git diff --exit-code HEAD -- go.mod go.sum
       sourceDateEpoch: 1790192178
       outputType: disk-image
       disk:

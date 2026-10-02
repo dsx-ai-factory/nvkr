@@ -13,33 +13,43 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-func TestOSWorkflowPreflightSelection(t *testing.T) {
+type osWorkflowStep struct {
+	Name, Run, Uses, ID, If string
+	Env                     map[string]string
+}
+
+type osWorkflowJob struct {
+	If          string
+	Permissions map[string]string
+	Steps       []osWorkflowStep
+}
+
+func osValidationWorkflow(t *testing.T) map[string]osWorkflowJob {
+	t.Helper()
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nke-os-local.sh")))
 	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "nke-os-validation.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var workflow struct {
-		Jobs map[string]struct {
-			If          string
-			Permissions map[string]string
-			Steps       []struct {
-				Name, Run, Uses string
-				Env             map[string]string
-			}
-		}
+		Jobs map[string]osWorkflowJob
 	}
 	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
+	return workflow.Jobs
+}
+
+func TestOSWorkflowPreflightSelection(t *testing.T) {
+	jobs := osValidationWorkflow(t)
 	var selection, preflight, full string
 	var requiresKVMTest bool
-	for _, step := range workflow.Jobs["select"].Steps {
+	for _, step := range jobs["select"].Steps {
 		if step.Name == "Validate selection" {
 			selection = step.Run
 		}
 	}
-	for _, step := range workflow.Jobs["validate-kvm"].Steps {
+	for _, step := range jobs["validate-kvm"].Steps {
 		if step.Uses != "" {
 			t.Fatal("permission probe must not check out source or invoke an external action")
 		}
@@ -47,7 +57,7 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 			preflight = step.Run
 		}
 	}
-	for _, step := range workflow.Jobs["validate-full"].Steps {
+	for _, step := range jobs["validate-full"].Steps {
 		if step.Name == "Admit native KVM runner" {
 			full = step.Run
 		}
@@ -62,12 +72,12 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 	if !requiresKVMTest {
 		t.Fatal("full validation must require the guarded Packer dispatch cases to execute")
 	}
-	probe := workflow.Jobs["validate-kvm"]
+	probe := jobs["validate-kvm"]
 	if probe.If != "needs.select.outputs.mode == 'preflight'" || probe.Permissions == nil || len(probe.Permissions) != 0 {
 		t.Fatal("permission probe must be preflight-only with no token permissions")
 	}
-	if workflow.Jobs["fetch-nke-source"].If != "needs.select.outputs.mode == 'full'" ||
-		workflow.Jobs["validate-full"].If != "needs.select.outputs.mode == 'full'" {
+	if jobs["fetch-nke-source"].If != "needs.select.outputs.mode == 'full'" ||
+		jobs["validate-full"].If != "needs.select.outputs.mode == 'full'" {
 		t.Fatal("preflight must not admit a source-credential job or image build")
 	}
 	// A PR-gating checkout can be shallow and have no origin/main. Model the
@@ -129,6 +139,76 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 			output, err := cmd.CombinedOutput()
 			if (err == nil) != test.want {
 				t.Fatalf("selection error=%v, want accepted=%t: %s", err, test.want, output)
+			}
+		})
+	}
+}
+
+func TestOSWorkflowRetainsPrimaryLifecycleFailure(t *testing.T) {
+	var build, record osWorkflowStep
+	for _, step := range osValidationWorkflow(t)["validate-full"].Steps {
+		switch step.Name {
+		case "Build one QCOW2 through the NKD lifecycle":
+			build = step
+		case "Record exact native toolchain image ID":
+			record = step
+		}
+	}
+	if build.ID != "lifecycle" || record.If != "always() && (steps.lifecycle.outcome == 'success' || steps.lifecycle.outcome == 'failure')" {
+		t.Fatal("toolchain recording must run only after an executed lifecycle step")
+	}
+	for _, test := range []struct {
+		name, plan, outcome, image string
+		wantError                  bool
+	}{
+		{name: "failure before Plan", outcome: "failure", image: "sha256:observed"},
+		{name: "failure after Plan", outcome: "failure", image: "sha256:observed", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`},
+		{name: "invalid Plan remains an error", outcome: "failure", plan: `{}`, wantError: true},
+		{name: "successful lifecycle requires Plan", outcome: "success", wantError: true},
+		{name: "mismatched toolchain remains an error", outcome: "failure", image: "sha256:substituted", plan: `{"builds":[{"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","toolchain":"sha256:observed"}]}}]}`, wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			for path, body := range map[string]string{
+				"scripts/nke-os-local.sh": "#!/bin/sh\necho primary-fetch-error >&2\nexit 20\n",
+				"bin/docker":              "#!/bin/sh\nprintf '%s\\n' \"$OBSERVED_IMAGE\"\n",
+			} {
+				path = filepath.Join(root, path)
+				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(body), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.MkdirAll(filepath.Join(root, ".nkd/evidence"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			run := strings.NewReplacer("${{ matrix.arch }}", "arm64", "${{ needs.select.outputs.commit }}", "fixture").Replace(build.Run)
+			cmd := exec.CommandContext(t.Context(), "bash", "-c", run)
+			cmd.Dir = root
+			output, err := cmd.CombinedOutput()
+			if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 20 || !strings.Contains(string(output), "primary-fetch-error") {
+				t.Fatalf("primary lifecycle error was lost: %v: %s", err, output)
+			}
+			if test.plan != "" {
+				path := filepath.Join(root, ".nkd/runs/gha-arm64-fixture/.runner/plan.json")
+				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(test.plan), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd = exec.CommandContext(t.Context(), "bash", "-c", record.Run)
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "ARCH=arm64", "LIFECYCLE_OUTCOME="+test.outcome, "OBSERVED_IMAGE="+test.image, "PATH="+filepath.Join(root, "bin")+":"+os.Getenv("PATH"))
+			output, err = cmd.CombinedOutput()
+			if (err != nil) != test.wantError {
+				t.Fatalf("toolchain recording error=%v, want error=%t: %s", err, test.wantError, output)
+			}
+			if test.plan == "" && !test.wantError && !strings.Contains(string(output), "No executable Plan") {
+				t.Fatalf("missing Plan was not reported: %s", output)
 			}
 		})
 	}

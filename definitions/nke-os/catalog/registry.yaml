@@ -18,7 +18,17 @@ sources:
       - -ec
       - |
         cd agent
-        GOWORK=off go mod vendor
+        export GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly
+        # Go retries transport through its proxy fallback, not checksum failures.
+        # Keep the existing direct fallback only for a missing proxy module.
+        proxy=https://proxy.golang.org
+        GOPROXY="${proxy}|${proxy}|${proxy},direct" \
+          timeout --kill-after=10s 540s go mod download
+        git diff --exit-code HEAD -- go.mod go.sum
+        # Offline verification and vendoring run once, after acquisition succeeds.
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        git diff --exit-code HEAD -- go.mod go.sum
   nke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x

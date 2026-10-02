@@ -10,8 +10,9 @@ because the generated hosted adapter still rejects requirement-bearing VM jobs a
 
 Every push to `main`, including a merged PR, selects the exact pushed commit and runs full AMD64 and ARM64
 Docker/KVM image builds and boot smoke. Both QCOW2s are uploaded after successful validation. No path filter
-skips merges, and newer pushes do not cancel earlier runs. This trigger must still be exercised after merge;
-the recorded manual full builds do not prove automatic dispatch.
+skips merges, and newer pushes do not cancel earlier runs. The automatic post-merge run at `156d32c` passed
+both full builds; the following run at `53ba88b` passed AMD64 but failed ARM64 during module acquisition.
+Those runs do not validate the reliability edits below at a new head.
 
 Manual dispatch from the trusted workflow on `main` remains available for either architecture or both, in
 toolchain-only or full mode. The credential-free toolchain pass uses GitHub-hosted native AMD64 and ARM64
@@ -73,6 +74,34 @@ commit or copy-pr-bot mirror. A successful full run, not compilation or unit tes
 that the build works on the selected KVM runners.
 
 ## Acceptance
+
+### Dependency preparation and early failures
+
+The agent fetch command uses Go's existing module downloader and checksum verification. Three entries for the
+same public module proxy use Go's `|` transport fallback; checksum verification happens after transport and
+does not select another supplier. The existing direct-source fallback remains limited to proxy 404/410 responses.
+The complete download is bounded to 540 seconds with a 10-second kill grace. Completed modules remain in the
+same attempt-local container cache, not a shared Actions cache. Verification is bounded to 60 seconds and
+offline vendoring to 180 seconds, each with the same grace; neither command is retried. `GOWORK=off`,
+`GOTOOLCHAIN=local` and readonly module flags are explicit. Pinned `go.mod` and `go.sum` must remain unchanged
+after acquisition and vendoring. No Packer or component build is retried.
+
+The existing source-closure receipt is issued after successful vendoring and hashing. Source commit/tree and
+material checks remain unchanged. Architecture jobs still acquire separate closures: their source receipts bind
+the exact architecture-selected vendor specification and image. Sharing a vendored closure requires a new
+authenticated transport contract, not merely copying one job's directory or adding an Actions cache.
+
+The workflow records its attempt name before starting the lifecycle and preserves the primary exit status with
+`pipefail`. Toolchain recording runs only after an executed lifecycle step. A failed lifecycle without a Plan
+reports an unavailable toolchain observation rather than a spurious missing-file failure. A malformed existing
+Plan, mismatched image ID, or successful lifecycle without a Plan remains an error. Available logs are retained.
+The regression suite exercises the actual authored Go command against a fixture module proxy and executes the
+authored workflow snippets; it does not prove ARC availability or full NKE acquisition.
+
+Acceptance for these reliability edits requires a fresh AMD64 and ARM64 full build and boot smoke at the exact
+reviewed head, then one clean rerun. Contract tests alone cannot satisfy that external gate.
+
+### Full build
 
 Each full leg must pass native architecture, Docker, KVM, effective CPU, memory, storage and timeout admission; build
 through `nkdctl run local`; retain one Plan and completed Run; verify exactly one QCOW2 has no backing file and record its
