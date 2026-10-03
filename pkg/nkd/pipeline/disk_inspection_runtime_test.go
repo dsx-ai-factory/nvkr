@@ -2,10 +2,12 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"io"
 	"math"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +17,111 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
+
+type diskInspectionRunRuntime struct {
+	packerContainerRuntime
+	createDiagnostic, scanDiagnostic, report string
+	createErr, scanErr, cleanupErr           error
+	cancel                                   context.CancelFunc
+	started, copied                          bool
+}
+
+func (runtime *diskInspectionRunRuntime) Run(_ context.Context, input io.Reader, output, diagnostic io.Writer, args ...string) error {
+	if args[0] == "create" {
+		_, _ = io.WriteString(diagnostic, runtime.createDiagnostic)
+		return runtime.createErr
+	}
+	runtime.started = true
+	if runtime.cancel != nil {
+		runtime.cancel()
+	}
+	if runtime.scanErr != nil {
+		_, _ = io.WriteString(diagnostic, runtime.scanDiagnostic)
+		return runtime.scanErr
+	}
+	_, err := io.Copy(io.Discard, input)
+	runtime.copied = err == nil
+	if err != nil {
+		return err
+	}
+	_, _ = io.WriteString(diagnostic, runtime.scanDiagnostic)
+	_, err = io.WriteString(output, runtime.report)
+	return err
+}
+
+func (runtime *diskInspectionRunRuntime) Cleanup(_ context.Context, _ time.Duration, output, _ io.Writer, args ...string) error {
+	if args[0] == "ps" {
+		_, err := io.WriteString(output, strings.Repeat("a", 64))
+		return err
+	}
+	return runtime.cleanupErr
+}
+
+func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		runtime      diskInspectionRunRuntime
+		closeSubject bool
+		canceled     bool
+		want         e.Code
+		wantStart    bool
+		wantReport   bool
+	}{
+		{name: "complete", runtime: diskInspectionRunRuntime{report: "report"}, wantStart: true, wantReport: true},
+		{name: "create failure", runtime: diskInspectionRunRuntime{createErr: errors.New("create")}, want: e.CodeEngineCapability},
+		{name: "create warning before start", runtime: diskInspectionRunRuntime{createDiagnostic: "requested limit ignored"}, want: e.CodeEngineCapability},
+		{name: "start failure joins blocked writer", runtime: diskInspectionRunRuntime{scanErr: errors.New("start")}, want: e.CodeEnvelopeDecode, wantStart: true},
+		{name: "copy failure", closeSubject: true, want: e.CodeEnvelopeDecode, wantStart: true},
+		{name: "scan diagnostic", runtime: diskInspectionRunRuntime{report: "report", scanDiagnostic: "scan warning"}, want: e.CodeEnvelopeDecode, wantStart: true},
+		{name: "empty report", want: e.CodeEnvelopeDecode, wantStart: true},
+		{name: "cleanup revokes report", runtime: diskInspectionRunRuntime{report: "report", cleanupErr: errors.New("cleanup")}, want: e.CodeInternal, wantStart: true},
+		{name: "canceled scan", runtime: diskInspectionRunRuntime{scanErr: context.Canceled}, canceled: true, want: e.CodeTimeout, wantStart: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			subject, err := heldfile.FromBytesContext(t.Context(), []byte("held subject"), heldfile.Options{Label: "fixture", MaxBytes: 128})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer subject.Close()
+			if tt.closeSubject {
+				if err := subject.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			if tt.canceled {
+				tt.runtime.cancel = cancel
+			}
+			raw, err := runDiskInspectionContainer(ctx, &tt.runtime, testDiskInspectionSelection(t), "image", subject)
+			if code(err) != tt.want || tt.runtime.started != tt.wantStart || (raw != nil) != tt.wantReport {
+				t.Fatalf("raw=%q error=%v started=%t", raw, err, tt.runtime.started)
+			}
+			if tt.wantReport && (!tt.runtime.copied || string(raw) != "report") {
+				t.Fatal("accepted report before input streaming completed")
+			}
+		})
+	}
+}
+
+func TestDiskInspectionDiagnosticsAreBoundedAndQuoted(t *testing.T) {
+	for _, raw := range []string{"\x1b[31merror\n\x00", strings.Repeat("x", 8192)} {
+		got := diskInspectionDiagnostic([]byte(raw))
+		if len(got) > 6*4096+64 || strings.ContainsAny(got, "\x1b\n\x00") {
+			t.Fatalf("unsafe or unbounded diagnostic: %q", got)
+		}
+		want := raw
+		if len(want) > 4096 {
+			want = want[:4096]
+		}
+		if !strings.HasPrefix(got, strconv.Quote(strings.TrimSpace(want))) {
+			t.Fatalf("diagnostic not quoted: %q", got)
+		}
+		if !strings.HasSuffix(got, "(truncated="+strconv.FormatBool(len(raw) > 4096)+")") {
+			t.Fatal("diagnostic truncation not recorded")
+		}
+	}
+}
 
 func testDiskInspectionSelection(t *testing.T) DiskInspectionSelection {
 	t.Helper()
@@ -96,6 +203,7 @@ type diskInspectionCleanupRuntime struct {
 	packerContainerRuntime
 	listed   string
 	commands [][]string
+	lateID   string
 }
 
 func (runtime *diskInspectionCleanupRuntime) Cleanup(_ context.Context, _ time.Duration,
@@ -103,10 +211,39 @@ func (runtime *diskInspectionCleanupRuntime) Cleanup(_ context.Context, _ time.D
 ) error {
 	runtime.commands = append(runtime.commands, slices.Clone(args))
 	if args[0] == "ps" {
+		if runtime.lateID != "" && len(runtime.commands) > 1 {
+			runtime.listed = runtime.lateID
+		}
 		_, err := io.WriteString(stdout, runtime.listed)
 		return err
 	}
 	return nil
+}
+
+func TestDiskInspectionCleanupReconcilesUncertainCreation(t *testing.T) {
+	for _, tt := range []struct {
+		name, lateID string
+		want         e.Code
+	}{
+		{name: "late daemon registration", lateID: strings.Repeat("a", 64)},
+		{name: "absence is not creation completion", want: e.CodeInternal},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime := &diskInspectionCleanupRuntime{lateID: tt.lateID}
+			ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+			defer cancel()
+			if err := removeDiskInspectionContainer(ctx, runtime, "attempt-token", true); code(err) != tt.want {
+				t.Fatalf("cleanup outcome: %v, want %s", err, tt.want)
+			}
+			last := runtime.commands[len(runtime.commands)-1]
+			if tt.lateID != "" && !slices.Equal(last, []string{"rm", "--force", tt.lateID}) {
+				t.Fatalf("late registration not removed by owned ID: %v", last)
+			}
+			if tt.lateID == "" && last[0] == "rm" {
+				t.Fatal("removed a container without an owned identity")
+			}
+		})
+	}
 }
 
 func TestDiskInspectionCleanupRemovesOnlyOwnedIdentity(t *testing.T) {
@@ -116,7 +253,7 @@ func TestDiskInspectionCleanupRemovesOnlyOwnedIdentity(t *testing.T) {
 		wantRemove   bool
 		wantCode     e.Code
 	}{
-		{name: "failed create collision leaves sibling untouched"},
+		{name: "completed attempt already absent leaves siblings untouched"},
 		{name: "canceled create cleans its owned container", listed: id + "\n", wantRemove: true},
 		{name: "invalid identity", listed: "nkd-inspect-sibling\n", wantCode: e.CodeVerifyFailed},
 		{name: "short identity", listed: id[:12] + "\n", wantCode: e.CodeVerifyFailed},
@@ -124,7 +261,7 @@ func TestDiskInspectionCleanupRemovesOnlyOwnedIdentity(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			runtime := &diskInspectionCleanupRuntime{listed: tt.listed}
-			if err := removeDiskInspectionContainer(t.Context(), runtime, "attempt-token"); code(err) != tt.wantCode {
+			if err := removeDiskInspectionContainer(t.Context(), runtime, "attempt-token", false); code(err) != tt.wantCode {
 				t.Fatalf("cleanup error %v, want %s", err, tt.wantCode)
 			}
 			wantLookup := []string{"ps", "--all", "--no-trunc", "--filter", "label=nkd.dev/inspection-attempt=attempt-token", "--format", "{{.ID}}"}

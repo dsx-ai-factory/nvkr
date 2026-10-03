@@ -22,8 +22,10 @@ type DiskInspectionRuntime struct {
 	container *pipeline.DiskInspectionContainer
 }
 
-// OpenDiskInspectionRuntime authenticates an already-local exact image and
-// native Linux runtime before any disk input or output is touched.
+// OpenDiskInspectionRuntime checks an already-local exact image and observes
+// the caller-selected trusted Linux runtime before touching disk input/output.
+// The runtime is held and rechecked for freshness, not authenticated against an
+// independently supplied executable or daemon pin.
 func OpenDiskInspectionRuntime(ctx context.Context, selection pipeline.DiskInspectionSelection) (*DiskInspectionRuntime, error) {
 	container, err := pipeline.OpenDiskInspectionContainer(ctx, selection)
 	if err != nil {
@@ -147,14 +149,11 @@ func RunDiskInspectionHelper(ctx context.Context, inspectorDigest, codecDigest, 
 		return err
 	}
 	defer func() { _ = inspector.Close() }()
-	subject, err := heldfile.FromReaderContext(ctx, input, heldfile.Options{Label: "inspection-subject", MaxBytes: size, ExpectedDigest: subjectDigest})
+	subject, err := holdDiskInspectionSubject(ctx, input, subjectDigest, size)
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "holding container inspection subject")
+		return err
 	}
 	defer func() { _ = subject.Close() }()
-	if subject.Size() != size {
-		return e.New(e.CodeVerifyFailed, "inspection subject size differs")
-	}
 	inventory, err := inspector.InspectHeldInstalledPackages(ctx, subject, "qcow2", "none")
 	if err != nil {
 		return err
@@ -176,4 +175,19 @@ func RunDiskInspectionHelper(ctx context.Context, inspectorDigest, codecDigest, 
 		return e.Wrap(e.CodeInternal, err, "writing inspection report")
 	}
 	return nil
+}
+
+func holdDiskInspectionSubject(ctx context.Context, input io.Reader, digest string, size int64) (*heldfile.File, error) {
+	subject, err := heldfile.FromReaderContext(ctx, input, heldfile.Options{Label: "inspection-subject", MaxBytes: size, ExpectedDigest: digest})
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, e.Wrap(e.CodeTimeout, errors.Join(err, ctx.Err()), "holding container inspection subject")
+		}
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "holding container inspection subject")
+	}
+	if subject.Size() != size {
+		_ = subject.Close()
+		return nil, e.New(e.CodeVerifyFailed, "inspection subject size differs")
+	}
+	return subject, nil
 }
