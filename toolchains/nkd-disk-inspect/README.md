@@ -22,7 +22,9 @@ podman build --build-arg TARGETARCH=arm64 \
 ```
 
 Use `GOARCH=amd64`, `bin/nkd-disk-inspect-amd64` and `TARGETARCH=amd64` on an
-AMD64 host. Docker is also supported. Do not treat a local image tag, package
+AMD64 host. Docker is admitted by the adapter and argument contracts, but this
+inspection route has been exercised only with Podman; no Docker daemon run is
+recorded here. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
 
@@ -57,7 +59,9 @@ image identity before and after inspection and uses a fixed launcher: UID/GID
 credential mounts, no-new-privileges, an init reaper and bounded process count.
 The helper is part of the selected image closure and receives only authenticated
 stdin bytes, not a host pathname. No runtime download or image pull is performed.
-The daemon and host kernel remain trusted in this local development route; it
+The caller-selected executable, daemon and host kernel remain trusted in this
+local development route. The held runtime is rechecked for freshness, not
+compared with an independently supplied executable or daemon pin; it
 does not authenticate provider isolation or grant qualification.
 
 The exact image config digest binds its immutable rootfs content, including the

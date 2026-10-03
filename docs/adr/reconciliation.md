@@ -63,7 +63,9 @@ runtime TCB. An optional concrete diagnostic runtime now admits an already-local
 Linux Docker/Podman executable and observed daemon identity. Its fixed launcher enforces non-root execution,
 network-none, a read-only root, dropped capabilities, absent caller mounts/devices/credentials, bounded
 resources and cancellation/cleanup. The opaque installed inventory binds the exact subject, tools and complete
-image config identity; the daemon and host kernel remain trusted. The native Linux AMD64 and ARM64 contracts
+image config identity, not a separately pinned runtime executable or daemon; the caller-selected runtime,
+daemon and host kernel remain trusted. Docker is admitted by argument contracts but no Docker inspection
+daemon run is recorded. The native Linux AMD64 and ARM64 contracts
 are tested, and the [native ARM64 runtime exercise](../evidence/2026-10-02-nke-os-inspector-runtime.md)
 inspected the retained disk's 730 packages and checked timeout/cleanup. That historical cancellation test did
 not observe a running container first, so it does not prove the interruption phase. The subsequent
