@@ -28,6 +28,8 @@ type LocalOptions struct {
 	// DiskInspection opts into diagnostic installed-package inspection. The
 	// caller owns this already-admitted runtime and keeps it open for execution.
 	// Omitting it preserves the existing build-only path, not an inspection claim.
+	// DryRun does not admit or execute this runtime: it returns only the pending,
+	// static-unqualified Run description, without observed outputs or inventories.
 	DiskInspection *sbom.DiskInspectionRuntime
 }
 

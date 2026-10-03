@@ -120,3 +120,51 @@ func TestLocalInspectionRejectsMissingAdmissionBeforeAttemptStorage(t *testing.T
 		t.Fatalf("unadmitted inspector created attempt storage: %v", err)
 	}
 }
+
+func TestLocalInspectionDryRunDoesNotAdmitRuntimeOrIssueInventory(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		runtime *sbom.DiskInspectionRuntime
+	}{
+		{name: "omitted"},
+		{name: "supplied", runtime: &sbom.DiskInspectionRuntime{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			prepared, _ := diskLifecycleFixture(t, "dry-inspection")
+			original := prepared.Description()
+			listed := false
+			run, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{
+				AttemptsRoot: ".nkd/runs", DryRun: true, DiskInspection: tt.runtime,
+			}, localExecutionDependencies{
+				admitLocal: factory.AdmitLocal,
+				runFactory: func(_ context.Context, _ *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
+					if !options.DryRun {
+						t.Fatal("dry-run invoked an executing factory")
+					}
+					listed = true
+					return nil, nil
+				},
+				writeRecordState: writeRunRecordState, beginDiskCommit: beginDiskAttemptTransaction,
+				admitInspection: func(context.Context, *factory.Plan, *sbom.DiskInspectionRuntime) error {
+					t.Fatal("dry-run admitted an inspection runtime")
+					return nil
+				},
+				inspectDisks: func(context.Context, *factory.Plan, localExecutionResult, *sbom.DiskInspectionRuntime) ([]factory.DiskInstalledInventoryDescription, error) {
+					t.Fatal("dry-run inspected a disk")
+					return nil, nil
+				},
+			})
+			if err != nil || !listed || run == nil {
+				t.Fatalf("dry-run listing: run=%v err=%v listed=%t", run, err, listed)
+			}
+			if run.Status != original.Status || run.Lane != LaneUnqualified ||
+				run.PlanDigest != original.PlanDigest || len(run.Observed) != 0 || len(run.InstalledDiskInventories()) != 0 {
+				t.Fatalf("dry-run issued execution or inspection evidence: %+v", run)
+			}
+			if _, err := os.Stat(".nkd"); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("dry-run created attempt storage: %v", err)
+			}
+		})
+	}
+}

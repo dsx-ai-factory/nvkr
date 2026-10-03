@@ -3,6 +3,8 @@
 The local lifecycle can opt into installed-package inspection through `LocalOptions.DiskInspection`. Its caller
 supplies an already admitted, concrete SBOM inspection runtime and keeps it open for the operation. Without
 that capability, existing OS builds remain build-only. No default inspection or full disk SBOM is claimed.
+Dry-run remains non-executing even when an inspection runtime is supplied: it does not admit or invoke that
+runtime and returns only the pending, static-unqualified Run description, with no observed outputs or inventories.
 
 The lifecycle invokes factory inspection after execution succeeds and before exporting or closing the held
 QCOW2. Factory retains the original Run's disk lifetime permit, authenticates its private material trace,
