@@ -110,9 +110,13 @@ runtime-only: image=sha256:a0e238dedfca964f4474ee0d649826d03642dbb256ad8f9b3b8b4
 PASS
 ```
 
-The cancellation case uses a two-second caller deadline, requires a timeout-coded
-error and no observation, then queries the daemon and requires no adapter-owned
-container to remain. The final source also contract-tests a queued inspection
+The historical cancellation case uses a two-second caller deadline, requires a
+timeout-coded error and no observation, then queries the daemon and requires no
+adapter-owned container to remain. It did not observe the running container before
+cancellation, so this result does not establish which inspection phase was interrupted.
+The strengthened acceptance test waits for a running container before canceling;
+its separate [review-fix exercise](2026-10-03-nke-os-inspector-review-fixes.md)
+records the exact draft source and actual running-phase cancellation. The source also contract-tests a queued inspection
 with no caller deadline: its own one-second configured timeout bounds lock wait.
 
 `make check` passed on the frozen functional code: formatting, vet, lint (zero

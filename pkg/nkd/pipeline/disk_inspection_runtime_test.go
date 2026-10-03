@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"io"
 	"math"
 	"os"
 	"slices"
@@ -71,11 +72,14 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer subject.Close()
-			args := diskInspectionCreateArgs(selection, selection.Image, "owned-attempt", subject)
+			args := diskInspectionCreateArgs(selection, selection.Image, "owned-attempt", "attempt-token", subject)
 			for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65534:65534", "--init", "--pids-limit=256", "--pull=never", "--no-healthcheck", "--memory=16384m", "--memory-swap=16384m", "/tmp:rw,nosuid,nodev,size=16384m,mode=1777", selection.Platform, "--entrypoint=/usr/local/bin/nkd-disk-inspect", subject.Digest()} {
 				if !slices.Contains(args, required) {
 					t.Fatalf("missing containment argument %q", required)
 				}
+			}
+			if !slices.Contains(args, "--label=nkd.dev/inspection-attempt=attempt-token") {
+				t.Fatal("missing cleanup ownership label")
 			}
 			for _, arg := range args {
 				for _, forbidden := range []string{"--device", "--mount", "--volume", "--privileged", "--cap-add", "--env-file", "--pid=host", "--user=0"} {
@@ -83,6 +87,56 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 						t.Fatalf("unexpected authority %q", arg)
 					}
 				}
+			}
+		})
+	}
+}
+
+type diskInspectionCleanupRuntime struct {
+	packerContainerRuntime
+	listed   string
+	commands [][]string
+}
+
+func (runtime *diskInspectionCleanupRuntime) Cleanup(_ context.Context, _ time.Duration,
+	stdout, _ io.Writer, args ...string,
+) error {
+	runtime.commands = append(runtime.commands, slices.Clone(args))
+	if args[0] == "ps" {
+		_, err := io.WriteString(stdout, runtime.listed)
+		return err
+	}
+	return nil
+}
+
+func TestDiskInspectionCleanupRemovesOnlyOwnedIdentity(t *testing.T) {
+	id := strings.Repeat("a", 64)
+	for _, tt := range []struct {
+		name, listed string
+		wantRemove   bool
+		wantCode     e.Code
+	}{
+		{name: "failed create collision leaves sibling untouched"},
+		{name: "canceled create cleans its owned container", listed: id + "\n", wantRemove: true},
+		{name: "invalid identity", listed: "nkd-inspect-sibling\n", wantCode: e.CodeVerifyFailed},
+		{name: "short identity", listed: id[:12] + "\n", wantCode: e.CodeVerifyFailed},
+		{name: "ambiguous ownership", listed: id + "\n" + strings.Repeat("b", 64) + "\n", wantCode: e.CodeVerifyFailed},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime := &diskInspectionCleanupRuntime{listed: tt.listed}
+			if err := removeDiskInspectionContainer(t.Context(), runtime, "attempt-token"); code(err) != tt.wantCode {
+				t.Fatalf("cleanup error %v, want %s", err, tt.wantCode)
+			}
+			wantLookup := []string{"ps", "--all", "--no-trunc", "--filter", "label=nkd.dev/inspection-attempt=attempt-token", "--format", "{{.ID}}"}
+			if !slices.Equal(runtime.commands[0], wantLookup) {
+				t.Fatalf("cleanup does not discover owned IDs: %v", runtime.commands)
+			}
+			if tt.wantRemove {
+				if len(runtime.commands) != 2 || !slices.Equal(runtime.commands[1], []string{"rm", "--force", id}) {
+					t.Fatalf("cleanup did not remove the exact owned ID: %v", runtime.commands)
+				}
+			} else if len(runtime.commands) != 1 {
+				t.Fatalf("cleanup removed an unowned or ambiguous container: %v", runtime.commands)
 			}
 		})
 	}
@@ -106,6 +160,29 @@ func TestDiskInspectionRuntimeRevocationAndCancellation(t *testing.T) {
 	defer cancel()
 	if err := lockDiskInspection(ctx, &mu); code(err) != e.CodeTimeout {
 		t.Fatalf("canceled lock: %v", err)
+	}
+}
+
+func TestDiskInspectionSubjectCancellationKeepsTimeoutCode(t *testing.T) {
+	subject, err := heldfile.FromBytesContext(t.Context(), []byte("held subject"), heldfile.Options{Label: "fixture", MaxBytes: 128})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	for _, phase := range []string{"checking inspection subject", "rechecking inspected disk"} {
+		t.Run(phase, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			if err := checkDiskInspectionSubject(ctx, subject, phase); code(err) != e.CodeTimeout {
+				t.Fatalf("canceled verification has error %v, want timeout", err)
+			}
+		})
+	}
+	if err := subject.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkDiskInspectionSubject(t.Context(), subject, "checking inspection subject"); code(err) != e.CodeVerifyFailed {
+		t.Fatalf("closed subject has error %v, want verify-failed", err)
 	}
 }
 

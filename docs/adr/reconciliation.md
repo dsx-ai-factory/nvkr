@@ -65,7 +65,10 @@ network-none, a read-only root, dropped capabilities, absent caller mounts/devic
 resources and cancellation/cleanup. The opaque installed inventory binds the exact subject, tools and complete
 image config identity; the daemon and host kernel remain trusted. The native Linux AMD64 and ARM64 contracts
 are tested, and the [native ARM64 runtime exercise](../evidence/2026-10-02-nke-os-inspector-runtime.md)
-inspected the retained disk's 730 packages and exercised cancellation/cleanup. Native AMD64 execution, an original
+inspected the retained disk's 730 packages and checked timeout/cleanup. That historical cancellation test did
+not observe a running container first, so it does not prove the interruption phase. The subsequent
+[review-fix exercise](../evidence/2026-10-03-nke-os-inspector-review-fixes.md) observed a running container before
+cancellation and confirmed join/removal for its recorded local patch. Native AMD64 execution, an original
 live bake followed by inspection, registry publication and license/security clearance remain unproved. This is an optional
 diagnostic capability, not a compiler Plan input or an authenticated production closure. The shared codec probe
 explicitly selects the driver and rejects external references. The local lifecycle now optionally
@@ -405,7 +408,7 @@ Earlier verification does not transfer by renaming or reinterpreting records.
 
 | Record | What actually ran | Limit |
 |---|---|---|
-| [Concrete local inspection runtime, 2026-10-02](../evidence/2026-10-02-nke-os-inspector-runtime.md) | Exact local OCI closure, held Podman/runtime/tool identities, non-root networkless inspection of one retained ARM64 QCOW2, 730 installed packages, actual cancellation/container cleanup and native Linux race suites | Native AMD64 runtime and original live-Run integration are unexercised; no registry publication, NVIDIA license/security clearance, full-disk SBOM or qualified claim |
+| [Concrete local inspection runtime, 2026-10-02](../evidence/2026-10-02-nke-os-inspector-runtime.md) | Exact local OCI closure, held Podman/runtime/tool identities, non-root networkless inspection of one retained ARM64 QCOW2, 730 installed packages, timeout/no-retained-container assertion and native Linux race suites | Historical cancellation test did not observe the running phase; native AMD64 runtime and original live-Run integration are unexercised; no registry publication, NVIDIA license/security clearance, full-disk SBOM or qualified claim |
 | [Shared VMDK codec admission, 2026-10-02](../evidence/2026-10-02-vmdk-codec-admission.md) | Opt-in ARM64 real-QEMU sparse and stream-optimized decoding, valid external-descriptor rejection and controlled probe/conversion markers | Earlier and linked follow-up replays retain their own exact source, executable and committed log identities; not ordinary CI, an AMD64 runtime result, an NKE image build or qualified reproduction |
 | [Corrected local installed-package inspection, 2026-10-02](../evidence/2026-10-02-nke-os-disk-inspection.md) | ARM64 ELF contract tests and non-root libguestfs scans, external-reference rejection and actual appliance cancellation at each replay's listed source blobs | Original and later checked-inventory rebuild retain separate source, test-binary and complete terminal-log identities. Diagnostic installed metadata only, not full SBOM, runtime authentication or qualified reproduction |
 | [Local installed-package inspection, 2026-10-01](../evidence/2026-10-01-nke-os-disk-inspection.md) | Historical ARM64 libguestfs diagnostic scan of a retained non-FDE disk, external-reference negatives and cancellation | Exact draft tree was not retained; not committed-candidate acceptance, full-disk SBOM, publication or qualified reproduction |

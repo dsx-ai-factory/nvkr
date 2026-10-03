@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -76,7 +76,7 @@ func OpenDiskInspectionContainer(ctx context.Context, selection DiskInspectionSe
 	held.identity, err = observeHeldRuntimeIdentity(ctx, held)
 	if err != nil {
 		_ = held.capability.Close()
-		return nil, err
+		return nil, runtimeCommandError(ctx, err, "", e.CodeEngineCapability, "admitting disk inspection runtime identity")
 	}
 	container := &DiskInspectionContainer{runtime: held, selection: selection}
 	if err := container.observeBinding(ctx); err != nil {
@@ -121,7 +121,7 @@ func (container *DiskInspectionContainer) observeBinding(ctx context.Context) er
 	}
 	raw, err := heldExecutionOutput(ctx, container.runtime, "image", "inspect", "--format", "{{json .}}", container.selection.Image)
 	if err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "observing inspection image identity")
+		return runtimeCommandError(ctx, err, "", e.CodeEngineCapability, "observing inspection image identity")
 	}
 	id, err := decodeDiskInspectionImageID(raw)
 	if err != nil {
@@ -245,30 +245,34 @@ func (container *DiskInspectionContainer) InspectHeld(ctx context.Context, subje
 	if err := container.observeBinding(ctx); err != nil {
 		return nil, err
 	}
-	if err := subject.AssertUnchangedContext(ctx); err != nil {
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "checking inspection subject")
+	if err := checkDiskInspectionSubject(ctx, subject, "checking inspection subject"); err != nil {
+		return nil, err
 	}
 	if err := container.admitResources(ctx, subject.Size()); err != nil {
 		return nil, err
 	}
-	name := fmt.Sprintf("nkd-inspect-%d-%d", os.Getpid(), containerSequence.Add(1))
+	attempt, err := packerAttemptID()
+	if err != nil {
+		return nil, e.Wrap(e.CodeInternal, err, "allocating disk inspection attempt identity")
+	}
+	name := "nkd-inspect-" + attempt
 	defer func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
-		err := container.runtime.runCleanup(cleanupCtx, time.Second, io.Discard, io.Discard, "rm", "--force", name)
+		err := removeDiskInspectionContainer(cleanupCtx, heldPackerContainerRuntime{runtime: container.runtime}, attempt)
 		if err != nil {
 			observation = nil
 			returnErr = errors.Join(returnErr, e.Wrap(e.CodeInternal, err, "removing inspection container"))
 		}
 	}()
 	var diagnostic, report diskInspectionBuffer
-	if err := container.runtime.run(ctx, io.Discard, &diagnostic, diskInspectionCreateArgs(container.selection, container.imageID, name, subject)...); err != nil {
+	if err := container.runtime.run(ctx, io.Discard, &diagnostic, diskInspectionCreateArgs(container.selection, container.imageID, name, attempt, subject)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diagnostic.String(), e.CodeEngineCapability, "creating disk inspection container")
 	}
 	reader, writer := io.Pipe()
 	done := make(chan error, 1)
 	go func() { _, err := subject.WriteToContext(ctx, writer); _ = writer.CloseWithError(err); done <- err }()
-	err := container.runtime.runIO(ctx, reader, &report, &diagnostic, "start", "--attach", "--interactive", name)
+	err = container.runtime.runIO(ctx, reader, &report, &diagnostic, "start", "--attach", "--interactive", name)
 	_ = reader.Close()
 	copyErr := <-done
 	if err := errors.Join(err, copyErr); err != nil {
@@ -277,13 +281,20 @@ func (container *DiskInspectionContainer) InspectHeld(ctx context.Context, subje
 	if diagnostic.Len() != 0 || report.Len() == 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection returned diagnostics or no report")
 	}
-	if err := subject.AssertUnchangedContext(ctx); err != nil {
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "rechecking inspected disk")
+	if err := checkDiskInspectionSubject(ctx, subject, "rechecking inspected disk"); err != nil {
+		return nil, err
 	}
 	if err := container.observeBinding(ctx); err != nil {
 		return nil, err
 	}
 	return &DiskInspectionObservation{report: bytes.Clone(report.Bytes()), subject: subject.Digest(), size: subject.Size(), image: container.imageID, inspector: container.selection.InspectorDigest, codec: container.selection.CodecDigest}, nil
+}
+
+func checkDiskInspectionSubject(ctx context.Context, subject *heldfile.File, phase string) error {
+	if err := subject.AssertUnchangedContext(ctx); err != nil {
+		return runtimeCommandError(ctx, err, "", e.CodeVerifyFailed, "%s", phase)
+	}
+	return nil
 }
 
 func (container *DiskInspectionContainer) admitResources(ctx context.Context, size int64) error {
@@ -314,8 +325,9 @@ func validateDiskInspectionResources(selection DiskInspectionSelection, facts ex
 	return nil
 }
 
-func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containerName string, subject *heldfile.File) []string {
+func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containerName, attempt string, subject *heldfile.File) []string {
 	return []string{"create", "--name", containerName, "--pull=never", "--platform", selection.Platform,
+		"--label=nkd.dev/inspection-attempt=" + attempt,
 		"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
 		"--user=65534:65534", "--hostname=nkd-inspector", "--no-healthcheck", "--init", "--interactive",
 		"--cpus=" + strconv.FormatFloat(float64(selection.Resources.CPUMillis)/1000, 'f', 3, 64),
@@ -324,6 +336,32 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 		"--env", "PATH=/usr/bin:/bin", "--env", "HOME=/tmp", "--env", "LC_ALL=C", "--env", "TZ=UTC",
 		"--entrypoint=/usr/local/bin/nkd-disk-inspect", image,
 		selection.InspectorDigest, selection.CodecDigest, subject.Digest(), strconv.FormatInt(subject.Size(), 10)}
+}
+
+// removeDiskInspectionContainer removes only this attempt's immutable container
+// ID. A failed create may leave no container or complete before cancellation, so
+// cleanup discovers its unique label rather than deleting by a reusable name.
+// The held local daemon is trusted; labels are not cross-process authority.
+func removeDiskInspectionContainer(ctx context.Context, runtime packerContainerRuntime, attempt string) error {
+	var stdout, stderr diskInspectionBuffer
+	if err := runtime.Cleanup(ctx, time.Second, &stdout, &stderr, "ps", "--all", "--no-trunc",
+		"--filter", "label=nkd.dev/inspection-attempt="+attempt, "--format", "{{.ID}}"); err != nil {
+		return e.Wrap(e.CodeInternal, err, "finding the owned disk inspection container")
+	}
+	if stderr.Len() != 0 {
+		return e.New(e.CodeVerifyFailed, "disk inspection cleanup discovery returned diagnostics")
+	}
+	ids := strings.Fields(stdout.String())
+	if len(ids) == 0 {
+		return nil
+	}
+	if len(ids) != 1 || !canonical.IsDigest("sha256:"+ids[0]) {
+		return e.New(e.CodeVerifyFailed, "disk inspection cleanup has an ambiguous container identity")
+	}
+	if err := runtime.Cleanup(ctx, time.Second, io.Discard, io.Discard, "rm", "--force", ids[0]); err != nil {
+		return e.Wrap(e.CodeInternal, err, "removing the owned disk inspection container")
+	}
+	return nil
 }
 
 func lockDiskInspection(ctx context.Context, mu *sync.Mutex) error {
