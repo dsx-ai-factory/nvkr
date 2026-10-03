@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -305,12 +306,32 @@ func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRunt
 	_ = reader.Close()
 	copyErr := <-done
 	if err := errors.Join(err, copyErr); err != nil {
-		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.Bytes()), e.CodeEnvelopeDecode, "inspecting held disk")
+		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.Bytes()), diskInspectionHelperCode(err), "inspecting held disk")
 	}
 	if diagnostic.Len() != 0 || report.Len() == 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection returned diagnostics or no report")
 	}
 	return bytes.Clone(report.Bytes()), nil
+}
+
+// Attached Docker/Podman start propagates the fixed helper's exit status. Reuse
+// the owning frozen mapping for its expected error classes, not diagnostic text.
+// Generic CLI statuses (including 1/2), runtime statuses 125/126/127, signals and
+// unknown statuses are ambiguous and retain envelope-decode. Caller cancellation
+// still takes precedence in runtimeCommandError.
+func diskInspectionHelperCode(err error) e.Code {
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		for _, candidate := range []e.Code{
+			e.CodeEngineCapability, e.CodeEncryptedArtifact, e.CodeProvenanceMissing,
+			e.CodeVerifyFailed, e.CodeEnvelopeDecode, e.CodeTimeout, e.CodeUnpinnedInput, e.CodeUnverifiedRef,
+		} {
+			if exit.ExitCode() == e.ExitCode(e.New(candidate, "")) {
+				return candidate
+			}
+		}
+	}
+	return e.CodeEnvelopeDecode
 }
 
 func diskInspectionDiagnostic(raw []byte) string {

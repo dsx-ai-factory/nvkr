@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"os/exec"
 	"runtime"
 	"slices"
 	"strconv"
@@ -131,6 +132,83 @@ func TestDiskInspectionDiagnosticsAreBoundedAndQuoted(t *testing.T) {
 		if !strings.HasSuffix(got, "(truncated="+strconv.FormatBool(len(raw) > 4096)+")") {
 			t.Fatal("diagnostic truncation not recorded")
 		}
+	}
+}
+
+func TestDiskInspectionExitProcessHelper(t *testing.T) {
+	raw := os.Getenv("NKD_DISK_INSPECTION_EXIT_HELPER")
+	if raw == "" {
+		return
+	}
+	if raw == "signal" {
+		process, err := os.FindProcess(os.Getpid())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := process.Kill(); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	status, err := strconv.Atoi(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Exit(status)
+}
+
+func TestDiskInspectionRunPreservesHelperErrorClasses(t *testing.T) {
+	path, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name   string
+		status string
+		want   e.Code
+		cancel bool
+	}{
+		{name: "unsupported root", status: strconv.Itoa(e.ExitCode(e.New(e.CodeEngineCapability, ""))), want: e.CodeEngineCapability},
+		{name: "encrypted guest", status: strconv.Itoa(e.ExitCode(e.New(e.CodeEncryptedArtifact, ""))), want: e.CodeEncryptedArtifact},
+		{name: "empty inventory", status: strconv.Itoa(e.ExitCode(e.New(e.CodeProvenanceMissing, ""))), want: e.CodeProvenanceMissing},
+		{name: "changed subject", status: strconv.Itoa(e.ExitCode(e.New(e.CodeVerifyFailed, ""))), want: e.CodeVerifyFailed},
+		{name: "bad envelope", status: strconv.Itoa(e.ExitCode(e.New(e.CodeEnvelopeDecode, ""))), want: e.CodeEnvelopeDecode},
+		{name: "helper timeout", status: strconv.Itoa(e.ExitCode(e.New(e.CodeTimeout, ""))), want: e.CodeTimeout},
+		{name: "missing pin", status: strconv.Itoa(e.ExitCode(e.New(e.CodeUnpinnedInput, ""))), want: e.CodeUnpinnedInput},
+		{name: "changed tool", status: strconv.Itoa(e.ExitCode(e.New(e.CodeUnverifiedRef, ""))), want: e.CodeUnverifiedRef},
+		{name: "generic CLI failure", status: "1", want: e.CodeEnvelopeDecode},
+		{name: "usage ambiguity", status: "2", want: e.CodeEnvelopeDecode},
+		{name: "unknown status", status: "99", want: e.CodeEnvelopeDecode},
+		{name: "runtime failure", status: "125", want: e.CodeEnvelopeDecode},
+		{name: "runtime permission", status: "126", want: e.CodeEnvelopeDecode},
+		{name: "runtime executable", status: "127", want: e.CodeEnvelopeDecode},
+		{name: "signal", status: "signal", want: e.CodeEnvelopeDecode},
+		{name: "caller cancellation wins", status: strconv.Itoa(e.ExitCode(e.New(e.CodeEngineCapability, ""))), cancel: true, want: e.CodeTimeout},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, path, "-test.run=^TestDiskInspectionExitProcessHelper$")
+			command.Env = append(os.Environ(), "NKD_DISK_INSPECTION_EXIT_HELPER="+tt.status)
+			exitErr := command.Run()
+			var exit *exec.ExitError
+			if ctx.Err() != nil || !errors.As(exitErr, &exit) {
+				t.Fatalf("helper did not produce a process exit: %v", exitErr)
+			}
+			subject, err := heldfile.FromBytesContext(ctx, []byte("held subject"), heldfile.Options{Label: "fixture", MaxBytes: 128})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer subject.Close()
+			runtime := &diskInspectionRunRuntime{scanErr: exitErr, scanDiagnostic: "helper failure"}
+			if tt.cancel {
+				runtime.cancel = cancel
+			}
+			raw, err := runDiskInspectionContainer(ctx, runtime, testDiskInspectionSelection(t), "image", subject)
+			if raw != nil || code(err) != tt.want || !errors.As(err, &exit) {
+				t.Fatalf("helper status=%s returned raw=%q err=%v", tt.status, raw, err)
+			}
+		})
 	}
 }
 

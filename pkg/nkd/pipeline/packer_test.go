@@ -39,9 +39,11 @@ const packerTestHelperSource = `package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -49,6 +51,9 @@ import (
 const manifestBytes = "{\"materials\":[{\"path\":\"materials/component\",\"sha256\":\"sha256:c2aaf954104b212a6339d4f99a1f156e153868345a25a03e3d264ef2a533c1d9\"}],\"schema\":\"test\"}"
 
 func main() {
+	if root := os.Getenv("NKD_DISK_INSPECTION_FIXTURE_ROOT"); root != "" {
+		os.Exit(runDiskInspectionFixture(root, os.Args[1:]))
+	}
 	if filepath.Base(os.Args[0]) == "nkd-test-helper" {
 		fmt.Println("held-host-tool")
 		return
@@ -64,6 +69,74 @@ func main() {
 		os.Exit(96)
 	}
 	os.Exit(run(os.Args[1:]))
+}
+
+// This controlled ELF runtime exercises the concrete held subprocess adapter,
+// not a Docker daemon or an installed-package scanner.
+func runDiskInspectionFixture(root string, args []string) int {
+	if len(args) == 0 {
+		return 96
+	}
+	log, err := os.OpenFile(filepath.Join(root, "commands"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		return 91
+	}
+	_, writeErr := fmt.Fprintln(log, strings.Join(args, "\t"))
+	if err := log.Close(); writeErr != nil || err != nil {
+		return 91
+	}
+	_, finished := os.Stat(filepath.Join(root, "start-complete"))
+	mode := os.Getenv("NKD_DISK_INSPECTION_FIXTURE_MODE")
+	switch args[0] {
+	case "version":
+		fmt.Print("{\"Client\":{\"Version\":\"fixture\"},\"Server\":{\"Version\":\"fixture\"}}")
+	case "info":
+		id := "original-daemon"
+		if finished == nil && mode == "daemon" {
+			id = "changed-daemon"
+		}
+		fmt.Printf("%q", id)
+	case "image":
+		id := "sha256:" + strings.Repeat("4", 64)
+		if finished == nil && mode == "image" {
+			id = "sha256:" + strings.Repeat("5", 64)
+		}
+		fmt.Printf("{\"Id\":%q,\"RepoDigests\":[%q],\"Os\":\"linux\",\"Architecture\":%q,\"Config\":{\"Env\":[]}}", id,
+			"example.test/inspection@sha256:"+strings.Repeat("1", 64), runtime.GOARCH)
+	case "create":
+	case "start":
+		if _, err := io.Copy(io.Discard, os.Stdin); err != nil {
+			return 92
+		}
+		if err := os.WriteFile(filepath.Join(root, "consumed"), nil, 0600); err != nil {
+			return 92
+		}
+		if mode == "subject" {
+			deadline := time.Now().Add(10 * time.Second)
+			for {
+				if _, err := os.Stat(filepath.Join(root, "release")); err == nil {
+					break
+				}
+				if time.Now().After(deadline) {
+					return 95
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(root, "start-complete"), nil, 0600); err != nil {
+			return 92
+		}
+		fmt.Print("controlled-report")
+	case "ps":
+		fmt.Print(strings.Repeat("a", 64))
+	case "rm":
+		if err := os.WriteFile(filepath.Join(root, "removed"), nil, 0600); err != nil {
+			return 93
+		}
+	default:
+		return 96
+	}
+	return 0
 }
 
 func run(args []string) int {
