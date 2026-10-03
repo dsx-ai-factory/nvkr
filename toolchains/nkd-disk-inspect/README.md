@@ -66,6 +66,12 @@ and codec byte pins are checked again inside that closure. The returned opaque
 installed inventory records that image identity; the executable-only API returns
 no runtime binding and cannot substitute for it.
 
+The host revalidates returned package fields, format and conflicting duplicates
+using the same metadata checks as the XML projection. Each container has a fresh
+random attempt label; cleanup discovers only that attempt's full container ID and
+removes by ID, never by a reusable name after a failed creation. These are local
+daemon safeguards, not authenticated cross-process ownership or receipt protocols.
+
 The current exact probe pin must include
 the QEMU CVE-2024-4467 fix; an arbitrary caller pin is not security clearance.
 The API places its private snapshot, temporary appliance files, cache and socket
@@ -93,9 +99,9 @@ require network package access.
 
 Runtime selection is currently a diagnostic, explicitly supplied opaque local
 capability. It is not an authored Definition selector or compiler Plan input.
-The live factory join binds its observed image/tools separately to the inspected
-output's existing Plan and Build identities; this does not authorize disk SBOM,
-publication or qualification.
+The live factory join is separate integration work. It must bind the observed
+image/tools to the inspected output's existing Plan and Build identities; this
+runtime capability alone does not authorize disk SBOM, publication or qualification.
 
 Source `toolchain.lock.json` pins the frozen acquisition inputs and helper source,
 not an image

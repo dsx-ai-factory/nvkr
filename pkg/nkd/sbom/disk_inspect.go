@@ -456,9 +456,32 @@ func installedPackagesFromXML(raw []byte) ([]InstalledDiskPackage, error) {
 		packages = append(packages, InstalledDiskPackage{Name: fields[0], Version: fields[1],
 			Release: fields[2], Epoch: fields[3], Architecture: fields[4], Format: system.Format[0]})
 	}
+	return checkedInstalledDiskPackages(packages)
+}
+
+// checkedInstalledDiskPackages is shared by XML projection and host-side helper
+// report admission. Parsing in a sandbox does not make its metadata trusted.
+func checkedInstalledDiskPackages(packages []InstalledDiskPackage) ([]InstalledDiskPackage, error) {
 	if len(packages) == 0 {
 		return nil, e.New(e.CodeProvenanceMissing, "disk inspector found no installed packages")
 	}
+	if len(packages) > maxDiskInstalledPackages {
+		return nil, e.New(e.CodeEnvelopeDecode, "disk installed-package inventory exceeds its package budget")
+	}
+	for _, pkg := range packages {
+		if pkg.Format != "deb" {
+			return nil, e.New(e.CodeEngineCapability, "disk inspection supports Debian-package metadata")
+		}
+		if _, err := oneDiskPackageField([]string{pkg.Name}, true); err != nil {
+			return nil, err
+		}
+		for _, field := range []string{pkg.Version, pkg.Release, pkg.Epoch, pkg.Architecture} {
+			if _, err := oneDiskPackageField([]string{field}, false); err != nil {
+				return nil, err
+			}
+		}
+	}
+	packages = slices.Clone(packages)
 	slices.SortFunc(packages, func(a, b InstalledDiskPackage) int {
 		if order := strings.Compare(a.Name, b.Name); order != 0 {
 			return order

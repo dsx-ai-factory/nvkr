@@ -46,7 +46,8 @@ func (runtime *DiskInspectionRuntime) Close() error {
 	return runtime.container.Close()
 }
 
-// AdmitSubject is the fail-before-copy capacity gate for the live factory join.
+// AdmitSubject provides a fail-before-copy capacity gate for a future or separate
+// live factory join; this runtime module does not invoke that join.
 func (runtime *DiskInspectionRuntime) AdmitSubject(ctx context.Context, size int64) error {
 	if runtime == nil {
 		return e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
@@ -90,6 +91,17 @@ func inventoryFromContainerObservation(observation *pipeline.DiskInspectionObser
 		return nil, e.New(e.CodeVerifyFailed, "disk inspection observation is absent")
 	}
 	raw := observation.Report()
+	subject, size, image, inspector, codec := observation.Binding()
+	packages, err := checkedContainerInstalledPackages(raw, subject, size, image, inspector, codec)
+	if err != nil {
+		return nil, err
+	}
+	return &DiskInstalledInventory{subjectDigest: subject, subjectSize: size, inspectorDigest: inspector, codecDigest: codec, runtimeDigest: image, packages: packages}, nil
+}
+
+// checkedContainerInstalledPackages validates untrusted helper metadata without
+// issuing authority. Only the opaque container observation above can do that.
+func checkedContainerInstalledPackages(raw []byte, subject string, size int64, image, inspector, codec string) ([]InstalledDiskPackage, error) {
 	if len(raw) > maxDiskPackageReportBytes {
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection report exceeds its budget")
 	}
@@ -102,14 +114,12 @@ func inventoryFromContainerObservation(observation *pipeline.DiskInspectionObser
 	if err := decoder.Decode(&report); err != nil {
 		return nil, e.Wrap(e.CodeEnvelopeDecode, err, "decoding inspection helper report")
 	}
-	subject, size, image, inspector, codec := observation.Binding()
 	if !canonical.IsDigest(image) || report.Subject != subject || report.Size != size || report.Inspector != inspector || report.Codec != codec || len(report.Packages) == 0 || len(report.Packages) > maxDiskInstalledPackages {
 		return nil, e.New(e.CodeVerifyFailed, "inspection helper report differs from its held subject or tool binding")
 	}
-	// This is an internal report from one exact helper image, not a public receipt
-	// constructor. Installed metadata already passes the owning XML projection in
-	// that helper; receipt issuance additionally requires the opaque runtime result.
-	return &DiskInstalledInventory{subjectDigest: subject, subjectSize: size, inspectorDigest: inspector, codecDigest: codec, runtimeDigest: image, packages: report.Packages}, nil
+	// The helper parses attacker-controlled disk contents. Reapply the owning
+	// metadata invariants outside the sandbox before accepting its report.
+	return checkedInstalledDiskPackages(report.Packages)
 }
 
 // RunDiskInspectionHelper is the thin container entrypoint's owning operation.

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
@@ -28,6 +29,70 @@ func TestDiskInspectionRuntimeRejectsDescriptions(t *testing.T) {
 	}
 	if err := capability.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestContainerInstalledPackagesCheckBindingAndMetadata(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("1", 64)
+	valid := diskInspectionReport{Subject: digest, Size: 123, Inspector: digest, Codec: digest,
+		Packages: []InstalledDiskPackage{{Name: "hello", Version: "1", Architecture: "arm64", Format: "deb"}}}
+	for _, tt := range []struct {
+		name  string
+		edit  func(*diskInspectionReport)
+		image string
+		want  e.Code
+	}{
+		{name: "valid"},
+		{name: "wrong subject", edit: func(r *diskInspectionReport) { r.Subject = "sha256:" + strings.Repeat("2", 64) }, want: e.CodeVerifyFailed},
+		{name: "wrong size", edit: func(r *diskInspectionReport) { r.Size++ }, want: e.CodeVerifyFailed},
+		{name: "wrong inspector", edit: func(r *diskInspectionReport) { r.Inspector = "" }, want: e.CodeVerifyFailed},
+		{name: "wrong codec", edit: func(r *diskInspectionReport) { r.Codec = "" }, want: e.CodeVerifyFailed},
+		{name: "invalid closure", image: "tag", want: e.CodeVerifyFailed},
+		{name: "empty inventory", edit: func(r *diskInspectionReport) { r.Packages = nil }, want: e.CodeVerifyFailed},
+		{name: "excess package count", edit: func(r *diskInspectionReport) { r.Packages = make([]InstalledDiskPackage, maxDiskInstalledPackages+1) }, want: e.CodeVerifyFailed},
+		{name: "empty name", edit: func(r *diskInspectionReport) { r.Packages[0].Name = "" }, want: e.CodeEnvelopeDecode},
+		{name: "control characters", edit: func(r *diskInspectionReport) { r.Packages[0].Name = "hello\x1b[31m" }, want: e.CodeEnvelopeDecode},
+		{name: "oversized field", edit: func(r *diskInspectionReport) { r.Packages[0].Version = strings.Repeat("x", 4097) }, want: e.CodeEnvelopeDecode},
+		{name: "unsupported format", edit: func(r *diskInspectionReport) { r.Packages[0].Format = "rpm" }, want: e.CodeEngineCapability},
+		{name: "conflicting duplicate", edit: func(r *diskInspectionReport) {
+			r.Packages = append(r.Packages, InstalledDiskPackage{Name: "hello", Version: "2", Architecture: "arm64", Format: "deb"})
+		}, want: e.CodeVerifyFailed},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			report := valid
+			report.Packages = append([]InstalledDiskPackage(nil), valid.Packages...)
+			if tt.edit != nil {
+				tt.edit(&report)
+			}
+			raw, err := canonical.Marshal(report)
+			if err != nil {
+				t.Fatal(err)
+			}
+			image := digest
+			if tt.image != "" {
+				image = tt.image
+			}
+			packages, err := checkedContainerInstalledPackages(raw, digest, 123, image, digest, digest)
+			if sbomCode(err) != tt.want {
+				t.Fatalf("report error %v, want %s", err, tt.want)
+			}
+			if tt.want == "" && (len(packages) != 1 || packages[0] != valid.Packages[0]) {
+				t.Fatalf("valid inventory changed: %v", packages)
+			}
+		})
+	}
+	raw, err := canonical.Marshal(valid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw[:len(raw)-1], []byte(`,"unknown":true}`)...)
+	if _, err := checkedContainerInstalledPackages(raw, digest, 123, digest, digest, digest); sbomCode(err) != e.CodeEnvelopeDecode {
+		t.Fatalf("unknown report field accepted: %v", err)
+	}
+	packages := []InstalledDiskPackage{{Name: "z", Format: "deb"}, {Name: "a", Format: "deb"}, {Name: "a", Format: "deb"}}
+	got, err := checkedInstalledDiskPackages(packages)
+	if err != nil || len(got) != 2 || got[0].Name != "a" || got[1].Name != "z" || packages[0].Name != "z" {
+		t.Fatalf("normalization changed input or did not sort/compact: %v, %v", got, err)
 	}
 }
 

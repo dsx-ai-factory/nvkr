@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,16 +66,53 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 	}
 	t.Logf("runtime-only: image=%s subject=%s bytes=%d packages=%d inspector=%s codec=%s", closure, got, size, len(report.Packages), inspector, codec)
 	t.Run("canceled inspection joins and removes container", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 		defer cancel()
-		observation, err := container.InspectHeld(ctx, subject)
-		if observation != nil || code(err) != e.CodeTimeout {
-			t.Fatalf("canceled inspection returned observation=%v error=%v", observation, err)
+		lookup := func() ([]byte, error) {
+			return heldExecutionOutput(ctx, container.runtime, "ps", "--all", "--no-trunc", "--filter", "label=nkd.dev/inspection-attempt", "--format", "{{.ID}}")
 		}
-		// InspectHeld does not return until the input writer and runtime command
-		// have joined and the adapter-owned container has been removed.
-		filter := fmt.Sprintf("name=nkd-inspect-%d-", os.Getpid())
-		raw, err := heldExecutionOutput(t.Context(), container.runtime, "ps", "--all", "--filter", filter, "--format", "{{.Names}}")
+		if raw, err := lookup(); err != nil || len(bytes.TrimSpace(raw)) != 0 {
+			t.Fatalf("real cancellation test requires an isolated inspector daemon: %q, %v", raw, err)
+		}
+		var observation *DiskInspectionObservation
+		var inspectErr error
+		done := make(chan struct{})
+		go func() { observation, inspectErr = container.InspectHeld(ctx, subject); close(done) }()
+		defer func() { cancel(); <-done }()
+		// Do not mistake pre-launch cancellation for appliance cancellation.
+		// This opt-in acceptance test requires one isolated running inspector.
+		for {
+			raw, err := heldExecutionOutput(ctx, container.runtime, "ps", "--no-trunc", "--filter", "label=nkd.dev/inspection-attempt", "--format", "{{.ID}}")
+			if err != nil {
+				t.Fatal(err)
+			}
+			ids := strings.Fields(string(raw))
+			if len(ids) > 1 {
+				t.Fatal("another inspection started during the isolated cancellation test")
+			}
+			if len(ids) == 1 {
+				t.Logf("canceling a running inspection container: %s", ids[0])
+				break
+			}
+			timer := time.NewTimer(100 * time.Millisecond)
+			select {
+			case <-done:
+				timer.Stop()
+				t.Fatalf("inspection returned before a running container was observed: %v", inspectErr)
+			case <-ctx.Done():
+				timer.Stop()
+				t.Fatal("inspection container did not start before the bounded deadline")
+			case <-timer.C:
+			}
+		}
+		cancel()
+		<-done
+		if observation != nil || code(inspectErr) != e.CodeTimeout {
+			t.Fatalf("canceled inspection returned observation=%v error=%v", observation, inspectErr)
+		}
+		cleanupCtx, cleanupCancel := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cleanupCancel()
+		raw, err := heldExecutionOutput(cleanupCtx, container.runtime, "ps", "--all", "--filter", "label=nkd.dev/inspection-attempt", "--format", "{{.ID}}")
 		if err != nil || len(bytes.TrimSpace(raw)) != 0 {
 			t.Fatalf("canceled inspection leaked a container: %q, %v", raw, err)
 		}
