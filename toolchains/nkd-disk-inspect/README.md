@@ -128,9 +128,11 @@ The live factory join is separate integration work. It must bind the observed
 image/tools to the inspected output's existing Plan and Build identities; this
 runtime capability alone does not authorize disk SBOM, publication or qualification.
 
-Source `toolchain.lock.json` pins the frozen acquisition inputs and helper source,
-not an image
-digest or runtime closure. `go test ./toolchains/nkd-disk-inspect` checks the
+Source `toolchain.lock.json` pins frozen acquisition inputs and records the helper
+source location and build metadata. It does not bind a helper source commit or
+standalone helper bytes. The selected complete image binds the actual helper
+bytes; the source lock is not an image digest or runtime closure.
+`go test ./toolchains/nkd-disk-inspect` checks the
 declared pins and architecture mappings against the Dockerfile, not its complete
 grammar or runtime closure. No AMD64 executable measurements are invented. Executable
 hashes generated inside a local image are descriptive, not independent evidence.

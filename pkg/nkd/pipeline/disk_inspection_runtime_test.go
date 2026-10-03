@@ -163,6 +163,20 @@ func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
 			if tt.wantReport && (!tt.runtime.copied || string(raw) != "report") {
 				t.Fatal("accepted report before input streaming completed")
 			}
+			if tt.runtime.name == "podman" {
+				creates := 0
+				for _, args := range tt.runtime.commands {
+					if len(args) < 2 || args[0] != "--default-mounts-file=/dev/null" {
+						t.Fatalf("Podman failure path omitted its fixed override: %v", args)
+					}
+					if args[1] == "create" {
+						creates++
+					}
+				}
+				if creates != 1 {
+					t.Fatalf("unsupported Podman override retried creation: %v", tt.runtime.commands)
+				}
+			}
 			if tt.uncertain && (!strings.Contains(err.Error(), "creation outcome remains uncertain") || time.Since(started) > 15*time.Second) {
 				t.Fatalf("missing or unbounded cleanup uncertainty: %v", err)
 			}
