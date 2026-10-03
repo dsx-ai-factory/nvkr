@@ -37,3 +37,9 @@ RUN set -eux; \
       > /usr/share/nkd-disk-inspect/executables.sha256; \
     rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/99bootstrap-ca \
       /etc/apt/sources.list.d/ubuntu.sources /etc/ssl/certs/ca-certificates.crt
+
+# Build this static helper from the exact NKD source with its pinned Go version
+# before image assembly. Its bytes become part of the selected OCI closure.
+COPY bin/nkd-disk-inspect-${TARGETARCH} /usr/local/bin/nkd-disk-inspect
+USER 65534:65534
+WORKDIR /tmp

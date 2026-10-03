@@ -8,14 +8,21 @@ for both AMD64 and ARM64. Transitive packages remain inside the same frozen,
 signature-checked archive; the build records the complete installed package list
 and executable hashes. Distribution copyright files remain installed.
 
-Build a local native image, then record its actual digest and package inventory:
+Build the static helper from the exact NKD source using `.go-version`, then
+assemble a local native image from the repository root. Record its actual image
+identity, executable hashes and package inventory; no tag is an authority pin:
 
 ```sh
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOTOOLCHAIN=local \
+  go build -trimpath -buildvcs=false \
+  -o bin/nkd-disk-inspect-arm64 ./cmd/nkd-disk-inspect
 podman build --build-arg TARGETARCH=arm64 \
-  -t nkd-disk-inspect:local toolchains/nkd-disk-inspect
+  -f toolchains/nkd-disk-inspect/Dockerfile \
+  -t nkd-disk-inspect:local .
 ```
 
-Use `TARGETARCH=amd64` on an AMD64 host. Do not treat a local image tag, package
+Use `GOARCH=amd64`, `bin/nkd-disk-inspect-amd64` and `TARGETARCH=amd64` on an
+AMD64 host. Docker is also supported. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
 
@@ -29,7 +36,7 @@ Installed-package output follows
 omits empty optional version, release and architecture fields and zero epochs.
 NKD keeps those fields separate and does not guess missing versions.
 
-The staged API has no lifecycle/CLI caller yet. It holds exact `virt-inspector`,
+The original executable-only diagnostic API holds exact `virt-inspector`,
 `qemu-img` probe and QCOW2 bytes, validates the
 self-contained unencrypted envelope with held `qemu-img`, creates a private read-only
 snapshot and checks it after inspection. The diagnostic capability deliberately
@@ -40,16 +47,38 @@ Dynamic loaders, libraries, `qemu-system-*`, appliance `qemu-img`, supermin and 
 explicit enclosing runtime TCB. See upstream
 [security guidance](https://libguestfs.org/guestfs-security.1.html).
 
-Callers MUST supply an unprivileged, non-root, network-less, credential-free
-container or equivalent sandbox before calling the API. UID zero is rejected;
-the API does not authenticate the enclosing sandbox. Use a standard container
-init process to reap killed descendants, do not mount credentials or host
-devices, and remove all capabilities. The current exact probe pin must include
+Callers of that original API MUST supply an unprivileged, non-root, network-less,
+credential-free container or equivalent sandbox. UID zero is rejected; that
+API does not authenticate the enclosing sandbox. The concrete
+`sbom.DiskInspectionRuntime` instead admits an already-local complete image and
+the held Linux Docker/Podman executable and daemon identity. It revalidates
+image identity before and after inspection and uses a fixed launcher: UID/GID
+65534, network-none, read-only root, all capabilities removed, no devices or
+credential mounts, no-new-privileges, an init reaper and bounded process count.
+The helper is part of the selected image closure and receives only authenticated
+stdin bytes, not a host pathname. No runtime download or image pull is performed.
+The daemon and host kernel remain trusted in this local development route; it
+does not authenticate provider isolation or grant qualification.
+
+The exact image config digest binds its immutable rootfs content, including the
+helper, dynamic loaders, libraries, QEMU, supermin and packaged kernel. Inspector
+and codec byte pins are checked again inside that closure. The returned opaque
+installed inventory records that image identity; the executable-only API returns
+no runtime binding and cannot substitute for it.
+
+The current exact probe pin must include
 the QEMU CVE-2024-4467 fix; an arbitrary caller pin is not security clearance.
 The API places its private snapshot, temporary appliance files, cache and socket
-directories beneath a short `/tmp` workspace. Budget up to 8 GiB for the held
-input and an additional 8 GiB copy, plus appliance/cache/overlay storage; `/tmp`
-may be memory-backed. Cancel inspection before `Close` when immediate shutdown
+directories beneath a short `/tmp` workspace. The concrete launcher uses a
+bounded RAM-backed `/tmp` and accounts for the helper's held input, private copy
+and an additional 2 GiB appliance/cache margin. Before factory snapshot creation,
+admission checks that the entire container memory grant and the additional
+host-held copy fit concurrently, not just the minimum appliance estimate.
+Admission uses actual subject size, not a fixed 8 GiB allocation. The container
+memory and swap limit are equal, and declared CPU, memory, workspace capacity and
+executor timeout cannot be silently weakened. A request too small for the subject
+fails before inspection. Capacity is point-in-time availability, not reservation.
+Cancel inspection before `Close` when immediate shutdown
 is needed. Installed-package inspection currently supports one Linux Debian
 package-manager root; no-root or multi-root layouts return `engine-capability`.
 An encrypted guest volume can therefore be rejected as an unsupported layout,
@@ -62,7 +91,14 @@ device access, or write permission to the caller. The bootstrap CA bundle and
 APT source file are removed after acquisition; runtime inspection does not
 require network package access.
 
-Source `toolchain.lock.json` pins the frozen acquisition inputs, not an image
+Runtime selection is currently a diagnostic, explicitly supplied opaque local
+capability. It is not an authored Definition selector or compiler Plan input.
+The live factory join binds its observed image/tools separately to the inspected
+output's existing Plan and Build identities; this does not authorize disk SBOM,
+publication or qualification.
+
+Source `toolchain.lock.json` pins the frozen acquisition inputs and helper source,
+not an image
 digest or runtime closure. `go test ./toolchains/nkd-disk-inspect` checks the
 declared pins and architecture mappings against the Dockerfile, not its complete
 grammar or runtime closure. No AMD64 executable measurements are invented. Executable

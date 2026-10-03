@@ -57,10 +57,18 @@ inventory. One retained ARM64 non-FDE disk yielded 730 installed packages in the
 [non-root local replays of their recorded source blobs](../evidence/2026-10-02-nke-os-disk-inspection.md),
 including the later checked-inventory rebuild and ELF test-helper corrections. This is not full-disk inspection or
 CycloneDX: staged package/image archives and loose files, the factory-owned material-trace handoff, complete
-acquisition records and semantic reconciliation remain absent. The enclosing loader, libraries, `qemu-system`
-emulator, appliance `qemu-img`, supermin and kernel remain diagnostic runtime TCB, not an authenticated
-production closure. A non-root caller is enforced; credential-free, network-less sandboxing remains a caller
-requirement, not an authenticated NKD capability. The shared codec probe explicitly selects the driver and
+acquisition records and semantic reconciliation remain absent. The original executable-only API enforces a
+non-root caller but leaves the enclosing loader, libraries, emulator, appliance and kernel as caller-owned
+runtime TCB. An optional concrete diagnostic runtime now admits an already-local exact OCI image, its held
+Linux Docker/Podman executable and observed daemon identity. Its fixed launcher enforces non-root execution,
+network-none, a read-only root, dropped capabilities, absent caller mounts/devices/credentials, bounded
+resources and cancellation/cleanup. The opaque installed inventory binds the exact subject, tools and complete
+image config identity; the daemon and host kernel remain trusted. The native Linux AMD64 and ARM64 contracts
+are tested, and the [native ARM64 runtime exercise](../evidence/2026-10-02-nke-os-inspector-runtime.md)
+inspected the retained disk's 730 packages and exercised cancellation/cleanup. Native AMD64 execution, original
+live-Run integration, registry publication and license/security clearance remain unproved. This is an optional
+diagnostic capability, not a compiler Plan input or an authenticated production closure. The shared codec probe
+explicitly selects the driver and
 rejects backing/data-file references; diagnostic admission is QCOW2-only. Shared VMDK decoding rejects
 descriptor layouts before the probe and admits only single-file VMDK4 sparse inputs whose QAPI extent binds
 the held input file (`/proc/self/fd/N`) and full virtual size, with an [actual ARM64 QEMU fixture replay](../evidence/2026-10-02-vmdk-codec-admission.md).
@@ -388,6 +396,7 @@ Earlier verification does not transfer by renaming or reinterpreting records.
 
 | Record | What actually ran | Limit |
 |---|---|---|
+| [Concrete local inspection runtime, 2026-10-02](../evidence/2026-10-02-nke-os-inspector-runtime.md) | Exact local OCI closure, held Podman/runtime/tool identities, non-root networkless inspection of one retained ARM64 QCOW2, 730 installed packages, actual cancellation/container cleanup and native Linux race suites | Native AMD64 runtime and original live-Run integration are unexercised; no registry publication, NVIDIA license/security clearance, full-disk SBOM or qualified claim |
 | [Shared VMDK codec admission, 2026-10-02](../evidence/2026-10-02-vmdk-codec-admission.md) | Opt-in ARM64 real-QEMU sparse and stream-optimized decoding, valid external-descriptor rejection and controlled probe/conversion markers | Earlier and linked follow-up replays retain their own exact source, executable and committed log identities; not ordinary CI, an AMD64 runtime result, an NKE image build or qualified reproduction |
 | [Corrected local installed-package inspection, 2026-10-02](../evidence/2026-10-02-nke-os-disk-inspection.md) | ARM64 ELF contract tests and non-root libguestfs scans, external-reference rejection and actual appliance cancellation at each replay's listed source blobs | Original and later checked-inventory rebuild retain separate source, test-binary and complete terminal-log identities. Diagnostic installed metadata only, not full SBOM, runtime authentication or qualified reproduction |
 | [Local installed-package inspection, 2026-10-01](../evidence/2026-10-01-nke-os-disk-inspection.md) | Historical ARM64 libguestfs diagnostic scan of a retained non-FDE disk, external-reference negatives and cancellation | Exact draft tree was not retained; not committed-candidate acceptance, full-disk SBOM, publication or qualified reproduction |

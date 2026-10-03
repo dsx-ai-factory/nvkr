@@ -66,7 +66,18 @@ type DiskInstalledInventory struct {
 	subjectSize     int64
 	inspectorDigest string
 	codecDigest     string
+	runtimeDigest   string
 	packages        []InstalledDiskPackage
+}
+
+// RuntimeBinding names the complete admitted OCI closure, when this inventory
+// was issued through DiskInspectionRuntime. An executable-only diagnostic
+// inventory returns an empty value and cannot satisfy runtime admission.
+func (inventory *DiskInstalledInventory) RuntimeBinding() string {
+	if inventory == nil {
+		return ""
+	}
+	return inventory.runtimeDigest
 }
 
 func (inventory *DiskInstalledInventory) Packages() []InstalledDiskPackage {

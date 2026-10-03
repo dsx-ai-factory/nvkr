@@ -3,6 +3,11 @@
   "baseImage": "ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3",
   "downloadImage": "curlimages/curl@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40",
   "ubuntuSnapshot": "20260920T000000Z",
+  "helper": {
+    "source": "cmd/nkd-disk-inspect",
+    "goToolchain": "go1.27.1",
+    "architectures": ["amd64", "arm64"]
+  },
   "packages": {
     "guestfs-tools": "1.52.0-2ubuntu5",
     "libguestfs0t64": "1:1.52.0-5ubuntu3",

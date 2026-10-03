@@ -45,6 +45,8 @@ func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
 	}
 	dockerfile := string(data)
 	for _, text := range []string{"FROM " + lock.BaseImage, "FROM " + lock.DownloadImage,
+		"COPY bin/nkd-disk-inspect-${TARGETARCH} /usr/local/bin/nkd-disk-inspect",
+		"USER 65534:65534",
 		"https://snapshot.ubuntu.com/ubuntu/" + lock.UbuntuSnapshot,
 		"amd64) qemu_package=qemu-system-x86 ;;",
 		"arm64) qemu_package=qemu-system-arm ;;",
