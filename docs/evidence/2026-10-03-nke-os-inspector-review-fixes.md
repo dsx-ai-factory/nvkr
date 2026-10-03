@@ -68,4 +68,3 @@ a native AMD64 exercise, full-disk CycloneDX, publication, license/security
 clearance or qualification. Host-side package validation rejects malformed
 metadata; it cannot independently prove package-manager truth after a
 compromised parser.
-
