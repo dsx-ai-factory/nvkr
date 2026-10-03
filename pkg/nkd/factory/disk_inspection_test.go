@@ -2,12 +2,15 @@ package factory
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
@@ -137,6 +140,104 @@ func TestLiveDiskInstalledInventoryCannotReplayEqualByteSiblingAttempt(t *testin
 	}
 	if err := owner.validateDiskInstalledInventory(t.Context(), plan, output, inspector, &DiskInstalledInventoryReceipt{}, testDiskInspectionBindings); factoryErrorCode(err) != e.CodeVerifyFailed {
 		t.Fatalf("caller-composed receipt admitted: %v", err)
+	}
+}
+
+func TestLiveDiskInstalledInventoryCannotReplayEqualByteSiblingOutput(t *testing.T) {
+	plan, owner := diskMaterialTraceFixtureWithSibling(t, true)
+	inspector := &sbom.DiskInspectionRuntime{}
+	original := plan.LifecycleOutputs[0]
+	var sibling LifecycleOutputPlan
+	var operation Node
+	for _, output := range plan.LifecycleOutputs {
+		if output.Name == "sibling-image" {
+			sibling = output
+		}
+	}
+	for _, node := range plan.Graph.Nodes {
+		if node.BuildTarget == sibling.Name && node.IRNode == "build-image" {
+			operation = node
+		}
+	}
+	if sibling.BuildDigest != original.BuildDigest || operation.ID == "" {
+		t.Fatal("fixture must have two real outputs with equal logical Build identities")
+	}
+	// Model the sibling's own successful invocations, not a missing-material
+	// rejection: both traces and held completions must be independently valid.
+	for id, consumption := range maps.Clone(owner.materialConsumptions) {
+		consumption.nodeID = strings.Replace(id, original.Name+"/", sibling.Name+"/", 1)
+		owner.materialConsumptions[consumption.nodeID] = consumption
+	}
+	completion := owner.diskCompletions[0]
+	content := fakeDiskPayloadState(completion.Payload)
+	held := &fakeDiskProducerResult{payload: append([]byte(nil), content.payload...), digest: content.digest, size: content.size}
+	if err := populateHeldDiskProducerCompletion(t.Context(), plan, operation.ID, owner,
+		func(context.Context, ir.Node) (*diskPayload, *pipeline.ArtifactResult, error) {
+			return fakeDiskPayload(held), &completion.Result, nil
+		}); err != nil {
+		t.Fatal(err)
+	}
+	owner.Nodes = append(owner.Nodes, LocalNodeResult{ID: operation.ID, Kind: NodeBuild, Status: "ok"})
+	issued := make(map[string]*DiskInstalledInventoryReceipt)
+	for _, output := range []LifecycleOutputPlan{original, sibling} {
+		receipt, err := owner.observeDiskInstalledInventory(t.Context(), plan, output, inspector, testDiskInspectionBindings, testDiskInventoryScan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := owner.validateDiskInstalledInventory(t.Context(), plan, output, inspector, receipt, testDiskInspectionBindings); err != nil {
+			t.Fatal(err)
+		}
+		issued[output.Name] = receipt
+	}
+	if issued[original.Name].Description().Subject.Digest != issued[sibling.Name].Description().Subject.Digest {
+		t.Fatal("fixture must have identical delivered bytes")
+	}
+	for _, output := range []LifecycleOutputPlan{original, sibling} {
+		other := issued[original.Name]
+		if output.Name == original.Name {
+			other = issued[sibling.Name]
+		}
+		if err := owner.validateDiskInstalledInventory(t.Context(), plan, output, inspector, other, testDiskInspectionBindings); factoryErrorCode(err) != e.CodeVerifyFailed {
+			t.Fatalf("receipt replay to real sibling output %q: %v", output.Name, err)
+		}
+	}
+}
+
+func TestLiveDiskInspectionDeadlineBoundsCompleteOperation(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		parent time.Duration
+	}{
+		{name: "shorter caller", parent: time.Minute},
+		{name: "longer caller", parent: 20 * time.Minute},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, owner := diskMaterialTraceFixture(t)
+			parent, cancel := context.WithTimeout(t.Context(), tt.parent)
+			defer cancel()
+			started := time.Now()
+			ctx, release, err := owner.beginDiskInspection(parent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer release()
+			deadline, ok := ctx.Deadline()
+			if !ok {
+				t.Fatal("inspection operation has no deadline")
+			}
+			if tt.parent < 10*time.Minute {
+				callerDeadline, _ := parent.Deadline()
+				if !deadline.Equal(callerDeadline) {
+					t.Fatal("inspection extended the shorter caller deadline")
+				}
+			} else if deadline.Before(started.Add(10*time.Minute)) || deadline.After(time.Now().Add(10*time.Minute)) {
+				t.Fatal("complete handoff escaped its ten-minute ceiling")
+			}
+			cancel()
+			if ctx.Err() != context.Canceled {
+				t.Fatal("inspection did not retain caller cancellation")
+			}
+		})
 	}
 }
 

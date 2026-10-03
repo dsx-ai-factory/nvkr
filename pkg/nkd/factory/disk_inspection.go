@@ -224,6 +224,9 @@ func (owner *LocalRunResult) validateDiskInstalledInventory(ctx context.Context,
 
 // beginDiskInspection owns a bounded operation under the same permit used by
 // disk export. Close cancels this context before waiting for its cleanup/join.
+// Its ten-minute ceiling covers the whole handoff, including queueing, tracing,
+// snapshotting, scanning and rechecks. The runtime's timeout is an additional
+// upper bound, not a guaranteed scan allowance beyond the remaining deadline.
 func (owner *LocalRunResult) beginDiskInspection(ctx context.Context) (context.Context, func(), error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	release, err := owner.acquireDiskPermit(ctx)

@@ -18,10 +18,18 @@ JSON cannot mint or restore live authority. The lifecycle returns these process-
 `Run.InstalledDiskInventories`; they are deliberately not an independently authored or persisted lifecycle
 object.
 
-The contract tests cover AMD64 and ARM64 subjects, missing/substituted material observations, changed disk or
-runtime/tool bindings, sibling replay, zero-value receipts, copied descriptions, cancellation and concurrent
-close. Lifecycle tests cover invocation before export/close and failure without a retained delivery payload.
+The binding test covers AMD64 and ARM64 subjects, description isolation, serialization exclusion and
+post-close rejection. Separate tests using the AMD64 fixture cover missing/substituted material observations,
+changed disk or runtime/tool bindings, sibling replay, zero-value receipts, cancellation and concurrent close.
+Lifecycle tests cover invocation before export/close and failure without a retained delivery payload.
 These tests use controlled producer/inspection seams, not real NKE bakes.
+The same-Run sibling-output test gives both outputs their own valid material trace and equal-byte held
+completion before checking receipt replay. The production scan closure's concrete Packer type check and
+capacity-before-snapshot wiring are source-reviewed, but are not exercised by those injected scan tests.
+
+One ten-minute operation deadline covers queueing, material tracing, snapshotting, scanning and subject/tool
+rechecks. The runtime's configured timeout imposes a second ceiling on the scan; it does not reserve that
+entire duration after preparation. A shorter caller deadline and caller cancellation remain effective.
 
 Real acceptance still requires both AMD64 and ARM64 NKE builds inspected through this same original live
 lifecycle, with the exact source, Plan, attempt, image/tool identities and terminal inventory observation
