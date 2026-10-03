@@ -145,6 +145,17 @@ differs. Each different QCOW2 digest remains a new Artifact identity with its ow
 provenance. Independently reproduced or acquired materials keep their own evidence relationships without
 upgrading the disk that consumed them.
 
+A narrower, opt-in local installed-package diagnostic may join the factory's live staged-material trace to
+read-only inspection before the issuing Run closes. Factory accepts only its original held Packer output and
+an admitted concrete inspection runtime. The runtime binds an exact OCI closure and inspector/codec identities;
+capacity admission precedes the additional anonymous disk snapshot. The package-issued, process-local result
+binds the original Run owner, named output, Plan, Build, QCOW2 digest/size and inspected runtime/tool bytes.
+Equal subject bytes or Build identity cannot authorize reuse by a sibling attempt. Closing the Run cancels
+active inspection, joins cleanup and revokes live use, including shallow receipt copies. Historical installed
+metadata remains inspectable but cannot be serialized and restored as authority. Omitting this opt-in does not
+claim inspection. This diagnostic is not the complete acquisition trace, reconciliation, full CycloneDX
+document, disk publication gate or qualification described above.
+
 For binaries and OCI image exports, the SBOM owner invokes the pinned scanner as an owned, bounded subprocess
 inside the offline utility container. Inputs are held and checked against producer digests. Syft's file resolver
 requires a pathname, so binary inspection uses a private read-only copy of held bytes and checks it again before

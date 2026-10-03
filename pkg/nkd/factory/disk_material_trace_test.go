@@ -28,8 +28,12 @@ func diskMaterialTraceFixtureWithSibling(t *testing.T, sibling bool) (*Plan, *Lo
 }
 
 func diskMaterialTraceFixtureWithNetwork(t *testing.T, sibling, networked bool) (*Plan, *LocalRunResult) {
+	return diskMaterialTraceFixtureForPlatform(t, sibling, networked, "linux/amd64")
+}
+
+func diskMaterialTraceFixtureForPlatform(t *testing.T, sibling, networked bool, platform string) (*Plan, *LocalRunResult) {
 	t.Helper()
-	fixture := newVMPackerMaterialFixture(t)
+	fixture := newVMPackerMaterialFixtureForPlatform(t, nil, map[string]string{"a-agent": "agent", "z-runtime": "runtime"}, platform)
 	base := fixture.plan.CatalogSnapshot
 	agent := base.Components["agent"]
 	agent.Prebuilt = nil

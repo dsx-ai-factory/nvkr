@@ -15,6 +15,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 )
 
 const (
@@ -71,6 +72,9 @@ type Run struct {
 	Observed          []Artifact       `json:"observed,omitempty"`
 	Failure           *runFailure      `json:"failure,omitempty"`
 	ContentSubject    string           `json:"contentSubject,omitempty"`
+	// Diagnostic inventories are returned only by this live execution. JSON
+	// cannot restore them, and they grant no live or full-SBOM authority.
+	diskInventories []factory.DiskInstalledInventoryDescription
 }
 
 type requiredOutput struct {

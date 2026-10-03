@@ -78,6 +78,8 @@ type LocalRunResult struct {
 	diskMu               sync.Mutex
 	diskPermit           chan struct{}
 	diskClosed           bool
+	diskClosing          bool
+	diskInspectionCancel context.CancelFunc
 	diskCompletions      []diskProducerCompletion
 	materialConsumptions map[string]producerConsumption
 }
