@@ -3,8 +3,10 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -49,8 +51,9 @@ func TestPackerSnapshotQueueHonorsContext(t *testing.T) {
 			artifact := &PackerArtifact{}
 			artifact.mu.Lock()
 			defer artifact.mu.Unlock()
-			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+			parent, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
+			ctx := &snapshotQueueContext{Context: parent, waiting: make(chan struct{})}
 			result := make(chan error, 1)
 			go func() {
 				held, err := artifact.SnapshotHeldContext(ctx, 1024)
@@ -59,15 +62,34 @@ func TestPackerSnapshotQueueHonorsContext(t *testing.T) {
 				}
 				result <- err
 			}()
+			// Initial admission only checks Err. Done is evaluated by the
+			// queue's select while the mutex remains held, proving cancellation
+			// cannot be satisfied by the already-canceled admission path.
+			select {
+			case <-ctx.waiting:
+			case <-time.After(5 * time.Second):
+				artifact.mu.Unlock()
+				<-result
+				artifact.mu.Lock()
+				t.Fatal("snapshot did not reach the lock queue")
+			}
+			if err := ctx.Err(); err != nil {
+				artifact.mu.Unlock()
+				<-result
+				artifact.mu.Lock()
+				t.Fatalf("context expired before queue entry: %v", err)
+			}
+			wantCause := context.DeadlineExceeded
 			if mode == "cancellation" {
+				wantCause = context.Canceled
 				cancel()
 			}
 			select {
 			case err := <-result:
-				if packerErrorCode(err) != e.CodeTimeout {
+				if packerErrorCode(err) != e.CodeTimeout || !errors.Is(err, wantCause) {
 					t.Fatalf("queued snapshot must fail with timeout: %v", err)
 				}
-			case <-time.After(time.Second):
+			case <-time.After(5 * time.Second):
 				// Release the lock and join before failing, so a regression does
 				// not leave the test's snapshot goroutine behind.
 				artifact.mu.Unlock()
@@ -77,6 +99,19 @@ func TestPackerSnapshotQueueHonorsContext(t *testing.T) {
 			}
 		})
 	}
+}
+
+// snapshotQueueContext observes the existing context boundary, not a production
+// hook. It delegates cancellation unchanged and signals only the first Done call.
+type snapshotQueueContext struct {
+	context.Context
+	waiting chan struct{}
+	once    sync.Once
+}
+
+func (ctx *snapshotQueueContext) Done() <-chan struct{} {
+	ctx.once.Do(func() { close(ctx.waiting) })
+	return ctx.Context.Done()
 }
 
 func TestPackerSnapshotRejectsInvalidAndChangedSubjects(t *testing.T) {
