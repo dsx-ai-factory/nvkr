@@ -99,25 +99,46 @@ func TestLocalInspectionFailureClosesRunWithoutExport(t *testing.T) {
 }
 
 func TestLocalInspectionRejectsMissingAdmissionBeforeAttemptStorage(t *testing.T) {
-	t.Chdir(t.TempDir())
-	prepared, _ := diskLifecycleFixture(t, "rejected-inspector")
-	called := false
-	_, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{
-		AttemptsRoot: ".nkd/runs", DiskInspection: &sbom.DiskInspectionRuntime{},
-	}, localExecutionDependencies{
-		admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
-		runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
-			called = true
-			return nil, nil
-		},
-		writeRecordState: writeRunRecordState, beginDiskCommit: beginDiskAttemptTransaction,
-	})
-	assertCode(t, err, e.CodeEngineCapability)
-	if called {
-		t.Fatal("unadmitted inspector started a build")
-	}
-	if _, err := os.Stat(".nkd"); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("unadmitted inspector created attempt storage: %v", err)
+	for _, mode := range []string{"unadmitted runtime", "no disk output"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			var prepared *PreparedRun
+			if mode == "no disk output" {
+				definition, environment := testDefinition(t), testEnvironment()
+				plan, err := Compile(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test")
+				if err != nil {
+					t.Fatal(err)
+				}
+				run, err := PrepareRun(definition, environment, plan, "rejected-inspector")
+				if err != nil {
+					t.Fatal(err)
+				}
+				prepared = &PreparedRun{plan: plan, run: run}
+			} else {
+				prepared, _ = diskLifecycleFixture(t, "rejected-inspector")
+			}
+			called := false
+			run, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{
+				AttemptsRoot: ".nkd/runs", DiskInspection: &sbom.DiskInspectionRuntime{},
+			}, localExecutionDependencies{
+				admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+				runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
+					called = true
+					return nil, nil
+				},
+				writeRecordState: writeRunRecordState, beginDiskCommit: beginDiskAttemptTransaction,
+			})
+			assertCode(t, err, e.CodeEngineCapability)
+			if called || run != nil {
+				t.Fatal("unadmitted inspection started a build or returned a Run")
+			}
+			if mode == "no disk output" && !strings.Contains(err.Error(), "without a disk output") {
+				t.Fatalf("non-disk Plan did not reach output admission: %v", err)
+			}
+			if _, err := os.Stat(".nkd"); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("unadmitted inspector created attempt storage: %v", err)
+			}
+		})
 	}
 }
 

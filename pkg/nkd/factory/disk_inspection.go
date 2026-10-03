@@ -26,7 +26,8 @@ type DiskInstalledInventoryDescription struct {
 // DiskInstalledInventoryReceipt joins an installed-package scan to the original
 // live execution's material observations. Only factory can issue it. Its live
 // use requires the original open owner and inspector, not equal identity fields
-// or an equal-byte sibling attempt. Close revokes use, including shallow copies.
+// or an equal-byte sibling attempt. It borrows the issuing LocalRunResult's
+// lifetime: closing that Run revokes use, including shallow receipt copies.
 type DiskInstalledInventoryReceipt struct {
 	owner       *LocalRunResult
 	runtime     *sbom.DiskInspectionRuntime

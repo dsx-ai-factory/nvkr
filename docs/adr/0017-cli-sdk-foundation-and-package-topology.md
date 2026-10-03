@@ -158,6 +158,11 @@ Ownership transfers are stated on the returning method. Facade results either cl
 one clear close obligation to their caller. Garbage-collector cleanup may be defense in depth, never the
 correctness or resource-reclamation mechanism.
 
+The non-owning installed-inventory receipt in ADR-13 borrows the issuing Run's
+lifetime; it has no separate close obligation or resource ownership. The Run's
+idempotent `Close` revokes every borrowed receipt and shallow copy. Live receipt
+validation requires that original open owner; a description cannot restore it.
+
 The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
 session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's
 context values and deadline. An asynchronous cancellation callback alone cannot enforce this close ordering.
