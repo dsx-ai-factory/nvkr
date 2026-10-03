@@ -28,10 +28,12 @@ recorded here. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
 
-The opt-in `TestDiskInspectionRuntimeReal` accepts
+The opt-in `TestDiskInspectionRuntimeReal` and
+`TestDiskInspectionRuntimeInventoryReal` accept
 `NKD_TEST_DISK_INSPECT_RUNTIME` to select a Docker or Podman executable and
-defaults to `podman`. The test records the selected executable and held byte and
-daemon identities. Selecting Docker enables that validation route; it does not
+default to `podman`. The pipeline test records held executable and daemon
+identities; the SBOM test checks the issued inventory's exact subject, image and
+tool bindings. Selecting Docker enables these validation routes; it does not
 mean a Docker run has been recorded.
 
 The libguestfs CLI is GPL-2.0-or-later, invoked out of process; it is not linked
@@ -61,11 +63,16 @@ API does not authenticate the enclosing sandbox. The concrete
 `sbom.DiskInspectionRuntime` instead admits an already-local complete image and
 the held Linux Docker/Podman executable and daemon identity. It revalidates
 image identity before and after inspection and uses a fixed launcher: UID/GID
-65534, network-none, read-only root, all capabilities removed, no devices or
-credential mounts, no-new-privileges, an init reaper and bounded process count.
+65534, network-none, read-only root, all capabilities removed, no requested devices
+or credential mounts, no-new-privileges, an init reaper and bounded process count.
+Native Podman inspection commands also select `/dev/null` as the default mounts
+file, including at container start, to suppress automatic `mounts.conf` inputs.
+Docker receives no Podman-specific flag. An unsupported override fails closed;
+the adapter never retries without it. This suppresses that documented native
+mechanism, not arbitrary OCI hooks, FIPS mounts or a malicious daemon.
 The helper is part of the selected image closure and receives only authenticated
 stdin bytes, not a host pathname. No runtime download or image pull is performed.
-The caller-selected executable, daemon and host kernel remain trusted in this
+The caller-selected executable, daemon configuration, OCI hooks and host kernel remain trusted in this
 local development route. The held runtime is rechecked for freshness, not
 compared with an independently supplied executable or daemon pin; it
 does not authenticate provider isolation or grant qualification.

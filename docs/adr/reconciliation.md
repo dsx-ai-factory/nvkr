@@ -62,7 +62,9 @@ non-root caller but leaves the enclosing loader, libraries, emulator, appliance 
 runtime TCB. An optional concrete diagnostic runtime now admits an already-local exact OCI image, its held
 Linux Docker/Podman executable and observed daemon identity. Its fixed launcher enforces non-root execution,
 network-none, a read-only root, dropped capabilities, absent caller mounts/devices/credentials, bounded
-resources and cancellation/cleanup. The opaque installed inventory binds the exact subject, tools and complete
+resources and cancellation/cleanup. Native Podman commands disable automatic `mounts.conf` inputs at start;
+daemon configuration, OCI hooks and FIPS mounts remain inside the trusted runtime boundary.
+The opaque installed inventory binds the exact subject, tools and complete
 image config identity, not a separately pinned runtime executable or daemon; the caller-selected runtime,
 daemon and host kernel remain trusted. Docker is admitted by argument contracts but no Docker inspection
 daemon run is recorded. The native Linux AMD64 and ARM64 contracts
@@ -70,9 +72,11 @@ are tested, and the [native ARM64 runtime exercise](../evidence/2026-10-02-nke-o
 inspected the retained disk's 730 packages and checked timeout/cleanup. That historical cancellation test did
 not observe a running container first, so it does not prove the interruption phase.
 The [later observed-running cancellation exercise](../evidence/2026-10-03-nke-os-inspector-review-fixes.md)
-confirmed join/removal only for its explicitly listed source blobs. Subsequent creation/cleanup and buffer-limit fixes are
-contract-tested, not a new real-runtime replay of the current head. Native AMD64 execution, an original
-live bake followed by inspection, registry publication and license/security clearance remain unproved. This is an optional
+also applies only to its explicitly listed source blobs. A subsequent
+[mount-suppression and issued-inventory replay](../evidence/2026-10-03-nke-os-inspector-mount-suppression.md)
+records its exact tested source blobs, native ARM64 runtime, successful SBOM-wrapper bindings and observed-running
+cancellation. It is a retained-disk exercise, not acceptance of a later committed head. Native AMD64 execution, original
+live-Run integration, registry publication and license/security clearance remain unproved. This is an optional
 diagnostic capability, not a compiler Plan input or an authenticated production closure. The shared codec probe
 explicitly selects the driver and rejects external references. The local lifecycle now optionally
 joins the original still-open factory disk/material trace to an opaque installed-inventory receipt through a
