@@ -137,7 +137,7 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	if err != nil {
 		return nil, acquisitionReadError(ctx, err)
 	}
-	if !acquisitionRegular(header) || header.Name != "manifest.json" ||
+	if source.offset() != 512 || !acquisitionRegular(header) || header.Name != "manifest.json" ||
 		header.Size <= 0 || header.Size > maxAcquisitionManifestBytes {
 		return nil, e.New(e.CodeVerifyFailed, "acquisition archive requires a bounded first manifest.json member")
 	}
@@ -152,12 +152,13 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	if err := manifest.validate(); err != nil {
 		return nil, err
 	}
+	nextHeader := int64(512) + acquisitionPaddedSize(header.Size)
 	for _, entry := range manifest.Packages {
 		header, err = reader.Next()
 		if err != nil {
 			return nil, acquisitionReadError(ctx, err)
 		}
-		if !acquisitionRegular(header) || header.Name != entry.Path || header.Size != entry.Size {
+		if source.offset() != nextHeader+512 || !acquisitionRegular(header) || header.Name != entry.Path || header.Size != entry.Size {
 			return nil, e.New(e.CodeVerifyFailed, "acquired package %q is missing, substituted or has the wrong size", entry.Name)
 		}
 		hash := sha256.New()
@@ -167,12 +168,16 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 		if "sha256:"+hex.EncodeToString(hash.Sum(nil)) != entry.Digest {
 			return nil, e.New(e.CodeVerifyFailed, "acquired package %q differs from its manifest digest", entry.Name)
 		}
+		nextHeader += 512 + acquisitionPaddedSize(header.Size)
 	}
 	if _, err := reader.Next(); err != io.EOF {
 		if err != nil {
 			return nil, acquisitionReadError(ctx, err)
 		}
 		return nil, e.New(e.CodeVerifyFailed, "acquisition archive has an extra or malformed member")
+	}
+	if source.offset() != nextHeader+1024 {
+		return nil, e.New(e.CodeVerifyFailed, "acquisition archive has hidden extension members or an incomplete terminator")
 	}
 	// archive/tar owns tar parsing. Its end marker does not consume arbitrary
 	// trailing bytes, so reject nonzero trailing data rather than silently hide
@@ -202,8 +207,14 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 
 func acquisitionRegular(header *tar.Header) bool {
 	return header != nil && header.Typeflag == tar.TypeReg && header.Linkname == "" &&
-		len(header.PAXRecords) == 0 && header.Size >= 0
+		header.Format == tar.FormatUSTAR && len(header.PAXRecords) == 0 && header.Size >= 0
 }
+
+// archive/tar owns header decoding. Its Next method can consume invisible GNU
+// or PAX metadata records, including immediately before EOF. Checking the held
+// SectionReader's position enforces one USTAR header per declared member and the
+// two-block terminator, without reimplementing the tar header grammar.
+func acquisitionPaddedSize(size int64) int64 { return (size + 511) / 512 * 512 }
 
 func acquisitionReadError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
@@ -214,7 +225,12 @@ func acquisitionReadError(ctx context.Context, err error) error {
 
 type acquisitionReader struct {
 	ctx    context.Context
-	source io.Reader
+	source *io.SectionReader
+}
+
+func (reader acquisitionReader) offset() int64 {
+	offset, _ := reader.source.Seek(0, io.SeekCurrent)
+	return offset
 }
 
 func (reader acquisitionReader) Read(buffer []byte) (int, error) {

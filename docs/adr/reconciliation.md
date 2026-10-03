@@ -69,6 +69,12 @@ The local lifecycle's bounded QCOW2 header handling still requires
 separate external-data/feature admission.
 Public lifecycle SBOM/publication and
 qualified admission are not enabled by this API.
+The diagnostic APT acquisition archive verifier checks canonical capture metadata
+and the exact digest/size of every declared held package member without extraction.
+The [dated ARM64/native and AMD64/emulated byte-correspondence record](../evidence/2026-10-03-apt-capture-correspondence.md)
+is not acquisition-origin authentication, installed inventory, a live-Run binding
+or a complete closure. The original NKE installer handoff remains unexercised;
+live collection and disk reconciliation remain absent.
 The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
 producer evidence verdict, performs content validation, or claims qualified disk reproduction. Reproduced or
 digest-verified materials cannot upgrade a future wrapped aggregate disk; its exact QCOW2 digest would identify

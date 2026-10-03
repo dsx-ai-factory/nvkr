@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -165,11 +166,139 @@ func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 	if observation, err := ObserveAcquisitionArchive(missingContext, held); observation != nil || errorCode(err) != e.CodeUsage {
 		t.Fatalf("nil context observation = %v, error = %v", observation, err)
 	}
-	for _, document := range []string{`{"schemaVersion":"a","schemaVersion":"b"}`, `{"unknown":true}`, strings.Repeat("x", 100)} {
-		var decoded AcquisitionManifest
-		if err := canonical.UnmarshalExact([]byte(document), &decoded); err == nil {
-			t.Fatal("malformed acquisition document accepted")
+	canonicalDocument, err := canonical.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, document := range []string{`{"schemaVersion":"a","schemaVersion":"b"}`, `{"unknown":true}`, " " + string(canonicalDocument), strings.Repeat("x", 100)} {
+		var encoded bytes.Buffer
+		writer := tar.NewWriter(&encoded)
+		if err := writer.WriteHeader(&tar.Header{Name: "manifest.json", Mode: 0o444, Size: int64(len(document)), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}); err != nil {
+			t.Fatal(err)
 		}
+		if _, err := writer.Write([]byte(document)); err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, encoded.Bytes())); observation != nil || errorCode(err) != e.CodeVerifyFailed {
+			t.Fatalf("malformed acquisition document accepted: observation=%v error=%v", observation, err)
+		}
+	}
+}
+
+func TestObserveAcquisitionArchiveRequiresExactOrdering(t *testing.T) {
+	manifest, first := acquisitionFixture("amd64")
+	second := []byte("another captured package")
+	hash := sha256.Sum256(second)
+	digest := "sha256:" + hex.EncodeToString(hash[:])
+	entry := manifest.Packages[0]
+	entry.Name, entry.Digest, entry.Size, entry.Path = "second", digest, int64(len(second)), "packages/"+hex.EncodeToString(hash[:])+".deb"
+	manifest.Packages = append(manifest.Packages, entry)
+	slices.SortFunc(manifest.Packages, func(a, b AcquiredPackage) int { return strings.Compare(a.Digest, b.Digest) })
+	payloads := map[string][]byte{manifest.Packages[0].Digest: first, digest: second}
+	// Match each fixture payload by content rather than relying on digest order.
+	firstHash := sha256.Sum256(first)
+	payloads["sha256:"+hex.EncodeToString(firstHash[:])] = first
+	for _, test := range []struct {
+		name           string
+		manifestOrder  bool
+		memberOrder    bool
+		uriOrder       bool
+		manifestSecond bool
+	}{
+		{name: "canonical two-package control"},
+		{name: "unsorted manifest", manifestOrder: true},
+		{name: "unsorted members", memberOrder: true},
+		{name: "unsorted URIs", uriOrder: true},
+		{name: "manifest is not first", manifestSecond: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := manifest
+			candidate.Packages = slices.Clone(manifest.Packages)
+			members := slices.Clone(manifest.Packages)
+			if test.manifestOrder {
+				slices.Reverse(candidate.Packages)
+			}
+			if test.memberOrder {
+				slices.Reverse(members)
+			}
+			if test.uriOrder {
+				candidate.Packages[0].RepositoryURIs = []string{"https://archive.example.invalid/z", "https://archive.example.invalid/a"}
+			}
+			raw, err := canonical.Marshal(candidate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var encoded bytes.Buffer
+			writer := tar.NewWriter(&encoded)
+			write := func(name string, content []byte) {
+				t.Helper()
+				if err := writer.WriteHeader(&tar.Header{Name: name, Mode: 0o444, Size: int64(len(content)), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := writer.Write(content); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !test.manifestSecond {
+				write("manifest.json", raw)
+			}
+			for index, member := range members {
+				write(member.Path, payloads[member.Digest])
+				if test.manifestSecond && index == 0 {
+					write("manifest.json", raw)
+				}
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, encoded.Bytes()))
+			if test.name == "canonical two-package control" {
+				if err != nil || observation == nil {
+					t.Fatalf("valid ordered capture rejected: %v", err)
+				}
+			} else if observation != nil || errorCode(err) != e.CodeVerifyFailed {
+				t.Fatalf("unordered capture accepted: observation=%v error=%v", observation, err)
+			}
+		})
+	}
+}
+
+func TestObserveAcquisitionArchiveRejectsHiddenExtensions(t *testing.T) {
+	manifest, payload := acquisitionFixture("amd64")
+	raw := acquisitionTar(t, manifest, payload, nil, false)
+	var extended bytes.Buffer
+	writer := tar.NewWriter(&extended)
+	if err := writer.WriteHeader(&tar.Header{Name: strings.Repeat("x", 200), Mode: 0o444, Typeflag: tar.TypeReg, Format: tar.FormatGNU}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// The standard writer emits a GNU long-name header and its one-block payload.
+	// Its NUL-terminated visible name hides otherwise undeclared bytes.
+	for _, test := range []struct {
+		name   string
+		offset int
+		target string
+	}{
+		{name: "before manifest", offset: 0, target: "manifest.json"},
+		{name: "before package", offset: 1024, target: manifest.Packages[0].Path},
+		{name: "before terminator", offset: len(raw) - 1024, target: "hidden"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			extension := bytes.Clone(extended.Bytes()[:1024])
+			clear(extension[512:])
+			copy(extension[512:], test.target+"\x00undeclared payload")
+			capture := append(bytes.Clone(raw[:test.offset]), extension...)
+			capture = append(capture, raw[test.offset:]...)
+			observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, capture))
+			if observation != nil || errorCode(err) != e.CodeVerifyFailed {
+				t.Fatalf("hidden extension accepted: observation=%v error=%v", observation, err)
+			}
+		})
 	}
 }
 

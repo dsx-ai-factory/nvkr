@@ -56,17 +56,12 @@ Both architectures have contract coverage. Native APT parsing and real Packer
 configuration validation cover both architectures, plain/FDE and capture on/off.
 These validations do not boot a VM.
 
-NKD's full completion gate passed with `GOFLAGS=-count=1 make check`, including
-uncached race tests, vet, lint, shellcheck and vulnerability checks. The uncached
-non-race suite `go test ./... -count=1` also passed. The final gate log is retained
-at `/private/tmp/nkd-apt-capture.NQ7NNU/nkd-check.log`. The NKE OS module's native
-`make -C os-image test` passed, including QEMU/entrypoint and Go tests. Packer
-format checking passed. Packer validation used the existing installed Packer
-1.15.4 and QEMU plugin closure, without `packer init`.
-The final NKE Packer suite passed 77 tests (two opt-in skips); the separate native
-APT/Packer capture suite passed all 11 tests with no skips. Logs are retained at
-`/private/tmp/nkd-apt-capture.NQ7NNU/nke-packer-tests.log` and
-`/private/tmp/nkd-apt-capture.NQ7NNU/nke-native-capture-tests.log`.
+The [dated diagnostic record](evidence/2026-10-03-apt-capture-correspondence.md)
+preserves the observed results, exact digests and limits. Historical local gate
+and capture logs were inspected during review, but their temporary storage is
+not a durable or shared artifact and does not prove a later changed revision.
+Packer validation used the existing installed Packer 1.15.4 and QEMU plugin
+closure, without `packer init`.
 
 Each real capture was separately admitted through `heldfile.OpenContext` and
 `ObserveAcquisitionArchive` in the opt-in `TestObserveRealAcquisitionArchive`.
@@ -80,14 +75,14 @@ NKD accepted the actual 30,720-byte capture, SHA-256
 `684ea432b9002ebb14fefcf81920e644dbd92d3afa7de8b24636f203d9e5504c`.
 This demonstrates native APT cache-cleanup survival, dpkg/python-apt matching and
 cross-language capture acceptance, not an NKE autoinstall or full image bake.
-The retained local capture is `/private/tmp/nkd-apt-capture.NQ7NNU/arm64-capture.tar`.
+The capture is not published as a retained CI artifact.
 
 The same real APT exercise also passed for AMD64 under local container emulation.
 Its actual `hello` package is 26,068 bytes, SHA-256
 `b6e9bef3c865aa17757cd9ffa820c05a37833f8a6b58287afc9f32dedb345965`.
 The capture is 30,720 bytes, SHA-256
 `4a23f41797a0a762a410f45d5725ca65e76377face354d8e62a67d82b05cc0f5`,
-retained at `/private/tmp/nkd-apt-capture.NQ7NNU/amd64-capture.tar`.
+not published as a retained CI artifact.
 This is not native AMD64 KVM evidence.
 
 Task C acceptance remains incomplete until a real NKE bake demonstrates the
