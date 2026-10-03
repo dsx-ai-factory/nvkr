@@ -68,7 +68,10 @@ daemon and host kernel remain trusted. Docker is admitted by argument contracts 
 daemon run is recorded. The native Linux AMD64 and ARM64 contracts
 are tested, and the [native ARM64 runtime exercise](../evidence/2026-10-02-nke-os-inspector-runtime.md)
 inspected the retained disk's 730 packages and checked timeout/cleanup. That historical cancellation test did
-not observe a running container first, so it does not prove the interruption phase. Native AMD64 execution, original
+not observe a running container first, so it does not prove the interruption phase.
+The [later observed-running cancellation exercise](../evidence/2026-10-03-nke-os-inspector-review-fixes.md)
+also applies only to its explicitly listed source blobs. Subsequent creation/cleanup and buffer-limit fixes are
+contract-tested, not a new real-runtime replay of the current head. Native AMD64 execution, original
 live-Run integration, registry publication and license/security clearance remain unproved. This is an optional
 diagnostic capability, not a compiler Plan input or an authenticated production closure. The shared codec probe
 explicitly selects the driver and

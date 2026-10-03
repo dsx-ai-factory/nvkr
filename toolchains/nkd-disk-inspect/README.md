@@ -82,8 +82,12 @@ The API places its private snapshot, temporary appliance files, cache and socket
 directories beneath a short `/tmp` workspace. The concrete launcher uses a
 bounded RAM-backed `/tmp` and accounts for the helper's held input, private copy
 and an additional 2 GiB appliance/cache margin. Before factory snapshot creation,
-admission checks that the entire container memory grant and the additional
-host-held copy fit concurrently, not just the minimum appliance estimate.
+admission compares the full container memory grant plus the additional
+host-held copy with host availability and the NKD process's cgroup-v2 headroom,
+not just the minimum appliance estimate. This is a conservative caller-side
+observation, not measurement or reservation of the daemon's separate scope.
+Different caller/daemon cgroup limits can reject an otherwise usable daemon or
+permit a container later killed by its enclosing limit.
 Admission uses actual subject size, not a fixed 8 GiB allocation. The container
 memory and swap limit are equal, and declared CPU, memory, workspace capacity and
 executor timeout cannot be silently weakened. A request too small for the subject

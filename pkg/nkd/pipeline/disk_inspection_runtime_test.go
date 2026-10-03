@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ type diskInspectionRunRuntime struct {
 	createErr, scanErr, cleanupErr           error
 	cancel                                   context.CancelFunc
 	started, copied                          bool
+	absent                                   bool
 }
 
 func (runtime *diskInspectionRunRuntime) Run(_ context.Context, input io.Reader, output, diagnostic io.Writer, args ...string) error {
@@ -51,6 +53,9 @@ func (runtime *diskInspectionRunRuntime) Run(_ context.Context, input io.Reader,
 
 func (runtime *diskInspectionRunRuntime) Cleanup(_ context.Context, _ time.Duration, output, _ io.Writer, args ...string) error {
 	if args[0] == "ps" {
+		if runtime.absent {
+			return nil
+		}
 		_, err := io.WriteString(output, strings.Repeat("a", 64))
 		return err
 	}
@@ -66,9 +71,11 @@ func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
 		want         e.Code
 		wantStart    bool
 		wantReport   bool
+		uncertain    bool
 	}{
 		{name: "complete", runtime: diskInspectionRunRuntime{report: "report"}, wantStart: true, wantReport: true},
 		{name: "create failure", runtime: diskInspectionRunRuntime{createErr: errors.New("create")}, want: e.CodeEngineCapability},
+		{name: "create failure with unresolved registration", runtime: diskInspectionRunRuntime{createErr: errors.New("create"), absent: true}, want: e.CodeEngineCapability, uncertain: true},
 		{name: "create warning before start", runtime: diskInspectionRunRuntime{createDiagnostic: "requested limit ignored"}, want: e.CodeEngineCapability},
 		{name: "start failure joins blocked writer", runtime: diskInspectionRunRuntime{scanErr: errors.New("start")}, want: e.CodeEnvelopeDecode, wantStart: true},
 		{name: "copy failure", closeSubject: true, want: e.CodeEnvelopeDecode, wantStart: true},
@@ -93,12 +100,16 @@ func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
 			if tt.canceled {
 				tt.runtime.cancel = cancel
 			}
+			started := time.Now()
 			raw, err := runDiskInspectionContainer(ctx, &tt.runtime, testDiskInspectionSelection(t), "image", subject)
 			if code(err) != tt.want || tt.runtime.started != tt.wantStart || (raw != nil) != tt.wantReport {
 				t.Fatalf("raw=%q error=%v started=%t", raw, err, tt.runtime.started)
 			}
 			if tt.wantReport && (!tt.runtime.copied || string(raw) != "report") {
 				t.Fatal("accepted report before input streaming completed")
+			}
+			if tt.uncertain && (!strings.Contains(err.Error(), "creation outcome remains uncertain") || time.Since(started) > 15*time.Second) {
+				t.Fatalf("missing or unbounded cleanup uncertainty: %v", err)
 			}
 		})
 	}
@@ -120,6 +131,83 @@ func TestDiskInspectionDiagnosticsAreBoundedAndQuoted(t *testing.T) {
 		if !strings.HasSuffix(got, "(truncated="+strconv.FormatBool(len(raw) > 4096)+")") {
 			t.Fatal("diagnostic truncation not recorded")
 		}
+	}
+}
+
+func TestDiskInspectionBufferHasNoUnboundedWriteFastPaths(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		copy func(io.Writer, string) (int64, error)
+	}{
+		{name: "write", copy: func(output io.Writer, raw string) (int64, error) {
+			n, err := output.Write([]byte(raw))
+			return int64(n), err
+		}},
+		{name: "copy", copy: func(output io.Writer, raw string) (int64, error) {
+			return io.Copy(output, io.LimitReader(strings.NewReader(raw), int64(len(raw))))
+		}},
+		{name: "string", copy: func(output io.Writer, raw string) (int64, error) {
+			n, err := io.WriteString(output, raw)
+			return int64(n), err
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buffer diskInspectionBuffer
+			if _, promoted := any(&buffer).(io.ReaderFrom); promoted {
+				t.Fatal("unbounded ReadFrom bypasses Write")
+			}
+			if _, promoted := any(&buffer).(io.StringWriter); promoted {
+				t.Fatal("unbounded WriteString bypasses Write")
+			}
+			if _, err := tt.copy(&buffer, strings.Repeat("x", 9<<20)); code(err) != e.CodeEnvelopeDecode || buffer.Len() > 8<<20 {
+				t.Fatalf("output bound: bytes=%d err=%v", buffer.Len(), err)
+			}
+		})
+	}
+}
+
+func TestDiskInspectionBufferProcessHelper(t *testing.T) {
+	mode := os.Getenv("NKD_DISK_INSPECTION_OUTPUT_HELPER")
+	if mode == "" {
+		return
+	}
+	done := make(chan struct{})
+	if mode == "stdout" || mode == "both" {
+		go func() { _, _ = io.WriteString(os.Stdout, strings.Repeat("x", 9<<20)); close(done) }()
+	} else {
+		close(done)
+	}
+	if mode == "stderr" || mode == "both" {
+		_, _ = io.WriteString(os.Stderr, strings.Repeat("x", 9<<20))
+	}
+	<-done
+}
+
+func TestDiskInspectionHeldSubprocessOutputIsBounded(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held executable inputs are Linux-only")
+	}
+	path, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	executable, err := heldfile.OpenContext(t.Context(), path, heldfile.Options{Label: "test-helper", Executable: true, MaxBytes: 128 << 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer executable.Close()
+	for _, mode := range []string{"stdout", "stderr", "both"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			var output, diagnostic diskInspectionBuffer
+			err := heldfile.RunContext(ctx, executable, []string{"-test.run=^TestDiskInspectionBufferProcessHelper$"}, heldfile.RunOptions{
+				Stdout: &output, Stderr: &diagnostic, Env: append(os.Environ(), "NKD_DISK_INSPECTION_OUTPUT_HELPER="+mode),
+			})
+			if err == nil || ctx.Err() != nil || output.Len() > 8<<20 || diagnostic.Len() > 8<<20 {
+				t.Fatalf("unbounded held subprocess output: stdout=%d stderr=%d err=%v context=%v", output.Len(), diagnostic.Len(), err, ctx.Err())
+			}
+		})
 	}
 }
 

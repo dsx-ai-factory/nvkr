@@ -180,7 +180,10 @@ func (container *DiskInspectionContainer) Close() error {
 // AdmitSubject checks capacity before the factory creates its anonymous held
 // snapshot. In addition to the container's two copies, this budgets that extra
 // factory-held copy. The original producer inode remains disk-backed. Admission
-// is point-in-time availability, not a reservation or provider allocation proof.
+// compares that combined budget with host availability and the NKD process's
+// cgroup headroom. It does not observe the daemon's separate cgroup/slice or
+// reserve capacity there; differing scopes may reject an otherwise usable
+// daemon or permit a container later killed by its enclosing limit.
 func (container *DiskInspectionContainer) AdmitSubject(ctx context.Context, size int64) error {
 	if err := requireRunContext(ctx, "inspection subject admission"); err != nil {
 		return err
@@ -346,9 +349,9 @@ func validateDiskInspectionResources(selection DiskInspectionSelection, facts ex
 		if hostMemory > math.MaxUint64-snapshotMiB {
 			return e.New(e.CodeEngineCapability, "inspection memory request exceeds its supported budget")
 		}
-		// The container may consume its entire declared limit, not merely the
-		// minimum appliance estimate. Its grant and the external factory snapshot
-		// must fit concurrently; checking their maxima independently is unsafe.
+		// Compare the full declared grant plus external snapshot with the
+		// caller-side observation, not merely their independent maxima. This
+		// conservative check does not authenticate the daemon's cgroup budget.
 		hostMemory += snapshotMiB
 	}
 	if request.MemoryMiB < needMemory || facts.Platform != execution.HostPlatform(selection.Platform) || facts.Resources.CPUMillis < request.CPUMillis || facts.Resources.MemoryMiB < hostMemory || facts.Resources.EphemeralStorageMiB < request.EphemeralStorageMiB {
@@ -429,13 +432,20 @@ func lockDiskInspection(ctx context.Context, mu *sync.Mutex) error {
 	return nil
 }
 
-type diskInspectionBuffer struct{ bytes.Buffer }
+// Do not embed bytes.Buffer: promoted ReadFrom and WriteString would let
+// io.Copy and io.WriteString bypass the bounded Write operation below.
+type diskInspectionBuffer struct{ data bytes.Buffer }
+
+func (buffer *diskInspectionBuffer) Len() int       { return buffer.data.Len() }
+func (buffer *diskInspectionBuffer) Bytes() []byte  { return buffer.data.Bytes() }
+func (buffer *diskInspectionBuffer) String() string { return buffer.data.String() }
+func (buffer *diskInspectionBuffer) Reset()         { buffer.data.Reset() }
 
 func (buffer *diskInspectionBuffer) Write(raw []byte) (int, error) {
 	if buffer.Len()+len(raw) > 8<<20 {
 		return 0, e.New(e.CodeEnvelopeDecode, "disk inspection output exceeds its bound")
 	}
-	return buffer.Buffer.Write(raw)
+	return buffer.data.Write(raw)
 }
 
 func decodeDiskInspectionImageID(raw []byte) (string, error) {
