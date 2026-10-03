@@ -30,7 +30,11 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer workspace.Close()
-	selection := DiskInspectionSelection{RuntimeExecutable: "podman", Image: image, Platform: "linux/" + runtime.GOARCH,
+	runtimeExecutable := os.Getenv("NKD_TEST_DISK_INSPECT_RUNTIME")
+	if runtimeExecutable == "" {
+		runtimeExecutable = "podman"
+	}
+	selection := DiskInspectionSelection{RuntimeExecutable: runtimeExecutable, Image: image, Platform: "linux/" + runtime.GOARCH,
 		InspectorDigest: os.Getenv("NKD_TEST_DISK_INSPECTOR_SHA256"), CodecDigest: os.Getenv("NKD_TEST_DISK_CODEC_SHA256"),
 		Resources: execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 10 * 1024, EphemeralStorageMiB: 512}, TimeoutSeconds: 600, Workspace: workspace}
 	container, err := OpenDiskInspectionContainer(t.Context(), selection)
@@ -38,7 +42,7 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer container.Close()
-	t.Logf("held runtime: executable=%s daemon=%s", container.runtime.capability.Digest(), container.runtime.identity)
+	t.Logf("held runtime: selected=%s executable=%s daemon=%s", runtimeExecutable, container.runtime.capability.Digest(), container.runtime.identity)
 	path := os.Getenv("NKD_TEST_DISK_QCOW2")
 	info, err := os.Stat(path)
 	if err != nil {

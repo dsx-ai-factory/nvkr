@@ -20,6 +20,7 @@ import (
 // real host admission and held subprocesses. It proves revalidation and cleanup
 // contracts, not a Docker daemon, QCOW2 inspection or package-discovery result.
 func TestDiskInspectionPostRunRevalidation(t *testing.T) {
+	const subjectBytes = "controlled held subject"
 	for _, tt := range []struct {
 		name, mode, diagnostic string
 		want                   e.Code
@@ -32,6 +33,16 @@ func TestDiskInspectionPostRunRevalidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 			defer cancel()
+			selection := testDiskInspectionSelection(t)
+			selection.Platform = "linux/" + runtime.GOARCH
+			selection.Resources = execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 2050, EphemeralStorageMiB: 1}
+			facts, err := execution.ObserveLocalHost(ctx, selection.Workspace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := validateDiskInspectionResources(selection, facts, int64(len(subjectBytes)), false); err != nil {
+				t.Skipf("controlled held-subprocess fixture requires its real host capacity: %v", err)
+			}
 			root := t.TempDir()
 			path, _ := copyTestExecutable(t, "docker")
 			heldRuntime, err := snapshotRuntimeExecutableContext(ctx, path)
@@ -47,12 +58,9 @@ func TestDiskInspectionPostRunRevalidation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			selection := testDiskInspectionSelection(t)
-			selection.Platform = "linux/" + runtime.GOARCH
 			// A manifest pin remains constant while the observed config ID
 			// changes, isolating the post-run image-ID comparison itself.
 			selection.Image = "example.test/inspection@sha256:" + strings.Repeat("1", 64)
-			selection.Resources = execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 2050, EphemeralStorageMiB: 1}
 			selection.TimeoutSeconds = 20
 			container := &DiskInspectionContainer{runtime: heldRuntime, selection: selection}
 			defer container.Close()
@@ -60,7 +68,7 @@ func TestDiskInspectionPostRunRevalidation(t *testing.T) {
 				t.Fatal(err)
 			}
 			originalImage := container.imageID
-			subject, err := heldfile.FromBytesContext(ctx, []byte("controlled held subject"), heldfile.Options{Label: "revalidation-subject", MaxBytes: 128})
+			subject, err := heldfile.FromBytesContext(ctx, []byte(subjectBytes), heldfile.Options{Label: "revalidation-subject", MaxBytes: 128})
 			if err != nil {
 				t.Fatal(err)
 			}

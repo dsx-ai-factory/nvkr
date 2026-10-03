@@ -28,6 +28,12 @@ recorded here. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
 
+The opt-in `TestDiskInspectionRuntimeReal` accepts
+`NKD_TEST_DISK_INSPECT_RUNTIME` to select a Docker or Podman executable and
+defaults to `podman`. The test records the selected executable and held byte and
+daemon identities. Selecting Docker enables that validation route; it does not
+mean a Docker run has been recorded.
+
 The libguestfs CLI is GPL-2.0-or-later, invoked out of process; it is not linked
 into NKD. The library is LGPL-2.1-or-later. Repository subprocess-license guidance
 is in `CONTRIBUTING.md`; source licenses are in the upstream
