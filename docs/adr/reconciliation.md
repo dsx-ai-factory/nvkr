@@ -83,7 +83,9 @@ are contract-tested with AMD64 and ARM64 subjects. Separate negative tests cover
 changed bytes and cancellation using the AMD64 fixture. Default builds remain build-only. The opt-in SDK acceptance test exists, but an
 original live NKE bake followed by this inspection has not been exercised on either architecture.
 The controlled scan tests do not exercise the production closure's concrete Packer assertion or
-capacity-before-snapshot wiring; those remain source-reviewed until the real SDK acceptance run.
+capacity-before-snapshot wiring. The injected lifecycle ordering tests also do not exercise the concrete
+disk-only selection, receipt observation/validation and description collection. These paths remain
+source-reviewed until the real SDK acceptance run.
 Diagnostic admission is QCOW2-only, and the shared codec rejects backing/data-file references. Shared VMDK decoding rejects
 descriptor layouts before the probe and admits only single-file VMDK4 sparse inputs whose QAPI extent binds
 the held input file (`/proc/self/fd/N`) and full virtual size, with an [actual ARM64 QEMU fixture replay](../evidence/2026-10-02-vmdk-codec-admission.md).

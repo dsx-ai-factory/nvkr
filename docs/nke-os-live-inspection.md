@@ -28,6 +28,8 @@ These tests use controlled producer/inspection seams, not real NKE bakes.
 The same-Run sibling-output test gives both outputs their own valid material trace and equal-byte held
 completion before checking receipt replay. The production scan closure's concrete Packer type check and
 capacity-before-snapshot wiring are source-reviewed, but are not exercised by those injected scan tests.
+The concrete lifecycle join's disk-only selection, receipt observation and validation, and description
+collection are also source-reviewed, not exercised by the injected lifecycle ordering tests.
 
 One ten-minute operation deadline covers queueing, material tracing, snapshotting, scanning and subject/tool
 rechecks. The runtime's configured timeout imposes a second ceiling on the scan; it does not reserve that
