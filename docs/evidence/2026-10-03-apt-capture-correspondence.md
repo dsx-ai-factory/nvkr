@@ -39,7 +39,16 @@ to other reviewers. This document preserves the observed results and exact
 digests, not a claim that a temporary pathname is shared or durable evidence.
 
 For an independent recheck, supply a capture having one of the exact digests
-above as `NKD_TEST_ACQUISITION_ARCHIVE` and run the diagnostic test. A different
+above and run the diagnostic test with verbose output:
+
+```sh
+NKD_TEST_ACQUISITION_ARCHIVE=/path/to/capture.tar \
+  go test ./pkg/nkd/material -run TestObserveRealAcquisitionArchive -count=1 -v
+```
+
+Compare the logged archive digest, size, manifest digest, architecture and
+package count with this record; the generic diagnostic does not assert these
+historical values automatically. A different
 capture establishes its own byte correspondence, not reproduction of these
 observed bytes. A future retained CI acquisition artifact and original NKE bake
 are still required for shared operational evidence.

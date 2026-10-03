@@ -179,6 +179,18 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	if source.offset() != nextHeader+1024 {
 		return nil, e.New(e.CodeVerifyFailed, "acquisition archive has hidden extension members or an incomplete terminator")
 	}
+	// Next may consume exactly two blocks of hidden GNU metadata and then return
+	// EOF. Its byte count alone cannot prove the required zero-block terminator.
+	var terminator [1024]byte
+	footer := acquisitionReader{ctx: ctx, source: io.NewSectionReader(archive, nextHeader, int64(len(terminator)))}
+	if _, err := io.ReadFull(footer, terminator[:]); err != nil {
+		return nil, acquisitionReadError(ctx, err)
+	}
+	for _, value := range terminator {
+		if value != 0 {
+			return nil, e.New(e.CodeVerifyFailed, "acquisition archive has a nonzero terminator")
+		}
+	}
 	// archive/tar owns tar parsing. Its end marker does not consume arbitrary
 	// trailing bytes, so reject nonzero trailing data rather than silently hide
 	// another archive or undeclared payload after the terminator.

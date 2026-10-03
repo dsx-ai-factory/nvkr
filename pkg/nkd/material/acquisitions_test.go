@@ -33,6 +33,11 @@ func acquisitionTar(t *testing.T, manifest AcquisitionManifest, payload []byte, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	return acquisitionTarWithManifestJSON(t, manifest, raw, payload, mutate, extra)
+}
+
+func acquisitionTarWithManifestJSON(t *testing.T, manifest AcquisitionManifest, raw, payload []byte, mutate func(*tar.Header), extra bool) []byte {
+	t.Helper()
 	var destination bytes.Buffer
 	writer := tar.NewWriter(&destination)
 	write := func(name string, content []byte, alter bool) {
@@ -170,21 +175,29 @@ func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, document := range []string{`{"schemaVersion":"a","schemaVersion":"b"}`, `{"unknown":true}`, " " + string(canonicalDocument), strings.Repeat("x", 100)} {
-		var encoded bytes.Buffer
-		writer := tar.NewWriter(&encoded)
-		if err := writer.WriteHeader(&tar.Header{Name: "manifest.json", Mode: 0o444, Size: int64(len(document)), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := writer.Write([]byte(document)); err != nil {
-			t.Fatal(err)
-		}
-		if err := writer.Close(); err != nil {
-			t.Fatal(err)
-		}
-		if observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, encoded.Bytes())); observation != nil || errorCode(err) != e.CodeVerifyFailed {
-			t.Fatalf("malformed acquisition document accepted: observation=%v error=%v", observation, err)
-		}
+	document := string(canonicalDocument)
+	for _, test := range []struct {
+		name     string
+		document string
+		valid    bool
+	}{
+		{name: "canonical complete capture", document: document, valid: true},
+		{name: "duplicate field", document: strings.Replace(document, `"schemaVersion":`, `"schemaVersion":"`+AcquisitionSchemaVersion+`","schemaVersion":`, 1)},
+		{name: "unknown field", document: strings.TrimSuffix(document, "}") + `,"unknown":true}`},
+		{name: "leading whitespace", document: " " + document},
+		{name: "malformed JSON", document: strings.Repeat("x", 100)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			capture := acquisitionTarWithManifestJSON(t, manifest, []byte(test.document), payload, nil, false)
+			observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, capture))
+			if test.valid {
+				if observation == nil || err != nil {
+					t.Fatalf("canonical complete capture rejected: observation=%v error=%v", observation, err)
+				}
+			} else if observation != nil || errorCode(err) != e.CodeVerifyFailed {
+				t.Fatalf("malformed acquisition document accepted: observation=%v error=%v", observation, err)
+			}
+		})
 	}
 }
 
@@ -280,20 +293,24 @@ func TestObserveAcquisitionArchiveRejectsHiddenExtensions(t *testing.T) {
 	// The standard writer emits a GNU long-name header and its one-block payload.
 	// Its NUL-terminated visible name hides otherwise undeclared bytes.
 	for _, test := range []struct {
-		name   string
-		offset int
-		target string
+		name     string
+		offset   int
+		target   string
+		truncate bool
 	}{
 		{name: "before manifest", offset: 0, target: "manifest.json"},
 		{name: "before package", offset: 1024, target: manifest.Packages[0].Path},
 		{name: "before terminator", offset: len(raw) - 1024, target: "hidden"},
+		{name: "instead of terminator at EOF", offset: len(raw) - 1024, target: "hidden", truncate: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			extension := bytes.Clone(extended.Bytes()[:1024])
 			clear(extension[512:])
 			copy(extension[512:], test.target+"\x00undeclared payload")
 			capture := append(bytes.Clone(raw[:test.offset]), extension...)
-			capture = append(capture, raw[test.offset:]...)
+			if !test.truncate {
+				capture = append(capture, raw[test.offset:]...)
+			}
 			observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, capture))
 			if observation != nil || errorCode(err) != e.CodeVerifyFailed {
 				t.Fatalf("hidden extension accepted: observation=%v error=%v", observation, err)

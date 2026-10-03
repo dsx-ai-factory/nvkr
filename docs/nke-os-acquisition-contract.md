@@ -45,6 +45,9 @@ manifest and 8 GiB total archive. Source export additionally limits captured
 package bytes to 7 GiB; capture storage is charged to the existing VM workspace.
 Copying may fail earlier if workspace storage is exhausted, which fails the
 build rather than producing an accepted capture.
+This is not canonicalization of the whole tar container. Header metadata and
+member-block padding are not package claims; all archive bytes, including those
+regions, remain bound by the exact archive digest.
 
 ## Validation and remaining acceptance
 
