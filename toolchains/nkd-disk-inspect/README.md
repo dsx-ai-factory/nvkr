@@ -97,6 +97,10 @@ is needed. Installed-package inspection currently supports one Linux Debian
 package-manager root; no-root or multi-root layouts return `engine-capability`.
 An encrypted guest volume can therefore be rejected as an unsupported layout,
 not necessarily a detected encryption marker.
+The attached helper's supported failure exit statuses retain their NKD error
+classes. Unknown, signaled and runtime-only exits, including ambiguous generic
+CLI statuses `1` and `2`, remain `envelope-decode`; cancellation of the caller's
+operation remains `timeout`. Diagnostic text is never parsed for an error code.
 
 Ubuntu installs the appliance kernel with root-only read permissions. The image
 build makes only its packaged `/boot/vmlinuz-*` files readable (`0644`), so
