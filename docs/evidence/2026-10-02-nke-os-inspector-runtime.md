@@ -36,7 +36,7 @@ signed Ubuntu archive snapshot and package versions in
 | Native test executable | `sha256:76e3a55d8e910c7856a8d4a642b321613add2ced5a091798dd3753e2b0d40a92` |
 
 The disk was independently rehashed before this exercise. Its original location
-was `/Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/nke-os-integration/.nkd/runs/20260923-arm64-e2e-17/outputs/nke-node-image-arm64.qcow2`.
+was `<nke-os-integration-worktree>/.nkd/runs/20260923-arm64-e2e-17/outputs/nke-node-image-arm64.qcow2`.
 The runtime receives sealed bytes through stdin, not this host pathname. The
 original disk is not modified. The local image config identifies immutable
 rootfs diff IDs, including the helper, loaders, libraries, QEMU, supermin and
@@ -58,7 +58,9 @@ Git blob identities for the tested source:
 ## Commands and containment
 
 Run from the runtime worktree using `GOTOOLCHAIN=local` and the repository's
-`.go-version`:
+`.go-version`. Host-specific worktree and module-cache roots below are represented
+by placeholders; the retained attempt-relative path and measured identities are
+unchanged:
 
 ```sh
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false \
@@ -81,7 +83,7 @@ NKD_TEST_DISK_INSPECT_IMAGE=sha256:a0e238dedfca964f4474ee0d649826d03642dbb256ad8
 NKD_TEST_DISK_INSPECTOR_SHA256=sha256:e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b
 NKD_TEST_DISK_CODEC_SHA256=sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e
 NKD_TEST_DISK_SHA256=sha256:da7e44bf7192b113747de07f5eff189a1375eb7ee792971b9b3597947f67a8b7
-NKD_TEST_DISK_QCOW2=/Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/nke-os-integration/.nkd/runs/20260923-arm64-e2e-17/outputs/nke-node-image-arm64.qcow2
+NKD_TEST_DISK_QCOW2='<nke-os-integration-worktree>/.nkd/runs/20260923-arm64-e2e-17/outputs/nke-node-image-arm64.qcow2'
 ```
 
 The adapter uses only its fixed command: UID/GID 65534, network-none, read-only
@@ -123,8 +125,8 @@ the new regression tests, through this pinned Go test container:
 ```sh
 podman run --rm --name=nkd-b-inspector-runtime-linux-gate --init \
   --user=65534:65534 --network=none --cpus=2 --memory=4g \
-  --volume /Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/os-inspector-runtime:/src:ro \
-  --volume /Users/ikislenko/go/pkg/mod:/go/pkg/mod:ro --workdir=/src \
+  --volume '<os-inspector-runtime-worktree>:/src:ro' \
+  --volume '<go-module-cache>:/go/pkg/mod:ro' --workdir=/src \
   --env GOTOOLCHAIN=local --env GOFLAGS=-mod=readonly \
   --env GOCACHE=/tmp/nkd-go-cache --entrypoint go \
   sha256:266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6 \
