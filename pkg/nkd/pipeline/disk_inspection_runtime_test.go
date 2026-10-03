@@ -22,6 +22,8 @@ import (
 
 type diskInspectionRunRuntime struct {
 	packerContainerRuntime
+	name                                     string
+	commands                                 [][]string
 	createDiagnostic, scanDiagnostic, report string
 	createErr, scanErr, cleanupErr           error
 	cancel                                   context.CancelFunc
@@ -29,7 +31,18 @@ type diskInspectionRunRuntime struct {
 	absent                                   bool
 }
 
+func (runtime *diskInspectionRunRuntime) RuntimeName() string {
+	if runtime.name == "" {
+		return "docker"
+	}
+	return runtime.name
+}
+
 func (runtime *diskInspectionRunRuntime) Run(_ context.Context, input io.Reader, output, diagnostic io.Writer, args ...string) error {
+	runtime.commands = append(runtime.commands, slices.Clone(args))
+	if args[0] == "--default-mounts-file=/dev/null" {
+		args = args[1:]
+	}
 	if args[0] == "create" {
 		_, _ = io.WriteString(diagnostic, runtime.createDiagnostic)
 		return runtime.createErr
@@ -53,6 +66,10 @@ func (runtime *diskInspectionRunRuntime) Run(_ context.Context, input io.Reader,
 }
 
 func (runtime *diskInspectionRunRuntime) Cleanup(_ context.Context, _ time.Duration, output, _ io.Writer, args ...string) error {
+	runtime.commands = append(runtime.commands, slices.Clone(args))
+	if args[0] == "--default-mounts-file=/dev/null" {
+		args = args[1:]
+	}
 	if args[0] == "ps" {
 		if runtime.absent {
 			return nil
@@ -61,6 +78,42 @@ func (runtime *diskInspectionRunRuntime) Cleanup(_ context.Context, _ time.Durat
 		return err
 	}
 	return runtime.cleanupErr
+}
+
+func TestDiskInspectionCommandsSuppressPodmanAutomaticMounts(t *testing.T) {
+	for _, runtimeName := range []string{"docker", "podman"} {
+		t.Run(runtimeName, func(t *testing.T) {
+			subject, err := heldfile.FromBytesContext(t.Context(), []byte("held subject"), heldfile.Options{Label: "fixture", MaxBytes: 128})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer subject.Close()
+			runtime := &diskInspectionRunRuntime{name: runtimeName, report: "report"}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			raw, err := runDiskInspectionContainer(ctx, runtime, testDiskInspectionSelection(t), "image", subject)
+			if err != nil || string(raw) != "report" || !runtime.copied {
+				t.Fatalf("inspection did not complete its streaming and cleanup: %q, %v", raw, err)
+			}
+			wantCommands := []string{"create", "start", "ps", "rm"}
+			if len(runtime.commands) != len(wantCommands) {
+				t.Fatalf("unexpected operation sequence: %v", runtime.commands)
+			}
+			for index, args := range runtime.commands {
+				if runtimeName == "podman" {
+					if len(args) < 2 || args[0] != "--default-mounts-file=/dev/null" {
+						t.Fatalf("Podman operation lacks its fixed global override: %v", args)
+					}
+					args = args[1:]
+				} else if slices.Contains(args, "--default-mounts-file=/dev/null") {
+					t.Fatalf("Docker received a Podman-only option: %v", args)
+				}
+				if args[0] != wantCommands[index] {
+					t.Fatalf("operation %d = %v, want %s", index, args, wantCommands[index])
+				}
+			}
+		})
+	}
 }
 
 func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
@@ -76,6 +129,7 @@ func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
 	}{
 		{name: "complete", runtime: diskInspectionRunRuntime{report: "report"}, wantStart: true, wantReport: true},
 		{name: "create failure", runtime: diskInspectionRunRuntime{createErr: errors.New("create")}, want: e.CodeEngineCapability},
+		{name: "unsupported Podman override", runtime: diskInspectionRunRuntime{name: "podman", createErr: errors.New("unknown flag: --default-mounts-file")}, want: e.CodeEngineCapability},
 		{name: "create failure with unresolved registration", runtime: diskInspectionRunRuntime{createErr: errors.New("create"), absent: true}, want: e.CodeEngineCapability, uncertain: true},
 		{name: "create warning before start", runtime: diskInspectionRunRuntime{createDiagnostic: "requested limit ignored"}, want: e.CodeEngineCapability},
 		{name: "start failure joins blocked writer", runtime: diskInspectionRunRuntime{scanErr: errors.New("start")}, want: e.CodeEnvelopeDecode, wantStart: true},
@@ -371,6 +425,8 @@ type diskInspectionCleanupRuntime struct {
 	commands [][]string
 	lateID   string
 }
+
+func (*diskInspectionCleanupRuntime) RuntimeName() string { return "docker" }
 
 func (runtime *diskInspectionCleanupRuntime) Cleanup(_ context.Context, _ time.Duration,
 	stdout, _ io.Writer, args ...string,

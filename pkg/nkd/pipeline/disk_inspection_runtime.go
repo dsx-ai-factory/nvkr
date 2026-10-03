@@ -290,7 +290,7 @@ func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRunt
 		}
 	}()
 	var createDiagnostic, diagnostic, report diskInspectionBuffer
-	if err := runtime.Run(ctx, nil, io.Discard, &createDiagnostic, diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...); err != nil {
+	if err := runtime.Run(ctx, nil, io.Discard, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(createDiagnostic.Bytes()), e.CodeEngineCapability, "creating disk inspection container")
 	}
 	creationUncertain = false
@@ -302,7 +302,7 @@ func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRunt
 	reader, writer := io.Pipe()
 	done := make(chan error, 1)
 	go func() { _, err := subject.WriteToContext(ctx, writer); _ = writer.CloseWithError(err); done <- err }()
-	err = runtime.Run(ctx, reader, &report, &diagnostic, "start", "--attach", "--interactive", name)
+	err = runtime.Run(ctx, reader, &report, &diagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), "start", "--attach", "--interactive", name)...)
 	_ = reader.Close()
 	copyErr := <-done
 	if err := errors.Join(err, copyErr); err != nil {
@@ -312,6 +312,16 @@ func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRunt
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection returned diagnostics or no report")
 	}
 	return bytes.Clone(report.Bytes()), nil
+}
+
+// Podman adds mounts.conf content at start, even when create reports no mounts.
+// Its native global override suppresses those automatic host inputs. Missing
+// flag support fails at the command boundary; Docker receives no new flag.
+func diskInspectionCommandArgs(runtimeName string, args ...string) []string {
+	if runtimeName == "podman" {
+		return append([]string{"--default-mounts-file=/dev/null"}, args...)
+	}
+	return args
 }
 
 // Attached Docker/Podman start propagates the fixed helper's exit status. Reuse
@@ -405,8 +415,8 @@ func removeDiskInspectionContainer(ctx context.Context, runtime packerContainerR
 	for {
 		stdout.Reset()
 		stderr.Reset()
-		if err := runtime.Cleanup(ctx, time.Second, &stdout, &stderr, "ps", "--all", "--no-trunc",
-			"--filter", "label=nkd.dev/inspection-attempt="+attempt, "--format", "{{.ID}}"); err != nil {
+		if err := runtime.Cleanup(ctx, time.Second, &stdout, &stderr, diskInspectionCommandArgs(runtime.RuntimeName(), "ps", "--all", "--no-trunc",
+			"--filter", "label=nkd.dev/inspection-attempt="+attempt, "--format", "{{.ID}}")...); err != nil {
 			return e.Wrap(e.CodeInternal, err, "finding the owned disk inspection container")
 		}
 		if stderr.Len() != 0 {
@@ -429,7 +439,7 @@ func removeDiskInspectionContainer(ctx context.Context, runtime packerContainerR
 		if len(ids) != 1 || !canonical.IsDigest("sha256:"+ids[0]) {
 			return e.New(e.CodeVerifyFailed, "disk inspection cleanup has an ambiguous container identity")
 		}
-		if err := runtime.Cleanup(ctx, time.Second, io.Discard, io.Discard, "rm", "--force", ids[0]); err != nil {
+		if err := runtime.Cleanup(ctx, time.Second, io.Discard, io.Discard, diskInspectionCommandArgs(runtime.RuntimeName(), "rm", "--force", ids[0])...); err != nil {
 			return e.Wrap(e.CodeInternal, err, "removing the owned disk inspection container")
 		}
 		return nil
