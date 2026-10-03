@@ -158,6 +158,34 @@ func TestObserveAcquisitionArchiveRejectsBadCaptures(t *testing.T) {
 	}
 }
 
+func TestObserveAcquisitionArchiveAcceptsZeroRecordPadding(t *testing.T) {
+	manifest, payload := acquisitionFixture("amd64")
+	document, err := canonical.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestHash := sha256.Sum256(document)
+	for _, test := range []struct {
+		name string
+		size int
+	}{{name: "one record", size: 10240}, {name: "two records", size: 20480}} {
+		t.Run(test.name, func(t *testing.T) {
+			raw := acquisitionTar(t, manifest, payload, nil, false)
+			// Python tarfile's record padding follows the two-block terminator.
+			raw = append(raw, make([]byte, test.size-len(raw))...)
+			archiveHash := sha256.Sum256(raw)
+			observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, raw))
+			if err != nil || observation == nil {
+				t.Fatalf("zero record padding rejected: observation=%v error=%v", observation, err)
+			}
+			digest, size, document := observation.Binding()
+			if digest != "sha256:"+hex.EncodeToString(archiveHash[:]) || size != int64(len(raw)) || document != "sha256:"+hex.EncodeToString(manifestHash[:]) {
+				t.Fatalf("padded capture has wrong exact-byte binding: %s %d %s", digest, size, document)
+			}
+		})
+	}
+}
+
 func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 	manifest, payload := acquisitionFixture("amd64")
 	raw := acquisitionTar(t, manifest, payload, nil, false)
