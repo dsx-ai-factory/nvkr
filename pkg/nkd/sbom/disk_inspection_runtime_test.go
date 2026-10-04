@@ -70,7 +70,7 @@ func TestDiskInspectionRuntimeRejectsDescriptions(t *testing.T) {
 	if _, _, _, err := capability.BindingContext(t.Context()); sbomCode(err) != e.CodeEngineCapability {
 		t.Fatalf("absent runtime: %v", err)
 	}
-	if err := capability.AdmitSubject(t.Context(), 1); sbomCode(err) != e.CodeEngineCapability {
+	if reservation, err := capability.AdmitSubject(t.Context(), 1); reservation != nil || sbomCode(err) != e.CodeEngineCapability {
 		t.Fatalf("absent runtime admits subject: %v", err)
 	}
 	if err := capability.Close(); err != nil {

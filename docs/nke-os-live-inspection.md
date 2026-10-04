@@ -8,7 +8,11 @@ runtime and returns only the pending, static-unqualified Run description, with n
 
 The lifecycle invokes factory inspection after execution succeeds and before exporting or closing the held
 QCOW2. Factory retains the original Run's disk lifetime permit, authenticates its private material trace,
-admits snapshot capacity, and snapshots the originally collected inode. It does not reopen a caller-selected
+holds a process-wide capacity-admission permit, and snapshots the originally collected inode. The permit remains
+held through inspection, container cleanup and snapshot close, including failure and cancellation. Separate
+runtime instances cannot allocate competing admitted snapshots in this process. This is serialization around
+current host/cgroup availability, not a kernel memory allocation or a reservation against other processes or
+the daemon's enclosing cgroup. Factory does not reopen a caller-selected
 disk path or reconstruct producer observations from result JSON. The SBOM owner returns an opaque inventory
 from the admitted runtime, and factory binds it to the original owner, named output, Plan, Build, exact disk
 digest and size, and runtime/inspector/codec identities. The trace and held disk are rechecked after scanning.

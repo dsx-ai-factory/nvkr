@@ -48,27 +48,38 @@ func (runtime *DiskInspectionRuntime) Close() error {
 	return runtime.container.Close()
 }
 
-// AdmitSubject provides a fail-before-copy capacity gate for a future or separate
-// live factory join; this runtime module does not invoke that join.
-func (runtime *DiskInspectionRuntime) AdmitSubject(ctx context.Context, size int64) error {
-	if runtime == nil {
-		return e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+// DiskInspectionReservation retains the runtime's capacity permit from before
+// snapshot allocation until the caller closes its snapshot and the reservation.
+type DiskInspectionReservation struct {
+	reservation *pipeline.DiskInspectionReservation
+}
+
+func (reservation *DiskInspectionReservation) Close() error {
+	if reservation == nil {
+		return nil
 	}
-	return runtime.container.AdmitSubject(ctx, size)
+	return reservation.reservation.Close()
+}
+
+// AdmitSubject returns a fail-before-copy permit for a live factory join. No
+// second snapshot may be admitted by this process while the permit is held.
+func (runtime *DiskInspectionRuntime) AdmitSubject(ctx context.Context, size int64) (*DiskInspectionReservation, error) {
+	if runtime == nil {
+		return nil, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+	}
+	reservation, err := runtime.container.AdmitSubject(ctx, size)
+	if err != nil {
+		return nil, err
+	}
+	return &DiskInspectionReservation{reservation: reservation}, nil
 }
 
 // InspectHeldInstalledPackages accepts only held subject authority. The fixed
 // container helper uses the existing exact held probe/inspector boundary; this
 // owner authenticates its returned metadata against the opaque container result.
 func (runtime *DiskInspectionRuntime) InspectHeldInstalledPackages(ctx context.Context, subject *heldfile.File, format, encryption string) (*DiskInstalledInventory, error) {
-	if err := validateSBOMContext(ctx); err != nil {
+	if err := validateContainerInspection(ctx, format, encryption); err != nil {
 		return nil, err
-	}
-	if encryption != "none" {
-		return nil, e.New(e.CodeEncryptedArtifact, "disk inspection requires unencrypted content")
-	}
-	if format != "qcow2" {
-		return nil, e.New(e.CodeEngineCapability, "disk inspection supports only QCOW2")
 	}
 	if runtime == nil {
 		return nil, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
@@ -78,6 +89,35 @@ func (runtime *DiskInspectionRuntime) InspectHeldInstalledPackages(ctx context.C
 		return nil, err
 	}
 	return inventoryFromContainerObservation(observation)
+}
+
+// InspectHeldInstalledPackages scans under the already-held reservation. It
+// never releases the permit or reacquires capacity between copying and scanning.
+func (reservation *DiskInspectionReservation) InspectHeldInstalledPackages(ctx context.Context, subject *heldfile.File, format, encryption string) (*DiskInstalledInventory, error) {
+	if err := validateContainerInspection(ctx, format, encryption); err != nil {
+		return nil, err
+	}
+	if reservation == nil {
+		return nil, e.New(e.CodeEngineCapability, "disk inspection reservation is absent")
+	}
+	observation, err := reservation.reservation.InspectHeld(ctx, subject)
+	if err != nil {
+		return nil, err
+	}
+	return inventoryFromContainerObservation(observation)
+}
+
+func validateContainerInspection(ctx context.Context, format, encryption string) error {
+	if err := validateSBOMContext(ctx); err != nil {
+		return err
+	}
+	if encryption != "none" {
+		return e.New(e.CodeEncryptedArtifact, "disk inspection requires unencrypted content")
+	}
+	if format != "qcow2" {
+		return e.New(e.CodeEngineCapability, "disk inspection supports only QCOW2")
+	}
+	return nil
 }
 
 type diskInspectionReport struct {

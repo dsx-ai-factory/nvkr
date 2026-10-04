@@ -83,6 +83,13 @@ joins the original still-open factory disk/material trace to an opaque installed
 concrete admitted inspection runtime, before export and Run close. The receipt binds the original attempt owner,
 output, Plan, Build, exact QCOW2 digest/size and
 runtime/tool identities. Binding, description isolation, serialization exclusion and post-close rejection
+are supplemented by a process-wide capacity-admission permit held before factory snapshotting until
+inspection, container cleanup and snapshot close complete. Separate runtime instances serialize their
+admitted snapshots; this does not reserve kernel resources against unrelated processes or authenticate the
+daemon's enclosing cgroup. The reservation API rejects unissued/closed permits and mismatched subject sizes.
+The held-runtime Linux regression exercises snapshot allocation, scan cleanup and subsequent admission,
+but its controlled runtime executable is not an actual inspection daemon or original NKE bake.
+The receipt bindings
 are contract-tested with AMD64 and ARM64 subjects. Separate negative tests cover substitution, sibling replay,
 changed bytes and cancellation using the AMD64 fixture. Default builds remain build-only. The opt-in SDK acceptance test exists, but an
 original live NKE bake followed by this inspection has not been exercised on either architecture.

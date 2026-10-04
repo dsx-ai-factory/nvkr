@@ -82,14 +82,16 @@ func (owner *LocalRunResult) ObserveDiskInstalledInventory(ctx context.Context, 
 			if !ok || artifact == nil {
 				return diskInstalledScan{}, e.New(e.CodeVerifyFailed, "disk inspection requires the original held Packer capability")
 			}
-			if err := runtime.AdmitSubject(ctx, payload.size); err != nil {
+			reservation, err := runtime.AdmitSubject(ctx, payload.size)
+			if err != nil {
 				return diskInstalledScan{}, err
 			}
+			defer func() { _ = reservation.Close() }()
 			subject, err := artifact.SnapshotHeldContext(ctx, sbom.MaxDiagnosticDiskBytes)
 			if err != nil {
 				return diskInstalledScan{}, err
 			}
-			inventory, scanErr := runtime.InspectHeldInstalledPackages(ctx, subject, format, encryption)
+			inventory, scanErr := reservation.InspectHeldInstalledPackages(ctx, subject, format, encryption)
 			closeErr := subject.Close()
 			if closeErr == nil && scanErr != nil {
 				return diskInstalledScan{}, scanErr

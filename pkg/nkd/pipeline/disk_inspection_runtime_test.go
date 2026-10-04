@@ -520,7 +520,7 @@ func TestDiskInspectionRuntimeRevocationAndCancellation(t *testing.T) {
 	if _, _, _, err := container.BindingContext(t.Context()); code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed binding: %v", err)
 	}
-	if err := container.AdmitSubject(t.Context(), 128); code(err) != e.CodeEngineCapability {
+	if reservation, err := container.AdmitSubject(t.Context(), 128); reservation != nil || code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed admission: %v", err)
 	}
 	if err := container.Close(); err != nil {
@@ -533,6 +533,69 @@ func TestDiskInspectionRuntimeRevocationAndCancellation(t *testing.T) {
 	defer cancel()
 	if err := lockDiskInspection(ctx, &mu); code(err) != e.CodeTimeout {
 		t.Fatalf("canceled lock: %v", err)
+	}
+}
+
+// This private fixture exercises permit ownership without claiming Linux host
+// admission. The Linux suite separately exercises AdmitSubject with a held ELF.
+func TestDiskInspectionReservationSerializesRuntimesAndRevokesCopies(t *testing.T) {
+	if err := lockDiskInspection(t.Context(), &diskInspectionCapacity); err != nil {
+		t.Fatal(err)
+	}
+	reservation := &DiskInspectionReservation{state: &diskInspectionReservationState{
+		container: &DiskInspectionContainer{}, size: 128, timeoutSeconds: 1,
+	}}
+	t.Cleanup(func() { _ = reservation.Close() })
+	copy := *reservation
+	other := &DiskInspectionContainer{}
+	for _, method := range []string{"before snapshot", "already held"} {
+		t.Run(method, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+			defer cancel()
+			got, err := other.reserveSubject(ctx, 128, method == "before snapshot")
+			if got != nil || code(err) != e.CodeTimeout {
+				t.Fatalf("competing runtime escaped held admission: %v, %v", got, err)
+			}
+		})
+	}
+	if err := copy.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reservation.InspectHeld(t.Context(), nil); code(err) != e.CodeEngineCapability {
+		t.Fatalf("reservation copy restored revoked authority: %v", err)
+	}
+	if err := reservation.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !diskInspectionCapacity.TryLock() {
+		t.Fatal("closed reservation leaked its capacity permit")
+	}
+	diskInspectionCapacity.Unlock()
+}
+
+func TestDiskInspectionReservationRejectsUnissuedAndWrongSubjects(t *testing.T) {
+	subject, err := heldfile.FromBytesContext(t.Context(), []byte("held"), heldfile.Options{Label: "reservation-subject", MaxBytes: 16})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	for _, tt := range []struct {
+		name        string
+		reservation *DiskInspectionReservation
+		want        e.Code
+	}{
+		{name: "absent", want: e.CodeEngineCapability},
+		{name: "zero value", reservation: &DiskInspectionReservation{}, want: e.CodeEngineCapability},
+		{name: "different size", reservation: &DiskInspectionReservation{state: &diskInspectionReservationState{
+			container: &DiskInspectionContainer{}, size: subject.Size() + 1, timeoutSeconds: 1,
+		}}, want: e.CodeVerifyFailed},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.reservation.InspectHeld(t.Context(), subject)
+			if got != nil || code(err) != tt.want {
+				t.Fatalf("invalid reservation accepted: %v, %v", got, err)
+			}
+		})
 	}
 }
 
@@ -581,7 +644,7 @@ func TestDiskInspectionDeadlineIncludesQueuedWait(t *testing.T) {
 		run  func(context.Context) error
 	}{
 		{name: "binding", run: func(ctx context.Context) error { _, _, _, err := container.BindingContext(ctx); return err }},
-		{name: "admission", run: func(ctx context.Context) error { return container.AdmitSubject(ctx, subject.Size()) }},
+		{name: "admission", run: func(ctx context.Context) error { _, err := container.AdmitSubject(ctx, subject.Size()); return err }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)

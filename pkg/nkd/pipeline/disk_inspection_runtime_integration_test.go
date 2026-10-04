@@ -48,15 +48,17 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := container.AdmitSubject(t.Context(), info.Size()); err != nil {
+	reservation, err := container.AdmitSubject(t.Context(), info.Size())
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer reservation.Close()
 	subject, err := heldfile.OpenContext(t.Context(), path, heldfile.Options{Label: "runtime-test-subject", MaxBytes: 8 << 30, ExpectedDigest: os.Getenv("NKD_TEST_DISK_SHA256")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer subject.Close()
-	observation, err := container.InspectHeld(t.Context(), subject)
+	observation, err := reservation.InspectHeld(t.Context(), subject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +83,7 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 		var observation *DiskInspectionObservation
 		var inspectErr error
 		done := make(chan struct{})
-		go func() { observation, inspectErr = container.InspectHeld(ctx, subject); close(done) }()
+		go func() { observation, inspectErr = reservation.InspectHeld(ctx, subject); close(done) }()
 		defer func() { cancel(); <-done }()
 		// Do not mistake pre-launch cancellation for appliance cancellation.
 		// This opt-in acceptance test requires one isolated running inspector.

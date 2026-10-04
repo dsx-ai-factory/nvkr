@@ -51,16 +51,18 @@ func TestDiskInspectionRuntimeInventoryReal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := capability.AdmitSubject(ctx, info.Size()); err != nil {
+	reservation, err := capability.AdmitSubject(ctx, info.Size())
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer reservation.Close()
 	subject, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "inventory-runtime-test", MaxBytes: MaxDiagnosticDiskBytes,
 		ExpectedDigest: os.Getenv("NKD_TEST_DISK_SHA256")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer subject.Close()
-	inventory, err := capability.InspectHeldInstalledPackages(ctx, subject, "qcow2", "none")
+	inventory, err := reservation.InspectHeldInstalledPackages(ctx, subject, "qcow2", "none")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -15,6 +16,118 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
+
+// This regression uses a controlled runtime ELF and a real held-inode snapshot,
+// not a Docker daemon or QCOW2 bake. It exercises capacity admission and the
+// reserved scan/cleanup boundary before another runtime may allocate a snapshot.
+func TestDiskInspectionReservationHoldsSnapshotAndCleanup(t *testing.T) {
+	for _, mode := range []string{"unchanged", "daemon"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+			defer cancel()
+			container, root := newReservedDiskInspectionFixture(t, ctx, mode)
+			other, _ := newReservedDiskInspectionFixture(t, ctx, "unchanged")
+			raw := []byte("controlled held subject")
+			path := filepath.Join(t.TempDir(), "payload")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			file, err := os.Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			artifact := &PackerArtifact{file: file, size: int64(len(raw)), digest: FileDigest(raw)}
+			t.Cleanup(func() { _ = artifact.Close() })
+			reservation, err := container.AdmitSubject(ctx, artifact.size)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer reservation.Close()
+			blocked := func() {
+				t.Helper()
+				wait, stop := context.WithTimeout(ctx, 10*time.Millisecond)
+				defer stop()
+				got, err := other.AdmitSubject(wait, artifact.size)
+				if got != nil {
+					_ = got.Close()
+				}
+				if got != nil || code(err) != e.CodeTimeout {
+					t.Fatalf("second runtime spent reserved capacity: %v, %v", got, err)
+				}
+			}
+			blocked() // Admission precedes the first snapshot allocation.
+			subject, err := artifact.SnapshotHeldContext(ctx, 128)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer subject.Close()
+			got, err := subject.ReadAllContext(ctx, 128)
+			if err != nil || !bytes.Equal(got, raw) {
+				t.Fatalf("original snapshot: %q, %v", got, err)
+			}
+			observation, err := reservation.InspectHeld(ctx, subject)
+			want := e.Code("")
+			if mode == "daemon" {
+				want = e.CodeEngineCapability
+			}
+			if code(err) != want || (observation != nil) != (want == "") {
+				t.Fatalf("reserved scan result: %v, %v", observation, err)
+			}
+			if _, err := os.Stat(filepath.Join(root, "removed")); err != nil {
+				t.Fatalf("scan returned before container cleanup: %v", err)
+			}
+			blocked() // Successful or failed scan does not release the snapshot budget.
+			if err := subject.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := reservation.Close(); err != nil {
+				t.Fatal(err)
+			}
+			next, err := other.AdmitSubject(ctx, artifact.size)
+			if err != nil {
+				t.Fatalf("completed snapshot leaked admission: %v", err)
+			}
+			if err := next.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func newReservedDiskInspectionFixture(t *testing.T, ctx context.Context, mode string) (*DiskInspectionContainer, string) {
+	t.Helper()
+	selection := testDiskInspectionSelection(t)
+	selection.Platform = "linux/" + runtime.GOARCH
+	selection.Resources = execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 2050, EphemeralStorageMiB: 1}
+	selection.TimeoutSeconds = 20
+	facts, err := execution.ObserveLocalHost(ctx, selection.Workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateDiskInspectionResources(selection, facts, 128, true); err != nil {
+		t.Skipf("controlled runtime fixture requires its real host capacity: %v", err)
+	}
+	root := t.TempDir()
+	path, _ := copyTestExecutable(t, "docker")
+	held, err := snapshotRuntimeExecutableContext(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = held.capability.Close() })
+	held.environment = append(held.environment,
+		"NKD_DISK_INSPECTION_FIXTURE_ROOT="+root, "NKD_DISK_INSPECTION_FIXTURE_MODE="+mode)
+	held.identity, err = observeHeldRuntimeIdentity(ctx, held)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection.Image = "example.test/inspection@sha256:" + strings.Repeat("1", 64)
+	container := &DiskInspectionContainer{runtime: held, selection: selection}
+	t.Cleanup(func() { _ = container.Close() })
+	if err := container.observeBinding(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return container, root
+}
 
 // The controlled ELF fixture drives the exact InspectHeld boundary, including
 // real host admission and held subprocesses. It proves revalidation and cleanup
