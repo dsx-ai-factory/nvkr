@@ -8,16 +8,33 @@ for both AMD64 and ARM64. Transitive packages remain inside the same frozen,
 signature-checked archive; the build records the complete installed package list
 and executable hashes. Distribution copyright files remain installed.
 
-Build a local native image, then record its actual digest and package inventory:
+Build the static helper from the exact NKD source using `.go-version`, then
+assemble a local native image from the repository root. Record its actual image
+identity, executable hashes and package inventory; no tag is an authority pin:
 
 ```sh
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOTOOLCHAIN=local \
+  go build -trimpath -buildvcs=false \
+  -o bin/nkd-disk-inspect-arm64 ./cmd/nkd-disk-inspect
 podman build --build-arg TARGETARCH=arm64 \
-  -t nkd-disk-inspect:local toolchains/nkd-disk-inspect
+  -f toolchains/nkd-disk-inspect/Dockerfile \
+  -t nkd-disk-inspect:local .
 ```
 
-Use `TARGETARCH=amd64` on an AMD64 host. Do not treat a local image tag, package
+Use `GOARCH=amd64`, `bin/nkd-disk-inspect-amd64` and `TARGETARCH=amd64` on an
+AMD64 host. Docker is admitted by the adapter and argument contracts, but this
+inspection route has been exercised only with Podman; no Docker daemon run is
+recorded here. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
+
+The opt-in `TestDiskInspectionRuntimeReal` and
+`TestDiskInspectionRuntimeInventoryReal` accept
+`NKD_TEST_DISK_INSPECT_RUNTIME` to select a Docker or Podman executable and
+default to `podman`. The pipeline test records held executable and daemon
+identities; the SBOM test checks the issued inventory's exact subject, image and
+tool bindings. Selecting Docker enables these validation routes; it does not
+mean a Docker run has been recorded.
 
 The libguestfs CLI is GPL-2.0-or-later, invoked out of process; it is not linked
 into NKD. The library is LGPL-2.1-or-later. Repository subprocess-license guidance
@@ -29,7 +46,7 @@ Installed-package output follows
 omits empty optional version, release and architecture fields and zero epochs.
 NKD keeps those fields separate and does not guess missing versions.
 
-The staged API has no lifecycle/CLI caller yet. It holds exact `virt-inspector`,
+The original executable-only diagnostic API holds exact `virt-inspector`,
 `qemu-img` probe and QCOW2 bytes, validates the
 self-contained unencrypted envelope with held `qemu-img`, creates a private read-only
 snapshot and checks it after inspection. The diagnostic capability deliberately
@@ -40,20 +57,87 @@ Dynamic loaders, libraries, `qemu-system-*`, appliance `qemu-img`, supermin and 
 explicit enclosing runtime TCB. See upstream
 [security guidance](https://libguestfs.org/guestfs-security.1.html).
 
-Callers MUST supply an unprivileged, non-root, network-less, credential-free
-container or equivalent sandbox before calling the API. UID zero is rejected;
-the API does not authenticate the enclosing sandbox. Use a standard container
-init process to reap killed descendants, do not mount credentials or host
-devices, and remove all capabilities. The current exact probe pin must include
+Callers of that original API MUST supply an unprivileged, non-root, network-less,
+credential-free container or equivalent sandbox. UID zero is rejected; that
+API does not authenticate the enclosing sandbox. The concrete
+`sbom.DiskInspectionRuntime` instead admits an already-local complete image and
+the held Linux Docker/Podman executable and daemon identity. It revalidates
+image identity before and after inspection and uses a fixed launcher: UID/GID
+65534, network-none, read-only root, all capabilities removed, no requested devices
+or credential mounts, no-new-privileges, an init reaper and bounded process count.
+Native Podman inspection commands also select `/dev/null` as the default mounts
+file, including at container start, to suppress automatic `mounts.conf` inputs.
+Docker receives no Podman-specific flag. An unsupported override fails closed;
+the adapter never retries without it. This suppresses that documented native
+mechanism, not arbitrary OCI hooks, FIPS mounts or a malicious daemon.
+The helper is part of the selected image closure and receives only authenticated
+stdin bytes, not a host pathname. No runtime download or image pull is performed.
+The caller-selected executable, daemon configuration, OCI hooks and host kernel remain trusted in this
+local development route. The held runtime is rechecked for freshness, not
+compared with an independently supplied executable or daemon pin; it
+does not authenticate provider isolation or grant qualification.
+
+The adapter records and rechecks the runtime-reported image ID. The recorded
+Podman exercise measured a config digest binding immutable rootfs content,
+including the helper, dynamic loaders, libraries, QEMU, supermin and packaged
+kernel. The unexercised Docker route must not inherit that config-digest claim:
+the adapter does not establish which image-store identity its `.Id` represents.
+Inspector and codec byte pins are checked again inside the selected image. The
+returned opaque installed inventory records that observed image identity; its
+`RuntimeBinding` is descriptive, not a repository-approved pin or production
+admission receipt. The executable-only API returns no runtime binding.
+
+The host revalidates returned package fields, format and conflicting duplicates
+using the same metadata checks as the XML projection. Each container has a fresh
+random attempt label; cleanup discovers only that attempt's full container ID and
+removes by ID, never by a reusable name after a failed creation. These are local
+daemon safeguards, not authenticated cross-process ownership or receipt protocols.
+Create's bounded, validated full ID also selects attached start. The fixed
+launcher requests `--log-driver=none`; the
+[Oct 5 native ARM64 replay](../../docs/evidence/2026-10-05-nke-os-inspector-launcher.md)
+checked attached report delivery and start by create ID against the unchanged
+Oct 2 image. Docker and native AMD64 execution of these changes remain unexercised.
+Cleanup discovery diagnostics revoke a result but do not prevent removal of a
+unique valid owned ID. Ambiguous or absent identities are never removed.
+
+UID/GID 65534 is deliberately unchanged. On a rootful daemon without user
+namespaces it can share per-UID accounting with host `nobody`; the trusted-daemon
+diagnostic does not claim subordinate-identity or provider isolation. Automatic
+user-namespace selection needs a separately admitted and exercised capability,
+not an untested launcher flag.
+
+The current exact probe pin must include
 the QEMU CVE-2024-4467 fix; an arbitrary caller pin is not security clearance.
 The API places its private snapshot, temporary appliance files, cache and socket
-directories beneath a short `/tmp` workspace. Budget up to 8 GiB for the held
-input and an additional 8 GiB copy, plus appliance/cache/overlay storage; `/tmp`
-may be memory-backed. Cancel inspection before `Close` when immediate shutdown
+directories beneath a short `/tmp` workspace. The concrete launcher uses a
+bounded RAM-backed `/tmp` and accounts for the helper's held input, private copy
+and an additional 2 GiB appliance/cache margin. Before factory snapshot creation,
+admission compares the full container memory grant plus the additional
+host-held copy with host availability and the NKD process's cgroup-v2 headroom,
+not just the minimum appliance estimate. This is a conservative caller-side
+observation, not measurement or reservation of the daemon's separate scope.
+Different caller/daemon cgroup limits can reject an otherwise usable daemon or
+permit a container later killed by its enclosing limit.
+Admission uses actual subject size, not a fixed 8 GiB allocation. The container
+memory and swap limit are equal, and declared CPU, memory, workspace capacity and
+executor timeout cannot be silently weakened. A request too small for the subject
+fails before inspection. Capacity is point-in-time availability, not reservation.
+Cancel inspection before `Close` when immediate shutdown
 is needed. Installed-package inspection currently supports one Linux Debian
 package-manager root; no-root or multi-root layouts return `engine-capability`.
+The configured operation deadline covers queueing, inspection, full subject
+rehashing and post-run runtime checks; it is not extended after a late scan.
+Cancellation/deadline remains `timeout` under ADR-03, and no unchecked report
+can escape by receiving a fresh post-run budget. Owned cleanup alone gets its
+separate ten-second deadline. A failed joined create client is not proof that
+daemon registration is absent, so cleanup reconciles the unique attempt label
+until an owned ID appears or that deadline expires.
 An encrypted guest volume can therefore be rejected as an unsupported layout,
 not necessarily a detected encryption marker.
+The attached helper's supported failure exit statuses retain their NKD error
+classes. Unknown, signaled and runtime-only exits, including ambiguous generic
+CLI statuses `1` and `2`, remain `envelope-decode`; cancellation of the caller's
+operation remains `timeout`. Diagnostic text is never parsed for an error code.
 
 Ubuntu installs the appliance kernel with root-only read permissions. The image
 build makes only its packaged `/boot/vmlinuz-*` files readable (`0644`), so
@@ -62,8 +146,17 @@ device access, or write permission to the caller. The bootstrap CA bundle and
 APT source file are removed after acquisition; runtime inspection does not
 require network package access.
 
-Source `toolchain.lock.json` pins the frozen acquisition inputs, not an image
-digest or runtime closure. `go test ./toolchains/nkd-disk-inspect` checks the
+Runtime selection is currently a diagnostic, explicitly supplied opaque local
+capability. It is not an authored Definition selector or compiler Plan input.
+The live factory join is separate integration work. It must bind the observed
+image/tools to the inspected output's existing Plan and Build identities; this
+runtime capability alone does not authorize disk SBOM, publication or qualification.
+
+Source `toolchain.lock.json` pins frozen acquisition inputs and records the helper
+source location and build metadata. It does not bind a helper source commit or
+standalone helper bytes. The selected complete image binds the actual helper
+bytes; the source lock is not an image digest or runtime closure.
+`go test ./toolchains/nkd-disk-inspect` checks the
 declared pins and architecture mappings against the Dockerfile, not its complete
 grammar or runtime closure. No AMD64 executable measurements are invented. Executable
 hashes generated inside a local image are descriptive, not independent evidence.
