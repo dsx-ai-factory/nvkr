@@ -59,7 +59,7 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 			}
 			workflow := string(bundle.Files[factory.GitHubWorkflowPath])
 			if plan.Environment.RuntimeBinary() != tc.resolved || !strings.Contains(workflow,
-				"factory execute-node --plan "+bundle.PlanPath+" --node cwe/build-cwe") {
+				"factory github run-node --plan "+bundle.PlanPath+" --node cwe/build-cwe") {
 				t.Fatalf("CWE launch does not execute the plan carrying its admitted %s runtime", tc.resolved)
 			}
 		})

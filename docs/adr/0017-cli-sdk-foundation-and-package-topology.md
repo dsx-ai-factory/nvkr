@@ -86,7 +86,7 @@ that pin owner with normal lifecycle compilation/generation for review-only cand
 explicitly configured maintenance workflow. `catalog refresh` and `catalog update-ci` remain thin adapters;
 these maintenance descriptions cannot grant execution or release authority.
 
-Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
+Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect|browse`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
@@ -98,6 +98,14 @@ artifact references, and release content projection. Lifecycle applies consumer 
 view. Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
+
+`lifecycle.InspectRelease` is the bounded, context-first read-only entry point for registry or local release
+navigation. Delivery opens the complete held publication before projecting output and evidence membership;
+presentation may then focus on an exact output or render text, JSON, or Mermaid. Reference and transport
+admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
+by default; an explicit caller-owned workspace is retained while its private staging child is removed.
+These detached descriptions carry no signature or policy authority, and cannot restore a verified Release
+capability. The existing compact local `release inspect` view remains.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic
@@ -160,6 +168,18 @@ copies. If it also retains file descriptors, subprocesses, locks, or other resou
 Ownership transfers are stated on the returning method. Facade results either close on every failure or transfer
 one clear close obligation to their caller. Garbage-collector cleanup may be defense in depth, never the
 correctness or resource-reclamation mechanism.
+
+The non-owning installed-inventory receipt in ADR-13 borrows the issuing Run's
+lifetime; it has no separate close obligation or resource ownership. The Run's
+idempotent `Close` revokes every borrowed receipt and shallow copy. Live receipt
+validation requires that original open owner; a description cannot restore it.
+
+The current diagnostic `client/v1.LocalRunOptions` facade aliases the lifecycle options, including
+`DiskInspection`; callers therefore open and own the concrete `sbom.DiskInspectionRuntime` using the
+pipeline selection type. `Run.InstalledDiskInventories` exposes factory subject descriptions and SBOM package
+metadata, never a receipt. This deliberately retains the existing deep-owner types for the optional diagnostic
+instead of adding a second runtime or inventory schema. A facade-only construction API and independent
+`client/v1` acceptance harness remain deferred; direct deep-package tests do not establish that acceptance.
 
 The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
 session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's

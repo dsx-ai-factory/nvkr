@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// cmdFactory retains only the generated-plan execution entry point. Definition,
+// cmdFactory retains the generated-plan execution entry points. Definition,
 // Environment, Run, and provider generation are owned by the lifecycle commands.
 func cmdFactory() *cli.Command {
 	return &cli.Command{
@@ -19,11 +19,18 @@ func cmdFactory() *cli.Command {
 			Hidden: true,
 			Usage:  "execute one node from an exact generated plan",
 			Flags: []cli.Flag{
-				&cli.StringFlag{Name: "plan", Required: true},
-				&cli.StringFlag{Name: "node", Required: true},
+				&cli.StringFlag{Name: "plan"},
+				&cli.StringFlag{Name: "node"},
+				&cli.StringFlag{Name: "plan-digest"},
 				&cli.StringFlag{Name: "workspace", Value: ".nkd/factory"},
 			},
 			Action: func(c *cli.Context) error {
+				if c.String("plan") == "" || c.String("node") == "" {
+					return e.New(e.CodeUsage, "execute-node requires --plan and --node")
+				}
+				if c.Args().Present() {
+					return e.New(e.CodeUsage, "execute-node does not accept positional arguments")
+				}
 				if c.String("workspace") != ".nkd/factory" {
 					return e.New(e.CodeUsage, "generated plan nodes require workspace .nkd/factory")
 				}
@@ -31,10 +38,54 @@ func cmdFactory() *cli.Command {
 				if err != nil {
 					return err
 				}
+				if expected := c.String("plan-digest"); expected != "" {
+					if err := factory.VerifyPlanDigest(plan, expected); err != nil {
+						return err
+					}
+				}
 				return factory.ExecuteNode(c.Context, plan, c.String("node"), os.Stdout, os.Stderr)
 			},
-		}},
+		}, cmdFactoryGitHub()},
 	}
 }
 
 func factoryGeneratorVersion() string { return version + " (" + commit + ")" }
+
+// Provider adapters supply selectors and diagnostics only. Plan admission and all
+// execution/transport behavior remain in the factory module.
+func cmdFactoryGitHub() *cli.Command {
+	return &cli.Command{Name: "github", Hidden: true, Usage: "execute exact generated GitHub steps", Subcommands: []*cli.Command{
+		githubFactoryCommand("run-node", "node", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+			return factory.RunGitHubNode(c.Context, plan, c.String("node"), options)
+		}),
+		githubFactoryCommand("restore-inputs", "stage", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+			return factory.RestoreGitHubInputs(c.Context, plan, c.String("stage"), options)
+		}),
+		githubFactoryCommand("pack-outputs", "node", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+			return factory.PackGitHubOutputs(c.Context, plan, c.String("node"), options)
+		}),
+		githubFactoryCommand("recover", "", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+			return factory.RecoverGitHubArtifacts(c.Context, plan, os.Getenv("NKD_JOB_RESULTS"), options)
+		}),
+	}}
+}
+
+func githubFactoryCommand(name, selector string, action func(*cli.Context, *factory.Plan, factory.GitHubStepOptions) error) *cli.Command {
+	flags := []cli.Flag{&cli.StringFlag{Name: "plan"}}
+	if selector != "" {
+		flags = append(flags, &cli.StringFlag{Name: selector})
+	}
+	return &cli.Command{Name: name, Hidden: true, Flags: flags, Action: func(c *cli.Context) error {
+		if c.String("plan") == "" || (selector != "" && c.String(selector) == "") {
+			return e.New(e.CodeUsage, "%s requires --plan and its operation selector", name)
+		}
+		if c.Args().Present() {
+			return e.New(e.CodeUsage, "%s does not accept positional arguments", name)
+		}
+		plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
+		if err != nil {
+			return err
+		}
+		return action(c, plan, factory.GitHubStepOptions{Stdout: os.Stdout, Stderr: os.Stderr, SummaryPath: os.Getenv("GITHUB_STEP_SUMMARY")})
+	}}
+}

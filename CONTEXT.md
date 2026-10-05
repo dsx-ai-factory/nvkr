@@ -28,6 +28,7 @@ _Avoid_: Producer, expected output, release
 
 **Release**:
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
+Inspection can expose checked artifact/evidence membership without establishing signature or policy acceptance.
 _Avoid_: Bundle, mutable tag, clearance
 
 **Verification Policy**:
@@ -227,6 +228,12 @@ root. A producer-owned projection may replace only the envelope schema and per-b
 not replace the authenticated input fields. The manifest is not an authenticated observation or a host-path
 authority.
 _Avoid_: Node-SKU staging manifest, producer receipt, absolute staging path
+
+**Guest package capture**:
+A source-reported record of package archives retained during a guest installation event, distinct from a
+catalog component acquisition or build-material input. Checking its held archive proves declared member-byte
+correspondence, not acquisition origin, installed content, a complete closure or live-Run authority.
+_Avoid_: Full disk SBOM, authenticated download trace, build-material manifest
 
 **VM-image builder**:
 A from-source builder capability for a disk-image output. The catalog binds one VM-image producer form and its

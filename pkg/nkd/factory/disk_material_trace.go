@@ -168,7 +168,7 @@ func (owner *LocalRunResult) recordProducerConsumption(ctx context.Context, plan
 	}
 	owner.diskMu.Lock()
 	defer owner.diskMu.Unlock()
-	if owner.diskClosed {
+	if owner.diskClosed || owner.diskClosing {
 		return e.New(e.CodeGateUnmet, "local disk execution result is closed")
 	}
 	if _, duplicate := owner.materialConsumptions[node.ID]; duplicate {
@@ -200,8 +200,16 @@ func (owner *LocalRunResult) observeDiskMaterials(ctx context.Context, plan *Pla
 		return nil, err
 	}
 	defer release()
+	return owner.observeDiskMaterialsWhileHeld(ctx, plan, expected)
+}
+
+// observeDiskMaterialsWhileHeld requires the caller to own the disk lifetime
+// permit. Inspection uses it to keep tracing and scanning in one live handoff.
+func (owner *LocalRunResult) observeDiskMaterialsWhileHeld(ctx context.Context, plan *Plan,
+	expected LifecycleOutputPlan,
+) (*diskMaterialTrace, error) {
 	owner.diskMu.Lock()
-	if owner.diskClosed {
+	if owner.diskClosed || owner.diskClosing {
 		owner.diskMu.Unlock()
 		return nil, e.New(e.CodeGateUnmet, "disk material tracing requires an open local execution record")
 	}

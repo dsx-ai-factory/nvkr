@@ -150,16 +150,22 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 
 	internalInputs := 0
 	externalInputs := 0
-	runs := joinRuns(job.Steps)
+	wantRestore := "./nkd-exec factory github restore-inputs --plan " + FactoryPlanPath + " --stage " + shellQuote(stage.ID)
+	restores := 0
+	for _, step := range job.Steps {
+		if strings.TrimSpace(step.Run) == wantRestore {
+			restores++
+		}
+	}
+	if restores != 1 {
+		t.Fatalf("grouped stage has %d exact input-restore helpers, want one", restores)
+	}
 	for _, node := range stage.Nodes {
 		for _, input := range node.Inputs {
 			internal := nodeJobs[artifacts[input].Producer] == stage.ID
 			downloaded := stepDownloadsArtifact(plan, job.Steps, githubArtifactName(input))
 			if internal && downloaded {
 				t.Errorf("internal input %q was redundantly downloaded", input)
-			}
-			if internal && strings.Contains(runs, "transport-unpack --archive "+carrierPath(input)) {
-				t.Errorf("internal input %q was redundantly restored", input)
 			}
 			if !internal && !downloaded {
 				t.Errorf("external input %q was not downloaded", input)
@@ -329,8 +335,16 @@ func requireGroupedGitHubStage(t *testing.T, stages []githubStage) githubStage {
 
 func stepDownloadsArtifact(plan *Plan, steps []githubStep, name string) bool {
 	for _, step := range steps {
-		if step.Uses == plan.Actions["download-artifact"].Uses() && step.With["name"] == name {
+		if step.Uses != plan.Actions["download-artifact"].Uses() {
+			continue
+		}
+		if step.With["name"] == name || step.With["pattern"] == name {
 			return true
+		}
+		for _, member := range strings.Split(strings.Trim(step.With["pattern"], "{}"), ",") {
+			if member == name {
+				return true
+			}
 		}
 	}
 	return false

@@ -76,7 +76,7 @@ func TestGitHubSourceCredentialIsFetchStepOnly(t *testing.T) {
 	}
 	for _, test := range []struct{ name, old, replacement string }{
 		{"wrong-secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER_TOKEN"},
-		{"missing-token-check", requireSourceToken, "true"},
+		{"bypassed-token-check", "factory github run-node --plan", "factory execute-node --plan"},
 		{"wrong-mirror", "url.https://github.com/test-owner/private-source.insteadOf", "url.https://github.com/other/source.insteadOf"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
