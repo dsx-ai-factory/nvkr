@@ -22,6 +22,7 @@ func ValidatePublicationReference(reference string) error {
 // closure. It carries no signature, policy or execution authority.
 type PublicationDescription struct {
 	Reference             string                `json:"reference"`
+	ReferenceScope        string                `json:"referenceScope"`
 	RootDigest            string                `json:"rootDigest"`
 	DeclaredQualification string                `json:"declaredQualification"`
 	Metadata              ReleaseMetadata       `json:"metadata"`
@@ -74,6 +75,7 @@ func (publication *Publication) Description(reference string) (PublicationDescri
 	root := publication.inspection.Root
 	view := PublicationDescription{
 		Reference: reference, RootDigest: publication.inspection.RootDigest,
+		ReferenceScope:        "derived from supplied root reference; no registry availability claim",
 		DeclaredQualification: root.Qualification, Metadata: *root.Release,
 		Outputs: make([]PublicationOutput, 0, len(publication.outputs)), Evidence: []PublicationEvidence{},
 	}
@@ -84,7 +86,7 @@ func (publication *Publication) Description(reference string) (PublicationDescri
 			continue
 		}
 		binding := *object.Evidence
-		binding.Outputs = append([]string(nil), binding.Outputs...)
+		binding.Outputs = append([]string{}, binding.Outputs...)
 		view.Evidence = append(view.Evidence, PublicationEvidence{
 			Name: object.Name, Kind: object.Kind, Reference: evidenceRefs[object.Name],
 			ArtifactType: object.ArtifactType, ManifestDigest: object.DescriptorDigest,
@@ -100,7 +102,7 @@ func (publication *Publication) Description(reference string) (PublicationDescri
 		platform := publication.platforms[output.Name]
 		view.Outputs = append(view.Outputs, PublicationOutput{
 			Output: output, ArtifactType: object.ArtifactType, OS: platform.OS, Arch: platform.Arch,
-			BuildSubjects: append([]BuildSubject(nil), object.Output.BuildSubjects...),
+			BuildSubjects: append([]BuildSubject{}, object.Output.BuildSubjects...),
 		})
 	}
 	sort.Slice(view.Evidence, func(i, j int) bool { return view.Evidence[i].Name < view.Evidence[j].Name })

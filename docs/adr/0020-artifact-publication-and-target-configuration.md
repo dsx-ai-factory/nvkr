@@ -198,10 +198,13 @@ independent revalidation at each call.
 
 Registry and local release navigation use that same held owner. Its detached description joins exact sibling
 output and evidence references, all output memberships, Build/component subjects and evidence stage/subject
-bindings. Executable and image platform labels come from the inspected payload config; a contradictory
-executable metadata label is rejected. Text, readable JSON and Mermaid explicitly describe integrity-only
-inspection and report qualification as a declaration. Output filtering occurs only after full closure checking.
-The diagram presents published relationships, not an inferred build graph. Navigation adds no canonical
+bindings. Locators are explicitly labeled as derived from the supplied root reference; the detached view does
+not establish registry availability. Registry acquisition fetches and checks each sibling manifest, while local
+layout inspection does not probe the supplied registry namespace. Executable and image platform labels come
+from the inspected payload config; a contradictory executable metadata label is rejected. Text, readable JSON and Mermaid explicitly describe integrity-only
+inspection and report qualification as a declaration. JSON escapes nonprinting Unicode without changing
+decoded string values, and empty build-subject collections are arrays. Output filtering occurs only after full
+closure checking. The diagram presents published relationships, not an inferred build graph. Navigation adds no canonical
 identity, signature verification or new publication authority. Loopback-registry, held-copy, admission and
 cancellation contracts are implemented; production-registry navigation remains separately evidenced.
 

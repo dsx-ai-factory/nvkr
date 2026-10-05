@@ -36,6 +36,18 @@ func TestPublicationDescriptionBindsEvidenceAndOwnsCopies(t *testing.T) {
 		evidence.Binding.Outputs[0] != output.Name {
 		t.Fatalf("unbound output or evidence: %+v", view)
 	}
+	// A local caller can choose another namespace without changing checked bytes.
+	// The projection must label those locators as derived, not registry observations.
+	alternative, err := publication.Description("other.example.test/elsewhere/releases@" + digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.ReferenceScope != "derived from supplied root reference; no registry availability claim" || alternative.ReferenceScope != view.ReferenceScope ||
+		alternative.RootDigest != view.RootDigest || alternative.Metadata != view.Metadata ||
+		alternative.Outputs[0].Reference != "other.example.test/elsewhere/tools@"+output.Digest ||
+		alternative.Evidence[0].Reference != "other.example.test/elsewhere/tools@"+evidence.ManifestDigest {
+		t.Fatalf("derived locator scope is ambiguous: original=%+v alternative=%+v", view, alternative)
+	}
 	before, err := publication.Description(reference)
 	if err != nil {
 		t.Fatal(err)
@@ -117,6 +129,24 @@ func TestPublicationRejectsContradictoryExecutablePlatform(t *testing.T) {
 			if err != nil || view.Outputs[0].OS != "linux" || view.Outputs[0].Arch != "amd64" {
 				t.Fatalf("wrong payload platform: %+v, %v", view, err)
 			}
+		})
+	}
+}
+
+func TestPublicationRejectsEvidenceWithoutOutputMembership(t *testing.T) {
+	for _, outputs := range [][]string{nil, {}} {
+		t.Run(map[bool]string{true: "nil", false: "empty"}[outputs == nil], func(t *testing.T) {
+			root, _ := releasePublicationFixture(t)
+			inspection, err := Inspect(t.Context(), root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range inspection.Root.Objects {
+				if inspection.Root.Objects[i].Evidence != nil {
+					inspection.Root.Objects[i].Evidence.Outputs = outputs
+				}
+			}
+			assertRegistryCode(t, verifyReleaseEvidence(t.Context(), root, inspection.Root), e.CodeVerifyFailed)
 		})
 	}
 }

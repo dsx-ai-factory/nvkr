@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -70,7 +71,7 @@ func Render(description delivery.PublicationDescription, options Options) ([]byt
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "encoding release view")
 		}
-		return append(raw, '\n'), nil
+		return append(escapeJSONDisplayControls(raw), '\n'), nil
 	case "mermaid":
 		return []byte(renderMermaid(selected)), nil
 	default:
@@ -81,6 +82,7 @@ func Render(description delivery.PublicationDescription, options Options) ([]byt
 func renderText(selected view) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "Release %s\nInspection: %s\nDeclared qualification: %s\n", terminal(selected.Reference), selected.Inspection, terminal(selected.DeclaredQualification))
+	fmt.Fprintf(&out, "References: %s\n", terminal(selected.ReferenceScope))
 	fmt.Fprintf(&out, "Content: %s\nDefinition: %s\nEnvironment: %s\n", terminal(selected.Metadata.ContentSubject), terminal(selected.Metadata.DefinitionDigest), terminal(selected.Metadata.EnvironmentDigest))
 	fmt.Fprintf(&out, "Outputs: %d of %d\n", len(selected.Outputs), selected.TotalOutputs)
 	for _, output := range selected.Outputs {
@@ -88,7 +90,7 @@ func renderText(selected view) string {
 		if output.OS != "" || output.Arch != "" {
 			platform = " " + output.OS + "/" + output.Arch
 		}
-		fmt.Fprintf(&out, "\n%s (%s%s)\n  Artifact: %s\n  Build: %s\n", terminal(output.Name), terminal(output.Kind), terminal(platform), terminal(output.Reference), terminal(output.BuildDigest))
+		fmt.Fprintf(&out, "\n%s (%s%s)\n  Derived artifact reference: %s\n  Build: %s\n", terminal(output.Name), terminal(output.Kind), terminal(platform), terminal(output.Reference), terminal(output.BuildDigest))
 		for _, subject := range output.BuildSubjects {
 			fmt.Fprintf(&out, "  Component: %s @ %s\n", terminal(subject.Component), terminal(subject.Digest))
 		}
@@ -97,7 +99,7 @@ func renderText(selected view) string {
 			if !slices.Contains(binding.Outputs, output.Name) {
 				continue
 			}
-			fmt.Fprintf(&out, "  Evidence: %s (%s, %s)\n    Reference: %s\n    Subject: %s %s\n", terminal(evidence.Name), terminal(binding.Component), terminal(binding.Stage), terminal(evidence.Reference), terminal(binding.SubjectKind), terminal(binding.SubjectDigest))
+			fmt.Fprintf(&out, "  Evidence: %s (%s, %s)\n    Derived reference: %s\n    Subject: %s %s\n", terminal(evidence.Name), terminal(binding.Component), terminal(binding.Stage), terminal(evidence.Reference), terminal(binding.SubjectKind), terminal(binding.SubjectDigest))
 			fmt.Fprintf(&out, "    Members: %s\n", terminal(strings.Join(binding.Outputs, ", ")))
 		}
 	}
@@ -134,9 +136,33 @@ func renderMermaid(selected view) string {
 	return out.String()
 }
 
+// MarshalIndent already escapes C0 controls inside strings. Escape remaining
+// nonprinting Unicode without changing decoded values or structural whitespace.
+func escapeJSONDisplayControls(raw []byte) []byte {
+	var out strings.Builder
+	out.Grow(len(raw))
+	for _, char := range string(raw) {
+		if char >= 0x7f && !strconv.IsPrint(char) {
+			if char <= 0xffff {
+				fmt.Fprintf(&out, `\u%04x`, char)
+			} else {
+				high, low := utf16.EncodeRune(char)
+				fmt.Fprintf(&out, `\u%04x\u%04x`, high, low)
+			}
+			continue
+		}
+		out.WriteRune(char)
+	}
+	return []byte(out.String())
+}
+
 func shortDigest(value string) string {
-	if len(value) > 19 {
-		return value[:19]
+	count := 0
+	for index := range value {
+		if count == 19 {
+			return value[:index]
+		}
+		count++
 	}
 	return value
 }

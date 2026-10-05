@@ -2,12 +2,11 @@ package lifecycle
 
 import (
 	"context"
-	"path/filepath"
+	"os"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
 // InspectionOptions chooses a local closure or registry materialization.
@@ -39,10 +38,6 @@ func InspectRelease(ctx context.Context, reference string, options InspectionOpt
 	if options.LayoutPath != "" && (options.WorkspaceRoot != "" || options.Registry != (delivery.RegistryOptions{})) {
 		return delivery.PublicationDescription{}, e.New(e.CodeUsage, "local release inspection cannot use registry or workspace options")
 	}
-	subject := sign.Subject{Ref: reference, Digest: referenceDigest(reference)}
-	if err := subject.Validate(); err != nil {
-		return delivery.PublicationDescription{}, err
-	}
 	if err := delivery.ValidatePublicationReference(reference); err != nil {
 		return delivery.PublicationDescription{}, err
 	}
@@ -55,11 +50,15 @@ func InspectRelease(ctx context.Context, reference string, options InspectionOpt
 	var publication *delivery.Publication
 	var err error
 	if options.LayoutPath != "" {
-		publication, err = delivery.OpenPublication(ctx, options.LayoutPath, subject.Digest)
+		publication, err = delivery.OpenPublication(ctx, options.LayoutPath, referenceDigest(reference))
 	} else {
 		workspace := options.WorkspaceRoot
 		if workspace == "" {
-			workspace = filepath.Join(".nkd", "inspected-releases")
+			workspace, err = os.MkdirTemp("", "nkd-release-inspection-*")
+			if err != nil {
+				return delivery.PublicationDescription{}, e.Wrap(e.CodeImmutableViolation, err, "creating release inspection workspace")
+			}
+			defer func() { _ = os.RemoveAll(workspace) }()
 		}
 		publication, err = delivery.PullPublication(ctx, reference, workspace, options.Registry)
 	}

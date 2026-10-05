@@ -84,6 +84,11 @@ func TestInspectReleaseAdmissionPrecedesFilesystemAndNetwork(t *testing.T) {
 	}{
 		{"nil context", nil, ref, InspectionOptions{}, e.CodeUsage},
 		{"canceled", canceled, ref, InspectionOptions{}, e.CodeTimeout},
+		{"blank", t.Context(), "", InspectionOptions{}, e.CodeUnverifiedRef},
+		{"whitespace", t.Context(), " " + ref, InspectionOptions{}, e.CodeUnverifiedRef},
+		{"missing digest", t.Context(), strings.Split(ref, "@")[0], InspectionOptions{}, e.CodeUnverifiedRef},
+		{"malformed digest", t.Context(), strings.Split(ref, "@")[0] + "@sha256:bad", InspectionOptions{}, e.CodeUnverifiedRef},
+		{"multiple digests", t.Context(), ref + "@sha256:" + strings.Repeat("b", 64), InspectionOptions{}, e.CodeUnverifiedRef},
 		{"tag", t.Context(), strings.Split(ref, "@")[0] + ":latest", InspectionOptions{}, e.CodeUnverifiedRef},
 		{"URL scheme", t.Context(), "https://" + ref, InspectionOptions{}, e.CodeUnverifiedRef},
 		{"implicit registry", t.Context(), "releases@sha256:" + strings.Repeat("a", 64), InspectionOptions{}, e.CodeUnverifiedRef},
@@ -122,5 +127,69 @@ func TestInspectReleaseTimeoutCleansRegistryWorkspace(t *testing.T) {
 	entries, err := os.ReadDir(workspace)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("timeout leaked staging: %v, %v", entries, err)
+	}
+}
+
+func TestInspectReleaseDefaultWorkspaceIsOwnedAndTemporary(t *testing.T) {
+	layout, _ := testPublicationLayout(t)
+	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+	var mode atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch mode.Load() {
+		case 1:
+			w.WriteHeader(http.StatusForbidden)
+		case 2:
+			<-r.Context().Done()
+		default:
+			handler.ServeHTTP(w, r)
+		}
+	}))
+	defer server.Close()
+	transport := delivery.RegistryOptions{PlainHTTP: true, Anonymous: true}
+	reference, err := delivery.Push(t.Context(), layout, strings.TrimPrefix(server.URL, "http://")+"/product/releases:test", transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	if err := os.Chmod(cwd, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(cwd, 0o700) })
+	for _, tc := range []struct {
+		name string
+		mode int32
+		code e.Code
+	}{
+		{"success", 0, ""},
+		{"registry rejection", 1, e.CodeUnavailable},
+		{"timeout", 2, e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mode.Store(tc.mode)
+			temporary := t.TempDir()
+			t.Setenv("TMPDIR", temporary)
+			options := InspectionOptions{Registry: transport, Timeout: 5 * time.Second}
+			if tc.mode == 2 {
+				options.Timeout = 50 * time.Millisecond
+			}
+			view, err := InspectRelease(t.Context(), reference, options)
+			if tc.code == "" {
+				if err != nil || len(view.Outputs) != 1 {
+					t.Fatalf("default inspection failed in a read-only working directory: %+v, %v", view, err)
+				}
+			} else {
+				assertCode(t, err, tc.code)
+				if !reflect.DeepEqual(view, delivery.PublicationDescription{}) {
+					t.Fatal("failed inspection returned a view")
+				}
+			}
+			for _, directory := range []string{cwd, temporary} {
+				entries, err := os.ReadDir(directory)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("inspection retained files in %s: %v, %v", directory, entries, err)
+				}
+			}
+		})
 	}
 }

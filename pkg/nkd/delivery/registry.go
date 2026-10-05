@@ -34,7 +34,7 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if err := validateRegistryOptions(options); err != nil {
+	if err := options.Validate(); err != nil {
 		return "", err
 	}
 	inspection, err := Inspect(ctx, layoutPath)
@@ -135,7 +135,7 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
 	}
-	if err := validateRegistryOptions(options); err != nil {
+	if err := options.Validate(); err != nil {
 		return Inspection{}, err
 	}
 	if strings.Count(reference, "@") != 1 {
@@ -229,7 +229,7 @@ func ResolveDigest(ctx context.Context, reference string, options RegistryOption
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if err := validateRegistryOptions(options); err != nil {
+	if err := options.Validate(); err != nil {
 		return "", err
 	}
 	if strings.Count(reference, "@") != 1 {
@@ -365,8 +365,6 @@ func (options RegistryOptions) Validate() error {
 	}
 	return nil
 }
-
-func validateRegistryOptions(options RegistryOptions) error { return options.Validate() }
 
 // Only sibling repositories in the caller-selected namespace are admitted.
 // Metadata cannot redirect registry credentials to another host or namespace.
