@@ -17,6 +17,16 @@ at `/private/tmp/m2-image-pin-live-diagnostic.go`; it is not a default network-d
 test. Fixture tests cover both native media formats, ambiguity, platform/digest/size
 substitution, metadata bounds and cancellation. No production runtime approval follows.
 
+The source-owned PostgreSQL index `sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71`
+and SPIRE Bash index `sha256:90041f375e30f41aa7e0390075d8a69dc61900771d52fa98d63ee5d03d866a58`
+differ from all four selected native child pins. The inherited executable compiler
+rejects those four rows with `CodeUnverifiedRef`: index membership was authenticated
+at pin maintenance, but no retained membership receipt reaches execution.
+`TestMaintainedM2DeploymentImageMembership` preserves and checks those exact refusals,
+while checking the other twenty native acquired-image graphs. All 34 authored outputs
+remain selected. This additional launch blocker cannot be solved by silently stripping
+the source-owned index or changing its pin to a child without the owning contract.
+
 ## Candidate output selections and requirement ownership
 
 The combined Definition now selects 34 candidate outputs: the original ten below plus twelve

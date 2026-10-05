@@ -136,12 +136,15 @@ their owning catalog boundary before maintenance validates the resulting referen
 - `catalog pin-artifacts --dir <catalog> [--all] [component...]` — resolve the complete declared architecture
   set of prebuilt digests through the existing URL or image acquisition path.
 
-An authored digest-qualified image reference may select an upstream index while
-its artifact lock selects each declared native manifest. The compiler uses the
-existing OCI reference parser to retain repository transport and the locked
-native subject separately; it never concatenates two digest suffixes or treats
-an index digest as a different native manifest. Fixed source-reviewed image refs
-are ordinary acquired producers, not automatically extracted chart pin-set members.
+Image pin maintenance may authenticate an authored upstream index and resolve
+its exact native children through the existing OCI library. The artifact lock
+records the native digests, but does not retain an index-membership receipt.
+Executable lowering therefore accepts a digest-qualified reference only when
+its authored digest equals the selected native subject; a distinct index digest
+fails with `CodeUnverifiedRef` until an owning retained membership contract is
+implemented. It neither discards the authored digest nor concatenates digest
+suffixes. Fixed source-reviewed image refs are ordinary acquired producers, not
+automatically extracted chart pin-set members.
 - `catalog pin` and `catalog bump` accept `--check`: resolve and print the complete update without writing.
 - **Derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
   error naming its umbrella; bumping the umbrella is **one operation** that re-derives and rewrites the umbrella

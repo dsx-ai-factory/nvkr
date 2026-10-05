@@ -1,11 +1,13 @@
 package buildgraph
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
@@ -88,6 +90,13 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 			t.Fatal(err)
 		}
 		graph, err := Compile(resolved)
+		if component == "postgresql-image" || component == "spire-bash-image" {
+			var coded *e.Error
+			if graph != nil || !errors.As(err, &coded) || coded.Code != e.CodeUnverifiedRef {
+				t.Fatalf("source-owned index lost its unresolved native membership gate: graph=%+v error=%v", graph, err)
+			}
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -359,6 +359,11 @@ The refreshed native image pin owner uses the existing pinned OCI library and bo
 transport. It authenticates native manifest/config bytes, rejects ambiguous or substituted descriptors and
 preserves OCI/Docker schema-2 subjects. A fresh read-only owner diagnostic matched all 24 maintained native
 digests; no lock or registry object changed. Layer scans and publication remain separate acceptance gates.
+PostgreSQL and SPIRE Bash retain their source-owned index digests and independently locked native
+children. Their four native executable graphs fail `CodeUnverifiedRef` until index membership is retained
+at the owning execution boundary; transient pin-maintenance validation is not an execution receipt.
+The membership regression checks those refusals and the other twenty native acquired-image graphs
+without removing any of the 34 authored output selections.
 
 Four OS/material source entries are machine-pinned at the exact capture-capable NKE commit without
 creating a release tag. The generic commit-pin path shares Git acquisition and atomic lock writing;
