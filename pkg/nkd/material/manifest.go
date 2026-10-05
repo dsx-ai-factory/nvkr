@@ -1,5 +1,7 @@
 // Package material models the deterministic, execution-local input manifest for
-// a component build. It does not acquire, verify, or stage artifacts. Callers must
+// a component build, and diagnostic byte correspondence for held guest-package
+// captures. It does not acquire or stage artifacts, authenticate acquisition
+// origin, or grant live-Run authority. Callers of the build-manifest API must
 // authenticate producer observations before constructing the manifest and must
 // materialize its relative paths beneath a private staging root.
 package material

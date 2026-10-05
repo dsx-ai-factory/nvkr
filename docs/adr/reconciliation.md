@@ -134,6 +134,12 @@ The local lifecycle's bounded QCOW2 header handling still requires
 separate external-data/feature admission.
 Public lifecycle SBOM/publication and
 qualified admission are not enabled by this API.
+The diagnostic APT acquisition archive verifier checks canonical capture metadata
+and the exact digest/size of every declared held package member without extraction.
+The [dated ARM64/native and AMD64/emulated byte-correspondence record](../evidence/2026-10-03-apt-capture-correspondence.md)
+is not acquisition-origin authentication, installed inventory, a live-Run binding
+or a complete closure. The original NKE installer handoff remains unexercised;
+live collection and disk reconciliation remain absent.
 The compiled graph preserves exact material-producer relationships, but no current disk path issues a mixed
 producer evidence verdict, performs content validation, or claims qualified disk reproduction. Reproduced or
 digest-verified materials cannot upgrade a future wrapped aggregate disk; its exact QCOW2 digest would identify
@@ -453,6 +459,7 @@ Earlier verification does not transfer by renaming or reinterpreting records.
 
 | Record | What actually ran | Limit |
 |---|---|---|
+| [Guest package capture byte correspondence, 2026-10-03](../evidence/2026-10-03-apt-capture-correspondence.md) | Held ARM64/native and AMD64/emulated APT capture archives rechecked with the recorded verifier blob; exact archive and manifest-blob SHA-256 values plus one annotated follow-up log retained | Local byte correspondence only; original capture logs and archive files unretained in Git, AMD64 emulated, no NKE installer bake, live Run or complete disk SBOM |
 | [Concrete local inspection runtime, 2026-10-02](../evidence/2026-10-02-nke-os-inspector-runtime.md) | Exact local OCI closure, held Podman/runtime/tool identities, non-root networkless inspection of one retained ARM64 QCOW2, 730 installed packages, timeout/no-retained-container assertion and native Linux race suites | Historical cancellation test did not observe the running phase; native AMD64 runtime and original live-Run integration are unexercised; no registry publication, NVIDIA license/security clearance, full-disk SBOM or qualified claim |
 | [Inspector review-fix replay, 2026-10-03](../evidence/2026-10-03-nke-os-inspector-review-fixes.md) | New host-side pipeline test binary used the unchanged Oct 2 ARM64 inspector image; retained-disk scan and observed-running cancellation/cleanup passed | No rebuilt helper or runtime exercise of later in-image XML/package validation and timeout classification; one historical host-side source blob is unavailable for independent recovery; no full-disk SBOM or production acceptance |
 | [Mount-suppression and inventory replay, 2026-10-03](../evidence/2026-10-03-nke-os-inspector-mount-suppression.md) | New host-side runtime and SBOM test binaries used the unchanged Oct 2 ARM64 helper; issued-inventory bindings, mutation detection and observed-running cancellation passed | Later helper subject-holding and timeout classification did not execute inside this image; no rebuilt closure, native AMD64 runtime, original live-Run integration or production acceptance |
