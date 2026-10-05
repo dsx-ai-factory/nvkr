@@ -1,12 +1,12 @@
 # Plan-view review validation
 
-Date: 2026-10-05 UTC. Base: `b6d31b8b99cb22c727bdbefde1250eea36e350ea`.
+Date: 2026-10-05 UTC. Base: `42e81ffd4a2496a5dada671c6576492aca9db869`.
 Scope: read-only Plan views and contract tests on macOS ARM64 with Go `1.27.1` and
 `GOTOOLCHAIN=local`. The source table identifies the tested candidate independently of the eventual commit.
 Git blob identities describe exact source bytes; they are not NKD Build Digests.
 
 The [October 3 record](2026-10-03-plan-views.md) retains its original source and test scope. It does not
-claim to cover subsequent review commits. The preceding `b6d31b8` candidate passed its full local gates and
+claim to cover subsequent review commits. The earlier `b6d31b8` candidate passed its full local gates and
 [hosted Merge Gate](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37342253222); this record covers
 the further review changes below rather than replacing historical source identities.
 
@@ -34,6 +34,9 @@ the further review changes below rather than replacing historical source identit
   digest implementation or unmeasured performance claim is introduced.
 
 Independent review found no actionable findings across the final diff, inspection, graph and CLI changes.
+Hosted CodeQL subsequently identified a possible integer overflow in the optional map capacity hint added
+in `42e81ff`. The hint is removed without changing union behavior; the current source and repeated full
+gates below include that independently reviewed correction.
 
 ## Tested source
 
@@ -41,7 +44,7 @@ Independent review found no actionable findings across the final diff, inspectio
 |---|---|
 | `pkg/nkd/planview/inspect.go` | `ac261984944b55a5673dbd8828caf147209c9fe9` |
 | `pkg/nkd/planview/graph.go` | `ef84922325f0f77e1a9b339b1c211d625f20d055` |
-| `pkg/nkd/planview/diff.go` | `3b365998f6e40289b2244fb3701a5d2274a0ed86` |
+| `pkg/nkd/planview/diff.go` | `55b7d75c63ab074f9bfbd1482323c0d94b58e4b4` |
 | `pkg/nkd/planview/comparison_options.go` | `0e76a7cd8ffe7c84d7a80df1429bdbfb9611faa5` |
 | `cmd/nkdctl/plan_views.go` | `1263e9356c60b6897c8b56259cd535616534eba3` |
 | `cmd/nkdctl/lifecycle.go` | `5ce65f77ab320b6c5e8f91f990a2a26c38b9628c` |
@@ -60,10 +63,10 @@ vulnerability scanner reported no vulnerabilities.
 
 | Command | Exit | Log SHA-256 |
 |---|---|---|
-| `make check` | 0 | `9bf651d911ddff287040709da5d5479afa9ad73b8ca73a752ce9ced0897f46a8` |
-| `go test ./... -count=1` | 0 | `262c9259c57a2df6dc813d31bc41a5bcf10ffc77ccfe7a42a256854f0de744f0` |
-| `go test -race ./... -count=1` | 0 | `6a1dcc1135b9db7517b0e42aa4e5801f291a3fcff465198a07418be632018ca1` |
-| `make build` | 0 | `66a1302dad5a9ca971c4a2a5d6a114b232eb550c95911902c243c19ed72409df` |
+| `make check` | 0 | `b2dde0dd3ebb771bbe14ef0967ff6fa16eb48b3e293884e6f6dd3245cde5a363` |
+| `go test ./... -count=1` | 0 | `14facde0cb323d1a56fd178fa5a85510558d87dbb3d299d492836bab3f14a109` |
+| `go test -race ./... -count=1` | 0 | `c54b602bcac01e6601c6f69a178aaa223be7a93a70319dc8266c2ca9e5ffd15b` |
+| `make build` | 0 | `7089aa3cca76af0e53d3fc198c4568f2eb56d0e9ae76853b872135d6dba3b353` |
 | `make workflows-check` | 0 | `5626c4456f2d99a4f503cd4d7c93061bbac18b9fde1b4dfc66473250221c2cf9` |
 | `git diff --check` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 

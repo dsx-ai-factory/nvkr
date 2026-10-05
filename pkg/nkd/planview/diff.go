@@ -275,7 +275,7 @@ func category(path string) string {
 }
 
 func unionKeys[V any](left, right map[string]V) []string {
-	members := make(map[string]struct{}, len(left)+len(right))
+	members := make(map[string]struct{})
 	for key := range left {
 		members[key] = struct{}{}
 	}
