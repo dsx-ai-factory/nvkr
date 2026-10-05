@@ -1,0 +1,107 @@
+---
+name: NKD native hosted VM preflight
+
+# Temporary diagnostic branch probe. No source checkout or artifact authority.
+'on':
+  push:
+    branches: [codex/m2-generated-execution-sprint]
+    paths: [.github/workflows/nkd-hosted-vm-preflight.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nkd-hosted-vm-preflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native:
+    name: Native ${{ matrix.arch }} host and sandbox
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            machine: x86_64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            machine: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    env:
+      EXPECTED_MACHINE: ${{ matrix.machine }}
+      PROBE_IMAGE: docker.io/library/ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3
+    steps:
+      - name: Measure native resources and usable KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          test "$(uname -m)" = "$EXPECTED_MACHINE"
+          id
+          nproc
+          free -m
+          df -Pm .
+          cat /proc/self/cgroup
+          for name in cpu.max memory.max memory.current; do
+            if test -r "/sys/fs/cgroup/$name"; then
+              printf '%s: ' "$name"
+              cat "/sys/fs/cgroup/$name"
+            fi
+          done
+          if ! test -c /dev/kvm; then
+            echo 'BLOCKER: native generic runner has no /dev/kvm' >&2
+            exit 1
+          fi
+          ls -l /dev/kvm
+          python3 - <<'PY'
+          import os, fcntl
+          fd = os.open("/dev/kvm", os.O_RDWR)
+          version = fcntl.ioctl(fd, 0xae00, 0)
+          os.close(fd)
+          print("KVM_GET_API_VERSION:", version)
+          assert version == 12
+          PY
+      - name: Observe and exercise rootless subordinate sandbox
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(id -u)" != 0
+          test "$(id -g)" != 0
+          if ! command -v podman >/dev/null || ! command -v crun >/dev/null; then
+            sudo apt-get update -qq
+            podman_version=$(apt-cache policy podman | awk '/Candidate:/ {print $2}')
+            crun_version=$(apt-cache policy crun | awk '/Candidate:/ {print $2}')
+            uidmap_version=$(apt-cache policy uidmap | awk '/Candidate:/ {print $2}')
+            printf 'Diagnostic runtime packages: podman=%s crun=%s uidmap=%s\n' \
+              "$podman_version" "$crun_version" "$uidmap_version"
+            sudo apt-get install --yes --no-install-recommends \
+              "podman=$podman_version" "crun=$crun_version" "uidmap=$uidmap_version"
+          fi
+          podman --version
+          crun --version
+          podman info --format '{{json .}}' > "$RUNNER_TEMP/nkd-podman-info.json"
+          jq '.host | {os, arch, cgroupVersion, serviceIsRemote, ociRuntime, security, idMappings}' \
+            "$RUNNER_TEMP/nkd-podman-info.json"
+          jq -e '.host.os == "linux" and .host.cgroupVersion == "v2" and
+            .host.serviceIsRemote == false and .host.security.rootless == true and
+            .host.security.seccompEnabled == true and .host.ociRuntime.name == "crun"' \
+            "$RUNNER_TEMP/nkd-podman-info.json"
+          uid=$(id -u)
+          gid=$(id -g)
+          jq -e --argjson uid "$uid" --argjson gid "$gid" '
+            def subordinate($id): any(.[]; .size > 0 and .container_id <= $id and
+              $id < (.container_id + .size) and (.host_id + $id - .container_id) != $id and
+              (.host_id + $id - .container_id) != 0);
+            (.host.idMappings.uidmap | subordinate($uid)) and (.host.idMappings.gidmap | subordinate($gid))
+          ' "$RUNNER_TEMP/nkd-podman-info.json"
+          mapfile -t mappings < <(jq -r '.host.idMappings |
+            (.uidmap[] | "--uidmap=\(.container_id):\(.container_id):\(.size)"),
+            (.gidmap[] | "--gidmap=\(.container_id):\(.container_id):\(.size)")' \
+            "$RUNNER_TEMP/nkd-podman-info.json")
+          podman pull "$PROBE_IMAGE"
+          podman run --rm --pull=never --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+            "${mappings[@]}" --user="$uid:$gid" "$PROBE_IMAGE" \
+            sh -ec 'id; cat /proc/self/uid_map; cat /proc/self/gid_map; grep "^Seccomp:" /proc/self/status'
