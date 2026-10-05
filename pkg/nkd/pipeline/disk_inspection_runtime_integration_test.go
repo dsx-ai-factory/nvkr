@@ -22,6 +22,11 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 	if image == "" {
 		t.Skip("requires exact local inspector image and retained QCOW2")
 	}
+	for _, variable := range []string{"NKD_TEST_DISK_INSPECTOR_SHA256", "NKD_TEST_DISK_CODEC_SHA256", "NKD_TEST_DISK_SHA256", "NKD_TEST_DISK_QCOW2"} {
+		if os.Getenv(variable) == "" {
+			t.Fatalf("opt-in runtime evidence requires %s", variable)
+		}
+	}
 	if runtime.GOOS != "linux" {
 		t.Fatal("runtime integration requires native Linux")
 	}
@@ -51,7 +56,7 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 	if err := container.AdmitSubject(t.Context(), info.Size()); err != nil {
 		t.Fatal(err)
 	}
-	subject, err := heldfile.OpenContext(t.Context(), path, heldfile.Options{Label: "runtime-test-subject", MaxBytes: 8 << 30, ExpectedDigest: os.Getenv("NKD_TEST_DISK_SHA256")})
+	subject, err := heldfile.OpenContext(t.Context(), path, heldfile.Options{Label: "runtime-test-subject", MaxBytes: MaxDiagnosticDiskBytes, ExpectedDigest: os.Getenv("NKD_TEST_DISK_SHA256")})
 	if err != nil {
 		t.Fatal(err)
 	}

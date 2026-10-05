@@ -77,17 +77,31 @@ local development route. The held runtime is rechecked for freshness, not
 compared with an independently supplied executable or daemon pin; it
 does not authenticate provider isolation or grant qualification.
 
-The exact image config digest binds its immutable rootfs content, including the
-helper, dynamic loaders, libraries, QEMU, supermin and packaged kernel. Inspector
-and codec byte pins are checked again inside that closure. The returned opaque
-installed inventory records that image identity; the executable-only API returns
-no runtime binding and cannot substitute for it.
+The adapter records and rechecks the runtime-reported image ID. The recorded
+Podman exercise measured a config digest binding immutable rootfs content,
+including the helper, dynamic loaders, libraries, QEMU, supermin and packaged
+kernel. The unexercised Docker route must not inherit that config-digest claim:
+the adapter does not establish which image-store identity its `.Id` represents.
+Inspector and codec byte pins are checked again inside the selected image. The
+returned opaque installed inventory records that observed image identity; its
+`RuntimeBinding` is descriptive, not a repository-approved pin or production
+admission receipt. The executable-only API returns no runtime binding.
 
 The host revalidates returned package fields, format and conflicting duplicates
 using the same metadata checks as the XML projection. Each container has a fresh
 random attempt label; cleanup discovers only that attempt's full container ID and
 removes by ID, never by a reusable name after a failed creation. These are local
 daemon safeguards, not authenticated cross-process ownership or receipt protocols.
+Create's bounded, validated full ID also selects attached start. The fixed
+launcher disables the daemon log driver; attach remains the report channel.
+Cleanup discovery diagnostics revoke a result but do not prevent removal of a
+unique valid owned ID. Ambiguous or absent identities are never removed.
+
+UID/GID 65534 is deliberately unchanged. On a rootful daemon without user
+namespaces it can share per-UID accounting with host `nobody`; the trusted-daemon
+diagnostic does not claim subordinate-identity or provider isolation. Automatic
+user-namespace selection needs a separately admitted and exercised capability,
+not an untested launcher flag.
 
 The current exact probe pin must include
 the QEMU CVE-2024-4467 fix; an arbitrary caller pin is not security clearance.
@@ -108,6 +122,13 @@ fails before inspection. Capacity is point-in-time availability, not reservation
 Cancel inspection before `Close` when immediate shutdown
 is needed. Installed-package inspection currently supports one Linux Debian
 package-manager root; no-root or multi-root layouts return `engine-capability`.
+The configured operation deadline covers queueing, inspection, full subject
+rehashing and post-run runtime checks; it is not extended after a late scan.
+Cancellation/deadline remains `timeout` under ADR-03, and no unchecked report
+can escape by receiving a fresh post-run budget. Owned cleanup alone gets its
+separate ten-second deadline. A failed joined create client is not proof that
+daemon registration is absent, so cleanup reconciles the unique attempt label
+until an owned ID appears or that deadline expires.
 An encrypted guest volume can therefore be rejected as an unsupported layout,
 not necessarily a detected encryption marker.
 The attached helper's supported failure exit statuses retain their NKD error

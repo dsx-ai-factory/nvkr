@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -137,7 +136,7 @@ func RunDiskInspectionHelper(ctx context.Context, inspectorDigest, codecDigest, 
 	if input == nil || output == nil {
 		return e.New(e.CodeUsage, "inspection helper requires input and output streams")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, pipeline.MaxDiskInspectionTimeout)
 	defer cancel()
 	codec, err := assemble.OpenQemuImgCodec(ctx, "/usr/bin/qemu-img", codecDigest)
 	if err != nil {

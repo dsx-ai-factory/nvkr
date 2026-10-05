@@ -26,6 +26,7 @@ type diskInspectionRunRuntime struct {
 	commands                                 [][]string
 	createDiagnostic, scanDiagnostic, report string
 	createErr, scanErr, cleanupErr           error
+	createID                                 string
 	cancel                                   context.CancelFunc
 	started, copied                          bool
 	absent                                   bool
@@ -45,6 +46,11 @@ func (runtime *diskInspectionRunRuntime) Run(_ context.Context, input io.Reader,
 	}
 	if args[0] == "create" {
 		_, _ = io.WriteString(diagnostic, runtime.createDiagnostic)
+		id := runtime.createID
+		if id == "" {
+			id = strings.Repeat("a", 64)
+		}
+		_, _ = io.WriteString(output, id)
 		return runtime.createErr
 	}
 	runtime.started = true
@@ -111,6 +117,9 @@ func TestDiskInspectionCommandsSuppressPodmanAutomaticMounts(t *testing.T) {
 				if args[0] != wantCommands[index] {
 					t.Fatalf("operation %d = %v, want %s", index, args, wantCommands[index])
 				}
+				if args[0] == "start" && args[len(args)-1] != strings.Repeat("a", 64) {
+					t.Fatalf("start did not use immutable create ID: %v", args)
+				}
 			}
 		})
 	}
@@ -132,6 +141,8 @@ func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
 		{name: "unsupported Podman override", runtime: diskInspectionRunRuntime{name: "podman", createErr: errors.New("unknown flag: --default-mounts-file")}, want: e.CodeEngineCapability},
 		{name: "create failure with unresolved registration", runtime: diskInspectionRunRuntime{createErr: errors.New("create"), absent: true}, want: e.CodeEngineCapability, uncertain: true},
 		{name: "create warning before start", runtime: diskInspectionRunRuntime{createDiagnostic: "requested limit ignored"}, want: e.CodeEngineCapability},
+		{name: "invalid create ID", runtime: diskInspectionRunRuntime{createID: "reusable-name"}, want: e.CodeVerifyFailed},
+		{name: "ambiguous create ID", runtime: diskInspectionRunRuntime{createID: strings.Repeat("a", 64) + " " + strings.Repeat("b", 64)}, want: e.CodeVerifyFailed},
 		{name: "start failure joins blocked writer", runtime: diskInspectionRunRuntime{scanErr: errors.New("start")}, want: e.CodeEnvelopeDecode, wantStart: true},
 		{name: "copy failure", closeSubject: true, want: e.CodeEnvelopeDecode, wantStart: true},
 		{name: "scan diagnostic", runtime: diskInspectionRunRuntime{report: "report", scanDiagnostic: "scan warning"}, want: e.CodeEnvelopeDecode, wantStart: true},
@@ -156,7 +167,7 @@ func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
 				tt.runtime.cancel = cancel
 			}
 			started := time.Now()
-			raw, err := runDiskInspectionContainer(ctx, &tt.runtime, testDiskInspectionSelection(t), "image", subject)
+			raw, err := runDiskInspectionContainerWithCleanupTimeout(ctx, &tt.runtime, testDiskInspectionSelection(t), "image", subject, 100*time.Millisecond)
 			if code(err) != tt.want || tt.runtime.started != tt.wantStart || (raw != nil) != tt.wantReport {
 				t.Fatalf("raw=%q error=%v started=%t", raw, err, tt.runtime.started)
 			}
@@ -386,6 +397,8 @@ func TestDiskInspectionSelectionFailsClosed(t *testing.T) {
 		{name: "missing inspector", edit: func(s *DiskInspectionSelection) { s.InspectorDigest = "" }, want: e.CodeUnpinnedInput},
 		{name: "missing codec", edit: func(s *DiskInspectionSelection) { s.CodecDigest = "" }, want: e.CodeUnpinnedInput},
 		{name: "no cpu", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 0 }, want: e.CodeEngineCapability},
+		{name: "below CPU runtime floor", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 9 }, want: e.CodeEngineCapability},
+		{name: "CPU runtime floor", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 10 }},
 		{name: "no appliance memory", edit: func(s *DiskInspectionSelection) { s.Resources.MemoryMiB = 1024 }, want: e.CodeEngineCapability},
 		{name: "no timeout", edit: func(s *DiskInspectionSelection) { s.TimeoutSeconds = 0 }, want: e.CodeEngineCapability},
 		{name: "unbounded timeout", edit: func(s *DiskInspectionSelection) { s.TimeoutSeconds = 601 }, want: e.CodeEngineCapability},
@@ -414,6 +427,9 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 			}
 			defer subject.Close()
 			args := diskInspectionCreateArgs(selection, selection.Image, "owned-attempt", "attempt-token", subject)
+			if !slices.Contains(args, "--log-driver=none") {
+				t.Fatal("daemon log persistence was not disabled")
+			}
 			for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65534:65534", "--init", "--pids-limit=256", "--pull=never", "--no-healthcheck", "--memory=16384m", "--memory-swap=16384m", "/tmp:rw,nosuid,nodev,size=16384m,mode=1777", selection.Platform, "--entrypoint=/usr/local/bin/nkd-disk-inspect", subject.Digest()} {
 				if !slices.Contains(args, required) {
 					t.Fatalf("missing containment argument %q", required)
@@ -435,25 +451,31 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 
 type diskInspectionCleanupRuntime struct {
 	packerContainerRuntime
-	listed   string
-	commands [][]string
-	lateID   string
+	listed                  string
+	commands                [][]string
+	lateID                  string
+	diagnostic              string
+	discoveryErr, removeErr error
 }
 
 func (*diskInspectionCleanupRuntime) RuntimeName() string { return "docker" }
 
 func (runtime *diskInspectionCleanupRuntime) Cleanup(_ context.Context, _ time.Duration,
-	stdout, _ io.Writer, args ...string,
+	stdout, stderr io.Writer, args ...string,
 ) error {
 	runtime.commands = append(runtime.commands, slices.Clone(args))
 	if args[0] == "ps" {
+		_, _ = io.WriteString(stderr, runtime.diagnostic)
+		if runtime.discoveryErr != nil {
+			return runtime.discoveryErr
+		}
 		if runtime.lateID != "" && len(runtime.commands) > 1 {
 			runtime.listed = runtime.lateID
 		}
 		_, err := io.WriteString(stdout, runtime.listed)
 		return err
 	}
-	return nil
+	return runtime.removeErr
 }
 
 func TestDiskInspectionCleanupReconcilesUncertainCreation(t *testing.T) {
@@ -533,6 +555,126 @@ func TestDiskInspectionRuntimeRevocationAndCancellation(t *testing.T) {
 	defer cancel()
 	if err := lockDiskInspection(ctx, &mu); code(err) != e.CodeTimeout {
 		t.Fatalf("canceled lock: %v", err)
+	}
+}
+
+func TestDiskInspectionCanceledFreeLockReleasesMutex(t *testing.T) {
+	var mu sync.Mutex
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := lockDiskInspection(ctx, &mu); code(err) != e.CodeTimeout {
+		t.Fatalf("canceled free lock: %v", err)
+	}
+	if !mu.TryLock() {
+		t.Fatal("canceled acquisition retained the mutex")
+	}
+	mu.Unlock()
+}
+
+func TestDiskInspectionCleanupDiscoveryFailures(t *testing.T) {
+	id := strings.Repeat("a", 64)
+	for _, uncertain := range []bool{false, true} {
+		for _, tt := range []struct {
+			name, listed, diagnostic string
+			discoveryErr, removeErr  error
+			want                     e.Code
+			remove                   bool
+		}{
+			{name: "discovery error", discoveryErr: errors.New("discovery"), want: e.CodeInternal},
+			{name: "warning without identity", diagnostic: "warning", want: e.CodeVerifyFailed},
+			{name: "warning with owned identity", listed: id, diagnostic: "warning", want: e.CodeVerifyFailed, remove: true},
+			{name: "warning with ambiguous identity", listed: id + " " + strings.Repeat("b", 64), diagnostic: "warning", want: e.CodeVerifyFailed},
+			{name: "warning joins removal failure", listed: id, diagnostic: "warning", removeErr: errors.New("remove failure"), want: e.CodeVerifyFailed, remove: true},
+			{name: "removal failure", listed: id, removeErr: errors.New("remove failure"), want: e.CodeInternal, remove: true},
+		} {
+			t.Run(tt.name+"/uncertain="+strconv.FormatBool(uncertain), func(t *testing.T) {
+				runtime := &diskInspectionCleanupRuntime{listed: tt.listed, diagnostic: tt.diagnostic, discoveryErr: tt.discoveryErr, removeErr: tt.removeErr}
+				err := removeDiskInspectionContainer(t.Context(), runtime, "attempt-token", uncertain)
+				if code(err) != tt.want || (len(runtime.commands) == 2) != tt.remove {
+					t.Fatalf("cleanup=%v commands=%v", err, runtime.commands)
+				}
+				if tt.remove && !slices.Equal(runtime.commands[1], []string{"rm", "--force", id}) {
+					t.Fatalf("wrong removal target: %v", runtime.commands)
+				}
+				if tt.removeErr != nil && !errors.Is(err, tt.removeErr) {
+					t.Fatalf("removal error lost: %v", err)
+				}
+				if tt.discoveryErr != nil && !errors.Is(err, tt.discoveryErr) {
+					t.Fatalf("discovery error lost: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestOpenDiskInspectionContainerAdmitsBeforeRuntimeIO(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		nilContext bool
+		want       e.Code
+	}{
+		{name: "nil context", nilContext: true, want: e.CodeUsage},
+		{name: "non-native host", want: e.CodeEngineCapability},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			selection := testDiskInspectionSelection(t)
+			selection.RuntimeExecutable = "/must-not-spawn/podman"
+			selection.Platform = "linux/amd64"
+			if runtime.GOARCH == "amd64" {
+				selection.Platform = "linux/arm64"
+			}
+			ctx := t.Context()
+			if tt.nilContext {
+				ctx = nil
+			}
+			container, err := OpenDiskInspectionContainer(ctx, selection)
+			if container != nil || code(err) != tt.want {
+				t.Fatalf("container=%v error=%v", container, err)
+			}
+			if !tt.nilContext && !strings.Contains(err.Error(), "native Linux host architecture") {
+				t.Fatalf("rejection reached runtime work instead of native admission: %v", err)
+			}
+		})
+	}
+}
+
+func TestDiskInspectionResourceAdmissionIndependentClauses(t *testing.T) {
+	for _, before := range []bool{false, true} {
+		for _, tt := range []struct {
+			name string
+			size int64
+			edit func(*DiskInspectionSelection, *execution.ObservedHostFacts)
+			want e.Code
+		}{
+			{name: "exact minimum", size: 1 << 30},
+			{name: "request one MiB short", size: 1 << 30, edit: func(s *DiskInspectionSelection, _ *execution.ObservedHostFacts) { s.Resources.MemoryMiB-- }, want: e.CodeEngineCapability},
+			{name: "8GiB needs more than 16GiB", size: 8 << 30, edit: func(s *DiskInspectionSelection, f *execution.ObservedHostFacts) {
+				s.Resources.MemoryMiB = 16384
+				f.Resources.MemoryMiB = 32768
+			}, want: e.CodeEngineCapability},
+			{name: "platform", size: 1 << 30, edit: func(_ *DiskInspectionSelection, f *execution.ObservedHostFacts) {
+				f.Platform = execution.HostPlatformLinuxARM64
+			}, want: e.CodeEngineCapability},
+			{name: "CPU", size: 1 << 30, edit: func(_ *DiskInspectionSelection, f *execution.ObservedHostFacts) { f.Resources.CPUMillis-- }, want: e.CodeEngineCapability},
+			{name: "storage", size: 1 << 30, edit: func(_ *DiskInspectionSelection, f *execution.ObservedHostFacts) { f.Resources.EphemeralStorageMiB-- }, want: e.CodeEngineCapability},
+			{name: "host memory", size: 1 << 30, edit: func(_ *DiskInspectionSelection, f *execution.ObservedHostFacts) { f.Resources.MemoryMiB-- }, want: e.CodeEngineCapability},
+		} {
+			t.Run(tt.name+"/before="+strconv.FormatBool(before), func(t *testing.T) {
+				selection := testDiskInspectionSelection(t)
+				selection.Resources.MemoryMiB = 4096
+				memory := uint64(4096)
+				if before {
+					memory += 1024
+				}
+				facts := execution.ObservedHostFacts{Platform: execution.HostPlatformLinuxAMD64, Resources: execution.ResourceCapacity{CPUMillis: 1000, MemoryMiB: memory, EphemeralStorageMiB: 1024}}
+				if tt.edit != nil {
+					tt.edit(&selection, &facts)
+				}
+				if err := validateDiskInspectionResources(selection, facts, tt.size, before); code(err) != tt.want {
+					t.Fatalf("resource error=%v want=%s", err, tt.want)
+				}
+			})
+		}
 	}
 }
 

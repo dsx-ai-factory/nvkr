@@ -17,7 +17,7 @@ import (
 )
 
 // The controlled ELF fixture drives the exact InspectHeld boundary, including
-// real host admission and held subprocesses. It proves revalidation and cleanup
+// deterministic host admission and held subprocesses. It proves revalidation and cleanup
 // contracts, not a Docker daemon, QCOW2 inspection or package-discovery result.
 func TestDiskInspectionPostRunRevalidation(t *testing.T) {
 	const subjectBytes = "controlled held subject"
@@ -36,13 +36,6 @@ func TestDiskInspectionPostRunRevalidation(t *testing.T) {
 			selection := testDiskInspectionSelection(t)
 			selection.Platform = "linux/" + runtime.GOARCH
 			selection.Resources = execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 2050, EphemeralStorageMiB: 1}
-			facts, err := execution.ObserveLocalHost(ctx, selection.Workspace)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := validateDiskInspectionResources(selection, facts, int64(len(subjectBytes)), false); err != nil {
-				t.Skipf("controlled held-subprocess fixture requires its real host capacity: %v", err)
-			}
 			root := t.TempDir()
 			path, _ := copyTestExecutable(t, "docker")
 			heldRuntime, err := snapshotRuntimeExecutableContext(ctx, path)
@@ -63,6 +56,9 @@ func TestDiskInspectionPostRunRevalidation(t *testing.T) {
 			selection.Image = "example.test/inspection@sha256:" + strings.Repeat("1", 64)
 			selection.TimeoutSeconds = 20
 			container := &DiskInspectionContainer{runtime: heldRuntime, selection: selection}
+			container.observeHost = func(context.Context, *os.File) (execution.ObservedHostFacts, error) {
+				return execution.ObservedHostFacts{Platform: execution.HostPlatform(selection.Platform), Resources: execution.ResourceCapacity{CPUMillis: 1000, MemoryMiB: 2050, EphemeralStorageMiB: 1}}, nil
+			}
 			defer container.Close()
 			if err := container.observeBinding(ctx); err != nil {
 				t.Fatal(err)

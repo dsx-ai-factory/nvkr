@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -16,20 +17,29 @@ import (
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
-	defer stop()
-	if len(os.Args) != 5 {
-		err := e.New(e.CodeUsage, "inspection helper requires exact tool and subject pins")
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(e.ExitCode(err))
+	status := run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	stop()
+	if status != 0 {
+		os.Exit(status)
 	}
-	size, err := strconv.ParseInt(os.Args[4], 10, 64)
+}
+
+// run maps flags and the owning SBOM operation to the frozen CLI exit table.
+func run(ctx context.Context, args []string, input io.Reader, output, diagnostic io.Writer) int {
+	if len(args) != 4 {
+		err := e.New(e.CodeUsage, "inspection helper requires exact tool and subject pins")
+		fmt.Fprintln(diagnostic, err)
+		return e.ExitCode(err)
+	}
+	size, err := strconv.ParseInt(args[3], 10, 64)
 	if err != nil {
 		err = e.Wrap(e.CodeUsage, err, "inspection helper subject size must be an exact integer")
 	} else {
-		err = sbom.RunDiskInspectionHelper(ctx, os.Args[1], os.Args[2], os.Args[3], size, os.Stdin, os.Stdout)
+		err = sbom.RunDiskInspectionHelper(ctx, args[0], args[1], args[2], size, input, output)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(e.ExitCode(err))
+		fmt.Fprintln(diagnostic, err)
+		return e.ExitCode(err)
 	}
+	return 0
 }

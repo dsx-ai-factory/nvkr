@@ -1,8 +1,9 @@
 # Inspection mount suppression and issued inventory replay
 
 This records a local patch based on `26093dfd47e2f0fe665adf5c4a2323051e7340d7`.
-The source blobs below identify the tested implementation, not a later committed
-head or original live factory Run. The already-local image and retained QCOW2
+The source blobs below identify the host-side test binaries and contract tests,
+not the helper inside the unchanged inspector image, a later committed head or
+original live factory Run. The already-local image and retained QCOW2
 are the same exact subjects as the [earlier runtime record](2026-10-02-nke-os-inspector-runtime.md).
 
 ## Automatic mount boundary
@@ -23,7 +24,7 @@ unchanged. An unsupported flag fails closed, without retrying unprotected.
 This suppresses `mounts.conf`, not OCI hooks, FIPS mounts or a malicious daemon;
 the configured runtime, daemon and kernel remain trusted.
 
-## Exact tested source
+## Host-side source and unchanged image helper
 
 | File | Git blob |
 | --- | --- |
@@ -31,6 +32,22 @@ the configured runtime, daemon and kernel remain trusted.
 | `pkg/nkd/pipeline/disk_inspection_runtime_test.go` | `f174737bbc15e47535a08f11fc63910cc84b6d7d` |
 | `pkg/nkd/sbom/disk_inspection_runtime.go` | `5ca3504fda3dab6018e3ab84da5196ba02e542e1` |
 | `pkg/nkd/sbom/disk_inspection_runtime_integration_test.go` | `5857692cebe94de81c570be8c3de6595aeefcc77` |
+
+The reused image contains the earlier ARM64 helper ELF
+`sha256:fa56af977873a433c44fd2256513b3dc27a7f1a02d1befadc59c49a6765c2046`.
+Its source is recorded in the earlier runtime record:
+
+| In-image helper source | Git blob |
+| --- | --- |
+| `pkg/nkd/sbom/disk_inspection_runtime.go` | `689812ec087ed19a0faebdbf0811e68e6b6f6308` |
+| `pkg/nkd/sbom/disk_inspect.go` | `dbe44f59722af9ce1d867c0a9fa6781a6feed448` |
+| `cmd/nkd-disk-inspect/main.go` | `9a77cd9be52d61fe6b6ac158d6e0904452b01131` |
+
+The newer host-side SBOM wrapper and its receipt-binding checks ran against that
+old helper. The newer `RunDiskInspectionHelper` subject-holding and timeout-code
+changes did not run inside this image. Their contract tests are separate from
+this retained-disk runtime exercise; this record does not establish a rebuilt
+helper or acceptance of all changed source in the container.
 
 Static native ARM64 test binaries were compiled with `CGO_ENABLED=0 GOOS=linux
 GOARCH=arm64 go test -c`, using the repository's Go version. Their SHA-256 values:
@@ -68,8 +85,8 @@ matched the earlier record.
 Native ARM64 race contracts passed: pipeline 21.170 seconds, SBOM 8.830 seconds,
 in the existing pinned Go image, network disabled, UID/GID 65534, init, two CPUs,
 4 GiB and read-only source/module-cache mounts. Focused normal and race contracts
-also passed, including Docker argument preservation, Podman overrides on every
-operation and unsupported-flag rejection before copying input.
+also passed, including Docker argument preservation, Podman overrides on create,
+start and owned cleanup, and unsupported-flag rejection before copying input.
 
 This is retained-disk runtime and SBOM-wrapper evidence, not an original live
 factory build-to-inspection join, native AMD64 or Docker execution, complete disk

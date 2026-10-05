@@ -138,6 +138,18 @@ A catalog declaration may validate without those tools, but it is not a disk SBO
 Disk Plan lowering, material tracing, inspection, reconciliation, and evidence publication are not implemented
 by the authoring schema.
 
+The optional local installed-package diagnostic uses a caller-selected, already-local
+exact image on its native Linux architecture. Its fixed launcher is unprivileged
+(UID/GID 65534), networkless, read-only, drops all capabilities, disallows requested
+mounts/devices/credentials, enables no-new-privileges and init reaping, and bounds
+resources and the operation deadline. Native Podman commands suppress automatic
+`mounts.conf` inputs on create, start and owned cleanup; an unsupported override
+fails closed. The runtime executable, daemon configuration, OCI hooks and host
+kernel remain trusted. Held subjects and tool bytes are rechecked; the returned
+installed-package inventory carries the runtime-reported image identity, not a
+repository-approved runtime pin or provider-isolation receipt. This diagnostic
+does not authorize full-disk SBOM, production publication or qualification.
+
 This reconciliation proves the composition observed in one exact disk; it is not a reproduction comparison.
 Matching dependency digests, installed-package sets, selected file hashes, or SBOM documents across two Runs can
 support content validation and diagnose drift, but cannot mint `Reproduced` when the qualified artifact subject

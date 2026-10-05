@@ -24,13 +24,14 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 const (
 	// MaxDiagnosticDiskBytes bounds both the held input and private snapshot.
 	// Callers must budget this additional disk copy and the held-file memory.
-	MaxDiagnosticDiskBytes    = 8 << 30
-	maxDiskPackageReportBytes = 8 << 20
+	MaxDiagnosticDiskBytes    = pipeline.MaxDiagnosticDiskBytes
+	maxDiskPackageReportBytes = pipeline.MaxDiskInspectionReportBytes
 	maxDiskInstalledPackages  = 16384
 	maxDiskDiagnosticBytes    = 4096
 )
@@ -70,9 +71,10 @@ type DiskInstalledInventory struct {
 	packages        []InstalledDiskPackage
 }
 
-// RuntimeBinding names the complete admitted OCI closure, when this inventory
-// was issued through DiskInspectionRuntime. An executable-only diagnostic
-// inventory returns an empty value and cannot satisfy runtime admission.
+// RuntimeBinding describes the runtime-reported image identity retained when
+// DiskInspectionRuntime issued this inventory. It is not a repository-approved
+// image pin, provider-isolation proof, or production admission receipt. An
+// executable-only diagnostic inventory returns an empty value.
 func (inventory *DiskInstalledInventory) RuntimeBinding() string {
 	if inventory == nil {
 		return ""
