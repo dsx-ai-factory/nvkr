@@ -143,8 +143,18 @@ jobs:
             (.gidmap[] | "--gidmap=\(.container_id):\(.container_id):\(.size)")' \
             "$RUNNER_TEMP/nkd-clean-podman-info.json")
           "${runtime[@]}" pull "$PROBE_IMAGE"
+          # Inspector's required init helper must work independently of limits.
+          "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --init "${mappings[@]}" --user="$(id -u):$(id -g)" \
+            "$PROBE_IMAGE" sh -ec 'id; cat /proc/self/cgroup'
+          # These command substitutions intentionally execute inside the child.
+          # shellcheck disable=SC2016
           "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
             --security-opt=no-new-privileges --cpus=2 --memory=2g --pids-limit=512 \
+            --cgroupns=private \
             "${mappings[@]}" --user="$(id -u):$(id -g)" "$PROBE_IMAGE" \
             sh -ec 'id; cat /proc/self/uid_map; cat /proc/self/gid_map; grep "^Seccomp:" /proc/self/status;
-              cat /sys/fs/cgroup/cpu.max; cat /sys/fs/cgroup/memory.max; cat /sys/fs/cgroup/pids.max'
+              cat /proc/self/cgroup; cat /sys/fs/cgroup/cpu.max; cat /sys/fs/cgroup/memory.max;
+              cat /sys/fs/cgroup/pids.max; test "$(cat /sys/fs/cgroup/cpu.max)" = "200000 100000";
+              test "$(cat /sys/fs/cgroup/memory.max)" = 2147483648;
+              test "$(cat /sys/fs/cgroup/pids.max)" = 512'
