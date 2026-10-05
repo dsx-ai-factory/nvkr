@@ -8,6 +8,7 @@
 | Choose and run a demo | [Demo index](../scripts/README.md) |
 | Learn the six public objects | [Domain vocabulary](../CONTEXT.md) |
 | Understand architecture and failure behavior | [SADD](sadd.md) |
+| Review generated Plans, visualize dependencies and explain regeneration changes | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Inspect the single release registry graph and signing scope | [Publication architecture](publication-architecture.md) |
 | Change an engineering contract | Current [ADRs](adr/); public lifecycle in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) |
 | Determine what works and what is deferred | [Implementation/evidence record](adr/reconciliation.md) |

@@ -60,8 +60,13 @@ Committed bundle members and `exec-node`'s diagnostic canonical graph are opened
 no-follow regular file capabilities and revalidated against their live pathname after reading. A symlink, FIFO,
 oversized member or inode substitution fails closed before hashing or execution.
 
-A separately generated meta-lint workflow and richer drift classification remain deferred. They have no current
-CLI or library implementation; the maintained repository gate invokes `run generate --check` directly.
+A separately generated meta-lint workflow and automatic semantic explanation inside `--check` remain deferred.
+The maintained repository gate invokes `run generate --check` directly. Read-only `run diff` separately compares
+two fully validated canonical Plans: it reports changed named Build identities, classifies every changed field,
+keys named collections without array-shift noise, and preserves command/patch order. Concise text counts all
+changes; detailed text and descriptive JSON retain the full comparison. `run graph` exports complete linked
+producer/artifact graphs, and `run plan --pretty` emits a display-only view. These views remain outside the
+generator-owned directory and do not change stored canonical bytes, Plan identity, or the byte-exact drift gate.
 
 ### 3. Churn automation: bump → regenerate → PR, gated by drift
 

@@ -91,6 +91,9 @@ within the same family from being interpreted.
   signature**. Alternate whitespace, key order, duplicate keys, unknown fields, or noncanonical scalar forms fail
   closed; canonicalization is not a lossy repair step at a trust seam.
 - A separate **`--pretty` view** may render an object for humans. It is **display-only and never hashed**.
+  Run Plan inspection validates the complete canonical source before producing text, pretty JSON, graph
+  projections or semantic comparisons. These descriptive outputs cannot replace a canonical Plan or restore
+  execution/evidence authority. The exact `run plan --json` result has no appended whitespace.
 - **Result streams** (canonical objects) go to **stdout** or `--out` files; **logs and diagnostics** go to
   **stderr**; `--output json` emits **exactly one** canonical document. `stdout` never carries a log line, so
   results are always machine-consumable.

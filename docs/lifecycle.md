@@ -53,6 +53,10 @@ go run ./cmd/nkdctl run plan \
   --environment definitions/nke-v1/environment-local.yaml
 ```
 
+For saved generated Plans, `run plan --plan <path>` prints the required outputs and instructions;
+`--pretty` provides an indented display view. `run graph` exports complete linked producer/artifact graphs,
+and `run diff` explains changes between canonical Plans. See [Plan and graph inspection](plan-and-graph-inspection.md).
+
 Generation writes provider files and their commit manifest from the same admitted inputs. The matching
 `--check` invocation regenerates in memory and fails if committed files differ:
 

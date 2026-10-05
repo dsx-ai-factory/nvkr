@@ -83,7 +83,11 @@ and returned decision remain diagnostic; this operation adds no trusted-time or 
 lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
 not own the persisted status schema or reconstruct pin-update transactions.
 
-Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
+`planview` owns immutable descriptive snapshots after factory validates the complete Plan. It renders readable
+Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
+separating per-output Build Digest changes from execution and transport changes. It issues no authority.
+
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
