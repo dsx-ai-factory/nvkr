@@ -20,7 +20,7 @@ separate jobs and their existing isolation, credentials and permissions.
 Descriptions exclude raw recipe arguments, environment values, credentials, source/destination URLs and file
 contents. Raw arguments can contain literal authentication values; the canonical Plan retains those exact
 instructions for deliberate local inspection. Safe compiled context explains which instruction ran without
-dumping its execution environment. Summary formatting and provider/shell expression syntax are escaped.
+dumping its execution environment. Runtime descriptions never become provider expressions or shell commands; summaries escape control text and Markdown.
 
 Summaries are optional diagnostics. If GitHub does not provide a summary path, or that file cannot be written,
 the original operation status remains authoritative for the step. A job that never starts, is canceled or
@@ -28,8 +28,8 @@ loses its runner may have no summary. A successful summary is not an authenticat
 
 ## Understanding transfers and recovery
 
-A consumer job downloads one exact set of external input carriers and restores them in one or more steps,
-splitting only when the provider script limit requires it. The log names the current carrier before each unpack. A missing or invalid carrier stops the job at that exact
+A consumer job downloads one exact set of external input carriers and restores them in one helper step.
+The log names the current carrier before each unpack. A missing or invalid carrier stops the job at that exact
 artifact; the next consumer cannot run. The download action can match a partial set, so every mandatory
 unpack remains essential. Artifacts produced earlier in the same grouped job use the existing local
 workspace and are not downloaded again.
@@ -38,35 +38,66 @@ Each operation archives its declared outputs in one step, then uploads each carr
 carrier names, paths, payload verification, evidence bindings and upload failure behavior remain intact.
 If preparing one output fails, that operation's subsequent upload steps do not run.
 
-The finalizer uses one exact all-carrier download followed by bounded recovery batches. Its table records each
+The finalizer uses one exact all-carrier download followed by one recovery helper. Its summary records each
 artifact as `job-failed`, `missing`, `restore-failed` or `restored:success`. It continues recording outcomes
 after returned restore failures. These are the same per-carrier files consumed by the finalizer: a batch
-step's success does not establish completeness, and a carrier from a failed grouped job cannot become a
+helper's success does not establish completeness, and a carrier from a failed grouped job cannot become a
 successful output. The finalization gate still authenticates output membership, observations and evidence.
+
+## Compact workflow commands
+
+The generated workflow invokes four operations against the canonical Plan. The helper derives exact input
+and output paths, execution settings, diagnostic context and recovery membership; the workflow retains
+meaningful step names, pinned provider actions, credentials, permissions, dependencies and conditions.
+There is no new authored transport manifest. Source-fetch credentials stay on `run-node`, while
+`pack-outputs` remains a separate step.
+
+These are actual excerpts from the maintained generated workflow:
+
+```yaml
+      - name: 'Build nke-controller-chart (controller-chart)'
+        id: nkd-controller-chart-build-nke-controller-chart
+        run: |
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node controller-chart/build-nke-controller-chart
+      - name: 'Prepare output carriers: Build nke-controller-chart (controller-chart)'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node controller-chart/build-nke-controller-chart
+```
+
+```yaml
+      - name: Recover planned carriers
+        id: recover-artifacts
+        env:
+          NKD_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: ./nkd-exec factory github recover --plan .github/nkd-run/plan.json
+```
+
+The recovery helper bounds and validates the provider JSON before touching carriers. It requires exactly the
+expected stage and bootstrap jobs, rejects duplicate or unknown fields and statuses, and ignores string-valued
+job outputs without logging them. It records ordinary carrier failures and continues; cancellation or a
+failure to persist outcomes stops recovery. The finalizer still authenticates completeness and evidence.
 
 ## Measured generated workflow
 
-Regenerating the maintained six-output `nke-deploy` Definition at base `d1a4ec9` gives:
+The maintained six-output `nke-deploy` Definition, with identical canonical Plan bytes:
 
-| Item | Before | After |
+| Item | Initial PR #90 (`582ab01`) | Compact helper |
 |---|---:|---:|
+| Workflow lines | 5,079 | 1,145 |
+| Workflow bytes | 345,920 | 59,933 |
 | Jobs | 23 | 23 |
 | Logical execution operations | 33 | 33 |
-| Visible steps | 338 | 212 |
-| Download actions | 75 | 36 |
+| Visible steps | 212 | 209 |
+| Download actions | 36 | 36 |
 | Upload actions, including helper and final Run record | 44 | 44 |
-| Finalizer steps | 49 | 10 |
+| Finalizer steps | 10 | 7 |
+| Largest decoded run script, bytes | 20,408 | 412 |
 
-Recovery blocks stay intact within each batch. Every generated shell step is admitted against a conservative
-21,000-byte ceiling, matching GitHub's [21,000-character run limit](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsrun).
-The largest step here is 20,408 bytes; the 42 carrier outcomes occupy three recovery batches. An indivisible
-oversized script fails with a capability error before a bundle is returned.
+Repeated shell traps, status loops and inline utility launch commands now live in the Go helper. The
+conservative 21,000-byte limit still applies to every generated run script, including explicit operator setup.
+Workflow and manifest bytes change; the Plan digest and bytes remain unchanged. Transport count and payload
+size are unchanged by this refactor, including the remaining work to minimize OS-image transfer.
 
-The Plan digest and canonical Plan bytes are unchanged. Workflow bytes and their manifest digest change;
-regeneration remains the sole owner of those files. The wrappers add explicit diagnostic script text, so
-fewer visible steps do not mean a smaller generated YAML file.
-
-[Recorded local evidence](evidence/2026-10-03-ci-log-readability.md) covers injected operation and carrier
-failures, exact primary exit status, partial recovery, shell/provider/Markdown escaping, summary write
-failure and byte-exact regeneration. The changed workflow has not been dispatched on GitHub. The counts
-are static measurements, not a hosted duration, performance, release or qualification claim.
+[Current validation evidence](evidence/2026-10-04-ci-runner-encapsulation.md) records the compact-helper
+checks. [Initial shell-wrapper evidence](evidence/2026-10-03-ci-log-readability.md) retains its historical
+subjects and scope. These static counts do not establish hosted duration or Release acceptance.

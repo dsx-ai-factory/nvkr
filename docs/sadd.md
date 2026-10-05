@@ -661,7 +661,9 @@ qualified EvidenceBundle is diagnostic and cannot stand in for an authenticated 
 
 Generated GitHub operations include safe compiled node/component/output context, declared inputs and expected
 outputs, with elapsed time, primary exit status and exact failed phase in logs and diagnostic job summaries.
-Transfer steps batch exact carrier selections while retaining every mandatory restore and independent upload.
+The host helper owns logging, Plan-bound utility launch and exact carrier preparation/recovery; generated
+steps retain node selectors, provider actions, permissions and credential scope. Transfer steps batch exact
+carrier selections while retaining every mandatory restore and independent upload.
 Finalization records each carrier's producer/restore outcome even after returned recovery failures. Summary
 availability cannot authorize a result or replace authenticated Run finalization; see the
 [CI log guide](ci-step-and-log-readability.md).

@@ -18,65 +18,15 @@ func writeGitHubStageInputSteps(out *bytes.Buffer, plan *Plan, stage githubStage
 		return nil
 	}
 	selected := make([]Artifact, len(inputs))
-	var details []string
-	var work []githubProgressCommand
 	for i, input := range inputs {
 		selected[i] = artifacts[input]
-		details = append(details, githubArtifactDetail(plan, "Input", input))
-		work = append(work, githubProgressCommand{phase: "restore " + input,
-			run: fmt.Sprintf("printf '%%s\\n' %s || :\n./nkd-exec transport-unpack --archive %s --root . --path %s",
-				githubShellText("Restore: "+input), shellQuote(carrierPath(input)), shellQuote(artifacts[input].Path))})
 	}
 	pattern, err := githubCarrierPattern(selected)
 	if err != nil {
 		return err
 	}
-	var restored bytes.Buffer
-	if err := writeGitHubRestoreBatches(&restored, details, work); err != nil {
-		return err
-	}
 	fmt.Fprintf(out, "      - name: Download %d required input carriers\n        uses: %s\n        with:\n          pattern: %s\n          path: .nkd/carriers\n          merge-multiple: 'true'\n", len(inputs), actions.Download, yamlSingle(pattern))
-	out.Write(restored.Bytes())
-	return nil
-}
-
-// Keep each exact carrier restore and its failure phase together. GitHub skips
-// subsequent ordinary steps after a failure, so splitting a batch cannot allow
-// the consumer to run with missing inputs. Admit every script before any output.
-func writeGitHubRestoreBatches(out *bytes.Buffer, details []string, work []githubProgressCommand) error {
-	if len(details) != len(work) || len(work) == 0 {
-		return e.New(e.CodeInvalidCatalog, "GitHub restore batches require exact input descriptions")
-	}
-	type restoreBatch struct {
-		commands []string
-		count    int
-	}
-	var batches []restoreBatch
-	start := 0
-	for end := 1; end <= len(work); end++ {
-		commands := githubProgressCommands("Restore required inputs", details[start:end], work[start:end])
-		if githubScriptBytes(commands) > githubMaximumRunBytes {
-			if end-start == 1 {
-				return e.New(e.CodeEngineCapability, "one GitHub input restore exceeds the provider script limit")
-			}
-			batches = append(batches, restoreBatch{githubProgressCommands("Restore required inputs", details[start:end-1], work[start:end-1]), end - 1 - start})
-			start = end - 1
-			commands = githubProgressCommands("Restore required inputs", details[start:end], work[start:end])
-			if githubScriptBytes(commands) > githubMaximumRunBytes {
-				return e.New(e.CodeEngineCapability, "one GitHub input restore exceeds the provider script limit")
-			}
-		}
-		if end == len(work) {
-			batches = append(batches, restoreBatch{commands, end - start})
-		}
-	}
-	for i, batch := range batches {
-		label := fmt.Sprintf("Restore %d required inputs", batch.count)
-		if len(batches) > 1 {
-			label += fmt.Sprintf(" (%d/%d)", i+1, len(batches))
-		}
-		writeGitHubShellStep(out, label, batch.commands)
-	}
+	writeGitHubShellStep(out, fmt.Sprintf("Restore %d required inputs", len(inputs)), []string{githubRunnerCommand("restore-inputs", "stage", stage.ID)})
 	return nil
 }
 
@@ -84,16 +34,7 @@ func writeGitHubOutputSteps(out *bytes.Buffer, plan *Plan, node Node, artifacts 
 	if len(node.Outputs) == 0 {
 		return
 	}
-	var details []string
-	var work []githubProgressCommand
-	for _, output := range node.Outputs {
-		details = append(details, githubArtifactDetail(plan, "Output", output))
-		work = append(work, githubProgressCommand{phase: "archive " + output,
-			run: fmt.Sprintf("printf '%%s\\n' %s || :\n./nkd-exec transport-pack --archive %s --root . --path %s",
-				githubShellText("Archive: "+output), shellQuote(carrierPath(output)), shellQuote(artifacts[output].Path))})
-	}
-	writeGitHubShellStep(out, "Prepare output carriers: "+githubNodeLabel(plan, node),
-		githubProgressCommands("Prepare output carriers", details, work))
+	writeGitHubShellStep(out, "Prepare output carriers: "+githubNodeLabel(plan, node), []string{githubRunnerCommand("pack-outputs", "node", node.ID)})
 	for _, output := range node.Outputs {
 		actions.writeUploadStep(out, githubArtifactLabel(plan, artifacts[output]), githubArtifactName(output), carrierPath(output))
 	}

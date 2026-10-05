@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/urfave/cli/v2"
 )
 
@@ -25,8 +26,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := newApp().RunContext(ctx, os.Args); err != nil {
+		// The final diagnostic must not replace the selected exit status when
+		// its log reader has closed. No command work remains at this point.
+		signal.Ignore(syscall.SIGPIPE)
 		fmt.Fprintln(os.Stderr, "nkdctl: "+err.Error())
-		os.Exit(nkderr.ExitCode(err))
+		os.Exit(factory.GitHubStepExitCode(err))
 	}
 }
 

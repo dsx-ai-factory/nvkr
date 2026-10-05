@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"sigs.k8s.io/yaml"
 )
 
@@ -161,6 +160,12 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			if len(step.Env) == 0 {
 				continue
 			}
+			if jobID == "nkd-lifecycle-run" && step.ID == "recover-artifacts" {
+				if !reflect.DeepEqual(step.Env, map[string]string{"NKD_JOB_RESULTS": "${{ toJSON(needs) }}"}) || strings.TrimSpace(step.Run) != githubRunnerCommand("recover", "", "") || step.ContinueOnError || step.If != "" || step.Uses != "" {
+					return e.New(e.CodeEngineCapability, "GitHub recovery must receive only exact provider job results")
+				}
+				continue
+			}
 			if len(catalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nkd-lifecycle-run" && step.ID == "finalize-catalog")) {
 				if !reflect.DeepEqual(step.Env, catalogEnv) {
 					return e.New(e.CodeEngineCapability, "catalog source environment differs")
@@ -180,7 +185,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 					return e.New(e.CodeEngineCapability, "GitHub job %q source environment differs at %s", jobID, key)
 				}
 			}
-			if !strings.Contains(step.Run, "\n"+requireSourceToken+"\n") {
+			if stage, ok := byNodeForJob(stages, jobID); !ok || len(stage.Nodes) != 1 || strings.TrimSpace(step.Run) != githubRunnerCommand("run-node", "node", stage.Nodes[0].ID) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q must refuse an empty source credential", jobID)
 			}
 			foundSource = true
@@ -284,20 +289,6 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if err := validateGitHubStageExecution(plan, stage, job.Steps); err != nil {
 			return err
 		}
-		runs := joinRuns(job.Steps)
-		if !strings.Contains(runs, "factory execute-node") && !strings.Contains(runs, "exec-node") {
-			return e.New(e.CodeInvalidCatalog, "GitHub job %q does not execute an NKD plan node", jobID)
-		}
-		// Producer isolation is owned by ExecuteNode; utility containers remain explicit.
-		if node.IRNode == "" {
-			if node.Network == ir.NetworkNone && !strings.Contains(runs, "--network none") {
-				return e.New(e.CodeEngineCapability, "GitHub isolated job %q does not enforce network none", jobID)
-			}
-			if node.Container != "" &&
-				(!strings.Contains(runs, "--platform "+node.Platform) || node.Platform == "") {
-				return e.New(e.CodeEngineCapability, "GitHub container job %q does not bind its target platform", jobID)
-			}
-		}
 		wantCondition := stage.condition(plan)
 		if job.If != wantCondition {
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on an admitted branch", jobID)
@@ -340,13 +331,13 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			}
 		}
 		for _, output := range node.Outputs {
-			if !strings.Contains(runs, "transport-pack --archive "+carrierPath(output)+" --root . --path "+artifacts[output].Path) ||
+			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("pack-outputs", "node", node.ID)) ||
 				!actions.stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
 		}
 		for _, input := range stage.inputs(artifacts, nodeJobs) {
-			if !strings.Contains(runs, "transport-unpack --archive "+carrierPath(input)+" --root . --path "+artifacts[input].Path) {
+			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("restore-inputs", "stage", stage.ID)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not restore exact input %q", jobID, input)
 			}
 		}
@@ -498,4 +489,22 @@ func validateGitHubScriptLimits(document githubWorkflowDocument) error {
 		}
 	}
 	return nil
+}
+
+func byNodeForJob(stages []githubStage, id string) (githubStage, bool) {
+	for _, stage := range stages {
+		if stage.ID == id {
+			return stage, true
+		}
+	}
+	return githubStage{}, false
+}
+
+func hasExactGitHubRun(steps []githubStep, command string) bool {
+	for _, step := range steps {
+		if strings.TrimSpace(step.Run) == command && step.Uses == "" && step.If == "" && !step.ContinueOnError && len(step.Env) == 0 {
+			return true
+		}
+	}
+	return false
 }

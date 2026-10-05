@@ -471,10 +471,10 @@ GitHub job and step labels describe the operation and selected component or outp
 packaged outputs and disclose Helm image binding when present; stable execution step IDs and exact commands
 retain the graph binding independently of display names. Each execution step logs its operation, node and
 producer instruction, component and selected output where applicable, platform/network, declared inputs and
-expected outputs. The step reports successful outputs; its exit handler reports elapsed seconds, primary exit
+expected outputs. The host helper reports successful outputs, elapsed seconds, primary exit
 status and the last phase; failed execution cannot print a successful completion. Job summaries show the same diagnostic context and
 outcome without requiring every transfer step to be expanded. Closed log streams and an absent or unwritable summary cannot change the
-operation's exit status. Descriptions are escaped for shell/provider expressions, control lines and Markdown;
+operation's exit status. Descriptions are emitted as one-line runtime data and escaped for control lines and Markdown;
 arbitrary recipe arguments, source/destination URLs, file contents and environment values are not dumped.
 The exact producer argv remains in the canonical Plan for deliberate local inspection. Packaging reports the
 actual bound image digest, and publication reports its persisted immutable reference. Logs and summaries remain
@@ -486,19 +486,31 @@ CycloneDX document before final release identity is derived. It adds one interna
 internal job transfers, not additional deliverables. Product names do not cause duplicate copies of the full
 closure to be uploaded or published.
 
+Generated steps invoke `factory github run-node`, `restore-inputs`, `pack-outputs`, or `recover` against
+the complete canonical Plan and an exact node or derived stage selector. The factory module admits the
+complete graph and capabilities before work, derives carrier membership and paths, and owns progress,
+optional summaries and utility-container launch. Utility nodes share a launcher with local execution; the
+inner helper checks the outer helper's exact Plan digest before executing. Provider YAML retains topology,
+permissions, source credential scope, pinned actions and explicit operator setup. Packing remains a separate
+step from source fetch so it receives no source credential. No authored transport manifest or arbitrary
+command argument is added.
+
 Each stage downloads one exact set of external input carriers, then restores each required carrier in one
-step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
+helper step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
 part of the requested set. Each operation prepares its outputs in one step and retains an independent upload
 for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
 artifacts. Logical commands, transport authentication and isolation remain unchanged.
 
-The finalizer batches downloads with the exact set of all planned carrier names. Bounded recovery batches still visit
+The finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits
 every carrier and records its producer and restore outcome separately; it continues after missing carriers,
 failed producer jobs and returned restore failures. A diagnostic summary names every outcome. A successful batch
 download or recovery step proves no completeness: the finalizer consumes those unchanged per-carrier records
-and authenticates the complete output and evidence closure. Recovery blocks are indivisible; batches split before
-GitHub's 21,000-character run limit, conservatively measured as UTF-8 bytes. Every generated run script is checked
-against that ceiling, and an indivisible oversized script fails capability admission before bundle output.
+and authenticates the complete output and evidence closure. The helper accepts bounded `toJSON(needs)` data
+through a step environment value, with an exact stage/bootstrap job set, known statuses, duplicate rejection
+and bounded parsing before filesystem work. Unknown, missing or malformed job results fail closed. Individual
+carrier failure does not stop later recovery; cancellation or failed outcome persistence does.
+Every generated run script remains checked against GitHub's 21,000-character ceiling, conservatively measured
+as UTF-8 bytes, including explicit operator setup and bootstrap commands.
 Provider outage or failed local outcome storage can
 still prevent finalization.
 
@@ -524,8 +536,8 @@ the finalizer itself from starting; inspect provider status when no Run record e
   artifact storage; emission correctly fails for those configurations.
 
 **Neutral**
-- The runner is a mode/subset of `nkdctl`. Maintained hosted jobs use `nkd-exec factory execute-node` and
-  share producer execution with local Runs. Qualified graph protocols retain the separate `exec-node` entry point.
+- The runner is a mode/subset of `nkdctl`. Maintained hosted steps use `nkd-exec factory github`; its utility-container
+  child uses `factory execute-node` bound to the expected Plan digest. Producer execution is shared with local Runs. Qualified graph protocols retain the separate `exec-node` entry point.
 
 ## Alternatives considered
 

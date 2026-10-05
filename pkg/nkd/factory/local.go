@@ -11,10 +11,8 @@ import (
 	"runtime"
 	"runtime/debug"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
@@ -748,26 +746,11 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		}
 		arch := strings.TrimPrefix(node.Platform, "linux/")
 		containerRunner := "/workspace/.nkd/factory/.runner/nkd-exec-" + arch
-		name := "nkd-factory-" + sanitizeLocalNodeID(node.ID) + "-" + strconv.Itoa(os.Getpid())
-		args := []string{"run", "--rm", "--name", name, "--network", "none", "--platform", node.Platform,
-			"-e", "HOME=/tmp"}
-		if user := localContainerUser(); user != "" {
-			args = append(args, "--user", user)
-		}
-		args = append(args, "-v", workspace+":/workspace/.nkd/factory", "-w", "/workspace",
-			node.Container, containerRunner, "factory", "execute-node",
-			"--plan", "/workspace/.nkd/factory/"+localPlanPath, "--node", node.ID,
-			"--workspace", ".nkd/factory")
-		cmd := exec.CommandContext(ctx, options.Runtime, args...)
-		cmd.Stdout, cmd.Stderr = options.Stdout, options.Stderr
-		runErr := ownedcmd.Run(ctx, cmd)
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		_, _ = ownedcmd.CombinedOutput(cleanupCtx, options.Runtime, "rm", "-f", name)
-		cancel()
-		if runErr != nil {
-			return classifyContext(ctx, runErr)
-		}
-		return nil
+		return executeUtilityNode(ctx, node, utilityRunnerLocation{
+			runtime: options.Runtime, mountSource: workspace, mountTarget: "/workspace/.nkd/factory",
+			helper: containerRunner, plan: "/workspace/.nkd/factory/" + localPlanPath,
+			user: localContainerUser(), home: true,
+		}, options.Stdout, options.Stderr)
 	}
 	relocated, err := relocateFactoryPlan(plan, options.Workspace)
 	if err != nil {

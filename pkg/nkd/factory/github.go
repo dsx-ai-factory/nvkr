@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 const (
@@ -223,14 +222,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 	}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {
-		allNeeds := make([]string, 0, len(nodeJobs)+len(bootstrapJobs))
-		for _, job := range nodeJobs {
-			allNeeds = append(allNeeds, job)
+		allNeeds, err := githubFinalizerJobs(plan, nodeJobs)
+		if err != nil {
+			return nil, err
 		}
-		for _, job := range bootstrapJobs {
-			allNeeds = append(allNeeds, job)
-		}
-		allNeeds = uniqueSorted(allNeeds)
 		runners := sortedKeys(bootstrapJobs)
 		fmt.Fprintln(&body, "  nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
@@ -292,33 +287,6 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 
 // irProjectedNode identifies a reference to an exact producer instruction.
 func irProjectedNode(node Node) bool { return node.BuildTarget != "" && node.IRNode != "" }
-
-func generatedNodeCommands(node Node, plan *Plan, planPath, workspaceVariable string) []string {
-	// The container runtime the helper orchestrates with is sourced from the operator's
-	// Environment execution settings (ADR-18 §8), defaulting to rootless podman.
-	runtime := plan.Environment.RuntimeBinary()
-	command := fmt.Sprintf("./nkd-exec factory execute-node --plan %s --node %s --workspace .nkd/factory",
-		shellQuote(planPath), shellQuote(node.ID))
-	if node.IRNode != "" || node.Container == "" {
-		return []string{command}
-	}
-	network := "bridge"
-	if node.Network == ir.NetworkNone {
-		network = "none"
-	}
-	platform := ""
-	if node.Platform != "" {
-		platform = " --platform " + shellQuote(node.Platform)
-	}
-	owner := ""
-	if runtime == "docker" {
-		// Docker's container root is host root. Keep private staged layouts owned
-		// by the runner so subsequent host transport steps can reopen them.
-		owner = ` --user "$(id -u):$(id -g)" -e HOME=/tmp`
-	}
-	return []string{fmt.Sprintf("%s run --rm --network %s%s%s -v \"%s:/workspace\" -w /workspace %s %s",
-		runtime, network, platform, owner, workspaceVariable, shellQuote(node.Container), "/workspace/"+strings.TrimPrefix(command, "./"))}
-}
 
 func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, label, name, path string) {
 	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name), yamlSingle(path))

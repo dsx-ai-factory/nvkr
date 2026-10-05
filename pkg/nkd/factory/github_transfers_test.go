@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,7 +12,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestGitHubTransfersBatchPresentationAndFailAtExactArtifact(t *testing.T) {
+func TestGitHubTransfersUsePlanDerivedCommandsAndExactActions(t *testing.T) {
 	for _, direction := range []string{"restore", "archive"} {
 		t.Run(direction, func(t *testing.T) {
 			plan := &Plan{Actions: githubTestPlan(t).Actions}
@@ -33,7 +31,7 @@ func TestGitHubTransfersBatchPresentationAndFailAtExactArtifact(t *testing.T) {
 				jobs[artifact.Producer] = "job-" + name
 			}
 			var rendered bytes.Buffer
-			var run string
+			var run, want string
 			if direction == "restore" {
 				stage := githubStage{ID: "consumer-job", Nodes: []Node{{ID: "consumer", Inputs: ids}}}
 				if err := writeGitHubStageInputSteps(&rendered, plan, stage, artifacts, jobs, actions); err != nil {
@@ -44,6 +42,10 @@ func TestGitHubTransfersBatchPresentationAndFailAtExactArtifact(t *testing.T) {
 					t.Fatalf("stage input batch not exact and mandatory: %+v", steps)
 				}
 				run = steps[1].Run
+				want = "./nkd-exec factory github restore-inputs --plan " + FactoryPlanPath + " --stage consumer-job"
+				if steps[1].ContinueOnError || steps[1].If != "" || len(steps[1].Env) != 0 {
+					t.Fatalf("input restore must be mandatory and credential-free: %+v", steps[1])
+				}
 			} else {
 				node := Node{ID: "package/test", Kind: NodePackage, Outputs: ids}
 				writeGitHubOutputSteps(&rendered, plan, node, artifacts, actions)
@@ -57,71 +59,15 @@ func TestGitHubTransfersBatchPresentationAndFailAtExactArtifact(t *testing.T) {
 					}
 				}
 				run = steps[0].Run
+				want = "./nkd-exec factory github pack-outputs --plan " + FactoryPlanPath + " --node package/test"
+				if steps[0].ContinueOnError || steps[0].If != "" || len(steps[0].Env) != 0 {
+					t.Fatalf("output packing must be mandatory and credential-free: %+v", steps[0])
+				}
 			}
-			root := t.TempDir()
-			writeTransferFixture(t, root)
-			summary := filepath.Join(root, "summary.md")
-			log := runGitHubScript(t, root, run, summary, 23)
-			if !strings.Contains(log, "at "+direction+" input/b (exit 23") || strings.Contains(log, "helper: transport-unpack --archive .nkd/carriers/input-c.tar") || strings.Contains(log, "helper: transport-pack --archive .nkd/carriers/input-c.tar") || strings.Contains(log, "Completed:") {
-				t.Fatalf("batch failed to stop at exact carrier: %s", log)
-			}
-			raw, err := os.ReadFile(summary)
-			if err != nil || !strings.Contains(string(raw), "| failed | 23 |") || !strings.Contains(string(raw), "<code>"+direction+" input/b</code>") {
-				t.Fatalf("wrong transfer failure summary: %v\n%s", err, raw)
+			if strings.TrimSpace(run) != want {
+				t.Fatalf("carrier helper = %q, want %q", run, want)
 			}
 		})
-	}
-}
-
-func TestGitHubBatchedRecoveryRecordsEveryOutcomeAfterFailure(t *testing.T) {
-	plan := &Plan{Actions: githubTestPlan(t).Actions}
-	jobs := map[string]string{}
-	for _, name := range []string{"a", "b", "c", "d"} {
-		plan.Graph.Artifacts = append(plan.Graph.Artifacts, Artifact{ID: "input/" + name, Name: name, Path: ".nkd/factory/" + name, Producer: "producer-" + name})
-		jobs["producer-"+name] = "job-" + name
-	}
-	var rendered bytes.Buffer
-	if err := writeGitHubFinalizerRestoreSteps(&rendered, plan, jobs); err != nil {
-		t.Fatal(err)
-	}
-	steps := decodeGitHubSteps(t, rendered.Bytes())
-	if len(steps) != 3 || !steps[1].ContinueOnError {
-		t.Fatalf("recovery must retain tolerant exact download then all-carrier accounting: %+v", steps)
-	}
-	root := t.TempDir()
-	for _, dir := range []string{".nkd/carriers", ".nkd/restore-outcomes"} {
-		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, name := range []string{"a", "b", "d"} {
-		if err := os.WriteFile(filepath.Join(root, carrierPath("input/"+name)), []byte("fixture"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	writeTransferFixture(t, root)
-	script := steps[2].Run
-	for _, name := range []string{"a", "b", "c", "d"} {
-		result := "success"
-		if name == "a" {
-			result = "failure"
-		}
-		script = strings.ReplaceAll(script, "${{ needs.job-"+name+".result }}", result)
-	}
-	summary := filepath.Join(root, "summary.md")
-	log := runGitHubScript(t, root, script, summary, 0)
-	raw, err := os.ReadFile(summary)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, test := range []struct{ name, outcome string }{{"a", "job-failed"}, {"b", "restore-failed"}, {"c", "missing"}, {"d", "restored:success"}} {
-		status, err := os.ReadFile(filepath.Join(root, HostedRestoreOutcomePath(".nkd/factory", "input/"+test.name)))
-		if err != nil || string(status) != test.outcome+"\n" {
-			t.Fatalf("%s outcome = %q, %v; log %s", test.name, status, err, log)
-		}
-		if !strings.Contains(string(raw), "| <code>input/"+test.name+"</code> | "+test.outcome+" |") {
-			t.Fatalf("summary omits recovery outcome: %s", raw)
-		}
 	}
 }
 
@@ -155,14 +101,7 @@ func decodeGitHubSteps(t *testing.T, raw []byte) []githubStep {
 	return document.Steps
 }
 
-func writeTransferFixture(t *testing.T, root string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(root, "nkd-exec"), []byte("#!/bin/sh\nprintf 'helper: %s\\n' \"$*\"\ncase \"$*\" in *input-b.tar*) exit 23;; esac\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestGitHubRecoveryBatchesRespectProviderScriptLimit(t *testing.T) {
+func TestGitHubRecoveryCommandRemainsCompactForLargeGraph(t *testing.T) {
 	plan := &Plan{Actions: githubTestPlan(t).Actions}
 	jobs := map[string]string{}
 	for i := range 150 {
@@ -175,19 +114,17 @@ func TestGitHubRecoveryBatchesRespectProviderScriptLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	steps := decodeGitHubSteps(t, rendered.Bytes())
-	if len(steps) < 4 {
-		t.Fatal("large recovery did not split into bounded batches")
+	if len(steps) != 2 {
+		t.Fatalf("large recovery requires download and one helper, got %d steps", len(steps))
 	}
 	for _, step := range steps {
 		if len(step.Run) > githubMaximumRunBytes {
 			t.Fatalf("step %q has %d bytes", step.Name, len(step.Run))
 		}
 	}
-	runs := joinRuns(steps)
-	for _, artifact := range plan.Graph.Artifacts {
-		if strings.Count(runs, "nkd_recovery=$(cat "+HostedRestoreOutcomePath(".nkd/factory", artifact.ID)+")") != 1 {
-			t.Fatalf("recovery batching duplicated or omitted %s", artifact.ID)
-		}
+	want := "./nkd-exec factory github recover --plan " + FactoryPlanPath
+	if strings.TrimSpace(steps[1].Run) != want {
+		t.Fatalf("recovery command expanded with graph: %q", steps[1].Run)
 	}
 }
 
@@ -207,15 +144,6 @@ func TestGitHubRunScriptLimitAdmission(t *testing.T) {
 				t.Fatalf("oversized script must fail capability admission: %v", err)
 			}
 		})
-	}
-}
-
-func TestGitHubRecoveryRejectsOversizedCarrierBeforeOutput(t *testing.T) {
-	var rendered bytes.Buffer
-	err := writeGitHubRecoveryBatches(&rendered, []string{"set -eu"}, [][]string{{"true"}, {strings.Repeat("a", githubMaximumRunBytes)}})
-	var coded *e.Error
-	if rendered.Len() != 0 || !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
-		t.Fatalf("oversized recovery produced bytes=%d, error=%v", rendered.Len(), err)
 	}
 }
 
@@ -272,7 +200,7 @@ func TestGitHubBatchSelectionCannotExpandRequiredClosure(t *testing.T) {
 	}
 }
 
-func TestGitHubInputRestoreBatchesRespectProviderLimit(t *testing.T) {
+func TestGitHubInputRestoreCommandRemainsCompactForLargeGraph(t *testing.T) {
 	for _, count := range []int{1, 34, 150} {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			plan := &Plan{Actions: githubTestPlan(t).Actions}
@@ -295,32 +223,23 @@ func TestGitHubInputRestoreBatchesRespectProviderLimit(t *testing.T) {
 				t.Fatal(err)
 			}
 			steps := decodeGitHubSteps(t, rendered.Bytes())
-			if count > 1 && len(steps) < 3 {
-				t.Fatal("large restore did not split into bounded steps")
+			if len(steps) != 2 {
+				t.Fatalf("restore requires download and one helper, got %d steps", len(steps))
 			}
 			for _, step := range steps {
 				if step.ContinueOnError || len(step.Run) > githubMaximumRunBytes {
 					t.Fatalf("input restore is tolerant or oversized: %s", step.Name)
 				}
 			}
-			runs := joinRuns(steps)
+			want := "./nkd-exec factory github restore-inputs --plan " + FactoryPlanPath + " --stage consumer"
+			if strings.TrimSpace(steps[1].Run) != want {
+				t.Fatalf("restore command expanded with graph: %q", steps[1].Run)
+			}
 			for _, id := range inputs {
-				command := "./nkd-exec transport-unpack --archive " + shellQuote(carrierPath(id)) + " --root . --path " + shellQuote(artifacts[id].Path)
-				if strings.Count(runs, command) != 1 {
-					t.Fatalf("restore duplicated or omitted %s", id)
+				if !stepDownloadsArtifact(plan, steps, githubArtifactName(id)) {
+					t.Fatalf("download omitted %s", id)
 				}
 			}
 		})
-	}
-}
-
-func TestGitHubInputRestoreRejectsOversizeBeforeOutput(t *testing.T) {
-	var rendered bytes.Buffer
-	err := writeGitHubRestoreBatches(&rendered, []string{"small", "oversized"}, []githubProgressCommand{
-		{phase: "small", run: "true"}, {phase: "oversized", run: strings.Repeat("a", githubMaximumRunBytes)},
-	})
-	var coded *e.Error
-	if rendered.Len() != 0 || !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
-		t.Fatalf("oversized restore returned bytes=%d, error=%v", rendered.Len(), err)
 	}
 }

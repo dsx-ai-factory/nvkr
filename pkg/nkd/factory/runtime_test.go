@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -39,60 +40,53 @@ func TestDeliveryRuntimeValidation(t *testing.T) {
 	}
 }
 
-// TestDeliveryRuntimeSourcesGeneratedRuntime proves `run generate` sources the
-// container runtime from internal Environment execution settings (default podman; overridable to
-// docker) instead of a hardcoded value.
+// The compact helper consumes the admitted Environment's default/overridden
+// runtime. The workflow contains selectors rather than inline runtime launchers.
 func TestDeliveryRuntimeSourcesGeneratedRuntime(t *testing.T) {
-	plan := githubTestPlan(t)
-	bundle, err := Render(context.Background(), plan, EngineGitHub)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wf := string(bundle.Files[GitHubWorkflowPath])
-	// Utility containers render the authored runtime. Producer runtime selection
-	// is tested through the shared execution operation.
-	if !strings.Contains(wf, "podman run") {
-		t.Fatalf("default Environment runtime must generate podman:\n%s", wf)
-	}
-	if strings.Contains(wf, "--runtime docker") || strings.Contains(wf, "docker run") {
-		t.Fatalf("default Environment runtime must not emit docker:\n%s", wf)
-	}
-
-	override := githubTestPlan(t)
-	override.Environment.Runtime = authored.Runtime{Runtime: "docker"}
-	digest, err := override.Environment.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	override.EnvironmentDigest = digest
-	bundle2, err := Render(context.Background(), override, EngineGitHub)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wf2 := string(bundle2.Files[GitHubWorkflowPath])
-	if !strings.Contains(wf2, "docker run") {
-		t.Fatalf("Environment runtime override to docker was not honored:\n%s", wf2)
+	for _, runtimeName := range []string{"", "docker"} {
+		t.Run("runtime="+runtimeName, func(t *testing.T) {
+			plan, node, calls := githubRunnerRuntimeFixtureFor(t, runtimeName, "exit 0\n")
+			bundle, err := Render(context.Background(), plan, EngineGitHub)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workflow := string(bundle.Files[GitHubWorkflowPath])
+			if !strings.Contains(workflow, githubRunnerCommand("run-node", "node", node.ID)) || strings.Contains(workflow, "podman run") || strings.Contains(workflow, "docker run") {
+				t.Fatal("workflow does not delegate runtime selection to helper")
+			}
+			if err := RunGitHubNode(t.Context(), plan, node.ID, GitHubStepOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(calls)
+			if err != nil || !strings.Contains(string(raw), "CALL\nrun\n") {
+				t.Fatalf("selected runtime was not executed: %s %v", raw, err)
+			}
+			want := "podman"
+			if runtimeName != "" {
+				want = runtimeName
+			}
+			if plan.Environment.RuntimeBinary() != want {
+				t.Fatalf("runtime=%s want%s", plan.Environment.RuntimeBinary(), want)
+			}
+		})
 	}
 }
 
 func TestGitHubDockerUtilityPreservesRunnerOwnership(t *testing.T) {
 	for _, runtime := range []string{"docker", "podman"} {
 		t.Run(runtime, func(t *testing.T) {
-			plan := githubTestPlan(t)
-			plan.Environment.Runtime.Runtime = runtime
-			digest, err := plan.Environment.Digest()
+			plan, node, calls := githubRunnerRuntimeFixtureFor(t, runtime, "exit 0\n")
+			if err := RunGitHubNode(t.Context(), plan, node.ID, GitHubStepOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(calls)
 			if err != nil {
 				t.Fatal(err)
 			}
-			plan.EnvironmentDigest = digest
-			bundle, err := RenderGitHub(context.Background(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			workflow := string(bundle.Files[GitHubWorkflowPath])
-			owner := `--user "$(id -u):$(id -g)" -e HOME=/tmp`
-			if strings.Contains(workflow, owner) != (runtime == "docker") {
-				t.Fatalf("utility ownership missing or applied to the wrong runtime: %s", runtime)
+			for _, argument := range []string{"--user\n" + localContainerUser() + "\n", "-e\nHOME=/tmp\n"} {
+				if strings.Contains(string(raw), argument) != (runtime == "docker") {
+					t.Fatalf("ownership argument %q incorrectly scoped: %s", argument, raw)
+				}
 			}
 		})
 	}
