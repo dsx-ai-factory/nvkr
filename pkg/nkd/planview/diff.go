@@ -183,7 +183,7 @@ func collectionKey(path string) string {
 	// Explicit schema set collections only. Patches and command arguments are
 	// ordered even if a patch happens to carry a unique name.
 	switch path[strings.LastIndex(path, "/")+1:] {
-	case "builds", "lifecycleOutputs", "outputs", "routes", "env", "variables":
+	case "builds", "lifecycleOutputs", "outputs", "routes", "env", "variables", "executionClasses":
 		return "name"
 	case "resolvedComponents":
 		return "Name"

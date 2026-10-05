@@ -6,9 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
 
 func TestCompareDistinguishesBuildIdentityFromExecutionAndTransport(t *testing.T) {
@@ -85,6 +87,61 @@ func TestCompareDistinguishesBuildIdentityFromExecutionAndTransport(t *testing.T
 			text, err := comparison.Render("text")
 			if err != nil || !strings.Contains(string(text), test.contains) {
 				t.Fatalf("text report lost change: %s %v", text, err)
+			}
+		})
+	}
+}
+
+func TestCompareExecutionClassesByName(t *testing.T) {
+	alpha := execution.Class{Name: "alpha", RunsOn: "ubuntu-22.04", HostPlatform: execution.HostPlatformLinuxAMD64, MaxTimeoutSeconds: 600}
+	beta := execution.Class{Name: "beta", RunsOn: "ubuntu-24.04", HostPlatform: execution.HostPlatformLinuxAMD64, MaxTimeoutSeconds: 600}
+	updatedBeta := beta
+	updatedBeta.Resources.MemoryMiB = 2048
+	withClasses := func(classes []execution.Class) *Document {
+		return inspectPlan(t, comparisonPlan(t, func(_ *catalog.Catalog, _ *definition.Definition, env *definition.Environment) {
+			env.ExecutionClasses = classes
+		}))
+	}
+	for _, test := range []struct {
+		name          string
+		before, after []execution.Class
+		path          string
+		old, new      any
+	}{
+		{"insertion", []execution.Class{beta}, []execution.Class{alpha, beta}, "/environment/executionClasses/@name=alpha", nil, alpha},
+		{"removal", []execution.Class{alpha, beta}, []execution.Class{beta}, "/environment/executionClasses/@name=alpha", alpha, nil},
+		{"field change", []execution.Class{alpha, beta}, []execution.Class{alpha, updatedBeta}, "/environment/executionClasses/@name=beta/resources/memoryMiB", nil, uint64(2048)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			before, after := withClasses(test.before), withClasses(test.after)
+			comparison, err := Compare(before, after)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(comparison.Builds) != 0 || comparison.UnchangedBuilds != len(before.plan.Builds) {
+				t.Fatalf("execution class change altered logical build identities: %+v", comparison)
+			}
+			var changes []Change
+			for _, change := range comparison.Changes {
+				if strings.HasPrefix(change.Path, "/environment/executionClasses/") {
+					changes = append(changes, change)
+				}
+			}
+			want := Change{Category: "environment and execution", Path: test.path}
+			if test.old != nil {
+				want.Before, err = canonical.Marshal(test.old)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if test.new != nil {
+				want.After, err = canonical.Marshal(test.new)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !reflect.DeepEqual(changes, []Change{want}) {
+				t.Fatalf("execution class changes=%+v, want %+v", changes, want)
 			}
 		})
 	}
