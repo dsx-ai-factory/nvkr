@@ -197,3 +197,30 @@ jobs:
               cat /sys/fs/cgroup/pids.max; test "$(cat /sys/fs/cgroup/cpu.max)" = "200000 100000";
               test "$(cat /sys/fs/cgroup/memory.max)" = 2147483648;
               test "$(cat /sys/fs/cgroup/pids.max)" = 256'
+          # Observe the daemon's actual named-volume filesystem, not the
+          # runner workspace or declared class capacity. No quota is inferred.
+          scratch_name="nkd-preflight-scratch-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RANDOM"
+          scratch_created=false
+          scratch_cleanup() {
+            exit_code=$?
+            trap - EXIT
+            if "$scratch_created"; then
+              if ! "${runtime[@]}" volume rm "$scratch_name"; then
+                echo "BLOCKER: failed exact owned-volume cleanup: $scratch_name" >&2
+                exit_code=1
+              fi
+            fi
+            exit "$exit_code"
+          }
+          trap scratch_cleanup EXIT
+          if "${runtime[@]}" volume inspect "$scratch_name" >/dev/null 2>&1; then
+            echo 'BLOCKER: diagnostic scratch volume unexpectedly exists' >&2
+            exit 1
+          fi
+          "${runtime[@]}" volume create --label "nkd.dev/preflight-run=$GITHUB_RUN_ID" "$scratch_name"
+          scratch_created=true
+          "${runtime[@]}" volume inspect "$scratch_name" --format '{{json .}}'
+          "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --init --user="$(id -u):$(id -g)" \
+            --mount "type=volume,source=$scratch_name,destination=/tmp,readonly,volume-nocopy" \
+            "$PROBE_IMAGE" sh -ec 'df -Pm /tmp; stat -f -c "filesystem=%T blocksize=%S availableblocks=%a" /tmp'
