@@ -5,6 +5,17 @@ Go compiler, and ShellCheck. Docker or podman is needed for actual local builds;
 neither a registry nor a source checkout. Linux is required for held-executable qualified/signing authority;
 macOS supports development, planning and contract tests.
 
+The ordinary test gate (`go test ./...`, `make test`, and `make check`) also requires Bash 3.2 or later,
+Git, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
+The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
+if a prerequisite is missing. On macOS with Homebrew, install the additional JSON and timeout tools with:
+
+```sh
+brew install jq coreutils
+```
+
+The lab discovers `gtimeout` directly on macOS; no `timeout` alias or unprefixed coreutils setup is needed.
+
 ```sh
 make build
 make check
