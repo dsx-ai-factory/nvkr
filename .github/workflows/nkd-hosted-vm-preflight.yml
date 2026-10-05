@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   native:
-    name: Native ${{ matrix.arch }} host and sandbox
+    name: Native ${{ matrix.arch }} host and sandbox (${{ matrix.runner }})
     strategy:
       fail-fast: false
       matrix:
@@ -26,6 +26,13 @@ jobs:
             machine: x86_64
           - arch: arm64
             runner: ubuntu-24.04-arm
+            machine: aarch64
+          # Repository-owned diagnostic exception only, never generated jobs.
+          - arch: amd64
+            runner: arc-amd64-kvm
+            machine: x86_64
+          - arch: arm64
+            runner: arc-arm64-kvm
             machine: aarch64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
