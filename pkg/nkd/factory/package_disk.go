@@ -76,7 +76,11 @@ func (owner *LocalRunResult) PackageReconciledDisk(ctx context.Context, plan *Pl
 	if err := document.Validate(); err != nil {
 		return delivery.Result{}, nil, err
 	}
-	evidence, err := prepareReconciledEvidence(ctx, plan, expected, document, receipt.ComponentDocuments())
+	componentDocuments, err := receipt.ComponentDocuments()
+	if err != nil {
+		return delivery.Result{}, nil, err
+	}
+	evidence, err := prepareReconciledEvidence(ctx, plan, expected, document, componentDocuments)
 	if err != nil {
 		return delivery.Result{}, nil, err
 	}

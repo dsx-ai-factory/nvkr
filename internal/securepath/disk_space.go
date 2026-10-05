@@ -7,11 +7,29 @@ import (
 	"os"
 )
 
-type diskSpaceFacts struct {
+// FilesystemSpace is a point-in-time statfs description, not a reservation or
+// proof of physical storage. Admission owners decide whether memory-backed
+// scratch is suitable for their operation.
+type FilesystemSpace struct {
 	blockSize    int64
 	available    uint64
 	readOnly     bool
 	memoryBacked bool
+}
+
+// ReadOnly reports the filesystem's observed read-only flag.
+func (facts FilesystemSpace) ReadOnly() bool { return facts.readOnly }
+
+// AvailableBytes converts available allocation units with checked arithmetic.
+func (facts FilesystemSpace) AvailableBytes() (uint64, error) {
+	if facts.blockSize <= 0 {
+		return 0, fmt.Errorf("scratch filesystem reports an invalid block size")
+	}
+	blockSize := uint64(facts.blockSize)
+	if facts.available > math.MaxUint64/blockSize {
+		return 0, fmt.Errorf("scratch filesystem capacity exceeds the supported range")
+	}
+	return facts.available * blockSize, nil
 }
 
 // AvailableDiskBackedBytes observes available bytes on the filesystem of a
@@ -21,7 +39,7 @@ func AvailableDiskBackedBytes(ctx context.Context, directory *os.File) (uint64, 
 	return availableDiskBackedBytes(ctx, directory, observeDiskSpace)
 }
 
-func availableDiskBackedBytes(ctx context.Context, directory *os.File, observe func(int) (diskSpaceFacts, error)) (uint64, error) {
+func availableDiskBackedBytes(ctx context.Context, directory *os.File, observe func(int) (FilesystemSpace, error)) (uint64, error) {
 	if ctx == nil || directory == nil || observe == nil {
 		return 0, fmt.Errorf("disk space observation requires context and a held directory")
 	}
@@ -42,12 +60,12 @@ func availableDiskBackedBytes(ctx context.Context, directory *os.File, observe f
 	if facts.readOnly || facts.memoryBacked || facts.blockSize <= 0 {
 		return 0, fmt.Errorf("scratch filesystem is read-only, memory-backed or reports an invalid block size")
 	}
-	blockSize := uint64(facts.blockSize)
-	if facts.available > math.MaxUint64/blockSize {
-		return 0, fmt.Errorf("scratch filesystem capacity exceeds the supported range")
+	available, err := facts.AvailableBytes()
+	if err != nil {
+		return 0, err
 	}
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	return facts.available * blockSize, nil
+	return available, nil
 }

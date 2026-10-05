@@ -3,6 +3,7 @@ package factory
 import (
 	"context"
 	"testing"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
@@ -34,6 +35,65 @@ func TestHostedDiskPublicationReservation(t *testing.T) {
 			release()
 			if len(tc.owner.diskPublicationPending) != 0 {
 				t.Fatal("reservation leaked")
+			}
+		})
+	}
+}
+
+func TestHostedDiskPublicationCloseJoinsReservedCompletion(t *testing.T) {
+	for _, committed := range []bool{false, true} {
+		name := "aborted"
+		if committed {
+			name = "committed"
+		}
+		t.Run(name, func(t *testing.T) {
+			owner := &LocalRunResult{}
+			release, err := owner.reserveHostedDiskPublication(t.Context(), "package", "evidence")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer release()
+			closed := make(chan error, 1)
+			go func() { closed <- owner.Close() }()
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				owner.diskMu.Lock()
+				closing := owner.diskClosing
+				owner.diskMu.Unlock()
+				if closing {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("Close did not revoke new admission")
+				}
+				time.Sleep(time.Millisecond)
+			}
+			select {
+			case err := <-closed:
+				t.Fatalf("Close abandoned a reserved completion: %v", err)
+			default:
+			}
+			if committed {
+				// The durable commit is now complete: late cancellation/Close
+				// must not erase its descriptive node outcomes.
+				owner.recordCommittedHostedDiskPublication("package", "evidence")
+			}
+			release()
+			release() // cleanup is idempotent, including its wait-group release
+			select {
+			case err := <-closed:
+				if err != nil {
+					t.Fatal(err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("Close did not join the released completion")
+			}
+			want := 0
+			if committed {
+				want = 2
+			}
+			if len(owner.Nodes) != want || len(owner.diskPublicationPending) != 0 {
+				t.Fatalf("completion outcomes=%v, pending=%v", owner.Nodes, owner.diskPublicationPending)
 			}
 		})
 	}

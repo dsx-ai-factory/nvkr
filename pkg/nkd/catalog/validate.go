@@ -23,6 +23,11 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 	sort.Strings(componentNames)
 	for _, name := range componentNames {
 		c := reg.Components[name]
+		if c.Prebuilt != nil && c.Prebuilt.Image != "" {
+			if err := validateAcquiredImageReference(name, c.Prebuilt.Image); err != nil {
+				return err
+			}
+		}
 		if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
 			return err
 		}
@@ -464,6 +469,9 @@ func validatePrebuilt(name string, c Component) error {
 	ref := p.URL
 	if hasImg {
 		ref = p.Image
+		if err := validateAcquiredImageReference(name, ref); err != nil {
+			return err
+		}
 	}
 	if err := checkArchTokens("component", name, "prebuilt ref", ref); err != nil {
 		return err

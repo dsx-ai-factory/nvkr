@@ -114,6 +114,14 @@ later unknown source fails, but no partial update commits. Artifact selections a
 are admitted before upstream calls. No-op updates preserve existing lock bytes. Source check mode returns
 `CodeDiff` when changes are available without writing; artifact pinning does not acquire a new check mode.
 
+Acquired `prebuilt.image` declarations name a tag-qualified acquisition reference; the generated artifact lock
+records the selected native manifest subjects. Digest-qualified authored image references are rejected with
+`CodeUnverifiedRef` by raw/resolved catalog admission and artifact maintenance before upstream work. The current
+lock protocol does not authenticate membership between an authored index digest and its native children, and
+does not independently pin a single-manifest authored digest. That capability remains deferred; neither stripping
+the authored digest nor accepting a stale child pin establishes membership. Existing templates are rendered by
+their owning catalog boundary before maintenance validates the resulting reference.
+
 - `catalog pin --dir <catalog> --tag vX.Y.Z <source>` — resolve that tag to
   `{tag, commit, treeHash, sourceDateEpoch}` and update the lock.
 - `catalog bump --dir <catalog> [--all] [source...]` — resolve the newest tag matching each selected source's

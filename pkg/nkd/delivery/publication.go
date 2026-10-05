@@ -166,12 +166,23 @@ func openPublication(ctx context.Context, root, expectedRoot string,
 }
 
 func admitPublicationDiskScratch(ctx context.Context, directory *os.File, required uint64) error {
-	available, err := securepath.AvailableDiskBackedBytes(ctx, directory)
+	return admitPublicationDiskScratchWith(ctx, directory, required, securepath.AvailableDiskBackedBytes)
+}
+
+// Only capacity observation is replaceable in tests; refusal and exact-fit
+// admission always execute the production policy.
+func admitPublicationDiskScratchWith(ctx context.Context, directory *os.File, required uint64,
+	observe func(context.Context, *os.File) (uint64, error),
+) error {
+	if ctx == nil || directory == nil || observe == nil {
+		return e.New(e.CodeEngineCapability, "publication disk snapshot admission requires context, held scratch and capacity observer")
+	}
+	available, err := observe(ctx, directory)
 	if err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "publication requires observed disk-backed scratch")
+		return e.Wrap(e.CodeEngineCapability, err, "publication disk snapshot scratch %q (under TMPDIR %q) requires writable non-memory-backed capacity; select a disk-backed TMPDIR", directory.Name(), os.TempDir())
 	}
 	if available < required {
-		return e.New(e.CodeEngineCapability, "publication scratch cannot hold its aggregate unique disk snapshots")
+		return e.New(e.CodeEngineCapability, "publication disk snapshot scratch %q (under TMPDIR %q) has %d available bytes, requires %d for unique QCOW2 snapshots", directory.Name(), os.TempDir(), available, required)
 	}
 	return nil
 }

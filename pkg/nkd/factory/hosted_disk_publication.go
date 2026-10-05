@@ -3,6 +3,7 @@ package factory
 import (
 	"context"
 	"slices"
+	"sync"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
@@ -53,21 +54,18 @@ func CompleteHostedDiskPublication(ctx context.Context, plan *Plan, expected Lif
 	if _, _, err := owner.PackageReconciledDisk(ctx, plan, expected, runtime, receipt, output); err != nil {
 		return err
 	}
-	if err := ctx.Err(); err != nil {
-		return e.Wrap(e.CodeTimeout, err, "hosted disk completion canceled before recording outcomes")
-	}
+	// The package/evidence no-replace commit succeeded. Commit wins over
+	// subsequent cancellation; Close waits for this reservation to finish.
+	owner.recordCommittedHostedDiskPublication(output.Producer, evidence.Producer)
+	return nil
+}
+
+func (owner *LocalRunResult) recordCommittedHostedDiskPublication(output, evidence string) {
 	owner.diskMu.Lock()
 	defer owner.diskMu.Unlock()
-	if err := ctx.Err(); err != nil {
-		return e.Wrap(e.CodeTimeout, err, "hosted disk completion canceled before recording outcomes")
-	}
-	if owner.diskClosed || owner.diskClosing {
-		return e.New(e.CodeGateUnmet, "hosted disk completion requires its original open Run")
-	}
 	owner.Nodes = append(owner.Nodes,
-		LocalNodeResult{ID: evidence.Producer, Kind: NodeSBOM, Status: "ok"},
-		LocalNodeResult{ID: output.Producer, Kind: NodePackage, Status: "ok"})
-	return nil
+		LocalNodeResult{ID: evidence, Kind: NodeSBOM, Status: "ok"},
+		LocalNodeResult{ID: output, Kind: NodePackage, Status: "ok"})
 }
 
 // Reserve the exact completion while inspection temporarily releases the Run's
@@ -94,9 +92,14 @@ func (owner *LocalRunResult) reserveHostedDiskPublication(ctx context.Context, o
 		owner.diskPublicationPending = make(map[string]bool)
 	}
 	owner.diskPublicationPending[output] = true
+	owner.diskPublicationWait.Add(1)
+	var once sync.Once
 	return func() {
-		owner.diskMu.Lock()
-		delete(owner.diskPublicationPending, output)
-		owner.diskMu.Unlock()
+		once.Do(func() {
+			owner.diskMu.Lock()
+			delete(owner.diskPublicationPending, output)
+			owner.diskMu.Unlock()
+			owner.diskPublicationWait.Done()
+		})
 	}, nil
 }

@@ -4,16 +4,23 @@ package securepath
 
 import "golang.org/x/sys/unix"
 
-func observeDiskSpace(fd int) (diskSpaceFacts, error) {
+func observeDiskSpace(fd int) (FilesystemSpace, error) {
 	var stat unix.Statfs_t
 	if err := unix.Fstatfs(fd, &stat); err != nil {
-		return diskSpaceFacts{}, err
+		return FilesystemSpace{}, err
 	}
-	return diskSpaceFactsFromStat(stat), nil
+	return FilesystemSpaceFromStat(stat), nil
 }
 
-func diskSpaceFactsFromStat(stat unix.Statfs_t) diskSpaceFacts {
-	return diskSpaceFacts{blockSize: stat.Bsize, available: stat.Bavail,
+// FilesystemSpaceFromStat projects Linux allocation facts. Bavail is counted in
+// Frsize units; older filesystems that report no fragment size use Bsize.
+// Overlay filesystems do not reveal the backing mount's storage class here.
+func FilesystemSpaceFromStat(stat unix.Statfs_t) FilesystemSpace {
+	blockSize := int64(stat.Frsize)
+	if blockSize == 0 {
+		blockSize = int64(stat.Bsize)
+	}
+	return FilesystemSpace{blockSize: blockSize, available: uint64(stat.Bavail),
 		readOnly:     uint64(stat.Flags)&uint64(unix.ST_RDONLY) != 0,
-		memoryBacked: stat.Type == unix.TMPFS_MAGIC || stat.Type == unix.RAMFS_MAGIC}
+		memoryBacked: uint32(stat.Type) == uint32(unix.TMPFS_MAGIC) || uint32(stat.Type) == uint32(unix.RAMFS_MAGIC)}
 }

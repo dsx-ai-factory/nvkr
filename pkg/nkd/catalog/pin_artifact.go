@@ -71,6 +71,11 @@ func prebuiltTargetFor(name string, raw rawComponent, pin Pin) (PrebuiltTarget, 
 	if err != nil {
 		return PrebuiltTarget{}, e.Wrap(e.CodeInvalidCatalog, err, "prebuilt component %q", name)
 	}
+	if image != "" {
+		if err := validateAcquiredImageReference(name, image); err != nil {
+			return PrebuiltTarget{}, err
+		}
+	}
 	return PrebuiltTarget{
 		Name:      name,
 		PinnedBy:  raw.PinnedBy,
@@ -106,6 +111,9 @@ func resolvePrebuiltTarget(ctx context.Context, selected PrebuiltTarget, runtime
 		return pin, nil
 	}
 	if selected.Image != "" {
+		if err := validateAcquiredImageReference(selected.Name, selected.Image); err != nil {
+			return pin, err
+		}
 		digests, err := resolveImageDigests(ctx, runtime, selected.Image, arches)
 		pin.Digests = digests
 		return pin, err
@@ -156,6 +164,9 @@ func resolveBinaryDigest(ctx context.Context, url string) (string, error) {
 // `docker manifest inspect`, returning arch -> sha256:<digest> for each requested arch
 // (fail closed if an arch is absent from the manifest list).
 func resolveImageDigests(ctx context.Context, docker, ref string, arches []string) (map[string]string, error) {
+	if err := validateAcquiredImageReference("image pin", ref); err != nil {
+		return nil, err
+	}
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "image digest resolution requires a context")
 	}

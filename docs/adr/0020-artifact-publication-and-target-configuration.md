@@ -210,7 +210,15 @@ further projections. Signature and policy verification remain in the lifecycle c
 integrity and membership only, never signer authority by itself. Path-based diagnostic operations retain their
 independent revalidation at each call.
 
-Large QCOW2 payloads use streamed, anonymous disk-backed snapshots rather than payload-sized RAM files.
+Large QCOW2 payloads use streamed anonymous filesystem snapshots rather than payload-sized RAM files.
+The consumer snapshot root uses the process `TMPDIR` (the platform temporary directory when unset),
+including when registry acquisition has a separate workspace. Before payload copies, the consumer admits
+aggregate unique QCOW2 bytes against writable free space and rejects detected tmpfs/ramfs storage with
+`CodeEngineCapability`; the error identifies the scratch location and asks for a disk-backed `TMPDIR`.
+This is point-in-time capacity, not a reservation or proof of physical backing. Linux overlayfs reports
+capacity for its writable layer but does not identify that layer's backing mount, so a non-memory-backed
+statfs result cannot certify physical disk storage. General VM ephemeral scratch may be memory-backed;
+its separate execution admission uses the same allocation facts without this consumer snapshot policy.
 Payload export checks the exact held digest and size again, and the original publication owner controls the
 snapshot lifetime. These transport capabilities cannot restore the live reconciliation receipt used by
 production packaging.

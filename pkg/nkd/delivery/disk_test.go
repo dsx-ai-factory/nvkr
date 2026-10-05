@@ -571,7 +571,6 @@ func TestDiskArtifactCancellationAndClose(t *testing.T) {
 	case <-blocked.entered:
 	case <-time.After(5 * time.Second):
 		close(blocked.release)
-		<-streamDone
 		t.Fatal("stream did not enter destination")
 	}
 	waitCtx, stopWait := context.WithCancel(t.Context())
@@ -583,17 +582,20 @@ func TestDiskArtifactCancellationAndClose(t *testing.T) {
 		assertRegistryCode(t, err, e.CodeTimeout)
 	case <-time.After(5 * time.Second):
 		close(blocked.release)
-		<-streamDone
 		t.Fatal("waiting stream ignored cancellation")
 	}
 	closeDone := make(chan error, 1)
 	go func() { closeDone <- artifact.Close() }()
 	close(blocked.release)
-	if err := <-streamDone; err != nil {
-		t.Fatal(err)
-	}
-	if err := <-closeDone; err != nil {
-		t.Fatal(err)
+	for _, done := range []<-chan error{streamDone, closeDone} {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("released stream or close did not finish")
+		}
 	}
 	_, err = artifact.WriteToContext(t.Context(), io.Discard)
 	assertRegistryCode(t, err, e.CodeGateUnmet)

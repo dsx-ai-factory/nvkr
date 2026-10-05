@@ -79,6 +79,7 @@ type LocalRunResult struct {
 	diskClosing            bool
 	diskInspectionCancel   context.CancelFunc
 	diskPublicationPending map[string]bool
+	diskPublicationWait    sync.WaitGroup
 	diskCompletions        []diskProducerCompletion
 	materialConsumptions   map[string]producerConsumption
 }

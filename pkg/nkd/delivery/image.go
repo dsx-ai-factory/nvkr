@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"io"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
@@ -72,6 +74,9 @@ func inspectPublishedContainerImage(ctx context.Context, root string, publicatio
 		return ImageInspection{}, e.Wrap(e.CodeVerifyFailed, err, "validating published image manifest JSON")
 	}
 	var manifest ociManifest
+	if err := validateImageSchemaNames(manifestRaw, reflect.TypeFor[v1.Manifest]()); err != nil {
+		return ImageInspection{}, err
+	}
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return ImageInspection{}, e.Wrap(e.CodeVerifyFailed, err, "decoding published image manifest")
 	}
@@ -110,6 +115,9 @@ func InspectContainerImage(ctx context.Context, root, platform string) (ImageIns
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return ImageInspection{}, e.Wrap(e.CodeVerifyFailed, err, "validating container image index JSON")
 	}
+	if err := validateImageSchemaNames(raw, reflect.TypeFor[v1.IndexManifest]()); err != nil {
+		return ImageInspection{}, err
+	}
 	if index.ArtifactType != "" || len(index.Manifests) != 1 || !types.MediaType(index.Manifests[0].MediaType).IsImage() {
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "container image requires exactly one OCI image manifest")
 	}
@@ -122,6 +130,9 @@ func InspectContainerImage(ctx context.Context, root, platform string) (ImageIns
 		return ImageInspection{}, e.Wrap(e.CodeVerifyFailed, err, "validating container image manifest JSON")
 	}
 	var manifest ociManifest
+	if err := validateImageSchemaNames(manifestRaw, reflect.TypeFor[v1.Manifest]()); err != nil {
+		return ImageInspection{}, err
+	}
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return ImageInspection{}, e.Wrap(e.CodeVerifyFailed, err, "decoding container image manifest")
 	}
@@ -159,6 +170,9 @@ func verifyImageManifest(ctx context.Context, root string, manifest ociManifest,
 	}
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return config, e.Wrap(e.CodeVerifyFailed, err, "validating container image config JSON")
+	}
+	if err := validateImageSchemaNames(raw, reflect.TypeFor[v1.ConfigFile]()); err != nil {
+		return config, err
 	}
 	if err := json.Unmarshal(raw, &config); err != nil {
 		return config, e.Wrap(e.CodeVerifyFailed, err, "decoding container image config")

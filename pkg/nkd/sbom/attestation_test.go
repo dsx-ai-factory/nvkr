@@ -68,10 +68,49 @@ func TestAttestedDocumentInventoryAndBundleSizeBounds(t *testing.T) {
 }
 
 func TestAttestedDocumentRejectsOversizedBundleBeforeDecode(t *testing.T) {
-	_, err := AttestedDocument(bytes.Repeat([]byte{' '}, MaxBundleBytes+1), "sha256:"+strings.Repeat("a", 64))
-	var coded *e.Error
-	if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
-		t.Fatalf("wrong rejection: %v", err)
+	digest := "sha256:" + strings.Repeat("a", 64)
+	bom, err := NewSubject(digest, "component", digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, err := bom.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	statement, err := json.Marshal(map[string]any{"_type": "https://in-toto.io/Statement/v1", "predicateType": CycloneDXPredicateType,
+		"subject": []any{map[string]any{"digest": map[string]string{"sha256": strings.TrimPrefix(digest, "sha256:")}}}, "predicate": json.RawMessage(document)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(map[string]any{"mediaType": BundleMediaType, "verificationMaterial": map[string]any{},
+		"dsseEnvelope": map[string]any{"payloadType": "application/vnd.in-toto+json", "payload": base64.StdEncoding.EncodeToString(statement), "signatures": []any{map[string]string{"sig": "Zml4dHVyZQ=="}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		size int
+		code e.Code
+	}{
+		{name: "exact limit", size: MaxBundleBytes},
+		{name: "one byte over", size: MaxBundleBytes + 1, code: e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Whitespace is valid JSON padding; without the size gate both
+			// fixtures would decode to the same otherwise valid document.
+			padded := append(bytes.Clone(raw), bytes.Repeat([]byte{' '}, tc.size-len(raw))...)
+			got, err := AttestedDocument(padded, digest)
+			if tc.code != "" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != tc.code || got != nil {
+					t.Fatalf("wrong rejection: %v", err)
+				}
+				return
+			}
+			if err != nil || !bytes.Equal(got, document) {
+				t.Fatalf("exact-limit document changed: %v", err)
+			}
+		})
 	}
 }
 

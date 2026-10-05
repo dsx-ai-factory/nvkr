@@ -145,3 +145,68 @@ func TestReconciledDiskPackageTransaction(t *testing.T) {
 		})
 	}
 }
+
+func TestReconciledDiskPackageTransactionAdmission(t *testing.T) {
+	for _, scenario := range []struct {
+		name string
+		code e.Code
+	}{
+		{name: "missing context", code: e.CodeUsage},
+		{name: "missing cleanup", code: e.CodeUsage},
+		{name: "missing builder", code: e.CodeUsage},
+		{name: "canceled", code: e.CodeTimeout},
+		{name: "package escape", code: e.CodePipelineDrift},
+		{name: "evidence escape", code: e.CodePipelineDrift},
+		{name: "same destination", code: e.CodePipelineDrift},
+		{name: "package contains evidence", code: e.CodePipelineDrift},
+		{name: "evidence contains package", code: e.CodePipelineDrift},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			workspace := t.TempDir()
+			foreign := filepath.Join(t.TempDir(), "sentinel")
+			if err := os.WriteFile(foreign, []byte("caller-owned"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			output := filepath.Join(workspace, "package")
+			evidence := reconciledEvidenceFiles{directory: filepath.Join(workspace, "evidence")}
+			ctx := t.Context()
+			calls := 0
+			closeCarrier := func() error { calls++; return nil }
+			build := func(context.Context, string) (delivery.Result, error) { calls++; return delivery.Result{}, nil }
+			switch scenario.name {
+			case "missing context":
+				ctx = nil
+			case "missing cleanup":
+				closeCarrier = nil
+			case "missing builder":
+				build = nil
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			case "package escape":
+				output = foreign
+			case "evidence escape":
+				evidence.directory = foreign
+			case "same destination":
+				evidence.directory = output
+			case "package contains evidence":
+				evidence.directory = filepath.Join(output, "child")
+			case "evidence contains package":
+				output = filepath.Join(evidence.directory, "child")
+			}
+			result, err := publishReconciledDiskPackage(ctx, workspace, output, evidence, closeCarrier, build)
+			if factoryErrorCode(err) != scenario.code || !reflect.DeepEqual(result, delivery.Result{}) || calls != 0 {
+				t.Fatalf("admission returned %+v, %v; callbacks=%d", result, err, calls)
+			}
+			entries, err := os.ReadDir(workspace)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("admission left workspace entries: %v, %v", entries, err)
+			}
+			preserved, err := os.ReadFile(foreign)
+			if err != nil || string(preserved) != "caller-owned" {
+				t.Fatalf("admission touched a foreign file: %q, %v", preserved, err)
+			}
+		})
+	}
+}

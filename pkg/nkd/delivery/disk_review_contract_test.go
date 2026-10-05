@@ -114,7 +114,7 @@ func TestOpenPublicationRejectsSelfPinnedDiskBindingChanges(t *testing.T) {
 						}
 					}
 				})
-				owner, err := OpenPublication(t.Context(), root, pin)
+				owner, err := openDiskPublicationFixture(t.Context(), root, pin)
 				assertRegistryCode(t, err, e.CodeVerifyFailed)
 				if owner != nil || !strings.Contains(err.Error(), test.diagnostic) {
 					t.Fatalf("changed binding reached the wrong gate: owner=%v, %v", owner, err)

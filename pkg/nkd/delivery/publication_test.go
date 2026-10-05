@@ -20,6 +20,17 @@ func releasePublicationFixture(t *testing.T) (string, string) {
 
 func releasePublicationPlatformFixture(t *testing.T, osName, arch string) (string, string) {
 	t.Helper()
+	request := releasePublicationRequestFixture(t, osName, arch)
+	root := filepath.Join(t.TempDir(), "publication")
+	result, err := BuildPublicationRoot(t.Context(), root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root, result.RootDigest
+}
+
+func releasePublicationRequestFixture(t *testing.T, osName, arch string) PublicationRequest {
+	t.Helper()
 	source := filepath.Join(t.TempDir(), "cli")
 	payload := []byte("exact executable")
 	if err := os.WriteFile(source, payload, 0o755); err != nil {
@@ -56,15 +67,10 @@ func releasePublicationPlatformFixture(t *testing.T, osName, arch string) (strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := filepath.Join(t.TempDir(), "publication")
-	result, err := BuildPublicationRoot(t.Context(), root, PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: []ObjectInput{
+	return PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: []ObjectInput{
 		{Name: "tools", Kind: "binary-bundle", Path: bundlePath, Layout: true, ArtifactType: MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest, OS: osName, Arch: arch, Output: &OutputBinding{Repository: "tools", Format: "executable", BuildDigest: build, Components: []string{"cli"}, BuildSubjects: []BuildSubject{{Component: "cli", Digest: digestBytes(payload)}}}},
 		{Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: semantic, Bytes: raw, Evidence: &EvidenceBinding{Outputs: []string{"tools"}, Component: "cli", Stage: "build-output", SubjectKind: "file", SubjectDigest: digestBytes(payload)}},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return root, result.RootDigest
+	}}
 }
 
 func TestPublicationOwnsHeldClosureLifetime(t *testing.T) {

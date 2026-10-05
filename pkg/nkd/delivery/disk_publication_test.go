@@ -94,6 +94,15 @@ func diskPublicationRequest(t *testing.T, arch string) (PublicationRequest, stri
 	return request, manifest
 }
 
+// Synthetic disk fixtures exercise the real owner and capacity policy using
+// controlled observed headroom, not a claim about the test host's TMPDIR.
+func openDiskPublicationFixture(ctx context.Context, root, pin string) (*Publication, error) {
+	return openPublication(ctx, root, pin, func(ctx context.Context, directory *os.File, required uint64) error {
+		return admitPublicationDiskScratchWith(ctx, directory, required,
+			func(context.Context, *os.File) (uint64, error) { return required, nil })
+	})
+}
+
 func TestDiskPublicationPreservesManifestAndPayloadSubjects(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
@@ -120,7 +129,7 @@ func TestDiskPublicationPreservesManifestAndPayloadSubjects(t *testing.T) {
 					t.Fatal("SBOM attested the wrapper instead of raw build payload")
 				}
 			}
-			publication, err := OpenPublication(t.Context(), final, result.RootDigest)
+			publication, err := openDiskPublicationFixture(t.Context(), final, result.RootDigest)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -206,7 +215,7 @@ func TestDiskPublicationLargeInventoryAttestationReadback(t *testing.T) {
 	if !expanded {
 		t.Fatal("fixture did not exercise an expanded signed bundle")
 	}
-	publication, err := OpenPublication(t.Context(), final, result.RootDigest)
+	publication, err := openDiskPublicationFixture(t.Context(), final, result.RootDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +239,7 @@ func TestPublicationDiskStreamAdmissionCancellationAndClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	publication, err := OpenPublication(t.Context(), root, result.RootDigest)
+	publication, err := openDiskPublicationFixture(t.Context(), root, result.RootDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +318,7 @@ func TestPublicationDiskStreamRechecksSubstitutedSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	publication, err := OpenPublication(t.Context(), root, result.RootDigest)
+	publication, err := openDiskPublicationFixture(t.Context(), root, result.RootDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +398,7 @@ func TestPublicationAdmitsDiskMetadataAndInventoryBeforePayloadCapture(t *testin
 			if disks != nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("admission did not precede capture: %v", err)
 			}
-			publication, err := OpenPublication(t.Context(), root, pin)
+			publication, err := openDiskPublicationFixture(t.Context(), root, pin)
 			assertRegistryCode(t, err, e.CodeVerifyFailed)
 			if publication != nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("publication reached payload capture: %v", err)
@@ -559,7 +568,12 @@ func TestDiskRegistryRoundTrip(t *testing.T) {
 				if !strings.HasSuffix(reference, "@"+result.RootDigest) {
 					t.Fatal("registry changed root pin")
 				}
-				publication, err := PullPublication(t.Context(), reference, t.TempDir(), options)
+				pulled := filepath.Join(t.TempDir(), "pulled")
+				inspection, err := Pull(t.Context(), reference, pulled, options)
+				if err != nil {
+					t.Fatal(err)
+				}
+				publication, err := openDiskPublicationFixture(t.Context(), pulled, inspection.RootDigest)
 				if err != nil {
 					t.Fatal(err)
 				}
