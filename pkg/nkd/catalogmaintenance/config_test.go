@@ -2,8 +2,11 @@ package catalogmaintenance
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -87,4 +90,55 @@ func TestMaintenanceLoadRejectsAmbiguousAndUnsafeFiles(t *testing.T) {
 	assertCode(t, err, e.CodeUsage)
 	_, err = Refresh(ctx, Config{}, "test", false)
 	assertCode(t, err, e.CodeTimeout)
+}
+
+func TestMaintenanceLoadRequiresOneStrictDocument(t *testing.T) {
+	const valid = `apiVersion: nkd.dev/catalog-maintenance/v1
+name: test
+catalog: catalog
+sources: [first, second]
+sameRelease: [[first, second]]
+definition: definition.yaml
+environment: environment.yaml
+validation: static
+`
+	jsonConfig, err := json.Marshal(validConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name    string
+		content string
+		valid   bool
+	}{
+		{"single document", valid, true},
+		{"single JSON document", string(jsonConfig), true},
+		{"explicit document boundaries", "---\n" + valid + "...\n# trailing comment\n", true},
+		{"additional unknown policy", valid + "---\nunknownPolicy: true\n", false},
+		{"additional conflicting policy", valid + "---\n" + valid + "schedule: '0 6 * * 1'\n", false},
+		{"malformed trailing document", valid + "---\ninvalid: [\n", false},
+		{"empty second document", valid + "---\n", false},
+		{"unknown field", valid + "unknownPolicy: true\n", false},
+		{"duplicate field", valid + "validation: local-run\n", false},
+		{"nested unknown field", valid + "sourceCheckout: {unknown: true}\n", false},
+		{"nested duplicate field", valid + "sourceCheckout: {secret: FIRST, secret: SECOND}\n", false},
+		{"anchor", strings.Replace(valid, "name: test", "name: &policy test", 1), false},
+		{"alias", strings.Replace(valid, "sources: [first, second]", "sources: [&source first, *source]", 1), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), "config.yaml")
+			writeFixture(t, p, []byte(tc.content))
+			got, err := Load(t.Context(), p)
+			if !tc.valid {
+				assertCode(t, err, e.CodeInvalidCatalog)
+				if !reflect.DeepEqual(got, Config{}) {
+					t.Fatalf("invalid document returned partial policy: %+v", got)
+				}
+				return
+			}
+			if err != nil || !reflect.DeepEqual(got, validConfig()) {
+				t.Fatalf("valid config = %+v, error = %v", got, err)
+			}
+		})
+	}
 }

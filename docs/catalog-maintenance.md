@@ -12,8 +12,9 @@ not infer or rewrite it.
 
 A maintenance config names one catalog, explicit source roots, a Definition and its Environment. Paths
 are relative to the repository root; run the commands there. This is an operational configuration, not
-an additional public lifecycle object. Unknown fields, path escapes, symlinks in selected input paths,
-unknown sources and missing release constraints fail closed.
+an additional public lifecycle object. The file contains exactly one YAML or JSON object; additional documents,
+unknown fields, duplicate keys, YAML anchors and aliases fail before refresh or workflow generation. Path
+escapes, symlinks in selected input paths, unknown sources and missing release constraints fail closed.
 
 `sameRelease` optionally groups independent source roles with identical repository, tag prefix and
 constraint text. The catalog transaction checks that they resolve the same tag, commit, tree and epoch

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/documentpath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"sigs.k8s.io/yaml"
@@ -140,6 +141,11 @@ func Load(ctx context.Context, filename string) (Config, error) {
 	raw, err := held.ReadAllContext(ctx, 64<<10)
 	if err != nil {
 		return Config{}, contextError(ctx, e.Wrap(e.CodeInvalidCatalog, err, "reading maintenance config"))
+	}
+	// Admit the complete document stream before strict typed decoding, which
+	// otherwise accepts only the first YAML document and ignores trailing policy.
+	if _, err := documentpath.Decode(raw); err != nil {
+		return Config{}, e.Wrap(e.CodeInvalidCatalog, err, "decoding maintenance config")
 	}
 	var config Config
 	if err := yaml.UnmarshalStrict(raw, &config); err != nil {
