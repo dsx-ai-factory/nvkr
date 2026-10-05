@@ -39,6 +39,9 @@ jobs:
     env:
       EXPECTED_MACHINE: ${{ matrix.machine }}
       PROBE_IMAGE: docker.io/library/ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3
+      # Diagnostic standard storage route, independent of nested overlay/FUSE.
+      # This does not admit a production runtime or change generated jobs.
+      STORAGE_DRIVER: vfs
     steps:
       - name: Measure native resources and usable KVM
         shell: bash
