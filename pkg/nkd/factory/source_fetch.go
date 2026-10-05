@@ -19,6 +19,8 @@ import (
 // existing repository-scoped helper; the downstream job receives source bytes and
 // a receipt which its producer must independently rehash before consumption.
 // This does not change ExecuteNode or RunLocal's capability restrictions.
+// Live fetching requires Linux's inherited-directory path and excludes dependency
+// vendoring until that runtime's bind mount can authenticate the held checkout.
 func ExecuteSourceFetch(ctx context.Context, plan *Plan, nodeID string, stdout, stderr io.Writer) error {
 	return executeSourceFetch(ctx, plan, nodeID, os.Environ(), stdout, stderr, (pipeline.Local{}).ExecNode)
 }
@@ -37,6 +39,9 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if err := rejectUnsupportedRuntimeStorage(plan, "source fetching"); err != nil {
+		return err
+	}
 	nodes, artifacts := planIndex(plan)
 	node, ok := nodes[nodeID]
 	if !ok || node.Kind != NodeFetch || node.Requirements != nil || !irProjectedNode(node) {
@@ -48,6 +53,9 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	}
 	if instruction.Kind != ir.KindFetch {
 		return e.New(e.CodePipelineDrift, "source fetch %q does not bind a fetch instruction", nodeID)
+	}
+	if len(instruction.VendorCmd) != 0 {
+		return e.New(e.CodeEngineCapability, "source fetching cannot authenticate a held checkout mount for dependency vendoring")
 	}
 	if err := admitSourceFetchEnvironment(plan, node, environment); err != nil {
 		return err
@@ -63,7 +71,16 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	if stderr == nil {
 		stderr = io.Discard
 	}
-	return executeProducer(ctx, plan, node, plan.Environment.RuntimeBinary(), 1, stdout, stderr, run, nil)
+	workspace, _, err := securepath.OpenDirectory(".")
+	if err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "holding source fetch workspace")
+	}
+	defer func() { _ = workspace.Close() }()
+	return executeProducer(ctx, plan, node, plan.Environment.RuntimeBinary(), 1, stdout, stderr,
+		func(instruction ir.Node, options pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
+			options.SourceWorkspace = workspace
+			return run(instruction, options)
+		}, nil)
 }
 
 // Existing path components must be real directories; a fresh missing suffix is

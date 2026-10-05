@@ -162,6 +162,13 @@ func (c *preparedSourceCache) materialize(n ir.Node, opts RunOptions) (*material
 // Existing receipts are reusable only when both their declaration and current bytes
 // still match. Any drift fails closed; this function never silently blesses it.
 func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func() error) error {
+	if opts.fetchDirectory != nil {
+		var err error
+		dir, err = sourceFetchDescriptorPath(opts.fetchDirectory.Fd())
+		if err != nil {
+			return err
+		}
+	}
 	wantVendor, err := fetchVendorSpecDigest(n)
 	if err != nil {
 		return err
@@ -170,7 +177,7 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	if err != nil {
 		return err
 	}
-	receipt, exists, err := readSourceReceiptContext(opts.ctx(), receiptPath)
+	receipt, exists, err := readSourceReceiptContext(opts.ctx(), receiptPath, opts.fetchReceiptDirectory)
 	if err != nil {
 		return err
 	}
@@ -191,7 +198,7 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	// A missing receipt is accepted only for a pristine checkout. Include ignored
 	// files in the inspection: stale build/vendor caches can affect compilation even
 	// though ordinary `git status` hides them.
-	status, err := gitOut(opts.ctx(), dir, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching")
+	status, err := sourceFetchGitOut(opts, dir, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching")
 	if err != nil {
 		if opts.ctx().Err() != nil {
 			return err
@@ -216,7 +223,7 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	return writeSourceReceiptContext(opts.ctx(), receiptPath, sourceReceipt{
 		Schema: sourceReceiptSchema, Commit: n.Commit, TreeHash: n.TreeHash,
 		VendorSpecDigest: wantVendor, ClosureDigest: closure,
-	})
+	}, opts.fetchReceiptDirectory)
 }
 
 // materializeSource authenticates the fetch receipt, copies the exact closure to
@@ -783,12 +790,20 @@ func pathWithin(root, rel string) (string, error) {
 	return full, nil
 }
 
-func readSourceReceiptContext(ctx context.Context, path string) (sourceReceipt, bool, error) {
+func readSourceReceiptContext(ctx context.Context, path string, directories ...*os.File) (sourceReceipt, bool, error) {
 	var out sourceReceipt
 	if ctx == nil {
 		return out, false, e.New(e.CodeUsage, "reading a source receipt requires a non-nil context")
 	}
-	b, err := readRegularLimitedContext(ctx, path, 1<<20)
+	root := filepath.Dir(path)
+	if len(directories) != 0 && directories[0] != nil {
+		var err error
+		root, err = sourceFetchDescriptorPath(directories[0].Fd())
+		if err != nil {
+			return out, false, err
+		}
+	}
+	b, err := readRegularBeneathContext(ctx, root, filepath.Base(path), 1<<20)
 	if err != nil {
 		// readRegularLimitedContext descriptor-wraps a missing parent/final path.
 		// os.IsNotExist only recognizes a limited set of legacy wrappers; errors.Is
@@ -808,7 +823,7 @@ func writeSourceReceipt(path string, receipt sourceReceipt) error {
 	return writeSourceReceiptContext(context.Background(), path, receipt)
 }
 
-func writeSourceReceiptContext(ctx context.Context, path string, receipt sourceReceipt) error {
+func writeSourceReceiptContext(ctx context.Context, path string, receipt sourceReceipt, directories ...*os.File) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "writing a source receipt requires a non-nil context")
 	}
@@ -819,15 +834,22 @@ func writeSourceReceiptContext(ctx context.Context, path string, receipt sourceR
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return e.Wrap(e.CodeFetchFailed, err, "creating source receipt directory")
+	var parent *os.File
+	if len(directories) != 0 {
+		parent = directories[0]
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".source-receipt-")
+	if parent == nil {
+		parent, err = holdSourceFetchDirectory(ctx, filepath.Dir(path))
+		if err != nil {
+			return err
+		}
+		defer func() { _ = parent.Close() }()
+	}
+	tmp, tmpName, err := securepath.CreateTemporarySibling(parent)
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "creating source receipt")
 	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }()
+	defer func() { _ = unix.Unlinkat(int(parent.Fd()), tmpName, 0) }()
 	if err := tmp.Chmod(0o644); err != nil {
 		tmp.Close()
 		return err
@@ -846,8 +868,11 @@ func writeSourceReceiptContext(ctx context.Context, path string, receipt sourceR
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "publishing source receipt %s", path)
 	}
-	if err := os.Rename(tmpName, path); err != nil {
+	if err := unix.Renameat(int(parent.Fd()), tmpName, int(parent.Fd()), filepath.Base(path)); err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "publishing source receipt")
+	}
+	if err := parent.Sync(); err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "syncing source receipt directory")
 	}
 	return nil
 }

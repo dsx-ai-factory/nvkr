@@ -22,6 +22,9 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := n.Validate(); err != nil {
 		return nil, err
 	}
+	if opts.SourceWorkspace != nil && (n.Kind != ir.KindFetch || !opts.Launch || len(n.VendorCmd) != 0 || opts.Qualification != nil) {
+		return nil, e.New(e.CodeEngineCapability, "held source workspace requires launched, unqualified source fetching without dependency vendoring")
+	}
 	if err := rejectUnsupportedExecutionRequirements([]ir.Node{n}, "exec-node"); err != nil {
 		return nil, err
 	}

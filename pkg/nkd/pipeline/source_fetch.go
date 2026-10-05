@@ -16,6 +16,11 @@ import (
 // already-checked-out matching source closure is reused only through a re-hashed
 // source receipt; HEAD alone is never sufficient.
 func (l Local) fetch(n ir.Node, opts RunOptions) error {
+	if opts.SourceWorkspace != nil {
+		if _, err := sourceFetchDescriptorPath(3); err != nil {
+			return err
+		}
+	}
 	dir, err := pathWithin(opts.SourceRoot, n.Dest)
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "resolving fetch destination %q", n.Dest)
@@ -26,18 +31,38 @@ func (l Local) fetch(n ir.Node, opts RunOptions) error {
 		fmt.Fprintf(opts.Stdout, "[fetch] %s @ %s -> %s (verify tree %s)\n", n.Repo, abbrev(n.Commit), abs, abbrev(n.TreeHash))
 		return nil
 	}
+	if opts.SourceWorkspace != nil {
+		checkout, err := holdSourceFetchWorkspaceDirectory(opts.ctx(), opts.SourceWorkspace, filepath.Join(opts.SourceRoot, n.Dest))
+		if err != nil {
+			return err
+		}
+		defer func() { _ = checkout.Close() }()
+		opts.fetchDirectory = checkout
+		receiptPath, err := sourceReceiptPath(opts.SourceRoot, n.Dest)
+		if err != nil {
+			return err
+		}
+		receipts, err := holdSourceFetchWorkspaceDirectory(opts.ctx(), opts.SourceWorkspace, filepath.Dir(receiptPath))
+		if err != nil {
+			return err
+		}
+		defer func() { _ = receipts.Close() }()
+		opts.fetchReceiptDirectory = receipts
+	}
 
-	if head, err := gitOut(opts.ctx(), dir, "rev-parse", "HEAD"); err == nil && head == n.Commit {
+	if head, err := sourceFetchGitOut(opts, dir, "rev-parse", "HEAD"); err == nil && head == n.Commit {
 		if err := l.verifyTree(dir, n, opts); err != nil {
 			return err
 		}
 		return l.vendor(n, dir, opts)
 	}
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return e.Wrap(e.CodeFetchFailed, err, "creating source dir %s", dir)
-	}
 	// Fetch exactly the pinned commit (shallow). GitHub serves reachable SHAs.
+	if opts.fetchDirectory == nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return e.Wrap(e.CodeFetchFailed, err, "creating source dir %s", dir)
+		}
+	}
 	steps := [][]string{
 		{"init", "-q"},
 		{"remote", "add", "origin", n.Repo},
@@ -45,7 +70,7 @@ func (l Local) fetch(n ir.Node, opts RunOptions) error {
 		{"checkout", "-q", "--detach", "FETCH_HEAD"},
 	}
 	for _, s := range steps {
-		if _, err := gitOut(opts.ctx(), dir, s...); err != nil {
+		if _, err := sourceFetchGitOut(opts, dir, s...); err != nil {
 			if opts.ctx().Err() != nil {
 				return err
 			}
@@ -84,7 +109,7 @@ func (l Local) vendor(n ir.Node, dir string, opts RunOptions) error {
 }
 
 func (l Local) verifyTree(dir string, n ir.Node, opts RunOptions) error {
-	head, err := gitOut(opts.ctx(), dir, "rev-parse", "HEAD")
+	head, err := sourceFetchGitOut(opts, dir, "rev-parse", "HEAD")
 	if err != nil {
 		if opts.ctx().Err() != nil {
 			return err
@@ -94,7 +119,7 @@ func (l Local) verifyTree(dir string, n ir.Node, opts RunOptions) error {
 	if head != n.Commit {
 		return e.New(e.CodeFetchFailed, "commit mismatch in %s: got %s want %s", dir, head, n.Commit)
 	}
-	tree, err := gitOut(opts.ctx(), dir, "rev-parse", "HEAD^{tree}")
+	tree, err := sourceFetchGitOut(opts, dir, "rev-parse", "HEAD^{tree}")
 	if err != nil {
 		if opts.ctx().Err() != nil {
 			return err
