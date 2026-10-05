@@ -148,3 +148,59 @@ func TestGitSourceCheckoutPrefixWouldRedirectSibling(t *testing.T) {
 		t.Fatalf("expected local prefix collision: %s %v", output, err)
 	}
 }
+
+func TestSourceCheckoutWithOnlyAliasedRoots(t *testing.T) {
+	for _, suffix := range []string{".git", "/", ".git/"} {
+		for _, mode := range []string{"static", "local-run"} {
+			t.Run(suffix+"/"+mode, func(t *testing.T) {
+				cfg := sourceCheckoutFixture(t)
+				cfg.Validation = mode
+				for _, name := range []string{"root", "role", "app"} {
+					changeCheckoutSource(t, "catalog", name, checkoutRepo+suffix)
+				}
+				// Exercise the exact generated Git rewrite before either public owner.
+				command := exec.CommandContext(t.Context(), "git", "ls-remote", checkoutRepo+suffix, "refs/tags/release/v1.0.0")
+				if output, err := command.CombinedOutput(); err != nil || !bytes.Contains(output, []byte("refs/tags/release/v1.0.0")) {
+					t.Fatalf("alias did not reach the real local Git repository: %s %v", output, err)
+				}
+				if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", false); err != nil {
+					t.Fatal(err)
+				}
+				beforeLock := readFixture(t, "catalog/pins.lock.yaml")
+				beforePlan := readFixture(t, ".github/nkd-run/plan.json")
+				raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+				if err != nil || len(raw) == 0 {
+					t.Errorf("alias-only workflow rejected: %v", err)
+				}
+				result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false)
+				if err != nil || result.Changed || result.PlanDigest == "" {
+					t.Errorf("alias-only refresh rejected or changed pinned release: %+v %v", result, err)
+				}
+				if !bytes.Equal(beforeLock, readFixture(t, "catalog/pins.lock.yaml")) || !bytes.Equal(beforePlan, readFixture(t, ".github/nkd-run/plan.json")) {
+					t.Fatal("alias-only no-op changed the lock or generated Plan")
+				}
+			})
+		}
+	}
+}
+
+func TestAliasedRootStillRejectsDistinctRepository(t *testing.T) {
+	cfg := sourceCheckoutFixture(t)
+	changeCheckoutSource(t, "catalog", "root", checkoutRepo+".git")
+	changeCheckoutSource(t, "catalog", "app", checkoutRepo+".git")
+	changeCheckoutSource(t, "catalog", "role", checkoutRepo+"-tools")
+	raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+	assertCode(t, err, e.CodeEngineCapability)
+	if len(raw) != 0 {
+		t.Fatal("sibling collision emitted a workflow")
+	}
+	calls := 0
+	_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+		calls++
+		return catalog.SourcePinUpdate{}, nil
+	})
+	assertCode(t, err, e.CodeEngineCapability)
+	if calls != 0 {
+		t.Fatal("sibling collision reached the pin transaction")
+	}
+}

@@ -76,10 +76,18 @@ func admitSourceCheckoutRepo(checkout *SourceCheckout, repo string) error {
 		return nil
 	}
 	prefix := "https://github.com/" + checkout.Repository
-	// Git accepts the same repository with an optional .git and trailing slash.
-	identity := strings.TrimSuffix(strings.TrimSuffix(repo, "/"), ".git")
-	if strings.HasPrefix(repo, prefix) && identity != prefix {
+	if strings.HasPrefix(repo, prefix) && !matchesSourceCheckout(checkout, repo) {
 		return e.New(e.CodeEngineCapability, "source checkout URL prefix %q would redirect distinct repository %q", prefix, repo)
 	}
 	return nil
+}
+
+// Use the same repository spelling rules for root selection and prefix admission.
+func matchesSourceCheckout(checkout *SourceCheckout, repo string) bool {
+	if checkout == nil {
+		return false
+	}
+	// Git accepts the same repository with an optional .git and trailing slash.
+	identity := strings.TrimSuffix(strings.TrimSuffix(repo, "/"), ".git")
+	return identity == "https://github.com/"+checkout.Repository
 }

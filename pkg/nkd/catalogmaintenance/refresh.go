@@ -139,7 +139,7 @@ func prepare(ctx context.Context, config Config, generatorVersion string) (*fact
 		if !ok || source.PinnedBy != "" || strings.TrimSpace(source.Constraint) == "" {
 			return nil, e.New(e.CodeInvalidCatalog, "maintenance source %q requires an independent root with an explicit release constraint", name)
 		}
-		if config.SourceCheckout != nil && source.Repo == "https://github.com/"+config.SourceCheckout.Repository {
+		if matchesSourceCheckout(config.SourceCheckout, source.Repo) {
 			sourceAccessUsed = true
 		}
 	}
