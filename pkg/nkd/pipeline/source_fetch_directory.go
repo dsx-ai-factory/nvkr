@@ -90,6 +90,10 @@ func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (string, err
 		return "", err
 	}
 	cmd := execCmd(opts, "git", append([]string{"-C", path}, args...)...)
+	cmd.Env = append([]string(nil), opts.SourceGitEnvironment...)
+	if cmd.Env == nil {
+		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=credential.helper", "GIT_CONFIG_VALUE_0="}
+	}
 	cmd.ExtraFiles = []*os.File{opts.fetchDirectory}
 	out, err := outputOwnedCommand(opts.ctx(), cmd)
 	if err != nil {

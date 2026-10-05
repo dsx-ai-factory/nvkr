@@ -35,9 +35,13 @@ type RunOptions struct {
 	// The caller retains ownership through ExecNode; no build authority is issued.
 	// SourceRoot must be relative to this directory. Held Git execution is Linux-only.
 	SourceWorkspace *os.File
-	Only            []string // if set, build only these component names
-	Jobs            int      // max concurrent local work slots across fetch/source/build nodes
-	DryRun          bool     // print the docker invocations instead of executing
+	// SourceGitEnvironment describes the factory-admitted source-only child
+	// environment. It is used only with SourceWorkspace; nil selects the fixed
+	// public-source baseline, never the ambient process environment.
+	SourceGitEnvironment []string
+	Only                 []string // if set, build only these component names
+	Jobs                 int      // max concurrent local work slots across fetch/source/build nodes
+	DryRun               bool     // print the docker invocations instead of executing
 	// Launch selects ADR-18 §8 for a single exec-node: instead of running the
 	// build DIRECTLY (assuming the engine placed the job inside the toolchain container),
 	// the helper ORCHESTRATES the pinned toolchain container itself — the same code path as

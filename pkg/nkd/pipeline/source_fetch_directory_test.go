@@ -6,12 +6,51 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
+
+func TestSourceFetchHeldGitDoesNotInheritAmbientCredentials(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("actual held Git child execution requires Linux")
+	}
+	checkout, err := holdSourceFetchDirectory(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer checkout.Close()
+	commands := t.TempDir()
+	if err := os.WriteFile(filepath.Join(commands, "git"), []byte("#!/bin/sh\nexec /usr/bin/env\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := commands + string(os.PathListSeparator) + os.Getenv("PATH")
+	t.Setenv("PATH", path)
+	for _, key := range []string{"HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK", "ACTIONS_RUNTIME_TOKEN", "REGISTRY_AUTH_FILE", "HTTPS_PROXY", "UNSELECTED_SECRET"} {
+		t.Setenv(key, "ambient-secret")
+	}
+	for _, private := range []bool{false, true} {
+		opts := RunOptions{Ctx: t.Context(), fetchDirectory: checkout}
+		if private {
+			opts.SourceGitEnvironment = []string{"PATH=" + path, "LC_ALL=C", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "NKD_SOURCE_TOKEN=selected-test-token"}
+		}
+		output, err := sourceFetchGitOut(opts, ".", "status")
+		if err != nil {
+			t.Fatal(err)
+		}
+		fields := strings.Split(output, "\n")
+		if strings.Contains(output, "ambient-secret") || !slices.Contains(fields, "GIT_CONFIG_GLOBAL=/dev/null") || !slices.Contains(fields, "GIT_CONFIG_NOSYSTEM=1") {
+			t.Fatal("held Git child inherited ambient state or lacked its fixed baseline")
+		}
+		if slices.Contains(fields, "NKD_SOURCE_TOKEN=selected-test-token") != private {
+			t.Fatal("selected source credential escaped its private child scope")
+		}
+	}
+}
 
 func TestSourceFetchHeldDirectoryAndReceiptSurviveParentSubstitution(t *testing.T) {
 	if runtime.GOOS != "linux" {

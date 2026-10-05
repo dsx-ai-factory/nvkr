@@ -18,24 +18,6 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", factory.FactoryPlanPath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	digest, err := plan.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var nonFetch string
-	for _, node := range plan.Graph.Nodes {
-		if node.Kind == factory.NodeBuild {
-			nonFetch = node.ID
-			break
-		}
-	}
-	if nonFetch == "" {
-		t.Fatal("generated Plan has no build operation for source-only admission")
-	}
 	for _, test := range []struct {
 		name string
 		args []string
@@ -49,14 +31,6 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 		{"positional arguments", []string{"github", "recover", "--plan", "plan.json", "unexpected"}, e.CodeUsage},
 		{"extra authority flag", []string{"github", "run-node", "--plan", "plan.json", "--node", "unknown", "--workspace", "outside"}, e.CodeUsage},
 		{"substituted plan", []string{"execute-node", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
-		{"source fetch missing plan", []string{"fetch-source", "--node", "unknown"}, e.CodeUsage},
-		{"source fetch missing node", []string{"fetch-source", "--plan", "plan.json"}, e.CodeUsage},
-		{"source fetch unknown node", []string{"fetch-source", "--plan", "plan.json", "--node", "unknown"}, e.CodeEngineCapability},
-		{"source fetch positional argument", []string{"fetch-source", "--plan", "plan.json", "--node", "unknown", "unexpected"}, e.CodeUsage},
-		{"source fetch outside workspace", []string{"fetch-source", "--plan", "plan.json", "--node", "unknown", "--workspace", "outside"}, e.CodeUsage},
-		{"source fetch substituted plan", []string{"fetch-source", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
-		{"source fetch exact plan", []string{"fetch-source", "--plan", "plan.json", "--node", "unknown", "--plan-digest", digest}, e.CodeEngineCapability},
-		{"source fetch cannot build", []string{"fetch-source", "--plan", "plan.json", "--node", nonFetch}, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -74,6 +48,14 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestFactoryDoesNotExposeUnusedSourceFetchCommand(t *testing.T) {
+	for _, command := range cmdFactory().Subcommands {
+		if command.Name == "fetch-source" {
+			t.Fatal("unused source-only command bypasses the GitHub Plan admission boundary")
+		}
 	}
 }
 

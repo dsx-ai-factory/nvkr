@@ -52,7 +52,7 @@ func (l Local) Run(g *ir.Graph, buildDigest string, opts RunOptions) (*Report, e
 	if err := requireRunContext(opts.Ctx, "local pipeline run"); err != nil {
 		return &Report{}, err
 	}
-	if opts.SourceWorkspace != nil {
+	if opts.SourceWorkspace != nil || opts.SourceGitEnvironment != nil {
 		return &Report{}, e.New(e.CodeEngineCapability, "held source workspace is restricted to source-only ExecNode")
 	}
 	if err := opts.Ctx.Err(); err != nil {

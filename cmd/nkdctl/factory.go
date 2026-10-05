@@ -45,37 +45,6 @@ func cmdFactory() *cli.Command {
 				}
 				return factory.ExecuteNode(c.Context, plan, c.String("node"), os.Stdout, os.Stderr)
 			},
-		}, {
-			Name:   "fetch-source",
-			Hidden: true,
-			Usage:  "acquire one exact generated source scope without build or publication authority",
-			Flags: []cli.Flag{
-				&cli.StringFlag{Name: "plan"},
-				&cli.StringFlag{Name: "node"},
-				&cli.StringFlag{Name: "plan-digest"},
-				&cli.StringFlag{Name: "workspace", Value: ".nkd/factory"},
-			},
-			Action: func(c *cli.Context) error {
-				if c.String("plan") == "" || c.String("node") == "" {
-					return e.New(e.CodeUsage, "fetch-source requires --plan and --node")
-				}
-				if c.Args().Present() {
-					return e.New(e.CodeUsage, "fetch-source does not accept positional arguments")
-				}
-				if c.String("workspace") != ".nkd/factory" {
-					return e.New(e.CodeUsage, "generated source fetch requires workspace .nkd/factory")
-				}
-				plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
-				if err != nil {
-					return err
-				}
-				if expected := c.String("plan-digest"); expected != "" {
-					if err := factory.VerifyPlanDigest(plan, expected); err != nil {
-						return err
-					}
-				}
-				return factory.ExecuteSourceFetch(c.Context, plan, c.String("node"), os.Stdout, os.Stderr)
-			},
 		}, cmdFactoryGitHub()},
 	}
 }
