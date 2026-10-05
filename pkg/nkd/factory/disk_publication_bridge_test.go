@@ -45,7 +45,7 @@ func diskPublicationPlanFixtureForHost(t *testing.T, platform, host string) *Pla
 		InspectorDigest: "sha256:" + strings.Repeat("2", 64), CodecDigest: "sha256:" + strings.Repeat("3", 64),
 		GuestfishDigest: "sha256:" + strings.Repeat("4", 64), ScannerDigest: "sha256:" + strings.Repeat("5", 64),
 		PackageReaderDigest: "sha256:" + strings.Repeat("6", 64),
-		Resources:           execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 128, EphemeralStorageMiB: 2048},
+		Resources:           execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 2048, EphemeralStorageMiB: 2048},
 		TimeoutSeconds:      60, MaxFilesystemBytes: 1 << 20, ScratchStorage: "private-volume",
 	}}
 	base := fixture.plan.CatalogSnapshot
