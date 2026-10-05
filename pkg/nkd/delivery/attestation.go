@@ -36,7 +36,7 @@ func AttestEvidence(ctx context.Context, source, out string, attest func(context
 	root.Objects = append([]PublishedObject(nil), root.Objects...)
 	var direct []Descriptor
 	for i, object := range root.Objects {
-		descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
+		descriptor := Descriptor{MediaType: publishedManifestMediaType(object), Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
 		if object.Evidence == nil {
 			if err := writer.copyClosure(ctx, source, descriptor); err != nil {
 				return Result{}, err
@@ -73,7 +73,7 @@ func AttestEvidence(ctx context.Context, source, out string, attest func(context
 			return Result{}, err
 		}
 		descriptor, blob, err := writer.addBytesObject(ctx, ObjectInput{Name: object.Name, Kind: object.Kind, ArtifactType: sbom.BundleMediaType, LayerMediaType: sbom.BundleMediaType,
-			SemanticDigest: object.SemanticDigest, Bytes: bundle, annotations: map[string]string{"dev.sigstore.bundle.predicateType": sbom.CycloneDXPredicateType}, subject: &Descriptor{MediaType: MediaOCIManifest, Digest: owner.DescriptorDigest, Size: owner.Size}})
+			SemanticDigest: object.SemanticDigest, Bytes: bundle, annotations: map[string]string{"dev.sigstore.bundle.predicateType": sbom.CycloneDXPredicateType}, subject: &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}})
 		if err != nil {
 			return Result{}, err
 		}

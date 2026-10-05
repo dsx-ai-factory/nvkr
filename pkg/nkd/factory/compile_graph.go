@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -41,32 +42,51 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		for _, name := range build.Components {
 			selected[name] = true
 		}
-		if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, nodes, artifacts); err != nil {
+		if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, delivery.Publication != nil, nodes, artifacts); err != nil {
 			return ArtifactGraph{}, err
+		}
+		if target.Format == "disk-image" && delivery.Publication != nil {
+			if err := admitDiskPublicationProducer(build); err != nil {
+				return ArtifactGraph{}, err
+			}
+			host, profile, err := diskPublicationInspectionProfile(build, delivery)
+			if err != nil {
+				return ArtifactGraph{}, err
+			}
+			node := nodes[target.Name+"/sbom"]
+			node.Container, node.Platform = profile.Image, host
+			nodes[node.ID] = node
 		}
 	}
 	if definition.SBOMTool != "" {
 		if _, ok := tools[definition.SBOMTool]; !ok {
 			return ArtifactGraph{}, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
 		}
-		for id, node := range nodes {
-			if node.Kind != NodeSBOM {
-				continue
-			}
-			components := map[string]bool{}
-			for _, input := range node.Inputs {
-				if artifacts[input].Kind == "producer-result" {
-					components[artifacts[input].Component] = true
-				}
-			}
-			for _, artifact := range artifacts {
-				if artifact.BuildTarget == node.BuildTarget && components[artifact.Component] && strings.HasPrefix(artifact.ID, "artifact/") {
-					node.Inputs = append(node.Inputs, artifact.ID)
-				}
-			}
-			node.Inputs = uniqueSorted(append(node.Inputs, "tool/"+definition.SBOMTool))
-			nodes[id] = node
+	}
+	for id, node := range nodes {
+		if node.Kind != NodeSBOM {
+			continue
 		}
+		disk := plan.hasCompiledDiskTarget(node.BuildTarget, artifacts)
+		if !disk && definition.SBOMTool == "" {
+			continue
+		}
+		components := map[string]bool{}
+		for _, input := range node.Inputs {
+			if artifacts[input].Kind == "producer-result" {
+				components[artifacts[input].Component] = true
+			}
+		}
+		for _, artifact := range artifacts {
+			if artifact.BuildTarget == node.BuildTarget && components[artifact.Component] && strings.HasPrefix(artifact.ID, "artifact/") {
+				node.Inputs = append(node.Inputs, artifact.ID)
+			}
+		}
+		if !disk {
+			node.Inputs = append(node.Inputs, "tool/"+definition.SBOMTool)
+		}
+		node.Inputs = uniqueSorted(node.Inputs)
+		nodes[id] = node
 	}
 
 	packages, err := orderPackageSpecs(packageSpecs)
@@ -81,8 +101,15 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		if err := validatePackageInputs(spec, inputs, artifacts); err != nil {
 			return ArtifactGraph{}, err
 		}
-		if spec.Kind == PackageImage && nodes[artifacts[inputs[0]].Producer].Kind != NodeBuild {
-			return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q currently requires a built OCI export; acquired layouts need a separate adapter", spec.Name)
+		if spec.Kind == PackageImage {
+			input := artifacts[inputs[0]]
+			switch nodes[input.Producer].Kind {
+			case NodeBuild:
+			case NodeAcquire:
+				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
+			default:
+				return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q requires a build or acquired-image producer", spec.Name)
+			}
 		}
 		if spec.Kind == PackageHelm {
 			for _, id := range inputs {
@@ -105,6 +132,16 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.
 		inputs = append(inputs, observationInputs(inputs, artifacts)...)
+		if spec.Kind == PackageDiskImage {
+			inputs = append(inputs, "sbom/"+spec.Name)
+			// Every contributing material subject/record remains explicit. Root
+			// reconciliation does not waive its independent build-output slots.
+			for id, artifact := range artifacts {
+				if artifact.BuildTarget == spec.Name && (artifact.Kind == "producer-result" || strings.HasPrefix(id, "artifact/")) {
+					inputs = append(inputs, id)
+				}
+			}
+		}
 		if spec.Kind == PackageOCI {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
 			inputs = append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...)
@@ -153,6 +190,30 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		return ArtifactGraph{}, err
 	}
 	return plan.Graph, nil
+}
+
+// Production reconciliation consumes the original held Packer capability.
+// Generic VM command builds remain supported as local raw diagnostics only.
+func admitDiskPublicationProducer(build BuildPlan) error {
+	root, err := buildgraph.DiskRootName(build.ResolvedComponents)
+	if err != nil {
+		return err
+	}
+	if build.Graph == nil {
+		return e.New(e.CodeEngineCapability, "disk publication has no resolved producer graph")
+	}
+	for _, node := range build.Graph.Nodes {
+		if node.Component == root && node.Kind == ir.KindBuild && node.OutputType == PackageDiskImage {
+			if node.BuilderType == ir.BuilderVMImage && node.Packer != nil {
+				if node.Packer.AcquisitionArchive == "" {
+					return e.New(e.CodeEngineCapability, "disk publication requires a declared producer-owned package acquisition carrier")
+				}
+				return nil
+			}
+			return e.New(e.CodeEngineCapability, "disk publication requires an original direct-Packer producer capability")
+		}
+	}
+	return e.New(e.CodeEngineCapability, "disk publication has no supported direct-Packer producer")
 }
 
 func mapNodes(values map[string]Node) []Node {

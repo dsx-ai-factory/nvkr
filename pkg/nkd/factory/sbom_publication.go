@@ -9,6 +9,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
@@ -21,7 +22,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 	if err != nil {
 		return nil, err
 	}
-	raw, err := readSmallFactoryFile(ctx, filepath.Join(path, "index.json"), "hosted SBOM index")
+	raw, err := readFactorySBOMFile(ctx, filepath.Join(path, "index.json"), "hosted SBOM index")
 	if err != nil {
 		return nil, e.Wrap(e.CodeProvenanceMissing, err, "reading hosted SBOM index")
 	}
@@ -74,7 +75,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 		if !ok || entry.ArtifactSHA != result.SHA256 {
 			return nil, e.New(e.CodeVerifyFailed, "hosted SBOM entry %q has the wrong subject", entry.Artifact)
 		}
-		bomRaw, err := readSmallFactoryFile(ctx, filepath.Join(path, entry.Artifact+".cdx.json"), "hosted per-artifact SBOM")
+		bomRaw, err := readFactorySBOMFile(ctx, filepath.Join(path, entry.Artifact+".cdx.json"), "hosted per-artifact SBOM")
 		if err != nil {
 			return nil, e.Wrap(e.CodeProvenanceMissing, err, "reading hosted per-artifact SBOM")
 		}
@@ -95,6 +96,12 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			}
 		}
 		objects = append(objects, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(digest, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: digest, Bytes: bomRaw})
+		if plan.hasCompiledDiskTarget(artifact.BuildTarget, artifacts) {
+			if err := validateReconciledDiskDocument(plan, artifact.BuildTarget, entry.Artifact, entry.ArtifactSHA, &bom); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		if plan.Definition.SBOMTool != "" {
 			if len(bom.Components) == 0 {
 				return nil, e.New(e.CodeProvenanceMissing, "hosted SBOM omits required dependency inventory")
@@ -125,4 +132,17 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 		}
 	}
 	return objects, nil
+}
+
+func readFactorySBOMFile(ctx context.Context, path, label string) ([]byte, error) {
+	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: label, MaxBytes: sbom.MaxDocumentBytes})
+	if err != nil {
+		return nil, classifyContext(ctx, e.Wrap(e.CodeProvenanceMissing, err, "opening bounded complete SBOM"))
+	}
+	defer func() { _ = held.Close() }()
+	raw, err := held.ReadAllContext(ctx, sbom.MaxDocumentBytes)
+	if err != nil {
+		return nil, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "reading bounded complete SBOM"))
+	}
+	return raw, nil
 }

@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -76,7 +77,7 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 		}
 		for _, member := range bound {
 			observed, ok := outputs[member.Name]
-			if !ok || observed.Kind != member.Kind || observed.Digest != member.Digest || observed.BuildDigest != member.BuildDigest || !equalStrings(observed.Components, member.Components) {
+			if !ok || observed.Kind != member.Kind || observed.Digest != member.Digest || observed.BuildDigest != member.BuildDigest || !equalStrings(observed.Components, member.Components) || !reflect.DeepEqual(observed.Disk, member.Disk) {
 				return e.New(e.CodeVerifyFailed, "publication substitutes observed output %q", member.Name)
 			}
 		}

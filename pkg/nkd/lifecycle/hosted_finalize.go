@@ -48,7 +48,7 @@ func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	if restoreErr := factory.ValidateHostedRestores(ctx, workspace, plan); restoreErr != nil {
 		return recordRunFailure(ctx, outputPath, run, restoreErr, "recording hosted failed Run")
 	}
-	observed, err := observeOutputs(ctx, workspace, run.Expected, artifacts, plan, nil)
+	observed, err := observeHostedOutputs(ctx, workspace, run.Expected, artifacts, plan)
 	if err != nil {
 		return recordRunFailure(ctx, outputPath, run, err, "recording hosted failed Run")
 	}

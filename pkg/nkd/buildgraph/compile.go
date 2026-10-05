@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/name"
+
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -92,6 +94,17 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				ref = ir.OCIBlobScheme + nc.Prebuilt.OCIArchive
 			} else if ref == "" {
 				ref = strings.TrimPrefix(nc.Prebuilt.Image, "oci://")
+				// An authored index digest selects the upstream architecture set.
+				// The owning artifact pin selects the native manifest subject.
+				// Retain only the parsed repository transport to avoid a double
+				// digest suffix when the pipeline acquires that native subject.
+				parsed, err := name.ParseReference(ref)
+				if err != nil {
+					return nil, e.Wrap(e.CodeInvalidCatalog, err, "parse acquired image transport %q", nc.Name)
+				}
+				if _, digested := parsed.(name.Digest); digested {
+					ref = parsed.Context().Name()
+				}
 			}
 			pid := "pull-" + nc.Name
 			verifyNeeds = append(verifyNeeds, pid)

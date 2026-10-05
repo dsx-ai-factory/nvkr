@@ -38,6 +38,9 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if len(buildPlan.ResolvedComponents) == 0 {
 		return e.New(e.CodePipelineDrift, "factory sbom node %q has no resolved components to bill", node.ID)
 	}
+	if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
+		return e.New(e.CodeProvenanceMissing, "disk evidence requires the original live execution and reconciled receipt")
+	}
 
 	// Observed subject digests come only from producer-result inputs; the terminal
 	// observation input is a scheduling gate, not a source of hashes.
@@ -93,7 +96,12 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			if err != nil {
 				return err
 			}
-			inventory, err := sbom.InspectDependencies(ctx, payload.Path, entry.ArtifactSHA, kind, scanner)
+			var inventory sbom.DependencyInventory
+			if kind == "oci-image" && planNode(plan, payload.Producer).Kind == NodeAcquire {
+				inventory, err = inspectAcquiredImageDependencies(ctx, plan, node, payload, artifacts, entry.ArtifactSHA, scanner)
+			} else {
+				inventory, err = sbom.InspectDependencies(ctx, payload.Path, entry.ArtifactSHA, kind, scanner)
+			}
 			if err != nil {
 				return err
 			}
@@ -121,6 +129,9 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 		if err != nil {
 			return err
 		}
+		if len(raw) >= sbom.MaxDocumentBytes {
+			return e.New(e.CodeVerifyFailed, "complete SBOM exceeds its newline-delimited file bound")
+		}
 		if err := writeFactoryFile(ctx, filepath.Join(dir, entry.Artifact+".cdx.json"), append(raw, '\n'), 0o644); err != nil {
 			return err
 		}
@@ -138,22 +149,27 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 
 func (plan *Plan) validateSBOMGraph() error {
 	tool := plan.Definition.SBOMTool
-	if tool == "" {
-		return nil
-	}
 	nodes, artifacts := planIndex(plan)
-	scanner, ok := nodes["tool/"+tool]
-	if !ok || scanner.Kind != NodeAcquire || !canonical.IsDigest(scanner.ExecutableDigest) || artifacts["tool/"+tool].Kind != "pipeline-tool" {
-		return e.New(e.CodeProvenanceMissing, "SBOM inspection requires a pinned acquired scanner")
+	if tool != "" {
+		scanner, ok := nodes["tool/"+tool]
+		if !ok || scanner.Kind != NodeAcquire || !canonical.IsDigest(scanner.ExecutableDigest) || artifacts["tool/"+tool].Kind != "pipeline-tool" {
+			return e.New(e.CodeProvenanceMissing, "SBOM inspection requires a pinned acquired scanner")
+		}
 	}
 	for _, artifact := range artifacts {
 		if artifact.Kind != "producer-result" {
 			continue
 		}
-		if plan.hasCompiledDiskTarget(artifact.BuildTarget, artifacts) {
-			// Disk targets require ADR-13's future disk inspection and material
-			// reconciliation operation, not this ordinary per-component SBOM.
+		disk := plan.hasCompiledDiskTarget(artifact.BuildTarget, artifacts)
+		if tool == "" && !disk {
 			continue
+		}
+		if disk {
+			// Local raw diagnostics do not claim this evidence. Production keeps
+			// every component slot, supplied by the same-attempt reconciliation.
+			if plan.Environment.Publication == nil {
+				continue
+			}
 		}
 		node, ok := nodes[artifact.BuildTarget+"/sbom"]
 		if !ok || node.Kind != NodeSBOM || node.BuildTarget != artifact.BuildTarget || !containsString(node.Inputs, artifact.ID) {
@@ -162,6 +178,25 @@ func (plan *Plan) validateSBOMGraph() error {
 	}
 	for _, node := range plan.Graph.Nodes {
 		if node.Kind != NodeSBOM {
+			continue
+		}
+		if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
+			var selected BuildPlan
+			for _, build := range plan.Builds {
+				if build.Name == node.BuildTarget {
+					selected = build
+				}
+			}
+			platform, profile, err := diskPublicationInspectionProfile(selected, plan.Environment)
+			if err != nil {
+				return err
+			}
+			if node.Container != profile.Image || node.Platform != platform || node.Network != ir.NetworkNone {
+				return e.New(e.CodeEngineCapability, "disk SBOM requires its exact offline Plan-selected inspection profile")
+			}
+			continue
+		}
+		if tool == "" {
 			continue
 		}
 		if node.Network != ir.NetworkNone || node.Container == "" || !containsString(node.Inputs, "tool/"+tool) {

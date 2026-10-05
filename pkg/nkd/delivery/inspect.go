@@ -14,6 +14,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 // Inspect verifies every descriptor reachable from the top-level index and then
@@ -97,7 +98,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 		if _, exists := descriptors[object.DescriptorDigest]; exists {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "deliverable is duplicated in release repository")
 		}
-		descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
+		descriptor := Descriptor{MediaType: publishedManifestMediaType(object), Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
 		if err := verifyDescriptor(ctx, root, descriptor, visited); err != nil {
 			return Inspection{}, err
 		}
@@ -119,7 +120,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 			descriptor.Annotations["org.opencontainers.image.title"] != object.Name) {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "publication object %q descriptor annotations do not match root semantics", object.Name)
 		}
-		if publication.Release != nil && descriptor.MediaType != MediaOCIManifest {
+		if publication.Release != nil && !types.MediaType(descriptor.MediaType).IsImage() {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "release objects must be direct manifests")
 		}
 		if err := verifyPublishedObjectBinding(ctx, root, object, descriptor); err != nil {
@@ -146,7 +147,7 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 		}
 		return nil
 	}
-	if descriptor.MediaType != MediaOCIManifest {
+	if !types.MediaType(descriptor.MediaType).IsImage() {
 		return e.New(e.CodeVerifyFailed, "publication object %q has unsupported descriptor media type", object.Name)
 	}
 	manifestRaw, err := readBlob(ctx, root, descriptor, 8<<20)
@@ -157,8 +158,22 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "decoding publication manifest")
 	}
-	if manifest.Config.MediaType == MediaImageConfig {
-		if object.ArtifactType != MediaOCIManifest || object.BlobDigest != descriptor.Digest {
+	if types.MediaType(manifest.Config.MediaType).IsConfig() {
+		if len(manifest.Layers) == 1 && manifest.Layers[0].MediaType == MediaQCOW2 {
+			artifact, err := openDiskManifest(ctx, root, descriptor, object.OS+"/"+object.Arch, maxDeliveryFileBytes)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = artifact.Close() }()
+			observed := artifact.Inspection()
+			if object.Kind != "disk-image" || object.ArtifactType != observed.ArtifactType || object.BlobDigest != observed.PayloadDigest ||
+				(object.Output != nil && (object.Output.Disk == nil || object.Output.Disk.PayloadDigest != observed.PayloadDigest ||
+					object.Output.Disk.Size != observed.Size || observed.Encryption != object.Output.Disk.Encryption)) {
+				return e.New(e.CodeVerifyFailed, "disk wrapper differs from exact release payload binding")
+			}
+			return nil
+		}
+		if object.ArtifactType != manifest.MediaType || manifest.MediaType != descriptor.MediaType || object.BlobDigest != descriptor.Digest {
 			return e.New(e.CodeVerifyFailed, "native image descriptor differs from release binding")
 		}
 		config, err := verifyImageManifest(ctx, root, manifest, map[string]bool{})
@@ -247,17 +262,32 @@ func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, v
 				return err
 			}
 		}
-	case MediaOCIManifest:
+	case MediaOCIManifest, MediaDockerManifest:
 		var manifest ociManifest
 		if err := json.Unmarshal(raw, &manifest); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "decoding OCI artifact manifest")
 		}
-		if manifest.ArtifactType == "" && manifest.Config.MediaType == MediaImageConfig {
+		if manifest.MediaType != descriptor.MediaType {
+			return e.New(e.CodeVerifyFailed, "manifest media type differs from its descriptor")
+		}
+		if manifest.ArtifactType == "" && types.MediaType(manifest.Config.MediaType).IsConfig() {
 			_, err := verifyImageManifest(ctx, root, manifest, visited)
 			return err
 		}
 		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.ArtifactType == "" {
 			return e.New(e.CodeVerifyFailed, "OCI artifact manifest has an invalid schema")
+		}
+		if manifest.Config.MediaType == MediaImageConfig && len(manifest.Layers) == 1 && manifest.Layers[0].MediaType == MediaQCOW2 {
+			artifact, err := openDiskManifest(ctx, root, descriptor, "", maxDeliveryFileBytes)
+			if err != nil {
+				return err
+			}
+			if err := artifact.Close(); err != nil {
+				return err
+			}
+			visited[manifest.Config.Digest] = true
+			visited[manifest.Layers[0].Digest] = true
+			return nil
 		}
 		if _, err := readBlob(ctx, root, manifest.Config, 8<<20); err != nil {
 			return err

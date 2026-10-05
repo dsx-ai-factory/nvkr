@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -81,12 +82,32 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 		object := delivery.ObjectInput{Name: input.Name, Kind: input.Kind, Path: input.Path,
 			ArtifactType: input.MediaType, LayerMediaType: input.MediaType}
 		switch input.Kind {
+		case PackageDiskImage:
+			var expected LifecycleOutputPlan
+			for _, candidate := range plan.LifecycleOutputs {
+				if candidate.Name == input.Name && candidate.Kind == PackageDiskImage {
+					expected = candidate
+				}
+			}
+			disk, err := inspectFactoryDisk(ctx, plan, expected, input)
+			if err != nil {
+				return nil, nil, err
+			}
+			object.Layout, object.SemanticDigest = true, disk.ManifestDigest
+			// Layout import authenticates its index carrier, not the QCOW2 layer.
+			// The checked wrapper separately binds the exact raw payload subject.
+			object.BlobDigest, err = digestFactoryPath(ctx, filepath.Join(input.Path, "index.json"))
+			if err != nil {
+				return nil, nil, err
+			}
+			object.OS, object.Arch = "linux", strings.TrimPrefix(disk.Platform, "linux/")
 		case PackageImage:
 			image, err := inspectFactoryImage(ctx, plan, input)
 			if err != nil {
 				return nil, nil, err
 			}
 			object.Layout, object.SemanticDigest, object.BlobDigest = true, image.ManifestDigest, image.RootDigest
+			object.ArtifactType = image.MediaType
 			object.OS, object.Arch = image.OS, image.Arch
 		case PackageBinaryBundle:
 			_, inspected, err := delivery.InspectBinaryBundle(ctx, input.Path)
@@ -176,7 +197,7 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 				return nil, err
 			}
 			objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind,
-				BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects}
+				BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects, Disk: output.Disk}
 			if output.Kind == PackageAPT {
 				objects[i].Output.TransportPath = transportPaths[output.Name]
 			}

@@ -85,6 +85,7 @@ func TestDiskOutputBindingIsExactAndExcludedFromReleaseContentIdentity(t *testin
 		func(output *Output) { output.Disk.Encryption = "luks2" },
 		func(output *Output) { output.Disk.Size++ },
 		func(output *Output) { output.Disk.PlanDigest = "sha256:" + strings.Repeat("d", 64) },
+		func(output *Output) { output.Disk.PayloadDigest = "sha256:" + strings.Repeat("f", 64) },
 	} {
 		candidate := valid
 		candidate.Components = append([]string(nil), valid.Components...)
@@ -135,6 +136,7 @@ func TestDiskOutputBindingIsExactAndExcludedFromReleaseContentIdentity(t *testin
 		{name: "wrong encryption", change: func(output *Output) { output.Disk.Encryption = "aes" }},
 		{name: "missing size", change: func(output *Output) { output.Disk.Size = 0 }},
 		{name: "wrong plan", change: func(output *Output) { output.Disk.PlanDigest = "mutable" }},
+		{name: "malformed payload pin", change: func(output *Output) { output.Disk.PayloadDigest = "mutable" }},
 		{name: "wrong outcome", change: func(output *Output) { output.Disk.Outcome = "failed" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

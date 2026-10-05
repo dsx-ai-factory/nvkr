@@ -68,6 +68,7 @@ const (
 	PackageOCI          = "oci-root"
 	PackageHelm         = "helm-oci"
 	PackageImage        = "container-image"
+	PackageDiskImage    = "disk-image"
 )
 
 const (

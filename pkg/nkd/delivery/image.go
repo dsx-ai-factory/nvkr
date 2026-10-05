@@ -12,18 +12,21 @@ import (
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 const (
 	MediaImageConfig    = "application/vnd.oci.image.config.v1+json"
 	MediaImageLayer     = "application/vnd.oci.image.layer.v1.tar"
 	MediaImageLayerGzip = "application/vnd.oci.image.layer.v1.tar+gzip"
+	MediaDockerManifest = string(types.DockerManifestSchema2)
 )
 
 // ImageInspection describes a verified single-platform runnable image. It is
 // descriptive evidence, not a release authorization or reproduction receipt.
 // ManifestDigest is the pullable image identity; RootDigest identifies its layout index.
 type ImageInspection struct {
+	MediaType      string
 	RootDigest     string
 	ManifestDigest string
 	OS             string
@@ -55,11 +58,11 @@ func inspectPublishedContainerImage(ctx context.Context, root string, publicatio
 			object = candidate
 		}
 	}
-	if object.Name == "" || object.ArtifactType != MediaOCIManifest || object.OS != "linux" ||
+	if object.Name == "" || !types.MediaType(object.ArtifactType).IsImage() || object.OS != "linux" ||
 		(object.Arch != "amd64" && object.Arch != "arm64") || object.BlobDigest != object.DescriptorDigest {
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "publication has no exact native image binding for %q", name)
 	}
-	descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size}
+	descriptor := Descriptor{MediaType: object.ArtifactType, Digest: object.DescriptorDigest, Size: object.Size}
 	manifestRaw, err := readBlob(ctx, root, descriptor, 8<<20)
 	if err != nil {
 		return ImageInspection{}, err
@@ -75,7 +78,7 @@ func inspectPublishedContainerImage(ctx context.Context, root string, publicatio
 	if config.OS != object.OS || config.Architecture != object.Arch {
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "published image platform differs from its binding")
 	}
-	return ImageInspection{RootDigest: object.DescriptorDigest, ManifestDigest: descriptor.Digest,
+	return ImageInspection{MediaType: manifest.MediaType, RootDigest: object.DescriptorDigest, ManifestDigest: descriptor.Digest,
 		OS: config.OS, Arch: config.Architecture, Entrypoint: config.Config.Entrypoint, Command: config.Config.Cmd}, nil
 }
 
@@ -97,7 +100,7 @@ func InspectContainerImage(ctx context.Context, root, platform string) (ImageIns
 	if err != nil {
 		return ImageInspection{}, err
 	}
-	if index.ArtifactType != "" || len(index.Manifests) != 1 || index.Manifests[0].MediaType != MediaOCIManifest {
+	if index.ArtifactType != "" || len(index.Manifests) != 1 || !types.MediaType(index.Manifests[0].MediaType).IsImage() {
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "container image requires exactly one OCI image manifest")
 	}
 	descriptor := index.Manifests[0]
@@ -108,6 +111,9 @@ func InspectContainerImage(ctx context.Context, root, platform string) (ImageIns
 	var manifest ociManifest
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return ImageInspection{}, e.Wrap(e.CodeVerifyFailed, err, "decoding container image manifest")
+	}
+	if manifest.MediaType != descriptor.MediaType {
+		return ImageInspection{}, e.New(e.CodeVerifyFailed, "container image manifest differs from descriptor media type")
 	}
 	visited := map[string]bool{descriptor.Digest: true}
 	config, err := verifyImageManifest(ctx, root, manifest, visited)
@@ -120,14 +126,18 @@ func InspectContainerImage(ctx context.Context, root, platform string) (ImageIns
 	if err := verifyBlobInventory(root, visited); err != nil {
 		return ImageInspection{}, err
 	}
-	return ImageInspection{RootDigest: digestBytes(raw), ManifestDigest: descriptor.Digest,
+	return ImageInspection{MediaType: manifest.MediaType, RootDigest: digestBytes(raw), ManifestDigest: descriptor.Digest,
 		OS: config.OS, Arch: config.Architecture, Entrypoint: config.Config.Entrypoint, Command: config.Config.Cmd}, nil
 }
 
 func verifyImageManifest(ctx context.Context, root string, manifest ociManifest, visited map[string]bool) (imageConfig, error) {
 	var config imageConfig
-	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.ArtifactType != "" ||
-		manifest.Config.MediaType != MediaImageConfig || len(manifest.Layers) == 0 || len(manifest.Layers) > maxDeliveryObjects {
+	media := types.MediaType(manifest.MediaType)
+	configMedia := types.MediaType(manifest.Config.MediaType)
+	if manifest.SchemaVersion != 2 || !media.IsImage() || manifest.ArtifactType != "" ||
+		!configMedia.IsConfig() || (media == types.OCIManifestSchema1 && configMedia != types.OCIConfigJSON) ||
+		(media == types.DockerManifestSchema2 && configMedia != types.DockerConfigJSON) ||
+		len(manifest.Layers) == 0 || len(manifest.Layers) > maxDeliveryObjects {
 		return config, e.New(e.CodeVerifyFailed, "container image manifest has an invalid schema or layer count")
 	}
 	raw, err := readBlob(ctx, root, manifest.Config, 8<<20)
@@ -154,7 +164,8 @@ func verifyImageManifest(ctx context.Context, root string, manifest ociManifest,
 
 func verifyImageLayer(ctx context.Context, root string, layer Descriptor, diffID string) error {
 	if !isDigest(layer.Digest) || !isDigest(diffID) || layer.Size < 0 || layer.Size > maxDeliveryFileBytes ||
-		(layer.MediaType != MediaImageLayer && layer.MediaType != MediaImageLayerGzip) {
+		(layer.MediaType != MediaImageLayer && layer.MediaType != MediaImageLayerGzip &&
+			layer.MediaType != string(types.DockerLayer) && layer.MediaType != string(types.DockerUncompressedLayer)) {
 		return e.New(e.CodeVerifyFailed, "container image layer has an invalid identity, size or media type")
 	}
 	held, err := heldfile.OpenContext(ctx, filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(layer.Digest, "sha256:")),
@@ -167,7 +178,7 @@ func verifyImageLayer(ctx context.Context, root string, layer Descriptor, diffID
 		return e.New(e.CodeVerifyFailed, "container image layer does not match its descriptor")
 	}
 	var reader io.Reader = io.NewSectionReader(held, 0, held.Size())
-	if layer.MediaType == MediaImageLayerGzip {
+	if layer.MediaType == MediaImageLayerGzip || layer.MediaType == string(types.DockerLayer) {
 		gz, err := gzip.NewReader(reader)
 		if err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "decoding container image layer")
@@ -200,4 +211,13 @@ func verifyImageLayer(ctx context.Context, root string, layer Descriptor, diffID
 		return e.New(e.CodeVerifyFailed, "container image layer does not match its uncompressed identity")
 	}
 	return nil
+}
+
+// publishedManifestMediaType keeps the exact native image encoding. Other
+// deliverables and evidence are NKD-owned OCI artifact manifests.
+func publishedManifestMediaType(object PublishedObject) string {
+	if types.MediaType(object.ArtifactType).IsImage() {
+		return object.ArtifactType
+	}
+	return MediaOCIManifest
 }

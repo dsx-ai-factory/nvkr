@@ -186,7 +186,7 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 			if err != nil {
 				return e.Wrap(e.CodeUnavailable, err, "fetching deliverable %q", object.Name)
 			}
-			if digestBytes(descriptor.Manifest) != object.DescriptorDigest || int64(len(descriptor.Manifest)) != object.Size || string(descriptor.MediaType) != MediaOCIManifest {
+			if digestBytes(descriptor.Manifest) != object.DescriptorDigest || int64(len(descriptor.Manifest)) != object.Size || string(descriptor.MediaType) != publishedManifestMediaType(object) {
 				return e.New(e.CodeVerifyFailed, "registry substituted deliverable %q", object.Name)
 			}
 			img, err := descriptor.Image()
@@ -406,7 +406,7 @@ func outputImage(ctx context.Context, root string, object PublishedObject) (v1.I
 		return nil, noop, e.Wrap(e.CodeInternal, err, "creating output upload workspace")
 	}
 	cleanup := func() { _ = os.RemoveAll(stage) }
-	descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
+	descriptor := Descriptor{MediaType: publishedManifestMediaType(object), Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
 	writer := layoutWriter{root: stage}
 	if err := writer.copyClosure(ctx, root, descriptor); err != nil {
 		cleanup()

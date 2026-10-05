@@ -20,7 +20,7 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	}
 	switch node.PackageKind {
 	case PackageImage:
-		return executeImagePackage(ctx, plan, node, output, inputs, stdout)
+		return executeImagePackage(ctx, plan, node, output, inputs, artifacts, stdout)
 	case PackageBinaryBundle:
 		return executeBinaryPackage(ctx, plan, output, inputs)
 	case PackageAPT:
