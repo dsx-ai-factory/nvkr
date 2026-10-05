@@ -154,6 +154,12 @@ jobs:
             --security-opt=no-new-privileges --init "--init-path=$init_path" \
             "${mappings[@]}" --user="$(id -u):$(id -g)" \
             "$PROBE_IMAGE" sh -ec 'id; cat /proc/self/cgroup'
+          # Test the existing heldfile child-descriptor route, not path trust.
+          exec 4<"$init_path"
+          "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --init --init-path=/proc/self/fd/4 \
+            "${mappings[@]}" --user="$(id -u):$(id -g)" "$PROBE_IMAGE" sh -ec 'id; cat /proc/self/cgroup'
+          exec 4<&-
           # These command substitutions intentionally execute inside the child.
           # shellcheck disable=SC2016
           "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
