@@ -16,11 +16,13 @@ import (
 )
 
 const (
-	AcquisitionSchemaVersion          = "nkd.dev/package-acquisitions/v1"
-	MaxAcquisitionArchiveBytes  int64 = 8 << 30
-	maxAcquisitionManifestBytes int64 = 8 << 20
-	maxAcquisitionPackageBytes  int64 = 1 << 30
-	maxAcquisitionPackages            = 16384
+	AcquisitionSchemaVersion               = "nkd.dev/package-acquisitions/v1"
+	MaxAcquisitionArchiveBytes       int64 = 8 << 30
+	maxAcquisitionManifestBytes      int64 = 8 << 20
+	maxAcquisitionPackageBytes       int64 = 1 << 30
+	maxAcquisitionPackages                 = 16384
+	maxAcquisitionRepositoryURIs           = 32
+	maxAcquisitionRepositoryURIBytes       = 4096
 )
 
 // AcquiredPackage describes one archive retained by an APT pre-install hook.
@@ -51,11 +53,12 @@ type AcquisitionManifest struct {
 // AcquisitionObservation records verified archive-to-manifest byte correspondence.
 // It deliberately cannot authorize a live Run or assert acquisition origin,
 // installed content, complete closure, qualified reproduction or a disk SBOM.
+// A nil or zero value is an empty description, never verification authority.
 type AcquisitionObservation struct {
-	archiveDigest  string
-	archiveSize    int64
-	manifestDigest string
-	manifest       AcquisitionManifest
+	archiveDigest      string
+	archiveSize        int64
+	manifestBlobSHA256 string
+	manifest           AcquisitionManifest
 }
 
 // Description returns a deep copy of untrusted source metadata whose referenced
@@ -74,38 +77,80 @@ func (observation *AcquisitionObservation) Description() AcquisitionManifest {
 
 // Binding returns exact archive and manifest-blob digests, not structured
 // lifecycle identities or a receipt over acquisition origin.
-func (observation *AcquisitionObservation) Binding() (archive string, size int64, manifest string) {
+func (observation *AcquisitionObservation) Binding() (archive string, size int64, manifestBlobSHA256 string) {
 	if observation == nil {
 		return "", 0, ""
 	}
-	return observation.archiveDigest, observation.archiveSize, observation.manifestDigest
+	return observation.archiveDigest, observation.archiveSize, observation.manifestBlobSHA256
 }
 
 func (manifest *AcquisitionManifest) validate() error {
-	if manifest.SchemaVersion != AcquisitionSchemaVersion || manifest.Scope != "apt-pre-install-pkgs" ||
-		(manifest.Architecture != "amd64" && manifest.Architecture != "arm64") ||
-		len(manifest.Packages) == 0 || len(manifest.Packages) > maxAcquisitionPackages {
-		return e.New(e.CodeVerifyFailed, "unsupported or empty package acquisition manifest")
+	if manifest.SchemaVersion != AcquisitionSchemaVersion {
+		return e.New(e.CodeVerifyFailed, "unsupported package acquisition schema")
+	}
+	if manifest.Scope != "apt-pre-install-pkgs" {
+		return e.New(e.CodeVerifyFailed, "unsupported package acquisition scope")
+	}
+	if manifest.Architecture != "amd64" && manifest.Architecture != "arm64" {
+		return e.New(e.CodeVerifyFailed, "unsupported package acquisition architecture")
+	}
+	if len(manifest.Packages) == 0 || len(manifest.Packages) > maxAcquisitionPackages {
+		return e.New(e.CodeVerifyFailed, "package acquisition count outside supported bounds")
 	}
 	previous := ""
 	for _, entry := range manifest.Packages {
-		if !canonicalToken(entry.Name, maxMaterialNameBytes) || !canonicalToken(entry.Version, maxMaterialNameBytes) ||
-			(entry.Architecture != "all" && entry.Architecture != manifest.Architecture) ||
-			!canonical.IsDigest(entry.Digest) || entry.Digest <= previous || entry.Size <= 0 ||
-			entry.Size > maxAcquisitionPackageBytes || entry.Path != "packages/"+strings.TrimPrefix(entry.Digest, "sha256:")+".deb" {
-			return e.New(e.CodeVerifyFailed, "invalid, unsorted or duplicate acquired package description")
+		// These are bounded display tokens, not Debian name/version validation.
+		// An admitted dpkg reader must check them against the actual package bytes.
+		if !canonicalToken(entry.Name, maxMaterialNameBytes) || !canonicalToken(entry.Version, maxMaterialNameBytes) {
+			return e.New(e.CodeVerifyFailed, "acquired package has invalid display metadata")
+		}
+		if entry.Architecture != "all" && entry.Architecture != manifest.Architecture {
+			return e.New(e.CodeVerifyFailed, "acquired package architecture differs from capture")
+		}
+		if !canonical.IsDigest(entry.Digest) {
+			return e.New(e.CodeVerifyFailed, "acquired package has invalid blob digest")
+		}
+		if entry.Digest <= previous {
+			return e.New(e.CodeVerifyFailed, "acquired package digests must be strictly sorted and unique")
+		}
+		if entry.Size <= 0 || entry.Size > maxAcquisitionPackageBytes {
+			return e.New(e.CodeVerifyFailed, "acquired package size outside supported bounds")
+		}
+		if entry.Path != "packages/"+strings.TrimPrefix(entry.Digest, "sha256:")+".deb" {
+			return e.New(e.CodeVerifyFailed, "acquired package path is not digest-derived")
 		}
 		previous = entry.Digest
-		if len(entry.RepositoryURIs) == 0 || len(entry.RepositoryURIs) > 32 {
+		if len(entry.RepositoryURIs) == 0 || len(entry.RepositoryURIs) > maxAcquisitionRepositoryURIs {
 			return e.New(e.CodeVerifyFailed, "acquired package %q requires bounded repository metadata locations", entry.Name)
 		}
 		previousURI := ""
 		for _, raw := range entry.RepositoryURIs {
+			if !canonicalToken(raw, maxAcquisitionRepositoryURIBytes) {
+				return e.New(e.CodeVerifyFailed, "acquired package repository location is not bounded display text")
+			}
+			if raw <= previousURI {
+				return e.New(e.CodeVerifyFailed, "acquired package repository locations must be strictly sorted and unique")
+			}
 			location, err := url.Parse(raw)
-			if !canonicalToken(raw, 4096) || raw <= previousURI || err != nil ||
-				(location.Scheme != "http" && location.Scheme != "https") || location.Hostname() == "" ||
-				location.User != nil || location.RawQuery != "" || location.ForceQuery || location.Fragment != "" {
-				return e.New(e.CodeVerifyFailed, "acquired package %q has an unsafe repository metadata location", entry.Name)
+			if err != nil {
+				// net/url errors can echo the input, including credentials. The raw
+				// source description is deliberately not included in diagnostics.
+				return e.New(e.CodeVerifyFailed, "parsing acquired package repository location")
+			}
+			if location.Scheme != "http" && location.Scheme != "https" {
+				return e.New(e.CodeVerifyFailed, "acquired package repository location requires HTTP(S)")
+			}
+			if location.Hostname() == "" {
+				return e.New(e.CodeVerifyFailed, "acquired package repository location requires a host")
+			}
+			if location.User != nil {
+				return e.New(e.CodeVerifyFailed, "acquired package repository location contains credentials")
+			}
+			if location.RawQuery != "" || location.ForceQuery {
+				return e.New(e.CodeVerifyFailed, "acquired package repository location contains a query")
+			}
+			if location.Fragment != "" {
+				return e.New(e.CodeVerifyFailed, "acquired package repository location contains a fragment")
 			}
 			previousURI = raw
 		}
@@ -137,9 +182,17 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	if err != nil {
 		return nil, acquisitionReadError(ctx, err)
 	}
-	if source.offset() != 512 || !acquisitionRegular(header) || header.Name != "manifest.json" ||
-		header.Size <= 0 || header.Size > maxAcquisitionManifestBytes {
-		return nil, e.New(e.CodeVerifyFailed, "acquisition archive requires a bounded first manifest.json member")
+	if source.offset() != 512 {
+		return nil, e.New(e.CodeVerifyFailed, "acquisition archive has hidden headers before manifest")
+	}
+	if !acquisitionRegular(header) {
+		return nil, e.New(e.CodeVerifyFailed, "acquisition manifest requires a regular USTAR member")
+	}
+	if header.Name != "manifest.json" {
+		return nil, e.New(e.CodeVerifyFailed, "acquisition archive requires manifest.json first")
+	}
+	if header.Size <= 0 || header.Size > maxAcquisitionManifestBytes {
+		return nil, e.New(e.CodeVerifyFailed, "acquisition manifest size outside supported bounds")
 	}
 	raw, err := io.ReadAll(reader)
 	if err != nil {
@@ -158,8 +211,17 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 		if err != nil {
 			return nil, acquisitionReadError(ctx, err)
 		}
-		if source.offset() != nextHeader+512 || !acquisitionRegular(header) || header.Name != entry.Path || header.Size != entry.Size {
-			return nil, e.New(e.CodeVerifyFailed, "acquired package %q is missing, substituted or has the wrong size", entry.Name)
+		if source.offset() != nextHeader+512 {
+			return nil, e.New(e.CodeVerifyFailed, "acquisition archive has hidden headers before package")
+		}
+		if !acquisitionRegular(header) {
+			return nil, e.New(e.CodeVerifyFailed, "acquired package requires a regular USTAR member")
+		}
+		if header.Name != entry.Path {
+			return nil, e.New(e.CodeVerifyFailed, "acquired package member path differs from manifest")
+		}
+		if header.Size != entry.Size {
+			return nil, e.New(e.CodeVerifyFailed, "acquired package member size differs from manifest")
 		}
 		hash := sha256.New()
 		if _, err := io.Copy(hash, reader); err != nil {
@@ -193,7 +255,8 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	}
 	// archive/tar owns tar parsing. Its end marker does not consume arbitrary
 	// trailing bytes, so reject nonzero trailing data rather than silently hide
-	// another archive or undeclared payload after the terminator.
+	// another parser-visible archive after the terminator. Header slack and member
+	// padding remain opaque archive bytes bound by its digest, not package claims.
 	buffer := make([]byte, 32<<10)
 	for {
 		n, err := source.Read(buffer)
@@ -214,7 +277,7 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	}
 	manifestHash := sha256.Sum256(raw)
 	return &AcquisitionObservation{archiveDigest: archive.Digest(), archiveSize: archive.Size(),
-		manifestDigest: "sha256:" + hex.EncodeToString(manifestHash[:]), manifest: manifest}, nil
+		manifestBlobSHA256: "sha256:" + hex.EncodeToString(manifestHash[:]), manifest: manifest}, nil
 }
 
 func acquisitionRegular(header *tar.Header) bool {

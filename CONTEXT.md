@@ -222,6 +222,12 @@ not replace the authenticated input fields. The manifest is not an authenticated
 authority.
 _Avoid_: Node-SKU staging manifest, producer receipt, absolute staging path
 
+**Guest package capture**:
+A source-reported record of package archives retained during a guest installation event, distinct from a
+catalog component acquisition or build-material input. Checking its held archive proves declared member-byte
+correspondence, not acquisition origin, installed content, a complete closure or live-Run authority.
+_Avoid_: Full disk SBOM, authenticated download trace, build-material manifest
+
 **VM-image builder**:
 A from-source builder capability for a disk-image output. The catalog binds one VM-image producer form and its
 artifact path. Generic build requirements use the shared execution contract. Typed IR/Plan lowering is admitted;

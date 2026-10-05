@@ -1,7 +1,8 @@
 # Source-owned APT capture
 
-This change captures actual guest APT package archives and checks the capture's
-byte correspondence. It does not issue acquisition-origin authority, an installed
+NKD adds a diagnostic verifier for the guest package capture format emitted by
+an unpinned NKE source candidate. The maintained NKE OS source does not produce
+this capture. The verifier does not issue acquisition-origin authority, an installed
 inventory, a live-Run receipt or a full disk SBOM (ADR-10 and ADR-13).
 
 ## Field ownership
@@ -22,7 +23,7 @@ description authenticates an acquisition simply by being well-formed.
 
 ## Source and byte checks
 
-The NKE source owns the optional APT `Pre-Install-Pkgs` hook. Its native v1
+The NKE candidate owns the optional APT `Pre-Install-Pkgs` hook. Its native v1
 protocol supplies the actual archive paths immediately before dpkg invocation.
 GNU xargs passes newline-delimited paths directly to cp, without shell evaluation
 of those paths. Numbered backups prevent repeated filenames from overwriting
@@ -39,9 +40,18 @@ configuration, not silently enabled by an adapter.
 
 NKD verifies the held capture without extraction. It rejects noncanonical JSON,
 unsupported architecture, links, undeclared members, duplicate/unsorted records,
-digest/size substitution, unsafe repository metadata locations and nonzero data
+digest/size substitution, repository locations outside the bounded-description
+policy, and nonzero data
 after the tar terminator. Limits are 16,384 packages, 1 GiB per package, 8 MiB
-manifest and 8 GiB total archive. Source export additionally limits captured
+manifest and 8 GiB total archive, with 1–32 repository locations per package and
+at most 4,096 bytes per location. These are sorted raw HTTP(S) descriptions with
+a host and without credentials, queries or nonempty fragments, not normalized
+URLs or authorized fetch targets. Equivalent spellings can remain distinct;
+the verifier does not validate transport ports or path semantics. Name and
+version are bounded display tokens; an admitted dpkg reader owns Debian
+metadata validation against retained bytes. Empty captures are rejected, matching
+the candidate recorder's nonempty-package requirement.
+Source export additionally limits captured
 package bytes to 7 GiB; capture storage is charged to the existing VM workspace.
 Copying may fail earlier if workspace storage is exhausted, which fails the
 build rather than producing an accepted capture.
@@ -51,20 +61,13 @@ regions, remain bound by the exact archive digest.
 
 ## Validation and remaining acceptance
 
-The recorded source exercises used NKE `f1eddbf62ff5866d593a8eb05d8eb2fcac80be1c`.
-The source candidate is rebased onto `02b33339426031782ead68b8b9b05c64c5f4718b`,
-whose intervening change does not alter the OS capture files.
-The NKD baseline is `d1a4ec9403a936b154b16f4c53e3d3f6daa4c739`.
-Both architectures have contract coverage. Native APT parsing and real Packer
-configuration validation cover both architectures, plain/FDE and capture on/off.
-These validations do not boot a VM.
-
 The [dated diagnostic record](evidence/2026-10-03-apt-capture-correspondence.md)
-preserves the observed results, exact digests and limits. Historical local gate
-and capture logs were inspected during review, but their temporary storage is
-not a durable or shared artifact and does not prove a later changed revision.
-Packer validation used the existing installed Packer 1.15.4 and QEMU plugin
-closure, without `packer init`.
+records the actual tested verifier source blob, both exact retained capture
+digests, and committed recheck logs. The source hook belongs to the separate
+[NKE candidate PR](https://github.com/dsx-ai-factory/nke/pull/1211), not this
+verifier or the maintained NKE Definition. The ordinary suite includes a small
+Python `tarfile` fixture with exact archive and manifest-blob SHA-256 assertions;
+its payload is synthetic, not a Debian package or installer execution.
 
 Each real capture was separately admitted through `heldfile.OpenContext` and
 `ObserveAcquisitionArchive` in the opt-in `TestObserveRealAcquisitionArchive`.
@@ -88,7 +91,7 @@ The capture is 30,720 bytes, SHA-256
 not published as a retained CI artifact.
 This is not native AMD64 KVM evidence.
 
-Task C acceptance remains incomplete until a real NKE bake demonstrates the
+Live guest package capture integration remains incomplete until a real NKE bake demonstrates the
 installer/target capture handoff, and NKD admits and collects this extra payload
 while binding it to the live Run, exact producer and exact QCOW2. The current
 disk driver does not yet collect this declared acquisition carrier. Downloads

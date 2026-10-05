@@ -3,9 +3,12 @@ package material
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -111,6 +114,20 @@ func TestObserveAcquisitionArchiveChecksBytesWithoutClaimingPackageMetadata(t *t
 }
 
 func TestObserveAcquisitionArchiveRejectsBadCaptures(t *testing.T) {
+	reasons := map[string]string{
+		"wrong schema":                  "unsupported package acquisition schema",
+		"wrong scope":                   "unsupported package acquisition scope",
+		"wrong architecture":            "unsupported package acquisition architecture",
+		"package architecture mismatch": "package architecture differs",
+		"unsafe path":                   "path is not digest-derived", "metadata control": "invalid display metadata",
+		"missing URI":    "requires bounded repository metadata locations",
+		"credential URI": "contains credentials", "query URI": "contains a query",
+		"duplicate record":  "digests must be strictly sorted and unique",
+		"missing package":   "reading held package acquisition archive",
+		"substituted bytes": "differs from its manifest digest",
+		"wrong path":        "member path differs", "symbolic link": "requires a regular USTAR member",
+		"extra package": "extra or malformed member", "hidden trailing bytes": "nonzero trailing data",
+	}
 	for _, test := range []struct {
 		name     string
 		mutate   func(*AcquisitionManifest)
@@ -151,9 +168,7 @@ func TestObserveAcquisitionArchiveRejectsBadCaptures(t *testing.T) {
 				raw = append(raw, []byte("hidden")...)
 			}
 			got, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, raw))
-			if got != nil || errorCode(err) != e.CodeVerifyFailed {
-				t.Fatalf("observation = %v, error = %v", got, err)
-			}
+			assertAcquisitionFailure(t, got, err, reasons[test.name])
 		})
 	}
 }
@@ -222,8 +237,8 @@ func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 				if observation == nil || err != nil {
 					t.Fatalf("canonical complete capture rejected: observation=%v error=%v", observation, err)
 				}
-			} else if observation != nil || errorCode(err) != e.CodeVerifyFailed {
-				t.Fatalf("malformed acquisition document accepted: observation=%v error=%v", observation, err)
+			} else {
+				assertAcquisitionFailure(t, observation, err, "decoding package acquisition manifest")
 			}
 		})
 	}
@@ -300,8 +315,14 @@ func TestObserveAcquisitionArchiveRequiresExactOrdering(t *testing.T) {
 				if err != nil || observation == nil {
 					t.Fatalf("valid ordered capture rejected: %v", err)
 				}
-			} else if observation != nil || errorCode(err) != e.CodeVerifyFailed {
-				t.Fatalf("unordered capture accepted: observation=%v error=%v", observation, err)
+			} else {
+				reason := map[string]string{
+					"unsorted manifest":     "digests must be strictly sorted and unique",
+					"unsorted members":      "member path differs",
+					"unsorted URIs":         "repository locations must be strictly sorted and unique",
+					"manifest is not first": "requires manifest.json first",
+				}[test.name]
+				assertAcquisitionFailure(t, observation, err, reason)
 			}
 		})
 	}
@@ -325,11 +346,12 @@ func TestObserveAcquisitionArchiveRejectsHiddenExtensions(t *testing.T) {
 		offset   int
 		target   string
 		truncate bool
+		reason   string
 	}{
-		{name: "before manifest", offset: 0, target: "manifest.json"},
-		{name: "before package", offset: 1024, target: manifest.Packages[0].Path},
-		{name: "before terminator", offset: len(raw) - 1024, target: "hidden"},
-		{name: "instead of terminator at EOF", offset: len(raw) - 1024, target: "hidden", truncate: true},
+		{name: "before manifest", offset: 0, target: "manifest.json", reason: "hidden headers before manifest"},
+		{name: "before package", offset: 1024, target: manifest.Packages[0].Path, reason: "hidden headers before package"},
+		{name: "before terminator", offset: len(raw) - 1024, target: "hidden", reason: "hidden extension members or an incomplete terminator"},
+		{name: "instead of terminator at EOF", offset: len(raw) - 1024, target: "hidden", truncate: true, reason: "nonzero terminator"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			extension := bytes.Clone(extended.Bytes()[:1024])
@@ -340,9 +362,7 @@ func TestObserveAcquisitionArchiveRejectsHiddenExtensions(t *testing.T) {
 				capture = append(capture, raw[test.offset:]...)
 			}
 			observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, capture))
-			if observation != nil || errorCode(err) != e.CodeVerifyFailed {
-				t.Fatalf("hidden extension accepted: observation=%v error=%v", observation, err)
-			}
+			assertAcquisitionFailure(t, observation, err, test.reason)
 		})
 	}
 }
@@ -364,4 +384,35 @@ func TestObserveRealAcquisitionArchive(t *testing.T) {
 	digest, size, document := observation.Binding()
 	t.Logf("verified actual capture bytes: archive=%s size=%d manifest=%s architecture=%s packages=%d (not live-Run authority)",
 		digest, size, document, observation.Description().Architecture, len(observation.Description().Packages))
+}
+
+func TestObservePythonTarfileCapture(t *testing.T) {
+	encoded, err := os.ReadFile("testdata/python-acquisition.tar.gz.base64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressed, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(encoded)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive, size, manifest := observation.Binding()
+	if archive != "sha256:100cbc4b0354f184c7d0e81f3bf67805870074d272fccf63778a8f8669667f03" || size != 10240 || manifest != "sha256:e05865caa150eff0441b9f78f60e5195ad9928ada62c841dce993546b11dc118" {
+		t.Fatalf("Python producer format changed: %s %d %s", archive, size, manifest)
+	}
+	if description := observation.Description(); description.Architecture != "arm64" || len(description.Packages) != 1 || description.Packages[0].Architecture != "all" {
+		t.Fatalf("unexpected description: %+v", description)
+	}
 }
