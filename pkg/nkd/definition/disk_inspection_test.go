@@ -103,3 +103,23 @@ func TestEnvironmentDiskProfileFailureOrderIsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+func TestDiskInspectionProfileAdmitsRuntimeMemoryMinimum(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		for _, memory := range []uint64{1, 2047, 2048} {
+			profile := inspectionProfileFixture()
+			profile.Resources.MemoryMiB = memory
+			err := profile.Validate(platform)
+			if memory == 2048 {
+				if err != nil {
+					t.Fatalf("%s exact runtime minimum: %v", platform, err)
+				}
+				continue
+			}
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+				t.Fatalf("%s memory=%d error=%v, want capability refusal", platform, memory, err)
+			}
+		}
+	}
+}

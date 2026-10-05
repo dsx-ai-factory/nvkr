@@ -115,14 +115,17 @@ func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskI
 	if err := validateDiskScannerSelection(plan, selection.Platform, profile.ScannerDigest); err != nil {
 		return definition.DiskInspectionProfile{}, err
 	}
-	if selection.Image != profile.Image || selection.InspectorDigest != profile.InspectorDigest || selection.CodecDigest != profile.CodecDigest ||
-		filepath.Base(selection.RuntimeExecutable) != plan.Environment.RuntimeBinary() ||
-		selection.PodmanStorageDriver != plan.Environment.Runtime.PodmanStorageDriver ||
-		selection.GuestfishDigest != profile.GuestfishDigest || selection.ScannerDigest != profile.ScannerDigest || selection.PackageReaderDigest != profile.PackageReaderDigest ||
-		selection.Resources != profile.Resources || selection.TimeoutSeconds != profile.TimeoutSeconds || selection.MaxFilesystemBytes != profile.MaxFilesystemBytes || selection.ScratchStorage != profile.ScratchStorage {
+	if diskProfileFromSelection(selection) != profile || filepath.Base(selection.RuntimeExecutable) != plan.Environment.RuntimeBinary() ||
+		selection.PodmanStorageDriver != plan.Environment.Runtime.PodmanStorageDriver {
 		return definition.DiskInspectionProfile{}, e.New(e.CodeVerifyFailed, "admitted disk inspector differs from frozen Environment profile")
 	}
 	return profile, nil
+}
+
+func diskProfileFromSelection(selection pipeline.DiskInspectionSelection) definition.DiskInspectionProfile {
+	return definition.DiskInspectionProfile{Image: selection.Image, InspectorDigest: selection.InspectorDigest, CodecDigest: selection.CodecDigest,
+		GuestfishDigest: selection.GuestfishDigest, ScannerDigest: selection.ScannerDigest, PackageReaderDigest: selection.PackageReaderDigest,
+		Resources: selection.Resources, TimeoutSeconds: selection.TimeoutSeconds, MaxFilesystemBytes: selection.MaxFilesystemBytes, ScratchStorage: selection.ScratchStorage}
 }
 
 // A frozen inspection profile owns its complete scanner pin. Reuse a separately
@@ -150,7 +153,31 @@ func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 // acquisitions, and the complete live staged producer graph. No caller path,
 // input description or completeness boolean is admitted.
 func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime) (*DiskEvidenceReceipt, error) {
-	if ctx == nil || owner == nil {
+	return owner.reconcileDiskEvidence(ctx, plan, expected, inspection,
+		func(ctx context.Context) (definition.DiskInspectionProfile, error) {
+			return diskEvidenceProfile(ctx, plan, inspection)
+		},
+		func(ctx context.Context, build BuildPlan, trace *diskMaterialTrace, payload *diskPayload, profile definition.DiskInspectionProfile) (diskEvidenceScan, error) {
+			return owner.scanDiskEvidence(ctx, plan, build, trace, payload, inspection, profile)
+		})
+}
+
+// These private operations model scan failures and lifetime changes in contract
+// tests. The public wrapper always supplies the concrete runtime and Packer
+// scan above; neither decoded documents nor caller callbacks issue authority.
+type diskEvidenceScan struct {
+	subject   string
+	size      int64
+	profile   definition.DiskInspectionProfile
+	bom       *sbom.BOM
+	documents map[string][]byte
+}
+
+func (owner *LocalRunResult) reconcileDiskEvidence(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime,
+	bindings func(context.Context) (definition.DiskInspectionProfile, error),
+	scan func(context.Context, BuildPlan, *diskMaterialTrace, *diskPayload, definition.DiskInspectionProfile) (diskEvidenceScan, error),
+) (*DiskEvidenceReceipt, error) {
+	if ctx == nil || owner == nil || bindings == nil || scan == nil {
 		return nil, e.New(e.CodeUsage, "disk reconciliation requires context and original Run")
 	}
 	if err := ctx.Err(); err != nil {
@@ -165,7 +192,7 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 		return nil, err
 	}
 	defer release()
-	profile, err := diskEvidenceProfile(ctx, plan, inspection)
+	profile, err := bindings(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -178,28 +205,72 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 		return nil, e.New(e.CodeEncryptedArtifact, "disk evidence requires unencrypted inspected contents")
 	}
 	owner.diskMu.Lock()
-	var artifact *pipeline.PackerArtifact
+	var payload *diskPayload
 	for _, completion := range owner.diskCompletions {
 		if completion.NodeID == expected.Name+"/"+subject.Producer && completion.Payload != nil {
-			artifact, _ = completion.Payload.content.(*pipeline.PackerArtifact)
+			payload = completion.Payload
 		}
 	}
 	owner.diskMu.Unlock()
-	if artifact == nil {
+	if payload == nil {
 		return nil, e.New(e.CodeVerifyFailed, "disk evidence lost its original held Packer artifact")
 	}
+	observed, err := scan(ctx, build, trace, payload, profile)
+	if ctx.Err() != nil {
+		return nil, e.Wrap(e.CodeTimeout, errors.Join(ctx.Err(), err), "disk evidence join canceled")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if observed.subject != subject.Digest || observed.size != subject.Size || observed.profile != profile || observed.bom == nil {
+		return nil, e.New(e.CodeVerifyFailed, "disk evidence scan differs from its original subject or inspector profile")
+	}
+	raw, err := observed.bom.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	if observed.documents == nil {
+		return nil, e.New(e.CodeVerifyFailed, "disk evidence scan has no component documents")
+	}
+	observed.documents[subject.Component] = raw
+	current, err := bindings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if current != profile {
+		return nil, e.New(e.CodeVerifyFailed, "disk inspection profile changed during evidence join")
+	}
+	currentTrace, err := owner.observeDiskMaterialsWhileHeld(ctx, plan, expected)
+	if err != nil {
+		return nil, err
+	}
+	if err := trace.ValidateSubject(expected.Name, currentTrace.description.Subject.PlanDigest,
+		currentTrace.description.Subject.BuildDigest, currentTrace.description.Subject.Digest); err != nil {
+		return nil, err
+	}
+	return &DiskEvidenceReceipt{owner: owner, runtime: inspection, trace: trace, profile: profile, root: raw, documents: observed.documents}, nil
+}
+
+func (owner *LocalRunResult) scanDiskEvidence(ctx context.Context, plan *Plan, build BuildPlan, trace *diskMaterialTrace, payload *diskPayload,
+	inspection *sbom.DiskInspectionRuntime, profile definition.DiskInspectionProfile,
+) (diskEvidenceScan, error) {
+	artifact, ok := payload.content.(*pipeline.PackerArtifact)
+	if !ok || artifact == nil {
+		return diskEvidenceScan{}, e.New(e.CodeVerifyFailed, "disk evidence requires its original held Packer capability")
+	}
+	subject := trace.description.Subject
 	// Reject absent, changed or wrong-architecture capture before expensive
 	// filesystem discovery. This comes only from the original artifact owner.
 	acquisitions, err := artifact.ObserveAcquisitionsContext(ctx)
 	if err != nil {
-		return nil, err
+		return diskEvidenceScan{}, err
 	}
 	if acquisitions.Description().Architecture != strings.TrimPrefix(build.Platform, "linux/") {
-		return nil, e.New(e.CodeVerifyFailed, "retained acquisitions differ from the disk consumer architecture")
+		return diskEvidenceScan{}, e.New(e.CodeVerifyFailed, "retained acquisitions differ from the disk consumer architecture")
 	}
 	root, err := inspectOriginalDiskContent(ctx, inspection, artifact, subject.Size, build.Platform)
 	if err != nil {
-		return nil, err
+		return diskEvidenceScan{}, err
 	}
 	hashes := make(map[string]string, len(trace.description.Members))
 	for _, member := range trace.description.Members {
@@ -207,41 +278,26 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 	}
 	sources, _, err := sbom.PerArtifact(&buildgraph.Resolved{Platform: build.Platform, Components: build.ResolvedComponents}, build.BuildDigest, hashes)
 	if err != nil {
-		return nil, err
+		return diskEvidenceScan{}, err
 	}
 	inputs, documents, err := owner.inspectDiskEvidenceMaterials(ctx, plan, build, trace, inspection, sources)
 	if err != nil {
-		return nil, err
+		return diskEvidenceScan{}, err
 	}
 	captured, err := inspection.InspectPackerAcquisitionsContent(ctx, artifact, build.Platform)
 	if err != nil {
-		return nil, err
+		return diskEvidenceScan{}, err
 	}
 	inputs = append(inputs, captured)
 	bom, err := sbom.ReconcileDiskContents(ctx, subject.BuildDigest, subject.Component, root, inputs)
 	if err != nil {
-		return nil, err
+		return diskEvidenceScan{}, err
 	}
 	bom, err = sbom.WithSourceSubject(bom, sources[subject.Component])
 	if err != nil {
-		return nil, err
+		return diskEvidenceScan{}, err
 	}
-	raw, err := bom.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	documents[subject.Component] = raw
-	current, err := diskEvidenceProfile(ctx, plan, inspection)
-	if err != nil {
-		return nil, err
-	}
-	if current != profile {
-		return nil, e.New(e.CodeVerifyFailed, "disk inspection profile changed during evidence join")
-	}
-	if _, err := owner.observeDiskMaterialsWhileHeld(ctx, plan, expected); err != nil {
-		return nil, err
-	}
-	return &DiskEvidenceReceipt{owner: owner, runtime: inspection, trace: trace, profile: profile, root: raw, documents: documents}, nil
+	return diskEvidenceScan{subject: subject.Digest, size: subject.Size, profile: profile, bom: bom, documents: documents}, nil
 }
 
 func requireProductionDiskScratch(profile definition.DiskInspectionProfile) error {

@@ -139,7 +139,7 @@ filesystems, unsupported encryption, scanner failure, or disagreement fails clos
 A catalog declaration may validate without those tools, but it is not a disk SBOM and cannot compile or publish.
 The authoring schema alone grants no disk evidence. The full-content operation selects an explicit
 Environment-native `diskInspectionProfiles` entry frozen in the Plan: the complete OCI image, inspector,
-codec, guestfish, Syft and dpkg-deb executable pins, CPU/RAM ceilings, scratch capacity minima,
+codec, guestfish, Syft and dpkg-deb executable pins, CPU/RAM ceilings (at least 2 GiB for the appliance), scratch capacity minima,
 filesystem expansion bound and wall-time limit. Changing this observation profile changes Environment/Plan identity rather
 than the logical producer Build. The pinned tools own disk/filesystem, package and OCI grammars;
 NKD projects their observations and does not execute guest programs or package installation scripts.
@@ -173,8 +173,11 @@ QCOW2 digest/size and admitted inspection closure. Export revalidates those owne
 exact disk and returning its deterministic CycloneDX document. Descriptive documents, decoded receipts,
 equal-byte sibling Runs and shallow copies after owner closure cannot restore authority. The full-content
 helper, semantic reconciliation and private scratch paths are implemented. Contract tests cover modeled
-reconciliation observations, selected admission/decoder failures and export-owner revalidation; they do
-not establish full helper discovery or the complete original-owner receipt-issuance handshake. Complete
+reconciliation observations, selected admission/decoder failures, private issuer-core success for both
+consumer architectures and export-owner revalidation. The issuer tests keep complete Plan, original Run,
+payload selection and material-trace checks concrete, while modeling stopped scan/profile observations;
+the public wrapper still requires the actual Packer capability and opaque inspection operations. Those
+tests do not establish full helper discovery or the public native original-owner issuance handshake. Complete
 native NKE content runs, original live joins, publication and production acceptance remain unexercised.
 Documents exceeding the existing 8 MiB bound fail without truncation. The conservative
 simultaneous export/RAM budget is an admission condition, not evidence of runner capacity or reservation.

@@ -12,6 +12,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
@@ -19,6 +20,39 @@ type diskEvidenceExportMutationWriter struct {
 	bytes.Buffer
 	mutate     func()
 	afterBytes int
+}
+
+func TestDiskProfileProjectionPreservesWholeFrozenValue(t *testing.T) {
+	pin := "sha256:" + strings.Repeat("a", 64)
+	selection := pipeline.DiskInspectionSelection{Image: "registry.example/inspect@" + pin, InspectorDigest: pin, CodecDigest: pin,
+		GuestfishDigest: pin, ScannerDigest: pin, PackageReaderDigest: pin, Resources: execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 8192, EphemeralStorageMiB: 16384},
+		TimeoutSeconds: 600, MaxFilesystemBytes: 1 << 20, ScratchStorage: "private-volume"}
+	frozen := diskProfileFromSelection(selection)
+	for _, test := range []struct {
+		name string
+		edit func(*pipeline.DiskInspectionSelection)
+	}{
+		{"image", func(s *pipeline.DiskInspectionSelection) { s.Image += "substitution" }},
+		{"inspector", func(s *pipeline.DiskInspectionSelection) { s.InspectorDigest = "" }},
+		{"codec", func(s *pipeline.DiskInspectionSelection) { s.CodecDigest = "" }},
+		{"guestfish", func(s *pipeline.DiskInspectionSelection) { s.GuestfishDigest = "" }},
+		{"scanner", func(s *pipeline.DiskInspectionSelection) { s.ScannerDigest = "" }},
+		{"package reader", func(s *pipeline.DiskInspectionSelection) { s.PackageReaderDigest = "" }},
+		{"CPU", func(s *pipeline.DiskInspectionSelection) { s.Resources.CPUMillis++ }},
+		{"memory", func(s *pipeline.DiskInspectionSelection) { s.Resources.MemoryMiB++ }},
+		{"scratch capacity", func(s *pipeline.DiskInspectionSelection) { s.Resources.EphemeralStorageMiB++ }},
+		{"timeout", func(s *pipeline.DiskInspectionSelection) { s.TimeoutSeconds-- }},
+		{"filesystem", func(s *pipeline.DiskInspectionSelection) { s.MaxFilesystemBytes++ }},
+		{"scratch route", func(s *pipeline.DiskInspectionSelection) { s.ScratchStorage = "memory" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changed := selection
+			test.edit(&changed)
+			if diskProfileFromSelection(changed) == frozen {
+				t.Fatal("admitted selection substitution disappeared from whole profile comparison")
+			}
+		})
+	}
 }
 
 func (writer *diskEvidenceExportMutationWriter) Write(raw []byte) (int, error) {

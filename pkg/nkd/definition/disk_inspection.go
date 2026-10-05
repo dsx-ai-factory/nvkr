@@ -40,7 +40,7 @@ func (profile DiskInspectionProfile) Validate(platform string) error {
 			return e.New(e.CodeUnpinnedInput, "disk inspection profile requires all exact executable pins")
 		}
 	}
-	if profile.Resources.CPUMillis < 10 || profile.Resources.MemoryMiB == 0 || profile.Resources.EphemeralStorageMiB == 0 ||
+	if profile.Resources.CPUMillis < 10 || profile.Resources.MemoryMiB < 2048 || profile.Resources.EphemeralStorageMiB == 0 ||
 		profile.TimeoutSeconds == 0 || profile.TimeoutSeconds > 600 || profile.MaxFilesystemBytes == 0 || profile.MaxFilesystemBytes > 16<<30 {
 		return e.New(e.CodeEngineCapability, "disk inspection profile requires bounded filesystem, CPU, memory, scratch and wall-time capacity")
 	}
