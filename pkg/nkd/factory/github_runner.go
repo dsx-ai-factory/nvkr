@@ -52,6 +52,9 @@ func runGitHubNode(ctx context.Context, plan *Plan, nodeID string, options GitHu
 }
 
 func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHubStepOptions) error {
+	if node.Kind == NodeFetch {
+		return ExecuteSourceFetch(ctx, plan, node.ID, options.Stdout, options.Stderr)
+	}
 	if node.IRNode != "" || node.Container == "" {
 		return ExecuteNode(ctx, plan, node.ID, options.Stdout, options.Stderr)
 	}
