@@ -100,7 +100,8 @@ retains every complete before/after value, including added and removed objects.
 
 Named schema collections are matched by their keys, so inserting an output does not present every later
 output as replaced. Paths use JSON Pointer escaping plus selectors such as `/builds/@name=cwe` and
-`/graph/nodes/@id=package~1cwe`. Ordered arrays, including command arguments and patches, remain positional.
+`/graph/nodes/@id=package~1cwe`. Text paths use Go string quoting to escape control characters; JSON retains
+the exact paths. Ordered arrays, including command arguments and patches, remain positional.
 A changed ordering among surviving named entries is reported as `@order`. Generated IDs that change with
 pins appear as removed and added references; no heuristic guesses that two different producer identities
 are interchangeable. JSON numbers retain integer precision.

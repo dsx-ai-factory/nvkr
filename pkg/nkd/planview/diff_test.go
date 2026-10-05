@@ -3,6 +3,7 @@ package planview
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -144,6 +145,138 @@ func TestCompareExecutionClassesByName(t *testing.T) {
 				t.Fatalf("execution class changes=%+v, want %+v", changes, want)
 			}
 		})
+	}
+}
+
+func TestComparisonTextEscapesPaths(t *testing.T) {
+	for _, test := range []struct {
+		name, key string
+	}{
+		{"ANSI escape", "safe\x1b[2Jkey"},
+		{"ASCII controls", "safe\x07\b\t\x7fkey"},
+		{"Unicode controls", "safe\u009b\u202ekey"},
+		{"pointer characters", "safe/~key"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			withValue := func(value string) *Document {
+				return inspectPlan(t, comparisonPlan(t, func(_ *catalog.Catalog, _ *definition.Definition, env *definition.Environment) {
+					env.Runtime.Variables = map[string]string{test.key: value}
+				}))
+			}
+			comparison, err := Compare(withValue("before"), withValue("after"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantPath := "/environment/runtime/variables/" + pointer(test.key)
+			for _, format := range []string{"summary", "text", "json"} {
+				t.Run(format, func(t *testing.T) {
+					var output []byte
+					var err error
+					if format == "summary" {
+						output, err = comparison.Summary()
+					} else {
+						output, err = comparison.Render(format)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					if format == "json" {
+						var decoded Comparison
+						if err := json.Unmarshal(output, &decoded); err != nil {
+							t.Fatal(err)
+						}
+						found := false
+						for _, change := range decoded.Changes {
+							found = found || change.Path == wantPath
+						}
+						if !found || !reflect.DeepEqual(comparison, &decoded) {
+							t.Fatalf("JSON did not preserve exact comparison paths: %s", output)
+						}
+						return
+					}
+					if !strings.Contains(string(output), strconv.Quote(wantPath)) {
+						t.Fatalf("text did not quote the path safely: %q", output)
+					}
+					for _, char := range test.key {
+						if !strconv.IsPrint(char) && strings.ContainsRune(string(output), char) {
+							t.Fatalf("text contains raw nonprinting character %U", char)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestComparisonClassifiesExecutionObjects(t *testing.T) {
+	const nodePath = "/builds/@name=agent/executionGraph/nodes/@id=build-containerd"
+	withExecution := func(timeout, maximum uint64) *Document {
+		return inspectPlan(t, comparisonPlan(t, func(cat *catalog.Catalog, _ *definition.Definition, env *definition.Environment) {
+			env.ExecutionClasses = []execution.Class{{Name: "build", RunsOn: "ubuntu-24.04", HostPlatform: execution.HostPlatformLinuxAMD64, MaxTimeoutSeconds: maximum}}
+			if timeout != 0 {
+				component := cat.Components["containerd"]
+				component.BuildRequirements = &execution.Requirements{TimeoutSeconds: timeout}
+				cat.Components["containerd"] = component
+			}
+		}))
+	}
+	for _, test := range []struct {
+		name                        string
+		beforeTimeout, afterTimeout uint64
+		beforeMaximum, afterMaximum uint64
+		paths                       []string
+	}{
+		{"addition", 0, 30, 600, 600, []string{nodePath + "/requirements", nodePath + "/executionBinding"}},
+		{"removal", 30, 0, 600, 600, []string{nodePath + "/requirements", nodePath + "/executionBinding"}},
+		{"requirement descendant", 30, 60, 600, 600, []string{nodePath + "/requirements/timeoutSeconds"}},
+		{"binding descendant", 30, 30, 600, 900, []string{nodePath + "/executionBinding/class/maxTimeoutSeconds"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			before := withExecution(test.beforeTimeout, test.beforeMaximum)
+			after := withExecution(test.afterTimeout, test.afterMaximum)
+			comparison, err := Compare(before, after)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(comparison.Builds) != 0 || comparison.UnchangedBuilds != len(before.plan.Builds) {
+				t.Fatalf("execution-only change altered logical build identities: %+v", comparison)
+			}
+			for _, path := range test.paths {
+				found := false
+				for _, change := range comparison.Changes {
+					if change.Path != path {
+						continue
+					}
+					found = true
+					if change.Category != "environment and execution" {
+						t.Errorf("execution change at %s categorized as %q", path, change.Category)
+					}
+					if test.beforeTimeout == 0 && (change.Before != nil || change.After == nil) {
+						t.Errorf("addition lost its presence/absence distinction: %+v", change)
+					}
+					if test.afterTimeout == 0 && (change.Before == nil || change.After != nil) {
+						t.Errorf("removal lost its presence/absence distinction: %+v", change)
+					}
+				}
+				if !found {
+					t.Errorf("missing execution change at %s: %+v", path, comparison.Changes)
+				}
+			}
+		})
+	}
+}
+
+func TestCategoryKeepsProducerMapKeysSeparate(t *testing.T) {
+	const nodePath = "/builds/@name=node-image/executionGraph/nodes/@id=build-image"
+	for _, field := range []string{"requirements", "executionBinding"} {
+		for _, container := range []string{"packer/materialManifest/kinds", "packer/variables"} {
+			path := nodePath + "/" + container + "/" + field
+			t.Run(container+"/"+field, func(t *testing.T) {
+				if got := category(path); got != "producer instructions" {
+					t.Fatalf("logical producer input at %s categorized as %q", path, got)
+				}
+			})
+		}
 	}
 }
 

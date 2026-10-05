@@ -247,7 +247,10 @@ func category(path string) string {
 	case strings.HasPrefix(path, "/catalogSnapshot/") || strings.Contains(path, "/catalogSnapshot/") || strings.Contains(path, "/resolvedComponents/") || strings.Contains(path, "/appliedOverlays"):
 		return "catalog inputs"
 	case strings.HasPrefix(path, "/builds/"):
-		if strings.Contains(path, "/requirements/") || strings.Contains(path, "/executionBinding/") {
+		// Match the IR node fields, not producer map keys with the same names.
+		parts := strings.SplitN(path, "/", 8)
+		if len(parts) >= 7 && parts[3] == "executionGraph" && parts[4] == "nodes" &&
+			strings.HasPrefix(parts[5], "@id=") && (parts[6] == "requirements" || parts[6] == "executionBinding") {
 			return "environment and execution"
 		}
 		return "producer instructions"
@@ -305,7 +308,7 @@ func (c *Comparison) Render(format string) ([]byte, error) {
 			fmt.Fprintf(&out, "\n%s\n", change.Category)
 			previous = change.Category
 		}
-		fmt.Fprintf(&out, "  %s\n    %s -> %s\n", change.Path, compact(change.Before), compact(change.After))
+		fmt.Fprintf(&out, "  %q\n    %s -> %s\n", change.Path, compact(change.Before), compact(change.After))
 	}
 	return []byte(out.String()), nil
 }
@@ -363,7 +366,7 @@ func (c *Comparison) Summary() ([]byte, error) {
 	shown := 0
 	for _, change := range c.Changes {
 		if strings.HasPrefix(change.Path, "/definition/") || strings.HasPrefix(change.Path, "/environment/") || strings.HasPrefix(change.Path, "/catalogSnapshot/") || change.Category == "publication routes" || change.Category == "plan metadata" || change.Category == "provider tools" {
-			fmt.Fprintf(&out, "  %s\n    %s -> %s\n", change.Path, compact(change.Before), compact(change.After))
+			fmt.Fprintf(&out, "  %q\n    %s -> %s\n", change.Path, compact(change.Before), compact(change.After))
 			shown++
 		}
 	}
