@@ -32,7 +32,7 @@ captures through `heldfile.OpenContext` and checked them with
 The worktree base was NKD `71a8a359c57f19c473f6eaee7b8f9e375ac10b4a`, with local
 review fixes. The tested `pkg/nkd/material/acquisitions.go` Git blob was
 `2efa85692b96055186e618b5ea144b641f7b48f9` (`git hash-object`); this is the verifier,
-not the earlier main baseline which lacks it. The [complete test-output excerpt](2026-10-05-apt-capture-recheck.log)
+not the earlier main baseline which lacks it. The [annotated test output for both rechecks](2026-10-05-apt-capture-recheck.log)
 is retained. The archive files themselves remain local, not Git/CI artifacts.
 These checks do not invoke APT, dpkg, Packer or QEMU and do not prove an original
 installer-to-target capture handoff.
@@ -53,7 +53,7 @@ NKD_TEST_ACQUISITION_ARCHIVE=/path/to/capture.tar \
   go test ./pkg/nkd/material -run TestObserveRealAcquisitionArchive -count=1 -v
 ```
 
-Compare the logged archive digest, size, manifest digest, architecture and
+Compare the logged archive digest, size, manifest-blob SHA-256, architecture and
 package count with this record; the generic diagnostic does not assert these
 historical values automatically. A different
 capture establishes its own byte correspondence, not reproduction of these

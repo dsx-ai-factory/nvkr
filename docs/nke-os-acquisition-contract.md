@@ -63,7 +63,7 @@ regions, remain bound by the exact archive digest.
 
 The [dated diagnostic record](evidence/2026-10-03-apt-capture-correspondence.md)
 records the actual tested verifier source blob, both exact retained capture
-digests, and committed recheck logs. The source hook belongs to the separate
+digests, and the committed recheck log. The source hook belongs to the separate
 [NKE candidate PR](https://github.com/dsx-ai-factory/nke/pull/1211), not this
 verifier or the maintained NKE Definition. The ordinary suite includes a small
 Python `tarfile` fixture with exact archive and manifest-blob SHA-256 assertions;
@@ -74,16 +74,19 @@ Each real capture was separately admitted through `heldfile.OpenContext` and
 Its `NKD_TEST_ACQUISITION_ARCHIVE` variable selects an existing real capture for
 this diagnostic test; it grants neither source nor live-Run authority.
 
-A real ARM64 Ubuntu 26.04 container acquired `hello` version `2.10-5build1`.
+The original diagnostic record attributes an ARM64 `hello` acquisition, version
+`2.10-5build1`, to a native Ubuntu 26.04 container.
 Its retained archive is 25,642 bytes, SHA-256
 `8ab9e5cf329e88413dd502edd5e0907550132470ecb926d500d0d23a30c735d8`.
 NKD accepted the actual 30,720-byte capture, SHA-256
 `684ea432b9002ebb14fefcf81920e644dbd92d3afa7de8b24636f203d9e5504c`.
-This demonstrates native APT cache-cleanup survival, dpkg/python-apt matching and
-cross-language capture acceptance, not an NKE autoinstall or full image bake.
+NKD's retained recheck shows byte correspondence, and the Python fixture checks
+cross-language format acceptance. Neither retained check exercises APT cache
+cleanup, dpkg/python-apt matching, NKE autoinstall or a full image bake.
 The capture is not published as a retained CI artifact.
 
-The same real APT exercise also passed for AMD64 under local container emulation.
+The original record attributes the AMD64 capture to local container emulation;
+NKD's retained recheck verifies only its archive-to-manifest byte correspondence.
 Its actual `hello` package is 26,068 bytes, SHA-256
 `b6e9bef3c865aa17757cd9ffa820c05a37833f8a6b58287afc9f32dedb345965`.
 The capture is 30,720 bytes, SHA-256

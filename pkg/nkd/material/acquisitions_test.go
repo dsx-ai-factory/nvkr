@@ -41,11 +41,16 @@ func acquisitionTar(t *testing.T, manifest AcquisitionManifest, payload []byte, 
 
 func acquisitionTarWithManifestJSON(t *testing.T, manifest AcquisitionManifest, raw, payload []byte, mutate func(*tar.Header), extra bool) []byte {
 	t.Helper()
+	return acquisitionTarWithHeaders(t, manifest, raw, payload, nil, mutate, extra)
+}
+
+func acquisitionTarWithHeaders(t *testing.T, manifest AcquisitionManifest, raw, payload []byte, manifestHeader, packageHeader func(*tar.Header), extra bool) []byte {
+	t.Helper()
 	var destination bytes.Buffer
 	writer := tar.NewWriter(&destination)
-	write := func(name string, content []byte, alter bool) {
+	write := func(name string, content []byte, mutate func(*tar.Header)) {
 		header := &tar.Header{Name: name, Mode: 0o444, Size: int64(len(content)), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
-		if alter && mutate != nil {
+		if mutate != nil {
 			mutate(header)
 		}
 		if err := writer.WriteHeader(header); err != nil {
@@ -57,12 +62,12 @@ func acquisitionTarWithManifestJSON(t *testing.T, manifest AcquisitionManifest, 
 			}
 		}
 	}
-	write("manifest.json", raw, false)
+	write("manifest.json", raw, manifestHeader)
 	if payload != nil {
-		write(manifest.Packages[0].Path, payload, true)
+		write(manifest.Packages[0].Path, payload, packageHeader)
 	}
 	if extra {
-		write("extra.deb", []byte("undeclared"), false)
+		write("extra.deb", []byte("undeclared"), nil)
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)

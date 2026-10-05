@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -173,6 +174,37 @@ func TestObserveAcquisitionArchiveMemberBoundaries(t *testing.T) {
 			}
 			assertAcquisitionFailure(t, observation, err, reason)
 		})
+	}
+}
+
+func TestObserveAcquisitionArchiveManifestHeaderRegularity(t *testing.T) {
+	for _, architecture := range []string{"amd64", "arm64"} {
+		for _, test := range []struct {
+			name   string
+			mutate func(*tar.Header)
+		}{
+			{name: "regular USTAR control"},
+			{name: "GNU", mutate: func(h *tar.Header) { h.Format = tar.FormatGNU }},
+			{name: "directory", mutate: func(h *tar.Header) { h.Typeflag = tar.TypeDir; h.Size = 0 }},
+			{name: "symlink", mutate: func(h *tar.Header) { h.Typeflag = tar.TypeSymlink; h.Linkname = "target"; h.Size = 0 }},
+		} {
+			t.Run(architecture+"/"+test.name, func(t *testing.T) {
+				manifest, payload := acquisitionFixture(architecture)
+				document, err := canonical.Marshal(manifest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw := acquisitionTarWithHeaders(t, manifest, document, payload, test.mutate, nil, false)
+				observation, err := ObserveAcquisitionArchive(context.Background(), holdAcquisition(t, raw))
+				if test.mutate == nil {
+					if observation == nil || err != nil {
+						t.Fatalf("positive control rejected: observation=%v error=%v", observation, err)
+					}
+				} else {
+					assertAcquisitionFailure(t, observation, err, "acquisition manifest requires a regular USTAR member")
+				}
+			})
+		}
 	}
 }
 

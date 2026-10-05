@@ -142,7 +142,7 @@ The diagnostic guest package capture schema `nkd.dev/package-acquisitions/v1` ha
 `apt-pre-install-pkgs` and target `amd64` or `arm64`. Its canonical JSON manifest is the first USTAR member,
 followed by nonempty, unique package members in digest order with exact digest-derived paths and sizes.
 Limits are 16,384 packages, 1 GiB per package, 8 MiB manifest, 8 GiB archive, and 1–32 bounded raw repository
-locations of at most 4,096 bytes per package. The owning held-archive verifier checks member-byte
+locations per package, each at most 4,096 bytes. The owning held-archive verifier checks member-byte
 correspondence without extraction; package display metadata and locations remain source-reported descriptions.
 Header metadata and member padding are opaque digest-bound bytes, not canonical package evidence. Capture
 settings belong to the selected producer configuration. The [capture contract](../nke-os-acquisition-contract.md)
@@ -150,7 +150,7 @@ describes the unpinned NKE candidate; live collection, source/Run/QCOW2 binding,
 complete disk reconciliation remain deferred. Neither this diagnostic observation nor its zero-value
 description authorizes production or substitutes for the full exact-QCOW2 inventory required above.
 
-This reconciliation proves the composition observed in one exact disk; it is not a reproduction comparison.
+The exact-QCOW2 reconciliation proves the composition observed in one exact disk; it is not a reproduction comparison.
 Matching dependency digests, installed-package sets, selected file hashes, or SBOM documents across two Runs can
 support content validation and diagnose drift, but cannot mint `Reproduced` when the qualified artifact subject
 differs. Each different QCOW2 digest remains a new Artifact identity with its own SBOM subject and production
