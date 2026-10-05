@@ -11,17 +11,20 @@ and utility image pins are taken from the maintained inputs but are not pulled o
 
 ## Run it
 
-Use Linux or macOS, Git, Python 3, and the repository's pinned Go toolchain. From the repository root:
+Use Linux or macOS, Bash 3.2 or later, Git, `jq`, GNU `timeout` (or `gtimeout`), a SHA-256 utility
+(`sha256sum` or `shasum`), and the repository's pinned Go toolchain. From the repository root:
 
 ```sh
 make build
-python3 docs/examples/authoring-lab/run.py --nkdctl bin/nkdctl --work .nkd/authoring-lab-01
+bash docs/examples/authoring-lab/run.sh --nkdctl bin/nkdctl --work .nkd/authoring-lab-01
 ```
 
 Choose a new workspace for every run. The program refuses an existing directory and never deletes a
 previous run. Omitting `--work` retains the results in a newly created temporary directory and prints its
 path. After building the CLI, this journey requires no network or Docker. An isolated Git URL override
-routes the fixture source to its local repository; it does not edit global Git configuration.
+routes the fixture source to its local repository; it does not edit global Git configuration. Git and CLI
+commands have a 60-second deadline with a five-second termination grace period. Missing prerequisites fail
+before the workspace is created.
 
 Expected report:
 
