@@ -1,6 +1,6 @@
 # Plan-view review validation
 
-Date: 2026-10-05 UTC. Base: `42e81ffd4a2496a5dada671c6576492aca9db869`.
+Date: 2026-10-05 UTC. Base: `73799fbc3247d835ab487320cce7fe4276edd4be`.
 Scope: read-only Plan views and contract tests on macOS ARM64 with Go `1.27.1` and
 `GOTOOLCHAIN=local`. The source table identifies the tested candidate independently of the eventual commit.
 Git blob identities describe exact source bytes; they are not NKD Build Digests.
@@ -27,16 +27,21 @@ the further review changes below rather than replacing historical source identit
 - Long diff values retain their byte budget at a UTF-8 boundary. JSON retains complete values. Shared key-union
   and text-header helpers preserve deterministic comparison output and agreement between the two text views.
 - DOT labels use DOT-specific escaping, preserving literal substitution sequences and readable Unicode while
-  showing nonprinting characters as escaped text. Tests include a Unicode publication-host label admitted
-  through the public compile/inspect boundary. No registry is contacted by this fixture.
+  showing nonprinting characters as escaped text. A checked-in local catalog fixture compiles an authored
+  Unicode publication-host label through the public factory/inspection boundary. Its regression removes
+  executable tools from PATH, so accidental Git acquisition cannot use local credentials or cached inputs.
 - Snapshot copying no longer re-encodes internally generated canonical bytes merely to decode an owned copy.
   Factory file/canonical admission and complete Plan validation remain intact. No trusted caller flag, alternate
   digest implementation or unmeasured performance claim is introduced.
 
 Independent review found no actionable findings across the final diff, inspection, graph and CLI changes.
 Hosted CodeQL subsequently identified a possible integer overflow in the optional map capacity hint added
-in `42e81ff`. The hint is removed without changing union behavior; the current source and repeated full
-gates below include that independently reviewed correction.
+in `42e81ff`. The hint is removed without changing union behavior; CodeQL marked both alerts fixed at
+`73799fb`. That head's [hosted test job](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37360959632)
+then exposed the Unicode route fixture's private catalog-fetch dependency, which local credentials had hidden.
+The current candidate replaces that fixture with local catalog inputs while preserving complete Plan admission
+and the exact Unicode label assertions. Independent review approved the fixture correction; the source and
+repeated full local gates below include it.
 
 ## Tested source
 
@@ -49,7 +54,7 @@ gates below include that independently reviewed correction.
 | `cmd/nkdctl/plan_views.go` | `1263e9356c60b6897c8b56259cd535616534eba3` |
 | `cmd/nkdctl/lifecycle.go` | `5ce65f77ab320b6c5e8f91f990a2a26c38b9628c` |
 | `pkg/nkd/planview/inspect_fields_test.go` | `71ef0e72ede8f6eee41f7a34d87532596e613fe4` |
-| `pkg/nkd/planview/graph_dot_test.go` | `d7662d199aae1bf00c94116951ca4ecb42a84793` |
+| `pkg/nkd/planview/graph_dot_test.go` | `1b31e67da5d152ca2289a93d1af5eadf84f45253` |
 | `pkg/nkd/planview/diff_review_test.go` | `729b671da1645f7ecc3aa46ac486ae07f225e9fc` |
 | `pkg/nkd/planview/comparison_options_test.go` | `1539a53c70765cf53ec82e1f47ac309ea4ff833e` |
 | `cmd/nkdctl/plan_views_test.go` | `ae29cbcf3d3a5147ef66a068a604c8e4a2f4eb9e` |
@@ -63,12 +68,23 @@ vulnerability scanner reported no vulnerabilities.
 
 | Command | Exit | Log SHA-256 |
 |---|---|---|
-| `make check` | 0 | `b2dde0dd3ebb771bbe14ef0967ff6fa16eb48b3e293884e6f6dd3245cde5a363` |
-| `go test ./... -count=1` | 0 | `14facde0cb323d1a56fd178fa5a85510558d87dbb3d299d492836bab3f14a109` |
-| `go test -race ./... -count=1` | 0 | `c54b602bcac01e6601c6f69a178aaa223be7a93a70319dc8266c2ca9e5ffd15b` |
-| `make build` | 0 | `7089aa3cca76af0e53d3fc198c4568f2eb56d0e9ae76853b872135d6dba3b353` |
+| `make check` | 0 | `be788f01753fbcf8262d6a91f3242b2070eabe8ab23178ca7da0e94598d826e0` |
+| `go test ./... -count=1` | 0 | `6737f5366238aee78dea53ce8dcf7925a36f43548aa55ff8a1ef7f0573b8be35` |
+| `go test -race ./... -count=1` | 0 | `d085e0a1518f18dcc3d78395baeb2c7f17cf45d40608f7fe76ffbd55c125351a` |
+| `make build` | 0 | `0f67852ca9dd158430cab4a8fe18d4ce8ac685308526cef09a583187d9f9ee82` |
 | `make workflows-check` | 0 | `5626c4456f2d99a4f503cd4d7c93061bbac18b9fde1b4dfc66473250221c2cf9` |
 | `git diff --check` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+The focused Unicode-route regression also passed as a precompiled test binary in a clean environment with
+no HOME or credential variables, an empty PATH, a fresh empty cache, disabled Git transports and
+disabled global/system Git configuration. Its cache remained empty. The test still calls the local catalog
+loader, stack admission, public factory compiler and Plan inspector before checking the rendered route.
+The focused log SHA-256 is `16477be364df29d3b39ee8ff03cf17ac653003129c70105b66d428f46a27e9c3`.
+
+The same empty-PATH assertion failed against the previous fixture with `CodeFetchFailed` while looking up
+Git; the replacement passes without fetching a catalog. Compilation of the test binary used the existing
+Go toolchain/module cache; this focused run proves fixture independence from private catalog access, not a
+fresh offline Go dependency installation.
 
 The generated Plan, manifest and workflow remained byte-for-byte equal to the base:
 

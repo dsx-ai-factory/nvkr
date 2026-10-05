@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 )
 
 func TestDOTLabelsUseDOTEscapes(t *testing.T) {
@@ -106,15 +107,14 @@ func dotLabelCases() []struct {
 // authority can contain Unicode. Exercise the complete Plan admission boundary
 // so this is not solely a renderer test with an impossible producer name.
 func TestDOTQuotesAdmittedUnicodePublicationRoute(t *testing.T) {
-	plan := maintainedPlan(t)
-	plan.Environment.Publication.RepositoryPrefix = "registry\u200b.example/ns"
-	t.Chdir("../../..")
-	compiled, err := factory.CompileDocuments(t.Context(), plan.DefinitionPath, plan.Definition,
-		plan.EnvironmentPath, plan.Environment, plan.GeneratorVersion)
-	if err != nil {
-		t.Fatal(err)
-	}
-	document := inspectPlan(t, compiled)
+	// This presentation regression must not acquire catalogs or depend on Git credentials.
+	t.Setenv("PATH", t.TempDir())
+	// Compile the checked-in local catalog fixture through the public factory
+	// boundary, with the Unicode authority as an authored publication input.
+	plan := comparisonPlan(t, func(_ *catalog.Catalog, _ *definition.Definition, env *definition.Environment) {
+		env.Publication = &definition.Publication{RepositoryPrefix: "registry\u200b.example/ns", Anonymous: true}
+	})
+	document := inspectPlan(t, plan)
 	raw, err := document.Graph(GraphOptions{View: "complete", Format: "dot"})
 	if err != nil {
 		t.Fatal(err)
