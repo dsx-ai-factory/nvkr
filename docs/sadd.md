@@ -277,6 +277,13 @@ separate identity. Release content binds the exact named payload membership, and
 that content with its output and evidence bindings. Using the outer root as one of its own
 content members would create a circular identity and is forbidden.
 
+Release navigation opens the complete held publication closure and projects its derived output references,
+component subjects and evidence memberships into readable or diagram views. Locators derive from the supplied
+root namespace; the detached description makes no registry-availability claim. Selecting an output changes only
+the presentation. These views establish structural/content integrity, explicitly leave signatures and consumer
+policy unverified, and cannot restore a live verification capability. [Release navigation](release-navigation.md)
+documents the registry and local entry points and their validation scope.
+
 | Identity or record | Owner and purpose | Boundary |
 |---|---|---|
 | Definition | Product author → definition admission → compiler | Named output intent; the single product-authoring input |
@@ -659,6 +666,15 @@ Diagnostics go to stderr; machine-readable results go to stdout or declared outp
 credentials or key material. A useful failure report names the operation/node, coded error, expected subject and
 observed identity when available. Production predicates and run records provide the run/plan context; the
 qualified EvidenceBundle is diagnostic and cannot stand in for an authenticated receipt (ADR-03/05/17).
+
+Generated GitHub operations include safe compiled node/component/output context, declared inputs and expected
+outputs, with elapsed time, primary exit status and exact failed phase in logs and diagnostic job summaries.
+The host helper owns logging, Plan-bound utility launch and exact carrier preparation/recovery; generated
+steps retain node selectors, provider actions, permissions and credential scope. Transfer steps batch exact
+carrier selections while retaining every mandatory restore and independent upload.
+Finalization records each carrier's producer/restore outcome even after returned recovery failures. Summary
+availability cannot authorize a result or replace authenticated Run finalization; see the
+[CI log guide](ci-step-and-log-readability.md).
 
 Operational retention must preserve enough run, plan and subject information to investigate a partial publication.
 The retention duration and responsible store are open deployment parameters; transient CI logs alone are not a

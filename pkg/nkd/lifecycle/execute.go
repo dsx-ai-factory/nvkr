@@ -12,6 +12,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 type LocalOptions struct {
@@ -24,6 +25,12 @@ type LocalOptions struct {
 	DryRun       bool
 	Stdout       io.Writer
 	Stderr       io.Writer
+	// DiskInspection opts into diagnostic installed-package inspection. The
+	// caller owns this already-admitted runtime and keeps it open for execution.
+	// Omitting it preserves the existing build-only path, not an inspection claim.
+	// DryRun does not admit or execute this runtime: it returns only the pending,
+	// static-unqualified Run description, without observed outputs or inventories.
+	DiskInspection *sbom.DiskInspectionRuntime
 }
 
 // ExecuteLocal performs one new attempt and independently observes every output
@@ -63,6 +70,8 @@ type localExecutionDependencies struct {
 	openDiagnostics  func(context.Context, string) (*localPackerDiagnostics, error)
 	writeRecordState func(context.Context, string, *Run) (bool, error)
 	beginDiskCommit  func(string) (*diskAttemptTransaction, error)
+	admitInspection  func(context.Context, *factory.Plan, *sbom.DiskInspectionRuntime) error
+	inspectDisks     func(context.Context, *factory.Plan, localExecutionResult, *sbom.DiskInspectionRuntime) ([]factory.DiskInstalledInventoryDescription, error)
 }
 
 func executeLocalWithFactoryRunner(ctx context.Context, prepared *PreparedRun, options LocalOptions,
@@ -87,6 +96,12 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	if deps.openDiagnostics == nil {
 		deps.openDiagnostics = newLocalPackerDiagnosticSink
 	}
+	if deps.inspectDisks == nil {
+		deps.inspectDisks = inspectLocalDisks
+	}
+	if deps.admitInspection == nil {
+		deps.admitInspection = admitDiskInspection
+	}
 	root := options.AttemptsRoot
 	if root == "" {
 		root = filepath.ToSlash(filepath.Join(".nkd", "runs"))
@@ -108,6 +123,11 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 		}
 		description := prepared.Description()
 		return &description, nil
+	}
+	if options.DiskInspection != nil {
+		if err := deps.admitInspection(ctx, prepared.plan, options.DiskInspection); err != nil {
+			return nil, err
+		}
 	}
 	if !options.DryRun {
 		if err := os.MkdirAll(root, 0o700); err != nil {
@@ -161,6 +181,18 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	defer func() { _ = result.Close() }()
 	runForObservation := prepared.Description()
 	runForObservation.Lane = result.QualificationLane()
+	if options.DiskInspection != nil {
+		installed, err := deps.inspectDisks(ctx, prepared.plan, result, options.DiskInspection)
+		if err == nil && len(installed) == 0 {
+			err = e.New(e.CodeVerifyFailed, "requested disk inspection returned no installed inventories")
+		}
+		if err != nil {
+			cause := closeLocalExecutionResult(result, err)
+			return recordRunFailure(ctx, recordPath, &runForObservation, cause,
+				"recording failed Run after installed-package inspection")
+		}
+		runForObservation.diskInventories = installed
+	}
 	artifacts := make(map[string]factory.Artifact, len(prepared.plan.Graph.Artifacts))
 	for _, artifact := range prepared.plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact

@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestGitHubFinalizerBatchesExactCarriersAndPreservesFailureAccounting(t *testing.T) {
+func TestGitHubFinalizerDownloadsExactCarriersAndDelegatesRecovery(t *testing.T) {
 	plan := githubTestPlan(t)
 	nodeJobs := make(map[string]string, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
@@ -28,11 +28,10 @@ func TestGitHubFinalizerBatchesExactCarriersAndPreservesFailureAccounting(t *tes
 	if err := yaml.UnmarshalStrict(append([]byte("steps:\n"), rendered.Bytes()...), &document); err != nil {
 		t.Fatal(err)
 	}
-	if len(document.Steps) != len(plan.Graph.Artifacts)+2 {
-		t.Fatalf("finalizer steps = %d, want one prepare + one batch download + %d restores",
-			len(document.Steps), len(plan.Graph.Artifacts))
+	if len(document.Steps) != 2 {
+		t.Fatalf("finalizer steps = %d, want download and recovery helper", len(document.Steps))
 	}
-	download := document.Steps[1]
+	download := document.Steps[0]
 	if download.Uses != plan.Actions["download-artifact"].Uses() || !download.ContinueOnError ||
 		download.With["path"] != ".nkd/carriers" || download.With["merge-multiple"] != "true" {
 		t.Fatalf("batch download is incomplete: %+v", download)
@@ -50,11 +49,13 @@ func TestGitHubFinalizerBatchesExactCarriersAndPreservesFailureAccounting(t *tes
 		strings.Contains(download.With["pattern"], "nkd-lifecycle-run") {
 		t.Fatalf("batch pattern = %q, want exact carriers %q", download.With["pattern"], wantPattern)
 	}
-	for _, step := range document.Steps[2:] {
-		if !strings.Contains(step.Run, "job-failed\\n") || !strings.Contains(step.Run, "missing\\n") ||
-			!strings.Contains(step.Run, "restore-failed\\n") || !strings.Contains(step.Run, "restored:success\\n") {
-			t.Fatalf("restore step lost failure accounting: %+v", step)
-		}
+	recovery := document.Steps[1]
+	want := "./nkd-exec factory github recover --plan " + FactoryPlanPath
+	if strings.TrimSpace(recovery.Run) != want || recovery.ID != "recover-artifacts" || recovery.ContinueOnError || recovery.If != "" || recovery.Uses != "" {
+		t.Fatalf("recovery helper is not exact and mandatory: %+v", recovery)
+	}
+	if len(recovery.Env) != 1 || recovery.Env["NKD_JOB_RESULTS"] != "${{ toJSON(needs) }}" {
+		t.Fatalf("recovery does not receive only provider job descriptions: %+v", recovery.Env)
 	}
 }
 

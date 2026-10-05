@@ -89,27 +89,16 @@ jobs:
           GIT_TERMINAL_PROMPT: '0'
           NKD_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Fetch pinned source for nke-controller-chart (controller-chart)'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: controller-chart/fetch-source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3'
-          [ -n "${NKD_SOURCE_TOKEN:-}" ] || { printf '%s\n' 'nkdctl: [NKD-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node controller-chart/fetch-source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3 --workspace .nkd/factory
-          printf '%s\n' 'Produced: source-receipt/controller-chart/fetch-source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3'
-          printf '%s\n' 'Produced: source/controller-chart/fetch-source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3'
-      - name: 'Archive source verification for nke-controller-chart (controller-chart)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/source-receipt-controller-chart-fetc-683f851a4802.tar --root . --path .nkd/factory/controller-chart/source-receipts/source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3-4fa5733275c5.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node controller-chart/fetch-source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3
+      - name: 'Prepare output carriers: Fetch pinned source for nke-controller-chart (controller-chart)'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node controller-chart/fetch-source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3
       - name: 'Upload source verification for nke-controller-chart (controller-chart)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-receipt-controller-chart-fetc-683f851a4802'
           path: '.nkd/carriers/source-receipt-controller-chart-fetc-683f851a4802.tar'
           if-no-files-found: error
-      - name: 'Archive source for nke-controller-chart (controller-chart)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/source-controller-chart-fetch-source-790511a214f5.tar --root . --path .nkd/factory/controller-chart/src/source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3
       - name: 'Upload source for nke-controller-chart (controller-chart)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -134,43 +123,28 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download source verification for nke-controller-chart (controller-chart)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-source-receipt-controller-chart-fetc-683f851a4802'
-          path: '.nkd/carriers'
-      - name: 'Restore source verification for nke-controller-chart (controller-chart)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-controller-chart-fetc-683f851a4802.tar --root . --path .nkd/factory/controller-chart/source-receipts/source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3-4fa5733275c5.json
-      - name: 'Download source for nke-controller-chart (controller-chart)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-source-controller-chart-fetch-source-790511a214f5'
-          path: '.nkd/carriers'
-      - name: 'Restore source for nke-controller-chart (controller-chart)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-controller-chart-fetch-source-790511a214f5.tar --root . --path .nkd/factory/controller-chart/src/source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3
+          pattern: '{nkd-source-controller-chart-fetch-source-790511a214f5,nkd-source-receipt-controller-chart-fetc-683f851a4802}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-controller-chart-build-nke-controller-chart
       - name: 'Build nke-controller-chart (controller-chart)'
         id: nkd-controller-chart-build-nke-controller-chart
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Build nke-controller-chart (controller-chart)'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: controller-chart/build-nke-controller-chart'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node controller-chart/build-nke-controller-chart --workspace .nkd/factory
-          printf '%s\n' 'Produced: artifact/controller-chart/nke-controller-chart'
-          printf '%s\n' 'Produced: result/controller-chart/nke-controller-chart'
-      - name: 'Archive nke-controller-chart (source archive)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/out/nke-controller-chart/nke-controller-0.1.1.tgz
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node controller-chart/build-nke-controller-chart
+      - name: 'Prepare output carriers: Build nke-controller-chart (controller-chart)'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node controller-chart/build-nke-controller-chart
       - name: 'Upload nke-controller-chart (source archive)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-controller-chart-nke-controller-chart'
           path: '.nkd/carriers/artifact-controller-chart-nke-controller-chart.tar'
           if-no-files-found: error
-      - name: 'Archive build result for nke-controller-chart'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/result-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/results/build-nke-controller-chart.json
       - name: 'Upload build result for nke-controller-chart'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -195,34 +169,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download nke-controller-chart (source archive)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-artifact-controller-chart-nke-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore nke-controller-chart (source archive)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/out/nke-controller-chart/nke-controller-0.1.1.tgz
-      - name: 'Download build result for nke-controller-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-controller-chart-nke-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for nke-controller-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/results/build-nke-controller-chart.json
+          pattern: '{nkd-artifact-controller-chart-nke-controller-chart,nkd-result-controller-chart-nke-controller-chart}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-controller-chart-terminal-observe
       - name: 'Verify built artifacts: controller-chart'
         id: nkd-controller-chart-terminal-observe
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Verify built artifacts: controller-chart'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: controller-chart/terminal-observe'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node controller-chart/terminal-observe --workspace .nkd/factory
-          printf '%s\n' 'Produced: observation/controller-chart'
-      - name: 'Archive artifact checks for controller-chart'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-controller-chart.tar --root . --path .nkd/factory/controller-chart/terminal-observation.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node controller-chart/terminal-observe
+      - name: 'Prepare output carriers: Verify built artifacts: controller-chart'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node controller-chart/terminal-observe
       - name: 'Upload artifact checks for controller-chart'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -264,27 +226,16 @@ jobs:
           GIT_TERMINAL_PROMPT: '0'
           NKD_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Fetch pinned source for nke-controller (cwe)'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: cwe/fetch-source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17'
-          [ -n "${NKD_SOURCE_TOKEN:-}" ] || { printf '%s\n' 'nkdctl: [NKD-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node cwe/fetch-source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17 --workspace .nkd/factory
-          printf '%s\n' 'Produced: source-receipt/cwe/fetch-source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17'
-          printf '%s\n' 'Produced: source/cwe/fetch-source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17'
-      - name: 'Archive source verification for nke-controller (cwe)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.tar --root . --path .nkd/factory/cwe/source-receipts/source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17-4a3c5bffffee.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node cwe/fetch-source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17
+      - name: 'Prepare output carriers: Fetch pinned source for nke-controller (cwe)'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node cwe/fetch-source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17
       - name: 'Upload source verification for nke-controller (cwe)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-source-receipt-cwe-fetch-source-ef48-5b738fb9d582'
           path: '.nkd/carriers/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.tar'
           if-no-files-found: error
-      - name: 'Archive source for nke-controller (cwe)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.tar --root . --path .nkd/factory/cwe/src/source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17
       - name: 'Upload source for nke-controller (cwe)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -309,43 +260,28 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download source verification for nke-controller (cwe)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-source-receipt-cwe-fetch-source-ef48-5b738fb9d582'
-          path: '.nkd/carriers'
-      - name: 'Restore source verification for nke-controller (cwe)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.tar --root . --path .nkd/factory/cwe/source-receipts/source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17-4a3c5bffffee.json
-      - name: 'Download source for nke-controller (cwe)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-source-cwe-fetch-source-ef487f76cf9f-f736290b13b9'
-          path: '.nkd/carriers'
-      - name: 'Restore source for nke-controller (cwe)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.tar --root . --path .nkd/factory/cwe/src/source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17
+          pattern: '{nkd-source-cwe-fetch-source-ef487f76cf9f-f736290b13b9,nkd-source-receipt-cwe-fetch-source-ef48-5b738fb9d582}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-cwe-build-nke-controller
       - name: 'Build nke-controller (cwe)'
         id: nkd-cwe-build-nke-controller
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Build nke-controller (cwe)'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: cwe/build-nke-controller'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node cwe/build-nke-controller --workspace .nkd/factory
-          printf '%s\n' 'Produced: artifact/cwe/nke-controller'
-          printf '%s\n' 'Produced: result/cwe/nke-controller'
-      - name: 'Archive nke-controller (image export)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/out/nke-controller/nke-controller-image-amd64.oci.tar
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node cwe/build-nke-controller
+      - name: 'Prepare output carriers: Build nke-controller (cwe)'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node cwe/build-nke-controller
       - name: 'Upload nke-controller (image export)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-cwe-nke-controller'
           path: '.nkd/carriers/artifact-cwe-nke-controller.tar'
           if-no-files-found: error
-      - name: 'Archive build result for nke-controller'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/result-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/results/build-nke-controller.json
       - name: 'Upload build result for nke-controller'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -353,7 +289,7 @@ jobs:
           path: '.nkd/carriers/result-cwe-nke-controller.tar'
           if-no-files-found: error
   nkd-process-cwe-terminal-observe-package-e18762b8b021:
-    name: 'Verify and package outputs with Helm image binding'
+    name: 'Verify and package outputs with Helm image binding: controller-chart, cwe'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-controller-chart-build-nke-controller-chart, nkd-controller-chart-terminal-observe, nkd-cwe-build-nke-controller]
@@ -370,48 +306,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download nke-controller-chart (source archive)'
+      - name: Download 4 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-artifact-controller-chart-nke-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore nke-controller-chart (source archive)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/out/nke-controller-chart/nke-controller-0.1.1.tgz
-      - name: 'Download nke-controller (image export)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-artifact-cwe-nke-controller'
-          path: '.nkd/carriers'
-      - name: 'Restore nke-controller (image export)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/out/nke-controller/nke-controller-image-amd64.oci.tar
-      - name: 'Download artifact checks for controller-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-observation-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore artifact checks for controller-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-controller-chart.tar --root . --path .nkd/factory/controller-chart/terminal-observation.json
-      - name: 'Download build result for nke-controller'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-cwe-nke-controller'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for nke-controller'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/results/build-nke-controller.json
+          pattern: '{nkd-artifact-controller-chart-nke-controller-chart,nkd-artifact-cwe-nke-controller,nkd-observation-controller-chart,nkd-result-cwe-nke-controller}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 4 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-process-cwe-terminal-observe-package-e18762b8b021
       - name: 'Verify built artifacts: cwe'
         id: nkd-cwe-terminal-observe
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Verify built artifacts: cwe'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: cwe/terminal-observe'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node cwe/terminal-observe --workspace .nkd/factory
-          printf '%s\n' 'Produced: observation/cwe'
-      - name: 'Archive artifact checks for cwe'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-cwe.tar --root . --path .nkd/factory/cwe/terminal-observation.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node cwe/terminal-observe
+      - name: 'Prepare output carriers: Verify built artifacts: cwe'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node cwe/terminal-observe
       - name: 'Upload artifact checks for cwe'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -421,17 +331,10 @@ jobs:
       - name: 'Package container image: cwe'
         id: nkd-package-cwe
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Package container image: cwe'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: package/cwe'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/cwe --workspace .nkd/factory
-          printf '%s\n' 'Produced: package/cwe'
-      - name: 'Archive cwe (container image)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/package-cwe.tar --root . --path .nkd/factory/packages/cwe
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node package/cwe
+      - name: 'Prepare output carriers: Package container image: cwe'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node package/cwe
       - name: 'Upload cwe (container image)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -441,17 +344,10 @@ jobs:
       - name: 'Bind image digest and package Helm: controller-chart'
         id: nkd-package-controller-chart
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Bind image digest and package Helm: controller-chart'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: package/controller-chart'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/controller-chart --workspace .nkd/factory
-          printf '%s\n' 'Produced: package/controller-chart'
-      - name: 'Archive controller-chart (Helm bundle)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/package-controller-chart.tar --root . --path .nkd/factory/packages/controller-chart
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node package/controller-chart
+      - name: 'Prepare output carriers: Bind image digest and package Helm: controller-chart'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node package/controller-chart
       - name: 'Upload controller-chart (Helm bundle)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -479,26 +375,16 @@ jobs:
       - name: 'Acquire pinned postgresql/pull-postgresql-chart'
         id: nkd-postgresql-pull-postgresql-chart
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Acquire pinned postgresql/pull-postgresql-chart'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: postgresql/pull-postgresql-chart'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node postgresql/pull-postgresql-chart --workspace .nkd/factory
-          printf '%s\n' 'Produced: artifact/postgresql/postgresql-chart'
-          printf '%s\n' 'Produced: result/postgresql/postgresql-chart'
-      - name: 'Archive postgresql-chart (raw)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/fetch/postgresql-chart/postgresql-chart
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node postgresql/pull-postgresql-chart
+      - name: 'Prepare output carriers: Acquire pinned postgresql/pull-postgresql-chart'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node postgresql/pull-postgresql-chart
       - name: 'Upload postgresql-chart (raw)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-postgresql-postgresql-chart'
           path: '.nkd/carriers/artifact-postgresql-postgresql-chart.tar'
           if-no-files-found: error
-      - name: 'Archive build result for postgresql-chart'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/result-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/results/pull-postgresql-chart.json
       - name: 'Upload build result for postgresql-chart'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -506,7 +392,7 @@ jobs:
           path: '.nkd/carriers/result-postgresql-postgresql-chart.tar'
           if-no-files-found: error
   nkd-process-postgresql-terminal-observe-555d0da8f385:
-    name: 'Verify and package outputs'
+    name: 'Verify and package outputs: postgresql'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-postgresql-pull-postgresql-chart]
@@ -523,34 +409,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download postgresql-chart (raw)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-artifact-postgresql-postgresql-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore postgresql-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/fetch/postgresql-chart/postgresql-chart
-      - name: 'Download build result for postgresql-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-postgresql-postgresql-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for postgresql-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/results/pull-postgresql-chart.json
+          pattern: '{nkd-artifact-postgresql-postgresql-chart,nkd-result-postgresql-postgresql-chart}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-process-postgresql-terminal-observe-555d0da8f385
       - name: 'Verify built artifacts: postgresql'
         id: nkd-postgresql-terminal-observe
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Verify built artifacts: postgresql'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: postgresql/terminal-observe'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node postgresql/terminal-observe --workspace .nkd/factory
-          printf '%s\n' 'Produced: observation/postgresql'
-      - name: 'Archive artifact checks for postgresql'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-postgresql.tar --root . --path .nkd/factory/postgresql/terminal-observation.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node postgresql/terminal-observe
+      - name: 'Prepare output carriers: Verify built artifacts: postgresql'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node postgresql/terminal-observe
       - name: 'Upload artifact checks for postgresql'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -560,17 +434,10 @@ jobs:
       - name: 'Package Helm bundle: postgresql'
         id: nkd-package-postgresql
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Package Helm bundle: postgresql'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: package/postgresql'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/postgresql --workspace .nkd/factory
-          printf '%s\n' 'Produced: package/postgresql'
-      - name: 'Archive postgresql (Helm bundle)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/package-postgresql.tar --root . --path .nkd/factory/packages/postgresql
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node package/postgresql
+      - name: 'Prepare output carriers: Package Helm bundle: postgresql'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node package/postgresql
       - name: 'Upload postgresql (Helm bundle)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -598,26 +465,16 @@ jobs:
       - name: 'Acquire pinned spire-crds/pull-spire-crds-chart'
         id: nkd-spire-crds-pull-spire-crds-chart
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Acquire pinned spire-crds/pull-spire-crds-chart'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: spire-crds/pull-spire-crds-chart'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node spire-crds/pull-spire-crds-chart --workspace .nkd/factory
-          printf '%s\n' 'Produced: artifact/spire-crds/spire-crds-chart'
-          printf '%s\n' 'Produced: result/spire-crds/spire-crds-chart'
-      - name: 'Archive spire-crds-chart (raw)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/fetch/spire-crds-chart/spire-crds-chart
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node spire-crds/pull-spire-crds-chart
+      - name: 'Prepare output carriers: Acquire pinned spire-crds/pull-spire-crds-chart'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node spire-crds/pull-spire-crds-chart
       - name: 'Upload spire-crds-chart (raw)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-spire-crds-spire-crds-chart'
           path: '.nkd/carriers/artifact-spire-crds-spire-crds-chart.tar'
           if-no-files-found: error
-      - name: 'Archive build result for spire-crds-chart'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/result-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/results/pull-spire-crds-chart.json
       - name: 'Upload build result for spire-crds-chart'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -625,7 +482,7 @@ jobs:
           path: '.nkd/carriers/result-spire-crds-spire-crds-chart.tar'
           if-no-files-found: error
   nkd-process-spire-crds-terminal-observe-82be9f86e106:
-    name: 'Verify and package outputs'
+    name: 'Verify and package outputs: spire-crds'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-spire-crds-pull-spire-crds-chart]
@@ -642,34 +499,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download spire-crds-chart (raw)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-artifact-spire-crds-spire-crds-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore spire-crds-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/fetch/spire-crds-chart/spire-crds-chart
-      - name: 'Download build result for spire-crds-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-spire-crds-spire-crds-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for spire-crds-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/results/pull-spire-crds-chart.json
+          pattern: '{nkd-artifact-spire-crds-spire-crds-chart,nkd-result-spire-crds-spire-crds-chart}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-process-spire-crds-terminal-observe-82be9f86e106
       - name: 'Verify built artifacts: spire-crds'
         id: nkd-spire-crds-terminal-observe
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Verify built artifacts: spire-crds'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: spire-crds/terminal-observe'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node spire-crds/terminal-observe --workspace .nkd/factory
-          printf '%s\n' 'Produced: observation/spire-crds'
-      - name: 'Archive artifact checks for spire-crds'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-spire-crds.tar --root . --path .nkd/factory/spire-crds/terminal-observation.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node spire-crds/terminal-observe
+      - name: 'Prepare output carriers: Verify built artifacts: spire-crds'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node spire-crds/terminal-observe
       - name: 'Upload artifact checks for spire-crds'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -679,17 +524,10 @@ jobs:
       - name: 'Package Helm bundle: spire-crds'
         id: nkd-package-spire-crds
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Package Helm bundle: spire-crds'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: package/spire-crds'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/spire-crds --workspace .nkd/factory
-          printf '%s\n' 'Produced: package/spire-crds'
-      - name: 'Archive spire-crds (Helm bundle)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/package-spire-crds.tar --root . --path .nkd/factory/packages/spire-crds
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node package/spire-crds
+      - name: 'Prepare output carriers: Package Helm bundle: spire-crds'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node package/spire-crds
       - name: 'Upload spire-crds (Helm bundle)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -717,26 +555,16 @@ jobs:
       - name: 'Acquire pinned spire/pull-spire-chart'
         id: nkd-spire-pull-spire-chart
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Acquire pinned spire/pull-spire-chart'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: spire/pull-spire-chart'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node spire/pull-spire-chart --workspace .nkd/factory
-          printf '%s\n' 'Produced: artifact/spire/spire-chart'
-          printf '%s\n' 'Produced: result/spire/spire-chart'
-      - name: 'Archive spire-chart (raw)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-spire-spire-chart.tar --root . --path .nkd/factory/spire/fetch/spire-chart/spire-chart
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node spire/pull-spire-chart
+      - name: 'Prepare output carriers: Acquire pinned spire/pull-spire-chart'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node spire/pull-spire-chart
       - name: 'Upload spire-chart (raw)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-spire-spire-chart'
           path: '.nkd/carriers/artifact-spire-spire-chart.tar'
           if-no-files-found: error
-      - name: 'Archive build result for spire-chart'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/result-spire-spire-chart.tar --root . --path .nkd/factory/spire/results/pull-spire-chart.json
       - name: 'Upload build result for spire-chart'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -744,7 +572,7 @@ jobs:
           path: '.nkd/carriers/result-spire-spire-chart.tar'
           if-no-files-found: error
   nkd-process-spire-terminal-observe-package-spire:
-    name: 'Verify and package outputs'
+    name: 'Verify and package outputs: spire'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-spire-pull-spire-chart]
@@ -761,34 +589,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download spire-chart (raw)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-artifact-spire-spire-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore spire-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-spire-spire-chart.tar --root . --path .nkd/factory/spire/fetch/spire-chart/spire-chart
-      - name: 'Download build result for spire-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-spire-spire-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for spire-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-spire-spire-chart.tar --root . --path .nkd/factory/spire/results/pull-spire-chart.json
+          pattern: '{nkd-artifact-spire-spire-chart,nkd-result-spire-spire-chart}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-process-spire-terminal-observe-package-spire
       - name: 'Verify built artifacts: spire'
         id: nkd-spire-terminal-observe
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Verify built artifacts: spire'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: spire/terminal-observe'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node spire/terminal-observe --workspace .nkd/factory
-          printf '%s\n' 'Produced: observation/spire'
-      - name: 'Archive artifact checks for spire'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-spire.tar --root . --path .nkd/factory/spire/terminal-observation.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node spire/terminal-observe
+      - name: 'Prepare output carriers: Verify built artifacts: spire'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node spire/terminal-observe
       - name: 'Upload artifact checks for spire'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -798,17 +614,10 @@ jobs:
       - name: 'Package Helm bundle: spire'
         id: nkd-package-spire
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Package Helm bundle: spire'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: package/spire'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/spire --workspace .nkd/factory
-          printf '%s\n' 'Produced: package/spire'
-      - name: 'Archive spire (Helm bundle)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/package-spire.tar --root . --path .nkd/factory/packages/spire
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node package/spire
+      - name: 'Prepare output carriers: Package Helm bundle: spire'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node package/spire
       - name: 'Upload spire (Helm bundle)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -836,26 +645,16 @@ jobs:
       - name: 'Acquire pinned temporal/pull-temporal-chart'
         id: nkd-temporal-pull-temporal-chart
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Acquire pinned temporal/pull-temporal-chart'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: temporal/pull-temporal-chart'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node temporal/pull-temporal-chart --workspace .nkd/factory
-          printf '%s\n' 'Produced: artifact/temporal/temporal-chart'
-          printf '%s\n' 'Produced: result/temporal/temporal-chart'
-      - name: 'Archive temporal-chart (raw)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/artifact-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/fetch/temporal-chart/temporal-chart
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node temporal/pull-temporal-chart
+      - name: 'Prepare output carriers: Acquire pinned temporal/pull-temporal-chart'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node temporal/pull-temporal-chart
       - name: 'Upload temporal-chart (raw)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-artifact-temporal-temporal-chart'
           path: '.nkd/carriers/artifact-temporal-temporal-chart.tar'
           if-no-files-found: error
-      - name: 'Archive build result for temporal-chart'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/result-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/results/pull-temporal-chart.json
       - name: 'Upload build result for temporal-chart'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -863,7 +662,7 @@ jobs:
           path: '.nkd/carriers/result-temporal-temporal-chart.tar'
           if-no-files-found: error
   nkd-process-temporal-terminal-observe-pa-d14ae446c67c:
-    name: 'Verify and package outputs'
+    name: 'Verify and package outputs: temporal'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-temporal-pull-temporal-chart]
@@ -880,34 +679,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download temporal-chart (raw)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-artifact-temporal-temporal-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore temporal-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/fetch/temporal-chart/temporal-chart
-      - name: 'Download build result for temporal-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-temporal-temporal-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for temporal-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/results/pull-temporal-chart.json
+          pattern: '{nkd-artifact-temporal-temporal-chart,nkd-result-temporal-temporal-chart}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-process-temporal-terminal-observe-pa-d14ae446c67c
       - name: 'Verify built artifacts: temporal'
         id: nkd-temporal-terminal-observe
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Verify built artifacts: temporal'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: temporal/terminal-observe'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node temporal/terminal-observe --workspace .nkd/factory
-          printf '%s\n' 'Produced: observation/temporal'
-      - name: 'Archive artifact checks for temporal'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/observation-temporal.tar --root . --path .nkd/factory/temporal/terminal-observation.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node temporal/terminal-observe
+      - name: 'Prepare output carriers: Verify built artifacts: temporal'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node temporal/terminal-observe
       - name: 'Upload artifact checks for temporal'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -917,17 +704,10 @@ jobs:
       - name: 'Package Helm bundle: temporal'
         id: nkd-package-temporal
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Package Helm bundle: temporal'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: package/temporal'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/temporal --workspace .nkd/factory
-          printf '%s\n' 'Produced: package/temporal'
-      - name: 'Archive temporal (Helm bundle)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/package-temporal.tar --root . --path .nkd/factory/packages/temporal
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node package/temporal
+      - name: 'Prepare output carriers: Package Helm bundle: temporal'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node package/temporal
       - name: 'Upload temporal (Helm bundle)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -955,17 +735,10 @@ jobs:
       - name: 'Acquire pinned cosign'
         id: nkd-tool-cosign
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Acquire pinned cosign'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: tool/cosign'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node tool/cosign --workspace .nkd/factory
-          printf '%s\n' 'Produced: tool/cosign'
-      - name: 'Archive cosign (tool)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node tool/cosign
+      - name: 'Prepare output carriers: Acquire pinned cosign'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node tool/cosign
       - name: 'Upload cosign (tool)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -993,17 +766,10 @@ jobs:
       - name: 'Acquire pinned syft'
         id: nkd-tool-syft
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Acquire pinned syft'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: tool/syft'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node tool/syft --workspace .nkd/factory
-          printf '%s\n' 'Produced: tool/syft'
-      - name: 'Archive syft (tool)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/tool-syft.tar --root . --path .nkd/factory/tools/syft/syft
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node tool/syft
+      - name: 'Prepare output carriers: Acquire pinned syft'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node tool/syft
       - name: 'Upload syft (tool)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1011,7 +777,7 @@ jobs:
           path: '.nkd/carriers/tool-syft.tar'
           if-no-files-found: error
   nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4:
-    name: 'Verify and package outputs'
+    name: 'Verify and package outputs: release'
     runs-on: 'ubuntu-latest'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-latest, nkd-controller-chart-build-nke-controller-chart, nkd-controller-chart-terminal-observe, nkd-cwe-build-nke-controller, nkd-postgresql-pull-postgresql-chart, nkd-process-cwe-terminal-observe-package-e18762b8b021, nkd-process-postgresql-terminal-observe-555d0da8f385, nkd-process-spire-crds-terminal-observe-82be9f86e106, nkd-process-spire-terminal-observe-package-spire, nkd-process-temporal-terminal-observe-pa-d14ae446c67c, nkd-spire-crds-pull-spire-crds-chart, nkd-spire-pull-spire-chart, nkd-temporal-pull-temporal-chart, nkd-tool-syft]
@@ -1028,195 +794,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download nke-controller-chart (source archive)'
+      - name: Download 25 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-artifact-controller-chart-nke-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore nke-controller-chart (source archive)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/out/nke-controller-chart/nke-controller-0.1.1.tgz
-      - name: 'Download nke-controller (image export)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-artifact-cwe-nke-controller'
-          path: '.nkd/carriers'
-      - name: 'Restore nke-controller (image export)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/out/nke-controller/nke-controller-image-amd64.oci.tar
-      - name: 'Download postgresql-chart (raw)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-artifact-postgresql-postgresql-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore postgresql-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/fetch/postgresql-chart/postgresql-chart
-      - name: 'Download spire-crds-chart (raw)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-artifact-spire-crds-spire-crds-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore spire-crds-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/fetch/spire-crds-chart/spire-crds-chart
-      - name: 'Download spire-chart (raw)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-artifact-spire-spire-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore spire-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-spire-spire-chart.tar --root . --path .nkd/factory/spire/fetch/spire-chart/spire-chart
-      - name: 'Download temporal-chart (raw)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-artifact-temporal-temporal-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore temporal-chart (raw)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/fetch/temporal-chart/temporal-chart
-      - name: 'Download artifact checks for controller-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-observation-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore artifact checks for controller-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-controller-chart.tar --root . --path .nkd/factory/controller-chart/terminal-observation.json
-      - name: 'Download artifact checks for cwe'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-observation-cwe'
-          path: '.nkd/carriers'
-      - name: 'Restore artifact checks for cwe'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-cwe.tar --root . --path .nkd/factory/cwe/terminal-observation.json
-      - name: 'Download artifact checks for postgresql'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-observation-postgresql'
-          path: '.nkd/carriers'
-      - name: 'Restore artifact checks for postgresql'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-postgresql.tar --root . --path .nkd/factory/postgresql/terminal-observation.json
-      - name: 'Download artifact checks for spire'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-observation-spire'
-          path: '.nkd/carriers'
-      - name: 'Restore artifact checks for spire'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-spire.tar --root . --path .nkd/factory/spire/terminal-observation.json
-      - name: 'Download artifact checks for spire-crds'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-observation-spire-crds'
-          path: '.nkd/carriers'
-      - name: 'Restore artifact checks for spire-crds'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-spire-crds.tar --root . --path .nkd/factory/spire-crds/terminal-observation.json
-      - name: 'Download artifact checks for temporal'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-observation-temporal'
-          path: '.nkd/carriers'
-      - name: 'Restore artifact checks for temporal'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/observation-temporal.tar --root . --path .nkd/factory/temporal/terminal-observation.json
-      - name: 'Download controller-chart (Helm bundle)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-package-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore controller-chart (Helm bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-controller-chart.tar --root . --path .nkd/factory/packages/controller-chart
-      - name: 'Download cwe (container image)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-package-cwe'
-          path: '.nkd/carriers'
-      - name: 'Restore cwe (container image)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe.tar --root . --path .nkd/factory/packages/cwe
-      - name: 'Download postgresql (Helm bundle)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-package-postgresql'
-          path: '.nkd/carriers'
-      - name: 'Restore postgresql (Helm bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-postgresql.tar --root . --path .nkd/factory/packages/postgresql
-      - name: 'Download spire (Helm bundle)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-package-spire'
-          path: '.nkd/carriers'
-      - name: 'Restore spire (Helm bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-spire.tar --root . --path .nkd/factory/packages/spire
-      - name: 'Download spire-crds (Helm bundle)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-package-spire-crds'
-          path: '.nkd/carriers'
-      - name: 'Restore spire-crds (Helm bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-spire-crds.tar --root . --path .nkd/factory/packages/spire-crds
-      - name: 'Download temporal (Helm bundle)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-package-temporal'
-          path: '.nkd/carriers'
-      - name: 'Restore temporal (Helm bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-temporal.tar --root . --path .nkd/factory/packages/temporal
-      - name: 'Download build result for nke-controller-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-controller-chart-nke-controller-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for nke-controller-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/results/build-nke-controller-chart.json
-      - name: 'Download build result for nke-controller'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-cwe-nke-controller'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for nke-controller'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/results/build-nke-controller.json
-      - name: 'Download build result for postgresql-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-postgresql-postgresql-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for postgresql-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/results/pull-postgresql-chart.json
-      - name: 'Download build result for spire-crds-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-spire-crds-spire-crds-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for spire-crds-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/results/pull-spire-crds-chart.json
-      - name: 'Download build result for spire-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-spire-spire-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for spire-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-spire-spire-chart.tar --root . --path .nkd/factory/spire/results/pull-spire-chart.json
-      - name: 'Download build result for temporal-chart'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-result-temporal-temporal-chart'
-          path: '.nkd/carriers'
-      - name: 'Restore build result for temporal-chart'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/result-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/results/pull-temporal-chart.json
-      - name: 'Download syft (tool)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-tool-syft'
-          path: '.nkd/carriers'
-      - name: 'Restore syft (tool)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-syft.tar --root . --path .nkd/factory/tools/syft/syft
+          pattern: '{nkd-artifact-controller-chart-nke-controller-chart,nkd-artifact-cwe-nke-controller,nkd-artifact-postgresql-postgresql-chart,nkd-artifact-spire-crds-spire-crds-chart,nkd-artifact-spire-spire-chart,nkd-artifact-temporal-temporal-chart,nkd-observation-controller-chart,nkd-observation-cwe,nkd-observation-postgresql,nkd-observation-spire,nkd-observation-spire-crds,nkd-observation-temporal,nkd-package-controller-chart,nkd-package-cwe,nkd-package-postgresql,nkd-package-spire,nkd-package-spire-crds,nkd-package-temporal,nkd-result-controller-chart-nke-controller-chart,nkd-result-cwe-nke-controller,nkd-result-postgresql-postgresql-chart,nkd-result-spire-crds-spire-crds-chart,nkd-result-spire-spire-chart,nkd-result-temporal-temporal-chart,nkd-tool-syft}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 25 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4
       - name: 'Generate SBOMs: controller-chart'
         id: nkd-controller-chart-sbom
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Generate SBOMs: controller-chart'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: controller-chart/sbom'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node controller-chart/sbom --workspace .nkd/factory
-          printf '%s\n' 'Produced: sbom/controller-chart'
-      - name: 'Archive SBOMs for controller-chart'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-controller-chart.tar --root . --path .nkd/factory/controller-chart/sbom
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node controller-chart/sbom
+      - name: 'Prepare output carriers: Generate SBOMs: controller-chart'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node controller-chart/sbom
       - name: 'Upload SBOMs for controller-chart'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1226,17 +819,10 @@ jobs:
       - name: 'Generate SBOMs: cwe'
         id: nkd-cwe-sbom
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Generate SBOMs: cwe'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: cwe/sbom'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node cwe/sbom --workspace .nkd/factory
-          printf '%s\n' 'Produced: sbom/cwe'
-      - name: 'Archive SBOMs for cwe'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-cwe.tar --root . --path .nkd/factory/cwe/sbom
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node cwe/sbom
+      - name: 'Prepare output carriers: Generate SBOMs: cwe'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node cwe/sbom
       - name: 'Upload SBOMs for cwe'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1246,17 +832,10 @@ jobs:
       - name: 'Generate SBOMs: postgresql'
         id: nkd-postgresql-sbom
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Generate SBOMs: postgresql'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: postgresql/sbom'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node postgresql/sbom --workspace .nkd/factory
-          printf '%s\n' 'Produced: sbom/postgresql'
-      - name: 'Archive SBOMs for postgresql'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-postgresql.tar --root . --path .nkd/factory/postgresql/sbom
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node postgresql/sbom
+      - name: 'Prepare output carriers: Generate SBOMs: postgresql'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node postgresql/sbom
       - name: 'Upload SBOMs for postgresql'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1266,17 +845,10 @@ jobs:
       - name: 'Generate SBOMs: spire-crds'
         id: nkd-spire-crds-sbom
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Generate SBOMs: spire-crds'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: spire-crds/sbom'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node spire-crds/sbom --workspace .nkd/factory
-          printf '%s\n' 'Produced: sbom/spire-crds'
-      - name: 'Archive SBOMs for spire-crds'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-spire-crds.tar --root . --path .nkd/factory/spire-crds/sbom
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node spire-crds/sbom
+      - name: 'Prepare output carriers: Generate SBOMs: spire-crds'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node spire-crds/sbom
       - name: 'Upload SBOMs for spire-crds'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1286,17 +858,10 @@ jobs:
       - name: 'Generate SBOMs: spire'
         id: nkd-spire-sbom
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Generate SBOMs: spire'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: spire/sbom'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node spire/sbom --workspace .nkd/factory
-          printf '%s\n' 'Produced: sbom/spire'
-      - name: 'Archive SBOMs for spire'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-spire.tar --root . --path .nkd/factory/spire/sbom
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node spire/sbom
+      - name: 'Prepare output carriers: Generate SBOMs: spire'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node spire/sbom
       - name: 'Upload SBOMs for spire'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1306,17 +871,10 @@ jobs:
       - name: 'Generate SBOMs: temporal'
         id: nkd-temporal-sbom
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Generate SBOMs: temporal'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: temporal/sbom'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node temporal/sbom --workspace .nkd/factory
-          printf '%s\n' 'Produced: sbom/temporal'
-      - name: 'Archive SBOMs for temporal'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/sbom-temporal.tar --root . --path .nkd/factory/temporal/sbom
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node temporal/sbom
+      - name: 'Prepare output carriers: Generate SBOMs: temporal'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node temporal/sbom
       - name: 'Upload SBOMs for temporal'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1326,17 +884,10 @@ jobs:
       - name: 'Package publication bundle: release'
         id: nkd-package-release
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Package publication bundle: release'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: package/release'
-          docker run --rm --network none --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$GITHUB_WORKSPACE:/workspace" -w /workspace busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1 /workspace/nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node package/release --workspace .nkd/factory
-          printf '%s\n' 'Produced: prepared/release'
-      - name: 'Archive release (publication bundle)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/prepared-release.tar --root . --path .nkd/factory/prepared/release
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node package/release
+      - name: 'Prepare output carriers: Package publication bundle: release'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node package/release
       - name: 'Upload release (publication bundle)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1365,34 +916,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download release (publication bundle)'
+      - name: Download 2 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-prepared-release'
-          path: '.nkd/carriers'
-      - name: 'Restore release (publication bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/prepared-release.tar --root . --path .nkd/factory/prepared/release
-      - name: 'Download cosign (tool)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-tool-cosign'
-          path: '.nkd/carriers'
-      - name: 'Restore cosign (tool)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
+          pattern: '{nkd-prepared-release,nkd-tool-cosign}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 2 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-attest-sboms-release
       - name: 'Create and verify SBOM attestations: release'
         id: nkd-attest-sboms-release
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Create and verify SBOM attestations: release'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: attest-sboms/release'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node attest-sboms/release --workspace .nkd/factory
-          printf '%s\n' 'Produced: package/release'
-      - name: 'Archive release (publication bundle)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/package-release.tar --root . --path .nkd/factory/packages/release
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node attest-sboms/release
+      - name: 'Prepare output carriers: Create and verify SBOM attestations: release'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node attest-sboms/release
       - name: 'Upload release (publication bundle)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1424,27 +963,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download release (publication bundle)'
+      - name: Download 1 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-package-release'
-          path: '.nkd/carriers'
-      - name: 'Restore release (publication bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-release.tar --root . --path .nkd/factory/packages/release
+          pattern: 'nkd-package-release'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 1 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-publish-release
       - name: 'Publish release'
         id: nkd-publish-release
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Publish release'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: publish/release'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node publish/release --workspace .nkd/factory
-          printf '%s\n' 'Produced: publication/release'
-      - name: 'Archive release (published reference)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/publication-release.tar --root . --path .nkd/factory/publications/release.txt
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node publish/release
+      - name: 'Prepare output carriers: Publish release'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node publish/release
       - name: 'Upload release (published reference)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1477,50 +1011,28 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download release (publication bundle)'
+      - name: Download 3 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-package-release'
-          path: '.nkd/carriers'
-      - name: 'Restore release (publication bundle)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/package-release.tar --root . --path .nkd/factory/packages/release
-      - name: 'Download release (published reference)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-publication-release'
-          path: '.nkd/carriers'
-      - name: 'Restore release (published reference)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-release.tar --root . --path .nkd/factory/publications/release.txt
-      - name: 'Download cosign (tool)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-tool-cosign'
-          path: '.nkd/carriers'
-      - name: 'Restore cosign (tool)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
+          pattern: '{nkd-package-release,nkd-publication-release,nkd-tool-cosign}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 3 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-sign-release
       - name: 'Sign and attest release and deliverables: release'
         id: nkd-sign-release
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Sign and attest release and deliverables: release'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: sign/release'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node sign/release --workspace .nkd/factory
-          printf '%s\n' 'Produced: predicate/release'
-          printf '%s\n' 'Produced: signature/release'
-      - name: 'Archive release (provenance)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/predicate-release.tar --root . --path .nkd/factory/predicates/release.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node sign/release
+      - name: 'Prepare output carriers: Sign and attest release and deliverables: release'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node sign/release
       - name: 'Upload release (provenance)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: 'nkd-predicate-release'
           path: '.nkd/carriers/predicate-release.tar'
           if-no-files-found: error
-      - name: 'Archive release (signature record)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/signature-release.tar --root . --path .nkd/factory/signatures/release.json
       - name: 'Upload release (signature record)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1552,41 +1064,22 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: 'Download release (published reference)'
+      - name: Download 3 required input carriers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: 'nkd-publication-release'
-          path: '.nkd/carriers'
-      - name: 'Restore release (published reference)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/publication-release.tar --root . --path .nkd/factory/publications/release.txt
-      - name: 'Download release (signature record)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-signature-release'
-          path: '.nkd/carriers'
-      - name: 'Restore release (signature record)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/signature-release.tar --root . --path .nkd/factory/signatures/release.json
-      - name: 'Download cosign (tool)'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: 'nkd-tool-cosign'
-          path: '.nkd/carriers'
-      - name: 'Restore cosign (tool)'
-        run: ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64
+          pattern: '{nkd-publication-release,nkd-signature-release,nkd-tool-cosign}'
+          path: .nkd/carriers
+          merge-multiple: 'true'
+      - name: 'Restore 3 required inputs'
+        run: |
+          ./nkd-exec factory github restore-inputs --plan .github/nkd-run/plan.json --stage nkd-verify-publication-release
       - name: 'Verify release and deliverable signatures: release'
         id: nkd-verify-publication-release
         run: |
-          set -euo pipefail
-          nkd_started=$SECONDS
-          nkd_step='Verify release and deliverable signatures: release'
-          nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }
-          trap nkd_finish EXIT
-          printf 'Starting: %s\n' "$nkd_step"
-          printf '%s\n' 'Node: verify-publication/release'
-          ./nkd-exec factory execute-node --plan .github/nkd-run/plan.json --node verify-publication/release --workspace .nkd/factory
-          printf '%s\n' 'Produced: verification/release'
-      - name: 'Archive release (signature checks)'
-        run: ./nkd-exec transport-pack --archive .nkd/carriers/verification-release.tar --root . --path .nkd/factory/verifications/release.json
+          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node verify-publication/release
+      - name: 'Prepare output carriers: Verify release and deliverable signatures: release'
+        run: |
+          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node verify-publication/release
       - name: 'Upload release (signature checks)'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -1611,225 +1104,18 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nkd-exec
-      - name: Prepare artifact recovery
-        run: mkdir -p .nkd/restore-outcomes
       - name: Download artifacts and evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         continue-on-error: true
         with:
-          pattern: '{nkd-artifact-controller-chart-nke-controller-chart,nkd-artifact-cwe-nke-controller,nkd-artifact-postgresql-postgresql-chart,nkd-artifact-spire-crds-spire-crds-chart,nkd-artifact-spire-spire-chart,nkd-artifact-temporal-temporal-chart,nkd-observation-controller-chart,nkd-observation-cwe,nkd-observation-postgresql,nkd-observation-spire,nkd-observation-spire-crds,nkd-observation-temporal,nkd-package-controller-chart,nkd-package-cwe,nkd-package-postgresql,nkd-package-release,nkd-package-spire,nkd-package-spire-crds,nkd-package-temporal,nkd-predicate-release,nkd-prepared-release,nkd-publication-release,nkd-result-controller-chart-nke-controller-chart,nkd-result-cwe-nke-controller,nkd-result-postgresql-postgresql-chart,nkd-result-spire-crds-spire-crds-chart,nkd-result-spire-spire-chart,nkd-result-temporal-temporal-chart,nkd-sbom-controller-chart,nkd-sbom-cwe,nkd-sbom-postgresql,nkd-sbom-spire,nkd-sbom-spire-crds,nkd-sbom-temporal,nkd-signature-release,nkd-source-receipt-controller-chart-fetc-683f851a4802,nkd-source-receipt-cwe-fetch-source-ef48-5b738fb9d582,nkd-source-controller-chart-fetch-source-790511a214f5,nkd-source-cwe-fetch-source-ef487f76cf9f-f736290b13b9,nkd-tool-cosign,nkd-tool-syft,nkd-verification-release}'
+          pattern: '{nkd-artifact-controller-chart-nke-controller-chart,nkd-artifact-cwe-nke-controller,nkd-artifact-postgresql-postgresql-chart,nkd-artifact-spire-crds-spire-crds-chart,nkd-artifact-spire-spire-chart,nkd-artifact-temporal-temporal-chart,nkd-observation-controller-chart,nkd-observation-cwe,nkd-observation-postgresql,nkd-observation-spire,nkd-observation-spire-crds,nkd-observation-temporal,nkd-package-controller-chart,nkd-package-cwe,nkd-package-postgresql,nkd-package-release,nkd-package-spire,nkd-package-spire-crds,nkd-package-temporal,nkd-predicate-release,nkd-prepared-release,nkd-publication-release,nkd-result-controller-chart-nke-controller-chart,nkd-result-cwe-nke-controller,nkd-result-postgresql-postgresql-chart,nkd-result-spire-crds-spire-crds-chart,nkd-result-spire-spire-chart,nkd-result-temporal-temporal-chart,nkd-sbom-controller-chart,nkd-sbom-cwe,nkd-sbom-postgresql,nkd-sbom-spire,nkd-sbom-spire-crds,nkd-sbom-temporal,nkd-signature-release,nkd-source-controller-chart-fetch-source-790511a214f5,nkd-source-cwe-fetch-source-ef487f76cf9f-f736290b13b9,nkd-source-receipt-controller-chart-fetc-683f851a4802,nkd-source-receipt-cwe-fetch-source-ef48-5b738fb9d582,nkd-tool-cosign,nkd-tool-syft,nkd-verification-release}'
           path: .nkd/carriers
           merge-multiple: 'true'
-      - name: 'Recover nke-controller-chart (source archive)'
-        run: |
-          if [ '${{ needs.nkd-controller-chart-build-nke-controller-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-controller-chart-nke-controller-chart.status; elif [ ! -f .nkd/carriers/artifact-controller-chart-nke-controller-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-controller-chart-nke-controller-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/out/nke-controller-chart/nke-controller-0.1.1.tgz; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-controller-chart-nke-controller-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-controller-chart-nke-controller-chart.status; fi
-          printf '%s: ' 'nke-controller-chart (source archive)'
-          cat .nkd/restore-outcomes/artifact-controller-chart-nke-controller-chart.status
-      - name: 'Recover nke-controller (image export)'
-        run: |
-          if [ '${{ needs.nkd-cwe-build-nke-controller.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-cwe-nke-controller.status; elif [ ! -f .nkd/carriers/artifact-cwe-nke-controller.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-cwe-nke-controller.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/out/nke-controller/nke-controller-image-amd64.oci.tar; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-cwe-nke-controller.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-cwe-nke-controller.status; fi
-          printf '%s: ' 'nke-controller (image export)'
-          cat .nkd/restore-outcomes/artifact-cwe-nke-controller.status
-      - name: 'Recover postgresql-chart (raw)'
-        run: |
-          if [ '${{ needs.nkd-postgresql-pull-postgresql-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-postgresql-postgresql-chart.status; elif [ ! -f .nkd/carriers/artifact-postgresql-postgresql-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-postgresql-postgresql-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/fetch/postgresql-chart/postgresql-chart; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-postgresql-postgresql-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-postgresql-postgresql-chart.status; fi
-          printf '%s: ' 'postgresql-chart (raw)'
-          cat .nkd/restore-outcomes/artifact-postgresql-postgresql-chart.status
-      - name: 'Recover spire-crds-chart (raw)'
-        run: |
-          if [ '${{ needs.nkd-spire-crds-pull-spire-crds-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-spire-crds-spire-crds-chart.status; elif [ ! -f .nkd/carriers/artifact-spire-crds-spire-crds-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-spire-crds-spire-crds-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/fetch/spire-crds-chart/spire-crds-chart; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-spire-crds-spire-crds-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-spire-crds-spire-crds-chart.status; fi
-          printf '%s: ' 'spire-crds-chart (raw)'
-          cat .nkd/restore-outcomes/artifact-spire-crds-spire-crds-chart.status
-      - name: 'Recover spire-chart (raw)'
-        run: |
-          if [ '${{ needs.nkd-spire-pull-spire-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-spire-spire-chart.status; elif [ ! -f .nkd/carriers/artifact-spire-spire-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-spire-spire-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-spire-spire-chart.tar --root . --path .nkd/factory/spire/fetch/spire-chart/spire-chart; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-spire-spire-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-spire-spire-chart.status; fi
-          printf '%s: ' 'spire-chart (raw)'
-          cat .nkd/restore-outcomes/artifact-spire-spire-chart.status
-      - name: 'Recover temporal-chart (raw)'
-        run: |
-          if [ '${{ needs.nkd-temporal-pull-temporal-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/artifact-temporal-temporal-chart.status; elif [ ! -f .nkd/carriers/artifact-temporal-temporal-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/artifact-temporal-temporal-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/artifact-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/fetch/temporal-chart/temporal-chart; then printf 'restored:success\n' > .nkd/restore-outcomes/artifact-temporal-temporal-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/artifact-temporal-temporal-chart.status; fi
-          printf '%s: ' 'temporal-chart (raw)'
-          cat .nkd/restore-outcomes/artifact-temporal-temporal-chart.status
-      - name: 'Recover artifact checks for controller-chart'
-        run: |
-          if [ '${{ needs.nkd-controller-chart-terminal-observe.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-controller-chart.status; elif [ ! -f .nkd/carriers/observation-controller-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-controller-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-controller-chart.tar --root . --path .nkd/factory/controller-chart/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-controller-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-controller-chart.status; fi
-          printf '%s: ' 'artifact checks for controller-chart'
-          cat .nkd/restore-outcomes/observation-controller-chart.status
-      - name: 'Recover artifact checks for cwe'
-        run: |
-          if [ '${{ needs.nkd-process-cwe-terminal-observe-package-e18762b8b021.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-cwe.status; elif [ ! -f .nkd/carriers/observation-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-cwe.tar --root . --path .nkd/factory/cwe/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-cwe.status; fi
-          printf '%s: ' 'artifact checks for cwe'
-          cat .nkd/restore-outcomes/observation-cwe.status
-      - name: 'Recover artifact checks for postgresql'
-        run: |
-          if [ '${{ needs.nkd-process-postgresql-terminal-observe-555d0da8f385.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-postgresql.status; elif [ ! -f .nkd/carriers/observation-postgresql.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-postgresql.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-postgresql.tar --root . --path .nkd/factory/postgresql/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-postgresql.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-postgresql.status; fi
-          printf '%s: ' 'artifact checks for postgresql'
-          cat .nkd/restore-outcomes/observation-postgresql.status
-      - name: 'Recover artifact checks for spire'
-        run: |
-          if [ '${{ needs.nkd-process-spire-terminal-observe-package-spire.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-spire.status; elif [ ! -f .nkd/carriers/observation-spire.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-spire.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-spire.tar --root . --path .nkd/factory/spire/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-spire.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-spire.status; fi
-          printf '%s: ' 'artifact checks for spire'
-          cat .nkd/restore-outcomes/observation-spire.status
-      - name: 'Recover artifact checks for spire-crds'
-        run: |
-          if [ '${{ needs.nkd-process-spire-crds-terminal-observe-82be9f86e106.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-spire-crds.status; elif [ ! -f .nkd/carriers/observation-spire-crds.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-spire-crds.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-spire-crds.tar --root . --path .nkd/factory/spire-crds/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-spire-crds.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-spire-crds.status; fi
-          printf '%s: ' 'artifact checks for spire-crds'
-          cat .nkd/restore-outcomes/observation-spire-crds.status
-      - name: 'Recover artifact checks for temporal'
-        run: |
-          if [ '${{ needs.nkd-process-temporal-terminal-observe-pa-d14ae446c67c.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/observation-temporal.status; elif [ ! -f .nkd/carriers/observation-temporal.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/observation-temporal.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/observation-temporal.tar --root . --path .nkd/factory/temporal/terminal-observation.json; then printf 'restored:success\n' > .nkd/restore-outcomes/observation-temporal.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/observation-temporal.status; fi
-          printf '%s: ' 'artifact checks for temporal'
-          cat .nkd/restore-outcomes/observation-temporal.status
-      - name: 'Recover controller-chart (Helm bundle)'
-        run: |
-          if [ '${{ needs.nkd-process-cwe-terminal-observe-package-e18762b8b021.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-controller-chart.status; elif [ ! -f .nkd/carriers/package-controller-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-controller-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-controller-chart.tar --root . --path .nkd/factory/packages/controller-chart; then printf 'restored:success\n' > .nkd/restore-outcomes/package-controller-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-controller-chart.status; fi
-          printf '%s: ' 'controller-chart (Helm bundle)'
-          cat .nkd/restore-outcomes/package-controller-chart.status
-      - name: 'Recover cwe (container image)'
-        run: |
-          if [ '${{ needs.nkd-process-cwe-terminal-observe-package-e18762b8b021.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-cwe.status; elif [ ! -f .nkd/carriers/package-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-cwe.tar --root . --path .nkd/factory/packages/cwe; then printf 'restored:success\n' > .nkd/restore-outcomes/package-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-cwe.status; fi
-          printf '%s: ' 'cwe (container image)'
-          cat .nkd/restore-outcomes/package-cwe.status
-      - name: 'Recover postgresql (Helm bundle)'
-        run: |
-          if [ '${{ needs.nkd-process-postgresql-terminal-observe-555d0da8f385.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-postgresql.status; elif [ ! -f .nkd/carriers/package-postgresql.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-postgresql.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-postgresql.tar --root . --path .nkd/factory/packages/postgresql; then printf 'restored:success\n' > .nkd/restore-outcomes/package-postgresql.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-postgresql.status; fi
-          printf '%s: ' 'postgresql (Helm bundle)'
-          cat .nkd/restore-outcomes/package-postgresql.status
-      - name: 'Recover release (publication bundle)'
-        run: |
-          if [ '${{ needs.nkd-attest-sboms-release.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-release.status; elif [ ! -f .nkd/carriers/package-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-release.tar --root . --path .nkd/factory/packages/release; then printf 'restored:success\n' > .nkd/restore-outcomes/package-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-release.status; fi
-          printf '%s: ' 'release (publication bundle)'
-          cat .nkd/restore-outcomes/package-release.status
-      - name: 'Recover spire (Helm bundle)'
-        run: |
-          if [ '${{ needs.nkd-process-spire-terminal-observe-package-spire.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-spire.status; elif [ ! -f .nkd/carriers/package-spire.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-spire.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-spire.tar --root . --path .nkd/factory/packages/spire; then printf 'restored:success\n' > .nkd/restore-outcomes/package-spire.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-spire.status; fi
-          printf '%s: ' 'spire (Helm bundle)'
-          cat .nkd/restore-outcomes/package-spire.status
-      - name: 'Recover spire-crds (Helm bundle)'
-        run: |
-          if [ '${{ needs.nkd-process-spire-crds-terminal-observe-82be9f86e106.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-spire-crds.status; elif [ ! -f .nkd/carriers/package-spire-crds.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-spire-crds.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-spire-crds.tar --root . --path .nkd/factory/packages/spire-crds; then printf 'restored:success\n' > .nkd/restore-outcomes/package-spire-crds.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-spire-crds.status; fi
-          printf '%s: ' 'spire-crds (Helm bundle)'
-          cat .nkd/restore-outcomes/package-spire-crds.status
-      - name: 'Recover temporal (Helm bundle)'
-        run: |
-          if [ '${{ needs.nkd-process-temporal-terminal-observe-pa-d14ae446c67c.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/package-temporal.status; elif [ ! -f .nkd/carriers/package-temporal.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/package-temporal.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/package-temporal.tar --root . --path .nkd/factory/packages/temporal; then printf 'restored:success\n' > .nkd/restore-outcomes/package-temporal.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/package-temporal.status; fi
-          printf '%s: ' 'temporal (Helm bundle)'
-          cat .nkd/restore-outcomes/package-temporal.status
-      - name: 'Recover release (provenance)'
-        run: |
-          if [ '${{ needs.nkd-sign-release.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/predicate-release.status; elif [ ! -f .nkd/carriers/predicate-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/predicate-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/predicate-release.tar --root . --path .nkd/factory/predicates/release.json; then printf 'restored:success\n' > .nkd/restore-outcomes/predicate-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/predicate-release.status; fi
-          printf '%s: ' 'release (provenance)'
-          cat .nkd/restore-outcomes/predicate-release.status
-      - name: 'Recover release (publication bundle)'
-        run: |
-          if [ '${{ needs.nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/prepared-release.status; elif [ ! -f .nkd/carriers/prepared-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/prepared-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/prepared-release.tar --root . --path .nkd/factory/prepared/release; then printf 'restored:success\n' > .nkd/restore-outcomes/prepared-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/prepared-release.status; fi
-          printf '%s: ' 'release (publication bundle)'
-          cat .nkd/restore-outcomes/prepared-release.status
-      - name: 'Recover release (published reference)'
-        run: |
-          if [ '${{ needs.nkd-publish-release.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/publication-release.status; elif [ ! -f .nkd/carriers/publication-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/publication-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/publication-release.tar --root . --path .nkd/factory/publications/release.txt; then printf 'restored:success\n' > .nkd/restore-outcomes/publication-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/publication-release.status; fi
-          printf '%s: ' 'release (published reference)'
-          cat .nkd/restore-outcomes/publication-release.status
-      - name: 'Recover build result for nke-controller-chart'
-        run: |
-          if [ '${{ needs.nkd-controller-chart-build-nke-controller-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-controller-chart-nke-controller-chart.status; elif [ ! -f .nkd/carriers/result-controller-chart-nke-controller-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-controller-chart-nke-controller-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-controller-chart-nke-controller-chart.tar --root . --path .nkd/factory/controller-chart/results/build-nke-controller-chart.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-controller-chart-nke-controller-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-controller-chart-nke-controller-chart.status; fi
-          printf '%s: ' 'build result for nke-controller-chart'
-          cat .nkd/restore-outcomes/result-controller-chart-nke-controller-chart.status
-      - name: 'Recover build result for nke-controller'
-        run: |
-          if [ '${{ needs.nkd-cwe-build-nke-controller.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-cwe-nke-controller.status; elif [ ! -f .nkd/carriers/result-cwe-nke-controller.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-cwe-nke-controller.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-cwe-nke-controller.tar --root . --path .nkd/factory/cwe/results/build-nke-controller.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-cwe-nke-controller.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-cwe-nke-controller.status; fi
-          printf '%s: ' 'build result for nke-controller'
-          cat .nkd/restore-outcomes/result-cwe-nke-controller.status
-      - name: 'Recover build result for postgresql-chart'
-        run: |
-          if [ '${{ needs.nkd-postgresql-pull-postgresql-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-postgresql-postgresql-chart.status; elif [ ! -f .nkd/carriers/result-postgresql-postgresql-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-postgresql-postgresql-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-postgresql-postgresql-chart.tar --root . --path .nkd/factory/postgresql/results/pull-postgresql-chart.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-postgresql-postgresql-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-postgresql-postgresql-chart.status; fi
-          printf '%s: ' 'build result for postgresql-chart'
-          cat .nkd/restore-outcomes/result-postgresql-postgresql-chart.status
-      - name: 'Recover build result for spire-crds-chart'
-        run: |
-          if [ '${{ needs.nkd-spire-crds-pull-spire-crds-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-spire-crds-spire-crds-chart.status; elif [ ! -f .nkd/carriers/result-spire-crds-spire-crds-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-spire-crds-spire-crds-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-spire-crds-spire-crds-chart.tar --root . --path .nkd/factory/spire-crds/results/pull-spire-crds-chart.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-spire-crds-spire-crds-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-spire-crds-spire-crds-chart.status; fi
-          printf '%s: ' 'build result for spire-crds-chart'
-          cat .nkd/restore-outcomes/result-spire-crds-spire-crds-chart.status
-      - name: 'Recover build result for spire-chart'
-        run: |
-          if [ '${{ needs.nkd-spire-pull-spire-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-spire-spire-chart.status; elif [ ! -f .nkd/carriers/result-spire-spire-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-spire-spire-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-spire-spire-chart.tar --root . --path .nkd/factory/spire/results/pull-spire-chart.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-spire-spire-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-spire-spire-chart.status; fi
-          printf '%s: ' 'build result for spire-chart'
-          cat .nkd/restore-outcomes/result-spire-spire-chart.status
-      - name: 'Recover build result for temporal-chart'
-        run: |
-          if [ '${{ needs.nkd-temporal-pull-temporal-chart.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/result-temporal-temporal-chart.status; elif [ ! -f .nkd/carriers/result-temporal-temporal-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/result-temporal-temporal-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/result-temporal-temporal-chart.tar --root . --path .nkd/factory/temporal/results/pull-temporal-chart.json; then printf 'restored:success\n' > .nkd/restore-outcomes/result-temporal-temporal-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/result-temporal-temporal-chart.status; fi
-          printf '%s: ' 'build result for temporal-chart'
-          cat .nkd/restore-outcomes/result-temporal-temporal-chart.status
-      - name: 'Recover SBOMs for controller-chart'
-        run: |
-          if [ '${{ needs.nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-controller-chart.status; elif [ ! -f .nkd/carriers/sbom-controller-chart.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-controller-chart.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-controller-chart.tar --root . --path .nkd/factory/controller-chart/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-controller-chart.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-controller-chart.status; fi
-          printf '%s: ' 'SBOMs for controller-chart'
-          cat .nkd/restore-outcomes/sbom-controller-chart.status
-      - name: 'Recover SBOMs for cwe'
-        run: |
-          if [ '${{ needs.nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-cwe.status; elif [ ! -f .nkd/carriers/sbom-cwe.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-cwe.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-cwe.tar --root . --path .nkd/factory/cwe/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-cwe.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-cwe.status; fi
-          printf '%s: ' 'SBOMs for cwe'
-          cat .nkd/restore-outcomes/sbom-cwe.status
-      - name: 'Recover SBOMs for postgresql'
-        run: |
-          if [ '${{ needs.nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-postgresql.status; elif [ ! -f .nkd/carriers/sbom-postgresql.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-postgresql.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-postgresql.tar --root . --path .nkd/factory/postgresql/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-postgresql.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-postgresql.status; fi
-          printf '%s: ' 'SBOMs for postgresql'
-          cat .nkd/restore-outcomes/sbom-postgresql.status
-      - name: 'Recover SBOMs for spire'
-        run: |
-          if [ '${{ needs.nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-spire.status; elif [ ! -f .nkd/carriers/sbom-spire.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-spire.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-spire.tar --root . --path .nkd/factory/spire/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-spire.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-spire.status; fi
-          printf '%s: ' 'SBOMs for spire'
-          cat .nkd/restore-outcomes/sbom-spire.status
-      - name: 'Recover SBOMs for spire-crds'
-        run: |
-          if [ '${{ needs.nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-spire-crds.status; elif [ ! -f .nkd/carriers/sbom-spire-crds.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-spire-crds.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-spire-crds.tar --root . --path .nkd/factory/spire-crds/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-spire-crds.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-spire-crds.status; fi
-          printf '%s: ' 'SBOMs for spire-crds'
-          cat .nkd/restore-outcomes/sbom-spire-crds.status
-      - name: 'Recover SBOMs for temporal'
-        run: |
-          if [ '${{ needs.nkd-process-controller-chart-sbom-cwe-sb-a563ecdffba4.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/sbom-temporal.status; elif [ ! -f .nkd/carriers/sbom-temporal.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/sbom-temporal.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/sbom-temporal.tar --root . --path .nkd/factory/temporal/sbom; then printf 'restored:success\n' > .nkd/restore-outcomes/sbom-temporal.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/sbom-temporal.status; fi
-          printf '%s: ' 'SBOMs for temporal'
-          cat .nkd/restore-outcomes/sbom-temporal.status
-      - name: 'Recover release (signature record)'
-        run: |
-          if [ '${{ needs.nkd-sign-release.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/signature-release.status; elif [ ! -f .nkd/carriers/signature-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/signature-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/signature-release.tar --root . --path .nkd/factory/signatures/release.json; then printf 'restored:success\n' > .nkd/restore-outcomes/signature-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/signature-release.status; fi
-          printf '%s: ' 'release (signature record)'
-          cat .nkd/restore-outcomes/signature-release.status
-      - name: 'Recover source verification for nke-controller-chart (controller-chart)'
-        run: |
-          if [ '${{ needs.nkd-controller-chart-fetch-source-533797-2bcfe957eb36.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-controller-chart-fetc-683f851a4802.status; elif [ ! -f .nkd/carriers/source-receipt-controller-chart-fetc-683f851a4802.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-controller-chart-fetc-683f851a4802.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-controller-chart-fetc-683f851a4802.tar --root . --path .nkd/factory/controller-chart/source-receipts/source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3-4fa5733275c5.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-controller-chart-fetc-683f851a4802.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-controller-chart-fetc-683f851a4802.status; fi
-          printf '%s: ' 'source verification for nke-controller-chart (controller-chart)'
-          cat .nkd/restore-outcomes/source-receipt-controller-chart-fetc-683f851a4802.status
-      - name: 'Recover source verification for nke-controller (cwe)'
-        run: |
-          if [ '${{ needs.nkd-cwe-fetch-source-ef487f76cf9f0ef93e2-c9b45c9e168a.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.status; elif [ ! -f .nkd/carriers/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.tar --root . --path .nkd/factory/cwe/source-receipts/source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17-4a3c5bffffee.json; then printf 'restored:success\n' > .nkd/restore-outcomes/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.status; fi
-          printf '%s: ' 'source verification for nke-controller (cwe)'
-          cat .nkd/restore-outcomes/source-receipt-cwe-fetch-source-ef48-5b738fb9d582.status
-      - name: 'Recover source for nke-controller-chart (controller-chart)'
-        run: |
-          if [ '${{ needs.nkd-controller-chart-fetch-source-533797-2bcfe957eb36.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-controller-chart-fetch-source-790511a214f5.status; elif [ ! -f .nkd/carriers/source-controller-chart-fetch-source-790511a214f5.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-controller-chart-fetch-source-790511a214f5.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-controller-chart-fetch-source-790511a214f5.tar --root . --path .nkd/factory/controller-chart/src/source-53379795e20c567bbee5e13775b4da35f9769fe55522886ac429ccc73de317f3; then printf 'restored:success\n' > .nkd/restore-outcomes/source-controller-chart-fetch-source-790511a214f5.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-controller-chart-fetch-source-790511a214f5.status; fi
-          printf '%s: ' 'source for nke-controller-chart (controller-chart)'
-          cat .nkd/restore-outcomes/source-controller-chart-fetch-source-790511a214f5.status
-      - name: 'Recover source for nke-controller (cwe)'
-        run: |
-          if [ '${{ needs.nkd-cwe-fetch-source-ef487f76cf9f0ef93e2-c9b45c9e168a.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.status; elif [ ! -f .nkd/carriers/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.tar --root . --path .nkd/factory/cwe/src/source-ef487f76cf9f0ef93e22d616b0ae397b3232d742169828ad4b7bf06223e31d17; then printf 'restored:success\n' > .nkd/restore-outcomes/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.status; fi
-          printf '%s: ' 'source for nke-controller (cwe)'
-          cat .nkd/restore-outcomes/source-cwe-fetch-source-ef487f76cf9f-f736290b13b9.status
-      - name: 'Recover cosign (tool)'
-        run: |
-          if [ '${{ needs.nkd-tool-cosign.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/tool-cosign.status; elif [ ! -f .nkd/carriers/tool-cosign.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/tool-cosign.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/tool-cosign.tar --root . --path .nkd/factory/tools/cosign/cosign-linux-amd64; then printf 'restored:success\n' > .nkd/restore-outcomes/tool-cosign.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/tool-cosign.status; fi
-          printf '%s: ' 'cosign (tool)'
-          cat .nkd/restore-outcomes/tool-cosign.status
-      - name: 'Recover syft (tool)'
-        run: |
-          if [ '${{ needs.nkd-tool-syft.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/tool-syft.status; elif [ ! -f .nkd/carriers/tool-syft.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/tool-syft.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/tool-syft.tar --root . --path .nkd/factory/tools/syft/syft; then printf 'restored:success\n' > .nkd/restore-outcomes/tool-syft.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/tool-syft.status; fi
-          printf '%s: ' 'syft (tool)'
-          cat .nkd/restore-outcomes/tool-syft.status
-      - name: 'Recover release (signature checks)'
-        run: |
-          if [ '${{ needs.nkd-verify-publication-release.result }}' != 'success' ]; then printf 'job-failed\n' > .nkd/restore-outcomes/verification-release.status; elif [ ! -f .nkd/carriers/verification-release.tar ]; then printf 'missing\n' > .nkd/restore-outcomes/verification-release.status; elif ./nkd-exec transport-unpack --archive .nkd/carriers/verification-release.tar --root . --path .nkd/factory/verifications/release.json; then printf 'restored:success\n' > .nkd/restore-outcomes/verification-release.status; else printf 'restore-failed\n' > .nkd/restore-outcomes/verification-release.status; fi
-          printf '%s: ' 'release (signature checks)'
-          cat .nkd/restore-outcomes/verification-release.status
+      - name: Recover planned carriers
+        id: recover-artifacts
+        env:
+          NKD_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: ./nkd-exec factory github recover --plan .github/nkd-run/plan.json
       - name: Finalize Run and check completeness
         id: finalize-catalog
         env:

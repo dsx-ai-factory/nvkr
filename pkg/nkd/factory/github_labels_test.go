@@ -1,9 +1,6 @@
 package factory
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -30,54 +27,6 @@ func TestGitHubOperationLabels(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := githubNodeLabel(&Plan{}, tc.node); got != tc.want {
 				t.Fatalf("label = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestGitHubOperationLogsPreserveExitStatus(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		status string
-		code   int
-	}{
-		{"success", "0", 0},
-		{"failure", "23", 23},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			// Exercise the emitted shell against an executable protocol fixture. This
-			// checks logging/exit behavior, not a build, registry or signing service.
-			if err := os.WriteFile(filepath.Join(dir, "nkd-exec"), []byte("#!/bin/sh\nprintf 'child output\\n'\nexit \"$TEST_STATUS\"\n"), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			node := Node{ID: "package/charts", Kind: NodePackage, PackageKind: PackageHelm, Outputs: []string{"package/charts"}, HelmImage: testHelmBinding("package/image", "controller")}
-			commands := githubNodeCommands(node, &Plan{})
-			cmd := exec.CommandContext(t.Context(), "bash", "-c", strings.Join(commands, "\n"))
-			cmd.Dir = dir
-			cmd.Env = append(os.Environ(), "TEST_STATUS="+tc.status, "NKD_CREDENTIAL=do-not-log-this")
-			raw, err := cmd.CombinedOutput()
-			if tc.code == 0 && err != nil {
-				t.Fatal(err)
-			}
-			if cmd.ProcessState.ExitCode() != tc.code {
-				t.Fatalf("exit=%d, want %d: %s", cmd.ProcessState.ExitCode(), tc.code, raw)
-			}
-			log := string(raw)
-			for _, want := range []string{"Starting: Bind image digest and package Helm: charts", "Node: package/charts", "child output"} {
-				if !strings.Contains(log, want) {
-					t.Errorf("missing %q in %s", want, log)
-				}
-			}
-			if tc.code == 0 {
-				if !strings.Contains(log, "Completed:") || !strings.Contains(log, "Produced: package/charts") || strings.Contains(log, "Failed:") {
-					t.Fatalf("incorrect success log: %s", log)
-				}
-			} else if !strings.Contains(log, "Failed:") || !strings.Contains(log, "exit 23") || strings.Contains(log, "Completed:") || strings.Contains(log, "Produced:") {
-				t.Fatalf("incorrect failure log: %s", log)
-			}
-			if strings.Contains(log, "do-not-log-this") {
-				t.Fatal("credential leaked into operation log")
 			}
 		})
 	}

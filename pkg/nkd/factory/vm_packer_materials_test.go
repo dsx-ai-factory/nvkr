@@ -3,6 +3,7 @@ package factory
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -31,9 +32,16 @@ func newVMPackerMaterialFixtureWithContract(
 	projection *material.Projection,
 	bindings map[string]string,
 ) vmPackerMaterialFixture {
+	return newVMPackerMaterialFixtureForPlatform(t, projection, bindings, "linux/amd64")
+}
+
+func newVMPackerMaterialFixtureForPlatform(t *testing.T, projection *material.Projection,
+	bindings map[string]string, platform string,
+) vmPackerMaterialFixture {
 	t.Helper()
 	t.Chdir(t.TempDir())
-	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
+	definition, environment, stack := vmFactoryInputs(t, platform, execution.CapabilityPreferred)
+	arch := strings.TrimPrefix(platform, "linux/")
 	catalogCopy := *stack.Catalog
 	catalogCopy.Components = make(map[string]catalog.Component, len(stack.Catalog.Components)+2)
 	for name, component := range stack.Catalog.Components {
@@ -56,10 +64,10 @@ func newVMPackerMaterialFixtureWithContract(
 	}
 	for _, component := range []string{"agent", "runtime"} {
 		catalogCopy.Components[component] = catalog.Component{
-			Platforms: []string{"linux/amd64"}, OutputType: "host-package", Tag: "v1.0.0", SourceDate: 1,
+			Platforms: []string{platform}, OutputType: "host-package", Tag: "v1.0.0", SourceDate: 1,
 			Prebuilt: &catalog.Prebuilt{
 				URL:      "https://example.test/" + component + "-{{.Arch}}.deb",
-				Digests:  map[string]string{"amd64": pipeline.FileDigest(rawByComponent[component])},
+				Digests:  map[string]string{arch: pipeline.FileDigest(rawByComponent[component])},
 				Evidence: &catalog.ExternalEvidence{None: true},
 			},
 		}

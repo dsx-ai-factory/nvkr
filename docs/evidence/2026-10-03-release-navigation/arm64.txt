@@ -1,0 +1,16 @@
+Release 127.0.0.1:65010/navigation/releases@sha256:416f7fe2f29d6a105dcc0d83dc6a0314639a1b596fd971fb8895e8e26c026c1f
+Inspection: integrity-only; signatures and policy not verified
+Declared qualification: diagnostic
+Content: sha256:6aa72cf394fd6e74147dcb8993426eac29d049e852cd48c9798d7a9c0e2e8755
+Definition: sha256:29d68ea65301aa479a991374e400885c373f86baca621b3fbaa46d502d2bb806
+Environment: sha256:465c7b635ba7fdb9d2cd8a42f77142fc39ec512ec24e23787bca38a472287f5e
+Outputs: 1 of 2
+
+nkectl-linux-arm64 (executable linux/arm64)
+  Artifact: 127.0.0.1:65010/navigation/nkectl-linux-arm64@sha256:123e7fefdadd61ed59599c1f0b7cbef5d1db9c96cbbbbe42af089e14ce31cc84
+  Build: sha256:129039eab44ad65628dc4d107a946f880d5a837fa5835ccb963e43d6b5779a8c
+  Component: nkectl @ sha256:24aa1e1e667776097fae38b3d0d31c072b4ce5b0ddee45fbc21d94aadfd0763f
+  Evidence: sbom-9d1907cc5a0c2bfb2fd07c6226fe0cd272402d028a0aa1d7dbe7c4e0c947fe1f (nkectl, build-output)
+    Reference: 127.0.0.1:65010/navigation/nkectl-linux-arm64@sha256:db6eb73e9d8b3ff813989f15b3218dfbeec16e352d5beef3a2fc68a15b8755e0
+    Subject: file sha256:24aa1e1e667776097fae38b3d0d31c072b4ce5b0ddee45fbc21d94aadfd0763f
+    Members: nkectl-linux-arm64

@@ -36,7 +36,7 @@ func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
 				t.Fatal("workflow uses a parallel producer graph")
 			}
 			for _, node := range plan.Graph.Nodes {
-				command := "factory execute-node --plan " + bundle.PlanPath + " --node " + shellQuote(node.ID)
+				command := "factory github run-node --plan " + bundle.PlanPath + " --node " + shellQuote(node.ID)
 				if !strings.Contains(workflow, command) {
 					t.Fatalf("workflow omits exact Plan/node command: %s", command)
 				}

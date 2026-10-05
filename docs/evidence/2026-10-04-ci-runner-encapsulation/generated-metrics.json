@@ -1,0 +1,50 @@
+{
+  "base": {
+    "commit": "d1a4ec9403a936b154b16f4c53e3d3f6daa4c739",
+    "sha256": "4b34fdca17c1f100294d5b084b7c25e014f459d4958c14d38860ddab5060a267",
+    "lines": 1859,
+    "bytes": 139150,
+    "jobs": 23,
+    "steps": 338,
+    "logicalOperations": 33,
+    "downloadActions": 75,
+    "uploadActions": 44,
+    "finalizerSteps": 49,
+    "maximumRunBytes": 1132,
+    "inlineProgressFunctions": 33
+  },
+  "initialPR90": {
+    "commit": "582ab01c26226fd61358d3067b1746cd79d8fc49",
+    "sha256": "49f0ea5b93f8841deef8301294d42403c7b76cd7b380d619ce13c2020239d117",
+    "lines": 5079,
+    "bytes": 345920,
+    "jobs": 23,
+    "steps": 212,
+    "logicalOperations": 33,
+    "downloadActions": 36,
+    "uploadActions": 44,
+    "finalizerSteps": 10,
+    "maximumRunBytes": 20408,
+    "inlineProgressFunctions": 79
+  },
+  "compactHelper": {
+    "sha256": "d3a77769f9fa6e77cca56a4bd3cd8ac1dd00efe6eeb27a0c949dae2c39b2a809",
+    "lines": 1145,
+    "bytes": 59933,
+    "jobs": 23,
+    "steps": 209,
+    "logicalOperations": 33,
+    "downloadActions": 36,
+    "uploadActions": 44,
+    "finalizerSteps": 7,
+    "maximumRunBytes": 412,
+    "inlineProgressFunctions": 0
+  },
+  "invariants": {
+    "sameJobTopologyConditionsPermissions": true,
+    "samePinnedProviderActionSteps": true,
+    "sameCredentialEnvironments": true,
+    "samePlanBytes": true
+  },
+  "planSHA256": "b58a29d86da34bab189c0bd7810a16b604475ac64766962aebb331b078fbe8ac"
+}

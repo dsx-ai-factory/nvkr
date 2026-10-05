@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -315,77 +316,78 @@ type packerImageInspection struct {
 }
 
 func observeLocalPackerImage(ctx context.Context, runtime packerContainerRuntime, node ir.Node) error {
+	_, err := observeLocalContainerImage(ctx, runtime, node.Toolchain, node.ToolchainPlatform, "local Packer toolchain for node "+strconv.Quote(node.ID))
+	return err
+}
+
+// observeLocalContainerImage checks platform, inherited inputs and the exact
+// selected pin once, returning that same validated runtime document to owners.
+func observeLocalContainerImage(ctx context.Context, runtime packerContainerRuntime, image, platform, label string) (*packerImageInspection, error) {
 	wantImageID := ""
 	wantManifestDigest := ""
-	if canonical.IsDigest(node.Toolchain) {
-		wantImageID = node.Toolchain
+	if canonical.IsDigest(image) {
+		wantImageID = image
 	} else {
 		var err error
-		wantManifestDigest, err = imageManifestDigest(node.Toolchain)
+		wantManifestDigest, err = imageManifestDigest(image)
 		if err != nil {
-			return e.Wrap(e.CodeInvalidCatalog, err, "node %q toolchain", node.ID)
+			return nil, e.Wrap(e.CodeInvalidCatalog, err, "%s", label)
 		}
 	}
 	var stdout, stderr bytes.Buffer
 	args := []string{"image", "inspect"}
 	if named, ok := runtime.(interface{ RuntimeName() string }); !ok || named.RuntimeName() != "podman" {
-		args = append(args, "--platform", node.ToolchainPlatform)
+		args = append(args, "--platform", platform)
 	}
-	args = append(args, "--format", "{{json .}}", node.Toolchain)
+	args = append(args, "--format", "{{json .}}", image)
 	if err := runtime.Run(ctx, nil, &stdout, &stderr, args...); err != nil {
-		return runtimeCommandError(ctx, err, stderr.String(), e.CodeEngineCapability,
-			"inspecting already-local Packer toolchain for node %q", node.ID)
+		return nil, runtimeCommandError(ctx, err, stderr.String(), e.CodeEngineCapability, "inspecting %s", label)
 	}
 	var inspection packerImageInspection
 	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &inspection); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "decoding local Packer toolchain inspection for node %q", node.ID)
+		return nil, e.Wrap(e.CodeEngineCapability, err, "decoding %s inspection", label)
 	}
-	wantOS, wantArch, ok := strings.Cut(node.ToolchainPlatform, "/")
+	wantOS, wantArch, ok := strings.Cut(platform, "/")
 	if !ok || inspection.OS != wantOS || inspection.Architecture != wantArch {
-		return e.New(e.CodePreflightFailed,
-			"local Packer toolchain platform %s/%s differs from selected platform %q",
-			inspection.OS, inspection.Architecture, node.ToolchainPlatform)
+		return nil, e.New(e.CodePreflightFailed, "%s platform %s/%s differs from selected platform %q", label, inspection.OS, inspection.Architecture, platform)
 	}
 	if inspection.Config == nil {
-		return e.New(e.CodePreflightFailed,
-			"local Packer toolchain inspection omitted image configuration")
+		return nil, e.New(e.CodePreflightFailed, "%s inspection omitted image configuration", label)
 	}
 	if len(inspection.Config.Volumes) != 0 {
-		return e.New(e.CodePreflightFailed,
-			"local Packer toolchain declares inherited writable volumes")
+		return nil, e.New(e.CodePreflightFailed, "%s declares inherited writable volumes", label)
 	}
 	pathEntries := 0
 	for _, variable := range inspection.Config.Env {
 		name, _, ok := strings.Cut(variable, "=")
 		if !ok || name != "PATH" {
-			return e.New(e.CodePreflightFailed,
-				"local Packer toolchain declares inherited environment outside PATH")
+			return nil, e.New(e.CodePreflightFailed, "%s declares inherited environment outside PATH", label)
 		}
 		pathEntries++
 	}
 	if pathEntries > 1 {
-		return e.New(e.CodePreflightFailed,
-			"local Packer toolchain declares PATH more than once")
+		return nil, e.New(e.CodePreflightFailed, "%s declares PATH more than once", label)
 	}
 	if wantImageID != "" {
-		observedImageID := inspection.ID
-		if !canonical.IsDigest(observedImageID) && canonical.IsDigest("sha256:"+observedImageID) {
-			observedImageID = "sha256:" + observedImageID
-		}
+		observedImageID := normalizeLocalImageID(inspection.ID)
 		if observedImageID != wantImageID {
-			return e.New(e.CodePreflightFailed,
-				"runtime selected local Packer toolchain image ID %q for node %q, want %q",
-				inspection.ID, node.ID, wantImageID)
+			return nil, e.New(e.CodePreflightFailed, "runtime selected %s image ID %q, want %q", label, inspection.ID, wantImageID)
 		}
-		return nil
+		return &inspection, nil
 	}
 	for _, reference := range inspection.RepoDigests {
 		if _, digest, ok := strings.Cut(reference, "@"); ok && digest == wantManifestDigest {
-			return nil
+			return &inspection, nil
 		}
 	}
-	return e.New(e.CodePreflightFailed,
-		"runtime did not report selected Packer toolchain manifest %s for node %q", wantManifestDigest, node.ID)
+	return nil, e.New(e.CodePreflightFailed, "runtime did not report selected %s manifest %s", label, wantManifestDigest)
+}
+
+func normalizeLocalImageID(id string) string {
+	if !canonical.IsDigest(id) && canonical.IsDigest("sha256:"+id) {
+		return "sha256:" + id
+	}
+	return id
 }
 
 func validatePackerContainerManifest(manifest []byte, digest string) error {

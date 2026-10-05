@@ -50,12 +50,10 @@ func TestRenderGitHubProducesStaticallyValidCompleteBundle(t *testing.T) {
 		[]byte("uses: " + plan.Actions["setup-go"].Uses()),
 		[]byte("go-version-file: '.go-version'"),
 		[]byte("cache: 'false'"),
-		// IR build/fetch nodes are isolated by the helper orchestrating their pinned
-		// container itself (ADR-18 §8), sharing the pipeline emitter's per-node primitive.
-		[]byte("factory execute-node --plan"),
-		// glue nodes still use the inline `<runtime> run --network none` wrapper.
-		[]byte("--network none"),
-		[]byte("factory execute-node"),
+		// Factory helpers own operation isolation and Plan-derived carrier selections.
+		[]byte("factory github run-node --plan"),
+		[]byte("factory github restore-inputs --plan"),
+		[]byte("factory github pack-outputs --plan"),
 		[]byte("packages: write"),
 		[]byte("secrets.NKD_REGISTRY_AUTH"),
 		[]byte("persist-credentials: 'false'"),
@@ -86,8 +84,8 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 		{name: "job-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 15"), new: []byte("timeout-minutes: 0")},
 		{name: "stage-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 60"), new: []byte("timeout-minutes: 59")},
 		{name: "cancel-running-publication", code: e.CodeEngineCapability, old: []byte("cancel-in-progress: false"), new: []byte("cancel-in-progress: true")},
-		{name: "network", old: []byte("--network none"), new: []byte("--network bridge")},
-		{name: "node-dispatch", old: []byte("factory execute-node --plan"), new: []byte("exec-node --nodes")},
+		{name: "unplanned-launch-argument", code: e.CodeEngineCapability, old: []byte("factory github run-node --plan"), new: []byte("factory github run-node --network bridge --plan")},
+		{name: "node-dispatch", code: e.CodeEngineCapability, old: []byte("factory github run-node --plan"), new: []byte("factory execute-node --plan")},
 		{name: "setup-go-version", old: []byte("go-version-file: '.go-version'"), new: []byte("go-version-file: 'go.mod'")},
 		{name: "setup-go-cache", code: e.CodeInvalidCatalog, old: []byte("cache: 'false'"), new: []byte("cache: 'true'")},
 		{name: "setup-go-cache-removed", code: e.CodeInvalidCatalog, old: []byte("cache: 'false'"), new: nil},
@@ -152,7 +150,7 @@ func TestRenderGitHubPreparesHelperBeforeFirstUse(t *testing.T) {
 		if strings.Contains(joinRuns(job.Steps[3:]), prepareHelperRun) {
 			t.Fatalf("job %q chmods the helper a second time; preparation must happen exactly once", jobID)
 		}
-		if strings.Contains(joinRuns(job.Steps), "transport-unpack") {
+		if strings.Contains(joinRuns(job.Steps), "factory github restore-inputs") {
 			restoring++
 		}
 	}
@@ -174,8 +172,6 @@ func TestValidateGitHubBundleRejectsLateHelperPreparation(t *testing.T) {
 		[]byte("      - name: "+prepareHelperStepName+"\n        run: "+prepareHelperRun+"\n"), nil)
 	legacy = bytes.ReplaceAll(legacy, []byte("        run: |\n          ./nkd-exec"),
 		[]byte("        run: |\n          "+prepareHelperRun+"\n          ./nkd-exec"))
-	legacy = bytes.ReplaceAll(legacy, []byte("        run: |\n          podman"),
-		[]byte("        run: |\n          "+prepareHelperRun+"\n          podman"))
 	if bytes.Equal(legacy, original) {
 		t.Fatal("legacy workflow reconstruction changed nothing")
 	}
