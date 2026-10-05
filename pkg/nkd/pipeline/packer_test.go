@@ -111,7 +111,7 @@ func runDiskInspectionFixture(root string, args []string) int {
 		if err := os.WriteFile(filepath.Join(root, "consumed"), nil, 0600); err != nil {
 			return 92
 		}
-		if mode == "subject" {
+		if mode == "subject" || mode == "close-join" {
 			deadline := time.Now().Add(10 * time.Second)
 			for {
 				if _, err := os.Stat(filepath.Join(root, "release")); err == nil {
@@ -130,6 +130,15 @@ func runDiskInspectionFixture(root string, args []string) int {
 	case "ps":
 		fmt.Print(strings.Repeat("a", 64))
 	case "rm":
+		if mode == "close-join" {
+			if err := os.WriteFile(filepath.Join(root, "cleanup-started"), nil, 0600); err != nil { return 93 }
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				if _, err := os.Stat(filepath.Join(root, "release-cleanup")); err == nil { break }
+				if time.Now().After(deadline) { return 95 }
+				time.Sleep(time.Millisecond)
+			}
+		}
 		if err := os.WriteFile(filepath.Join(root, "removed"), nil, 0600); err != nil {
 			return 93
 		}

@@ -45,10 +45,15 @@ type DiskInspectionSelection struct {
 // and complete immutable image closure. No caller command, mount or device can
 // be passed through it. The daemon is trusted, as in the local Packer adapter.
 type DiskInspectionContainer struct {
-	mu        sync.Mutex
-	runtime   *heldRuntimeExecutable
-	selection DiskInspectionSelection
-	imageID   string
+	mu         sync.Mutex
+	lifetimeMu sync.Mutex
+	lifetime   context.Context
+	stop       context.CancelFunc
+	closing    bool
+	operations sync.WaitGroup
+	runtime    *heldRuntimeExecutable
+	selection  DiskInspectionSelection
+	imageID    string
 }
 
 const diskInspectionApplianceMiB uint64 = 2048
@@ -206,6 +211,11 @@ func (container *DiskInspectionContainer) BindingContext(ctx context.Context) (s
 	if container == nil {
 		return "", "", "", e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
 	}
+	ctx, finish, err := container.beginOperation(ctx)
+	if err != nil {
+		return "", "", "", err
+	}
+	defer finish()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := lockDiskInspection(ctx, &container.mu); err != nil {
@@ -218,12 +228,21 @@ func (container *DiskInspectionContainer) BindingContext(ctx context.Context) (s
 	return container.imageID, container.selection.InspectorDigest, container.selection.CodecDigest, nil
 }
 
-// Close revokes this capability after active inspection and cleanup have joined.
-// Cancel an active inspection's context first for immediate shutdown.
+// Close cancels registered operations, then joins their streaming and deferred
+// cleanup before closing the held runtime. Caller-owned snapshot reservations
+// remain held until their caller closes the snapshot and reservation.
 func (container *DiskInspectionContainer) Close() error {
 	if container == nil {
 		return nil
 	}
+	container.lifetimeMu.Lock()
+	container.closing = true
+	stop := container.stop
+	container.lifetimeMu.Unlock()
+	if stop != nil {
+		stop()
+	}
+	container.operations.Wait()
 	container.mu.Lock()
 	defer container.mu.Unlock()
 	if container.runtime == nil {
@@ -235,6 +254,23 @@ func (container *DiskInspectionContainer) Close() error {
 		return e.Wrap(e.CodeInternal, err, "closing disk inspection runtime")
 	}
 	return nil
+}
+
+// beginOperation registers before Close can start its join. Completion is
+// signaled only after owned subprocess streaming and deferred cleanup return.
+func (container *DiskInspectionContainer) beginOperation(ctx context.Context) (context.Context, func(), error) {
+	container.lifetimeMu.Lock()
+	defer container.lifetimeMu.Unlock()
+	if container.closing {
+		return nil, nil, e.New(e.CodeEngineCapability, "disk inspection runtime is closed")
+	}
+	if container.lifetime == nil {
+		container.lifetime, container.stop = context.WithCancel(context.WithoutCancel(ctx))
+	}
+	operation, cancel := context.WithCancel(ctx)
+	stopCancellation := context.AfterFunc(container.lifetime, cancel)
+	container.operations.Add(1)
+	return operation, func() { stopCancellation(); cancel(); container.operations.Done() }, nil
 }
 
 // AdmitSubject reserves capacity admission before the factory creates its held
@@ -255,7 +291,15 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 	if container == nil || size <= 0 || size > 8<<30 {
 		return nil, e.New(e.CodeEngineCapability, "inspection subject exceeds its supported byte budget")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	if container.selection.TimeoutSeconds == 0 || container.selection.TimeoutSeconds > 600 {
+		return nil, e.New(e.CodeEngineCapability, "inspection runtime lacks its bounded declared operation timeout")
+	}
+	ctx, finish, err := container.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(container.selection.TimeoutSeconds)*time.Second)
 	defer cancel()
 	if err := lockDiskInspection(ctx, &diskInspectionCapacity); err != nil {
 		return nil, err
@@ -273,7 +317,9 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 	if container.runtime == nil {
 		return nil, e.New(e.CodeEngineCapability, "disk inspection runtime is closed")
 	}
-	facts, err := execution.ObserveLocalHost(ctx, container.selection.Workspace)
+	observationCtx, observationCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer observationCancel()
+	facts, err := execution.ObserveLocalHost(observationCtx, container.selection.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -331,6 +377,11 @@ func (container *DiskInspectionContainer) InspectHeld(ctx context.Context, subje
 }
 
 func (container *DiskInspectionContainer) inspectHeld(ctx context.Context, subject *heldfile.File) (*DiskInspectionObservation, error) {
+	ctx, finish, err := container.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(container.selection.TimeoutSeconds)*time.Second)
 	defer cancel()
 	if err := lockDiskInspection(ctx, &container.mu); err != nil {

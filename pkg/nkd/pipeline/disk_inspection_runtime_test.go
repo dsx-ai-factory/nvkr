@@ -547,7 +547,7 @@ func TestDiskInspectionReservationSerializesRuntimesAndRevokesCopies(t *testing.
 	}}
 	t.Cleanup(func() { _ = reservation.Close() })
 	copy := *reservation
-	other := &DiskInspectionContainer{}
+	other := &DiskInspectionContainer{selection: DiskInspectionSelection{TimeoutSeconds: 1}}
 	for _, method := range []string{"before snapshot", "already held"} {
 		t.Run(method, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
