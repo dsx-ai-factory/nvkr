@@ -18,8 +18,9 @@ nkdctl run plan --plan .github/nkd-run/plan.json --pretty
 ```
 
 The text view lists required output slots and Build Digests, every producer instruction and dependency,
-source pins, build/prepare argv, Packer/material inputs when present, artifact operations and publication
-routes. `--pretty` shows every stored field as indented JSON; it is a display view and is rejected as a
+and each stored producer field in sorted order. This includes source and vendor pins, patch order, environment
+values, build/prepare argv, Nix flake inputs, Packer/material inputs and artifact paths when present. It also
+lists artifact operations and publication routes. Nonprinting characters are escaped for display. `--pretty` shows every stored field as indented JSON; it is a display view and is rejected as a
 canonical Plan input. `--json` emits the exact canonical Plan bytes, with no appended newline.
 
 The same views can compile authored inputs directly:
@@ -61,7 +62,8 @@ named output. `publication route` describes the selected transport destination. 
 relationships; a route or a planned verification node is not evidence that publication or verification ran.
 
 Mermaid labels use [numeric entity escaping](https://mermaid.js.org/syntax/flowchart.html#entity-codes-to-escape-characters),
-DOT labels use quoted strings, and renderer node IDs are generated independently of input strings.
+DOT labels use DOT quoting for quotes, backslashes and line breaks; other nonprinting characters are shown
+as literal Unicode escape text. Renderer node IDs are generated independently of input strings.
 JSON preserves complete vertex keys, source references and labeled edges under
 `nkd.dev/plan-graph-view/v1`. Its `planDigest` names the validated source Plan; `authority: description-only`
 does not grant a new identity or execution receipt. DOT can be rendered with Graphviz; Mermaid can be
@@ -88,8 +90,9 @@ nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.
 The default text report identifies changed, added or removed per-output Build Digests, counts every changed
 field by category, and shows changes in shared authored inputs, provider tools and publication routes.
 Repeated catalog snapshots, derived identities and generated references remain counted; `--details` prints
-every changed path. Long text values are explicitly abbreviated. The canonical descriptive JSON report
-retains every complete before/after value, including added and removed objects.
+every changed path. `--details` is valid only with text output; combining it with `--format json` fails
+before Plan input is read. Long text values are explicitly abbreviated at a UTF-8 boundary. The canonical
+descriptive JSON report retains every complete before/after value, including added and removed objects.
 
 | Change | Interpretation |
 |---|---|
@@ -123,5 +126,8 @@ Contract tests cover exact-byte JSON, display-only pretty JSON, caller-mutation 
 Plans, bounded/no-follow file loading, complete graph vertices and edges including the maintained controller
 chart/CWE relationship, diagram escaping, stable named comparisons, ordered argv/patches, large integers,
 absent-versus-null values, and transport/execution changes that preserve Build Digests. CLI tests cover
-file views, graph formats, concise/full differences, exit status and failure before output. The [local inspection record](evidence/2026-10-03-plan-views.md) lists the exercised Plan and completion gates.
+file views, graph formats, concise/full differences, exit status and failure before output. The
+[initial inspection record](evidence/2026-10-03-plan-views.md) retains its historical source scope; the
+[current review validation](evidence/2026-10-05-plan-view-review-validation.md) records the later tested
+source, producer-field regressions, option admission and display fixes.
 This is local inspection/contract evidence; it adds no registry, runner, signing or OS execution acceptance.

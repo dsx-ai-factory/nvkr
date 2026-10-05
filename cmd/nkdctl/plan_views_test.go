@@ -142,6 +142,8 @@ func TestPlanViewCommandsRejectBeforeOutput(t *testing.T) {
 		{"bad graph view", []string{"run", "graph", "--plan", "missing", "--view", "unknown"}, e.CodeUsage},
 		{"bad graph format", []string{"run", "graph", "--plan", "missing", "--format", "unknown"}, e.CodeUsage},
 		{"bad diff format", []string{"run", "diff", "--before", "missing", "--after", "missing", "--format", "unknown"}, e.CodeUsage},
+		{"JSON details before input", []string{"run", "diff", "--before", "missing", "--after", "missing", "--format", "json", "--details"}, e.CodeUsage},
+		{"JSON details with valid plans", []string{"run", "diff", "--before", ".github/nkd-run/plan.json", "--after", ".github/nkd-run/plan.json", "--format", "json", "--details"}, e.CodeUsage},
 		{"missing plan", []string{"run", "graph", "--plan", "missing"}, e.CodePipelineDrift},
 		{"missing after", []string{"run", "diff", "--before", ".github/nkd-run/plan.json", "--after", "missing"}, e.CodePipelineDrift},
 	} {

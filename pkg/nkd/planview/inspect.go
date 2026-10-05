@@ -7,8 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
+	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -48,7 +51,12 @@ func Inspect(plan *factory.Plan) (*Document, error) {
 		return nil, e.Wrap(e.CodeInternal, err, "serializing inspected plan")
 	}
 	var snapshot factory.Plan
-	if err := canonical.UnmarshalExact(raw, &snapshot); err != nil {
+	// These bytes were just produced by the canonical codec from the validated
+	// Plan. Decode an owned typed copy without repeating the canonical round trip;
+	// external bytes still enter only through factory.LoadPlanContext.
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&snapshot); err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "snapshotting inspected plan")
 	}
 	return &Document{plan: snapshot, raw: raw, digest: digest}, nil
@@ -103,31 +111,8 @@ func (d *Document) Render(o PlanOptions) ([]byte, error) {
 			if len(node.Needs) > 0 {
 				fmt.Fprintf(&out, "      requires: %s\n", strings.Join(node.Needs, ", "))
 			}
-			switch node.Kind {
-			case ir.KindFetch:
-				fmt.Fprintf(&out, "      source: %q commit=%s tree=%s\n", node.Repo, node.Commit, node.TreeHash)
-				if len(node.VendorCmd) > 0 {
-					fmt.Fprintf(&out, "      prepare argv: %s\n", jsonDisplay(node.VendorCmd))
-				}
-			case ir.KindPull:
-				fmt.Fprintf(&out, "      acquire: %q digest=%s\n", node.Artifact, node.Digest)
-			case ir.KindBuild:
-				fmt.Fprintf(&out, "      builder: %s; network: %s; toolchain: %q\n", node.BuilderType, node.Network, node.Toolchain)
-				if len(node.Command) > 0 {
-					fmt.Fprintf(&out, "      argv: %s\n", jsonDisplay(node.Command))
-				}
-				if node.Packer != nil {
-					fmt.Fprintf(&out, "      Packer: %s\n", jsonDisplay(node.Packer))
-				}
-				if len(node.Materials) > 0 {
-					fmt.Fprintf(&out, "      materials: %s\n", jsonDisplay(node.Materials))
-				}
-				if node.Requirements != nil {
-					fmt.Fprintf(&out, "      requirements: %s\n", jsonDisplay(node.Requirements))
-				}
-				if node.ExecutionBinding != nil {
-					fmt.Fprintf(&out, "      execution: %s\n", jsonDisplay(node.ExecutionBinding))
-				}
+			if err := renderProducerFields(&out, node); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -169,20 +154,57 @@ func (d *Document) valid() error {
 	return nil
 }
 
+// renderProducerFields uses the serialized IR schema so newly admitted producer
+// fields cannot silently disappear from the text view. RawMessage preserves exact
+// numeric values, and field sorting changes presentation only, never array order.
+func renderProducerFields(out *strings.Builder, node ir.Node) error {
+	raw, err := json.Marshal(node)
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "serializing producer instructions")
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return e.Wrap(e.CodeInternal, err, "reading producer instruction fields")
+	}
+	for _, key := range keys(fields) {
+		if key == "id" || key == "kind" || key == "needs" {
+			continue // The node header and dependency line already display these.
+		}
+		label := key
+		switch key {
+		case "command":
+			label = "command argv"
+		case "vendorCmd":
+			label = "vendorCmd argv"
+		}
+		fmt.Fprintf(out, "      %s: %s\n", label, jsonDisplay(fields[key]))
+	}
+	return nil
+}
+
 func jsonDisplay(value any) string {
 	// Only validated schema values and derived descriptions reach this helper.
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Sprintf("%q", err.Error())
 	}
-	return string(raw)
+	// encoding/json escapes ASCII controls, but leaves Unicode format controls
+	// such as bidi overrides intact. Escape every nonprinting rune for terminal
+	// display while retaining valid JSON strings and their exact decoded values.
+	var out strings.Builder
+	for _, r := range string(raw) {
+		if strconv.IsPrint(r) {
+			out.WriteRune(r)
+		} else if r <= 0xffff {
+			fmt.Fprintf(&out, "\\u%04x", r)
+		} else {
+			hi, lo := utf16.EncodeRune(r)
+			fmt.Fprintf(&out, "\\u%04x\\u%04x", hi, lo)
+		}
+	}
+	return out.String()
 }
 
 func keys[V any](values map[string]V) []string {
-	result := make([]string, 0, len(values))
-	for key := range values {
-		result = append(result, key)
-	}
-	sort.Strings(result)
-	return result
+	return slices.Sorted(maps.Keys(values))
 }

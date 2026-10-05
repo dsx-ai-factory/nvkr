@@ -4,6 +4,10 @@ Date: 2026-10-03 UTC. Base: `d1a4ec9`. Scope: local read-only Plan inspection an
 macOS ARM64 with Go `1.27.1` and `GOTOOLCHAIN=local`. This does not record a producer build, external hosted
 Run, registry interaction, signing operation, or release acceptance.
 
+This is a historical record of the source blobs below, not a claim about later branch heads.
+The [2026-10-05 review validation](2026-10-05-plan-view-review-validation.md) records the later review fixes
+and current tested source. Earlier blob identities and their original test scope are retained unchanged.
+
 ## Tested source
 
 The implementation was exercised as working-tree changes over the base. These Git blob identities identify

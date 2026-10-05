@@ -69,7 +69,8 @@ func cmdRunDiff() *cli.Command {
 		if c.Args().Present() {
 			return e.New(e.CodeUsage, "run diff accepts flags only")
 		}
-		if err := planview.ValidateComparisonFormat(c.String("format")); err != nil {
+		options := planview.ComparisonOptions{Format: c.String("format"), Details: c.Bool("details")}
+		if err := options.Validate(); err != nil {
 			return err
 		}
 		before, err := planview.Load(c.Context, c.String("before"))
@@ -84,19 +85,14 @@ func cmdRunDiff() *cli.Command {
 		if err != nil {
 			return err
 		}
-		var raw []byte
-		if c.String("format") == "text" && !c.Bool("details") {
-			raw, err = comparison.Summary()
-		} else {
-			raw, err = comparison.Render(c.String("format"))
-		}
+		raw, err := comparison.RenderView(options)
 		if err != nil {
 			return err
 		}
 		if err := writePlanView(c.Context, raw); err != nil {
 			return err
 		}
-		if c.Bool("exit-code") && comparison.Before != comparison.After {
+		if c.Bool("exit-code") && !comparison.Equal() {
 			return e.New(e.CodeDiff, "generated Plans differ")
 		}
 		return nil

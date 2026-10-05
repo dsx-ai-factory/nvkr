@@ -143,7 +143,7 @@ func (d *Document) graph(view string) Graph {
 func (g Graph) dot() string {
 	var out strings.Builder
 	out.WriteString("digraph plan {\n  rankdir=LR;\n")
-	fmt.Fprintf(&out, "  label=%s;\n", strconv.Quote("Planned "+g.View+" graph; description only; "+g.PlanDigest))
+	fmt.Fprintf(&out, "  label=%s;\n", dotLabel("Planned "+g.View+" graph; description only; "+g.PlanDigest))
 	indices := make(map[string]string, len(g.Vertices))
 	for i, vertex := range g.Vertices {
 		id := fmt.Sprintf("v%d", i)
@@ -155,12 +155,40 @@ func (g Graph) dot() string {
 		if vertex.Kind == "output" {
 			shape = "hexagon"
 		}
-		fmt.Fprintf(&out, "  %s [label=%s,shape=%s];\n", id, strconv.Quote(vertex.Label), shape)
+		fmt.Fprintf(&out, "  %s [label=%s,shape=%s];\n", id, dotLabel(vertex.Label), shape)
 	}
 	for _, edge := range g.Edges {
-		fmt.Fprintf(&out, "  %s -> %s [label=%s];\n", indices[edge.From], indices[edge.To], strconv.Quote(edge.Relation))
+		fmt.Fprintf(&out, "  %s -> %s [label=%s];\n", indices[edge.From], indices[edge.To], dotLabel(edge.Relation))
 	}
 	out.WriteString("}\n")
+	return out.String()
+}
+
+// dotLabel quotes a DOT escString, whose escape rules differ from Go strings.
+// Newlines split rendered lines; other nonprinting runes are shown as literal
+// Unicode escapes. Their doubled backslashes prevent DOT substitutions or a
+// dropped escape prefix while keeping the source safe to print in a terminal.
+func dotLabel(value string) string {
+	var out strings.Builder
+	out.WriteByte('"')
+	for _, char := range value {
+		switch char {
+		case '\\', '"':
+			out.WriteByte('\\')
+			out.WriteRune(char)
+		case '\n':
+			out.WriteString(`\n`)
+		default:
+			if strconv.IsPrint(char) {
+				out.WriteRune(char)
+			} else if char <= 0xffff {
+				fmt.Fprintf(&out, `\\u%04x`, char)
+			} else {
+				fmt.Fprintf(&out, `\\U%08x`, char)
+			}
+		}
+	}
+	out.WriteByte('"')
 	return out.String()
 }
 

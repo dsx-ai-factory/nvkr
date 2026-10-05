@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -55,14 +56,7 @@ func Compare(before, after *Document) (*Comparison, error) {
 	for _, build := range after.plan.Builds {
 		newBuilds[build.Name] = build.BuildDigest
 	}
-	names := map[string]bool{}
-	for name := range oldBuilds {
-		names[name] = true
-	}
-	for name := range newBuilds {
-		names[name] = true
-	}
-	for _, name := range keys(names) {
+	for _, name := range unionKeys(oldBuilds, newBuilds) {
 		if oldBuilds[name] == newBuilds[name] {
 			result.UnchangedBuilds++
 			continue
@@ -106,14 +100,7 @@ func (c *Comparison) compare(path string, left any, leftExists bool, right any, 
 		leftMap, leftOK := left.(map[string]any)
 		rightMap, rightOK := right.(map[string]any)
 		if leftOK && rightOK {
-			members := map[string]bool{}
-			for key := range leftMap {
-				members[key] = true
-			}
-			for key := range rightMap {
-				members[key] = true
-			}
-			for _, key := range keys(members) {
+			for _, key := range unionKeys(leftMap, rightMap) {
 				lv, le := leftMap[key]
 				rv, re := rightMap[key]
 				c.compare(path+"/"+pointer(key), lv, le, rv, re)
@@ -135,14 +122,7 @@ func (c *Comparison) compareArray(path string, left, right []any) {
 	lm, lo, lok := namedItems(left, key)
 	rm, ro, rok := namedItems(right, key)
 	if key != "" && lok && rok {
-		names := map[string]bool{}
-		for name := range lm {
-			names[name] = true
-		}
-		for name := range rm {
-			names[name] = true
-		}
-		for _, name := range keys(names) {
+		for _, name := range unionKeys(lm, rm) {
 			lv, le := lm[name]
 			rv, re := rm[name]
 			c.compare(path+"/@"+key+"="+pointer(name), lv, le, rv, re)
@@ -233,40 +213,82 @@ func (c *Comparison) add(path string, left any, leftExists bool, right any, righ
 	c.Changes = append(c.Changes, change)
 }
 
+// Category rules name complete schema fields. Named collection selectors match
+// exactly one path segment, so similarly named producer map keys cannot acquire
+// a different category. More specific rules precede their containing fields.
+// Tests check these paths and selectors against the serialized Plan schema.
+var comparisonCategories = []struct {
+	path     string
+	category string
+}{
+	{"/definitionDigest", "derived identities"},
+	{"/environmentDigest", "derived identities"},
+	{"/catalogDigest", "derived identities"},
+	{"/builds/@name=/buildDigest", "derived identities"},
+	{"/builds/@name=/catalogDigest", "derived identities"},
+	{"/lifecycleOutputs/@name=/buildDigest", "derived identities"},
+	{"/builds/@name=/executionGraph/nodes/@id=/requirements", "environment and execution"},
+	{"/builds/@name=/executionGraph/nodes/@id=/executionBinding", "environment and execution"},
+	{"/graph/nodes/@id=/requirements", "environment and execution"},
+	{"/graph/nodes/@id=/executionBinding", "environment and execution"},
+	{"/graph/nodes/@id=/runsOn", "environment and execution"},
+	{"/builds/@name=/catalogSnapshot", "catalog inputs"},
+	{"/builds/@name=/resolvedComponents", "catalog inputs"},
+	{"/builds/@name=/appliedOverlays", "catalog inputs"},
+	{"/catalogSnapshot", "catalog inputs"},
+	{"/appliedOverlays", "catalog inputs"},
+	{"/definition", "definition"},
+	{"/environment", "environment and execution"},
+	{"/builds", "producer instructions"},
+	{"/graph/artifacts", "artifact bindings"},
+	{"/graph/nodes", "operation bindings"},
+	{"/routes", "publication routes"},
+	{"/targets", "publication routes"},
+	{"/lifecycleOutputs", "required outputs"},
+	{"/actions", "provider tools"},
+}
+
 func category(path string) string {
-	leaf := path[strings.LastIndex(path, "/")+1:]
-	switch leaf {
-	case "buildDigest", "catalogDigest", "definitionDigest", "environmentDigest":
-		return "derived identities"
-	}
-	switch {
-	case strings.HasPrefix(path, "/definition/"):
-		return "definition"
-	case strings.HasPrefix(path, "/environment/"):
-		return "environment and execution"
-	case strings.HasPrefix(path, "/catalogSnapshot/") || strings.Contains(path, "/catalogSnapshot/") || strings.Contains(path, "/resolvedComponents/") || strings.Contains(path, "/appliedOverlays"):
-		return "catalog inputs"
-	case strings.HasPrefix(path, "/builds/"):
-		// Match the IR node fields, not producer map keys with the same names.
-		parts := strings.SplitN(path, "/", 8)
-		if len(parts) >= 7 && parts[3] == "executionGraph" && parts[4] == "nodes" &&
-			strings.HasPrefix(parts[5], "@id=") && (parts[6] == "requirements" || parts[6] == "executionBinding") {
-			return "environment and execution"
+	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	for _, rule := range comparisonCategories {
+		fields := strings.Split(strings.TrimPrefix(rule.path, "/"), "/")
+		if len(parts) < len(fields) {
+			continue
 		}
-		return "producer instructions"
-	case strings.HasPrefix(path, "/graph/artifacts/"):
-		return "artifact bindings"
-	case strings.HasPrefix(path, "/graph/nodes/"):
-		return "operation bindings"
-	case strings.HasPrefix(path, "/routes") || strings.HasPrefix(path, "/targets"):
-		return "publication routes"
-	case strings.HasPrefix(path, "/lifecycleOutputs"):
-		return "required outputs"
-	case strings.HasPrefix(path, "/actions"):
-		return "provider tools"
-	default:
-		return "plan metadata"
+		matches := true
+		for index, field := range fields {
+			if strings.HasPrefix(field, "@") {
+				if !strings.HasPrefix(parts[index], field) || len(parts[index]) == len(field) {
+					matches = false
+					break
+				}
+			} else if parts[index] != field {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return rule.category
+		}
 	}
+	return "plan metadata"
+}
+
+func unionKeys[V any](left, right map[string]V) []string {
+	members := make(map[string]struct{}, len(left)+len(right))
+	for key := range left {
+		members[key] = struct{}{}
+	}
+	for key := range right {
+		members[key] = struct{}{}
+	}
+	return keys(members)
+}
+
+// Equal reports whether the compared canonical Plans have the same identity.
+// It describes the inputs only, not observed artifacts or release acceptance.
+func (c *Comparison) Equal() bool {
+	return c != nil && c.Before == c.After
 }
 
 func pointer(value string) string {
@@ -291,15 +313,9 @@ func (c *Comparison) Render(format string) ([]byte, error) {
 		return raw, nil
 	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "before: %s\nafter:  %s\n", c.Before, c.After)
-	out.WriteString("Logical input changes only; output bytes and release acceptance are not observed.\n")
-	if c.Before == c.After {
-		out.WriteString("No changes.\n")
+	c.writeTextHeader(&out)
+	if c.Equal() {
 		return []byte(out.String()), nil
-	}
-	fmt.Fprintf(&out, "\nBuild identities: %d changed/added/removed; %d unchanged\n", len(c.Builds), c.UnchangedBuilds)
-	for _, build := range c.Builds {
-		fmt.Fprintf(&out, "  %s: %s -> %s\n", build.Name, orAbsent(build.Before), orAbsent(build.After))
 	}
 	fmt.Fprintf(&out, "\nChanged fields: %d (long values abbreviated; --format json retains full values)\n", len(c.Changes))
 	previous := ""
@@ -311,6 +327,19 @@ func (c *Comparison) Render(format string) ([]byte, error) {
 		fmt.Fprintf(&out, "  %q\n    %s -> %s\n", change.Path, compact(change.Before), compact(change.After))
 	}
 	return []byte(out.String()), nil
+}
+
+func (c *Comparison) writeTextHeader(out *strings.Builder) {
+	fmt.Fprintf(out, "before: %s\nafter:  %s\n", c.Before, c.After)
+	out.WriteString("Logical input changes only; output bytes and release acceptance are not observed.\n")
+	if c.Equal() {
+		out.WriteString("No changes.\n")
+		return
+	}
+	fmt.Fprintf(out, "\nBuild identities: %d changed/added/removed; %d unchanged\n", len(c.Builds), c.UnchangedBuilds)
+	for _, build := range c.Builds {
+		fmt.Fprintf(out, "  %s: %s -> %s\n", build.Name, orAbsent(build.Before), orAbsent(build.After))
+	}
 }
 
 func ValidateComparisonFormat(format string) error {
@@ -326,8 +355,13 @@ func compact(raw []byte) string {
 	if len(raw) <= 180 {
 		return string(raw)
 	}
-	// Keep JSON escape sequences intact by quoting the abbreviated raw prefix.
-	return fmt.Sprintf("%q … (%d bytes)", string(raw[:140]), len(raw))
+	// Quote the raw JSON prefix to retain its escapes, and keep the byte budget
+	// without cutting a Unicode code point in half.
+	end := 140
+	for end > 0 && !utf8.RuneStart(raw[end]) {
+		end--
+	}
+	return fmt.Sprintf("%q … (%d bytes)", string(raw[:end]), len(raw))
 }
 func orAbsent(value string) string {
 	if value == "" {
@@ -344,15 +378,9 @@ func (c *Comparison) Summary() ([]byte, error) {
 		return nil, e.New(e.CodeUsage, "comparison requires inspected plans")
 	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "before: %s\nafter:  %s\n", c.Before, c.After)
-	out.WriteString("Logical input changes only; output bytes and release acceptance are not observed.\n")
-	if c.Before == c.After {
-		out.WriteString("No changes.\n")
+	c.writeTextHeader(&out)
+	if c.Equal() {
 		return []byte(out.String()), nil
-	}
-	fmt.Fprintf(&out, "\nBuild identities: %d changed/added/removed; %d unchanged\n", len(c.Builds), c.UnchangedBuilds)
-	for _, build := range c.Builds {
-		fmt.Fprintf(&out, "  %s: %s -> %s\n", build.Name, orAbsent(build.Before), orAbsent(build.After))
 	}
 	counts := map[string]int{}
 	for _, change := range c.Changes {
