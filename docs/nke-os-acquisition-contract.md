@@ -76,7 +76,7 @@ this diagnostic test; it grants neither source nor live-Run authority.
 
 The original diagnostic record attributes an ARM64 `hello` acquisition, version
 `2.10-5build1`, to a native Ubuntu 26.04 container.
-Its retained archive is 25,642 bytes, SHA-256
+Its retained package is 25,642 bytes, SHA-256
 `8ab9e5cf329e88413dd502edd5e0907550132470ecb926d500d0d23a30c735d8`.
 NKD accepted the actual 30,720-byte capture, SHA-256
 `684ea432b9002ebb14fefcf81920e644dbd92d3afa7de8b24636f203d9e5504c`.

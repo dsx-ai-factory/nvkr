@@ -170,8 +170,8 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "package acquisition observation canceled")
 	}
-	if archive == nil || archive.Size() <= 0 || archive.Size() > MaxAcquisitionArchiveBytes {
-		return nil, e.New(e.CodeVerifyFailed, "package acquisition archive is absent or oversized")
+	if err := validateAcquisitionArchiveSize(archive.Size()); err != nil {
+		return nil, err
 	}
 	if err := archive.AssertUnchangedContext(ctx); err != nil {
 		return nil, acquisitionReadError(ctx, err)
@@ -278,6 +278,14 @@ func ObserveAcquisitionArchive(ctx context.Context, archive *heldfile.File) (*Ac
 	manifestHash := sha256.Sum256(raw)
 	return &AcquisitionObservation{archiveDigest: archive.Digest(), archiveSize: archive.Size(),
 		manifestBlobSHA256: "sha256:" + hex.EncodeToString(manifestHash[:]), manifest: manifest}, nil
+}
+
+// Keep the observer's limit independent of the caller-selected held-file bound.
+func validateAcquisitionArchiveSize(size int64) error {
+	if size <= 0 || size > MaxAcquisitionArchiveBytes {
+		return e.New(e.CodeVerifyFailed, "package acquisition archive is absent or oversized")
+	}
+	return nil
 }
 
 func acquisitionRegular(header *tar.Header) bool {

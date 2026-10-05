@@ -20,6 +20,33 @@ func assertAcquisitionFailure(t *testing.T, observation *AcquisitionObservation,
 	}
 }
 
+func TestAcquisitionArchiveSizeBoundary(t *testing.T) {
+	// Held-file construction and unchanged checks hash all logical bytes, even
+	// for sparse files. Test the exact owning predicate without an 8 GiB hash;
+	// public observation tests separately exercise real held-file parsing.
+	for _, test := range []struct {
+		name string
+		size int64
+		want e.Code
+	}{
+		{name: "negative", size: -1, want: e.CodeVerifyFailed},
+		{name: "empty", want: e.CodeVerifyFailed},
+		{name: "nonempty", size: 1},
+		{name: "exact limit", size: MaxAcquisitionArchiveBytes},
+		{name: "one byte over", size: MaxAcquisitionArchiveBytes + 1, want: e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateAcquisitionArchiveSize(test.size)
+			if errorCode(err) != test.want {
+				t.Fatalf("size %d: error=%v, want code=%s", test.size, err, test.want)
+			}
+			if test.want != "" && !strings.Contains(err.Error(), "absent or oversized") {
+				t.Fatalf("size %d: unexpected rejection phase: %v", test.size, err)
+			}
+		})
+	}
+}
+
 func TestAcquisitionManifestValidate(t *testing.T) {
 	for _, architecture := range []string{"amd64", "arm64"} {
 		for _, test := range []struct {
