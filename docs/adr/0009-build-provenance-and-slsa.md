@@ -112,6 +112,12 @@ Acquired provenance is NKD's acquisition record (upstream reference, lock pin, f
 build or signature-verification claim. Without declared digest-pinned upstream evidence it remains
 `evidence: none` under ADR-13. Live producer signing and consumer acceptance remain separate operational tests.
 
+For a selected release executable, the transport URL dependency binds the archive's exact digest, never
+the extracted executable digest. A separate `nkd:prebuilt/<component>` URI with `archive` and `member` query
+parameters records the selected member's exact executable digest. This logical dependency distinguishes
+members and architecture-specific archive URLs without claiming that fetching the archive URL returns the
+selected member bytes. Raw executable assets retain the ordinary URL/executable digest pair.
+
 ## Consequences
 
 **Positive**

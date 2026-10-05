@@ -136,6 +136,12 @@ their owning catalog boundary before maintenance validates the resulting referen
 - `catalog pin-artifacts --dir <catalog> [--all] [component...]` — resolve the complete declared architecture
   set of prebuilt digests through the existing URL or image acquisition path.
 
+- `catalog pin` and `catalog bump` accept `--check`: resolve and print the complete update without writing.
+- **Derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
+  error naming its umbrella; bumping the umbrella is **one operation** that re-derives and rewrites the umbrella
+  entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
+  prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
+
 Image pin maintenance may authenticate an authored upstream index and resolve
 its exact native children through the existing OCI library. The artifact lock
 records the native digests, but does not retain an index-membership receipt.
@@ -145,11 +151,6 @@ fails with `CodeUnverifiedRef` until an owning retained membership contract is
 implemented. It neither discards the authored digest nor concatenates digest
 suffixes. Fixed source-reviewed image refs are ordinary acquired producers, not
 automatically extracted chart pin-set members.
-- `catalog pin` and `catalog bump` accept `--check`: resolve and print the complete update without writing.
-- **Derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
-  error naming its umbrella; bumping the umbrella is **one operation** that re-derives and rewrites the umbrella
-  entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
-  prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
 
 Maintenance callers may additionally supply explicit `SameRelease` groups of selected independent sources.
 Each group must share the exact repository, tag prefix and constraint before upstream resolution; the complete
@@ -411,6 +412,10 @@ one exact bounded regular member after archive verification, then rechecks the
 executable digest. Archive selection is byte-preserving acquisition, not a build
 or an upstream authenticity claim. The selected executable and transport/member
 pins participate in logical Build identity; transport locations do not.
+The shared source-tool selector admits at most 4,096 members and 1 GiB of both
+physical expanded stream bytes and aggregate logical member bytes; sparse holes
+cannot evade the latter. Reads of synthesized member bytes remain cancellation-aware.
+Production provenance records archive and selected-member digests independently (ADR-09).
 
 ## GitHub action dependencies
 

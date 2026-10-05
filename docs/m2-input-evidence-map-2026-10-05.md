@@ -1,21 +1,18 @@
 # M2 maintained input evidence map
 
-Initially checked against integration baseline `dde5fffea9e33d0922188cfb8d6019c889ae1fd9`.
-The isolated D extraction was based on `e816cd255bef0926caaa3ca4ac95097a888d0572`.
-The B/C/A stack supplies the capture schema and scoped trusted source-fetch interfaces;
+The source candidate is reviewed as PR #95, stacked on source-fetch PR #94,
+publication PR #92 and evidence PR #91. Those reviewed source dependencies supply
+the capture schema and scoped trusted source-fetch interfaces;
 the native capture regression runs against those inherited interfaces. Exact-head local
 validation is recorded in the pull request separately from production acceptance.
 This is an input/configuration record. It grants no runtime, publication, signer or M2 acceptance claim.
 
 The refreshed catalog image-pin owner uses the existing pinned OCI library instead of
-Docker's manifest JSON projection. A temporary read-only owner diagnostic on October 5
-resolved all twelve selected upstream references and both native architectures: all 24
-manifest digests exactly matched the maintained lock (`TestM2LiveImagePinReadback`,
-8.713 s package result). It fetched and authenticated each native manifest/config, not
-layers, and wrote no lock or registry object. The diagnostic source is preserved privately
-at `/private/tmp/m2-image-pin-live-diagnostic.go`; it is not a default network-dependent
-test. Fixture tests cover both native media formats, ambiguity, platform/digest/size
-substitution, metadata bounds and cancellation. No production runtime approval follows.
+Docker's manifest JSON projection. Fixture tests cover both native media formats,
+ambiguity, platform/digest/size substitution, metadata bounds and cancellation.
+External live acquisition/read-back is not recorded in this repository and is not
+claimed here. The maintained native digests below are lock data, not a retained
+live diagnostic or production runtime approval.
 
 The source-owned PostgreSQL index `sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71`
 and SPIRE Bash index `sha256:90041f375e30f41aa7e0390075d8a69dc61900771d52fa98d63ee5d03d866a58`
@@ -35,8 +32,11 @@ is the exact pinned NKE deployment values, not unmodified chart defaults. This d
 runtime/publication completion or resolve the separately owned external-NKE-image checkpoint.
 `docs/epics-v1-spec.md`, Epic M2 Goal/Acquisition/acceptance criteria 2–3, and
 `docs/milestones.md:36–55` require external NKE and third-party image rows in addition to these packages.
-The formal v1 scope is AMD64; this sprint additionally
-requires a separate native ARM64 non-FDE disk. Each disk has its own execution and evidence obligations.
+The formal v1 scope is AMD64. The additional ARM64 disk and runtime-image rows are
+out-of-spec sprint candidates, not a ratified change to M2 acceptance. Their inclusion
+preserves the requested candidate matrix; each disk still has independent execution
+and evidence obligations. Deployment-value membership is human-transcribed from the
+pinned tree, not derived or machine-verified by the literal membership regression.
 
 | Output | Authoritative authored selection | Source and scope |
 | --- | --- | --- |
@@ -87,13 +87,13 @@ capture-enabled installer bake or a live evidence join.
 | Disk toolchain host architecture | Separate AMD64/ARM64 source toolchain maps and native allowed-host platforms | Existing catalog digests are local identities; approved published per-native OCI manifests remain absent |
 | Packer and preparation tools | `toolchains/nkd-packer/toolchain.lock.json` and Dockerfile | `images` remains null; BUSL redistribution and vulnerability review approvals remain `not-recorded` |
 | Full inspector tools | `toolchains/nkd-disk-inspect/Dockerfile` and source lock | Updated helper closure, native execution, exact image identity and executable measurements required |
-| Syft inspector scanner | Official v1.51.1 release checksums; schema Git blob `37a6582388f00a8dcbf9a030d227921b1322f8f1` at that tag | Both source archive digests verified; full native image execution remains separate |
+| Syft inspector scanner | Source lock selects v1.51.1 and schemaVersion `16.1.10` | Native image execution and a retained external acquisition record remain separate |
 | Inspector architecture | Profile key must equal native `linux/amd64` or `linux/arm64` execution host | Both measured native full profiles and capacity grants remain required |
 | Scratch and memory | B's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
 | Registry namespace | Existing `definitions/nke-v1/environment-github.yaml` | M2 production target preserves `ghcr.io/dsx-ai-factory/nke-recipes`; live blob limits, retention and package access not verified here |
 | Registry credential | Existing `github:GITHUB_TOKEN` reference | Runtime values are not inspected or serialized; production credential admission/read-back required |
 | Signing identity | Existing main `nkd-run.yml` identity regex and Actions issuer | Existing policy copied byte-for-byte; protected publication environment and current keyless run remain unverified |
-| Private source transport | Existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
+| Private source transport | Exact `https://github.com/dsx-ai-factory/nke` CLI/controller and `https://github.com/dsx-ai-factory/nke.git` OS keys, sharing the existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
 | Generated runner route | ADR-18 generic-hosted-only rule | Native KVM capability for both routes remains unresolved; historical ARC diagnostics cannot establish generated production admission |
 
 `definitions/nke-m2/environment-github.yaml` records the existing production publication/signing target and
@@ -162,7 +162,19 @@ No such update was executed during this read-only source refresh.
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
   --dir definitions/nke-m2/os-catalog \
   --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
-  nke-os nke-cni-calico-source nke-kubeadm-distro-source nke-spire-agent-source
+  nke-os
+GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
+  --dir definitions/nke-m2/os-catalog \
+  --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
+  nke-cni-calico-source
+GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
+  --dir definitions/nke-m2/os-catalog \
+  --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
+  nke-kubeadm-distro-source
+GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
+  --dir definitions/nke-m2/os-catalog \
+  --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
+  nke-spire-agent-source
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
   --dir definitions/nke-m2/catalog --tag v4.1.4 helm
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
@@ -172,7 +184,8 @@ GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin-artifacts \
 toolchains/nkd-packer/build.sh --check
 ```
 
-The source check requires authorized access to the exact NKE repository. Existing
+Each source check invokes the existing one-source pin owner separately and requires
+authorized access to the exact NKE repository. Existing
 source mirrors or local Git `insteadOf` transport overrides do not alter its pin.
 Release executable selection downloads and verifies the archive/member without
 executing it. Image pin maintenance uses the repository's existing manifest
@@ -209,33 +222,25 @@ approved publication owner supplies an exact repository digest, `crane digest
 the native descriptor back; no currently missing reference is invented here.
 Reviewed Packer pins are consumed through existing `ToolchainSubstitution`, and
 reviewed inspector pins through the native Environment profiles described above.
-The current integration diagnostic workflow
-`.github/workflows/nkd-inspector-closure-diagnostic.yml` now explicitly runs
-`go test ./pkg/nkd/pipeline -run '^TestDiskInspectionSelectionProjectsAuthenticatedLogicalRuntime$' -count=1`
-in its native matrix. This covers the controlled accessor/held-runtime regression
-that helper compilation alone omitted. It does not exercise a full SDK disk scan,
-produce measured native image pins, or establish a successful workflow run.
+The Linux pipeline accessor regression can be run explicitly:
 
-Fresh read-only checks on October 5 found both NKE source PRs still open at the
-listed heads. Run `37353594709` completed with overall failure: ARC AMD64 job
-`111910268835` and ARC ARM64 job `111910268880` succeeded, while both generic hosted
-jobs failed. Successful ARC host observations included 96/64 CPUs, respectively;
-available memory 379292/249592 MiB and workspace space 3379904/3560851 MiB. These
-are historical observations, not reservations, provider admission, current
-availability or generic-runner approval. The later Docker diagnostic run
-`37357713937` completed with failure on all four jobs. No completed toolchain
-closure or image publication is inferred from either host probe.
+```sh
+go test ./pkg/nkd/pipeline -run '^TestDiskInspectionSelectionProjectsAuthenticatedLogicalRuntime$' -count=1
+```
 
-Both exact native Bash descriptors were freshly read back with `crane digest
---platform linux/amd64|linux/arm64` and agree with the image lock. The other 22
-descriptor measurements retain their recorded earlier scope; no fresh complete
-layer acquisition or signed publication is asserted. The source locks still
-contain no maintained published Packer/inspector image references; this is a
-statement about the checked locks, not a claim that no registry anywhere has an
-image. The October 5 installed-package inspector replay used unchanged October 2
-ARM64 image `sha256:a0e238dedfca964f4474ee0d649826d03642dbb256ad8f9b3b8b4ee63a6f663c`;
-its recorded tools and 730 installed packages do not satisfy the new full-content
-native profile or complete capture reconciliation.
+This repository does not contain `nkd-inspector-closure-diagnostic.yml`. No committed
+native workflow run is established by that command. The controlled accessor test does
+not exercise a full SDK scan or produce measured native image pins.
+
+Read-only GitHub checks on October 5 establish that NKE #1211 remains open at
+`b30117c25b2dcdf6c16021dae88a2eafdafcae61`, unmerged and BLOCKED. Comparing main
+with that exact commit reports diverged, ahead 9/behind 19. This source pin is an
+explicit review candidate, not main-reachable approval or protected-ref evidence.
+The existing missing execution-class/profile capability gate still disables candidate
+launch; the publication/signing configuration does not grant source approval.
+No historical host-probe or installed-package replay is claimed as current evidence
+here: those observations lack a retained record for this candidate. The checked
+source locks contain no approved published native Packer/inspector image references.
 
 ## Required embedded matrix rows
 
@@ -319,7 +324,8 @@ separate, not silently promoted to mandatory runtime members.
 The human-selected non-test runtime set is PostgreSQL (one), SPIRE (eight, including TPM server),
 and Temporal (three). Each image is independently required for both native architectures; the
 formal v1 AMD64 restriction is expanded here by the sprint's native runtime-image requirement.
-Both upstream architectures actually resolved. The original formal-v1 AMD64 operator executable
+Both architecture subjects are present in the lock, without a retained live acquisition record here.
+The original formal-v1 AMD64 operator executable
 package remains explicitly AMD64; it is not substituted for chart-side kubectl or SPIRE containers.
 
 The source pin was generated with `catalog pin --commit 33fb71b2f4224b470ebc628a9165fc4b92870406`.
@@ -327,17 +333,16 @@ The image lock was generated atomically with `catalog pin-artifacts --all --arch
 No artifact digest was hand-authored. The informational source/artifact `tag` is the source-selection
 commit, not a claimed upstream image version. Registry refs below and native artifact digests own acquisition.
 The Bash declaration uses its exact source-owned index digest with the informational `latest` tag omitted:
-Docker's combined tag-plus-digest spelling failed manifest verification, while its canonical digest-only
-spelling succeeded unchanged. The compiler uses the existing OCI reference parser to separate index
-selection from native manifest transport; no second digest suffix is emitted.
+The compiler refuses the four PostgreSQL/Bash native rows because the authored index differs from the
+native manifest pin. The current contract does not authorize separating an authored index selection
+from native transport without retained membership evidence. No index digest is silently discarded.
 
-Installed diagnostic `crane 0.22.1`, matching the repository's go-containerregistry dependency version,
-read back each of the 24 exact native manifest refs. `Docker v2` below means
+The following digest table transcribes the maintained lock. Its historical media annotations have no
+retained external diagnostic and are descriptive, not verified live acquisition evidence. `Docker v2` means
 `application/vnd.docker.distribution.manifest.v2+json`; `OCI v1` means
-`application/vnd.oci.image.manifest.v1+json`. Every selected layer reports its corresponding gzip media
-(`application/vnd.docker.image.rootfs.diff.tar.gzip` or `application/vnd.oci.image.layer.v1.tar+gzip`).
-No selected manifest reports zstd, uncompressed, or foreign layer media. These are descriptor read-backs,
-not complete layer acquisition, scanning, mirroring, signing or independent consumer verification.
+`application/vnd.oci.image.manifest.v1+json`. Layer/media compatibility must be remeasured and recorded
+before acquisition acceptance. This table does not prove layer acquisition, scanning, mirroring,
+signing or independent consumer verification.
 
 | Required native output | Native manifest digest | Manifest media |
 | --- | --- | --- |
@@ -366,20 +371,13 @@ not complete layer acquisition, scanning, mirroring, signing or independent cons
 | `temporal-server-image-arm64` | `sha256:77c887f311db18f086ce2b8ac3144e7f0ad59d73765d01c3e412dea9b8fb6e2c` | OCI v1 |
 | `temporal-ui-image-arm64` | `sha256:0e7478fad0eebac6d135a9c1efcc21f50f5026e017064b32f034585b13674788` | OCI v1 |
 
-### Actual acquisition diagnostics
+### External acquisition evidence gap
 
-The existing OCI acquisition pipeline fetched complete native Bash closures and independently re-opened
-and hashed them at its terminal gate. AMD64 subject `sha256:d49c2b6585ac8e6341adfe8cb214a656914ab5390fb7804a7ed9e90a5b785fba`
-had 14,946,289 total closure bytes (2.613 seconds acquisition, 155 ms terminal verification). ARM64 subject
-`sha256:8d29611142077489b9863426dfccf935c5ee9a27a3548d726c16de32692e71e3` had 13,933,611 bytes
-(1.806 seconds acquisition, 27 ms terminal verification). Both completed with the presentation
-`verified acquired bytes, no execution qualification or reproduction claim`.
-
-The initial concurrent local commands used the same default component fetch directory; the ARM64
-attempt correctly refused the existing AMD64 closure before output. An isolated diagnostic working
-directory passed the ARM64 retry. Generated factory paths are scoped by named output; the separate
-native output names preserve that distinction. These macOS acquisition diagnostics do not exercise
-Linux authority, container execution, SBOM scanning, publication/signing or consumer verification.
+No complete Helm, kubectl or Bash acquisition diagnostic with exact source, commands and terminal
+read-back is retained in this repository for this candidate. Historical private timings and read-backs
+are intentionally not presented as recorded evidence. Bash graph execution remains refused by the
+authored-index guard; a pre-guard acquisition is not reproducible through the current guarded graph.
+Contract fixtures and the lock data do not fill this operational evidence gap.
 
 ## Downstream-only and checkpoint ownership questions
 

@@ -38,7 +38,7 @@ podman build --platform linux/amd64 --build-arg TARGETARCH=amd64 \
 ```
 
 Run each assembly on its matching Linux host after the final helper source is
-composed and tested. Crosscompiling the helper does not exercise it, and merely
+composed and tested. Cross-compiling the helper does not exercise it, and merely
 selecting `--platform` does not prove a native host. There is no inspector build
 script or image publisher here. Docker is admitted by the adapter and argument contracts, but this
 inspection route has been exercised only with Podman; no Docker daemon run is
@@ -50,7 +50,7 @@ NVIDIA security clearance or license-allowlist approval is asserted here.
 
 On each native host, set `inspection_arch` to `amd64` or `arm64` for the image
 just built. Inspect its OS/architecture and retain its observed local ID, then
-read the five executable hashes and package inventory from those same local
+read the five profile executable hashes plus the helper hash and package inventory from those same local
 bytes. These commands do not pull, mount host paths, inspect credentials or
 publish anything:
 

@@ -22,7 +22,8 @@ type Limits struct {
 
 // SelectTarGzip uses the standard library's tar and gzip decoders. It scans the
 // complete archive, never extracts paths, and rejects duplicate names, links,
-// special files and malformed or oversized trailing content. The supplied reader
+// special files, metadata-only global headers and malformed or oversized trailing
+// content. The supplied reader
 // must itself be bounded and cancellation-aware when it can block on external I/O.
 func SelectTarGzip(ctx context.Context, source io.Reader, member string, limits Limits) ([]byte, error) {
 	if ctx == nil || source == nil {
@@ -44,6 +45,7 @@ func SelectTarGzip(ctx context.Context, source io.Reader, member string, limits 
 	reader := tar.NewReader(expanded)
 	seen := make(map[string]bool)
 	var selected []byte
+	var memberBytes int64
 	for count := 0; ; count++ {
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "release archive selection canceled")
@@ -65,15 +67,21 @@ func SelectTarGzip(ctx context.Context, source io.Reader, member string, limits 
 			return nil, e.New(e.CodeVerifyFailed, "release archive contains unsafe, duplicate or unsupported members")
 		}
 		seen[name] = true
+		// archive/tar can synthesize sparse holes without reading gzip bytes.
+		// Bound logical member sizes as well as the physical expanded stream.
+		if header.Size > limits.ExpandedBytes-memberBytes {
+			return nil, e.New(e.CodeVerifyFailed, "release archive exceeds its logical member byte limit")
+		}
+		memberBytes += header.Size
 		if name == member {
 			if header.Typeflag != tar.TypeReg || header.Size <= 0 || header.Size > limits.ExecutableBytes {
 				return nil, e.New(e.CodeVerifyFailed, "release executable is not one bounded nonempty regular member")
 			}
-			selected, err = io.ReadAll(reader)
+			selected, err = io.ReadAll(contextReader{ctx: ctx, source: reader})
 			if err != nil || int64(len(selected)) != header.Size {
 				return nil, archiveError(ctx, err, "reading release executable")
 			}
-		} else if _, err := io.Copy(io.Discard, reader); err != nil {
+		} else if _, err := io.Copy(io.Discard, contextReader{ctx: ctx, source: reader}); err != nil {
 			return nil, archiveError(ctx, err, "reading remaining release member")
 		}
 	}
@@ -81,6 +89,9 @@ func SelectTarGzip(ctx context.Context, source io.Reader, member string, limits 
 	// checksum and reject a concatenated hidden archive rather than ignoring it.
 	buffer := make([]byte, 32<<10)
 	for {
+		if err := ctx.Err(); err != nil {
+			return nil, e.Wrap(e.CodeTimeout, err, "release archive trailer scan canceled")
+		}
 		n, err := expanded.Read(buffer)
 		for _, value := range buffer[:n] {
 			if value != 0 {

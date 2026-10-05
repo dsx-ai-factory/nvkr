@@ -29,6 +29,10 @@ have distinct pins; the delivered file is `helm`, not its tar archive. Kubectl i
 The local lock is generated with the existing catalog pin/bump command, not hand-authored.
 
 The four NKE OS/material sources are machine-pinned to that exact commit using `catalog pin --commit`.
+NKE #1211 is still open and unmerged at that head; the pin is a review candidate, not
+source-owner release approval. Exact commit acquisition does not establish reachability
+from a protected/default branch. Publication must not be treated as approved until that
+source-review gate and the independently missing execution/profile gates are resolved.
 Its source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde-apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
