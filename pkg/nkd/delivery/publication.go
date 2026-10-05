@@ -139,7 +139,8 @@ func openPublication(ctx context.Context, root, expectedRoot string,
 			return nil, err
 		}
 	}
-	inspection, err := Inspect(ctx, layout)
+	diskObservations := map[string]DiskArtifactInspection{}
+	inspection, err := inspectPublicationWithDisks(ctx, layout, nil, diskObservations)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func openPublication(ctx context.Context, root, expectedRoot string,
 		return nil, e.New(e.CodeVerifyFailed, "publication has no exact release metadata")
 	}
 	platforms := make(map[string]publicationPlatform)
-	outputs, err := inspectOutputs(ctx, layout, inspection, stage, platforms)
+	outputs, err := inspectOutputs(ctx, layout, inspection, stage, platforms, diskObservations)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +301,9 @@ func (publication *Publication) WriteDiskPayload(ctx context.Context, outputName
 	return 0, e.New(e.CodeVerifyFailed, "publication has no requested disk output")
 }
 
-func inspectOutputs(ctx context.Context, layout string, inspection Inspection, stage string, platforms map[string]publicationPlatform) ([]Output, error) {
+func inspectOutputs(ctx context.Context, layout string, inspection Inspection, stage string, platforms map[string]publicationPlatform,
+	disks map[string]DiskArtifactInspection,
+) ([]Output, error) {
 	var outputs []Output
 	for _, object := range inspection.Root.Objects {
 		binding := object.Output
@@ -317,15 +320,10 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 		members := append([]string(nil), output.Components...)
 		switch output.Kind {
 		case "disk-image":
-			artifact, err := openDiskManifest(ctx, layout, Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}, object.OS+"/"+object.Arch, maxDeliveryFileBytes)
-			if err != nil {
-				return nil, err
-			}
-			observed := artifact.Inspection()
-			if err := artifact.Close(); err != nil {
-				return nil, err
-			}
-			if output.Disk == nil || observed.PayloadDigest != output.Disk.PayloadDigest || observed.Size != output.Disk.Size || observed.Encryption != "none" {
+			observed, found := disks[object.DescriptorDigest]
+			if !found || observed.ManifestDigest != object.DescriptorDigest || observed.ArtifactType != object.ArtifactType ||
+				observed.Platform != object.OS+"/"+object.Arch || output.Disk == nil || observed.PayloadDigest != output.Disk.PayloadDigest ||
+				observed.Size != output.Disk.Size || observed.Encryption != "none" {
 				return nil, e.New(e.CodeVerifyFailed, "disk output differs from its wrapper binding")
 			}
 			platforms[output.Name] = publicationPlatform{OS: "linux", Arch: strings.TrimPrefix(observed.Platform, "linux/")}

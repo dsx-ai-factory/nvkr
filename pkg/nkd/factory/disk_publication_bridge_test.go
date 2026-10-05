@@ -268,10 +268,14 @@ func TestObserveProductionDiskKeepsManifestAndRawDigestsSeparate(t *testing.T) {
 }
 
 func TestPackageReconciledDiskRequiresLiveEvidenceBeforeOutput(t *testing.T) {
-	for _, condition := range []string{"nil context", "canceled", "missing owner", "missing runtime", "missing receipt"} {
+	for _, condition := range []string{"nil context", "canceled", "missing owner", "missing plan", "missing runtime", "missing receipt", "inert receipt"} {
 		t.Run(condition, func(t *testing.T) {
 			ctx := t.Context()
 			owner, inspection := &LocalRunResult{}, &sbom.DiskInspectionRuntime{}
+			plan := diskPublicationPlanFixture(t, "linux/amd64")
+			expected := plan.LifecycleOutputs[0]
+			_, artifacts := planIndex(plan)
+			output := artifacts["package/"+expected.Name]
 			// Non-nil but inert: this isolates each required argument without
 			// pretending that a live evidence owner issued a receipt.
 			receipt := &DiskEvidenceReceipt{}
@@ -286,17 +290,20 @@ func TestPackageReconciledDiskRequiresLiveEvidenceBeforeOutput(t *testing.T) {
 				want = e.CodeTimeout
 			case "missing owner":
 				owner = nil
+			case "missing plan":
+				plan = nil
 			case "missing runtime":
 				inspection = nil
 			case "missing receipt":
 				receipt = nil
+			case "inert receipt":
+				want = e.CodeVerifyFailed
 			}
-			path := filepath.Join(t.TempDir(), "never-created")
-			result, document, err := owner.PackageReconciledDisk(ctx, &Plan{}, LifecycleOutputPlan{}, inspection, receipt, Artifact{Path: path})
+			result, document, err := owner.PackageReconciledDisk(ctx, plan, expected, inspection, receipt, output)
 			if factoryErrorCode(err) != want || document != nil || !reflect.DeepEqual(result, delivery.Result{}) {
 				t.Fatalf("refusal = %+v, %v, %v", result, document, err)
 			}
-			if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			if _, err := os.Stat(output.Path); !errors.Is(err, os.ErrNotExist) {
 				t.Fatalf("missing live authority created output: %v", err)
 			}
 		})

@@ -26,6 +26,15 @@ func Inspect(ctx context.Context, root string) (Inspection, error) {
 // fetchOutputs is used only by Pull to fill the private staging layout from the
 // exact signed sibling repository/digest bindings, before full closure checks.
 func inspectPublication(ctx context.Context, root string, fetchOutputs func(PublicationRoot) error) (Inspection, error) {
+	return inspectPublicationWithDisks(ctx, root, fetchOutputs, nil)
+}
+
+// diskObservations belongs only to this invocation. OpenPublication reuses it
+// while projecting the same private snapshot; no public caller can supply it
+// to waive descriptor verification, copy-time checks or later stream rechecks.
+func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs func(PublicationRoot) error,
+	diskObservations map[string]DiskArtifactInspection,
+) (Inspection, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
 	}
@@ -41,7 +50,10 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 	// Reuse only observations made by this invocation's descriptor walk. This
 	// avoids hashing a large disk twice in one Inspect; it grants no retained
 	// authority, and every independent inspection or payload copy rechecks bytes.
-	disks := map[string]DiskArtifactInspection{}
+	disks := diskObservations
+	if disks == nil {
+		disks = map[string]DiskArtifactInspection{}
+	}
 	var rootConfig Descriptor
 	direct := map[string]bool{}
 	for _, descriptor := range index.Manifests {

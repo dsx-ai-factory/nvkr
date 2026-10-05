@@ -382,7 +382,7 @@ Guard tests reject missing or unrelated receipt owners and profiles, and local a
 unwired publication graph without execution. The successful original-live-Run receipt-to-package-to-hosted-finalization
 path has not been exercised by those tests. Synthetic QCOW2 fixtures and controlled inspection seams do not
 prove a complete NKE filesystem scan, the original live build-to-inspection join, native execution, keyless
-signing or production publication. Both native generated NKE builds and independent signed disk consumption
+signing or production publication. Both native-generated NKE builds and independent signed disk consumption
 remain required operational evidence.
 
 Qualified end-to-end acceptance requires publishing one cleared mixed-artifact ReleaseSet to operator-selected targets,

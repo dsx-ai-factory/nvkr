@@ -27,6 +27,9 @@ import (
 func diskPublicationRequest(t *testing.T, arch string) (PublicationRequest, string) {
 	t.Helper()
 	layout, payload, manifest := diskFixture(t, "linux/"+arch)
+	manifest = rewriteDiskFixture(t, layout, manifest, func(wrapper *ociManifest, _ *[]byte) {
+		wrapper.ArtifactType = MediaDiskImage
+	})
 	index, _, err := readIndex(t.Context(), layout)
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +49,7 @@ func diskPublicationRequest(t *testing.T, arch string) (PublicationRequest, stri
 	}
 	agentPin := digestBytes([]byte("exact staged agent"))
 	request := PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: []ObjectInput{
-		{Name: output.Name, Kind: "disk-image", Path: layout, Layout: true, ArtifactType: testDiskType, SemanticDigest: rawPin,
+		{Name: output.Name, Kind: "disk-image", Path: layout, Layout: true, ArtifactType: MediaDiskImage, SemanticDigest: rawPin,
 			BlobDigest: digestBytes(indexRaw), OS: "linux", Arch: arch, Output: &OutputBinding{Repository: "node-image", Format: "disk-image",
 				BuildDigest: build, Components: append([]string(nil), output.Components...), Disk: disk,
 				BuildSubjects: []BuildSubject{{Component: "agent", Digest: agentPin}, {Component: "image", Digest: rawPin}}}},
@@ -446,7 +449,7 @@ func TestDiskPublicationRejectsMissingOrSubstitutedEvidence(t *testing.T) {
 					}
 				}
 			})
-		}, e.CodeVerifyFailed},
+		}, e.CodeProvenanceMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			request, manifest := diskPublicationRequest(t, "amd64")
@@ -497,7 +500,7 @@ func changeDiskFixtureComponentBOM(request *PublicationRequest, component string
 }
 
 func TestDiskPublicationRequiresEveryInspectionIdentity(t *testing.T) {
-	for _, key := range []string{"nkd:diskInspectionRuntimeDigest", "nkd:diskInspectorDigest", "nkd:diskCodecDigest"} {
+	for _, key := range []string{"nkd:dependencyScannerDigest", "nkd:diskInspectionRuntimeDigest", "nkd:diskInspectorDigest", "nkd:diskCodecDigest"} {
 		t.Run(key, func(t *testing.T) {
 			request, _ := diskPublicationRequest(t, "amd64")
 			changeDiskFixtureBOM(&request, func(bom *sbom.BOM) {

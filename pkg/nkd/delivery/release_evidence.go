@@ -158,21 +158,15 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &bom); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "decoding release SBOM")
 		}
-		digest, err := bom.Digest()
-		if err != nil || digest != object.SemanticDigest || object.Name != "sbom-"+strings.TrimPrefix(digest, "sha256:") || len(bom.Metadata.Component.Hashes) != 1 || "sha256:"+bom.Metadata.Component.Hashes[0].Content != binding.SubjectDigest || bom.Metadata.Component.Name != binding.Component {
-			return e.New(e.CodeVerifyFailed, "SBOM document differs from its exact release subject")
-		}
 		props := map[string]string{}
 		for _, p := range bom.Metadata.Props {
 			props[p.Name] = p.Value
 		}
+		// Missing disk provenance is rejected at the release's owning gate,
+		// including the scanner pin also required by generic BOM validation.
+		// This grants no authority: the exact semantic/subject checks still follow.
 		for _, outputName := range binding.Outputs {
-			if props["nkd:buildDigest"] != builds[outputName] {
-				return e.New(e.CodeVerifyFailed, "SBOM build is unbound")
-			}
-			diskRoot := diskRoots[outputName]
-			method := props["nkd:dependencyInspection"]
-			if diskRoot == binding.Component {
+			if diskRoots[outputName] == binding.Component {
 				if len(bom.Components) == 0 || props["nkd:dependencyInspection"] != "disk-reconciled/v1" {
 					return e.New(e.CodeProvenanceMissing, "disk root requires a full reconciled inventory")
 				}
@@ -181,11 +175,23 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 						return e.New(e.CodeProvenanceMissing, "disk inventory lacks an exact %s", key)
 					}
 				}
-			} else if diskRoot != "" {
+			}
+		}
+		digest, err := bom.Digest()
+		if err != nil || digest != object.SemanticDigest || object.Name != "sbom-"+strings.TrimPrefix(digest, "sha256:") || len(bom.Metadata.Component.Hashes) != 1 || "sha256:"+bom.Metadata.Component.Hashes[0].Content != binding.SubjectDigest || bom.Metadata.Component.Name != binding.Component {
+			return e.New(e.CodeVerifyFailed, "SBOM document differs from its exact release subject")
+		}
+		for _, outputName := range binding.Outputs {
+			if props["nkd:buildDigest"] != builds[outputName] {
+				return e.New(e.CodeVerifyFailed, "SBOM build is unbound")
+			}
+			diskRoot := diskRoots[outputName]
+			method := props["nkd:dependencyInspection"]
+			if diskRoot != "" && diskRoot != binding.Component {
 				if len(bom.Components) == 0 || method != "disk-content/v1" || !isDigest(props["nkd:dependencyScannerDigest"]) {
 					return e.New(e.CodeProvenanceMissing, "disk material requires its exact inspected content inventory")
 				}
-			} else if method == "disk-content/v1" || method == "disk-reconciled/v1" {
+			} else if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1") {
 				return e.New(e.CodeVerifyFailed, "disk inspection method is not valid for a non-disk output")
 			}
 		}

@@ -22,6 +22,11 @@ import (
 // MediaQCOW2 carries the unchanged envelope bytes, not a tar or decoded RAW disk.
 const MediaQCOW2 = "application/vnd.qemu.qcow2"
 
+// MediaDiskImage is the admitted v1 release wrapper for an exact QCOW2 payload.
+// Generic diagnostic transports may use other bounded MIME types, but those
+// declarations do not become production disk output types.
+const MediaDiskImage = "application/vnd.nkd.disk-image.v1"
+
 const (
 	diskFormatAnnotation     = "dev.nkd.disk.format"
 	diskEncryptionAnnotation = "dev.nkd.disk.encryption"

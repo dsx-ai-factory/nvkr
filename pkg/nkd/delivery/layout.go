@@ -141,7 +141,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 			continue
 		}
 		if root.Release == nil || !input.Layout || input.Output == nil || input.Output.Format != "disk-image" || input.Output.Disk == nil ||
-			!validDiskArtifactType(input.ArtifactType) || !isDigest(input.Output.Disk.PayloadDigest) ||
+			input.ArtifactType != MediaDiskImage || !isDigest(input.Output.Disk.PayloadDigest) ||
 			input.Output.Disk.Encryption != "none" || input.Output.Disk.Size > maxDeliveryFileBytes || input.Output.TransportPath != "" {
 			return Result{}, e.New(e.CodeVerifyFailed, "disk release input requires exact bounded unencrypted wrapper and payload binding")
 		}

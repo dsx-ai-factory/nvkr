@@ -94,7 +94,7 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			kind, media = "apt-repository", "application/vnd.nkd.apt-repository.v1"
 		case "disk-image":
 			kind, media = "disk-image", o.ArtifactType
-			if !validDiskArtifactType(media) || o.Output.Disk == nil || !isDigest(o.Output.Disk.PayloadDigest) ||
+			if media != MediaDiskImage || o.Output.Disk == nil || !isDigest(o.Output.Disk.PayloadDigest) ||
 				o.Output.Disk.PayloadDigest != o.BlobDigest || o.Output.Disk.Encryption != "none" || o.Output.TransportPath != "" {
 				return e.New(e.CodeVerifyFailed, "published disk requires an exact unencrypted payload binding")
 			}
