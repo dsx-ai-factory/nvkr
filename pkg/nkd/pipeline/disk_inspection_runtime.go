@@ -642,15 +642,21 @@ func (container *DiskInspectionContainer) hostFacts(ctx context.Context) (execut
 
 func validateDiskInspectionResources(selection DiskInspectionSelection, facts execution.ObservedHostFacts, size int64, beforeSnapshot bool) error {
 	request := selection.Resources
+	workspaceMiB := request.EphemeralStorageMiB
 	snapshotMiB := uint64((size + (1 << 20) - 1) >> 20)
 	needMemory := 2*snapshotMiB + diskInspectionApplianceMiB
 	if selection.MaxFilesystemBytes != 0 {
 		filesystemMiB := (selection.MaxFilesystemBytes + (1 << 20) - 1) / (1 << 20)
 		if selection.ScratchStorage == "private-volume" {
+			// Linux heldfile snapshots are sealed memfds, accounted in RAM
+			// below. No subject or helper scratch is written to Workspace:
+			// the attempt-private daemon volume is admitted separately before
+			// streaming. Do not demand that same scratch on two filesystems.
+			workspaceMiB = 0
 			needMemory += 6144 + 2*min(filesystemMiB, 1024)
 			needScratch := 12*filesystemMiB + 2*snapshotMiB + diskInspectionApplianceMiB
 			if request.EphemeralStorageMiB < needScratch {
-				return e.New(e.CodeEngineCapability, "inspection scratch lacks conservative simultaneous export capacity")
+				return e.New(e.CodeEngineCapability, "inspection scratch capacity: required=%dMiB declared=%dMiB (filesystem=%dMiB subject=%dMiB appliance=%dMiB)", needScratch, request.EphemeralStorageMiB, filesystemMiB, snapshotMiB, diskInspectionApplianceMiB)
 			}
 		} else {
 			needMemory += 12*filesystemMiB + 2048
@@ -659,15 +665,27 @@ func validateDiskInspectionResources(selection DiskInspectionSelection, facts ex
 	hostMemory := request.MemoryMiB
 	if beforeSnapshot {
 		if hostMemory > math.MaxUint64-snapshotMiB {
-			return e.New(e.CodeEngineCapability, "inspection memory request exceeds its supported budget")
+			return e.New(e.CodeEngineCapability, "inspection host memory requirement overflows: declared=%dMiB snapshot=%dMiB", request.MemoryMiB, snapshotMiB)
 		}
 		// Compare the full declared grant plus external snapshot with the
 		// caller-side observation, not merely their independent maxima. This
 		// conservative check does not authenticate the daemon's cgroup budget.
 		hostMemory += snapshotMiB
 	}
-	if request.MemoryMiB < needMemory || facts.Platform != execution.HostPlatform(selection.Platform) || facts.Resources.CPUMillis < request.CPUMillis || facts.Resources.MemoryMiB < hostMemory || facts.Resources.EphemeralStorageMiB < request.EphemeralStorageMiB {
-		return e.New(e.CodeEngineCapability, "inspection host lacks declared CPU, memory or workspace capacity (RAM must cover two disk copies plus appliance)")
+	if request.MemoryMiB < needMemory {
+		return e.New(e.CodeEngineCapability, "inspection memory capacity: required=%dMiB declared=%dMiB (subject=%dMiB)", needMemory, request.MemoryMiB, snapshotMiB)
+	}
+	if facts.Platform != execution.HostPlatform(selection.Platform) {
+		return e.New(e.CodeEngineCapability, "inspection host platform: required=%s observed=%s", selection.Platform, facts.Platform)
+	}
+	if facts.Resources.CPUMillis < request.CPUMillis {
+		return e.New(e.CodeEngineCapability, "inspection host CPU capacity: required=%dm observed=%dm", request.CPUMillis, facts.Resources.CPUMillis)
+	}
+	if facts.Resources.MemoryMiB < hostMemory {
+		return e.New(e.CodeEngineCapability, "inspection host memory capacity: required=%dMiB observed=%dMiB", hostMemory, facts.Resources.MemoryMiB)
+	}
+	if facts.Resources.EphemeralStorageMiB < workspaceMiB {
+		return e.New(e.CodeEngineCapability, "inspection workspace capacity: required=%dMiB observed=%dMiB", workspaceMiB, facts.Resources.EphemeralStorageMiB)
 	}
 	return nil
 }

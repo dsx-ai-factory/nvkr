@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -30,6 +31,9 @@ func TestParseCgroupV2Path(t *testing.T) {
 			got, err := parseCgroupV2Path(test.raw)
 			if got != test.want || errorCode(err) != test.code {
 				t.Fatalf("path = %q, error = %v; want %q, %s", got, err, test.want, test.code)
+			}
+			if test.name == "v1 only" && (!strings.Contains(err.Error(), "local execution observation requires cgroup v2") || strings.Contains(err.Error(), "VM")) {
+				t.Fatalf("shared cgroup refusal is not context-neutral: %v", err)
 			}
 		})
 	}

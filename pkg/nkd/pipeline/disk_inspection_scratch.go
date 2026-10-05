@@ -172,13 +172,16 @@ func (state *diskInspectionScratchState) verifyVolume(ctx context.Context) error
 func validateDiskInspectionScratchCapacity(raw []byte, requestedMiB uint64) error {
 	fields := strings.Fields(string(raw))
 	if len(fields) != 2 || requestedMiB == 0 {
-		return e.New(e.CodeEngineCapability, "inspection scratch returned no bounded available-space observation")
+		return e.New(e.CodeEngineCapability, "inspection scratch capacity: required=%dMiB observed=invalid statfs %s", requestedMiB, diskInspectionDiagnostic(raw))
 	}
 	blocks, blocksErr := strconv.ParseUint(fields[0], 10, 64)
 	blockSize, sizeErr := strconv.ParseUint(fields[1], 10, 64)
-	if blocksErr != nil || sizeErr != nil || blockSize == 0 || blocks > math.MaxUint64/blockSize ||
-		(blocks*blockSize)>>20 < requestedMiB {
-		return e.New(e.CodeEngineCapability, "inspection scratch lacks its declared disk headroom")
+	if blocksErr != nil || sizeErr != nil || blockSize == 0 || blocks > math.MaxUint64/blockSize {
+		return e.New(e.CodeEngineCapability, "inspection scratch capacity: required=%dMiB observed=invalid statfs %s", requestedMiB, diskInspectionDiagnostic(raw))
+	}
+	availableMiB := (blocks * blockSize) >> 20
+	if availableMiB < requestedMiB {
+		return e.New(e.CodeEngineCapability, "inspection scratch capacity: required=%dMiB observed=%dMiB (blocks=%d blockSize=%d)", requestedMiB, availableMiB, blocks, blockSize)
 	}
 	return nil
 }
