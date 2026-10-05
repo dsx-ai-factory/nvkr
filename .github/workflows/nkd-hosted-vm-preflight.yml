@@ -144,5 +144,7 @@ jobs:
             "$RUNNER_TEMP/nkd-clean-podman-info.json")
           "${runtime[@]}" pull "$PROBE_IMAGE"
           "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
-            --security-opt=no-new-privileges "${mappings[@]}" --user="$(id -u):$(id -g)" "$PROBE_IMAGE" \
-            sh -ec 'id; cat /proc/self/uid_map; cat /proc/self/gid_map; grep "^Seccomp:" /proc/self/status'
+            --security-opt=no-new-privileges --cpus=2 --memory=2g --pids-limit=512 \
+            "${mappings[@]}" --user="$(id -u):$(id -g)" "$PROBE_IMAGE" \
+            sh -ec 'id; cat /proc/self/uid_map; cat /proc/self/gid_map; grep "^Seccomp:" /proc/self/status;
+              cat /sys/fs/cgroup/cpu.max; cat /sys/fs/cgroup/memory.max; cat /sys/fs/cgroup/pids.max'
