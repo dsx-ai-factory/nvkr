@@ -166,7 +166,12 @@ The installer reader supports ISO9660 and its recognized SquashFS payload; a gen
 thereby known to be an installer. Nested Docker image discovery currently recognizes bounded gzip/tar
 archives with an unambiguous Docker manifest. Ordinary gzip/tar contents retain their outer file hash;
 OCI-layout and mixed OCI/Docker archives fail closed, and other compressed formats have no nested-image
-discovery. Synthetic archive-member paths describe inspection structure, not installed filesystem paths.
+discovery. The root file inventory retains actual exported paths and the exact outer archive hash;
+files inside cached Debian archives, Docker archives or SquashFS payloads are not presented as
+invented installed paths. Their discovered components carry descriptive `nkd:containedIn` values
+binding the immediate held carrier path and digest. Repeated public package identities retain a
+sorted canonical string list of those carriers; no recursive ancestry, installed origin or package
+ownership is inferred. A contained payload's file inventory is not an independent root-file inventory.
 
 The process-local reconciliation receipt binds the original Run, named output, complete Plan, Build,
 QCOW2 digest/size and admitted inspection closure. Export revalidates those owners before copying the

@@ -145,7 +145,8 @@ func TestDebianPayloadEmptyFilesystemReachesScannerAdmission(t *testing.T) {
 
 // This uses the existing dpkg owner on Linux, with a controlled empty scanner
 // response. It does not prove native Syft cataloging or a full NKE disk join.
-func TestControlOnlyDebianMaterialRetainsObservedMetadata(t *testing.T) {
+func debianMaterialOperationFixture(t *testing.T, withPayload bool) (*heldfile.File, Scanner, string) {
+	t.Helper()
 	if runtime.GOOS != "linux" {
 		t.Skip("held package-reader execution requires Linux")
 	}
@@ -166,6 +167,14 @@ func TestControlOnlyDebianMaterialRetainsObservedMetadata(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(control, "control"), []byte(metadata), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if withPayload {
+		if err := os.MkdirAll(filepath.Join(root, "usr", "bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "usr", "bin", "tool"), []byte("contained file"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	filename := filepath.Join(workspace, "package.deb")
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
@@ -178,16 +187,23 @@ func TestControlOnlyDebianMaterialRetainsObservedMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer subject.Close()
+	t.Cleanup(func() { _ = subject.Close() })
 	scannerPath := filepath.Join(workspace, "scanner")
 	script := []byte("#!/bin/sh\nprintf '%s' '{\"schema\":{\"version\":\"16.1.10\"},\"artifacts\":[]}'\n")
 	if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	return subject, Scanner{Path: scannerPath, Digest: rawDigest(script)}, rawDigest(toolBytes)
+}
+
+func TestControlOnlyDebianMaterialRetainsObservedMetadata(t *testing.T) {
+	subject, scanner, packageReader := debianMaterialOperationFixture(t, false)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
 	for _, depth := range []int{0, 1} {
 		t.Run(strconv.Itoa(depth), func(t *testing.T) {
 			inspection, err := inspectDebianMaterialDepth(ctx, subject, "linux/"+runtime.GOARCH,
-				Scanner{Path: scannerPath, Digest: rawDigest(script)}, rawDigest(toolBytes), 1<<20, depth)
+				scanner, packageReader, 1<<20, depth)
 			if err != nil || inspection == nil {
 				t.Fatalf("valid metapackage rejected: %v", err)
 			}
@@ -202,6 +218,67 @@ func TestControlOnlyDebianMaterialRetainsObservedMetadata(t *testing.T) {
 			class, err := diskComponentClass(components[0])
 			if err != nil || class != diskClassDebianArchive {
 				t.Fatalf("actual package-reader operation issued class %q: %v", class, err)
+			}
+		})
+	}
+}
+
+// This reaches the actual recursive archive and dpkg reader on Linux with a
+// controlled scanner, not a native Syft or guestfish discovery run.
+func TestCachedDebianArchivesDoNotInventInstalledPaths(t *testing.T) {
+	packageFile, scanner, packageReader := debianMaterialOperationFixture(t, true)
+	var raw bytes.Buffer
+	if _, err := packageFile.WriteToContext(t.Context(), &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, architecture := range []string{"amd64", "arm64"} {
+		t.Run(architecture, func(t *testing.T) {
+			members := map[string]string{"var/cache/apt/archives/first.deb": raw.String(), "var/cache/apt/archives/second.deb": raw.String(),
+				"packages/var/cache/apt/archives/first.deb/usr/bin/tool": "actual guest path"}
+			subject, err := createGeneratedInspectionFile(t.Context(), 1<<20, func(destination io.Writer) error {
+				archive := tar.NewWriter(destination)
+				for _, name := range slices.Sorted(maps.Keys(members)) {
+					data := members[name]
+					if err := archive.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(data))}); err != nil {
+						return err
+					}
+					if _, err := io.WriteString(archive, data); err != nil {
+						return err
+					}
+				}
+				return archive.Close()
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer subject.Close()
+			inspection, err := inspectMaterialArchive(t.Context(), subject, "linux/"+architecture, scanner, packageReader, 1<<20)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(inspection.Files()) != len(members) || len(inspection.Components()) != 2 {
+				t.Fatalf("nested files leaked into root inventory: %+v", inspection)
+			}
+			for _, file := range inspection.Files() {
+				if data, exists := members[file.Path]; !exists || file.Digest != rawDigest([]byte(data)) {
+					t.Fatalf("invented or altered guest file: %+v", file)
+				}
+			}
+			carriers := map[string]bool{}
+			for _, component := range inspection.Components() {
+				if class, err := diskComponentClass(component); err != nil || class != diskClassDebianArchive {
+					t.Fatalf("cached archive changed class: %q %v", class, err)
+				}
+				for _, property := range component.Properties {
+					if property.Name == "nkd:containedIn" {
+						carriers[property.Value] = true
+					}
+				}
+			}
+			for _, name := range []string{"var/cache/apt/archives/first.deb", "var/cache/apt/archives/second.deb"} {
+				if !carriers[name+"@"+packageFile.Digest()] {
+					t.Fatalf("exact cached carrier absent: %v", carriers)
+				}
 			}
 		})
 	}

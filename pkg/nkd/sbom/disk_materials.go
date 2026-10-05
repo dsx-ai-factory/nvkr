@@ -117,13 +117,14 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 			if err != nil {
 				return nil, e.Wrap(e.CodeVerifyFailed, err, "holding compressed archive")
 			}
+			digest := member.Digest()
 			inspection, scanErr := inspectCompressedImages(ctx, member, platform, scanner, maxBytes, depth)
 			closeErr := member.Close()
 			if err := errors.Join(scanErr, closeErr); err != nil {
 				return nil, err
 			}
 			if inspection != nil {
-				result.components = append(result.components, inspection.components...)
+				appendContainedArchive(result, inspection, path.Clean(header.Name), digest)
 			}
 			continue
 		}
@@ -138,12 +139,13 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "holding staged package bytes")
 		}
+		digest := member.Digest()
 		inspection, scanErr := inspectDebianMaterialDepth(ctx, member, platform, scanner, packageReaderDigest, maxBytes, depth+1)
 		closeErr := member.Close()
 		if err := errors.Join(scanErr, closeErr); err != nil {
 			return nil, err
 		}
-		result.components = append(result.components, inspection.components...)
+		appendContainedArchive(result, inspection, path.Clean(header.Name), digest)
 		if result.packageMetadataByDigest == nil {
 			result.packageMetadataByDigest = make(map[string]diskPackageKey)
 		}
@@ -153,16 +155,28 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 			}
 			result.packageMetadataByDigest[digest] = identity
 		}
-		for _, file := range inspection.files {
-			file.Path = "packages/" + strings.TrimPrefix(header.Name, "./") + "/" + file.Path
-			result.files = append(result.files, file)
-		}
 	}
 	if err := subject.AssertUnchangedContext(ctx); err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "rechecking staged archive")
 	}
 	slices.SortFunc(result.files, func(a, b DiskFile) int { return strings.Compare(a.Path, b.Path) })
 	return result, nil
+}
+
+// Containment is a description of the immediate held carrier, not an installed
+// path, package origin or recursive identity. The root keeps its actual archive
+// file/hash, never invented paths for files discovered inside that archive.
+func appendContainedArchive(root, nested *FilesystemInspection, carrierPath, carrierDigest string) {
+	for _, component := range nested.components {
+		component = cloneComponent(component)
+		// A deeper reader already bound this component to its immediate carrier.
+		// Do not overwrite that observation or invent a concatenated ancestry.
+		if !slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == "nkd:containedIn" }) {
+			component.Properties = append(component.Properties, Property{Name: "nkd:containedIn", Value: carrierPath + "@" + carrierDigest})
+			slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+		}
+		root.components = append(root.components, component)
+	}
 }
 
 // Ordinary compressed data remains covered by its existing regular-file hash;

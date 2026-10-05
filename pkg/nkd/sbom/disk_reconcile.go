@@ -79,7 +79,6 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 		return nil, e.New(e.CodeProvenanceMissing, "disk reconciliation requires inspected base installer, retained acquisitions and staged component payloads")
 	}
 	var components []Component
-	seenPackages := make(map[diskObservedPackageKey]bool)
 	for _, component := range root.report.Components {
 		// An unknown version stays unknown in descriptive inventory. Equal
 		// names and empty versions do not identify the same material bytes.
@@ -93,11 +92,7 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 		if !basis[key] {
 			return nil, e.New(e.CodeProvenanceMissing, "disk package %q version %q has no exact inspected material correspondence", component.Name, component.Version)
 		}
-		if seenPackages[key] {
-			continue
-		}
-		seenPackages[key] = true
-		components = append(components, diskDocumentComponent(component))
+		components = append(components, component)
 	}
 	// Include every observed regular file, including loose binaries which package
 	// catalogers do not recognize. A material hash match describes correspondence;
@@ -116,6 +111,10 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 		components = append(components, component)
 	}
 	bom, err := NewSubject(buildDigest, name, root.report.Subject)
+	if err != nil {
+		return nil, err
+	}
+	components, err = diskDocumentComponents(components)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +202,41 @@ func diskDocumentComponent(component Component) Component {
 	return result
 }
 
+// Existing public package refs combine repeated observations. Preserve every
+// immediate carrier before that deduplication as a deterministic descriptive
+// string list encoded by the existing canonical codec. No carrier is parsed or
+// used as authority, and conflicting non-containment metadata still fails in
+// WithDependencies rather than being silently merged here.
+func diskDocumentComponents(observed []Component) ([]Component, error) {
+	carriers := make(map[string][]string)
+	for _, component := range observed {
+		for _, property := range component.Properties {
+			if property.Name == "nkd:containedIn" {
+				ref := dependencyRef(component)
+				carriers[ref] = append(carriers[ref], property.Value)
+			}
+		}
+	}
+	result := make([]Component, len(observed))
+	for index, component := range observed {
+		component = diskDocumentComponent(component)
+		if values := carriers[dependencyRef(component)]; len(values) > 0 {
+			values = slices.Clone(values)
+			slices.Sort(values)
+			values = slices.Compact(values)
+			raw, err := canonical.Marshal(values)
+			if err != nil {
+				return nil, e.Wrap(e.CodeInternal, err, "encoding descriptive archive containment")
+			}
+			component.Properties = slices.DeleteFunc(component.Properties, func(property Property) bool { return property.Name == "nkd:containedIn" })
+			component.Properties = append(component.Properties, Property{Name: "nkd:containedIn", Value: string(raw)})
+			slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+		}
+		result[index] = component
+	}
+	return result, nil
+}
+
 // DiskContentDocument projects already-issued material discovery onto its exact
 // existing build-output subject. It is descriptive and cannot authorize a Run.
 func DiskContentDocument(buildDigest, name string, inspection *DiskContentInspection) (*BOM, error) {
@@ -217,13 +251,14 @@ func DiskContentDocument(buildDigest, name string, inspection *DiskContentInspec
 		return nil, err
 	}
 	components := inspection.Components()
-	for index := range components {
-		components[index] = diskDocumentComponent(components[index])
-	}
 	for _, file := range inspection.report.Files {
 		if file.Kind == "regular" {
 			components = append(components, Component{Type: "file", Name: file.Path, Hashes: []Hash{{Alg: "SHA-256", Content: strings.TrimPrefix(file.Digest, "sha256:")}}})
 		}
+	}
+	components, err = diskDocumentComponents(components)
+	if err != nil {
+		return nil, err
 	}
 	bom, err = WithDependencies(bom, components, "disk-content/v1", inspection.report.Scanner)
 	if err != nil {

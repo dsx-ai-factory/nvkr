@@ -197,8 +197,6 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 			return nil, err
 		}
 		inventory.components = append(inventory.components, nested.components...)
-		inventory.files = append(inventory.files, nested.files...)
-		slices.SortFunc(inventory.files, func(a, b DiskFile) int { return strings.Compare(a.Path, b.Path) })
 	}
 	return &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), guestfish: guestfishDigest,
 		scanner: scanner.Digest, exported: held.Digest(), components: inventory.components, files: inventory.files}, nil
@@ -290,16 +288,13 @@ func inspectInstallerMembers(ctx context.Context, archive *os.File, platform, gu
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "holding installer base filesystem")
 		}
+		digest := member.Digest()
 		inspection, scanErr := inspectFilesystem(ctx, member, "raw", platform, guestfishDigest, packageReaderDigest, scanner, codec, maxBytes)
 		closeErr := member.Close()
 		if err := errors.Join(scanErr, closeErr); err != nil {
 			return nil, err
 		}
-		result.components = append(result.components, inspection.components...)
-		for _, file := range inspection.files {
-			file.Path = "base/" + strings.TrimPrefix(header.Name, "./") + "/" + file.Path
-			result.files = append(result.files, file)
-		}
+		appendContainedArchive(result, inspection, path.Clean(header.Name), digest)
 	}
 	if count == 0 {
 		return nil, e.New(e.CodeEngineCapability, "installer has no supported base squashfs filesystem")
