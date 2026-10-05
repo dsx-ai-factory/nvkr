@@ -2,16 +2,115 @@ package factory
 
 import (
 	"bytes"
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
+
+type diskEvidenceExportMutationWriter struct {
+	bytes.Buffer
+	mutate     func()
+	afterBytes int
+}
+
+func (writer *diskEvidenceExportMutationWriter) Write(raw []byte) (int, error) {
+	written, err := writer.Buffer.Write(raw)
+	if writer.mutate != nil && writer.Len() >= writer.afterBytes {
+		writer.mutate()
+		writer.mutate = nil
+	}
+	return written, err
+}
+
+func TestDiskEvidenceExportReauthenticatesInspectorAfterStreaming(t *testing.T) {
+	for _, architecture := range []string{"amd64", "arm64"} {
+		for _, tt := range []struct {
+			name string
+			want e.Code
+		}{
+			{name: "unchanged"},
+			{name: "inspector closed", want: e.CodeEngineCapability},
+			{name: "profile substituted", want: e.CodeVerifyFailed},
+			{name: "caller canceled", want: e.CodeTimeout},
+		} {
+			t.Run(architecture+"/"+tt.name, func(t *testing.T) {
+				plan, owner := diskMaterialTraceFixtureForPlatform(t, false, false, "linux/"+architecture)
+				trace, err := owner.observeDiskMaterials(t.Context(), plan, plan.LifecycleOutputs[0])
+				if err != nil {
+					t.Fatal(err)
+				}
+				bom, err := sbom.NewSubject(plan.LifecycleOutputs[0].BuildDigest, "image", trace.description.Subject.Digest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw, err := bom.Marshal()
+				if err != nil {
+					t.Fatal(err)
+				}
+				inspection := &sbom.DiskInspectionRuntime{}
+				profile := definition.DiskInspectionProfile{TimeoutSeconds: 30}
+				receipt := &DiskEvidenceReceipt{owner: owner, runtime: inspection, trace: trace, profile: profile, root: raw}
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				closed, calls := false, 0
+				// Controlled profile observations model lifecycle changes; this
+				// does not exercise real native inspector concurrency.
+				bindings := func(ctx context.Context) (definition.DiskInspectionProfile, error) {
+					calls++
+					if err := ctx.Err(); err != nil {
+						return definition.DiskInspectionProfile{}, e.Wrap(e.CodeTimeout, err, "export canceled")
+					}
+					if closed {
+						return definition.DiskInspectionProfile{}, e.New(e.CodeEngineCapability, "inspector closed")
+					}
+					return profile, nil
+				}
+				writer := &diskEvidenceExportMutationWriter{mutate: func() {
+					switch tt.name {
+					case "inspector closed":
+						closed = true
+					case "profile substituted":
+						profile.TimeoutSeconds++
+					case "caller canceled":
+						cancel()
+					}
+				}}
+				if tt.name == "caller canceled" {
+					// Cancel after the last write: no later copy iteration can
+					// observe it, so final evidence admission must reject it.
+					writer.afterBytes = int(trace.description.Subject.Size)
+				}
+				observed, document, err := owner.exportReconciledDisk(ctx, plan, plan.LifecycleOutputs[0], inspection, receipt, writer, bindings)
+				if factoryErrorCode(err) != tt.want {
+					t.Fatalf("export error=%v want %s", err, tt.want)
+				}
+				if writer.Len() == 0 {
+					t.Fatal("mutation did not occur during payload streaming")
+				}
+				if tt.want != "" {
+					if observed.Digest != "" || document != nil {
+						t.Fatal("failed export returned authoritative observation or evidence")
+					}
+					if tt.name != "caller canceled" && calls != 2 {
+						t.Fatalf("late runtime change was not reauthenticated: calls=%d", calls)
+					}
+					return
+				}
+				if calls != 2 || document == nil || observed.Digest != trace.description.Subject.Digest || !bytes.Equal(writer.Bytes(), testQCOW2HeaderPayload()) {
+					t.Fatalf("unchanged export failed exact-byte/owner checks: calls=%d observed=%+v", calls, observed)
+				}
+			})
+		}
+	}
+}
 
 func TestDiskEvidenceCannotBeRestoredFromDescriptions(t *testing.T) {
 	for _, architecture := range []string{"amd64", "arm64"} {

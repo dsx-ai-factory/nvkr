@@ -299,8 +299,19 @@ func (owner *LocalRunResult) inspectDiskEvidenceMaterials(ctx context.Context, p
 
 // ExportReconciledDisk holds the same Run lifetime permit through validation,
 // exact raw export and document cloning. Closing either owner revokes live use.
+// Caller-owned staging bytes may remain on failure and convey no authority;
+// publication must discard that rejected staging rather than commit it.
 func (owner *LocalRunResult) ExportReconciledDisk(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime, receipt *DiskEvidenceReceipt, destination io.Writer) (DiskPayloadObservation, *sbom.BOM, error) {
-	if ctx == nil || destination == nil {
+	return owner.exportReconciledDisk(ctx, plan, expected, inspection, receipt, destination,
+		func(ctx context.Context) (definition.DiskInspectionProfile, error) {
+			return diskEvidenceProfile(ctx, plan, inspection)
+		})
+}
+
+// The private seam models runtime close/substitution during streaming. Public
+// callers always use the concrete inspector above, never supplied bindings.
+func (owner *LocalRunResult) exportReconciledDisk(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime, receipt *DiskEvidenceReceipt, destination io.Writer, bindings func(context.Context) (definition.DiskInspectionProfile, error)) (DiskPayloadObservation, *sbom.BOM, error) {
+	if ctx == nil || destination == nil || bindings == nil {
 		return DiskPayloadObservation{}, nil, e.New(e.CodeUsage, "reconciled export requires context and staging writer")
 	}
 	if owner == nil || receipt == nil || receipt.owner != owner || receipt.runtime != inspection || receipt.trace == nil || len(receipt.root) == 0 {
@@ -311,7 +322,7 @@ func (owner *LocalRunResult) ExportReconciledDisk(ctx context.Context, plan *Pla
 		return DiskPayloadObservation{}, nil, err
 	}
 	defer release()
-	profile, err := diskEvidenceProfile(ctx, plan, inspection)
+	profile, err := bindings(ctx)
 	if err != nil {
 		return DiskPayloadObservation{}, nil, err
 	}
@@ -343,6 +354,16 @@ func (owner *LocalRunResult) ExportReconciledDisk(ctx context.Context, plan *Pla
 	}
 	if err := bom.Validate(); err != nil {
 		return DiskPayloadObservation{}, nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return DiskPayloadObservation{}, nil, e.Wrap(e.CodeTimeout, err, "reconciled disk export canceled")
+	}
+	current, err := bindings(ctx)
+	if err != nil {
+		return DiskPayloadObservation{}, nil, err
+	}
+	if current != receipt.profile {
+		return DiskPayloadObservation{}, nil, e.New(e.CodeVerifyFailed, "reconciled inspector profile changed during export")
 	}
 	return observation, &bom, nil
 }
