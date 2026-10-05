@@ -60,6 +60,9 @@ func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packer
 	if request.node.BuilderType != ir.BuilderVMImage || request.node.Packer == nil || request.node.ExecutionBinding == nil {
 		return nil, e.New(e.CodeEngineCapability, "containerized Packer requires one bound VM-image Plan node")
 	}
+	if request.node.Packer.AcquisitionArchive != "" && request.node.Packer.AcquisitionArchive == request.node.ArtifactPath {
+		return nil, e.New(e.CodeInvalidCatalog, "acquisition carrier cannot be the disk payload")
+	}
 	if request.node.Disk == nil || request.node.Disk.Encryption != "none" {
 		return nil, e.New(e.CodeEngineCapability,
 			"containerized Packer does not admit encrypted disks without a typed secret channel")
@@ -263,6 +266,20 @@ func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packer
 		request.node.Requirements.Resources.EphemeralStorageMiB)
 	if err != nil {
 		return nil, err
+	}
+	if name := request.node.Packer.AcquisitionArchive; name != "" {
+		facts, err := execution.ObserveLocalHost(ctx, request.workspace)
+		if err != nil {
+			return artifact, err
+		}
+		budget := *request.node.Requirements.Resources
+		budget.MemoryMiB = min(budget.MemoryMiB, facts.Resources.MemoryMiB)
+		budget.EphemeralStorageMiB = min(budget.EphemeralStorageMiB, facts.Resources.EphemeralStorageMiB)
+		artifact.acquisitions, err = collectPackerContainerAcquisitions(ctx, request.runtime, buildName,
+			path.Join(packerContainerOutputPath, name), runRoot, budget, artifact.Size())
+		if err != nil {
+			return artifact, err
+		}
 	}
 	return artifact, nil
 }

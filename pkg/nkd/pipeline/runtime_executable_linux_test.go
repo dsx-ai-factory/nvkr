@@ -27,7 +27,7 @@ func TestQualifiedRuntimeUsesSealedDescriptorForObservationBuildAndCleanup(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer held.capability.Close()
+	defer held.close()
 	heldFile := held.capability.OSFile()
 
 	link, err := os.Readlink(fmt.Sprintf("/proc/self/fd/%d", heldFile.Fd()))
@@ -102,7 +102,7 @@ printf '%s|%s|%s|%s|%s|%s' "${LD_PRELOAD-unset}" "${LD_LIBRARY_PATH-unset}" "$PA
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer held.capability.Close()
+	defer held.close()
 	out, err := heldExecutionOutput(context.Background(), held)
 	if err != nil {
 		t.Fatal(err)
@@ -156,17 +156,30 @@ printf '%s|%s|%s|%s|%s|%s|%s|%s|%s' "$HOME" "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer held.capability.Close()
+	defer held.close()
 	out, err := heldExecutionOutput(t.Context(), held)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := strings.Join([]string{
-		home, runtimeDir, dataHome, "/nonexistent", "/nonexistent",
+		home, runtimeDir, dataHome, held.configurationRoot, "/nonexistent",
 		"unset", "unset", "unset", "unset",
 	}, "|")
 	if string(out) != want {
 		t.Fatalf("qualified Podman environment = %q, want %q", out, want)
+	}
+	if held.configurationRoot == "" || held.configurationRoot == configHome {
+		t.Fatal("Podman inherited caller configuration")
+	}
+	entries, err := os.ReadDir(held.configurationRoot)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("runtime configuration is not empty: %v %v", entries, err)
+	}
+	if err := held.close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(held.configurationRoot); !os.IsNotExist(err) {
+		t.Fatalf("runtime configuration survived close: %v", err)
 	}
 }
 
@@ -211,7 +224,7 @@ func TestQualifiedRuntimeAcceptsSymlinkInstallButPinsResolvedBytes(t *testing.T)
 	if err != nil {
 		t.Fatalf("ordinary symlink runtime installation did not qualify: %v", err)
 	}
-	defer held.capability.Close()
+	defer held.close()
 	if err := os.Remove(link); err != nil {
 		t.Fatal(err)
 	}

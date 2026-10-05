@@ -95,6 +95,10 @@ func runDiskInspectionFixture(root string, args []string) int {
 		if finished == nil && mode == "daemon" {
 			id = "changed-daemon"
 		}
+		if os.Getenv("NKD_DISK_INSPECTION_FIXTURE_RUNTIME") == "podman" {
+			fmt.Printf("{\"host\":{\"arch\":%q,\"os\":\"linux\",\"hostname\":%q},\"store\":{\"graphDriverName\":\"overlay\",\"graphRoot\":\"/fixture/store\"},\"version\":{\"Version\":\"fixture\",\"OsArch\":%q}}", runtime.GOARCH, id, "linux/"+runtime.GOARCH)
+			return 0
+		}
 		fmt.Printf("%q", id)
 	case "image":
 		id := "sha256:" + strings.Repeat("4", 64)

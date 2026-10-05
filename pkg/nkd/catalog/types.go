@@ -56,6 +56,10 @@ type PackerConfig struct {
 	SSHPublicKeyVariable      string               `json:"sshPublicKeyVariable,omitempty"`
 	BuildLogDirectoryVariable string               `json:"buildLogDirectoryVariable,omitempty"`
 	HTTPDirectoryVariable     string               `json:"httpDirectoryVariable,omitempty"`
+	// AcquisitionArchive is an optional, exact output-directory-relative carrier
+	// of guest package capture bytes. It does not assert complete acquisition
+	// coverage or authenticate the package metadata reported inside the carrier.
+	AcquisitionArchive string `json:"acquisitionArchive,omitempty"`
 	// Variables are public, literal string values passed to source-owned Packer
 	// variables. They are build inputs, not a secret channel; future lowering must
 	// expose them in the invocation record and let the pinned Packer executable

@@ -199,6 +199,17 @@ func (owner *LocalRunResult) validateDiskInstalledInventory(ctx context.Context,
 		return err
 	}
 	defer release()
+	return owner.validateDiskInstalledInventoryWhileHeld(ctx, plan, expected, runtime, receipt, bindings)
+}
+
+// The caller holds the disk permit through the complete evidence join.
+func (owner *LocalRunResult) validateDiskInstalledInventoryWhileHeld(ctx context.Context, plan *Plan,
+	expected LifecycleOutputPlan, runtime *sbom.DiskInspectionRuntime, receipt *DiskInstalledInventoryReceipt,
+	bindings diskInventoryBindings,
+) error {
+	if receipt == nil || receipt.owner != owner || receipt.runtime != runtime || receipt.trace == nil || bindings == nil {
+		return e.New(e.CodeVerifyFailed, "disk inventory belongs to a different Run or inspector")
+	}
 	trace, err := owner.observeDiskMaterialsWhileHeld(ctx, plan, expected)
 	if err != nil {
 		return err

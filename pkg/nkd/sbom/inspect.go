@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,6 +26,37 @@ type DependencyInventory struct {
 	Components    []Component
 	Method        string
 	ScannerDigest string
+}
+
+// DependencyScanReceipt is issued only after the owning scanner has read the
+// exact held input. It authenticates that scan, not complete disk coverage or a
+// relationship to another artifact. Factory must bind it to the original Run.
+type DependencyScanReceipt struct {
+	subject   string
+	size      int64
+	kind      string
+	inventory DependencyInventory
+}
+
+// Binding identifies the bytes actually supplied to the scanner.
+func (receipt *DependencyScanReceipt) Binding() (subject string, size int64, kind string) {
+	if receipt == nil {
+		return "", 0, ""
+	}
+	return receipt.subject, receipt.size, receipt.kind
+}
+
+// Inventory returns diagnostic data; modifying it cannot alter the receipt.
+func (receipt *DependencyScanReceipt) Inventory() DependencyInventory {
+	if receipt == nil {
+		return DependencyInventory{}
+	}
+	result := receipt.inventory
+	result.Components = slices.Clone(result.Components)
+	for index := range result.Components {
+		result.Components[index] = cloneComponent(result.Components[index])
+	}
+	return result
 }
 
 // InspectDependencies reads exactly the observed bytes. Syft is an external,
@@ -61,6 +93,49 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 	if subject.Digest() != artifactDigest {
 		return DependencyInventory{}, e.New(e.CodeVerifyFailed, "SBOM subject bytes differ from producer digest")
 	}
+	return inspectHeldDependencies(ctx, subject, kind, scanner)
+}
+
+// InspectHeldDependencies consumes the existing held capability without opening
+// a caller-selected path. It does not transfer ownership. Unsupported disk/ISO
+// and generic archive formats fail before executing a scanner.
+func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner) (*DependencyScanReceipt, error) {
+	if err := validateSBOMContext(ctx); err != nil {
+		return nil, err
+	}
+	if subject == nil || subject.Size() <= 0 || subject.Size() > maxInspectionBytes {
+		return nil, e.New(e.CodeVerifyFailed, "dependency scan requires a bounded held subject")
+	}
+	if kind != "host-package" && kind != "oci-image" {
+		return nil, e.New(e.CodeEngineCapability, "held composition scan does not support artifact kind %q", kind)
+	}
+	if !canonical.IsDigest(scanner.Digest) || scanner.Path == "" {
+		return nil, e.New(e.CodeProvenanceMissing, "dependency inspection requires a pinned Syft executable")
+	}
+	if err := heldfile.RequireExecutableSupport(); err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "dependency scanner requires held executable support")
+	}
+	if err := subject.AssertUnchangedContext(ctx); err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "checking held dependency scan input")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	inventory, err := inspectHeldDependencies(ctx, subject, kind, scanner)
+	if err != nil {
+		return nil, err
+	}
+	if err := subject.AssertUnchangedContext(ctx); err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "rechecking held dependency scan input")
+	}
+	return &DependencyScanReceipt{subject: subject.Digest(), size: subject.Size(), kind: kind, inventory: inventory}, nil
+}
+
+func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner) (DependencyInventory, error) {
+	return inspectHeldDependencyReport(ctx, subject, kind, scanner, false)
+}
+
+func inspectHeldDependencyReport(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, packageMetadata bool) (DependencyInventory, error) {
+	artifactDigest := subject.Digest()
 	if kind == "tarball" {
 		components, err := inspectHelmArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
 		return DependencyInventory{Components: components, Method: "helm-manifests/v1"}, err
@@ -80,6 +155,9 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 	source := "file:" + childPath
 	if kind == "oci-image" {
 		source = "oci-archive:" + childPath
+	}
+	if kind == "docker-image" {
+		source = "docker-archive:" + childPath
 	}
 	var output, diagnostic boundedScanBuffer
 	workdir, err := os.MkdirTemp("", "nkd-sbom-scan-*")
@@ -112,6 +190,10 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 		return DependencyInventory{}, e.Wrap(e.CodeInternal, err, "writing isolated scanner configuration")
 	}
 	args := []string{"scan", source, "--output", "cyclonedx-json@1.5", "--config", config}
+	if packageMetadata {
+		args[3] = "syft-json"
+		args = append(args, "--select-catalogers", "+deb-archive-cataloger")
+	}
 	err = heldfile.RunContext(ctx, executable, args, heldfile.RunOptions{
 		Stdout: &output, Stderr: &diagnostic, TerminationGrace: time.Second,
 		Dir: workdir,
@@ -129,6 +211,9 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 			return DependencyInventory{}, e.Wrap(e.CodeVerifyFailed, err, "scanner subject changed during inspection")
 		}
 		_ = checked.Close()
+	}
+	if packageMetadata {
+		return filesystemDependenciesFromJSON(output.Bytes(), scanner.Digest)
 	}
 	var scanned struct {
 		BOMFormat   string `json:"bomFormat"`

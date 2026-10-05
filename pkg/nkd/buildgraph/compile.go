@@ -347,6 +347,7 @@ func packerConfig(config *catalog.PackerConfig) *ir.PackerConfig {
 		SSHPublicKeyVariable:      config.SSHPublicKeyVariable,
 		BuildLogDirectoryVariable: config.BuildLogDirectoryVariable,
 		HTTPDirectoryVariable:     config.HTTPDirectoryVariable,
+		AcquisitionArchive:        config.AcquisitionArchive,
 		Variables:                 variables,
 	}
 }

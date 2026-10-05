@@ -68,6 +68,7 @@ type PackerConfig struct {
 	SSHPublicKeyVariable      string               `json:"sshPublicKeyVariable,omitempty"`
 	BuildLogDirectoryVariable string               `json:"buildLogDirectoryVariable,omitempty"`
 	HTTPDirectoryVariable     string               `json:"httpDirectoryVariable,omitempty"`
+	AcquisitionArchive        string               `json:"acquisitionArchive,omitempty"`
 	Variables                 []PackerVariable     `json:"variables,omitempty"`
 }
 

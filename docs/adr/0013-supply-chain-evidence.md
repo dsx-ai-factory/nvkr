@@ -135,8 +135,38 @@ read-only inspection of the final disk, then reconciles both views. The material
 and package scanner are pinned tools and explicit Plan inputs. Missing tools or trace members, unreadable
 filesystems, unsupported encryption, scanner failure, or disagreement fails closed at admission or inspection.
 A catalog declaration may validate without those tools, but it is not a disk SBOM and cannot compile or publish.
-Disk Plan lowering, material tracing, inspection, reconciliation, and evidence publication are not implemented
-by the authoring schema.
+The authoring schema alone grants no disk evidence. The full-content operation selects an explicit
+Environment-native `diskInspectionProfiles` entry frozen in the Plan: the complete OCI image, inspector,
+codec, guestfish, Syft and dpkg-deb executable pins, CPU/RAM ceilings, scratch capacity minima,
+filesystem expansion bound and wall-time limit. Changing this observation profile changes Environment/Plan identity rather
+than the logical producer Build. The pinned tools own disk/filesystem, package and OCI grammars;
+NKD projects their observations and does not execute guest programs or package installation scripts.
+
+The original held Packer artifact retains its declared acquisition carrier before producer cleanup.
+The runtime owns capacity admission, snapshot creation, bounded offline content scanning, snapshot
+closure and permit release as one registered operation. Factory retains the original Run permit
+through inspection of the disk, base installer, staged material closure and captured guest APT archives.
+Reconciliation rejects absent input classes and installed package identities absent from those inspected
+inputs. The exact captured package bytes are separately read by pinned dpkg-deb before source-reported
+metadata is accepted. Every supported regular file is hashed; exact material matches describe
+correspondence without inventing file origin or package ownership. Loose-file hashing observes bytes,
+not their derivation.
+
+The process-local reconciliation receipt binds the original Run, named output, complete Plan, Build,
+QCOW2 digest/size and admitted inspection closure. Export revalidates those owners before copying the
+exact disk and returning its deterministic CycloneDX document. Descriptive documents, decoded receipts,
+equal-byte sibling Runs and shallow copies after owner closure cannot restore authority. The full-content
+helper, semantic reconciliation, private scratch and negative receipt contracts are implemented and
+contract-tested; complete native NKE content runs, original live joins, publication and production acceptance
+remain unexercised. Documents exceeding the existing 8 MiB bound fail without truncation. The conservative
+simultaneous export/RAM budget is an admission condition, not evidence of runner capacity or reservation.
+
+The helper checks the actual cgroup-v2 CPU, memory and process-count ceilings before reading the subject.
+The leaf must exactly match the frozen CPU/RAM values and the launcher's 256-process ceiling; unknown,
+unlimited, malformed, changed or tighter visible ancestor limits fail closed. This authenticates kernel
+limits visible through the current cgroup mount, not a reservation, hidden ancestor capacity, provider
+allocation or a hosted identity boundary. The generic APIs do not by themselves connect a production disk
+compiler, packaging consumer or publisher.
 
 The diagnostic guest package capture schema `nkd.dev/package-acquisitions/v1` has scope
 `apt-pre-install-pkgs` and target `amd64` or `arm64`. Its canonical JSON manifest is the first USTAR member,
@@ -146,9 +176,10 @@ locations per package, each at most 4,096 bytes. The owning held-archive verifie
 correspondence without extraction; package display metadata and locations remain source-reported descriptions.
 Header metadata and member padding are opaque digest-bound bytes, not canonical package evidence. Capture
 settings belong to the selected producer configuration. The [capture contract](../nke-os-acquisition-contract.md)
-describes the unpinned NKE candidate; live collection, source/Run/QCOW2 binding, origin authentication and
-complete disk reconciliation remain deferred. Neither this diagnostic observation nor its zero-value
-description authorizes production or substitutes for the full exact-QCOW2 inventory required above.
+describes the unpinned NKE candidate. The generic collector binds a selected carrier to its original
+Run/QCOW2; native capture coverage and repository-origin authentication remain unverified. Neither this
+diagnostic observation nor its zero-value description authorizes production or substitutes for the full
+exact-QCOW2 inventory required above.
 
 The optional local installed-package diagnostic uses a caller-selected, already-local
 exact image on its native Linux architecture. Its fixed launcher is unprivileged

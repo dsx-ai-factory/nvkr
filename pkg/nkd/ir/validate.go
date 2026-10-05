@@ -499,6 +499,9 @@ func validateVMImageNode(n Node) error {
 	if err := validateIRPackerConfig(n.ID, n.Packer); err != nil {
 		return err
 	}
+	if n.Packer.AcquisitionArchive != "" && n.Packer.AcquisitionArchive == n.ArtifactPath {
+		return e.New(e.CodeInvalidCatalog, "VM build node %q acquisition carrier is its disk payload", n.ID)
+	}
 	if err := validateMaterialBindings(n.ID, n.Materials); err != nil {
 		return err
 	}
@@ -541,6 +544,10 @@ func validateIRPackerConfig(nodeID string, config *PackerConfig) error {
 		!safeRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q has an unsafe Packer project path", nodeID)
+	}
+	if config.AcquisitionArchive != "" && (!safetext.Valid(config.AcquisitionArchive, 4096, false) ||
+		!safeRelativePath(config.AcquisitionArchive) || config.AcquisitionArchive == "." || strings.ContainsAny(config.AcquisitionArchive, "{}")) {
+		return e.New(e.CodeInvalidCatalog, "VM build node %q has an unsafe acquisition archive path", nodeID)
 	}
 	if !safetext.Valid(config.BuildName, 256, false) || strings.ContainsAny(config.BuildName, ",*?[]\\") {
 		return e.New(e.CodeInvalidCatalog,

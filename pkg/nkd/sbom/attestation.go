@@ -13,10 +13,14 @@ import (
 const BundleMediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
 const CycloneDXPredicateType = "https://cyclonedx.org/bom"
 
+// MaxDocumentBytes bounds complete inventory documents. Oversize evidence is
+// refused rather than truncated.
+const MaxDocumentBytes = 8 << 20
+
 // AttestedDocument decodes exact SBOM semantics from a Sigstore bundle. It does
 // not authenticate signatures; the signing adapter or enclosing release must do so.
 func AttestedDocument(raw []byte, subject string) ([]byte, error) {
-	if len(raw) > 8<<20 || !canonical.IsDigest(subject) {
+	if len(raw) > MaxDocumentBytes || !canonical.IsDigest(subject) {
 		return nil, e.New(e.CodeVerifyFailed, "invalid SBOM attestation input")
 	}
 	if err := canonical.ValidateJSONDocument(raw); err != nil {

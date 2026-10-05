@@ -223,6 +223,14 @@ published `SHA256SUMS`. A minimal exact-version QEMU source returned exit zero, 
 on stdout, and empty stderr. This probes plugin discovery and validation framing only, not NKE execution or disk
 production.
 
+The optional `packer.acquisitionArchive` names one exact output-directory-relative guest acquisition
+carrier, distinct from the disk artifact. It affects catalog/IR/Build identity and is collected from the same
+producer container before cleanup using the existing bounded archive transport. The original Packer
+artifact owns both held subjects until closure. Missing, changed, unsafe or malformed selected carriers
+fail closed; there is no caller-selected replacement. This field does not assert acquisition completeness
+or authenticate repository origin. Full disk evidence additionally requires ADR-13's live inspection and
+semantic reconciliation.
+
 `materials` is a one-to-one map from a source-owned binding name to another explicitly selected component in
 the same output's build graph. The target may be a from-source build or a digest-pinned acquisition. Unknown,
 excluded, self-referential, duplicate-target, cyclic, or omitted targets fail catalog validation or build-graph

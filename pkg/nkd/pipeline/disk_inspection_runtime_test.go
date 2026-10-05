@@ -427,6 +427,9 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 			}
 			defer subject.Close()
 			args := diskInspectionCreateArgs(selection, selection.Image, "owned-attempt", "attempt-token", subject)
+			if !slices.Equal(args[len(args)-3:], []string{"1000", "16384", "256"}) {
+				t.Fatalf("frozen helper resource grant not projected: %v", args)
+			}
 			if !slices.Contains(args, "--log-driver=none") {
 				t.Fatal("daemon log persistence was not disabled")
 			}
@@ -444,6 +447,31 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 						t.Fatalf("unexpected authority %q", arg)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestDiskInspectionCPUArgumentPreservesExactMillis(t *testing.T) {
+	subject, err := heldfile.FromBytesContext(t.Context(), []byte("subject"), heldfile.Options{Label: "CPU argv", MaxBytes: 32})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	for _, tt := range []struct {
+		cpu  uint64
+		want string
+	}{
+		{10, "--cpus=0.010"},
+		{2001, "--cpus=2.001"},
+		{math.MaxUint64, "--cpus=18446744073709551.615"},
+	} {
+		t.Run(strconv.FormatUint(tt.cpu, 10), func(t *testing.T) {
+			selection := testDiskInspectionSelection(t)
+			selection.Resources.CPUMillis = tt.cpu
+			args := diskInspectionCreateArgs(selection, selection.Image, "name", "attempt", subject)
+			if !slices.Contains(args, tt.want) || args[len(args)-3] != strconv.FormatUint(tt.cpu, 10) {
+				t.Fatalf("CPU grant rounded during projection: %v", args)
 			}
 		})
 	}

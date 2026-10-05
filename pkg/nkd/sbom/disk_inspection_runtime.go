@@ -47,6 +47,35 @@ func (runtime *DiskInspectionRuntime) Close() error {
 	return runtime.container.Close()
 }
 
+func (runtime *DiskInspectionRuntime) SelectionContext(ctx context.Context) (pipeline.DiskInspectionSelection, error) {
+	if runtime == nil {
+		return pipeline.DiskInspectionSelection{}, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+	}
+	return runtime.container.SelectionContext(ctx)
+}
+
+func (runtime *DiskInspectionRuntime) InspectPackerContent(ctx context.Context, artifact *pipeline.PackerArtifact, platform string) (*DiskContentInspection, error) {
+	if runtime == nil {
+		return nil, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+	}
+	observation, err := runtime.container.InspectPackerContent(ctx, artifact, platform)
+	if err != nil {
+		return nil, err
+	}
+	return contentFromContainerObservation(observation)
+}
+
+func (runtime *DiskInspectionRuntime) InspectPackerAcquisitionsContent(ctx context.Context, artifact *pipeline.PackerArtifact, platform string) (*DiskContentInspection, error) {
+	if runtime == nil {
+		return nil, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+	}
+	observation, err := runtime.container.InspectPackerAcquisitionsContent(ctx, artifact, platform)
+	if err != nil {
+		return nil, err
+	}
+	return contentFromContainerObservation(observation)
+}
+
 // InspectHeldInstalledPackages accepts only held subject authority. The fixed
 // container helper uses the existing exact held probe/inspector boundary; this
 // owner authenticates its returned metadata against the opaque container result.
