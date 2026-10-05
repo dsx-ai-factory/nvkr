@@ -1,8 +1,6 @@
 package factory
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,9 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/releaseasset"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
@@ -186,48 +184,13 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 	if _, err := archive.Seek(0, io.SeekStart); err != nil {
 		return e.Wrap(e.CodeInternal, err, "rewinding tool archive")
 	}
-	gzipReader, err := gzip.NewReader(archive)
+	member, err := releaseasset.SelectTarGzip(ctx, archive, node.Executable, releaseasset.Limits{
+		ExecutableBytes: maxFactoryToolBytes, ExpandedBytes: maxFactoryToolExpandedBytes, Entries: maxFactoryToolEntries,
+	})
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening tool archive")
+		return err
 	}
-	defer func() { _ = gzipReader.Close() }()
-	tarReader := tar.NewReader(gzipReader)
-	var member []byte
-	var expanded int64
-	entries := 0
-	for {
-		header, nextErr := tarReader.Next()
-		if nextErr == io.EOF {
-			break
-		}
-		if nextErr != nil {
-			return e.Wrap(e.CodeVerifyFailed, nextErr, "reading tool archive")
-		}
-		entries++
-		if entries > maxFactoryToolEntries || header.Size < 0 || header.Size > maxFactoryToolExpandedBytes-expanded {
-			return e.New(e.CodeVerifyFailed, "tool %s archive exceeds expanded size or entry bounds", node.ID)
-		}
-		expanded += header.Size
-		name := strings.TrimPrefix(filepath.ToSlash(filepath.Clean(header.Name)), "./")
-		if name != node.Executable {
-			written, err := copyContext(ctx, io.Discard, io.LimitReader(tarReader, header.Size))
-			if err != nil || written != header.Size {
-				return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "discarding tool archive member"))
-			}
-			continue
-		}
-		if header.Typeflag != tar.TypeReg || header.Size < 0 || header.Size > maxFactoryToolBytes || member != nil {
-			return e.New(e.CodeVerifyFailed, "tool %s executable member is repeated, non-regular, or oversized", node.ID)
-		}
-		var captured strings.Builder
-		captured.Grow(int(header.Size))
-		written, err := copyContext(ctx, &captured, io.LimitReader(tarReader, header.Size+1))
-		if err != nil || written != header.Size {
-			return e.Wrap(e.CodeVerifyFailed, err, "reading tool executable member")
-		}
-		member = []byte(captured.String())
-	}
-	if member == nil || pipeline.FileDigest(member) != node.ExecutableDigest {
+	if pipeline.FileDigest(member) != node.ExecutableDigest {
 		return e.New(e.CodeVerifyFailed, "tool %s executable does not match %s", node.ID, node.ExecutableDigest)
 	}
 	if err := writeFactoryFile(ctx, output.Path, member, 0o555); err != nil {

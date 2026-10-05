@@ -181,6 +181,12 @@ type FlakePin struct {
 // authoritative source, avoiding duplicate semantic entries. A component is prebuilt XOR
 // from-source XOR an exclusion — declaring both fromSource and prebuilt fails closed.
 type Prebuilt struct {
+	// ReleaseExecutable selects the referenced source's pinned release executable.
+	// Authored URLs and component artifact pins are absent in this form: the
+	// existing source ToolPin owns archive and executable identity together.
+	ReleaseExecutable bool `json:"releaseExecutable,omitempty"`
+	// Executable is loader-resolved only; registries must not author it.
+	Executable *ToolPin          `json:"executable,omitempty"`
 	OCIArchive string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
 	Chart      *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
 	URL        string            `json:"url,omitempty"`

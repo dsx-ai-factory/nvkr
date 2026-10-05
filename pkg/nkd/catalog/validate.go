@@ -422,6 +422,19 @@ func validateComponent(name string, c Component) error {
 // digests are checked in sorted order so the first error is deterministic.
 func validatePrebuilt(name string, c Component) error {
 	p := c.Prebuilt
+	if p.ReleaseExecutable {
+		return e.New(e.CodeInvalidCatalog, "unresolved release executable for %q", name)
+	}
+	if p.Executable != nil {
+		if err := validateToolPin(*p.Executable); err != nil {
+			return err
+		}
+		arch := strings.TrimPrefix(p.Executable.Platform, "linux/")
+		if c.OutputType != "host-package" || len(c.Platforms) != 1 || c.Platforms[0] != p.Executable.Platform ||
+			p.URL != p.Executable.URL || len(p.Digests) != 1 || p.Digests[arch] != p.Executable.ExecutableDigest {
+			return e.New(e.CodeInvalidCatalog, "release executable %q disagrees with its exact source tool pin", name)
+		}
+	}
 	if p.Chart != nil {
 		return e.New(e.CodeInvalidCatalog, "unresolved chart acquisition for %q", name)
 	}

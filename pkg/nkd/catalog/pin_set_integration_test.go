@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -381,22 +382,22 @@ func TestPinSetImageRuntimeSelection(t *testing.T) {
 				}
 				fixture.registry.Components["image"] = image
 				fixture.writeRegistry(t)
-				bin := t.TempDir()
-				runtime := filepath.Join(bin, "docker")
-				if custom {
-					runtime = filepath.Join(bin, "podman")
-				}
 				digest := "sha256:" + strings.Repeat("a", 64)
-				script := "#!/bin/sh\n[ \"$#\" = 3 ] && [ \"$1\" = manifest ] && [ \"$2\" = inspect ] && [ \"$3\" = 'example.invalid/tool:" + version + "' ] || exit 91\nprintf '%s' '{\"manifests\":[{\"digest\":\"" + digest + "\",\"platform\":{\"os\":\"linux\",\"architecture\":\"amd64\"}}]}'\n"
-				if err := os.WriteFile(runtime, []byte(script), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 				request := SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.0.0"}
 				if custom {
-					request.Runtime = runtime
+					request.Runtime = "unused-legacy-runtime"
 				}
-				if _, err := UpdateSourcePins(t.Context(), request); err != nil {
+				resolveArtifact := func(ctx context.Context, selected PrebuiltTarget, runtime string) (ArtifactPin, error) {
+					wantRuntime := "docker"
+					if custom {
+						wantRuntime = request.Runtime
+					}
+					if runtime != wantRuntime || selected.Image != "example.invalid/tool:"+version {
+						t.Fatalf("maintenance projection = %q, %q", runtime, selected.Image)
+					}
+					return ArtifactPin{Tag: selected.Tag, Digests: map[string]string{"amd64": digest}}, nil
+				}
+				if _, err := updateSourcePinsWithArtifacts(t.Context(), request, ListTags, ResolvePin, resolveArtifact); err != nil {
 					t.Fatal(err)
 				}
 				if got := fixture.lock(t).Artifacts["image"].Digests["amd64"]; got != digest {

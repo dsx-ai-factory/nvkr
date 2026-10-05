@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/releaseasset"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -100,7 +102,9 @@ func (l Local) pullBinary(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	fmt.Fprintf(opts.Stdout, "\n=== pull %s (%s) ===\n", n.Component, n.Artifact)
 	var sum string
 	var size int64
-	if strings.HasPrefix(n.Artifact, ir.OCIBlobScheme) {
+	if n.ExecutableArchive != nil {
+		sum, size, err = downloadReleaseExecutable(opts.ctx(), n, dir, name)
+	} else if strings.HasPrefix(n.Artifact, ir.OCIBlobScheme) {
 		sum, size, err = downloadOCIBlobVerify(opts.ctx(), n.Artifact, dir, name, n.Digest)
 	} else {
 		sum, size, err = downloadVerify(opts.ctx(), n.Artifact, dir, name, n.Digest)
@@ -124,6 +128,67 @@ func (l Local) pullBinary(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		}
 	}
 	return res, nil
+}
+
+// downloadReleaseExecutable verifies the archive before selecting any member,
+// then verifies the executable separately before atomic output publication.
+// The carrier remains private and is never passed to a shell or extracted to disk.
+func downloadReleaseExecutable(ctx context.Context, node ir.Node, root, relative string) (string, int64, error) {
+	client := &http.Client{Timeout: 10 * time.Minute, CheckRedirect: func(request *http.Request, via []*http.Request) error {
+		if request.URL.Scheme != "https" || request.URL.User != nil || len(via) >= 10 {
+			return e.New(e.CodeFetchFailed, "unsafe release executable redirect")
+		}
+		return nil
+	}}
+	return downloadReleaseExecutableWithClient(ctx, node, root, relative, client)
+}
+
+func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root, relative string, client *http.Client) (string, int64, error) {
+	if ctx == nil || client == nil || node.ExecutableArchive == nil {
+		return "", 0, e.New(e.CodeUsage, "release acquisition requires a context, client and archive pin")
+	}
+	if err := ctx.Err(); err != nil {
+		return "", 0, e.Wrap(e.CodeTimeout, err, "release acquisition canceled")
+	}
+	if err := node.Validate(); err != nil {
+		return "", 0, err
+	}
+	carrier, err := os.MkdirTemp(root, ".release-executable-")
+	if err != nil {
+		return "", 0, e.Wrap(e.CodeFetchFailed, err, "creating private release carrier")
+	}
+	defer func() { _ = os.Remove(carrier) }()
+	const maxReleaseBytes = 256 << 20
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, node.Artifact, nil)
+	if err != nil {
+		return "", 0, e.Wrap(e.CodeFetchFailed, err, "creating release request")
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeFetchFailed, err, "fetching release archive"), "acquiring release executable")
+	}
+	defer response.Body.Close()
+	const archiveName = "asset.tar.gz"
+	defer func() { _ = os.Remove(filepath.Join(carrier, archiveName)) }()
+	if response.StatusCode != http.StatusOK {
+		return "", 0, e.New(e.CodeFetchFailed, "release archive returned HTTP %d", response.StatusCode)
+	}
+	if _, _, err := writeVerifiedDownload(ctx, response.Body, node.Artifact, carrier, archiveName,
+		node.ExecutableArchive.Digest, maxReleaseBytes); err != nil {
+		return "", 0, err
+	}
+	held, _, err := securepath.OpenRegular(filepath.Join(carrier, archiveName))
+	if err != nil {
+		return "", 0, e.Wrap(e.CodeVerifyFailed, err, "opening authenticated release carrier")
+	}
+	defer held.Close()
+	member, err := releaseasset.SelectTarGzip(ctx, held, node.ExecutableArchive.Member, releaseasset.Limits{
+		ExecutableBytes: maxReleaseBytes, ExpandedBytes: 1 << 30, Entries: 4096,
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	return writeVerifiedDownload(ctx, bytes.NewReader(member), node.Artifact, root, relative, node.Digest, maxReleaseBytes)
 }
 
 // downloadVerify streams url into a private sibling while hashing, and publishes it

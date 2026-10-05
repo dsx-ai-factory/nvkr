@@ -223,11 +223,7 @@ func printReport(rep *pipeline.Report) {
 	}
 	fmt.Printf("\n──────── nkdctl build report ────────\n")
 	fmt.Printf("buildDigest:  %s\n\n", rep.BuildDigest)
-	if rep.Qualified() {
-		fmt.Printf("authority:     qualified execution (%s)\n\n", orNone(rep.QualificationProfileDigest()))
-	} else {
-		fmt.Printf("authority:     UNQUALIFIED DEVELOPMENT OUTPUT — cannot attest, release, or claim reproduction\n\n")
-	}
+	fmt.Printf("authority:     %s\n\n", reportAuthorityLabel(rep.Qualified(), rep.QualificationProfileDigest()))
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "NODE\tKIND\tSTATUS\tDURATION")
 	for _, n := range rep.Nodes {
@@ -246,5 +242,18 @@ func printReport(rep *pipeline.Report) {
 			fmt.Fprintf(aw, "%s\t%s\t%s\t%d\n", a.Component, a.OutputType, a.SHA256, a.Size)
 		}
 		aw.Flush()
+	}
+}
+
+// reportAuthorityLabel describes an existing marker; it grants no authority.
+// Profile-free acquisition has no measured execution or reproduction claim.
+func reportAuthorityLabel(qualified bool, profileDigest string) string {
+	switch {
+	case !qualified:
+		return "UNQUALIFIED DEVELOPMENT OUTPUT, cannot attest, release, or claim reproduction"
+	case profileDigest == "":
+		return "verified acquired bytes, no execution qualification or reproduction claim"
+	default:
+		return fmt.Sprintf("qualified execution (%s)", profileDigest)
 	}
 }

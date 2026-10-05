@@ -1,7 +1,12 @@
 # Diagnostic disk inspection runtime
 
-This image supplies upstream `virt-inspector`, libguestfs, a Linux appliance
-kernel and QEMU. It is not a published or qualified NKD toolchain. The Dockerfile
+This image supplies upstream `virt-inspector`, `guestfish`, libguestfs, a Linux
+appliance kernel, QEMU, `dpkg-deb` and the exact native Syft archive selected by
+the source lock for the full content helper. The build records package inventory
+and the inspector/codec/guestfish/package-reader/scanner executable hashes.
+This source configuration is not a measured, published or qualified NKD toolchain.
+Both native `images` slots and license/security approval gates remain unresolved.
+The Dockerfile
 uses an exact official Ubuntu 24.04 base, the existing Packer toolchain's
 certificate image and signed archive snapshot. The named package versions were resolved from that snapshot
 for both AMD64 and ARM64. Transitive packages remain inside the same frozen,
@@ -16,17 +21,61 @@ identity, executable hashes and package inventory; no tag is an authority pin:
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOTOOLCHAIN=local \
   go build -trimpath -buildvcs=false \
   -o bin/nkd-disk-inspect-arm64 ./cmd/nkd-disk-inspect
-podman build --build-arg TARGETARCH=arm64 \
+podman build --platform linux/arm64 --build-arg TARGETARCH=arm64 \
   -f toolchains/nkd-disk-inspect/Dockerfile \
-  -t nkd-disk-inspect:local .
+  -t localhost/nkd-disk-inspect:local-arm64 .
 ```
 
-Use `GOARCH=amd64`, `bin/nkd-disk-inspect-amd64` and `TARGETARCH=amd64` on an
-AMD64 host. Docker is admitted by the adapter and argument contracts, but this
+The separate native AMD64 command is:
+
+```sh
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local \
+  go build -trimpath -buildvcs=false \
+  -o bin/nkd-disk-inspect-amd64 ./cmd/nkd-disk-inspect
+podman build --platform linux/amd64 --build-arg TARGETARCH=amd64 \
+  -f toolchains/nkd-disk-inspect/Dockerfile \
+  -t localhost/nkd-disk-inspect:local-amd64 .
+```
+
+Run each assembly on its matching Linux host after the final helper source is
+composed and tested. Crosscompiling the helper does not exercise it, and merely
+selecting `--platform` does not prove a native host. There is no inspector build
+script or image publisher here. Docker is admitted by the adapter and argument contracts, but this
 inspection route has been exercised only with Podman; no Docker daemon run is
 recorded here. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
+
+### Local measurement, not publication admission
+
+On each native host, set `inspection_arch` to `amd64` or `arm64` for the image
+just built. Inspect its OS/architecture and retain its observed local ID, then
+read the five executable hashes and package inventory from those same local
+bytes. These commands do not pull, mount host paths, inspect credentials or
+publish anything:
+
+```sh
+inspection_arch=arm64
+inspection_image="localhost/nkd-disk-inspect:local-${inspection_arch}"
+podman image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' "${inspection_image}"
+inspection_id="$(podman image inspect --format '{{.Id}}' "${inspection_image}")"
+podman run --rm --pull=never --platform "linux/${inspection_arch}" \
+  --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --user 65534:65534 --entrypoint sha256sum "${inspection_id}" \
+  /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish \
+  /usr/local/bin/syft /usr/bin/dpkg-deb /usr/local/bin/nkd-disk-inspect
+podman run --rm --pull=never --platform "linux/${inspection_arch}" \
+  --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --user 65534:65534 --entrypoint cat "${inspection_id}" \
+  /usr/share/nkd-disk-inspect/packages.tsv
+```
+
+Use `inspection_arch=amd64` on the separate AMD64 host. Record the exact source
+commit, runtime, image ID and full output together. Local IDs and these measurement
+commands are diagnostic descriptions; they do not authenticate the sandbox or
+replace a reviewed native repository digest, license/security review, full-content
+runtime exercise, or original live Run evidence. Publication needs its separately
+approved owner workflow; none is supplied by these commands.
 
 The opt-in `TestDiskInspectionRuntimeReal` and
 `TestDiskInspectionRuntimeInventoryReal` accept

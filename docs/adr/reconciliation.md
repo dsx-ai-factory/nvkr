@@ -346,6 +346,35 @@ Qualified interfaces require package-issued opaque receipts. Caller structs, pat
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the
 owning signed protocol, never serialization of an in-process capability.
 
+## Maintained M2 input candidate
+
+The combined M2 Definition selects 34 named outputs: the existing ten CLI/controller/chart/operator/disk
+outputs plus twelve third-party runtime images for each native architecture. The human-selected image mode
+uses pinned NKE deployment values, not chart defaults; optional chart-test images remain separate. Native
+AMD64 and ARM64 image manifests were resolved with the existing artifact-pin owner, and all 24 media
+read-backs report supported gzip layers. The separate source-owner checkpoint for NKE images outside the
+disk remains an explicit ownership question. Configurable charts do not imply image delivery or topology.
+
+The refreshed native image pin owner uses the existing pinned OCI library and bounded anonymous HTTPS
+transport. It authenticates native manifest/config bytes, rejects ambiguous or substituted descriptors and
+preserves OCI/Docker schema-2 subjects. A fresh read-only owner diagnostic matched all 24 maintained native
+digests; no lock or registry object changed. Layer scans and publication remain separate acceptance gates.
+
+Four OS/material source entries are machine-pinned at the exact capture-capable NKE commit without
+creating a release tag. The generic commit-pin path shares Git acquisition and atomic lock writing;
+GitHub actions and release-tool sources remain release-tag-only. Operator acquisition shares the source
+tool lock's separate archive and executable pins and the standard-library archive selector. Real official
+Helm/kubectl downloads and terminal re-hashes passed in the recorded acquisition diagnostics; no qualification
+or reproduction claim is made.
+
+The [input evidence map](../m2-input-evidence-map-2026-10-05.md) records exact pins, media, matrix obligations,
+the existing publication/signing target and remaining gaps. Native capture graph contracts depend on the
+separately reviewed acquisition-carrier schema and runtime implementation. The rebased maintained-input
+slice has focused acquisition, pinning and image-membership contract tests; full integrated and Linux gates
+remain separate. Published approved toolchain pins, native execution classes, full inspection profiles,
+actual capture-enabled bakes and production/consumer evidence remain required. No placeholder class/image
+pin or fictitious full M2 acceptance is substituted.
+
 ## Output-only implementation
 
 The current implementation uses Definition v4: named outputs select components and concrete target platforms.

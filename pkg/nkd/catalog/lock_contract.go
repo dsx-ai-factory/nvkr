@@ -174,6 +174,11 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 		if raw.Prebuilt == nil {
 			continue
 		}
+		if raw.Prebuilt.ReleaseExecutable {
+			// Source.Tool owns this executable's archive and content pins. Keeping
+			// it out of prebuilt also rejects a duplicate artifact lock entry.
+			continue
+		}
 		prebuilt[name] = raw
 		if len(raw.Prebuilt.Digests) != 0 {
 			return e.New(e.CodeInvalidCatalog,

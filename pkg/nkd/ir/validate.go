@@ -683,7 +683,7 @@ func validateMaterialDependencies(node Node, byID map[string]Node, fetchID strin
 func validatePullNode(n Node) error {
 	if err := rejectUnexpectedNodeFields(n, allowFields(
 		"component", "artifact", "digest", "platform", "network", "env",
-		"outputType", "artifactPath", "version")); err != nil {
+		"outputType", "artifactPath", "version", "executableArchive")); err != nil {
 		return err
 	}
 	if !canonicalNodeID.MatchString(n.Component) || n.ID != "pull-"+n.Component {
@@ -710,6 +710,12 @@ func validatePullNode(n Node) error {
 	}
 	if err := validatePullArtifact(n); err != nil {
 		return err
+	}
+	if n.ExecutableArchive != nil {
+		if n.OutputType != "host-package" || !strings.HasPrefix(n.Artifact, "https://") ||
+			!safeRelativePath(n.ExecutableArchive.Member) || !canonical.IsDigest(n.ExecutableArchive.Digest) {
+			return e.New(e.CodeInvalidCatalog, "release executable %q requires a pinned HTTPS archive and exact regular member", n.ID)
+		}
 	}
 	switch n.OutputType {
 	case "oci-image":

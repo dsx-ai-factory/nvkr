@@ -124,10 +124,24 @@ their owning catalog boundary before maintenance validates the resulting referen
 
 - `catalog pin --dir <catalog> --tag vX.Y.Z <source>` — resolve that tag to
   `{tag, commit, treeHash, sourceDateEpoch}` and update the lock.
+- `catalog pin --dir <catalog> --commit <full-commit> <source>` pins an exact Git
+  source revision through the same acquisition and atomic lock writer. It cannot
+  be combined with `--tag` or bump. The held Git commit, tree and epoch are checked;
+  the lock's descriptive `tag` is that full commit, not an invented release tag.
+  GitHub actions and release-tool sources retain their exact release-tag contract
+  and reject this option before source acquisition. This permits candidate source
+  integration without making a release or governance approval claim.
 - `catalog bump --dir <catalog> [--all] [source...]` — resolve the newest tag matching each selected source's
   `constraint` (e.g. `1.32.x`). `--all` selects independent roots and visits each explicitly nested set once.
 - `catalog pin-artifacts --dir <catalog> [--all] [component...]` — resolve the complete declared architecture
   set of prebuilt digests through the existing URL or image acquisition path.
+
+An authored digest-qualified image reference may select an upstream index while
+its artifact lock selects each declared native manifest. The compiler uses the
+existing OCI reference parser to retain repository transport and the locked
+native subject separately; it never concatenates two digest suffixes or treats
+an index digest as a different native manifest. Fixed source-reviewed image refs
+are ordinary acquired producers, not automatically extracted chart pin-set members.
 - `catalog pin` and `catalog bump` accept `--check`: resolve and print the complete update without writing.
 - **Derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
   error naming its umbrella; bumping the umbrella is **one operation** that re-derives and rewrites the umbrella
@@ -224,8 +238,17 @@ dependencies:
 Pinning `platform` resolves `controller/v0.9.3` and pins helper version `2.0.0` through its existing
 artifact-pin path, recording a digest for each declared architecture. Every resulting member pin records
 `derivedFrom: platform@<full-commit>`. The umbrella and all affected pins commit together.
-`catalog pin` and `catalog bump` accept `--runtime` for acquired image manifest inspection
-(default `docker`), including images whose versions come through derived sources.
+Image pinning uses the already pinned OCI library against anonymous HTTPS registries,
+not a runtime CLI's manifest projection. Index selection requires exactly one baseline
+Linux native descriptor for each requested architecture (unvariant AMD64; unvariant or
+baseline `v8` ARM64), authenticates the native manifest/config bytes and platform, and
+preserves OCI or Docker schema-2 native manifest identity. Nested indexes, ambiguous
+matches, constrained OS variants and substituted subjects fail closed. Metadata I/O is
+bounded to 8 MiB per response and five minutes. These pin read-backs do not authenticate
+layers or grant image-delivery, scanner or publication acceptance.
+`catalog pin`, `catalog bump` and `catalog pin-artifacts` retain `--runtime` (and the
+artifact command's `--docker` alias) only for maintenance API compatibility; it no longer
+selects a process or ambient runtime credentials for image pinning.
 
 **Explicit membership.** Each member names exactly one source or acquired artifact, with a reciprocal
 `pinnedBy` declaration. An acquired member has no `source`. Every record in a selector-addressed collection
@@ -375,6 +398,16 @@ These hashes pin acquired bytes; they do not establish an upstream signature or 
 The resolved catalog snapshot includes tool pins. Definition selects tools by purpose, and compilation
 requires each selected catalog tool to match the utility execution platform. Missing pins, invalid formats
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
+
+An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`
+with one matching-platform source tool declaration. The source tool lock owns
+both transport and selected executable pins; a second component artifact lock,
+authored URL/image/chart or resolved executable record is rejected. Raw assets
+retain their bytes. A tar-gzip asset uses the standard-library codecs to select
+one exact bounded regular member after archive verification, then rechecks the
+executable digest. Archive selection is byte-preserving acquisition, not a build
+or an upstream authenticity claim. The selected executable and transport/member
+pins participate in logical Build identity; transport locations do not.
 
 ## GitHub action dependencies
 

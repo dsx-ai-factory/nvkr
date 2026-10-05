@@ -125,6 +125,18 @@ func validatePinSets(reg *registryDoc) error {
 		if raw.Prebuilt != nil && raw.Prebuilt.OCIArchive != "" {
 			return e.New(e.CodeInvalidCatalog, "component %q authors resolved ociArchive; declare chart instead", name)
 		}
+		if raw.Prebuilt != nil && raw.Prebuilt.Executable != nil {
+			return e.New(e.CodeInvalidCatalog, "component %q authors a resolved executable pin; declare releaseExecutable instead", name)
+		}
+		if raw.Prebuilt != nil && raw.Prebuilt.ReleaseExecutable {
+			source, ok := reg.Sources[raw.Source]
+			if !ok || source.Tool == nil || raw.PinnedBy != "" || raw.FromSource ||
+				raw.Prebuilt.URL != "" || raw.Prebuilt.Image != "" || raw.Prebuilt.Chart != nil ||
+				len(raw.Prebuilt.Digests) != 0 || len(raw.Platforms) != 1 || raw.Platforms[0] != source.Tool.Platform ||
+				raw.OutputType != "host-package" {
+				return e.New(e.CodeInvalidCatalog, "release executable %q requires one matching tool-source platform, host-package output and no competing acquisition", name)
+			}
+		}
 		if raw.Prebuilt != nil && raw.Prebuilt.Chart != nil {
 			if raw.Prebuilt.URL != "" || raw.Prebuilt.Image != "" || raw.OutputType != "raw" {
 				return e.New(e.CodeInvalidCatalog, "chart %q requires outputType raw and no url/image", name)

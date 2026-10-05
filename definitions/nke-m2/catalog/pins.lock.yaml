@@ -1,0 +1,29 @@
+# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
+apiVersion: nkd.dev/lock/v1
+kind: PinLock
+pins:
+  helm:
+    commit: 05fa37973dc9e42b76e1d2883494c87174b6074f
+    sourceDateEpoch: 1775710686
+    tag: v4.1.4
+    tool:
+      archiveDigest: sha256:70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09
+      executableDigest: sha256:210d576a6dc04b7864af4b5d9a5af58860bbc03d19174ffeddbd29d01d1b59a9
+      executablePath: linux-amd64/helm
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz
+    treeHash: 0d1b8951004def309b5788c4aad4a1249bfe70fe
+  kubectl:
+    commit: 0f29094e5b73085e3802ecc1298ecae13866bfe6
+    goVersion: 1.26.5
+    sourceDateEpoch: 1784743658
+    tag: v1.36.3
+    tool:
+      archiveDigest: sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
+      executableDigest: sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
+      executablePath: kubectl
+      format: raw
+      platform: linux/amd64
+      url: https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl
+    treeHash: 3194a85fa3325c21657eb21aff2a34ede1478c3f

@@ -36,6 +36,26 @@ func ResolvePin(ctx context.Context, src Source, tag string) (Pin, error) {
 	if err != nil {
 		return Pin{}, err
 	}
+	return resolveSourceRevision(ctx, src, tag, commit)
+}
+
+// ResolveCommitPin pins one exact Git revision without pretending it is a release
+// tag. The lock's descriptive tag is the full commit reported by the held tree;
+// release tools and GitHub actions retain their exact-release-tag contract.
+func ResolveCommitPin(ctx context.Context, src Source, commit string) (Pin, error) {
+	if err := pinContextError(ctx); err != nil {
+		return Pin{}, err
+	}
+	if err := validateSourceKind(src); err != nil {
+		return Pin{}, err
+	}
+	if !fullSHA.MatchString(commit) || src.Kind == SourceGitHubAction || src.Tool != nil {
+		return Pin{}, e.New(e.CodeInvalidCatalog, "exact commit pin requires a full Git commit and a source without a release tool or GitHub action")
+	}
+	return resolveSourceRevision(ctx, src, commit, commit)
+}
+
+func resolveSourceRevision(ctx context.Context, src Source, tag, commit string) (Pin, error) {
 	tmp, err := os.MkdirTemp("", "nkd-pin-")
 	if err != nil {
 		return Pin{}, e.Wrap(e.CodeFetchFailed, err, "temp dir")
@@ -53,6 +73,10 @@ func ResolvePin(ctx context.Context, src Source, tag string) (Pin, error) {
 			}
 			return Pin{}, e.Wrap(e.CodeFetchFailed, err, "git %s: %s", strings.Join(args, " "), out)
 		}
+	}
+	heldCommit, err := gitAt(ctx, tmp, "rev-parse", "FETCH_HEAD^{commit}")
+	if err != nil || strings.TrimSpace(heldCommit) != commit {
+		return Pin{}, e.Wrap(e.CodeFetchFailed, err, "fetched revision does not match exact source commit %s", commit)
 	}
 	tree, err := gitAt(ctx, tmp, "rev-parse", commit+"^{tree}")
 	if err != nil {

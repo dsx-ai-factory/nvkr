@@ -125,6 +125,11 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				ArtifactPath: prebuiltArtifactName(nc),
 				Version:      catalog.NormalizeVersion(nc.Tag),
 			})
+			if tool := nc.Prebuilt.Executable; tool != nil && tool.Format == "tar-gzip" {
+				g.Nodes[len(g.Nodes)-1].ExecutableArchive = &ir.ExecutableArchive{
+					Digest: tool.ArchiveDigest, Member: tool.ExecutablePath,
+				}
+			}
 			continue
 		}
 		if !nc.FromSource {

@@ -1,0 +1,70 @@
+# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
+apiVersion: nkd.dev/lock/v1
+artifacts:
+  csi-node-driver-registrar-image:
+    digests:
+      amd64: sha256:1ca23bdbb1504e41233d527e826d02dac98571c45a6cd74c5fb28be485d680fa
+      arm64: sha256:0898bf569379e23a39b9dbd640934c4b9e2563b2c023cbad3e8f686167fd8b99
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  postgresql-image:
+    digests:
+      amd64: sha256:9ca5fe8db49a439acdfda55fcbd6ff1c44bc84facf5e775b7e170434d61ce18c
+      arm64: sha256:b3dec5235745879ca095c08c230e5a53825f7cd795bcee6e6ac88eed91267d28
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  spiffe-csi-image:
+    digests:
+      amd64: sha256:b98766c90387033702ef64a3a4dce1aae252cb741b3ac2ef13f271dd7660bb1e
+      arm64: sha256:6bfd786d4ffd3f7435659a7b923d819a7a0bcc55cd05673908915d433e86c0a2
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  spire-agent-image:
+    digests:
+      amd64: sha256:0d9c792d7f409b748d3a1fc93fe70b6d1450474c177d2a731ddc36e97a17e9fe
+      arm64: sha256:0c94e29f29a13c885294ae73755033040438117ca6c1e257318c5df0868290ac
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  spire-bash-image:
+    digests:
+      amd64: sha256:d49c2b6585ac8e6341adfe8cb214a656914ab5390fb7804a7ed9e90a5b785fba
+      arm64: sha256:8d29611142077489b9863426dfccf935c5ee9a27a3548d726c16de32692e71e3
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  spire-controller-manager-image:
+    digests:
+      amd64: sha256:fb3bfc8f98f24c769004543d6b760142380c8f2d3a0354391ee2bfdd48039e59
+      arm64: sha256:99dae65b7e207a7d34f9bef2aff901d6cbba40bd5ed31093ebf51e6a063783bc
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  spire-oidc-image:
+    digests:
+      amd64: sha256:32f5e7d7b6329ed9dff97ad374e11d9156c43611ecfcb0693b7ca085b5328cdf
+      arm64: sha256:6adc68d480f285e586edb67f4053bfb8923816a02486bf22d117e29bdee54a78
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  spire-server-image:
+    digests:
+      amd64: sha256:3aa2dce70fc1098d6718a87c629aa8cadb83e4672c71dd63c5575ea5d0603789
+      arm64: sha256:b2fb59ac8ec292b2d0e3685008b4a72726fc2298923a569ada9b2700f8b86380
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  spire-tpm-server-image:
+    digests:
+      amd64: sha256:0ba43be0bd5cee7afc54fb351989692ddd07c106111ecda3cf6e9cbe23da137c
+      arm64: sha256:d5a0bd84d06ce4a7cd8d0cc5f7f05ca041ed3e1cdd0f8fd129831d871669f2bf
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  temporal-admin-tools-image:
+    digests:
+      amd64: sha256:f24c619953ba5724f36446cca514ba7dd865c2367873cbad70977caf58a02448
+      arm64: sha256:2f90b7c95151bb7a3ddf41749681918f70528fd6c90b160a89e05970b678144a
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  temporal-server-image:
+    digests:
+      amd64: sha256:1a71947754cd244b3e6f1beb61e2eb2408e9180f7f092fd30182849625db0ac7
+      arm64: sha256:77c887f311db18f086ce2b8ac3144e7f0ad59d73765d01c3e412dea9b8fb6e2c
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  temporal-ui-image:
+    digests:
+      amd64: sha256:6734b3988aa3615286ac8edc83f4d40f10fba587b7109570702efe09478807f9
+      arm64: sha256:0e7478fad0eebac6d135a9c1efcc21f50f5026e017064b32f034585b13674788
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+kind: PinLock
+pins:
+  nke-deployment-selection:
+    commit: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    sourceDateEpoch: 1790728711
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    treeHash: 3e974db934ea90aba2f4d36e437872a31b39bdf6
