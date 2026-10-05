@@ -19,7 +19,9 @@ import (
 // authority. Its matching SourceAccess credential is admitted only for Git's
 // existing repository-scoped helper; the downstream job receives source bytes and
 // a receipt which its producer must independently rehash before consumption.
-// This does not change ExecuteNode or RunLocal's capability restrictions.
+// Hosted run-node fetch dispatch now uses this admission. Ordinary ExecuteNode
+// and RunLocal retain their existing developer-fetch behavior; they do not acquire
+// this route's additional environment and held-directory isolation guarantees.
 // Live fetching requires Linux's inherited-directory path and excludes dependency
 // vendoring until that runtime's bind mount can authenticate the held checkout.
 func executeGitHubSourceFetch(ctx context.Context, plan *Plan, nodeID string, stdout, stderr io.Writer) error {
@@ -51,6 +53,8 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	if !ok {
 		return e.New(e.CodeInvalidCatalog, "source fetch Plan has no node %q", nodeID)
 	}
+	// Complete Plan validation already rejects copied producer requirements and
+	// missing references; retain these checks as defensive source-only admission.
 	if node.Kind != NodeFetch || node.Requirements != nil || !irProjectedNode(node) {
 		return e.New(e.CodeEngineCapability, "source fetch cannot execute operation %q", nodeID)
 	}
@@ -58,6 +62,8 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	if err != nil {
 		return err
 	}
+	// producerInstruction authenticates the scheduler/instruction kind pairing.
+	// This guard is defensive, not an independently reachable valid-Plan branch.
 	if instruction.Kind != ir.KindFetch {
 		return e.New(e.CodePipelineDrift, "source fetch %q does not bind a fetch instruction", nodeID)
 	}

@@ -465,7 +465,7 @@ func TestSourceFetchRejectsRuntimeStorageBeforeWork(t *testing.T) {
 	}
 }
 
-func TestSourceFetchCancellationAndWrongResultFailClosed(t *testing.T) {
+func TestSourceFetchPreCanceledContextAndArtifactResultFailClosed(t *testing.T) {
 	plan, node, _ := authenticatedSourcePlan(t)
 	env := sourceFetchTestEnvironment(plan, node)
 	ctx, cancel := context.WithCancel(t.Context())
@@ -476,9 +476,44 @@ func TestSourceFetchCancellationAndWrongResultFailClosed(t *testing.T) {
 		t.Fatalf("canceled delegated=%t error=%v", called, err)
 	}
 	err = executeSourceFetch(t.Context(), plan, node.ID, env, nil, nil, func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
-		return &pipeline.ArtifactResult{Component: "wrong"}, nil
+		return &pipeline.ArtifactResult{}, nil
 	})
 	if factoryErrorCode(err) != e.CodeVerifyFailed {
 		t.Fatalf("unexpected fetch artifact result: %v", err)
+	}
+}
+
+func TestSourceFetchRejectsDriftedNodeShapesAtCompletePlanBoundary(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		edit func(*Node)
+		code e.Code
+	}{
+		{"copied fetch requirements", func(node *Node) { node.Requirements = testExecutionRequirements() }, e.CodePipelineDrift},
+		{"missing producer reference", func(node *Node) { node.IRNode = "" }, e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, selected, _ := authenticatedSourcePlan(t)
+			for index := range plan.Graph.Nodes {
+				if plan.Graph.Nodes[index].ID == selected.ID {
+					test.edit(&plan.Graph.Nodes[index])
+				}
+			}
+			// These shapes cannot pass the complete Plan boundary. Do not forge a
+			// "valid" Plan or bypass its owner solely to reach a defensive guard.
+			assertFactoryErrorCode(t, plan.Validate(), test.code)
+			t.Chdir(t.TempDir())
+			called := false
+			err := executeSourceFetch(t.Context(), plan, selected.ID, sourceFetchTestEnvironment(plan, selected), nil, nil,
+				func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) { called = true; return nil, nil })
+			assertFactoryErrorCode(t, err, test.code)
+			if called {
+				t.Fatal("drifted source shape reached the executor")
+			}
+			entries, err := os.ReadDir(".")
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("drifted source shape wrote output: %v / %v", entries, err)
+			}
+		})
 	}
 }
