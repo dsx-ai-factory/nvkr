@@ -48,6 +48,9 @@ old helper. The newer `RunDiskInspectionHelper` subject-holding and timeout-code
 changes did not run inside this image. Their contract tests are separate from
 this retained-disk runtime exercise; this record does not establish a rebuilt
 helper or acceptance of all changed source in the container.
+This historical replay did not exercise the subsequently added log-driver
+suppression or attached start by validated create ID; see their separately
+scoped [Oct 5 replay](2026-10-05-nke-os-inspector-launcher.md).
 
 Static native ARM64 test binaries were compiled with `CGO_ENABLED=0 GOOS=linux
 GOARCH=arm64 go test -c`, using the repository's Go version. Their SHA-256 values:

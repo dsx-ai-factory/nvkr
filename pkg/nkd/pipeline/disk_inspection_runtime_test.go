@@ -455,6 +455,7 @@ type diskInspectionCleanupRuntime struct {
 	commands                [][]string
 	lateID                  string
 	diagnostic              string
+	quietAfterFirst         bool
 	discoveryErr, removeErr error
 }
 
@@ -465,7 +466,9 @@ func (runtime *diskInspectionCleanupRuntime) Cleanup(_ context.Context, _ time.D
 ) error {
 	runtime.commands = append(runtime.commands, slices.Clone(args))
 	if args[0] == "ps" {
-		_, _ = io.WriteString(stderr, runtime.diagnostic)
+		if !runtime.quietAfterFirst || len(runtime.commands) == 1 {
+			_, _ = io.WriteString(stderr, runtime.diagnostic)
+		}
 		if runtime.discoveryErr != nil {
 			return runtime.discoveryErr
 		}
@@ -739,8 +742,11 @@ func TestDiskInspectionCleanupDiscoveryFailures(t *testing.T) {
 		} {
 			t.Run(tt.name+"/uncertain="+strconv.FormatBool(uncertain), func(t *testing.T) {
 				runtime := &diskInspectionCleanupRuntime{listed: tt.listed, diagnostic: tt.diagnostic, discoveryErr: tt.discoveryErr, removeErr: tt.removeErr}
-				err := removeDiskInspectionContainer(t.Context(), runtime, "attempt-token", uncertain)
-				if code(err) != tt.want || (len(runtime.commands) == 2) != tt.remove {
+				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+				defer cancel()
+				err := removeDiskInspectionContainer(ctx, runtime, "attempt-token", uncertain)
+				removed := len(runtime.commands) > 0 && runtime.commands[len(runtime.commands)-1][0] == "rm"
+				if code(err) != tt.want || removed != tt.remove {
 					t.Fatalf("cleanup=%v commands=%v", err, runtime.commands)
 				}
 				if tt.remove && !slices.Equal(runtime.commands[1], []string{"rm", "--force", id}) {
@@ -752,8 +758,48 @@ func TestDiskInspectionCleanupDiscoveryFailures(t *testing.T) {
 				if tt.discoveryErr != nil && !errors.Is(err, tt.discoveryErr) {
 					t.Fatalf("discovery error lost: %v", err)
 				}
+				if uncertain && tt.name == "warning without identity" && (!errors.Is(err, context.DeadlineExceeded) || len(runtime.commands) < 2) {
+					t.Fatalf("warning ended uncertain reconciliation before deadline: %v, %v", err, runtime.commands)
+				}
 			})
 		}
+	}
+}
+
+func TestDiskInspectionCleanupRetainsWarningThroughReconciliation(t *testing.T) {
+	id := strings.Repeat("a", 64)
+	removeFailure := errors.New("late removal failure")
+	for _, tt := range []struct {
+		name, lateID string
+		removeErr    error
+	}{
+		{name: "late identity after warning", lateID: id},
+		{name: "late removal failure", lateID: id, removeErr: removeFailure},
+		{name: "uncertain registration deadline"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime := &diskInspectionCleanupRuntime{lateID: tt.lateID, diagnostic: strings.Repeat("warning\n", 2048), quietAfterFirst: true, removeErr: tt.removeErr}
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			err := removeDiskInspectionContainer(ctx, runtime, "attempt-token", true)
+			if code(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), "truncated=true") || strings.Count(err.Error(), "discovery returned diagnostics") != 1 || len(err.Error()) > 5000 {
+				t.Fatalf("lost or unbounded retained warning: %v", err)
+			}
+			if len(runtime.commands) < 2 {
+				t.Fatal("warning stopped reconciliation before a second lookup")
+			}
+			last := runtime.commands[len(runtime.commands)-1]
+			if tt.lateID != "" {
+				if !slices.Equal(last, []string{"rm", "--force", id}) {
+					t.Fatalf("late owned identity not removed: %v", runtime.commands)
+				}
+			} else if !errors.Is(err, context.DeadlineExceeded) || last[0] == "rm" {
+				t.Fatalf("unresolved registration lost deadline or removed absent identity: %v, %v", err, runtime.commands)
+			}
+			if tt.removeErr != nil && !errors.Is(err, tt.removeErr) {
+				t.Fatalf("lost removal failure: %v", err)
+			}
+		})
 	}
 }
 
@@ -887,22 +933,19 @@ func TestDiskInspectionDeadlineIncludesQueuedWait(t *testing.T) {
 	}
 }
 
-func TestDiskInspectionImageIdentity(t *testing.T) {
+func TestLocalImageIDNormalization(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
 	for _, tt := range []struct {
 		name, raw, want string
-		wantCode        e.Code
 	}{
-		{name: "Docker", raw: `{"Id":"` + digest + `"}`, want: digest},
-		{name: "Podman", raw: `{"Id":"` + strings.Repeat("a", 64) + `"}`, want: digest},
-		{name: "tag", raw: `{"Id":"mutable-tag"}`, wantCode: e.CodeEngineCapability},
-		{name: "empty", raw: `{"Id":""}`, wantCode: e.CodeEngineCapability},
-		{name: "wrong shape", raw: `"invalid"`, wantCode: e.CodeEngineCapability},
+		{name: "Docker", raw: digest, want: digest},
+		{name: "Podman", raw: strings.Repeat("a", 64), want: digest},
+		{name: "invalid remains for owning admission", raw: "mutable-tag", want: "mutable-tag"},
+		{name: "empty"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeDiskInspectionImageID([]byte(tt.raw))
-			if got != tt.want || code(err) != tt.wantCode {
-				t.Fatalf("got %q, %v", got, err)
+			if got := normalizeLocalImageID(tt.raw); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})
 	}

@@ -93,7 +93,10 @@ random attempt label; cleanup discovers only that attempt's full container ID an
 removes by ID, never by a reusable name after a failed creation. These are local
 daemon safeguards, not authenticated cross-process ownership or receipt protocols.
 Create's bounded, validated full ID also selects attached start. The fixed
-launcher disables the daemon log driver; attach remains the report channel.
+launcher requests `--log-driver=none`; the
+[Oct 5 native ARM64 replay](../../docs/evidence/2026-10-05-nke-os-inspector-launcher.md)
+checked attached report delivery and start by create ID against the unchanged
+Oct 2 image. Docker and native AMD64 execution of these changes remain unexercised.
 Cleanup discovery diagnostics revoke a result but do not prevent removal of a
 unique valid owned ID. Ambiguous or absent identities are never removed.
 
