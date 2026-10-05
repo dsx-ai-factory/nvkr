@@ -659,6 +659,13 @@ credentials or key material. A useful failure report names the operation/node, c
 observed identity when available. Production predicates and run records provide the run/plan context; the
 qualified EvidenceBundle is diagnostic and cannot stand in for an authenticated receipt (ADR-03/05/17).
 
+Generated GitHub operations include safe compiled node/component/output context, declared inputs and expected
+outputs, with elapsed time, primary exit status and exact failed phase in logs and diagnostic job summaries.
+Transfer steps batch exact carrier selections while retaining every mandatory restore and independent upload.
+Finalization records each carrier's producer/restore outcome even after returned recovery failures. Summary
+availability cannot authorize a result or replace authenticated Run finalization; see the
+[CI log guide](ci-step-and-log-readability.md).
+
 Operational retention must preserve enough run, plan and subject information to investigate a partial publication.
 The retention duration and responsible store are open deployment parameters; transient CI logs alone are not a
 release record.

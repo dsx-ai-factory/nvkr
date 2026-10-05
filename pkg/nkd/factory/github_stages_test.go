@@ -329,8 +329,16 @@ func requireGroupedGitHubStage(t *testing.T, stages []githubStage) githubStage {
 
 func stepDownloadsArtifact(plan *Plan, steps []githubStep, name string) bool {
 	for _, step := range steps {
-		if step.Uses == plan.Actions["download-artifact"].Uses() && step.With["name"] == name {
+		if step.Uses != plan.Actions["download-artifact"].Uses() {
+			continue
+		}
+		if step.With["name"] == name || step.With["pattern"] == name {
 			return true
+		}
+		for _, member := range strings.Split(strings.Trim(step.With["pattern"], "{}"), ",") {
+			if member == name {
+				return true
+			}
 		}
 	}
 	return false

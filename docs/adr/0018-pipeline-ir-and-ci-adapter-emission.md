@@ -467,12 +467,18 @@ same workspace bytes and consumer checks. Each logical output retains its carrie
 shared job makes its outputs unsuccessful for finalization, even if an earlier step uploaded a carrier.
 This provider scheduling choice does not change the logical graph or logical build identity.
 
-GitHub job and step labels describe the operation and selected component or output. Grouped jobs disclose Helm
-image binding when present; stable execution step IDs and exact commands retain the graph binding independently
-of display names. Each execution step logs its start, node ID, successful outputs, elapsed seconds and exit
-status. Failure preserves the command's exit code and cannot print a successful completion. Packaging reports
-the actual bound image digest, and publication reports its persisted immutable reference. Logs are diagnostic,
-not authority receipts, and generated progress messages never dump credentials or environment variables.
+GitHub job and step labels describe the operation and selected component or output. Grouped jobs name their
+packaged outputs and disclose Helm image binding when present; stable execution step IDs and exact commands
+retain the graph binding independently of display names. Each execution step logs its operation, node and
+producer instruction, component and selected output where applicable, platform/network, declared inputs and
+expected outputs. The step reports successful outputs; its exit handler reports elapsed seconds, primary exit
+status and the last phase; failed execution cannot print a successful completion. Job summaries show the same diagnostic context and
+outcome without requiring every transfer step to be expanded. Closed log streams and an absent or unwritable summary cannot change the
+operation's exit status. Descriptions are escaped for shell/provider expressions, control lines and Markdown;
+arbitrary recipe arguments, source/destination URLs, file contents and environment values are not dumped.
+The exact producer argv remains in the canonical Plan for deliberate local inspection. Packaging reports the
+actual bound image digest, and publication reports its persisted immutable reference. Logs and summaries remain
+diagnostics, not authority receipts, completion evidence or qualification.
 
 The compiler creates a private release preparation, a production SBOM-attestation stage producing the
 final release package, and one publish/sign/verify route. The attestation stage binds and verifies each
@@ -480,8 +486,21 @@ CycloneDX document before final release identity is derived. It adds one interna
 internal job transfers, not additional deliverables. Product names do not cause duplicate copies of the full
 closure to be uploaded or published.
 
-The finalizer batches downloads with an exact set of planned carrier names. It still restores every carrier
-and records its producer and restore outcome; a successful batch download alone proves no completeness.
+Each stage downloads one exact set of external input carriers, then restores each required carrier in one
+step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
+part of the requested set. Each operation prepares its outputs in one step and retains an independent upload
+for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
+artifacts. Logical commands, transport authentication and isolation remain unchanged.
+
+The finalizer batches downloads with the exact set of all planned carrier names. Bounded recovery batches still visit
+every carrier and records its producer and restore outcome separately; it continues after missing carriers,
+failed producer jobs and returned restore failures. A diagnostic summary names every outcome. A successful batch
+download or recovery step proves no completeness: the finalizer consumes those unchanged per-carrier records
+and authenticates the complete output and evidence closure. Recovery blocks are indivisible; batches split before
+GitHub's 21,000-character run limit, conservatively measured as UTF-8 bytes. Every generated run script is checked
+against that ceiling, and an indivisible oversized script fails capability admission before bundle output.
+Provider outage or failed local outcome storage can
+still prevent finalization.
 
 Finalizers are scheduled unconditionally and fail on failed/missing producers, failed restore, omitted required
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent

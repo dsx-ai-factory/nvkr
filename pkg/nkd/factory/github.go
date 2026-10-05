@@ -194,10 +194,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		// themselves helper invocations, so a chmod folded into the later Execute step leaves
 		// every input-bearing job failing at its first Restore.
 		writePrepareHelperStep(&body)
-		for _, input := range stage.inputs(artifacts, nodeJobs) {
-			actions.writeDownloadStep(&body, githubArtifactLabel(plan, artifacts[input]), githubArtifactName(input), ".nkd/carriers")
-			fmt.Fprintf(&body, "      - name: %s\n        run: ./nkd-exec transport-unpack --archive %s --root . --path %s\n",
-				yamlSingle("Restore "+githubArtifactLabel(plan, artifacts[input])), shellQuote(carrierPath(input)), shellQuote(artifacts[input].Path))
+		if err := writeGitHubStageInputSteps(&body, plan, stage, artifacts, nodeJobs, actions); err != nil {
+			return nil, err
 		}
 		// Operator setup before the helper runs (e.g. `docker login` to pull a private,
 		// digest-pinned toolchain), configured by the admitted Environment.
@@ -221,11 +219,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for _, line := range githubNodeCommands(node, plan) {
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
-			for _, output := range node.Outputs {
-				fmt.Fprintf(&body, "      - name: %s\n        run: ./nkd-exec transport-pack --archive %s --root . --path %s\n",
-					yamlSingle("Archive "+githubArtifactLabel(plan, artifacts[output])), shellQuote(carrierPath(output)), shellQuote(artifacts[output].Path))
-				actions.writeUploadStep(&body, githubArtifactLabel(plan, artifacts[output]), githubArtifactName(output), carrierPath(output))
-			}
+			writeGitHubOutputSteps(&body, plan, node, artifacts, actions)
 		}
 	}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {

@@ -28,9 +28,8 @@ func TestGitHubFinalizerBatchesExactCarriersAndPreservesFailureAccounting(t *tes
 	if err := yaml.UnmarshalStrict(append([]byte("steps:\n"), rendered.Bytes()...), &document); err != nil {
 		t.Fatal(err)
 	}
-	if len(document.Steps) != len(plan.Graph.Artifacts)+2 {
-		t.Fatalf("finalizer steps = %d, want one prepare + one batch download + %d restores",
-			len(document.Steps), len(plan.Graph.Artifacts))
+	if len(document.Steps) < 3 || len(document.Steps) >= len(plan.Graph.Artifacts)+2 {
+		t.Fatalf("finalizer steps = %d, want prepare + batch download + bounded recovery batches", len(document.Steps))
 	}
 	download := document.Steps[1]
 	if download.Uses != plan.Actions["download-artifact"].Uses() || !download.ContinueOnError ||

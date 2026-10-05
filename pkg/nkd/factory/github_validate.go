@@ -67,6 +67,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := yaml.UnmarshalStrict(workflow, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
 	}
+	if err := validateGitHubScriptLimits(document); err != nil {
+		return err
+	}
 	if document.Name != "nkd-run-"+plan.Name || document.Permissions["contents"] != "read" || len(document.Permissions) != 1 {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow name/triggers/root permissions are incomplete")
 	}
@@ -477,6 +480,22 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 	}
 	if next != len(stage.Nodes) {
 		return e.New(e.CodeEngineCapability, "GitHub stage %q omits a logical node execution", stage.ID)
+	}
+	return nil
+}
+
+// GitHub limits each run value to 21,000 characters. Bound UTF-8 bytes
+// conservatively, including its final newline, before any bundle is returned.
+// https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsrun
+const githubMaximumRunBytes = 21000
+
+func validateGitHubScriptLimits(document githubWorkflowDocument) error {
+	for _, id := range sortedKeys(document.Jobs) {
+		for _, step := range document.Jobs[id].Steps {
+			if len(step.Run) > githubMaximumRunBytes {
+				return e.New(e.CodeEngineCapability, "GitHub job %q step %q exceeds the %d-byte run-script limit", id, step.Name, githubMaximumRunBytes)
+			}
+		}
 	}
 	return nil
 }
