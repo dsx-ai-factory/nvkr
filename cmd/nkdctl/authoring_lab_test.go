@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +43,19 @@ func TestAuthoringLabCLIProcess(t *testing.T) {
 }
 
 func TestAuthoringLabReplacementJourney(t *testing.T) {
+	for _, inherited := range []bool{false, true} {
+		name := "clean"
+		if inherited {
+			name = "inherited repository overrides"
+		}
+		t.Run(name, func(t *testing.T) {
+			runAuthoringLabReplacementJourney(t, inherited)
+		})
+	}
+}
+
+func runAuthoringLabReplacementJourney(t *testing.T, inherited bool) {
+	t.Helper()
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		t.Fatal("authoring lab requires Bash: ", err)
@@ -55,7 +70,16 @@ func TestAuthoringLabReplacementJourney(t *testing.T) {
 	}
 	root := t.TempDir()
 	wrapper := filepath.Join(root, "nkdctl with spaces")
-	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec \"$NKD_AUTHORING_TEST_EXE\" -test.run='^TestAuthoringLabCLIProcess$' -- \"$@\"\n"), 0o700); err != nil {
+	const wrapperScript = `#!/bin/sh
+for key in GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX; do
+  if env | grep -q "^$key="; then
+    printf 'inherited Git override reached CLI: %s\n' "$key" >&2
+    exit 1
+  fi
+done
+exec "$NKD_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
+`
+	if err := os.WriteFile(wrapper, []byte(wrapperScript), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	work := filepath.Join(root, "lab with spaces")
@@ -63,6 +87,17 @@ func TestAuthoringLabReplacementJourney(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bash, fixture, "--nkdctl", wrapper, "--work", work)
 	cmd.Env = append(os.Environ(), "NKD_AUTHORING_TEST_HELPER=1", "NKD_AUTHORING_TEST_EXE="+executable)
+	if inherited {
+		caller := filepath.Join(root, "caller with spaces")
+		overrides := authoringLabCallerRepository(t, caller)
+		before := authoringLabSnapshot(t, caller)
+		t.Cleanup(func() {
+			if after := authoringLabSnapshot(t, caller); !maps.Equal(before, after) {
+				t.Error("authoring lab modified the caller repository, index, objects, or worktree")
+			}
+		})
+		cmd.Env = append(cmd.Env, overrides...)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("authoring journey: %v\n%s", err, output)
@@ -142,4 +177,78 @@ func TestAuthoringLabMissingPrerequisitePreservesWorkspace(t *testing.T) {
 	if _, err := os.Lstat(work); !os.IsNotExist(err) {
 		t.Fatalf("workspace created before prerequisite admission: %v", err)
 	}
+}
+
+// authoringLabCallerRepository supplies real foreign Git paths, with staged and
+// unstaged changes that the lab must preserve along with all repository metadata.
+func authoringLabCallerRepository(t *testing.T, root string) []string {
+	t.Helper()
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	var cleanEnv []string
+	for _, entry := range os.Environ() {
+		if !strings.HasPrefix(entry, "GIT_") {
+			cleanEnv = append(cleanEnv, entry)
+		}
+	}
+	cleanEnv = append(cleanEnv, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	git := func(args ...string) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "git", append([]string{"-C", root,
+			"-c", "commit.gpgsign=false", "-c", "user.name=Caller Fixture",
+			"-c", "user.email=caller@example.invalid"}, args...)...)
+		cmd.Env = cleanEnv
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("create caller repository: %v\n%s", err, output)
+		}
+	}
+	git("init", "-q", "--template=", "--object-format=sha1", "--initial-branch=main")
+	file := filepath.Join(root, "keep.txt")
+	for i, contents := range []string{"committed\n", "staged\n", "unstaged\n"} {
+		if err := os.WriteFile(file, []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if i < 2 {
+			git("add", "keep.txt")
+		}
+		if i == 0 {
+			git("commit", "-q", "-m", "caller fixture")
+		}
+	}
+	gitDir := filepath.Join(root, ".git")
+	return []string{
+		"GIT_DIR=" + gitDir,
+		"GIT_WORK_TREE=" + root,
+		"GIT_COMMON_DIR=" + gitDir,
+		"GIT_INDEX_FILE=" + filepath.Join(gitDir, "index"),
+		"GIT_OBJECT_DIRECTORY=" + filepath.Join(gitDir, "objects"),
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES=" + filepath.Join(gitDir, "objects"),
+		"GIT_PREFIX=caller-prefix/",
+	}
+}
+
+func authoringLabSnapshot(t *testing.T, root string) map[string]string {
+	t.Helper()
+	files := make(map[string]string)
+	if err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			files[path] = "directory"
+			return nil
+		}
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[path] = string(contents)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return files
 }

@@ -22,9 +22,10 @@ bash docs/examples/authoring-lab/run.sh --nkdctl bin/nkdctl --work .nkd/authorin
 Choose a new workspace for every run. The program refuses an existing directory and never deletes a
 previous run. Omitting `--work` retains the results in a newly created temporary directory and prints its
 path. After building the CLI, this journey requires no network or Docker. An isolated Git URL override
-routes the fixture source to its local repository; it does not edit global Git configuration. Git and CLI
-commands have a 60-second deadline with a five-second termination grace period. Missing prerequisites fail
-before the workspace is created.
+routes the fixture source to its local repository; it does not edit global Git configuration. The program
+clears inherited Git repository, index, and object-directory overrides for its Git and CLI subprocesses.
+Git and CLI commands have a 60-second deadline with a five-second termination grace period. Missing
+prerequisites fail before the workspace is created.
 
 Expected report:
 

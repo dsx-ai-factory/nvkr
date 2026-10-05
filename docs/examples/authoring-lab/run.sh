@@ -48,6 +48,9 @@ bounded mkdir -- "$work/plans"
 cd -- "$work"
 
 # These settings affect only this process and its children, never global config.
+# Keep inherited repository paths out of fixture Git and CLI subprocesses.
+unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE \
+  GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="url.$work/upstream.insteadOf"
 export GIT_CONFIG_VALUE_0=https://authoring.example.invalid/platform
