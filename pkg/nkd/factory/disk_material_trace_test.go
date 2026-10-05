@@ -32,9 +32,16 @@ func diskMaterialTraceFixtureWithNetwork(t *testing.T, sibling, networked bool) 
 }
 
 func diskMaterialTraceFixtureForPlatform(t *testing.T, sibling, networked bool, platform string) (*Plan, *LocalRunResult) {
+	return diskMaterialTraceFixtureForPlatformAndEncryption(t, sibling, networked, platform, "none")
+}
+
+func diskMaterialTraceFixtureForPlatformAndEncryption(t *testing.T, sibling, networked bool, platform, encryption string) (*Plan, *LocalRunResult) {
 	t.Helper()
 	fixture := newVMPackerMaterialFixtureForPlatform(t, nil, map[string]string{"a-agent": "agent", "z-runtime": "runtime"}, platform)
 	base := fixture.plan.CatalogSnapshot
+	image := base.Components["image"]
+	image.Disk.Encryption = encryption
+	base.Components["image"] = image
 	agent := base.Components["agent"]
 	agent.Prebuilt = nil
 	agent.FromSource = true

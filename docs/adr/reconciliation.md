@@ -86,9 +86,10 @@ runtime/tool identities. Binding, description isolation, serialization exclusion
 are supplemented by a process-wide capacity-admission permit held before factory snapshotting until
 inspection, container cleanup and snapshot close complete. Separate runtime instances serialize their
 admitted snapshots; this does not reserve kernel resources against unrelated processes or authenticate the
-daemon's enclosing cgroup. The reservation API rejects unissued/closed permits and mismatched subject sizes.
-Runtime close cancels registered operations before joining subject streaming and bounded container cleanup;
-it does not release the caller's still-open snapshot permit. Capacity queueing uses the declared inspection
+daemon's enclosing cgroup. The Packer handoff owns admission, original-inode snapshot creation, scanning,
+snapshot closure and permit release as one registered operation; neither its snapshot nor its private
+reservation escapes. Runtime close cancels and joins that complete lifetime before releasing capacity.
+Capacity queueing uses the declared inspection
 deadline, with host observation separately bounded to thirty seconds. Held-child, blocked-cleanup,
 registration-race and a real thirty-one-second queue regression cover these contracts, not a real daemon scan.
 The held-runtime Linux regression exercises snapshot allocation, scan cleanup and subsequent admission,
@@ -101,7 +102,9 @@ When opted in, inspection failure fails the local Run and discards uncommitted d
 leave a successful build without the requested inventory. Later failure also clears diagnostic inventories.
 The observation join checks inventory output, Plan, Build, digest, size, format and encryption against delivered
 disk observations. Tests cover commit failure after a successful scan and missing, duplicate or substituted
-inventory subjects. The acceptance harness uses the lifecycle package directly, not only `client/v1`.
+inventory subjects, ordered mixed-output inspection, second-disk failure without partial inventories,
+persisted failure codes and joined scan/Close errors. Snapshot tests cancel during copying and confirm that
+the original artifact remains usable. The acceptance harness uses the lifecycle package directly, not only `client/v1`.
 The earlier aggregate Linux race run disclosed in PR #79 failed in the unchanged finalizer fixture's
 read-only-source storage setup; its separate rerun passed. After the review fixes, the native Linux ARM64
 race run of pipeline, factory, lifecycle and SBOM passed together with read-only source and private writable

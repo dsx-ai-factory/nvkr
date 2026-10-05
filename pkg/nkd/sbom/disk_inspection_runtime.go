@@ -48,32 +48,6 @@ func (runtime *DiskInspectionRuntime) Close() error {
 	return runtime.container.Close()
 }
 
-// DiskInspectionReservation retains the runtime's capacity permit from before
-// snapshot allocation until the caller closes its snapshot and the reservation.
-type DiskInspectionReservation struct {
-	reservation *pipeline.DiskInspectionReservation
-}
-
-func (reservation *DiskInspectionReservation) Close() error {
-	if reservation == nil {
-		return nil
-	}
-	return reservation.reservation.Close()
-}
-
-// AdmitSubject returns a fail-before-copy permit for a live factory join. No
-// second snapshot may be admitted by this process while the permit is held.
-func (runtime *DiskInspectionRuntime) AdmitSubject(ctx context.Context, size int64) (*DiskInspectionReservation, error) {
-	if runtime == nil {
-		return nil, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
-	}
-	reservation, err := runtime.container.AdmitSubject(ctx, size)
-	if err != nil {
-		return nil, err
-	}
-	return &DiskInspectionReservation{reservation: reservation}, nil
-}
-
 // InspectHeldInstalledPackages accepts only held subject authority. The fixed
 // container helper uses the existing exact held probe/inspector boundary; this
 // owner authenticates its returned metadata against the opaque container result.
@@ -91,16 +65,17 @@ func (runtime *DiskInspectionRuntime) InspectHeldInstalledPackages(ctx context.C
 	return inventoryFromContainerObservation(observation)
 }
 
-// InspectHeldInstalledPackages scans under the already-held reservation. It
-// never releases the permit or reacquires capacity between copying and scanning.
-func (reservation *DiskInspectionReservation) InspectHeldInstalledPackages(ctx context.Context, subject *heldfile.File, format, encryption string) (*DiskInstalledInventory, error) {
+// InspectPackerInstalledPackages owns before-copy admission, inspection and
+// temporary snapshot cleanup. Only the original opaque Packer artifact enters
+// this operation; neither its snapshot nor its capacity permit escapes.
+func (runtime *DiskInspectionRuntime) InspectPackerInstalledPackages(ctx context.Context, artifact *pipeline.PackerArtifact, format, encryption string) (*DiskInstalledInventory, error) {
 	if err := validateContainerInspection(ctx, format, encryption); err != nil {
 		return nil, err
 	}
-	if reservation == nil {
-		return nil, e.New(e.CodeEngineCapability, "disk inspection reservation is absent")
+	if runtime == nil {
+		return nil, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
 	}
-	observation, err := reservation.reservation.InspectHeld(ctx, subject)
+	observation, err := runtime.container.InspectPackerArtifact(ctx, artifact)
 	if err != nil {
 		return nil, err
 	}

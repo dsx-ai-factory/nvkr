@@ -96,6 +96,157 @@ func TestLocalInspectionFailureClosesRunWithoutExport(t *testing.T) {
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("failed scan retained a delivery file: %v", err)
 	}
+	raw, err := os.ReadFile(filepath.Join(".nkd/runs", prepared.run.Attempt, "lifecycle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var persisted Run
+	if err := canonical.UnmarshalExact(raw, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Status != RunFailed || persisted.Failure == nil || persisted.Failure.Code != string(e.CodeVerifyFailed) {
+		t.Fatalf("inspection failure lost its persisted coded outcome: %+v", persisted)
+	}
+}
+
+// The original exporter still owns its normal Close side effects. This wrapper
+// adds a failure after those effects rather than replacing cleanup altogether.
+type inspectionCloseFailure struct {
+	*fakeDiskExporter
+	cause error
+}
+
+func (exporter *inspectionCloseFailure) Close() error {
+	return errors.Join(exporter.fakeDiskExporter.Close(), exporter.cause)
+}
+
+func TestLocalInspectionFailurePreservesCloseFailure(t *testing.T) {
+	t.Chdir(t.TempDir())
+	prepared, original := diskLifecycleFixture(t, "inspection-and-close-failure")
+	scanErr := e.New(e.CodeVerifyFailed, "fixture installed-package scan failure")
+	closeErr := errors.New("fixture held Run close failure")
+	exporter := &inspectionCloseFailure{fakeDiskExporter: original, cause: closeErr}
+	run, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{
+		AttemptsRoot: ".nkd/runs", DiskInspection: &sbom.DiskInspectionRuntime{},
+	}, localExecutionDependencies{
+		admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+		runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
+			return exporter, nil
+		},
+		writeRecordState: writeRunRecordState, beginDiskCommit: beginDiskAttemptTransaction,
+		admitInspection: func(context.Context, *factory.Plan, *sbom.DiskInspectionRuntime) error { return nil },
+		inspectDisks: func(context.Context, *factory.Plan, localExecutionResult, *sbom.DiskInspectionRuntime) ([]factory.DiskInstalledInventoryDescription, error) {
+			return nil, scanErr
+		},
+	})
+	assertCode(t, err, e.CodeVerifyFailed)
+	if !errors.Is(err, scanErr) || !errors.Is(err, closeErr) || run == nil || run.Status != RunFailed ||
+		!original.closed || original.exports != 0 || len(run.InstalledDiskInventories()) != 0 {
+		t.Fatalf("scan/close failure: run=%+v err=%v closed=%t exports=%d", run, err, original.closed, original.exports)
+	}
+	raw, readErr := os.ReadFile(filepath.Join(".nkd/runs", prepared.run.Attempt, "lifecycle.json"))
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	var persisted Run
+	if err := canonical.UnmarshalExact(raw, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Status != RunFailed || persisted.Failure == nil || persisted.Failure.Code != string(e.CodeVerifyFailed) {
+		t.Fatalf("scan/close failure lost its persisted coded outcome: %+v", persisted)
+	}
+	path, pathErr := LocalDiskOutputPath(filepath.Join(".nkd/runs", prepared.run.Attempt), prepared.run.Expected[0].Name)
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("failed inspection/close exported a delivery file: %v", err)
+	}
+}
+
+func TestInspectLocalDisksRejectsUnownedInputs(t *testing.T) {
+	for _, mode := range []string{"non-factory result", "nil factory result", "nil Plan", "nil runtime"} {
+		t.Run(mode, func(t *testing.T) {
+			plan := &factory.Plan{}
+			runtime := &sbom.DiskInspectionRuntime{}
+			var result localExecutionResult = &factory.LocalRunResult{}
+			switch mode {
+			case "non-factory result":
+				result = &fakeDiskExporter{}
+			case "nil factory result":
+				result = (*factory.LocalRunResult)(nil)
+			case "nil Plan":
+				plan = nil
+			case "nil runtime":
+				runtime = nil
+			}
+			views, err := inspectLocalDisks(t.Context(), plan, result, runtime)
+			assertCode(t, err, e.CodeEngineCapability)
+			if views != nil {
+				t.Fatalf("unowned input returned installed metadata: %+v", views)
+			}
+		})
+	}
+}
+
+func TestInspectLocalDiskOutputLoop(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		fail string
+	}{
+		{name: "mixed ordered outputs"}, {name: "first disk fails", fail: "first"}, {name: "second disk fails", fail: "second"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			outputs := []factory.LifecycleOutputPlan{
+				{Name: "binary", Kind: OutputExecutable},
+				{Name: "first", Kind: OutputDiskImage},
+				{Name: "chart", Kind: OutputHelm},
+				{Name: "second", Kind: OutputDiskImage},
+			}
+			var called []string
+			cause := e.New(e.CodeVerifyFailed, "fixture output inspection/validation failed")
+			views, err := inspectLocalDiskOutputs(t.Context(), outputs,
+				func(_ context.Context, output factory.LifecycleOutputPlan) (factory.DiskInstalledInventoryDescription, error) {
+					called = append(called, output.Name)
+					if output.Name == test.fail {
+						return factory.DiskInstalledInventoryDescription{}, cause
+					}
+					return factory.DiskInstalledInventoryDescription{OutputName: output.Name}, nil
+				})
+			wantCalls := "first,second"
+			if test.fail == "first" {
+				wantCalls = "first"
+			}
+			if strings.Join(called, ",") != wantCalls {
+				t.Fatalf("inspection order=%v, want %s", called, wantCalls)
+			}
+			if test.fail != "" {
+				assertCode(t, err, e.CodeVerifyFailed)
+				if !errors.Is(err, cause) || views != nil {
+					t.Fatalf("failed output returned partial views: %+v, %v", views, err)
+				}
+				return
+			}
+			if err != nil || len(views) != 2 || views[0].OutputName != "first" || views[1].OutputName != "second" {
+				t.Fatalf("ordered installed views=%+v, error=%v", views, err)
+			}
+		})
+	}
+}
+
+func TestInspectLocalDiskOutputLoopRequiresDisk(t *testing.T) {
+	for _, outputs := range [][]factory.LifecycleOutputPlan{nil, {{Name: "binary", Kind: OutputExecutable}}} {
+		called := false
+		views, err := inspectLocalDiskOutputs(t.Context(), outputs,
+			func(context.Context, factory.LifecycleOutputPlan) (factory.DiskInstalledInventoryDescription, error) {
+				called = true
+				return factory.DiskInstalledInventoryDescription{}, nil
+			})
+		assertCode(t, err, e.CodeEngineCapability)
+		if called || views != nil {
+			t.Fatalf("non-disk outputs invoked inspection or returned metadata: called=%t views=%+v", called, views)
+		}
+	}
 }
 
 func TestLocalPostInspectionFailureDiscardsInventories(t *testing.T) {

@@ -72,19 +72,35 @@ func inspectLocalDisks(ctx context.Context, plan *factory.Plan, result localExec
 	if !ok || owner == nil || plan == nil || runtime == nil {
 		return nil, e.New(e.CodeEngineCapability, "installed inventory requires the original live factory Run and admitted inspector")
 	}
+	return inspectLocalDiskOutputs(ctx, plan.LifecycleOutputs,
+		func(ctx context.Context, output factory.LifecycleOutputPlan) (factory.DiskInstalledInventoryDescription, error) {
+			receipt, err := owner.ObserveDiskInstalledInventory(ctx, plan, output, runtime)
+			if err != nil {
+				return factory.DiskInstalledInventoryDescription{}, err
+			}
+			if err := owner.ValidateDiskInstalledInventory(ctx, plan, output, runtime, receipt); err != nil {
+				return factory.DiskInstalledInventoryDescription{}, err
+			}
+			return receipt.Description(), nil
+		})
+}
+
+// The production wrapper binds this private loop to the original live owner and
+// its Observe/Validate operations. The seam returns diagnostic descriptions only;
+// it cannot issue or restore an inventory receipt.
+func inspectLocalDiskOutputs(ctx context.Context, outputs []factory.LifecycleOutputPlan,
+	inspect func(context.Context, factory.LifecycleOutputPlan) (factory.DiskInstalledInventoryDescription, error),
+) ([]factory.DiskInstalledInventoryDescription, error) {
 	var installed []factory.DiskInstalledInventoryDescription
-	for _, output := range plan.LifecycleOutputs {
+	for _, output := range outputs {
 		if output.Kind != OutputDiskImage {
 			continue
 		}
-		receipt, err := owner.ObserveDiskInstalledInventory(ctx, plan, output, runtime)
+		inventory, err := inspect(ctx, output)
 		if err != nil {
 			return nil, err
 		}
-		if err := owner.ValidateDiskInstalledInventory(ctx, plan, output, runtime, receipt); err != nil {
-			return nil, err
-		}
-		installed = append(installed, receipt.Description())
+		installed = append(installed, inventory)
 	}
 	if len(installed) == 0 {
 		return nil, e.New(e.CodeEngineCapability, "installed inventory was requested without a disk output")

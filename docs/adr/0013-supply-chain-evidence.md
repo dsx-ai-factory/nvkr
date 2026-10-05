@@ -148,7 +148,9 @@ upgrading the disk that consumed them.
 A narrower, opt-in local installed-package diagnostic may join the factory's live staged-material trace to
 read-only inspection before the issuing Run closes. Factory accepts only its original held Packer output and
 an admitted concrete inspection runtime. The runtime binds an exact OCI closure and inspector/codec identities;
-capacity admission precedes the additional anonymous disk snapshot. The package-issued, process-local result
+capacity admission precedes the additional anonymous disk snapshot. The runtime owns admission, snapshot
+creation, scanning, snapshot closure and permit release as one cancelable, joined operation; no borrowed
+snapshot or capacity reservation escapes to a caller. The package-issued, process-local result
 binds the original Run owner, named output, Plan, Build, QCOW2 digest/size and inspected runtime/tool bytes.
 Equal subject bytes or Build identity cannot authorize reuse by a sibling attempt. Closing the Run cancels
 active inspection, joins cleanup and revokes live use, including shallow receipt copies. Historical installed

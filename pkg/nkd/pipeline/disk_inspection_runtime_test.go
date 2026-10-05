@@ -520,7 +520,7 @@ func TestDiskInspectionRuntimeRevocationAndCancellation(t *testing.T) {
 	if _, _, _, err := container.BindingContext(t.Context()); code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed binding: %v", err)
 	}
-	if reservation, err := container.AdmitSubject(t.Context(), 128); reservation != nil || code(err) != e.CodeEngineCapability {
+	if reservation, err := container.reserveSubject(t.Context(), 128, true); reservation != nil || code(err) != e.CodeEngineCapability {
 		t.Fatalf("closed admission: %v", err)
 	}
 	if err := container.Close(); err != nil {
@@ -537,26 +537,22 @@ func TestDiskInspectionRuntimeRevocationAndCancellation(t *testing.T) {
 }
 
 // This private fixture exercises permit ownership without claiming Linux host
-// admission. The Linux suite separately exercises AdmitSubject with a held ELF.
+// admission. The Linux suite exercises the owned Packer operation with a held ELF.
 func TestDiskInspectionReservationSerializesRuntimesAndRevokesCopies(t *testing.T) {
 	if err := lockDiskInspection(t.Context(), &diskInspectionCapacity); err != nil {
 		t.Fatal(err)
 	}
-	reservation := &DiskInspectionReservation{state: &diskInspectionReservationState{
+	reservation := &diskInspectionReservation{state: &diskInspectionReservationState{
 		container: &DiskInspectionContainer{}, size: 128, timeoutSeconds: 1,
 	}}
 	t.Cleanup(func() { _ = reservation.Close() })
 	copy := *reservation
 	other := &DiskInspectionContainer{selection: DiskInspectionSelection{TimeoutSeconds: 1}}
-	for _, method := range []string{"before snapshot", "already held"} {
-		t.Run(method, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
-			defer cancel()
-			got, err := other.reserveSubject(ctx, 128, method == "before snapshot")
-			if got != nil || code(err) != e.CodeTimeout {
-				t.Fatalf("competing runtime escaped held admission: %v, %v", got, err)
-			}
-		})
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+	defer cancel()
+	got, err := other.reserveSubject(ctx, 128, true)
+	if got != nil || code(err) != e.CodeTimeout {
+		t.Fatalf("competing runtime escaped held admission: %v, %v", got, err)
 	}
 	if err := copy.Close(); err != nil {
 		t.Fatal(err)
@@ -581,12 +577,12 @@ func TestDiskInspectionReservationRejectsUnissuedAndWrongSubjects(t *testing.T) 
 	defer subject.Close()
 	for _, tt := range []struct {
 		name        string
-		reservation *DiskInspectionReservation
+		reservation *diskInspectionReservation
 		want        e.Code
 	}{
 		{name: "absent", want: e.CodeEngineCapability},
-		{name: "zero value", reservation: &DiskInspectionReservation{}, want: e.CodeEngineCapability},
-		{name: "different size", reservation: &DiskInspectionReservation{state: &diskInspectionReservationState{
+		{name: "zero value", reservation: &diskInspectionReservation{}, want: e.CodeEngineCapability},
+		{name: "different size", reservation: &diskInspectionReservation{state: &diskInspectionReservationState{
 			container: &DiskInspectionContainer{}, size: subject.Size() + 1, timeoutSeconds: 1,
 		}}, want: e.CodeVerifyFailed},
 	} {
@@ -594,6 +590,97 @@ func TestDiskInspectionReservationRejectsUnissuedAndWrongSubjects(t *testing.T) 
 			got, err := tt.reservation.InspectHeld(t.Context(), subject)
 			if got != nil || code(err) != tt.want {
 				t.Fatalf("invalid reservation accepted: %v, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestDiskInspectionOwnedSnapshotCleanup(t *testing.T) {
+	for _, test := range []struct {
+		name                  string
+		scanError, closeError bool
+		want                  e.Code
+	}{
+		{name: "success"}, {name: "scan failure", scanError: true, want: e.CodeVerifyFailed},
+		{name: "close failure", closeError: true, want: e.CodeInternal},
+		{name: "joined failure", scanError: true, closeError: true, want: e.CodeVerifyFailed},
+		{name: "missing observation", want: e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			scanErr := e.New(e.CodeVerifyFailed, "fixture scan failure")
+			closeErr := errors.New("fixture snapshot close failure")
+			closed := false
+			observation, err := inspectAndCloseDiskSnapshot(t.Context(), nil,
+				func(context.Context, *heldfile.File) (*DiskInspectionObservation, error) {
+					if closed {
+						t.Fatal("snapshot closed before scan")
+					}
+					if test.scanError {
+						return &DiskInspectionObservation{}, scanErr
+					}
+					if test.name == "missing observation" {
+						return nil, nil
+					}
+					return &DiskInspectionObservation{}, nil
+				}, func() error {
+					closed = true
+					if test.closeError {
+						return closeErr
+					}
+					return nil
+				})
+			if !closed || code(err) != test.want || (observation != nil) != (test.want == "") ||
+				(test.scanError && !errors.Is(err, scanErr)) || (test.closeError && !errors.Is(err, closeErr)) {
+				t.Fatalf("snapshot cleanup: observation=%v closed=%t error=%v", observation, closed, err)
+			}
+		})
+	}
+	t.Run("panic still closes snapshot", func(t *testing.T) {
+		closed := false
+		defer func() {
+			if recover() != "fixture panic" || !closed {
+				t.Fatal("panic skipped owned snapshot cleanup")
+			}
+		}()
+		_, _ = inspectAndCloseDiskSnapshot(t.Context(), nil,
+			func(context.Context, *heldfile.File) (*DiskInspectionObservation, error) { panic("fixture panic") },
+			func() error { closed = true; return nil })
+	})
+}
+
+func TestDiskInspectionPackerOperationAdmission(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		timeout uint64
+		want    e.Code
+	}{
+		{name: "nil context", timeout: 1, want: e.CodeUsage},
+		{name: "canceled context", timeout: 1, want: e.CodeTimeout},
+		{name: "nil runtime", timeout: 1, want: e.CodeEngineCapability},
+		{name: "nil artifact", timeout: 1, want: e.CodeEngineCapability},
+		{name: "zero timeout", want: e.CodeEngineCapability},
+		{name: "timeout over limit", timeout: 601, want: e.CodeEngineCapability},
+		{name: "timeout overflow", timeout: math.MaxUint64, want: e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			container := &DiskInspectionContainer{selection: DiskInspectionSelection{TimeoutSeconds: test.timeout}}
+			artifact := &PackerArtifact{size: 1}
+			ctx := t.Context()
+			switch test.name {
+			case "nil context":
+				ctx = nil
+			case "canceled context":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			case "nil runtime":
+				container = nil
+			case "nil artifact":
+				artifact = nil
+			}
+			observation, err := container.InspectPackerArtifact(ctx, artifact)
+			if observation != nil || code(err) != test.want {
+				t.Fatalf("invalid operation: observation=%v error=%v", observation, err)
 			}
 		})
 	}
@@ -644,7 +731,10 @@ func TestDiskInspectionDeadlineIncludesQueuedWait(t *testing.T) {
 		run  func(context.Context) error
 	}{
 		{name: "binding", run: func(ctx context.Context) error { _, _, _, err := container.BindingContext(ctx); return err }},
-		{name: "admission", run: func(ctx context.Context) error { _, err := container.AdmitSubject(ctx, subject.Size()); return err }},
+		{name: "admission", run: func(ctx context.Context) error {
+			_, err := container.reserveSubject(ctx, subject.Size(), true)
+			return err
+		}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)

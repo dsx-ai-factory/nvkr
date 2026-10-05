@@ -48,7 +48,7 @@ func TestDiskInspectionRuntimeReal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reservation, err := container.AdmitSubject(t.Context(), info.Size())
+	reservation, err := container.reserveSubject(t.Context(), info.Size(), true)
 	if err != nil {
 		t.Fatal(err)
 	}

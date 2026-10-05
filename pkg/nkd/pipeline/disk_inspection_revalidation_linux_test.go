@@ -3,7 +3,6 @@
 package pipeline
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -20,16 +19,15 @@ import (
 // This regression uses a controlled runtime ELF and a real held-inode snapshot,
 // not a Docker daemon or QCOW2 bake. It exercises capacity admission and the
 // reserved scan/cleanup boundary before another runtime may allocate a snapshot.
-func TestDiskInspectionReservationHoldsSnapshotAndCleanup(t *testing.T) {
-	for _, mode := range []string{"unchanged", "daemon"} {
+func TestDiskInspectionOwnsPackerSnapshotAndPermit(t *testing.T) {
+	for _, mode := range []string{"unchanged", "daemon", "snapshot failure", "admission failure"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 			defer cancel()
 			container, root := newReservedDiskInspectionFixture(t, ctx, mode)
-			other, _ := newReservedDiskInspectionFixture(t, ctx, "unchanged")
 			raw := []byte("controlled held subject")
 			path := filepath.Join(t.TempDir(), "payload")
-			if err := os.WriteFile(path, raw, 0o600); err != nil {
+			if err := os.WriteFile(path, raw, 0600); err != nil {
 				t.Fatal(err)
 			}
 			file, err := os.Open(path)
@@ -37,58 +35,40 @@ func TestDiskInspectionReservationHoldsSnapshotAndCleanup(t *testing.T) {
 				t.Fatal(err)
 			}
 			artifact := &PackerArtifact{file: file, size: int64(len(raw)), digest: FileDigest(raw)}
-			t.Cleanup(func() { _ = artifact.Close() })
-			reservation, err := container.AdmitSubject(ctx, artifact.size)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer reservation.Close()
-			blocked := func() {
-				t.Helper()
-				wait, stop := context.WithTimeout(ctx, 10*time.Millisecond)
-				defer stop()
-				got, err := other.AdmitSubject(wait, artifact.size)
-				if got != nil {
-					_ = got.Close()
-				}
-				if got != nil || code(err) != e.CodeTimeout {
-					t.Fatalf("second runtime spent reserved capacity: %v, %v", got, err)
-				}
-			}
-			blocked() // Admission precedes the first snapshot allocation.
-			subject, err := artifact.SnapshotHeldContext(ctx, 128)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer subject.Close()
-			got, err := subject.ReadAllContext(ctx, 128)
-			if err != nil || !bytes.Equal(got, raw) {
-				t.Fatalf("original snapshot: %q, %v", got, err)
-			}
-			observation, err := reservation.InspectHeld(ctx, subject)
+			defer artifact.Close()
 			want := e.Code("")
-			if mode == "daemon" {
+			switch mode {
+			case "daemon":
+				want = e.CodeEngineCapability
+			case "snapshot failure":
+				artifact.digest = "tag"
+				want = e.CodeVerifyFailed
+			case "admission failure":
+				container.runtime = nil
+				artifact.mu.Lock() // A snapshot would block: admission must reject before copy.
+				defer artifact.mu.Unlock()
 				want = e.CodeEngineCapability
 			}
+			observation, err := container.InspectPackerArtifact(ctx, artifact)
 			if code(err) != want || (observation != nil) != (want == "") {
-				t.Fatalf("reserved scan result: %v, %v", observation, err)
+				t.Fatalf("owned scan: %v, %v", observation, err)
 			}
-			if _, err := os.Stat(filepath.Join(root, "removed")); err != nil {
-				t.Fatalf("scan returned before container cleanup: %v", err)
+			if mode == "unchanged" || mode == "daemon" {
+				if _, err := os.Stat(filepath.Join(root, "removed")); err != nil {
+					t.Fatalf("scan returned before container cleanup: %v", err)
+				}
+			} else if _, err := os.Stat(filepath.Join(root, "consumed")); !os.IsNotExist(err) {
+				t.Fatalf("failed admission/snapshot reached child input: %v", err)
 			}
-			blocked() // Successful or failed scan does not release the snapshot budget.
-			if err := subject.Close(); err != nil {
-				t.Fatal(err)
+			if !diskInspectionCapacity.TryLock() {
+				t.Fatal("owned operation leaked capacity after snapshot cleanup")
 			}
-			if err := reservation.Close(); err != nil {
-				t.Fatal(err)
-			}
-			next, err := other.AdmitSubject(ctx, artifact.size)
-			if err != nil {
-				t.Fatalf("completed snapshot leaked admission: %v", err)
-			}
-			if err := next.Close(); err != nil {
-				t.Fatal(err)
+			diskInspectionCapacity.Unlock()
+			if mode == "unchanged" {
+				digest, size, _, _, _ := observation.Binding()
+				if digest != artifact.Digest() || size != artifact.Size() {
+					t.Fatal("observation differs from original Packer subject")
+				}
 			}
 		})
 	}

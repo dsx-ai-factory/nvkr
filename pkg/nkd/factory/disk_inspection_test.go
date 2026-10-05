@@ -29,6 +29,45 @@ func testDiskInventoryScan(ctx context.Context, payload *diskPayload, format, en
 		packages: []sbom.InstalledDiskPackage{{Name: "fixture-package", Version: "1", Format: "deb"}}}, nil
 }
 
+func TestPackerInstalledInventoryHandoff(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		want e.Code
+	}{
+		{"different producer", e.CodeVerifyFailed}, {"nil Packer artifact", e.CodeVerifyFailed},
+		{"runtime failure", e.CodeEngineCapability}, {"missing inventory", e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			artifact := &pipeline.PackerArtifact{}
+			payload := &diskPayload{content: artifact}
+			switch test.name {
+			case "different producer":
+				payload.content = &fakeDiskProducerResult{}
+			case "nil Packer artifact":
+				payload.content = (*pipeline.PackerArtifact)(nil)
+			}
+			called := false
+			cause := e.New(e.CodeEngineCapability, "fixture admitted runtime failure")
+			scan := packerInstalledInventoryScan(func(ctx context.Context, got *pipeline.PackerArtifact, format, encryption string) (*sbom.DiskInstalledInventory, error) {
+				called = true
+				if ctx != t.Context() || got != artifact || format != "qcow2" || encryption != "none" {
+					t.Fatal("handoff changed original artifact or runtime arguments")
+				}
+				if test.name == "runtime failure" {
+					return nil, cause
+				}
+				return nil, nil
+			})
+			result, err := scan(t.Context(), payload, "qcow2", "none")
+			wantCalled := test.name == "runtime failure" || test.name == "missing inventory"
+			if factoryErrorCode(err) != test.want || called != wantCalled || result.subject != "" ||
+				(test.name == "runtime failure" && !errors.Is(err, cause)) {
+				t.Fatalf("handoff: called=%t scan=%+v error=%v", called, result, err)
+			}
+		})
+	}
+}
+
 func TestLiveDiskInventoryObservationAdmissionCodes(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -85,6 +124,19 @@ func TestLiveDiskInventoryObservationAdmissionCodes(t *testing.T) {
 				t.Fatalf("receipt=%v error=%v, want %s", receipt, err, test.want)
 			}
 		})
+	}
+}
+
+func TestLiveDiskInventoryRejectsEncryptedSubject(t *testing.T) {
+	plan, owner := diskMaterialTraceFixtureForPlatformAndEncryption(t, false, false, "linux/amd64", "luks2")
+	called := false
+	receipt, err := owner.observeDiskInstalledInventory(t.Context(), plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{}, testDiskInspectionBindings,
+		func(context.Context, *diskPayload, string, string) (diskInstalledScan, error) {
+			called = true
+			return diskInstalledScan{}, nil
+		})
+	if receipt != nil || called || factoryErrorCode(err) != e.CodeEncryptedArtifact {
+		t.Fatalf("encrypted subject reached inspector: receipt=%v called=%t error=%v", receipt, called, err)
 	}
 }
 

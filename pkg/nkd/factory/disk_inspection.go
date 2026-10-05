@@ -77,40 +77,29 @@ func (owner *LocalRunResult) ObserveDiskInstalledInventory(ctx context.Context, 
 		return nil, e.New(e.CodeEngineCapability, "disk installed inventory requires an admitted inspection runtime")
 	}
 	return owner.observeDiskInstalledInventory(ctx, plan, expected, runtime, runtimeInventoryBindings(runtime),
-		func(ctx context.Context, payload *diskPayload, format, encryption string) (diskInstalledScan, error) {
-			artifact, ok := payload.content.(*pipeline.PackerArtifact)
-			if !ok || artifact == nil {
-				return diskInstalledScan{}, e.New(e.CodeVerifyFailed, "disk inspection requires the original held Packer capability")
-			}
-			reservation, err := runtime.AdmitSubject(ctx, payload.size)
-			if err != nil {
-				return diskInstalledScan{}, err
-			}
-			defer func() { _ = reservation.Close() }()
-			subject, err := artifact.SnapshotHeldContext(ctx, sbom.MaxDiagnosticDiskBytes)
-			if err != nil {
-				return diskInstalledScan{}, err
-			}
-			inventory, scanErr := reservation.InspectHeldInstalledPackages(ctx, subject, format, encryption)
-			closeErr := subject.Close()
-			if closeErr == nil && scanErr != nil {
-				return diskInstalledScan{}, scanErr
-			}
-			if closeErr != nil {
-				code := e.CodeInternal
-				var coded *e.Error
-				if errors.As(scanErr, &coded) {
-					code = coded.Code
-				}
-				return diskInstalledScan{}, e.Wrap(code, errors.Join(scanErr, closeErr), "inspecting and closing the held disk snapshot")
-			}
-			if inventory == nil {
-				return diskInstalledScan{}, e.New(e.CodeVerifyFailed, "disk inspector returned no installed inventory")
-			}
-			digest, size, inspector, codec := inventory.Binding()
-			return diskInstalledScan{subject: digest, size: size, packages: inventory.Packages(),
-				bindings: diskInspectionBindings{image: inventory.RuntimeBinding(), inspector: inspector, codec: codec}}, nil
-		})
+		packerInstalledInventoryScan(runtime.InspectPackerInstalledPackages))
+}
+
+// The concrete runtime owns the complete snapshot lifetime. This private seam
+// exercises factory's handoff and result checks without admitting a substitute
+// inspector through the public API.
+func packerInstalledInventoryScan(inspect func(context.Context, *pipeline.PackerArtifact, string, string) (*sbom.DiskInstalledInventory, error)) diskInventoryScan {
+	return func(ctx context.Context, payload *diskPayload, format, encryption string) (diskInstalledScan, error) {
+		artifact, ok := payload.content.(*pipeline.PackerArtifact)
+		if !ok || artifact == nil {
+			return diskInstalledScan{}, e.New(e.CodeVerifyFailed, "disk inspection requires the original held Packer capability")
+		}
+		inventory, err := inspect(ctx, artifact, format, encryption)
+		if err != nil {
+			return diskInstalledScan{}, err
+		}
+		if inventory == nil {
+			return diskInstalledScan{}, e.New(e.CodeVerifyFailed, "disk inspector returned no installed inventory")
+		}
+		digest, size, inspector, codec := inventory.Binding()
+		return diskInstalledScan{subject: digest, size: size, packages: inventory.Packages(),
+			bindings: diskInspectionBindings{image: inventory.RuntimeBinding(), inspector: inspector, codec: codec}}, nil
+	}
 }
 
 func (owner *LocalRunResult) observeDiskInstalledInventory(ctx context.Context, plan *Plan,

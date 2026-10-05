@@ -29,12 +29,12 @@ func TestContainerInspectionAPIGates(t *testing.T) {
 		{name: "zero runtime", inspect: func(ctx context.Context, format, encryption string) (*DiskInstalledInventory, error) {
 			return (&DiskInspectionRuntime{}).InspectHeldInstalledPackages(ctx, nil, format, encryption)
 		}, close: (&DiskInspectionRuntime{}).Close},
-		{name: "nil reservation", inspect: func(ctx context.Context, format, encryption string) (*DiskInstalledInventory, error) {
-			return (*DiskInspectionReservation)(nil).InspectHeldInstalledPackages(ctx, nil, format, encryption)
-		}, close: (*DiskInspectionReservation)(nil).Close},
-		{name: "zero reservation", inspect: func(ctx context.Context, format, encryption string) (*DiskInstalledInventory, error) {
-			return (&DiskInspectionReservation{}).InspectHeldInstalledPackages(ctx, nil, format, encryption)
-		}, close: (&DiskInspectionReservation{}).Close},
+		{name: "nil Packer runtime", inspect: func(ctx context.Context, format, encryption string) (*DiskInstalledInventory, error) {
+			return (*DiskInspectionRuntime)(nil).InspectPackerInstalledPackages(ctx, nil, format, encryption)
+		}, close: (*DiskInspectionRuntime)(nil).Close},
+		{name: "zero Packer runtime", inspect: func(ctx context.Context, format, encryption string) (*DiskInstalledInventory, error) {
+			return (&DiskInspectionRuntime{}).InspectPackerInstalledPackages(ctx, nil, format, encryption)
+		}, close: (&DiskInspectionRuntime{}).Close},
 	} {
 		t.Run(capability.name, func(t *testing.T) {
 			canceled, cancel := context.WithCancel(t.Context())
@@ -120,8 +120,8 @@ func TestDiskInspectionRuntimeRejectsDescriptions(t *testing.T) {
 	if _, _, _, err := capability.BindingContext(t.Context()); sbomCode(err) != e.CodeEngineCapability {
 		t.Fatalf("absent runtime: %v", err)
 	}
-	if reservation, err := capability.AdmitSubject(t.Context(), 1); reservation != nil || sbomCode(err) != e.CodeEngineCapability {
-		t.Fatalf("absent runtime admits subject: %v", err)
+	if inventory, err := capability.InspectPackerInstalledPackages(t.Context(), nil, "qcow2", "none"); inventory != nil || sbomCode(err) != e.CodeEngineCapability {
+		t.Fatalf("absent runtime inspects Packer artifact: %v", err)
 	}
 	if err := capability.Close(); err != nil {
 		t.Fatal(err)

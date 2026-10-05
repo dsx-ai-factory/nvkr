@@ -64,10 +64,9 @@ const diskInspectionApplianceMiB uint64 = 2048
 // observed headroom twice, but cannot reserve resources against other processes.
 var diskInspectionCapacity sync.Mutex
 
-// DiskInspectionReservation holds capacity admission until the caller closes
-// its snapshot and releases the reservation. Copies share revocation state.
-// Close waits for an active scan and its container cleanup to finish.
-type DiskInspectionReservation struct {
+// diskInspectionReservation is private to the owning operation. It remains held
+// until that operation closes its snapshot and joins container cleanup.
+type diskInspectionReservation struct {
 	state *diskInspectionReservationState
 }
 
@@ -78,7 +77,7 @@ type diskInspectionReservationState struct {
 	timeoutSeconds uint64
 }
 
-func (reservation *DiskInspectionReservation) Close() error {
+func (reservation *diskInspectionReservation) Close() error {
 	if reservation == nil || reservation.state == nil {
 		return nil
 	}
@@ -94,7 +93,7 @@ func (reservation *DiskInspectionReservation) Close() error {
 
 // InspectHeld consumes only a subject of the admitted size, without reacquiring
 // capacity. The caller must keep the reservation until that subject is closed.
-func (reservation *DiskInspectionReservation) InspectHeld(ctx context.Context, subject *heldfile.File) (*DiskInspectionObservation, error) {
+func (reservation *diskInspectionReservation) InspectHeld(ctx context.Context, subject *heldfile.File) (*DiskInspectionObservation, error) {
 	if err := requireRunContext(ctx, "reserved disk inspection"); err != nil {
 		return nil, err
 	}
@@ -228,9 +227,8 @@ func (container *DiskInspectionContainer) BindingContext(ctx context.Context) (s
 	return container.imageID, container.selection.InspectorDigest, container.selection.CodecDigest, nil
 }
 
-// Close cancels registered operations, then joins their streaming and deferred
-// cleanup before closing the held runtime. Caller-owned snapshot reservations
-// remain held until their caller closes the snapshot and reservation.
+// Close cancels registered operations, then joins their streaming, snapshot
+// closure and deferred cleanup before closing the held runtime.
 func (container *DiskInspectionContainer) Close() error {
 	if container == nil {
 		return nil
@@ -273,18 +271,66 @@ func (container *DiskInspectionContainer) beginOperation(ctx context.Context) (c
 	return operation, func() { stopCancellation(); cancel(); container.operations.Done() }, nil
 }
 
-// AdmitSubject reserves capacity admission before the factory creates its held
-// snapshot. In addition to the container's two copies, this budgets that extra
-// factory-held copy. The original producer inode remains disk-backed. Admission
-// compares that combined budget with host availability and the NKD process's
-// cgroup headroom. The returned process-local permit must remain held through
-// snapshot creation, inspection, and snapshot close. It does not allocate memory
-// or authenticate the daemon's separate cgroup/slice or other processes' usage.
-func (container *DiskInspectionContainer) AdmitSubject(ctx context.Context, size int64) (*DiskInspectionReservation, error) {
-	return container.reserveSubject(ctx, size, true)
+// InspectPackerArtifact owns admission, original-inode snapshot creation,
+// inspection and cleanup as one registered operation. No caller can retain its
+// capacity permit or temporary snapshot. Close cancels and joins the complete
+// operation before the permit is released. Artifact ownership stays with Run.
+func (container *DiskInspectionContainer) InspectPackerArtifact(ctx context.Context, artifact *PackerArtifact) (*DiskInspectionObservation, error) {
+	if err := requireRunContext(ctx, "Packer disk inspection"); err != nil {
+		return nil, err
+	}
+	if container == nil || artifact == nil {
+		return nil, e.New(e.CodeEngineCapability, "disk inspection requires a runtime and original Packer artifact")
+	}
+	if container.selection.TimeoutSeconds == 0 || container.selection.TimeoutSeconds > 600 {
+		return nil, e.New(e.CodeEngineCapability, "inspection runtime lacks its bounded declared operation timeout")
+	}
+	ctx, finish, err := container.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(container.selection.TimeoutSeconds)*time.Second)
+	defer cancel()
+	reservation, err := container.reserveSubject(ctx, artifact.Size(), true)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = reservation.Close() }()
+	subject, err := artifact.SnapshotHeldContext(ctx, 8<<30)
+	if err != nil {
+		return nil, err
+	}
+	return inspectAndCloseDiskSnapshot(ctx, subject, reservation.InspectHeld, subject.Close)
 }
 
-func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, size int64, beforeSnapshot bool) (*DiskInspectionReservation, error) {
+// The private seam tests cleanup failure without making caller callbacks or
+// temporary snapshot ownership part of the public inspection contract.
+func inspectAndCloseDiskSnapshot(ctx context.Context, subject *heldfile.File,
+	scan func(context.Context, *heldfile.File) (*DiskInspectionObservation, error), closeSubject func() error,
+) (observation *DiskInspectionObservation, returnErr error) {
+	defer func() {
+		if closeErr := closeSubject(); closeErr != nil {
+			code := e.CodeInternal
+			var coded *e.Error
+			if errors.As(returnErr, &coded) {
+				code = coded.Code
+			}
+			observation = nil
+			returnErr = e.Wrap(code, errors.Join(returnErr, closeErr), "inspecting and closing the held disk snapshot")
+		}
+	}()
+	observation, returnErr = scan(ctx, subject)
+	if returnErr != nil {
+		return nil, returnErr
+	}
+	if observation == nil {
+		return nil, e.New(e.CodeVerifyFailed, "disk inspector returned no observation")
+	}
+	return observation, nil
+}
+
+func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, size int64, beforeSnapshot bool) (*diskInspectionReservation, error) {
 	if err := requireRunContext(ctx, "inspection subject admission"); err != nil {
 		return nil, err
 	}
@@ -327,7 +373,7 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 		return nil, err
 	}
 	admitted = true
-	return &DiskInspectionReservation{state: &diskInspectionReservationState{
+	return &diskInspectionReservation{state: &diskInspectionReservationState{
 		container: container, size: size, timeoutSeconds: container.selection.TimeoutSeconds,
 	}}, nil
 }

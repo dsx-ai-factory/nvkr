@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -42,6 +43,51 @@ func TestPackerSnapshotBindsOriginalInode(t *testing.T) {
 	got, err := snapshot.ReadAllContext(t.Context(), 1024)
 	if err != nil || !bytes.Equal(got, raw) || snapshot.Digest() != FileDigest(raw) {
 		t.Fatalf("held original = %q, %v", got, err)
+	}
+}
+
+// Err is checked at admission, at the artifact lock, at held allocation, and
+// before each 1 MiB copy block. Cancel at the second block, after real source
+// bytes have been read, rather than at admission or while waiting for a lock.
+type snapshotCopyCancelContext struct {
+	context.Context
+	cancel context.CancelFunc
+	checks atomic.Uint32
+}
+
+func (ctx *snapshotCopyCancelContext) Err() error {
+	if ctx.checks.Add(1) == 5 {
+		ctx.cancel()
+	}
+	return ctx.Context.Err()
+}
+
+func TestPackerSnapshotCancellationDuringCopy(t *testing.T) {
+	raw := bytes.Repeat([]byte("snapshot original bytes\n"), 100000)
+	path := filepath.Join(t.TempDir(), "payload")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := &PackerArtifact{file: file, digest: FileDigest(raw), size: int64(len(raw))}
+	defer artifact.Close()
+	parent, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	ctx := &snapshotCopyCancelContext{Context: parent, cancel: cancel}
+	subject, err := artifact.SnapshotHeldContext(ctx, int64(len(raw)))
+	if subject != nil || packerErrorCode(err) != e.CodeTimeout || !errors.Is(err, context.Canceled) || ctx.checks.Load() < 5 {
+		t.Fatalf("mid-copy cancellation: snapshot=%v checks=%d error=%v", subject, ctx.checks.Load(), err)
+	}
+	subject, err = artifact.SnapshotHeldContext(t.Context(), int64(len(raw)))
+	if err != nil {
+		t.Fatalf("cancellation damaged original artifact: %v", err)
+	}
+	defer subject.Close()
+	if subject.Digest() != artifact.Digest() || subject.Size() != artifact.Size() {
+		t.Fatal("retry no longer binds original bytes")
 	}
 }
 
