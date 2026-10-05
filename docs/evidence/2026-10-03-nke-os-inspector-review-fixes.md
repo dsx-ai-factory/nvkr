@@ -10,7 +10,7 @@ revalidates helper package metadata on the host using the existing XML rules,
 and adds report-binding regressions. The strengthened real cancellation test
 observes a running inspection container before canceling and joining cleanup.
 
-## Exact tested source
+## Host-side and contract-test source
 
 | File | Git blob |
 | --- | --- |
@@ -20,6 +20,12 @@ observes a running inspection container before canceling and joining cleanup.
 | `pkg/nkd/sbom/disk_inspection_runtime.go` | `46f44574ae81362797910e791eee86213c3291f6` |
 | `pkg/nkd/sbom/disk_inspection_runtime_test.go` | `bef9acd1e2cc944d79992279100abb3dd316b124` |
 | `pkg/nkd/sbom/disk_inspect.go` | `7080ec6acb18f4d5aa9bb16eb0ff15dc7f739a93` |
+
+These are the source fingerprints reported for the local patch and contract
+tests. They do not identify the helper in the reused image. The SBOM runtime
+blob `46f44574ae81362797910e791eee86213c3291f6` is not recoverable from the
+repository object store at this correction, so its contents cannot now be
+independently checked against that historical fingerprint.
 
 The native ARM64 test binary was built with
 `CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go test -c ./pkg/nkd/pipeline`.
@@ -33,6 +39,21 @@ were used. The retained read-only QCOW2 was
 `sha256:da7e44bf7192b113747de07f5eff189a1375eb7ee792971b9b3597947f67a8b7`,
 2,851,076,096 bytes. Inspector, codec, held runtime and daemon identities match
 the [historical closure record](2026-10-02-nke-os-inspector-runtime.md).
+
+No inspector image was rebuilt. The executed ARM64 helper ELF remained
+`sha256:fa56af977873a433c44fd2256513b3dc27a7f1a02d1befadc59c49a6765c2046`,
+with the earlier helper sources:
+
+| In-image helper source | Git blob |
+| --- | --- |
+| `pkg/nkd/sbom/disk_inspection_runtime.go` | `689812ec087ed19a0faebdbf0811e68e6b6f6308` |
+| `pkg/nkd/sbom/disk_inspect.go` | `dbe44f59722af9ce1d867c0a9fa6781a6feed448` |
+| `cmd/nkd-disk-inspect/main.go` | `9a77cd9be52d61fe6b6ac158d6e0904452b01131` |
+
+The real pipeline test exercised host-side runtime ownership and cancellation
+against this older helper. It did not exercise the later in-image XML/package
+validation or helper timeout classification. Local and native contract tests of
+those functions are not proof that the changed helper ran in the inspector image.
 
 `TestDiskInspectionRuntimeReal`, with its explicit pinned environment inputs
 and `-test.v -test.timeout=12m`, completed with exit zero:

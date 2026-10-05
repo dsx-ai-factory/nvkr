@@ -20,7 +20,6 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
@@ -45,18 +44,27 @@ type DiskInspectionSelection struct {
 // and complete immutable image closure. No caller command, mount or device can
 // be passed through it. The daemon is trusted, as in the local Packer adapter.
 type DiskInspectionContainer struct {
-	mu         sync.Mutex
-	lifetimeMu sync.Mutex
-	lifetime   context.Context
-	stop       context.CancelFunc
-	closing    bool
-	operations sync.WaitGroup
-	runtime    *heldRuntimeExecutable
-	selection  DiskInspectionSelection
-	imageID    string
+	mu          sync.Mutex
+	lifetimeMu  sync.Mutex
+	lifetime    context.Context
+	stop        context.CancelFunc
+	closing     bool
+	operations  sync.WaitGroup
+	runtime     *heldRuntimeExecutable
+	selection   DiskInspectionSelection
+	imageID     string
+	observeHost func(context.Context, *os.File) (execution.ObservedHostFacts, error)
 }
 
-const diskInspectionApplianceMiB uint64 = 2048
+const (
+	diskInspectionApplianceMiB uint64 = 2048
+	// MaxDiagnosticDiskBytes bounds the held diagnostic subject and its copies.
+	MaxDiagnosticDiskBytes = 8 << 30
+	// MaxDiskInspectionReportBytes bounds helper reports and runtime diagnostics.
+	MaxDiskInspectionReportBytes = 8 << 20
+	// MaxDiskInspectionTimeout bounds the complete operation, including revalidation.
+	MaxDiskInspectionTimeout = 10 * time.Minute
+)
 
 // One process-wide permit covers every inspection runtime, not just one
 // container. Availability observations are not allocations: serializing the
@@ -167,8 +175,8 @@ func validateDiskInspectionSelection(selection DiskInspectionSelection) error {
 	if !canonical.IsDigest(selection.InspectorDigest) || !canonical.IsDigest(selection.CodecDigest) {
 		return e.New(e.CodeUnpinnedInput, "disk inspection requires exact inspector and codec pins")
 	}
-	if selection.Workspace == nil || selection.Resources.CPUMillis == 0 || selection.Resources.MemoryMiB < diskInspectionApplianceMiB || selection.TimeoutSeconds == 0 || selection.TimeoutSeconds > 600 {
-		return e.New(e.CodeEngineCapability, "disk inspection requires a held workspace, positive CPU, at least 2 GiB memory and a timeout of at most ten minutes")
+	if selection.Workspace == nil || selection.Resources.CPUMillis < 10 || selection.Resources.MemoryMiB < diskInspectionApplianceMiB || selection.TimeoutSeconds == 0 || selection.TimeoutSeconds > uint64(MaxDiskInspectionTimeout/time.Second) {
+		return e.New(e.CodeEngineCapability, "disk inspection requires a held workspace, at least 10 CPU millis, at least 2 GiB memory and a timeout of at most ten minutes")
 	}
 	return nil
 }
@@ -181,17 +189,13 @@ func (container *DiskInspectionContainer) observeBinding(ctx context.Context) er
 	if err := observePackerRuntimeFreshness(ctx, adapter); err != nil {
 		return err
 	}
-	node := ir.Node{ID: "disk-inspection", Toolchain: container.selection.Image, ToolchainPlatform: container.selection.Platform}
-	if err := observeLocalPackerImage(ctx, adapter, node); err != nil {
-		return err
-	}
-	raw, err := heldExecutionOutput(ctx, container.runtime, "image", "inspect", "--format", "{{json .}}", container.selection.Image)
-	if err != nil {
-		return runtimeCommandError(ctx, err, "", e.CodeEngineCapability, "observing inspection image identity")
-	}
-	id, err := decodeDiskInspectionImageID(raw)
+	image, err := observeLocalContainerImage(ctx, adapter, container.selection.Image, container.selection.Platform, "local disk inspection image")
 	if err != nil {
 		return err
+	}
+	id := normalizeLocalImageID(image.ID)
+	if !canonical.IsDigest(id) {
+		return e.New(e.CodeEngineCapability, "runtime returned no exact inspection image identity")
 	}
 	if container.imageID != "" && container.imageID != id {
 		return e.New(e.CodeVerifyFailed, "disk inspection image changed after admission")
@@ -201,8 +205,9 @@ func (container *DiskInspectionContainer) observeBinding(ctx context.Context) er
 }
 
 // BindingContext checks that the capability remains open and unchanged. Image
-// config identity binds its immutable rootfs diff IDs and therefore the complete
-// inspector, loader, libraries, emulator, appliance and kernel, not just two tools.
+// identity is the runtime-reported image ID, not an independently approved pin.
+// The recorded Podman config identity binds rootfs content; the unexercised
+// Docker route does not establish which image-store identity .Id represents.
 func (container *DiskInspectionContainer) BindingContext(ctx context.Context) (string, string, string, error) {
 	if err := requireRunContext(ctx, "disk inspection runtime binding"); err != nil {
 		return "", "", "", err
@@ -282,7 +287,7 @@ func (container *DiskInspectionContainer) InspectPackerArtifact(ctx context.Cont
 	if container == nil || artifact == nil {
 		return nil, e.New(e.CodeEngineCapability, "disk inspection requires a runtime and original Packer artifact")
 	}
-	if container.selection.TimeoutSeconds == 0 || container.selection.TimeoutSeconds > 600 {
+	if container.selection.TimeoutSeconds == 0 || container.selection.TimeoutSeconds > uint64(MaxDiskInspectionTimeout/time.Second) {
 		return nil, e.New(e.CodeEngineCapability, "inspection runtime lacks its bounded declared operation timeout")
 	}
 	ctx, finish, err := container.beginOperation(ctx)
@@ -297,7 +302,7 @@ func (container *DiskInspectionContainer) InspectPackerArtifact(ctx context.Cont
 		return nil, err
 	}
 	defer func() { _ = reservation.Close() }()
-	subject, err := artifact.SnapshotHeldContext(ctx, 8<<30)
+	subject, err := artifact.SnapshotHeldContext(ctx, MaxDiagnosticDiskBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -334,10 +339,10 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 	if err := requireRunContext(ctx, "inspection subject admission"); err != nil {
 		return nil, err
 	}
-	if container == nil || size <= 0 || size > 8<<30 {
+	if container == nil || size <= 0 || size > MaxDiagnosticDiskBytes {
 		return nil, e.New(e.CodeEngineCapability, "inspection subject exceeds its supported byte budget")
 	}
-	if container.selection.TimeoutSeconds == 0 || container.selection.TimeoutSeconds > 600 {
+	if container.selection.TimeoutSeconds == 0 || container.selection.TimeoutSeconds > uint64(MaxDiskInspectionTimeout/time.Second) {
 		return nil, e.New(e.CodeEngineCapability, "inspection runtime lacks its bounded declared operation timeout")
 	}
 	ctx, finish, err := container.beginOperation(ctx)
@@ -365,7 +370,7 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 	}
 	observationCtx, observationCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer observationCancel()
-	facts, err := execution.ObserveLocalHost(observationCtx, container.selection.Workspace)
+	facts, err := container.hostFacts(observationCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +414,7 @@ func (container *DiskInspectionContainer) InspectHeld(ctx context.Context, subje
 	if err := requireRunContext(ctx, "container disk inspection"); err != nil {
 		return nil, err
 	}
-	if container == nil || subject == nil || subject.Size() <= 0 || subject.Size() > 8<<30 {
+	if container == nil || subject == nil || subject.Size() <= 0 || subject.Size() > MaxDiagnosticDiskBytes {
 		return nil, e.New(e.CodeEngineCapability, "container inspection requires one bounded held disk")
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(container.selection.TimeoutSeconds)*time.Second)
@@ -460,6 +465,12 @@ func (container *DiskInspectionContainer) inspectHeld(ctx context.Context, subje
 // no observation. Its caller must revalidate the held subject and runtime after
 // this operation returns. The seam is the existing concrete-runtime adapter.
 func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRuntime, selection DiskInspectionSelection, imageID string, subject *heldfile.File) (raw []byte, returnErr error) {
+	return runDiskInspectionContainerWithCleanupTimeout(ctx, runtime, selection, imageID, subject, 10*time.Second)
+}
+
+// The private timeout argument lets contract tests bound uncertain registration
+// without a mutable process-global policy. Production always grants ten seconds.
+func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime packerContainerRuntime, selection DiskInspectionSelection, imageID string, subject *heldfile.File, cleanupTimeout time.Duration) (raw []byte, returnErr error) {
 	attempt, err := packerAttemptID()
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "allocating disk inspection attempt identity")
@@ -467,7 +478,7 @@ func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRunt
 	name := "nkd-inspect-" + attempt
 	creationUncertain := true
 	defer func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), cleanupTimeout)
 		defer cleanupCancel()
 		err := removeDiskInspectionContainer(cleanupCtx, runtime, attempt, creationUncertain)
 		if err != nil {
@@ -475,8 +486,8 @@ func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRunt
 			returnErr = errors.Join(returnErr, e.Wrap(e.CodeInternal, err, "removing inspection container"))
 		}
 	}()
-	var createDiagnostic, diagnostic, report diskInspectionBuffer
-	if err := runtime.Run(ctx, nil, io.Discard, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...)...); err != nil {
+	var created, createDiagnostic, diagnostic, report diskInspectionBuffer
+	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(createDiagnostic.Bytes()), e.CodeEngineCapability, "creating disk inspection container")
 	}
 	creationUncertain = false
@@ -485,10 +496,14 @@ func runDiskInspectionContainer(ctx context.Context, runtime packerContainerRunt
 	if createDiagnostic.Len() != 0 {
 		return nil, e.New(e.CodeEngineCapability, "disk inspection creation returned diagnostics: %s", diskInspectionDiagnostic(createDiagnostic.Bytes()))
 	}
+	ids := strings.Fields(created.String())
+	if len(ids) != 1 || !canonical.IsDigest("sha256:"+ids[0]) {
+		return nil, e.New(e.CodeVerifyFailed, "disk inspection creation returned no unique immutable container ID")
+	}
 	reader, writer := io.Pipe()
 	done := make(chan error, 1)
 	go func() { _, err := subject.WriteToContext(ctx, writer); _ = writer.CloseWithError(err); done <- err }()
-	err = runtime.Run(ctx, reader, &report, &diagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), "start", "--attach", "--interactive", name)...)
+	err = runtime.Run(ctx, reader, &report, &diagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), "start", "--attach", "--interactive", ids[0])...)
 	_ = reader.Close()
 	copyErr := <-done
 	if err := errors.Join(err, copyErr); err != nil {
@@ -550,11 +565,19 @@ func checkDiskInspectionSubject(ctx context.Context, subject *heldfile.File, pha
 }
 
 func (container *DiskInspectionContainer) admitResources(ctx context.Context, size int64) error {
-	facts, err := execution.ObserveLocalHost(ctx, container.selection.Workspace)
+	facts, err := container.hostFacts(ctx)
 	if err != nil {
 		return err
 	}
 	return validateDiskInspectionResources(container.selection, facts, size, false)
+}
+
+func (container *DiskInspectionContainer) hostFacts(ctx context.Context) (execution.ObservedHostFacts, error) {
+	observe := container.observeHost
+	if observe == nil {
+		observe = execution.ObserveLocalHost
+	}
+	return observe(ctx, container.selection.Workspace)
 }
 
 func validateDiskInspectionResources(selection DiskInspectionSelection, facts execution.ObservedHostFacts, size int64, beforeSnapshot bool) error {
@@ -581,7 +604,7 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 	return []string{"create", "--name", containerName, "--pull=never", "--platform", selection.Platform,
 		"--label=nkd.dev/inspection-attempt=" + attempt,
 		"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-		"--user=65534:65534", "--hostname=nkd-inspector", "--no-healthcheck", "--init", "--interactive",
+		"--user=65534:65534", "--hostname=nkd-inspector", "--no-healthcheck", "--init", "--interactive", "--log-driver=none",
 		"--cpus=" + strconv.FormatFloat(float64(selection.Resources.CPUMillis)/1000, 'f', 3, 64),
 		"--memory=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m", "--memory-swap=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m",
 		"--pids-limit=256", "--tmpfs", "/tmp:rw,nosuid,nodev,size=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m,mode=1777",
@@ -605,11 +628,15 @@ func removeDiskInspectionContainer(ctx context.Context, runtime packerContainerR
 			"--filter", "label=nkd.dev/inspection-attempt="+attempt, "--format", "{{.ID}}")...); err != nil {
 			return e.Wrap(e.CodeInternal, err, "finding the owned disk inspection container")
 		}
+		var diagnosticErr error
 		if stderr.Len() != 0 {
-			return e.New(e.CodeVerifyFailed, "disk inspection cleanup discovery returned diagnostics")
+			diagnosticErr = e.New(e.CodeVerifyFailed, "disk inspection cleanup discovery returned diagnostics: %s", diskInspectionDiagnostic(stderr.Bytes()))
 		}
 		ids := strings.Fields(stdout.String())
 		if len(ids) == 0 {
+			if diagnosticErr != nil {
+				return diagnosticErr
+			}
 			if !creationUncertain {
 				return nil
 			}
@@ -623,12 +650,12 @@ func removeDiskInspectionContainer(ctx context.Context, runtime packerContainerR
 			}
 		}
 		if len(ids) != 1 || !canonical.IsDigest("sha256:"+ids[0]) {
-			return e.New(e.CodeVerifyFailed, "disk inspection cleanup has an ambiguous container identity")
+			return errors.Join(diagnosticErr, e.New(e.CodeVerifyFailed, "disk inspection cleanup has an ambiguous container identity"))
 		}
 		if err := runtime.Cleanup(ctx, time.Second, io.Discard, io.Discard, diskInspectionCommandArgs(runtime.RuntimeName(), "rm", "--force", ids[0])...); err != nil {
-			return e.Wrap(e.CodeInternal, err, "removing the owned disk inspection container")
+			return errors.Join(diagnosticErr, e.Wrap(e.CodeInternal, err, "removing the owned disk inspection container"))
 		}
-		return nil
+		return diagnosticErr
 	}
 }
 
@@ -659,7 +686,7 @@ func (buffer *diskInspectionBuffer) String() string { return buffer.data.String(
 func (buffer *diskInspectionBuffer) Reset()         { buffer.data.Reset() }
 
 func (buffer *diskInspectionBuffer) Write(raw []byte) (int, error) {
-	if buffer.Len()+len(raw) > 8<<20 {
+	if buffer.Len()+len(raw) > MaxDiskInspectionReportBytes {
 		return 0, e.New(e.CodeEnvelopeDecode, "disk inspection output exceeds its bound")
 	}
 	return buffer.data.Write(raw)
@@ -672,10 +699,7 @@ func decodeDiskInspectionImageID(raw []byte) (string, error) {
 	if err := json.Unmarshal(bytes.TrimSpace(raw), &image); err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "decoding inspection image identity")
 	}
-	id := image.ID
-	if !canonical.IsDigest(id) && canonical.IsDigest("sha256:"+id) {
-		id = "sha256:" + id
-	}
+	id := normalizeLocalImageID(image.ID)
 	if !canonical.IsDigest(id) {
 		return "", e.New(e.CodeEngineCapability, "runtime returned no exact inspection image identity")
 	}

@@ -108,8 +108,12 @@ func TestDiskInspectionCaptureDistinguishesCancellationAndIntegrity(t *testing.T
 }
 
 func TestDiskInspectionRuntimeRejectsDescriptions(t *testing.T) {
-	for _, observation := range []*pipeline.DiskInspectionObservation{nil, {}} {
-		if inventory, err := inventoryFromContainerObservation(observation); inventory != nil || sbomCode(err) == "" {
+	for index, observation := range []*pipeline.DiskInspectionObservation{nil, {}} {
+		want := e.CodeVerifyFailed
+		if index == 1 {
+			want = e.CodeEnvelopeDecode
+		}
+		if inventory, err := inventoryFromContainerObservation(observation); inventory != nil || sbomCode(err) != want {
 			t.Fatalf("unissued observation accepted: %v", err)
 		}
 	}
@@ -206,6 +210,9 @@ func TestDiskInspectionHelperAdmitsBeforeToolIO(t *testing.T) {
 		{name: "nil context", inspector: digest, codec: digest, subject: digest, size: 1, input: strings.NewReader("x"), output: io.Discard, want: e.CodeUsage},
 		{name: "wrong inspector", ctx: t.Context(), codec: digest, subject: digest, size: 1, input: strings.NewReader("x"), output: io.Discard, want: e.CodeUnpinnedInput},
 		{name: "wrong codec", ctx: t.Context(), inspector: digest, subject: digest, size: 1, input: strings.NewReader("x"), output: io.Discard, want: e.CodeUnpinnedInput},
+		{name: "wrong subject", ctx: t.Context(), inspector: digest, codec: digest, subject: "invalid", size: 1, input: strings.NewReader("x"), output: io.Discard, want: e.CodeUnpinnedInput},
+		{name: "zero subject", ctx: t.Context(), inspector: digest, codec: digest, subject: digest, input: strings.NewReader("x"), output: io.Discard, want: e.CodeUnpinnedInput},
+		{name: "negative subject", ctx: t.Context(), inspector: digest, codec: digest, subject: digest, size: -1, input: strings.NewReader("x"), output: io.Discard, want: e.CodeUnpinnedInput},
 		{name: "oversized subject", ctx: t.Context(), inspector: digest, codec: digest, subject: digest, size: MaxDiagnosticDiskBytes + 1, input: strings.NewReader("x"), output: io.Discard, want: e.CodeUnpinnedInput},
 		{name: "missing input", ctx: t.Context(), inspector: digest, codec: digest, subject: digest, size: 1, output: io.Discard, want: e.CodeUsage},
 		{name: "missing output", ctx: t.Context(), inspector: digest, codec: digest, subject: digest, size: 1, input: strings.NewReader("x"), want: e.CodeUsage},
@@ -215,5 +222,37 @@ func TestDiskInspectionHelperAdmitsBeforeToolIO(t *testing.T) {
 				t.Fatalf("got %v, want %s", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestDiskInspectionRuntimeHeldGuards(t *testing.T) {
+	for _, tt := range []struct {
+		name               string
+		runtime            *DiskInspectionRuntime
+		format, encryption string
+		ctx                context.Context
+		want               e.Code
+	}{
+		{name: "nil context", runtime: &DiskInspectionRuntime{}, format: "qcow2", encryption: "none", want: e.CodeUsage},
+		{name: "nil runtime", ctx: t.Context(), format: "qcow2", encryption: "none", want: e.CodeEngineCapability},
+		{name: "zero runtime", runtime: &DiskInspectionRuntime{}, ctx: t.Context(), format: "qcow2", encryption: "none", want: e.CodeEngineCapability},
+		{name: "encrypted", runtime: &DiskInspectionRuntime{}, ctx: t.Context(), format: "qcow2", encryption: "luks2", want: e.CodeEncryptedArtifact},
+		{name: "raw format", runtime: &DiskInspectionRuntime{}, ctx: t.Context(), format: "raw", encryption: "none", want: e.CodeEngineCapability},
+		{name: "nil subject", runtime: &DiskInspectionRuntime{container: &pipeline.DiskInspectionContainer{}}, ctx: t.Context(), format: "qcow2", encryption: "none", want: e.CodeEngineCapability},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			inventory, err := tt.runtime.InspectHeldInstalledPackages(tt.ctx, nil, tt.format, tt.encryption)
+			if inventory != nil || sbomCode(err) != tt.want {
+				t.Fatalf("inventory=%v err=%v", inventory, err)
+			}
+		})
+	}
+}
+
+func TestContainerInstalledPackageReportByteBound(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("1", 64)
+	packages, err := checkedContainerInstalledPackages([]byte(strings.Repeat(" ", maxDiskPackageReportBytes+1)), digest, 1, digest, digest, digest)
+	if packages != nil || sbomCode(err) != e.CodeEnvelopeDecode {
+		t.Fatalf("packages=%v err=%v", packages, err)
 	}
 }

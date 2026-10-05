@@ -7,8 +7,8 @@ Dry-run remains non-executing even when an inspection runtime is supplied: it do
 runtime and returns only the pending, static-unqualified Run description, with no observed outputs or inventories.
 
 The lifecycle invokes factory inspection after execution succeeds and before exporting or closing the held
-QCOW2. Factory retains the original Run's disk lifetime permit, authenticates its private material trace,
-holds a process-wide capacity-admission permit, and snapshots the originally collected inode. The permit remains
+QCOW2. Factory retains the original Run's disk lifetime permit and authenticates its private material trace.
+The concrete runtime owns a process-wide capacity-admission permit and snapshots the originally collected inode. The permit remains
 held through inspection, container cleanup and snapshot close, including failure and cancellation. Separate
 runtime instances cannot allocate competing admitted snapshots in this process. This is serialization around
 current host/cgroup availability, not a kernel memory allocation or a reservation against other processes or
@@ -34,9 +34,11 @@ Lifecycle tests cover invocation before export/close and failure without a retai
 These tests use controlled producer/inspection seams, not real NKE bakes.
 The same-Run sibling-output test gives both outputs their own valid material trace and equal-byte held
 completion before checking receipt replay. The production scan closure's concrete Packer type check and
-capacity-before-snapshot wiring are source-reviewed, but are not exercised by those injected scan tests.
-The concrete lifecycle join's disk-only selection, receipt observation and validation, and description
-collection are also source-reviewed, not exercised by the injected lifecycle ordering tests.
+capacity-before-snapshot wiring have separate guard and owned-operation tests. Those tests cover admission
+before copying, snapshot failure, mid-copy cancellation and runtime close joining child cleanup before
+snapshot closure and permit release. The concrete lifecycle join has disk-only selection, ordering and
+failure tests. A successful opaque inventory still requires the real runtime harness; injected tests do not
+prove a live NKE bake followed by inspection.
 
 An opted-in inspection failure fails the Run and discards uncommitted delivery bytes; it is not a warning
 that leaves a successful build without its requested inventory. Failed Runs expose no installed inventories,
@@ -44,8 +46,9 @@ including when scanning succeeded but later export, subject binding or disk comm
 must match every observed disk's output name, Plan, Build, exact digest, size, format and encryption.
 
 One ten-minute operation deadline covers queueing, material tracing, snapshotting, scanning and subject/tool
-rechecks. The runtime's configured timeout imposes a second ceiling on the scan; it does not reserve that
-entire duration after preparation. A shorter caller deadline and caller cancellation remain effective.
+rechecks. The runtime's configured timeout additionally bounds its complete owned admission, snapshot and
+scan operation; it does not reserve that entire duration after preparation. A shorter caller deadline and
+caller cancellation remain effective.
 
 Real acceptance still requires both AMD64 and ARM64 NKE builds inspected through this same original live
 lifecycle, with the exact source, Plan, attempt, image/tool identities and terminal inventory observation

@@ -1,8 +1,9 @@
 # Local disk material tracing
 
 This is a factory-package-internal, process-local API for the staged producer graph of a local disk Run.
-Recording is connected to local execution, but the observation API has no lifecycle, CLI or production SBOM
-consumer yet. Contract tests use fake producers; no NKE Run has exercised trace observation. It does not
+Recording is connected to local execution. The optional [live inspection SDK path](nke-os-live-inspection.md)
+consumes the trace before export; there is no CLI or production SBOM consumer yet. Contract tests use fake
+producers; no live NKE bake followed by this inspection handoff has been exercised. It does not
 claim a complete acquisition inventory, installed composition, reproduction or publication acceptance.
 
 ## Evidence ownership
@@ -31,7 +32,7 @@ cross-process authority. A serialized local Run cannot reconstruct this observat
 
 The trace's immutable subject check does not prove that its issuing Run remains open, distinguish equal-byte
 attempts of the same Plan, or grant access to held disk bytes. Future consumers must use the owning live-disk
-capability separately. Non-VM output/result pairs are re-hashed at recording time, intentionally adding I/O
+capability separately, as the live inspection SDK path does. Non-VM output/result pairs are re-hashed at recording time, intentionally adding I/O
 even for a multi-GB ISO; a consumer's held copy alone cannot establish that producer pairing.
 
 ## Declared NKE material map
@@ -60,8 +61,11 @@ this boundary. This implementation does not infer those leaves from logs or comm
 
 The factory owns the graph and live disk subject. The SBOM owner must not reconstruct that graph from paths,
 accept a description as authority, or compare archive digests directly with installed-file hashes. Inspection
-must consume the held disk through its existing export boundary and return its own exact-byte observation.
-Factory then joins the exact subject identities. Installed-only inventory and staged-only tracing together
+consumes an owner-issued snapshot of the original held inode, before export, and returns its own exact-byte
+observation. The owning runtime admits capacity before copying and closes the snapshot before releasing
+that capacity. Factory joins the subject identities and original Run/output/Plan/Build binding; it does not
+reopen an exported path. See [live disk inspection](nke-os-live-inspection.md) for the implemented handoff and
+its unexercised live-NKE acceptance criterion. Installed-only inventory and staged-only tracing together
 still do not establish full acquisition coverage or a reconciled production disk SBOM.
 
 Embedded-content declarations are a separate schema change. Under ADR-10, members already built by NKD retain

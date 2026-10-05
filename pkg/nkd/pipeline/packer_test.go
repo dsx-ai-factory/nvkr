@@ -104,6 +104,7 @@ func runDiskInspectionFixture(root string, args []string) int {
 		fmt.Printf("{\"Id\":%q,\"RepoDigests\":[%q],\"Os\":\"linux\",\"Architecture\":%q,\"Config\":{\"Env\":[]}}", id,
 			"example.test/inspection@sha256:"+strings.Repeat("1", 64), runtime.GOARCH)
 	case "create":
+		fmt.Print(strings.Repeat("a", 64))
 	case "start":
 		if _, err := io.Copy(io.Discard, os.Stdin); err != nil {
 			return 92
