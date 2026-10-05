@@ -127,6 +127,11 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 		copyRun.Observed = append(copyRun.Observed, cloneArtifact(artifact))
 	}
 	sort.Slice(copyRun.Observed, func(i, j int) bool { return copyRun.Observed[i].Name < copyRun.Observed[j].Name })
+	if len(run.diskInventories) != 0 {
+		if err := validateInstalledInventorySubjects(&copyRun); err != nil {
+			return nil, err
+		}
+	}
 	if len(seen) == len(required) {
 		copyRun.Status = RunComplete
 	} else {
@@ -173,6 +178,7 @@ func failedRun(run *Run, cause error) *Run {
 	copyRun := *run
 	copyRun.Expected = cloneRequired(run.Expected)
 	copyRun.Observed = nil
+	copyRun.diskInventories = nil
 	copyRun.Status = RunFailed
 	code := e.CodeInternal
 	var coded *e.Error

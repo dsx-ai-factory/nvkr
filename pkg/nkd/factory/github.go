@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 const (
@@ -194,10 +193,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		// themselves helper invocations, so a chmod folded into the later Execute step leaves
 		// every input-bearing job failing at its first Restore.
 		writePrepareHelperStep(&body)
-		for _, input := range stage.inputs(artifacts, nodeJobs) {
-			actions.writeDownloadStep(&body, githubArtifactLabel(plan, artifacts[input]), githubArtifactName(input), ".nkd/carriers")
-			fmt.Fprintf(&body, "      - name: %s\n        run: ./nkd-exec transport-unpack --archive %s --root . --path %s\n",
-				yamlSingle("Restore "+githubArtifactLabel(plan, artifacts[input])), shellQuote(carrierPath(input)), shellQuote(artifacts[input].Path))
+		if err := writeGitHubStageInputSteps(&body, plan, stage, artifacts, nodeJobs, actions); err != nil {
+			return nil, err
 		}
 		// Operator setup before the helper runs (e.g. `docker login` to pull a private,
 		// digest-pinned toolchain), configured by the admitted Environment.
@@ -221,22 +218,14 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for _, line := range githubNodeCommands(node, plan) {
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
-			for _, output := range node.Outputs {
-				fmt.Fprintf(&body, "      - name: %s\n        run: ./nkd-exec transport-pack --archive %s --root . --path %s\n",
-					yamlSingle("Archive "+githubArtifactLabel(plan, artifacts[output])), shellQuote(carrierPath(output)), shellQuote(artifacts[output].Path))
-				actions.writeUploadStep(&body, githubArtifactLabel(plan, artifacts[output]), githubArtifactName(output), carrierPath(output))
-			}
+			writeGitHubOutputSteps(&body, plan, node, artifacts, actions)
 		}
 	}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {
-		allNeeds := make([]string, 0, len(nodeJobs)+len(bootstrapJobs))
-		for _, job := range nodeJobs {
-			allNeeds = append(allNeeds, job)
+		allNeeds, err := githubFinalizerJobs(plan, nodeJobs)
+		if err != nil {
+			return nil, err
 		}
-		for _, job := range bootstrapJobs {
-			allNeeds = append(allNeeds, job)
-		}
-		allNeeds = uniqueSorted(allNeeds)
 		runners := sortedKeys(bootstrapJobs)
 		fmt.Fprintln(&body, "  nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
@@ -298,33 +287,6 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 
 // irProjectedNode identifies a reference to an exact producer instruction.
 func irProjectedNode(node Node) bool { return node.BuildTarget != "" && node.IRNode != "" }
-
-func generatedNodeCommands(node Node, plan *Plan, planPath, workspaceVariable string) []string {
-	// The container runtime the helper orchestrates with is sourced from the operator's
-	// Environment execution settings (ADR-18 §8), defaulting to rootless podman.
-	runtime := plan.Environment.RuntimeBinary()
-	command := fmt.Sprintf("./nkd-exec factory execute-node --plan %s --node %s --workspace .nkd/factory",
-		shellQuote(planPath), shellQuote(node.ID))
-	if node.IRNode != "" || node.Container == "" {
-		return []string{command}
-	}
-	network := "bridge"
-	if node.Network == ir.NetworkNone {
-		network = "none"
-	}
-	platform := ""
-	if node.Platform != "" {
-		platform = " --platform " + shellQuote(node.Platform)
-	}
-	owner := ""
-	if runtime == "docker" {
-		// Docker's container root is host root. Keep private staged layouts owned
-		// by the runner so subsequent host transport steps can reopen them.
-		owner = ` --user "$(id -u):$(id -g)" -e HOME=/tmp`
-	}
-	return []string{fmt.Sprintf("%s run --rm --network %s%s%s -v \"%s:/workspace\" -w /workspace %s %s",
-		runtime, network, platform, owner, workspaceVariable, shellQuote(node.Container), "/workspace/"+strings.TrimPrefix(command, "./"))}
-}
 
 func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, label, name, path string) {
 	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name), yamlSingle(path))

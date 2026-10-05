@@ -24,13 +24,14 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 const (
 	// MaxDiagnosticDiskBytes bounds both the held input and private snapshot.
 	// Callers must budget this additional disk copy and the held-file memory.
-	MaxDiagnosticDiskBytes    = 8 << 30
-	maxDiskPackageReportBytes = 8 << 20
+	MaxDiagnosticDiskBytes    = pipeline.MaxDiagnosticDiskBytes
+	maxDiskPackageReportBytes = pipeline.MaxDiskInspectionReportBytes
 	maxDiskInstalledPackages  = 16384
 	maxDiskDiagnosticBytes    = 4096
 )
@@ -66,7 +67,19 @@ type DiskInstalledInventory struct {
 	subjectSize     int64
 	inspectorDigest string
 	codecDigest     string
+	runtimeDigest   string
 	packages        []InstalledDiskPackage
+}
+
+// RuntimeBinding describes the runtime-reported image identity retained when
+// DiskInspectionRuntime issued this inventory. It is not a repository-approved
+// image pin, provider-isolation proof, or production admission receipt. An
+// executable-only diagnostic inventory returns an empty value.
+func (inventory *DiskInstalledInventory) RuntimeBinding() string {
+	if inventory == nil {
+		return ""
+	}
+	return inventory.runtimeDigest
 }
 
 func (inventory *DiskInstalledInventory) Packages() []InstalledDiskPackage {
@@ -445,9 +458,32 @@ func installedPackagesFromXML(raw []byte) ([]InstalledDiskPackage, error) {
 		packages = append(packages, InstalledDiskPackage{Name: fields[0], Version: fields[1],
 			Release: fields[2], Epoch: fields[3], Architecture: fields[4], Format: system.Format[0]})
 	}
+	return checkedInstalledDiskPackages(packages)
+}
+
+// checkedInstalledDiskPackages is shared by XML projection and host-side helper
+// report admission. Parsing in a sandbox does not make its metadata trusted.
+func checkedInstalledDiskPackages(packages []InstalledDiskPackage) ([]InstalledDiskPackage, error) {
 	if len(packages) == 0 {
 		return nil, e.New(e.CodeProvenanceMissing, "disk inspector found no installed packages")
 	}
+	if len(packages) > maxDiskInstalledPackages {
+		return nil, e.New(e.CodeEnvelopeDecode, "disk installed-package inventory exceeds its package budget")
+	}
+	for _, pkg := range packages {
+		if pkg.Format != "deb" {
+			return nil, e.New(e.CodeEngineCapability, "disk inspection supports Debian-package metadata")
+		}
+		if _, err := oneDiskPackageField([]string{pkg.Name}, true); err != nil {
+			return nil, err
+		}
+		for _, field := range []string{pkg.Version, pkg.Release, pkg.Epoch, pkg.Architecture} {
+			if _, err := oneDiskPackageField([]string{field}, false); err != nil {
+				return nil, err
+			}
+		}
+	}
+	packages = slices.Clone(packages)
 	slices.SortFunc(packages, func(a, b InstalledDiskPackage) int {
 		if order := strings.Compare(a.Name, b.Name); order != 0 {
 			return order

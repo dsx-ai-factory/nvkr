@@ -458,7 +458,7 @@ func (result *LocalRunResult) inspectDiskLifecyclePayload(ctx context.Context, p
 	}
 	defer release()
 	result.diskMu.Lock()
-	if result.diskClosed {
+	if result.diskClosed || result.diskClosing {
 		result.diskMu.Unlock()
 		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeGateUnmet,
 			"local disk execution result is closed")
@@ -482,6 +482,14 @@ func (result *LocalRunResult) Close() error {
 	if result == nil {
 		return nil
 	}
+	// Revoke new inspection admission and cancel an active scanner before
+	// waiting for its permit. The scanner owns bounded stop-and-join cleanup.
+	result.diskMu.Lock()
+	result.diskClosing = true
+	if result.diskInspectionCancel != nil {
+		result.diskInspectionCancel()
+	}
+	result.diskMu.Unlock()
 	permit := result.diskOperationPermit()
 	<-permit
 	defer func() { permit <- struct{}{} }()
@@ -533,7 +541,7 @@ func (result *LocalRunResult) recordDiskCompletion(completion diskProducerComple
 	}
 	result.diskMu.Lock()
 	defer result.diskMu.Unlock()
-	if result.diskClosed {
+	if result.diskClosed || result.diskClosing {
 		return e.New(e.CodeGateUnmet, "local disk execution result is closed")
 	}
 	for _, recorded := range result.diskCompletions {

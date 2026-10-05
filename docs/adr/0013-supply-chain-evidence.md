@@ -138,12 +138,52 @@ A catalog declaration may validate without those tools, but it is not a disk SBO
 Disk Plan lowering, material tracing, inspection, reconciliation, and evidence publication are not implemented
 by the authoring schema.
 
-This reconciliation proves the composition observed in one exact disk; it is not a reproduction comparison.
+The diagnostic guest package capture schema `nkd.dev/package-acquisitions/v1` has scope
+`apt-pre-install-pkgs` and target `amd64` or `arm64`. Its canonical JSON manifest is the first USTAR member,
+followed by nonempty, unique package members in digest order with exact digest-derived paths and sizes.
+Limits are 16,384 packages, 1 GiB per package, 8 MiB manifest, 8 GiB archive, and 1–32 bounded raw repository
+locations per package, each at most 4,096 bytes. The owning held-archive verifier checks member-byte
+correspondence without extraction; package display metadata and locations remain source-reported descriptions.
+Header metadata and member padding are opaque digest-bound bytes, not canonical package evidence. Capture
+settings belong to the selected producer configuration. The [capture contract](../nke-os-acquisition-contract.md)
+describes the unpinned NKE candidate; live collection, source/Run/QCOW2 binding, origin authentication and
+complete disk reconciliation remain deferred. Neither this diagnostic observation nor its zero-value
+description authorizes production or substitutes for the full exact-QCOW2 inventory required above.
+
+The optional local installed-package diagnostic uses a caller-selected, already-local
+exact image on its native Linux architecture. Its fixed launcher is unprivileged
+(UID/GID 65534), networkless, read-only, drops all capabilities, disallows requested
+mounts/devices/credentials, enables no-new-privileges and init reaping, and bounds
+resources and the operation deadline. Native Podman commands suppress automatic
+`mounts.conf` inputs on create, start and owned cleanup; an unsupported override
+fails closed. The runtime executable, daemon configuration, OCI hooks and host
+kernel remain trusted. Held subjects and tool bytes are rechecked; the returned
+installed-package inventory carries the runtime-reported image identity, not a
+repository-approved runtime pin or provider-isolation receipt. This diagnostic
+does not authorize full-disk SBOM, production publication or qualification.
+
+The exact-QCOW2 reconciliation proves the composition observed in one exact disk; it is not a reproduction comparison.
 Matching dependency digests, installed-package sets, selected file hashes, or SBOM documents across two Runs can
 support content validation and diagnose drift, but cannot mint `Reproduced` when the qualified artifact subject
 differs. Each different QCOW2 digest remains a new Artifact identity with its own SBOM subject and production
 provenance. Independently reproduced or acquired materials keep their own evidence relationships without
 upgrading the disk that consumed them.
+
+A narrower, opt-in local installed-package diagnostic may join the factory's live staged-material trace to
+read-only inspection before the issuing Run closes. Factory accepts only its original held Packer output and
+an admitted concrete inspection runtime. The runtime binds an exact OCI closure and inspector/codec identities;
+capacity admission precedes the additional anonymous disk snapshot. The runtime owns admission, snapshot
+creation, scanning, snapshot closure and permit release as one cancelable, joined operation; no borrowed
+snapshot or capacity reservation escapes to a caller. The package-issued, process-local result
+binds the original Run owner, named output, Plan, Build, QCOW2 digest/size and inspected runtime/tool bytes.
+Equal subject bytes or Build identity cannot authorize reuse by a sibling attempt. Closing the Run cancels
+active inspection, joins cleanup and revokes live use, including shallow receipt copies. Historical installed
+metadata remains inspectable but cannot be serialized and restored as authority. Omitting this opt-in does not
+claim inspection. Opting in makes successful inspection a condition of local Run completion: a failed scan,
+subject check or cleanup fails the Run and discards its uncommitted disk export. A failed Run exposes no
+installed inventories. This prevents a requested inventory from being paired with undelivered or differently
+observed bytes; it does not grant publication or qualification authority. This diagnostic is not the complete acquisition trace, reconciliation, full CycloneDX
+document, disk publication gate or qualification described above.
 
 For binaries and OCI image exports, the SBOM owner invokes the pinned scanner as an owned, bounded subprocess
 inside the offline utility container. Inputs are held and checked against producer digests. Syft's file resolver

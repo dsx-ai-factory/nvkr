@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -257,6 +258,17 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	}
 	layout, publication = attestFixtureLayout(t, layout)
 	reference := "registry.example.test/product@" + publication.RootDigest
+	navigation, err := InspectRelease(ctx, reference, InspectionOptions{LayoutPath: layout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if navigation.Outputs[0].Kind != OutputHelm || navigation.Outputs[0].BuildSubjects == nil || len(navigation.Outputs[0].BuildSubjects) != 0 {
+		t.Fatalf("component-free Helm output must describe an empty collection: %+v", navigation.Outputs[0])
+	}
+	rawNavigation, err := json.Marshal(navigation)
+	if err != nil || !strings.Contains(string(rawNavigation), `"buildSubjects":[]`) {
+		t.Fatalf("component-free Helm subjects must encode as an array: %s, %v", rawNavigation, err)
+	}
 	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: reference, Digest: publication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
 		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}

@@ -1,7 +1,6 @@
 package factory
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -103,7 +102,7 @@ func githubStageLabel(plan *Plan, nodes []Node) string {
 		if bindsImage {
 			label += " with Helm image binding"
 		}
-		return label
+		return label + ": " + strings.Join(uniqueSorted(packages), ", ")
 	}
 	return "Verify artifacts and generate SBOMs: " + strings.Join(uniqueSorted(builds), ", ")
 }
@@ -138,26 +137,4 @@ func githubArtifactLabel(plan *Plan, artifact Artifact) string {
 		kind = strings.ReplaceAll(artifact.Kind, "-", " ")
 	}
 	return artifact.Name + " (" + kind + ")"
-}
-
-// The EXIT trap reports failure without swallowing the command's status. No env
-// dump, command expansion, credentials or destination URLs enter these messages.
-func githubNodeCommands(node Node, plan *Plan) []string {
-	commands := []string{
-		"set -euo pipefail",
-		"nkd_started=$SECONDS",
-		"nkd_step=" + shellQuote(githubNodeLabel(plan, node)),
-		`nkd_finish() { nkd_status=$?; if [ "$nkd_status" -eq 0 ]; then printf "Completed: %s (%ss)\n" "$nkd_step" "$((SECONDS - nkd_started))"; else printf "Failed: %s (exit %s, %ss)\n" "$nkd_step" "$nkd_status" "$((SECONDS - nkd_started))" >&2; fi; exit "$nkd_status"; }`,
-		"trap nkd_finish EXIT",
-		`printf 'Starting: %s\n' "$nkd_step"`,
-		fmt.Sprintf("printf '%%s\\n' %s", shellQuote("Node: "+node.ID)),
-	}
-	if len(githubSourceEnvironment(plan, node)) > 0 {
-		commands = append(commands, requireSourceToken)
-	}
-	commands = append(commands, generatedNodeCommands(node, plan, FactoryPlanPath, "$GITHUB_WORKSPACE")...)
-	for _, output := range node.Outputs {
-		commands = append(commands, "printf '%s\\n' "+shellQuote("Produced: "+output))
-	}
-	return commands
 }

@@ -1,8 +1,11 @@
 package diskinspect_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,9 +25,26 @@ func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
 		Packages         map[string]string  `json:"packages"`
 		Images           map[string]*string `json:"images"`
 		PublicationGates map[string]string  `json:"publicationGates"`
+		Helper           struct {
+			Source        string   `json:"source"`
+			GoToolchain   string   `json:"goToolchain"`
+			Architectures []string `json:"architectures"`
+		} `json:"helper"`
 	}
-	if err := json.Unmarshal(raw, &lock); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&lock); err != nil {
 		t.Fatal(err)
+	}
+	goVersion, err := os.ReadFile("../../.go-version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lock.Helper.Source != "cmd/nkd-disk-inspect" || lock.Helper.GoToolchain != "go"+strings.TrimSpace(string(goVersion)) || !slices.Equal(lock.Helper.Architectures, []string{"amd64", "arm64"}) {
+		t.Fatal("helper source, Go version or architectures differ from the source contract")
+	}
+	if info, err := os.Stat(filepath.Join("../..", lock.Helper.Source, "main.go")); err != nil || !info.Mode().IsRegular() {
+		t.Fatalf("helper source absent: %v", err)
 	}
 	if lock.SchemaVersion != "nkd.dev/disk-inspect-toolchain/v1" || len(lock.Packages) != 6 || len(lock.Images) != 2 || lock.Images["amd64"] != nil || lock.Images["arm64"] != nil || lock.PublicationGates["licenseApproval"] != "not-recorded" || lock.PublicationGates["vulnerabilityApproval"] != "not-recorded" {
 		t.Fatal("diagnostic source lock has an unexpected contract or publication claim")
@@ -45,6 +65,8 @@ func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
 	}
 	dockerfile := string(data)
 	for _, text := range []string{"FROM " + lock.BaseImage, "FROM " + lock.DownloadImage,
+		"COPY bin/nkd-disk-inspect-${TARGETARCH} /usr/local/bin/nkd-disk-inspect",
+		"USER 65534:65534",
 		"https://snapshot.ubuntu.com/ubuntu/" + lock.UbuntuSnapshot,
 		"amd64) qemu_package=qemu-system-x86 ;;",
 		"arm64) qemu_package=qemu-system-arm ;;",

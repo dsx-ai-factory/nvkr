@@ -25,7 +25,10 @@ type Publication struct {
 	files      []*heldfile.File
 	inspection Inspection
 	outputs    []Output
+	platforms  map[string]publicationPlatform
 }
+
+type publicationPlatform struct{ OS, Arch string }
 
 // OpenPublication captures bounded immutable files, validates the exact root and
 // every reachable descriptor/evidence binding, then checks output payload members.
@@ -92,7 +95,8 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 	if inspection.RootDigest != expectedRoot || inspection.Root.Release == nil {
 		return nil, e.New(e.CodeVerifyFailed, "publication has no exact release metadata")
 	}
-	outputs, err := inspectOutputs(ctx, layout, inspection, stage)
+	platforms := make(map[string]publicationPlatform)
+	outputs, err := inspectOutputs(ctx, layout, inspection, stage, platforms)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +108,7 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 		return nil, e.New(e.CodeVerifyFailed, "release content subject differs from exact output payloads")
 	}
 	publication.inspection, publication.outputs = inspection, outputs
+	publication.platforms = platforms
 	failed = false
 	return publication, nil
 }
@@ -192,7 +197,7 @@ func (publication *Publication) RequireAttestedEvidence() error {
 	return RequireAttestedEvidence(publication.inspection)
 }
 
-func inspectOutputs(ctx context.Context, layout string, inspection Inspection, stage string) ([]Output, error) {
+func inspectOutputs(ctx context.Context, layout string, inspection Inspection, stage string, platforms map[string]publicationPlatform) ([]Output, error) {
 	var outputs []Output
 	for _, object := range inspection.Root.Objects {
 		binding := object.Output
@@ -219,11 +224,16 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 			if image.RootDigest != output.Digest {
 				return nil, e.New(e.CodeVerifyFailed, "OCI output differs from its image binding")
 			}
+			platforms[output.Name] = publicationPlatform{OS: image.OS, Arch: image.Arch}
 		case "executable":
 			bundle, err := extractBinaryBundle(ctx, layout, inspection, output.Name, filepath.Join(stage, output.Name+"-bundle"))
 			if err != nil {
 				return nil, err
 			}
+			if object.OS != "" && (object.OS != bundle.OS || object.Arch != bundle.Arch) {
+				return nil, e.New(e.CodeVerifyFailed, "executable output platform differs from its exact bundle config")
+			}
+			platforms[output.Name] = publicationPlatform{OS: bundle.OS, Arch: bundle.Arch}
 			members = nil
 			for _, entry := range bundle.Entries {
 				members = append(members, entry.Name)
