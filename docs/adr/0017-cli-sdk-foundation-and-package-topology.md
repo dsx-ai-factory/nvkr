@@ -83,7 +83,7 @@ and returned decision remain diagnostic; this operation adds no trusted-time or 
 lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
 not own the persisted status schema or reconstruct pin-update transactions.
 
-Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
+Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect|browse`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
@@ -95,6 +95,12 @@ artifact references, and release content projection. Lifecycle applies consumer 
 view. Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
+
+`lifecycle.InspectRelease` is the bounded, context-first read-only entry point for registry or local release
+navigation. Delivery opens the complete held publication before projecting output and evidence membership;
+presentation may then focus on an exact output or render text, JSON, or Mermaid. Reference and transport
+admission precede filesystem/network work. These detached descriptions carry no signature or policy authority,
+and cannot restore a verified Release capability. The existing compact local `release inspect` view remains.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic

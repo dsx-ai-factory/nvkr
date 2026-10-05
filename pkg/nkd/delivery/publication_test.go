@@ -15,6 +15,11 @@ import (
 
 func releasePublicationFixture(t *testing.T) (string, string) {
 	t.Helper()
+	return releasePublicationPlatformFixture(t, "", "")
+}
+
+func releasePublicationPlatformFixture(t *testing.T, osName, arch string) (string, string) {
+	t.Helper()
 	source := filepath.Join(t.TempDir(), "cli")
 	payload := []byte("exact executable")
 	if err := os.WriteFile(source, payload, 0o755); err != nil {
@@ -53,7 +58,7 @@ func releasePublicationFixture(t *testing.T) (string, string) {
 	}
 	root := filepath.Join(t.TempDir(), "publication")
 	result, err := BuildPublicationRoot(t.Context(), root, PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: []ObjectInput{
-		{Name: "tools", Kind: "binary-bundle", Path: bundlePath, Layout: true, ArtifactType: MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest, Output: &OutputBinding{Repository: "tools", Format: "executable", BuildDigest: build, Components: []string{"cli"}, BuildSubjects: []BuildSubject{{Component: "cli", Digest: digestBytes(payload)}}}},
+		{Name: "tools", Kind: "binary-bundle", Path: bundlePath, Layout: true, ArtifactType: MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest, OS: osName, Arch: arch, Output: &OutputBinding{Repository: "tools", Format: "executable", BuildDigest: build, Components: []string{"cli"}, BuildSubjects: []BuildSubject{{Component: "cli", Digest: digestBytes(payload)}}}},
 		{Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: semantic, Bytes: raw, Evidence: &EvidenceBinding{Outputs: []string{"tools"}, Component: "cli", Stage: "build-output", SubjectKind: "file", SubjectDigest: digestBytes(payload)}},
 	}})
 	if err != nil {

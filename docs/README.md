@@ -9,6 +9,7 @@
 | Learn the six public objects | [Domain vocabulary](../CONTEXT.md) |
 | Understand architecture and failure behavior | [SADD](sadd.md) |
 | Inspect the single release registry graph and signing scope | [Publication architecture](publication-architecture.md) |
+| Browse a registry release and its artifact/evidence relationships | [Release navigation](release-navigation.md) |
 | Change an engineering contract | Current [ADRs](adr/); public lifecycle in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) |
 | Determine what works and what is deferred | [Implementation/evidence record](adr/reconciliation.md) |
 | Plan v1 delivery | [Milestones](milestones.md), [acceptance specification](epics-v1-spec.md) |

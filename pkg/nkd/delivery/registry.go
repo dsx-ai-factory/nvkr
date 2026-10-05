@@ -355,7 +355,8 @@ func registryOptions(ctx context.Context, options RegistryOptions) []remote.Opti
 	}
 }
 
-func validateRegistryOptions(options RegistryOptions) error {
+// Validate admits transport credentials before filesystem or network work.
+func (options RegistryOptions) Validate() error {
 	if options.Anonymous && (options.Username != "" || options.Password != "") {
 		return e.New(e.CodeUsage, "anonymous registry access cannot carry explicit credentials")
 	}
@@ -364,6 +365,8 @@ func validateRegistryOptions(options RegistryOptions) error {
 	}
 	return nil
 }
+
+func validateRegistryOptions(options RegistryOptions) error { return options.Validate() }
 
 // Only sibling repositories in the caller-selected namespace are admitted.
 // Metadata cannot redirect registry credentials to another host or namespace.

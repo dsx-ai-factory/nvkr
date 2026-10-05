@@ -60,6 +60,7 @@ func cmdRelease() *cli.Command {
 		Usage:           "inspect or verify an immutable release closure",
 		HideHelpCommand: true,
 		Subcommands: append([]*cli.Command{
+			releaseBrowseCmd(),
 			{
 				Name: "inspect", Usage: "inspect an exact local OCI release layout without granting authority",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "layout", Required: true}},

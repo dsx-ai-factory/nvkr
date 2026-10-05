@@ -196,6 +196,15 @@ further projections. Signature and policy verification remain in the lifecycle c
 integrity and membership only, never signer authority by itself. Path-based diagnostic operations retain their
 independent revalidation at each call.
 
+Registry and local release navigation use that same held owner. Its detached description joins exact sibling
+output and evidence references, all output memberships, Build/component subjects and evidence stage/subject
+bindings. Executable and image platform labels come from the inspected payload config; a contradictory
+executable metadata label is rejected. Text, readable JSON and Mermaid explicitly describe integrity-only
+inspection and report qualification as a declaration. Output filtering occurs only after full closure checking.
+The diagram presents published relationships, not an inferred build graph. Navigation adds no canonical
+identity, signature verification or new publication authority. Loopback-registry, held-copy, admission and
+cancellation contracts are implemented; production-registry navigation remains separately evidenced.
+
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
 Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
 no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement

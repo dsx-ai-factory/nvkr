@@ -1,0 +1,15 @@
+{
+  "baseCommit": "d1a4ec9403a936b154b16f4c53e3d3f6daa4c739",
+  "branch": "codex/nkd-release-navigation",
+  "sourceGitBlobs": {
+    "cmd/nkdctl/release.go": "9131ac2a7e5771188c89fffc69113c1e8278f436",
+    "cmd/nkdctl/release_browse.go": "eb6c7c347f8c41e12b70b7ab3f9a627e8b71f433",
+    "pkg/nkd/delivery/publication.go": "d791ebe96c5482f3fbcb5a16cd78f423692fdaed",
+    "pkg/nkd/delivery/publication_description.go": "a87509b44cb5580e591b8758635525190c750223",
+    "pkg/nkd/delivery/registry.go": "ffc1752146407eb4f0c1e8dd10a88de5b6421dcf",
+    "pkg/nkd/lifecycle/release_inspection.go": "a553c01c0bbac5dc52c5d24dbabfe33b9f1a7f79",
+    "pkg/nkd/releaseview/render.go": "079badf19d1c87d1417687d71700c00167817d8b"
+  },
+  "binarySHA256": "cb64b7d8a6bc2f53106c699e16e1344ec15b1fcb8a069c483663f4fefa2557b1",
+  "replaySHA256": "3af87c666f7e14b4b931acb0144bb1ddbe9ed12a539db4f0d01b453474c70053"
+}
