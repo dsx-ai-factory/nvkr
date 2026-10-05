@@ -121,6 +121,7 @@ func TestPackerSnapshotRejectsInvalidAndChangedSubjects(t *testing.T) {
 	}{
 		{"nil context", e.CodeUsage}, {"canceled", e.CodeTimeout}, {"nil artifact", e.CodeUsage},
 		{"closed", e.CodeVerifyFailed}, {"over budget", e.CodeEngineCapability},
+		{"invalid digest", e.CodeVerifyFailed}, {"metadata I/O failure", e.CodeEngineCapability},
 		{"changed size", e.CodeVerifyFailed}, {"changed bytes", e.CodeVerifyFailed},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -134,7 +135,8 @@ func TestPackerSnapshotRejectsInvalidAndChangedSubjects(t *testing.T) {
 				t.Fatal(err)
 			}
 			artifact := &PackerArtifact{file: file, digest: FileDigest(raw), size: int64(len(raw))}
-			t.Cleanup(func() { _ = artifact.Close() })
+			original := artifact
+			t.Cleanup(func() { _ = original.Close() })
 			ctx, budget := t.Context(), int64(1024)
 			switch test.name {
 			case "nil context":
@@ -151,6 +153,14 @@ func TestPackerSnapshotRejectsInvalidAndChangedSubjects(t *testing.T) {
 				}
 			case "over budget":
 				budget = 1
+			case "invalid digest":
+				artifact.digest = "tag"
+			case "metadata I/O failure":
+				if err := file.Close(); err != nil {
+					t.Fatal(err)
+				}
+				// Cleanup must not close the deliberately faulted descriptor twice.
+				t.Cleanup(func() { original.file = nil })
 			case "changed size":
 				artifact.size++
 			case "changed bytes":

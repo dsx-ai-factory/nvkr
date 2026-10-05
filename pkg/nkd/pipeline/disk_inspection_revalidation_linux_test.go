@@ -105,6 +105,9 @@ func newReservedDiskInspectionFixture(t *testing.T, ctx context.Context, mode st
 		t.Fatal(err)
 	}
 	if err := validateDiskInspectionResources(selection, facts, 128, true); err != nil {
+		if os.Getenv("CI") == "true" {
+			t.Fatalf("controlled runtime fixture cannot validate required CI host capacity: %v", err)
+		}
 		t.Skipf("controlled runtime fixture requires its real host capacity: %v", err)
 	}
 	root := t.TempDir()

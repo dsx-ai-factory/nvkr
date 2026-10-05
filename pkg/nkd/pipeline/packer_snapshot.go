@@ -2,8 +2,10 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"io"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
@@ -32,19 +34,29 @@ func (artifact *PackerArtifact) SnapshotHeldContext(ctx context.Context, maxByte
 	if artifact.size <= 0 || artifact.size > maxBytes {
 		return nil, e.New(e.CodeEngineCapability, "collected Packer artifact exceeds the inspection byte budget")
 	}
-	// SectionReader uses the held descriptor's ReaderAt, leaving its streaming
-	// cursor unchanged. The existing held-file owner enforces bounds and digest.
+	if !canonical.IsDigest(artifact.digest) {
+		return nil, e.New(e.CodeVerifyFailed, "collected Packer artifact digest is not exact")
+	}
+	// SectionReader leaves the held descriptor's streaming cursor unchanged.
+	// Compare the frozen bytes separately so allocation and read failures cannot
+	// be mistaken for integrity failures.
 	info, err := artifact.file.Stat()
-	if err != nil || info.Size() != artifact.size {
+	if err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "reading collected Packer artifact metadata")
+	}
+	if info.Size() != artifact.size {
 		return nil, e.New(e.CodeVerifyFailed, "collected Packer artifact size changed")
 	}
 	snapshot, err := heldfile.FromReaderContext(ctx, io.NewSectionReader(artifact.file, 0, artifact.size),
-		heldfile.Options{Label: "disk-inspection-subject", MaxBytes: maxBytes, ExpectedDigest: artifact.digest})
+		heldfile.Options{Label: "disk-inspection-subject", MaxBytes: maxBytes})
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "snapshotting a Packer artifact")
+			return nil, e.Wrap(e.CodeTimeout, errors.Join(ctx.Err(), err), "snapshotting a Packer artifact")
 		}
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "holding the collected Packer artifact for inspection")
+		return nil, e.Wrap(e.CodeEngineCapability, err, "holding the collected Packer artifact for inspection")
+	}
+	if snapshot.Digest() != artifact.digest || snapshot.Size() != artifact.size {
+		return nil, e.Wrap(e.CodeVerifyFailed, snapshot.Close(), "collected Packer artifact bytes changed")
 	}
 	return snapshot, nil
 }

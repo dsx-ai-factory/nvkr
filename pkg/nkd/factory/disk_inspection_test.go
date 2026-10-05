@@ -29,6 +29,124 @@ func testDiskInventoryScan(ctx context.Context, payload *diskPayload, format, en
 		packages: []sbom.InstalledDiskPackage{{Name: "fixture-package", Version: "1", Format: "deb"}}}, nil
 }
 
+func TestLiveDiskInventoryObservationAdmissionCodes(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		want e.Code
+	}{
+		{"nil context", e.CodeUsage}, {"nil owner", e.CodeUsage},
+		{"nil bindings", e.CodeUsage}, {"nil scan", e.CodeUsage},
+		{"closed Run", e.CodeGateUnmet}, {"bindings failure", e.CodeEngineCapability},
+		{"non-digest image", e.CodeUnverifiedRef}, {"non-digest inspector", e.CodeUnverifiedRef},
+		{"non-digest codec", e.CodeUnverifiedRef}, {"post-scan bindings failure", e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, owner := diskMaterialTraceFixture(t)
+			ctx := t.Context()
+			bindings := diskInventoryBindings(testDiskInspectionBindings)
+			scan := diskInventoryScan(testDiskInventoryScan)
+			switch test.name {
+			case "nil context":
+				ctx = nil
+			case "nil owner":
+				owner = nil
+			case "nil bindings":
+				bindings = nil
+			case "nil scan":
+				scan = nil
+			case "closed Run":
+				if err := owner.Close(); err != nil {
+					t.Fatal(err)
+				}
+			default:
+				calls := 0
+				bindings = func(ctx context.Context) (diskInspectionBindings, error) {
+					value, err := testDiskInspectionBindings(ctx)
+					calls++
+					switch test.name {
+					case "bindings failure":
+						err = e.New(e.CodeEngineCapability, "fixture binding failure")
+					case "post-scan bindings failure":
+						if calls > 1 {
+							err = e.New(e.CodeEngineCapability, "fixture post-scan binding failure")
+						}
+					case "non-digest image":
+						value.image = "image:tag"
+					case "non-digest inspector":
+						value.inspector = "inspector"
+					case "non-digest codec":
+						value.codec = "codec"
+					}
+					return value, err
+				}
+			}
+			receipt, err := owner.observeDiskInstalledInventory(ctx, plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{}, bindings, scan)
+			if receipt != nil || factoryErrorCode(err) != test.want {
+				t.Fatalf("receipt=%v error=%v, want %s", receipt, err, test.want)
+			}
+		})
+	}
+}
+
+func TestLiveDiskInventoryValidationCodes(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		want e.Code
+	}{
+		{"nil context", e.CodeUsage}, {"nil bindings", e.CodeVerifyFailed},
+		{"nil trace", e.CodeVerifyFailed}, {"closed Run", e.CodeGateUnmet},
+		{"binding failure", e.CodeEngineCapability}, {"changed image", e.CodeVerifyFailed},
+		{"changed inspector", e.CodeVerifyFailed}, {"changed codec", e.CodeVerifyFailed},
+		{"changed recorded size", e.CodeVerifyFailed}, {"changed recorded output", e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, owner := diskMaterialTraceFixture(t)
+			inspector := &sbom.DiskInspectionRuntime{}
+			output := plan.LifecycleOutputs[0]
+			receipt, err := owner.observeDiskInstalledInventory(t.Context(), plan, output, inspector, testDiskInspectionBindings, testDiskInventoryScan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := t.Context()
+			bindings := diskInventoryBindings(testDiskInspectionBindings)
+			switch test.name {
+			case "nil context":
+				ctx = nil
+			case "nil bindings":
+				bindings = nil
+			case "nil trace":
+				receipt.trace = nil
+			case "closed Run":
+				if err := owner.Close(); err != nil {
+					t.Fatal(err)
+				}
+			case "changed recorded size":
+				receipt.description.Subject.Size++
+			case "changed recorded output":
+				receipt.description.OutputName = "sibling"
+			default:
+				bindings = func(ctx context.Context) (diskInspectionBindings, error) {
+					value, err := testDiskInspectionBindings(ctx)
+					switch test.name {
+					case "binding failure":
+						err = e.New(e.CodeEngineCapability, "fixture binding failure")
+					case "changed image":
+						value.image = "sha256:" + strings.Repeat("f", 64)
+					case "changed inspector":
+						value.inspector = "sha256:" + strings.Repeat("f", 64)
+					case "changed codec":
+						value.codec = "sha256:" + strings.Repeat("f", 64)
+					}
+					return value, err
+				}
+			}
+			if err := owner.validateDiskInstalledInventory(ctx, plan, output, inspector, receipt, bindings); factoryErrorCode(err) != test.want {
+				t.Fatalf("error=%v, want %s", err, test.want)
+			}
+		})
+	}
+}
+
 func TestLiveDiskInstalledInventoryBindsBothArchitectures(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
 		t.Run(platform, func(t *testing.T) {

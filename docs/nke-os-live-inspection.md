@@ -24,6 +24,9 @@ JSON cannot mint or restore live authority. The lifecycle returns these process-
 `Run.InstalledDiskInventories`; they are deliberately not an independently authored or persisted lifecycle
 object.
 
+The installed-inventory receipt has no publication consumer yet. The local lifecycle validates it before
+keeping only its diagnostic description; that extra live validation does not grant a stronger evidence lane.
+
 The binding test covers AMD64 and ARM64 subjects, description isolation, serialization exclusion and
 post-close rejection. Separate tests using the AMD64 fixture cover missing/substituted material observations,
 changed disk or runtime/tool bindings, sibling replay, zero-value receipts, cancellation and concurrent close.
@@ -54,5 +57,20 @@ runtime resources through its explicit environment inputs. It rejects a disk tar
 native host architecture and verifies the returned original Run, output, Plan, Build, digest and size. Run it
 separately on native Linux AMD64 and ARM64 with a test timeout sufficient for a complete bake; a skipped test
 is not acceptance evidence.
+
+The live-bake harness uses separate names to distinguish a new original-Run build from the existing
+retained-image inspector test. Its tool inputs map as follows:
+
+| Live-bake harness | Retained-image harness |
+| --- | --- |
+| `NKD_TEST_INSPECT_RUNTIME` | `NKD_TEST_DISK_INSPECT_RUNTIME` |
+| `NKD_TEST_INSPECT_IMAGE` | `NKD_TEST_DISK_INSPECT_IMAGE` |
+| `NKD_TEST_INSPECT_INSPECTOR_DIGEST` | `NKD_TEST_DISK_INSPECTOR_SHA256` |
+| `NKD_TEST_INSPECT_CODEC_DIGEST` | `NKD_TEST_DISK_CODEC_SHA256` |
+
+The live harness additionally requires Definition/Environment paths and numeric resource inputs. The retained
+image harness instead supplies an existing QCOW2 path and digest. Those tests establish different scopes and
+are not interchangeable acceptance evidence.
+
 Acquisition reconciliation, full CycloneDX generation, publication, FDE and qualified reproduction remain
 outside this change.
