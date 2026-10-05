@@ -115,15 +115,16 @@ jobs:
           podman run --rm --pull=never --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges \
             "${mappings[@]}" --user="$uid:$gid" "$PROBE_IMAGE" \
             sh -ec 'id; cat /proc/self/uid_map; cat /proc/self/gid_map; grep "^Seccomp:" /proc/self/status'
-      - name: Exercise explicit VFS route in exact sanitized runtime environment
+      - name: Exercise explicit VFS route with private empty runtime configuration
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           runtime_path=$(command -v podman)
           runtime_root=$(mktemp -d "$RUNNER_TEMP/nkd-vfs.XXXXXXXX")
+          mkdir "$runtime_root/config"
           runtime_env=(env -i PATH=/nonexistent LANG=C LC_ALL=C TZ=UTC
-            REGISTRY_AUTH_FILE=/nonexistent XDG_CONFIG_HOME=/nonexistent
+            REGISTRY_AUTH_FILE=/nonexistent "XDG_CONFIG_HOME=$runtime_root/config"
             "HOME=$HOME" "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
             "XDG_DATA_HOME=$runtime_root/data")
           runtime=("${runtime_env[@]}" "$runtime_path" --storage-driver=vfs
