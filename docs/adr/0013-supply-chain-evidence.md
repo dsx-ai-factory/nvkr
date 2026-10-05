@@ -153,7 +153,10 @@ binds the original Run owner, named output, Plan, Build, QCOW2 digest/size and i
 Equal subject bytes or Build identity cannot authorize reuse by a sibling attempt. Closing the Run cancels
 active inspection, joins cleanup and revokes live use, including shallow receipt copies. Historical installed
 metadata remains inspectable but cannot be serialized and restored as authority. Omitting this opt-in does not
-claim inspection. This diagnostic is not the complete acquisition trace, reconciliation, full CycloneDX
+claim inspection. Opting in makes successful inspection a condition of local Run completion: a failed scan,
+subject check or cleanup fails the Run and discards its uncommitted disk export. A failed Run exposes no
+installed inventories. This prevents a requested inventory from being paired with undelivered or differently
+observed bytes; it does not grant publication or qualification authority. This diagnostic is not the complete acquisition trace, reconciliation, full CycloneDX
 document, disk publication gate or qualification described above.
 
 For binaries and OCI image exports, the SBOM owner invokes the pinned scanner as an owned, bounded subprocess

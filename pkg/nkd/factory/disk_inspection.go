@@ -153,7 +153,7 @@ func (owner *LocalRunResult) observeDiskInstalledInventory(ctx context.Context, 
 	}
 	installed, err := scan(ctx, payload, subject.Format, subject.Encryption)
 	if ctx.Err() != nil {
-		return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "disk installed inventory canceled")
+		return nil, e.Wrap(e.CodeTimeout, errors.Join(ctx.Err(), err), "disk installed inventory canceled")
 	}
 	if err != nil {
 		return nil, err
@@ -170,7 +170,12 @@ func (owner *LocalRunResult) observeDiskInstalledInventory(ctx context.Context, 
 	if current != tools {
 		return nil, e.New(e.CodeVerifyFailed, "disk inspection runtime changed during inspection")
 	}
-	if _, err := owner.observeDiskMaterialsWhileHeld(ctx, plan, expected); err != nil {
+	currentTrace, err := owner.observeDiskMaterialsWhileHeld(ctx, plan, expected)
+	if err != nil {
+		return nil, err
+	}
+	if err := trace.ValidateSubject(expected.Name, currentTrace.description.Subject.PlanDigest,
+		currentTrace.description.Subject.BuildDigest, currentTrace.description.Subject.Digest); err != nil {
 		return nil, err
 	}
 	return &DiskInstalledInventoryReceipt{owner: owner, runtime: runtime, trace: trace,

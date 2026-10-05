@@ -98,6 +98,68 @@ func TestLocalInspectionFailureClosesRunWithoutExport(t *testing.T) {
 	}
 }
 
+func TestLocalPostInspectionFailureDiscardsInventories(t *testing.T) {
+	for _, failure := range []string{"disk commit", "wrong digest", "wrong size", "wrong output", "duplicate inventory", "empty inventory"} {
+		t.Run(failure, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			prepared, exporter := diskLifecycleFixture(t, "post-inspection-failure")
+			cause := e.New(e.CodeImmutableViolation, "fixture disk commit failure")
+			run, err := executeLocalWithDependencies(t.Context(), prepared, LocalOptions{
+				AttemptsRoot: ".nkd/runs", DiskInspection: &sbom.DiskInspectionRuntime{},
+			}, localExecutionDependencies{
+				admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+				runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
+					return exporter, nil
+				},
+				writeRecordState: writeRunRecordState,
+				beginDiskCommit:  func(string) (*diskAttemptTransaction, error) { return nil, cause },
+				admitInspection:  func(context.Context, *factory.Plan, *sbom.DiskInspectionRuntime) error { return nil },
+				inspectDisks: func(context.Context, *factory.Plan, localExecutionResult, *sbom.DiskInspectionRuntime) ([]factory.DiskInstalledInventoryDescription, error) {
+					inventory := factory.DiskInstalledInventoryDescription{
+						OutputName: prepared.run.Expected[0].Name, Subject: exporter.observation,
+						Packages: []sbom.InstalledDiskPackage{{Name: "fixture", Version: "1", Format: "deb"}},
+					}
+					switch failure {
+					case "wrong digest":
+						inventory.Subject.Digest = "sha256:" + strings.Repeat("e", 64)
+					case "wrong size":
+						inventory.Subject.Size++
+					case "wrong output":
+						inventory.OutputName = "sibling-image"
+					case "duplicate inventory":
+						return []factory.DiskInstalledInventoryDescription{inventory, inventory}, nil
+					case "empty inventory":
+						return nil, nil
+					}
+					return []factory.DiskInstalledInventoryDescription{inventory}, nil
+				},
+			})
+			wantCode := e.CodeVerifyFailed
+			if failure == "disk commit" {
+				wantCode = e.CodeImmutableViolation
+				if !errors.Is(err, cause) || exporter.exports != 1 {
+					t.Fatalf("did not reach the post-inspection disk commit: %v, exports=%d", err, exporter.exports)
+				}
+			}
+			assertCode(t, err, wantCode)
+			if run == nil || run.Status != RunFailed || !exporter.closed || len(run.InstalledDiskInventories()) != 0 || len(run.Observed) != 0 {
+				t.Fatalf("failed Run retained an inventory or output: %+v", run)
+			}
+			raw, readErr := os.ReadFile(filepath.Join(".nkd/runs", prepared.run.Attempt, "lifecycle.json"))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			var persisted Run
+			if err := canonical.UnmarshalExact(raw, &persisted); err != nil {
+				t.Fatal(err)
+			}
+			if persisted.Failure == nil || persisted.Failure.Code != string(wantCode) || persisted.Status != RunFailed {
+				t.Fatalf("persisted failure does not retain the coded outcome: %+v", persisted)
+			}
+		})
+	}
+}
+
 func TestLocalInspectionRejectsMissingAdmissionBeforeAttemptStorage(t *testing.T) {
 	for _, mode := range []string{"unadmitted runtime", "no disk output"} {
 		t.Run(mode, func(t *testing.T) {

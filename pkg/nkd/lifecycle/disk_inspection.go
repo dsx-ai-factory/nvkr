@@ -24,6 +24,34 @@ func (run *Run) InstalledDiskInventories() []factory.DiskInstalledInventoryDescr
 	return views
 }
 
+// This joins diagnostic views only; it does not reconstruct inspection authority.
+func validateInstalledInventorySubjects(run *Run) error {
+	byOutput := make(map[string]factory.DiskInstalledInventoryDescription, len(run.diskInventories))
+	for _, inventory := range run.diskInventories {
+		if _, duplicate := byOutput[inventory.OutputName]; duplicate {
+			return e.New(e.CodeVerifyFailed, "duplicate installed inventory for output %q", inventory.OutputName)
+		}
+		byOutput[inventory.OutputName] = inventory
+	}
+	for _, output := range run.Observed {
+		if output.Kind != OutputDiskImage {
+			continue
+		}
+		inventory, found := byOutput[output.Name]
+		if !found || output.Disk == nil || inventory.Subject.Digest != output.Digest ||
+			inventory.Subject.Size != output.Disk.Size || inventory.Subject.PlanDigest != run.PlanDigest ||
+			inventory.Subject.BuildDigest != output.BuildDigest || inventory.Subject.Format != output.Disk.Format ||
+			inventory.Subject.Encryption != output.Disk.Encryption {
+			return e.New(e.CodeVerifyFailed, "installed inventory does not bind observed disk output %q", output.Name)
+		}
+		delete(byOutput, output.Name)
+	}
+	if len(byOutput) != 0 {
+		return e.New(e.CodeVerifyFailed, "installed inventory names an unobserved disk output")
+	}
+	return nil
+}
+
 func admitDiskInspection(ctx context.Context, plan *factory.Plan, runtime *sbom.DiskInspectionRuntime) error {
 	if ctx == nil || plan == nil || runtime == nil {
 		return e.New(e.CodeEngineCapability, "installed inventory requires a Plan and admitted runtime")

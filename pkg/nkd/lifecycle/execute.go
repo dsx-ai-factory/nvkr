@@ -183,6 +183,9 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	runForObservation.Lane = result.QualificationLane()
 	if options.DiskInspection != nil {
 		installed, err := deps.inspectDisks(ctx, prepared.plan, result, options.DiskInspection)
+		if err == nil && len(installed) == 0 {
+			err = e.New(e.CodeVerifyFailed, "requested disk inspection returned no installed inventories")
+		}
 		if err != nil {
 			cause := closeLocalExecutionResult(result, err)
 			return recordRunFailure(ctx, recordPath, &runForObservation, cause,

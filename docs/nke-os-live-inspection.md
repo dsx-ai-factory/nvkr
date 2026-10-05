@@ -35,6 +35,11 @@ capacity-before-snapshot wiring are source-reviewed, but are not exercised by th
 The concrete lifecycle join's disk-only selection, receipt observation and validation, and description
 collection are also source-reviewed, not exercised by the injected lifecycle ordering tests.
 
+An opted-in inspection failure fails the Run and discards uncommitted delivery bytes; it is not a warning
+that leaves a successful build without its requested inventory. Failed Runs expose no installed inventories,
+including when scanning succeeded but later export, subject binding or disk commit failed. Successful views
+must match every observed disk's output name, Plan, Build, exact digest, size, format and encryption.
+
 One ten-minute operation deadline covers queueing, material tracing, snapshotting, scanning and subject/tool
 rechecks. The runtime's configured timeout imposes a second ceiling on the scan; it does not reserve that
 entire duration after preparation. A shorter caller deadline and caller cancellation remain effective.
@@ -42,7 +47,8 @@ entire duration after preparation. A shorter caller deadline and caller cancella
 Real acceptance still requires both AMD64 and ARM64 NKE builds inspected through this same original live
 lifecycle, with the exact source, Plan, attempt, image/tool identities and terminal inventory observation
 recorded. Inspecting a previously retained image in a separate process does not satisfy that handoff proof.
-`TestNKEOSLiveInstalledInventory` is the opt-in public SDK harness. It requires
+`TestNKEOSLiveInstalledInventory` is the opt-in lifecycle-package harness, not a `client/v1`-only SDK
+acceptance test. It requires
 `NKD_TEST_NKE_LIVE_INSPECTION=1`, exact Definition/Environment paths, inspector image/tool pins and measured
 runtime resources through its explicit environment inputs. It rejects a disk target other than the actual
 native host architecture and verifies the returned original Run, output, Plan, Build, digest and size. Run it

@@ -77,8 +77,10 @@ func TestNKEOSLiveInstalledInventory(t *testing.T) {
 		t.Fatal("the prepared Run must bind the exact native-architecture Definition checked above")
 	}
 	uniqueRoot := strings.ToLower(filepath.Base(filepath.Dir(t.TempDir())))
+	attemptsRoot := filepath.Join(".nkd", "live-inspection", uniqueRoot)
+	t.Logf("retaining live-inspection attempt bytes under %s", attemptsRoot)
 	run, err := lifecycle.ExecuteLocal(t.Context(), prepared, lifecycle.LocalOptions{
-		AttemptsRoot: filepath.Join(".nkd", "live-inspection", uniqueRoot), RunnerSource: repo,
+		AttemptsRoot: attemptsRoot, RunnerSource: repo,
 		Runtime: selection.RuntimeExecutable, DiskInspection: inspector, Stdout: os.Stdout, Stderr: os.Stderr,
 	})
 	if err != nil {
@@ -94,7 +96,9 @@ func TestNKEOSLiveInstalledInventory(t *testing.T) {
 	if output.Disk == nil || output.Disk.Format != "qcow2" || output.Disk.Encryption != "none" ||
 		view.OutputName != output.Name || view.Subject.PlanDigest != run.PlanDigest ||
 		view.Subject.BuildDigest != output.BuildDigest || view.Subject.Digest != output.Digest ||
-		view.Subject.Size != output.Disk.Size || len(view.Packages) == 0 {
+		view.Subject.Size != output.Disk.Size || view.Subject.Format != "qcow2" || view.Subject.Encryption != "none" ||
+		view.InspectorDigest != selection.InspectorDigest || view.CodecDigest != selection.CodecDigest ||
+		!canonical.IsDigest(view.RuntimeDigest) || len(view.Packages) == 0 {
 		t.Fatalf("real inventory does not bind the original attempt output: %+v", view)
 	}
 	raw, err := canonical.Marshal(view)

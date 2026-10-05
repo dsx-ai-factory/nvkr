@@ -163,6 +163,13 @@ lifetime; it has no separate close obligation or resource ownership. The Run's
 idempotent `Close` revokes every borrowed receipt and shallow copy. Live receipt
 validation requires that original open owner; a description cannot restore it.
 
+The current diagnostic `client/v1.LocalRunOptions` facade aliases the lifecycle options, including
+`DiskInspection`; callers therefore open and own the concrete `sbom.DiskInspectionRuntime` using the
+pipeline selection type. `Run.InstalledDiskInventories` exposes factory subject descriptions and SBOM package
+metadata, never a receipt. This deliberately retains the existing deep-owner types for the optional diagnostic
+instead of adding a second runtime or inventory schema. A facade-only construction API and independent
+`client/v1` acceptance harness remain deferred; direct deep-package tests do not establish that acceptance.
+
 The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
 session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's
 context values and deadline. An asynchronous cancellation callback alone cannot enforce this close ordering.

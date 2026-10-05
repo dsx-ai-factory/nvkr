@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"strings"
 	"testing"
@@ -244,12 +245,16 @@ func TestLiveDiskInspectionDeadlineBoundsCompleteOperation(t *testing.T) {
 func TestLiveDiskInspectionCloseCancelsAndJoinsScan(t *testing.T) {
 	plan, owner := diskMaterialTraceFixture(t)
 	started := make(chan struct{})
+	canceled := make(chan struct{})
+	finish := make(chan struct{})
 	returned := make(chan error, 1)
 	go func() {
 		receipt, err := owner.observeDiskInstalledInventory(t.Context(), plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{}, testDiskInspectionBindings,
 			func(ctx context.Context, _ *diskPayload, _, _ string) (diskInstalledScan, error) {
 				close(started)
 				<-ctx.Done()
+				close(canceled)
+				<-finish
 				return diskInstalledScan{}, ctx.Err()
 			})
 		if receipt != nil {
@@ -265,6 +270,19 @@ func TestLiveDiskInspectionCloseCancelsAndJoinsScan(t *testing.T) {
 	}
 	closed := make(chan error, 1)
 	go func() { closed <- owner.Close() }()
+	select {
+	case <-canceled:
+	case <-time.After(5 * time.Second):
+		close(finish)
+		t.Fatal("Close did not cancel the active scan")
+	}
+	select {
+	case err := <-closed:
+		close(finish)
+		t.Fatalf("Close returned before scan cleanup finished: %v", err)
+	default:
+	}
+	close(finish)
 	select {
 	case err := <-returned:
 		if factoryErrorCode(err) != e.CodeTimeout {
@@ -283,5 +301,22 @@ func TestLiveDiskInspectionCloseCancelsAndJoinsScan(t *testing.T) {
 	}
 	if !owner.diskClosed || len(owner.diskCompletions) != 0 || len(owner.materialConsumptions) != 0 {
 		t.Fatal("Close retained live disk state")
+	}
+}
+
+func TestLiveDiskInspectionCancellationPreservesCleanupFailure(t *testing.T) {
+	plan, owner := diskMaterialTraceFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	cleanupErr := errors.New("fixture cleanup failure")
+	receipt, err := owner.observeDiskInstalledInventory(ctx, plan, plan.LifecycleOutputs[0],
+		&sbom.DiskInspectionRuntime{}, testDiskInspectionBindings,
+		func(context.Context, *diskPayload, string, string) (diskInstalledScan, error) {
+			cancel()
+			return diskInstalledScan{}, e.Wrap(e.CodeInternal, cleanupErr, "removing inspection container")
+		})
+	if receipt != nil || factoryErrorCode(err) != e.CodeTimeout ||
+		!errors.Is(err, context.Canceled) || !errors.Is(err, cleanupErr) {
+		t.Fatalf("cancellation lost cleanup failure or issued a receipt: %v, %v", receipt, err)
 	}
 }

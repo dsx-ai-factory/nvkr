@@ -93,6 +93,15 @@ The receipt bindings
 are contract-tested with AMD64 and ARM64 subjects. Separate negative tests cover substitution, sibling replay,
 changed bytes and cancellation using the AMD64 fixture. Default builds remain build-only. The opt-in SDK acceptance test exists, but an
 original live NKE bake followed by this inspection has not been exercised on either architecture.
+When opted in, inspection failure fails the local Run and discards uncommitted disk delivery bytes; it does not
+leave a successful build without the requested inventory. Later failure also clears diagnostic inventories.
+The observation join checks inventory output, Plan, Build, digest, size, format and encryption against delivered
+disk observations. Tests cover commit failure after a successful scan and missing, duplicate or substituted
+inventory subjects. The acceptance harness uses the lifecycle package directly, not only `client/v1`.
+The earlier aggregate Linux race run disclosed in PR #79 failed in the unchanged finalizer fixture's
+read-only-source storage setup; its separate rerun passed. After the review fixes, the native Linux ARM64
+race run of pipeline, factory, lifecycle and SBOM passed together with read-only source and private writable
+attempt tmpfs. This is contract evidence, not a real NKE bake or a newly built inspector image.
 The controlled scan tests do not exercise the production closure's concrete Packer assertion or
 capacity-before-snapshot wiring. The injected lifecycle ordering tests also do not exercise the concrete
 disk-only selection, receipt observation/validation and description collection. These paths remain
