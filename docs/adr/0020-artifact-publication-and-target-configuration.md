@@ -82,14 +82,19 @@ store publishers remain deferred and fail capability admission. Credential value
 Transport settings stay replaceable by environment owners.
 
 The pipeline-attested disk transport uses a distinct OCI manifest over the unchanged QCOW2 payload. Its one
-`application/vnd.qemu.qcow2` layer binds the exact payload digest and size; the checked config declares the
-guest platform, QCOW2 format and unencrypted profile. Manifest identity and payload identity are separate.
+`application/vnd.qemu.qcow2` layer binds the exact payload digest and size. The checked config declares the
+guest platform; the layer media type and manifest annotations declare the QCOW2 format and encryption.
+Production consumption requires the explicit unencrypted declaration to match the release binding;
+the diagnostic reader keeps a missing encryption declaration unknown. Manifest identity and payload identity are separate.
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Production packaging consumes the original live Run's exact-subject reconciliation receipt, not a restored
-path or decoded receipt. Compiler, packaging and consumer contracts connect the wrapper to the existing
-output-repository, signing and read-back protocol. Transport construction alone does not authenticate
-composition or authorize release. The generated hosted VM executor remains capability-gated; a real generated
+path or decoded receipt. The compiler describes the wrapper's output-repository and evidence edges.
+Receipt-gated packaging and consumer APIs are implemented, but neither the ordinary local scheduler nor
+generated hosted VM executor consumes the complete live inspection-and-packaging operation yet.
+Local admission rejects that unsupported publication graph before runtime, source or workspace work;
+compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
+composition or authorize release. A real generated
 disk publication on either native architecture remains unexercised.
 
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
@@ -371,9 +376,11 @@ earlier inputs, not authenticated release publication or production-registry acc
 The single-entry layout and stage-bound evidence require a new authorized hosted publication run; the earlier
 NVIDIA run does not establish their external behavior.
 
-Disk contract tests cover both declared native platforms, distinct raw-payload and wrapper identities,
-same-live-owner receipt admission, complete component evidence membership, held consumer projection and
-loopback-registry byte-preserving transport. Synthetic QCOW2 fixtures and controlled inspection seams do not
+Synthetic disk transport tests cover both declared native platforms, distinct raw-payload and wrapper identities,
+component evidence membership, held consumer projection and loopback-registry byte-preserving transport.
+Guard tests reject missing or unrelated receipt owners and profiles, and local admission tests reject the
+unwired publication graph without execution. The successful original-live-Run receipt-to-package-to-hosted-finalization
+path has not been exercised by those tests. Synthetic QCOW2 fixtures and controlled inspection seams do not
 prove a complete NKE filesystem scan, the original live build-to-inspection join, native execution, keyless
 signing or production publication. Both native generated NKE builds and independent signed disk consumption
 remain required operational evidence.

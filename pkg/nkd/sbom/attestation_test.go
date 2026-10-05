@@ -1,6 +1,7 @@
 package sbom
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,70 @@ import (
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
+
+func TestAttestedDocumentInventoryAndBundleSizeBounds(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	for _, tc := range []struct {
+		name     string
+		padding  int
+		wantCode e.Code
+	}{
+		{name: "maximum inventory fits encoded bundle", padding: MaxDocumentBytes - 4096},
+		{name: "oversized inventory", padding: MaxDocumentBytes, wantCode: e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bom, err := NewSubject(digest, "component", digest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bom.Metadata.Component.Properties = []Property{{Name: "fixture", Value: strings.Repeat("x", tc.padding)}}
+			// Encode directly so the negative fixture can exercise decoder admission.
+			document, err := json.Marshal(bom)
+			if err != nil {
+				t.Fatal(err)
+			}
+			statement, err := json.Marshal(map[string]any{"_type": "https://in-toto.io/Statement/v1", "predicateType": CycloneDXPredicateType,
+				"subject": []any{map[string]any{"digest": map[string]string{"sha256": strings.TrimPrefix(digest, "sha256:")}}}, "predicate": json.RawMessage(document)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(map[string]any{"mediaType": BundleMediaType, "verificationMaterial": map[string]any{},
+				"dsseEnvelope": map[string]any{"payloadType": "application/vnd.in-toto+json", "payload": base64.StdEncoding.EncodeToString(statement), "signatures": []any{map[string]string{"sig": "Zml4dHVyZQ=="}}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(raw) <= MaxDocumentBytes {
+				t.Fatal("fixture did not exercise base64 expansion")
+			}
+			got, err := AttestedDocument(raw, digest)
+			if tc.wantCode != "" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != tc.wantCode {
+					t.Fatalf("wrong rejection: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := bom.Marshal()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Fatal("document changed")
+			}
+		})
+	}
+}
+
+func TestAttestedDocumentRejectsOversizedBundleBeforeDecode(t *testing.T) {
+	_, err := AttestedDocument(bytes.Repeat([]byte{' '}, MaxBundleBytes+1), "sha256:"+strings.Repeat("a", 64))
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
+		t.Fatalf("wrong rejection: %v", err)
+	}
+}
 
 func TestAttestedDocumentRejectsAmbiguousOrUnboundStatements(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)

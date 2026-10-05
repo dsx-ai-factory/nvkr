@@ -38,6 +38,10 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 	}
 	rootDigest := digestBytes(raw)
 	visited := map[string]bool{}
+	// Reuse only observations made by this invocation's descriptor walk. This
+	// avoids hashing a large disk twice in one Inspect; it grants no retained
+	// authority, and every independent inspection or payload copy rechecks bytes.
+	disks := map[string]DiskArtifactInspection{}
 	var rootConfig Descriptor
 	direct := map[string]bool{}
 	for _, descriptor := range index.Manifests {
@@ -45,7 +49,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 			return Inspection{}, e.New(e.CodeVerifyFailed, "publication index repeats a descriptor")
 		}
 		direct[descriptor.Digest] = true
-		if err := verifyDescriptor(ctx, root, descriptor, visited); err != nil {
+		if err := verifyDescriptorForInspection(ctx, root, descriptor, visited, disks); err != nil {
 			return Inspection{}, err
 		}
 		if descriptor.ArtifactType == MediaPublicationRoot {
@@ -99,7 +103,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 			return Inspection{}, e.New(e.CodeVerifyFailed, "deliverable is duplicated in release repository")
 		}
 		descriptor := Descriptor{MediaType: publishedManifestMediaType(object), Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
-		if err := verifyDescriptor(ctx, root, descriptor, visited); err != nil {
+		if err := verifyDescriptorForInspection(ctx, root, descriptor, visited, disks); err != nil {
 			return Inspection{}, err
 		}
 		descriptors[descriptor.Digest] = descriptor
@@ -123,7 +127,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 		if publication.Release != nil && !types.MediaType(descriptor.MediaType).IsImage() {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "release objects must be direct manifests")
 		}
-		if err := verifyPublishedObjectBinding(ctx, root, object, descriptor); err != nil {
+		if err := verifyPublishedObjectBinding(ctx, root, object, descriptor, disks); err != nil {
 			return Inspection{}, err
 		}
 	}
@@ -140,7 +144,7 @@ func inspectPublication(ctx context.Context, root string, fetchOutputs func(Publ
 	return Inspection{Root: publication, RootDigest: rootDigest, RootConfig: rootConfig}, nil
 }
 
-func verifyPublishedObjectBinding(ctx context.Context, root string, object PublishedObject, descriptor Descriptor) error {
+func verifyPublishedObjectBinding(ctx context.Context, root string, object PublishedObject, descriptor Descriptor, disks map[string]DiskArtifactInspection) error {
 	if descriptor.MediaType == MediaOCIIndex {
 		if object.BlobDigest != descriptor.Digest {
 			return e.New(e.CodeVerifyFailed, "nested publication object %q root digest does not match its blob binding", object.Name)
@@ -160,12 +164,10 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 	}
 	if types.MediaType(manifest.Config.MediaType).IsConfig() {
 		if len(manifest.Layers) == 1 && manifest.Layers[0].MediaType == MediaQCOW2 {
-			artifact, err := openDiskManifest(ctx, root, descriptor, object.OS+"/"+object.Arch, maxDeliveryFileBytes)
-			if err != nil {
-				return err
+			observed, ok := disks[descriptor.Digest]
+			if !ok || observed.ManifestDigest != descriptor.Digest || observed.Platform != object.OS+"/"+object.Arch {
+				return e.New(e.CodeVerifyFailed, "disk wrapper has no matching observation from the descriptor walk")
 			}
-			defer func() { _ = artifact.Close() }()
-			observed := artifact.Inspection()
 			if object.Kind != "disk-image" || object.ArtifactType != observed.ArtifactType || object.BlobDigest != observed.PayloadDigest ||
 				(object.Output != nil && (object.Output.Disk == nil || object.Output.Disk.PayloadDigest != observed.PayloadDigest ||
 					object.Output.Disk.Size != observed.Size || observed.Encryption != object.Output.Disk.Encryption)) {
@@ -240,12 +242,19 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 }
 
 func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, visited map[string]bool) error {
+	return verifyDescriptorForInspection(ctx, root, descriptor, visited, nil)
+}
+
+func verifyDescriptorForInspection(ctx context.Context, root string, descriptor Descriptor, visited map[string]bool, disks map[string]DiskArtifactInspection) error {
 	if visited[descriptor.Digest] {
 		return nil
 	}
 	visited[descriptor.Digest] = true
 	raw, err := readBlob(ctx, root, descriptor, 8<<20)
 	if err != nil {
+		return err
+	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return err
 	}
 	switch descriptor.MediaType {
@@ -258,7 +267,7 @@ func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, v
 			return e.New(e.CodeVerifyFailed, "nested OCI index has an invalid schema")
 		}
 		for _, child := range index.Manifests {
-			if err := verifyDescriptor(ctx, root, child, visited); err != nil {
+			if err := verifyDescriptorForInspection(ctx, root, child, visited, disks); err != nil {
 				return err
 			}
 		}
@@ -282,8 +291,12 @@ func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, v
 			if err != nil {
 				return err
 			}
+			observed := artifact.Inspection()
 			if err := artifact.Close(); err != nil {
 				return err
+			}
+			if disks != nil {
+				disks[descriptor.Digest] = observed
 			}
 			visited[manifest.Config.Digest] = true
 			visited[manifest.Layers[0].Digest] = true

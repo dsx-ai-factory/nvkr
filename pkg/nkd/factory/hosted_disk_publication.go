@@ -41,11 +41,11 @@ func CompleteHostedDiskPublication(ctx context.Context, plan *Plan, expected Lif
 		evidence.BuildTarget != expected.Name || !slices.Contains(evidenceNode.Outputs, evidence.ID) {
 		return e.New(e.CodePipelineDrift, "hosted disk completion lacks its exact component evidence operation")
 	}
-	for _, previous := range owner.Nodes {
-		if previous.ID == output.Producer || previous.ID == evidence.Producer {
-			return e.New(e.CodeImmutableViolation, "hosted disk completion was already recorded")
-		}
+	release, err := owner.reserveHostedDiskPublication(ctx, output.Producer, evidence.Producer)
+	if err != nil {
+		return err
 	}
+	defer release()
 	receipt, err := owner.ReconcileDiskEvidence(ctx, plan, expected, runtime)
 	if err != nil {
 		return err
@@ -56,8 +56,47 @@ func CompleteHostedDiskPublication(ctx context.Context, plan *Plan, expected Lif
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "hosted disk completion canceled before recording outcomes")
 	}
+	owner.diskMu.Lock()
+	defer owner.diskMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "hosted disk completion canceled before recording outcomes")
+	}
+	if owner.diskClosed || owner.diskClosing {
+		return e.New(e.CodeGateUnmet, "hosted disk completion requires its original open Run")
+	}
 	owner.Nodes = append(owner.Nodes,
 		LocalNodeResult{ID: evidence.Producer, Kind: NodeSBOM, Status: "ok"},
 		LocalNodeResult{ID: output.Producer, Kind: NodePackage, Status: "ok"})
 	return nil
+}
+
+// Reserve the exact completion while inspection temporarily releases the Run's
+// disk permit between operations. A second caller must not race the same package
+// destination; distinct outputs can reserve their own slots independently.
+func (owner *LocalRunResult) reserveHostedDiskPublication(ctx context.Context, output, evidence string) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "hosted disk completion canceled before reservation")
+	}
+	owner.diskMu.Lock()
+	defer owner.diskMu.Unlock()
+	if owner.diskClosed || owner.diskClosing {
+		return nil, e.New(e.CodeGateUnmet, "hosted disk completion requires its original open Run")
+	}
+	for _, previous := range owner.Nodes {
+		if previous.ID == output || previous.ID == evidence {
+			return nil, e.New(e.CodeImmutableViolation, "hosted disk completion was already recorded")
+		}
+	}
+	if owner.diskPublicationPending[output] {
+		return nil, e.New(e.CodeImmutableViolation, "hosted disk completion is already in progress")
+	}
+	if owner.diskPublicationPending == nil {
+		owner.diskPublicationPending = make(map[string]bool)
+	}
+	owner.diskPublicationPending[output] = true
+	return func() {
+		owner.diskMu.Lock()
+		delete(owner.diskPublicationPending, output)
+		owner.diskMu.Unlock()
+	}, nil
 }

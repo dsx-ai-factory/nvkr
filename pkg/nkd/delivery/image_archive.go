@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
@@ -150,6 +151,9 @@ func verifyImageLayoutMarker(ctx context.Context, root string) error {
 	raw, err := held.ReadAllContext(ctx, 4096)
 	if err != nil {
 		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "reading OCI layout marker"))
+	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "validating OCI layout marker JSON")
 	}
 	var marker struct {
 		Version string `json:"imageLayoutVersion"`

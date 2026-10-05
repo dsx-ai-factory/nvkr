@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -33,10 +34,16 @@ type Publication struct {
 
 type publicationPlatform struct{ OS, Arch string }
 
-// OpenPublication captures bounded immutable files, validates the exact root and
+// OpenPublication captures bounded held-byte snapshots, validates the exact root and
 // every reachable descriptor/evidence binding, then checks output payload members.
 // The caller's root digest is an expectation; only the checked bytes establish it.
 func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publication, error) {
+	return openPublication(ctx, root, expectedRoot, admitPublicationDiskScratch)
+}
+
+func openPublication(ctx context.Context, root, expectedRoot string,
+	admitDiskScratch func(context.Context, *os.File, uint64) error,
+) (*Publication, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return nil, err
 	}
@@ -87,6 +94,24 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 			_ = disk.Close()
 		}
 	}()
+	if len(disks) != 0 {
+		var required uint64
+		for _, disk := range disks {
+			size := uint64(disk.Inspection().Size)
+			if size > ^uint64(0)-required {
+				return nil, e.New(e.CodeEngineCapability, "publication disk snapshot capacity overflows")
+			}
+			required += size
+		}
+		directory, _, err := securepath.OpenDirectory(stage)
+		if err != nil {
+			return nil, e.Wrap(e.CodeEngineCapability, err, "holding publication scratch filesystem")
+		}
+		admitErr := admitDiskScratch(ctx, directory, required)
+		if err := errors.Join(admitErr, directory.Close()); err != nil {
+			return nil, classifyContext(ctx, e.Wrap(e.CodeEngineCapability, err, "admitting publication disk snapshots"))
+		}
+	}
 	entries, err := os.ReadDir(filepath.Join(root, "blobs", "sha256"))
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening publication blob inventory")
@@ -137,6 +162,17 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 	publication.platforms = platforms
 	failed = false
 	return publication, nil
+}
+
+func admitPublicationDiskScratch(ctx context.Context, directory *os.File, required uint64) error {
+	available, err := securepath.AvailableDiskBackedBytes(ctx, directory)
+	if err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "publication requires observed disk-backed scratch")
+	}
+	if available < required {
+		return e.New(e.CodeEngineCapability, "publication scratch cannot hold its aggregate unique disk snapshots")
+	}
+	return nil
 }
 
 // PullPublication owns registry materialization and its cleanup, then returns the
@@ -232,6 +268,7 @@ func (publication *Publication) RequireAttestedEvidence() error {
 // snapshot. The owner establishes byte integrity and membership only; signature,
 // policy and release authorization remain independent consumer checks. A failed
 // write can leave partial bytes; callers must discard their private destination.
+// This streaming API is contract-tested; no production export caller uses it yet.
 func (publication *Publication) WriteDiskPayload(ctx context.Context, outputName string, destination io.Writer) (int64, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return 0, err

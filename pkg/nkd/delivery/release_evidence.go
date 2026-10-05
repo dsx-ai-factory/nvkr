@@ -170,7 +170,9 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			if props["nkd:buildDigest"] != builds[outputName] {
 				return e.New(e.CodeVerifyFailed, "SBOM build is unbound")
 			}
-			if diskRoots[outputName] == binding.Component {
+			diskRoot := diskRoots[outputName]
+			method := props["nkd:dependencyInspection"]
+			if diskRoot == binding.Component {
 				if len(bom.Components) == 0 || props["nkd:dependencyInspection"] != "disk-reconciled/v1" {
 					return e.New(e.CodeProvenanceMissing, "disk root requires a full reconciled inventory")
 				}
@@ -179,6 +181,12 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 						return e.New(e.CodeProvenanceMissing, "disk inventory lacks an exact %s", key)
 					}
 				}
+			} else if diskRoot != "" {
+				if len(bom.Components) == 0 || method != "disk-content/v1" || !isDigest(props["nkd:dependencyScannerDigest"]) {
+					return e.New(e.CodeProvenanceMissing, "disk material requires its exact inspected content inventory")
+				}
+			} else if method == "disk-content/v1" || method == "disk-reconciled/v1" {
+				return e.New(e.CodeVerifyFailed, "disk inspection method is not valid for a non-disk output")
 			}
 		}
 		if props["nkd:evidenceStage"] != binding.Stage || props["nkd:inspectionInputDigest"] != binding.InspectionInputDigest {

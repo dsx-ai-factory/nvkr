@@ -29,7 +29,7 @@ const (
 	maxDiskMediaTypeNameBytes = 127
 )
 
-// DiskArtifactRequest describes a diagnostic transport operation. Digest and
+// DiskArtifactRequest describes a local transport operation. Digest and
 // Size are expectations checked against the exact stream, not producer authority.
 // Only a declared unencrypted QCOW2 on Linux amd64/arm64 is admitted. This does
 // not inspect the filesystem, detect LUKS, reproduce RAW or authorize publication.
@@ -125,11 +125,7 @@ func BuildDiskArtifact(ctx context.Context, out string, request DiskArtifactRequ
 	if err != nil {
 		return Result{}, err
 	}
-	layer := Descriptor{MediaType: MediaQCOW2, Digest: request.Digest, Size: request.Size,
-		Annotations: map[string]string{ocispec.AnnotationTitle: "disk.qcow2"}}
-	manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: request.ArtifactType,
-		Config: config, Layers: []Descriptor{layer}, Annotations: map[string]string{
-			diskFormatAnnotation: request.Format, diskEncryptionAnnotation: request.Encryption}}
+	manifest := standardDiskManifest(config, request.Digest, request.Size, request.ArtifactType)
 	descriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
 	if err != nil {
 		return Result{}, err
@@ -280,6 +276,53 @@ func (artifact *DiskArtifact) Inspection() DiskArtifactInspection {
 		return DiskArtifactInspection{}
 	}
 	return artifact.inspection
+}
+
+// RequireStandardProfile checks the exact wrapper bytes emitted by
+// BuildDiskArtifact. Generic OCI diagnostics may accept other annotations or
+// encoding, but production cannot sign a caller-modified, self-pinned wrapper.
+// This checks transport metadata only, not inventory or publication authority.
+func (artifact *DiskArtifact) RequireStandardProfile(ctx context.Context) error {
+	if err := deliveryContext(ctx); err != nil {
+		return err
+	}
+	if artifact == nil || artifact.owner == nil {
+		return e.New(e.CodeGateUnmet, "disk artifact is not open")
+	}
+	select {
+	case <-ctx.Done():
+		return classifyContext(ctx, ctx.Err())
+	case <-artifact.owner.permit:
+	}
+	defer func() { artifact.owner.permit <- struct{}{} }()
+	if artifact.owner.file == nil {
+		return e.New(e.CodeGateUnmet, "disk artifact is closed")
+	}
+	observed := artifact.inspection
+	platform, err := diskPlatform(observed.Platform)
+	if err != nil {
+		return err
+	}
+	configRaw, err := json.Marshal(platform)
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "encoding standard disk platform")
+	}
+	config := Descriptor{MediaType: MediaImageConfig, Digest: digestBytes(configRaw), Size: int64(len(configRaw))}
+	raw, err := json.Marshal(standardDiskManifest(config, observed.PayloadDigest, observed.Size, observed.ArtifactType))
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "encoding standard disk manifest")
+	}
+	if observed.Encryption != "none" || digestBytes(raw) != observed.ManifestDigest {
+		return e.New(e.CodeVerifyFailed, "disk wrapper differs from the exact standard transport profile")
+	}
+	return nil
+}
+
+func standardDiskManifest(config Descriptor, payload string, size int64, artifactType string) ociManifest {
+	return ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: artifactType,
+		Config: config, Layers: []Descriptor{{MediaType: MediaQCOW2, Digest: payload, Size: size,
+			Annotations: map[string]string{ocispec.AnnotationTitle: "disk.qcow2"}}},
+		Annotations: map[string]string{diskFormatAnnotation: "qcow2", diskEncryptionAnnotation: "none"}}
 }
 
 // WriteToContext emits only the held inode and checks its exact bytes and size.
@@ -464,10 +507,18 @@ func publicationDiskPayloads(ctx context.Context, root, expectedRoot string) (ma
 				return nil, err
 			}
 			reachable[object.DescriptorDigest], reachable[manifest.Config.Digest] = true, true
+			// A malformed disk wrapper must not fall back to whole-file capture.
+			// Both release declarations and byte-profile markers select the owning
+			// disk validator; no caller-controlled kind/config can bypass it.
+			_, hasFormat := manifest.Annotations[diskFormatAnnotation]
+			_, hasEncryption := manifest.Annotations[diskEncryptionAnnotation]
+			diskCandidate := object.Kind == "disk-image" || hasFormat || hasEncryption ||
+				(object.Output != nil && (object.Output.Format == "disk-image" || object.Output.Disk != nil))
 			for _, layer := range manifest.Layers {
 				reachable[layer.Digest] = true
+				diskCandidate = diskCandidate || layer.MediaType == MediaQCOW2
 			}
-			if manifest.Config.MediaType != MediaImageConfig || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaQCOW2 {
+			if !diskCandidate {
 				continue
 			}
 			disk, err := openDiskManifest(ctx, root, Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}, "", maxDeliveryFileBytes)

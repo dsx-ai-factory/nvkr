@@ -25,17 +25,24 @@ func ImportAcquiredContainerImage(ctx context.Context, source, manifestDigest, p
 	if image.ManifestDigest != manifestDigest {
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "acquired image differs from its pinned native manifest")
 	}
-	index, _, err := readIndex(ctx, source)
+	index, raw, err := readIndex(ctx, source)
 	if err != nil {
 		return ImageInspection{}, err
 	}
+	if digestBytes(raw) != image.RootDigest {
+		return ImageInspection{}, e.New(e.CodeVerifyFailed, "acquired image index changed after inspection")
+	}
+	// The index is local handoff scaffolding, not upstream image identity. Keep
+	// only the verified descriptor and discard acquisition-specific annotations.
+	descriptor := Descriptor{MediaType: image.MediaType, Digest: image.ManifestDigest, Size: index.Manifests[0].Size}
+	index = ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, Manifests: []Descriptor{descriptor}}
 	stage, commit, cleanup, err := stageLayout(out)
 	if err != nil {
 		return ImageInspection{}, err
 	}
 	defer cleanup()
 	writer := layoutWriter{root: stage}
-	if err := writer.copyClosure(ctx, source, index.Manifests[0]); err != nil {
+	if err := writer.copyClosure(ctx, source, descriptor); err != nil {
 		return ImageInspection{}, err
 	}
 	if _, err := writer.writeIndex(index); err != nil {

@@ -38,21 +38,30 @@ func TestSBOMAttestationCreationRequiresExactPredicateAndVerification(t *testing
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name                    string
-		substitute, fail, large bool
-		code                    e.Code
+		name             string
+		substitute, fail bool
+		padding          int
+		code             e.Code
 	}{
-		{name: "verified"}, {name: "large complete inventory", large: true}, {name: "substituted subject", substitute: true, code: e.CodeVerifyFailed}, {name: "verification failure", fail: true, code: e.CodeSignatureInvalid},
+		{name: "verified"}, {name: "substituted subject", substitute: true, code: e.CodeVerifyFailed}, {name: "verification failure", fail: true, code: e.CodeSignatureInvalid},
+		{name: "large complete inventory", padding: 25 << 20},
+		{name: "large inventory signed and verified", padding: sbom.MaxDocumentBytes - 4096},
+		{name: "inventory over document limit", padding: sbom.MaxDocumentBytes, code: e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			document := document
-			if tc.large {
+			predicate := document
+			if tc.padding != 0 {
 				large := *bom
-				large.Metadata.Props = append(append([]sbom.Property(nil), bom.Metadata.Props...), sbom.Property{Name: "nkd:zpayload", Value: strings.Repeat("x", 25<<20)})
-				var err error
-				document, err = large.Marshal()
+				large.Metadata.Props = append(append([]sbom.Property(nil), bom.Metadata.Props...), sbom.Property{Name: "nkd:zpayload", Value: strings.Repeat("x", tc.padding)})
+				predicate, err = json.Marshal(&large)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if tc.code == "" {
+					predicate, err = large.Marshal()
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			var calls []string
@@ -96,22 +105,28 @@ func TestSBOMAttestationCreationRequiresExactPredicateAndVerification(t *testing
 			if err != nil {
 				t.Fatal(err)
 			}
-			bundle, err := signer.AttestSBOM(t.Context(), ociTestDigest, document)
+			bundle, err := signer.AttestSBOM(t.Context(), ociTestDigest, predicate)
 			if tc.code != "" {
 				requireSignCode(t, err, tc.code)
 				if bundle != nil {
 					t.Fatal("failed attestation returned bundle")
+				}
+				if tc.padding > 0 && len(calls) != 0 {
+					t.Fatal("oversized inventory reached signer")
 				}
 				return
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tc.large && (len(document) > sbom.MaxDocumentBytes || len(bundle) <= sbom.MaxDocumentBytes || len(bundle) > sbom.MaxBundleBytes) {
-				t.Fatalf("fixture must separate document and bundle ceilings: document=%d bundle=%d", len(document), len(bundle))
+			if tc.padding == 25<<20 && (len(predicate) > sbom.MaxDocumentBytes || len(bundle) <= sbom.MaxDocumentBytes || len(bundle) > sbom.MaxBundleBytes) {
+				t.Fatalf("fixture must separate document and bundle ceilings: document=%d bundle=%d", len(predicate), len(bundle))
 			}
 			if strings.Join(calls, ",") != "attest-blob,verify-blob-attestation" {
 				t.Fatal("missing verification", calls)
+			}
+			if tc.padding == sbom.MaxDocumentBytes-4096 && len(bundle) <= sbom.MaxDocumentBytes {
+				t.Fatal("fixture did not exercise expanded bundle")
 			}
 		})
 	}

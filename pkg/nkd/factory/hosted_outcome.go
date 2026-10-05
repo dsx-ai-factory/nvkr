@@ -141,12 +141,12 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 				if expected, projected := diskPublicationRequirement(plan, planned); projected {
 					localized := make(map[string]Artifact, len(artifacts))
 					for id, artifact := range artifacts {
-						copy := artifact
-						copy.Path, err = local(artifact.Path)
+						localArtifact := artifact
+						localArtifact.Path, err = local(artifact.Path)
 						if err != nil {
 							return err
 						}
-						localized[id] = copy
+						localized[id] = localArtifact
 					}
 					var observed delivery.Output
 					observed, err = ObserveDiskPublicationPayload(ctx, plan, expected, localized)
@@ -203,12 +203,12 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			if len(plan.LifecycleOutputs) > 0 {
 				localized := make(map[string]Artifact, len(artifacts))
 				for id, artifact := range artifacts {
-					copy := artifact
-					copy.Path, err = local(artifact.Path)
+					localArtifact := artifact
+					localArtifact.Path, err = local(artifact.Path)
 					if err != nil {
 						return err
 					}
-					localized[id] = copy
+					localized[id] = localArtifact
 				}
 				expected, err = releaseEvidenceObjects(ctx, plan, packageNode, localized)
 				if err != nil {

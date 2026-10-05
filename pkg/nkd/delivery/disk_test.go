@@ -570,6 +570,8 @@ func TestDiskArtifactCancellationAndClose(t *testing.T) {
 	select {
 	case <-blocked.entered:
 	case <-time.After(5 * time.Second):
+		close(blocked.release)
+		<-streamDone
 		t.Fatal("stream did not enter destination")
 	}
 	waitCtx, stopWait := context.WithCancel(t.Context())

@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
@@ -81,15 +83,164 @@ func (owner *LocalRunResult) PackageReconciledDisk(ctx context.Context, plan *Pl
 	if err := capture.finish(); err != nil {
 		return delivery.Result{}, nil, err
 	}
-	if err := evidence.write(ctx); err != nil {
-		return delivery.Result{}, nil, err
-	}
-	result, err = delivery.BuildDiskArtifact(ctx, output.Path, delivery.DiskArtifactRequest{Path: capture.path,
-		Digest: digest, Size: size, Platform: platform, Format: "qcow2", Encryption: "none", ArtifactType: output.MediaType})
+	result, err = publishReconciledDiskPackage(ctx, workspace, output.Path, evidence, capture.close,
+		func(ctx context.Context, path string) (delivery.Result, error) {
+			return delivery.BuildDiskArtifact(ctx, path, delivery.DiskArtifactRequest{Path: capture.path,
+				Digest: digest, Size: size, Platform: platform, Format: "qcow2", Encryption: "none", ArtifactType: output.MediaType})
+		})
 	if err != nil {
 		return delivery.Result{}, nil, err
 	}
 	return result, document, nil
+}
+
+// Both roots are private until construction and carrier cleanup succeed. This
+// uses the existing descriptor-relative atomic no-replace transport primitive;
+// a failed second publication moves only our first root back for cleanup. A
+// process crash can expose unauthenticated bytes, never a completed node receipt.
+func publishReconciledDiskPackage(ctx context.Context, workspace, output string, evidence reconciledEvidenceFiles,
+	closeCarrier func() error, build func(context.Context, string) (delivery.Result, error),
+) (result delivery.Result, returnErr error) {
+	if ctx == nil || closeCarrier == nil || build == nil {
+		return delivery.Result{}, e.New(e.CodeUsage, "disk package transaction requires context and private construction")
+	}
+	if err := ctx.Err(); err != nil {
+		return delivery.Result{}, e.Wrap(e.CodeTimeout, err, "disk package transaction canceled")
+	}
+	root, _, err := securepath.OpenDirectory(workspace)
+	if err != nil {
+		return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "holding disk package transaction workspace")
+	}
+	defer func() { _ = root.Close() }()
+	type target struct {
+		parent       *os.File
+		name, staged string
+		info         os.FileInfo
+		published    bool
+	}
+	targets := []target{{staged: "package"}, {staged: "evidence"}}
+	relative := make([]string, 2)
+	for index, path := range []string{output, evidence.directory} {
+		relative[index], err = filepath.Rel(workspace, path)
+		if err != nil || !securepath.WorkspaceRelative(relative[index]) {
+			return delivery.Result{}, e.New(e.CodePipelineDrift, "disk package destination escapes its workspace")
+		}
+	}
+	if relative[0] == relative[1] || strings.HasPrefix(relative[0], relative[1]+string(filepath.Separator)) ||
+		strings.HasPrefix(relative[1], relative[0]+string(filepath.Separator)) {
+		return delivery.Result{}, e.New(e.CodePipelineDrift, "disk package and evidence destinations overlap")
+	}
+	defer func() {
+		for _, target := range targets {
+			if target.parent != nil {
+				_ = target.parent.Close() // cannot revoke durable commit or rollback
+			}
+		}
+	}()
+	for index := range targets {
+		targets[index].parent, targets[index].name, err = securepath.CreateParent(root, relative[index])
+		if err != nil {
+			return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "holding disk package destination")
+		}
+		var observed unix.Stat_t
+		err = unix.Fstatat(int(targets[index].parent.Fd()), targets[index].name, &observed, unix.AT_SYMLINK_NOFOLLOW)
+		if err == nil || !errors.Is(err, unix.ENOENT) {
+			return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "disk package destination already exists or cannot be admitted")
+		}
+	}
+	reserved, name, err := securepath.CreateTemporarySibling(root)
+	if err != nil {
+		return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "reserving private disk package stage")
+	}
+	if err := errors.Join(reserved.Close(), unix.Unlinkat(int(root.Fd()), name, 0)); err != nil {
+		return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "preparing private disk package stage")
+	}
+	if err := unix.Mkdirat(int(root.Fd()), name, 0o700); err != nil {
+		return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "creating private disk package stage")
+	}
+	stagePath := filepath.Join(workspace, name)
+	stage, stageInfo, err := securepath.OpenChild(root, name, true)
+	if err != nil {
+		cleanupErr := unix.Unlinkat(int(root.Fd()), name, unix.AT_REMOVEDIR)
+		return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, errors.Join(err, cleanupErr), "holding private disk package stage")
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			var rollbackErr error
+			for index := len(targets) - 1; index >= 0; index-- {
+				target := &targets[index]
+				if !target.published {
+					continue
+				}
+				current, info, err := securepath.OpenChild(target.parent, target.name, true)
+				if err == nil {
+					err = current.Close()
+				}
+				if err != nil || !os.SameFile(target.info, info) {
+					rollbackErr = errors.Join(rollbackErr, e.New(e.CodeImmutableViolation, "published disk package root changed before rollback"))
+					continue
+				}
+				if err := transportarchive.PublishAtNoReplace(int(target.parent.Fd()), target.name, int(stage.Fd()), target.staged); err != nil {
+					rollbackErr = errors.Join(rollbackErr, err)
+					continue
+				}
+				rollbackErr = errors.Join(rollbackErr, target.parent.Sync())
+			}
+			if rollbackErr != nil {
+				returnErr = joinFactoryCleanupError(returnErr, rollbackErr, "rolling back disk package transaction")
+			}
+		}
+		// Only this invocation's private directory is removed; a substituted
+		// pathname is never traversed or mistaken for our cleanup target.
+		current, err := os.Lstat(stagePath)
+		if err != nil || !os.SameFile(stageInfo, current) {
+			if !committed {
+				returnErr = joinFactoryCleanupError(returnErr, e.New(e.CodeImmutableViolation, "private disk package stage changed"), "cleaning disk package stage")
+			}
+		} else if err := os.RemoveAll(stagePath); err != nil && !committed {
+			returnErr = joinFactoryCleanupError(returnErr, err, "cleaning disk package stage")
+		}
+		_ = stage.Close() // no authority remains in this scratch descriptor
+	}()
+	result, err = build(ctx, filepath.Join(stagePath, "package"))
+	if err != nil {
+		return delivery.Result{}, err
+	}
+	if err := evidence.writeTo(ctx, filepath.Join(stagePath, "evidence")); err != nil {
+		return delivery.Result{}, err
+	}
+	if err := closeCarrier(); err != nil {
+		return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "closing private disk carrier before publication")
+	}
+	if err := ctx.Err(); err != nil {
+		return delivery.Result{}, e.Wrap(e.CodeTimeout, err, "disk package transaction canceled before publication")
+	}
+	for index := range targets {
+		child, info, err := securepath.OpenChild(stage, targets[index].staged, true)
+		if err != nil {
+			return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "holding staged disk package root")
+		}
+		targets[index].info = info
+		if err := child.Close(); err != nil {
+			return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "closing staged disk package root")
+		}
+	}
+	// Once the short multi-root commit starts, finish or roll it back rather
+	// than leaving a half-commit because voluntary cancellation arrived.
+	for index := range targets {
+		target := &targets[index]
+		if err := transportarchive.PublishAtNoReplace(int(stage.Fd()), target.staged, int(target.parent.Fd()), target.name); err != nil {
+			return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "publishing disk package transaction without replacement")
+		}
+		target.published = true
+		if err := target.parent.Sync(); err != nil {
+			return delivery.Result{}, e.Wrap(e.CodeImmutableViolation, err, "persisting disk package transaction")
+		}
+	}
+	committed = true
+	result.LayoutPath = output
+	return result, nil
 }
 
 func reconciledDiskPackageBinding(plan *Plan, expected LifecycleOutputPlan, output Artifact) (string, definition.DiskInspectionProfile, error) {

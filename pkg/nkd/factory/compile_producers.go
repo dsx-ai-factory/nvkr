@@ -116,8 +116,8 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 		Path: filepath.ToSlash(filepath.Join(".nkd", "factory", target, "terminal-observation.json"))}
 	if targetSpec.Format == authored.OutputDiskImage && !diskPublication {
 		// The ordinary per-component SBOM operation does not prove the disk
-		// inventory and material reconciliation required by ADR-13. Keep disk
-		// diagnostic-only plans retain their raw disk without claiming a complete
+		// inventory and material reconciliation required by ADR-13. Diagnostic-only
+		// plans retain their raw disk without claiming a complete
 		// SBOM. Production plans require the separate live reconciliation operation.
 		return nil
 	}

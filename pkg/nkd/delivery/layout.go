@@ -490,6 +490,9 @@ func readIndex(ctx context.Context, root string) (ociIndex, []byte, error) {
 	if err != nil {
 		return ociIndex{}, nil, err
 	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return ociIndex{}, nil, err
+	}
 	var index ociIndex
 	if err := json.Unmarshal(raw, &index); err != nil {
 		return ociIndex{}, nil, e.Wrap(e.CodeVerifyFailed, err, "decoding OCI index")

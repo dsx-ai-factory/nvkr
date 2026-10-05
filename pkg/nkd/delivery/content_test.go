@@ -72,7 +72,8 @@ func TestDiskOutputBindingIsExactAndExcludedFromReleaseContentIdentity(t *testin
 		Name: "node-image", Kind: "disk-image", Digest: digest, BuildDigest: buildDigest,
 		Components: []string{"agent", "image"},
 		Disk: &DiskOutput{
-			Producer: "build-image", Component: "image", Format: "qcow2",
+			PayloadDigest: digest,
+			Producer:      "build-image", Component: "image", Format: "qcow2",
 			Encryption: "none", Size: 4096, PlanDigest: planDigest, Outcome: "succeeded",
 		},
 	}
@@ -136,6 +137,7 @@ func TestDiskOutputBindingIsExactAndExcludedFromReleaseContentIdentity(t *testin
 		{name: "wrong encryption", change: func(output *Output) { output.Disk.Encryption = "aes" }},
 		{name: "missing size", change: func(output *Output) { output.Disk.Size = 0 }},
 		{name: "wrong plan", change: func(output *Output) { output.Disk.PlanDigest = "mutable" }},
+		{name: "missing payload pin", change: func(output *Output) { output.Disk.PayloadDigest = "" }},
 		{name: "malformed payload pin", change: func(output *Output) { output.Disk.PayloadDigest = "mutable" }},
 		{name: "wrong outcome", change: func(output *Output) { output.Disk.Outcome = "failed" }},
 	} {

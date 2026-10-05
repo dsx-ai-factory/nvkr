@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -34,8 +35,9 @@ func inspectFactoryDisk(ctx context.Context, plan *Plan, expected LifecycleOutpu
 		return delivery.DiskArtifactInspection{}, err
 	}
 	inspection := held.Inspection()
-	if err := held.Close(); err != nil {
-		return delivery.DiskArtifactInspection{}, e.Wrap(e.CodeVerifyFailed, err, "closing checked disk wrapper")
+	profileErr := held.RequireStandardProfile(ctx)
+	if err := errors.Join(profileErr, held.Close()); err != nil {
+		return delivery.DiskArtifactInspection{}, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "checking standard disk wrapper"))
 	}
 	if inspection.ArtifactType != artifact.MediaType || inspection.Encryption != "none" {
 		return delivery.DiskArtifactInspection{}, e.New(e.CodeVerifyFailed, "disk wrapper differs from planned artifact type or plain profile")

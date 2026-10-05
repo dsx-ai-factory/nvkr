@@ -29,9 +29,9 @@ type Output struct {
 // decoded RAW reproduction identity, compatibility, inspection, SBOM, or
 // publication authority.
 type DiskOutput struct {
-	// PayloadDigest is required in a published wrapper; legacy local outputs
-	// already identify the raw payload with Output.Digest and may omit it.
-	PayloadDigest string `json:"payloadDigest,omitempty"`
+	// PayloadDigest always identifies raw QCOW2 bytes. Output.Digest separately
+	// identifies the observed deliverable: raw locally, its manifest when wrapped.
+	PayloadDigest string `json:"payloadDigest"`
 	Producer      string `json:"producer"`
 	Component     string `json:"component"`
 	Format        string `json:"format"`
@@ -67,7 +67,7 @@ func (output Output) Validate() error {
 		output.Disk.Format != "qcow2" ||
 		(output.Disk.Encryption != "none" && output.Disk.Encryption != "luks2") ||
 		output.Disk.Size <= 0 || !canonical.IsDigest(output.Disk.PlanDigest) ||
-		(output.Disk.PayloadDigest != "" && !canonical.IsDigest(output.Disk.PayloadDigest)) ||
+		!canonical.IsDigest(output.Disk.PayloadDigest) ||
 		output.Disk.Outcome != "succeeded" || !containsOutputComponent(output.Components, output.Disk.Component) {
 		return e.New(e.CodeVerifyFailed, "disk artifact %q lacks an exact successful QCOW2 producer binding", output.Name)
 	}

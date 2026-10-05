@@ -94,15 +94,19 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				ref = ir.OCIBlobScheme + nc.Prebuilt.OCIArchive
 			} else if ref == "" {
 				ref = strings.TrimPrefix(nc.Prebuilt.Image, "oci://")
-				// An authored index digest selects the upstream architecture set.
-				// The owning artifact pin selects the native manifest subject.
-				// Retain only the parsed repository transport to avoid a double
-				// digest suffix when the pipeline acquires that native subject.
+				// A digest-qualified reference must name the selected native
+				// subject. A distinct authored index requires a retained index-to-
+				// native membership contract, which this lowering does not issue.
 				parsed, err := name.ParseReference(ref)
 				if err != nil {
 					return nil, e.Wrap(e.CodeInvalidCatalog, err, "parse acquired image transport %q", nc.Name)
 				}
-				if _, digested := parsed.(name.Digest); digested {
+				if authored, digested := parsed.(name.Digest); digested {
+					if authored.DigestStr() != nc.Prebuilt.Digests[arch] {
+						return nil, e.New(e.CodeUnverifiedRef,
+							"component %q authored image digest differs from its selected native pin; index membership is not established", nc.Name)
+					}
+					// Acquisition appends this same pin once to the repository.
 					ref = parsed.Context().Name()
 				}
 			}

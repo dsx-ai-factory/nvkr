@@ -104,7 +104,7 @@ func validateReconciledDiskDocument(plan *Plan, output, component, subject strin
 	for _, property := range bom.Metadata.Props {
 		properties[property.Name] = property.Value
 	}
-	method := "syft-cyclonedx/v1"
+	method := "disk-content/v1"
 	root := artifacts[expected.ArtifactID]
 	if component == root.Component {
 		method = "disk-reconciled/v1"
@@ -201,9 +201,14 @@ func prepareReconciledEvidence(ctx context.Context, plan *Plan, expected Lifecyc
 	return result, nil
 }
 
-func (files reconciledEvidenceFiles) write(ctx context.Context) error {
+// writeTo is used only beneath an invocation-private package stage. Final
+// evidence membership is published with its disk wrapper, never file by file.
+func (files reconciledEvidenceFiles) writeTo(ctx context.Context, directory string) error {
 	for _, name := range sortedKeys(files.files) {
-		if err := writeFactoryFile(ctx, filepath.Join(files.directory, name), files.files[name], 0o644); err != nil {
+		if name == "." || name == ".." || filepath.Base(name) != name {
+			return e.New(e.CodePipelineDrift, "disk evidence has an unsafe staged member")
+		}
+		if err := writeFactoryFile(ctx, filepath.Join(directory, name), files.files[name], 0o644); err != nil {
 			return err
 		}
 	}

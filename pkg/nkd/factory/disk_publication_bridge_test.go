@@ -168,7 +168,8 @@ func TestCompileProductionDiskPreservesRawRootAndAllEvidence(t *testing.T) {
 
 func TestObserveProductionDiskKeepsManifestAndRawDigestsSeparate(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
-		for _, condition := range []string{"valid", "manifest substituted for raw", "wrong size", "wrong wrapper platform", "canceled"} {
+		for _, condition := range []string{"valid", "manifest substituted for raw", "wrong size", "wrong wrapper platform", "canceled",
+			"missing raw", "wrong raw producer", "missing wrapper", "wrong wrapper producer", "missing record", "wrong record component", "wrong frozen output"} {
 			t.Run(platform+"/"+condition, func(t *testing.T) {
 				plan := diskPublicationPlanFixture(t, platform)
 				expected := plan.LifecycleOutputs[0]
@@ -213,6 +214,36 @@ func TestObserveProductionDiskKeepsManifestAndRawDigestsSeparate(t *testing.T) {
 				if err := writeFactoryFile(t.Context(), record.Path, encoded, 0o600); err != nil {
 					t.Fatal(err)
 				}
+				want := e.CodeVerifyFailed
+				switch condition {
+				case "missing raw":
+					delete(artifacts, expected.ArtifactID)
+					want = e.CodeReleaseIncomplete
+				case "wrong raw producer":
+					changed := artifacts[expected.ArtifactID]
+					changed.Producer = "sibling/build-image"
+					artifacts[expected.ArtifactID] = changed
+					want = e.CodeReleaseIncomplete
+				case "missing wrapper":
+					delete(artifacts, wrapper.ID)
+					want = e.CodeReleaseIncomplete
+				case "wrong wrapper producer":
+					wrapper.Producer = "sibling/package-image"
+					artifacts[wrapper.ID] = wrapper
+					want = e.CodeReleaseIncomplete
+				case "missing record":
+					delete(artifacts, record.ID)
+					want = e.CodeProvenanceMissing
+				case "wrong record component":
+					record.Component = "sibling"
+					artifacts[record.ID] = record
+					want = e.CodeProvenanceMissing
+				case "wrong frozen output":
+					expected.BuildDigest = "sha256:" + strings.Repeat("9", 64)
+					want = e.CodePipelineDrift
+				case "canceled":
+					want = e.CodeTimeout
+				}
 				ctx, cancel := context.WithCancel(t.Context())
 				defer cancel()
 				if condition == "canceled" {
@@ -220,7 +251,7 @@ func TestObserveProductionDiskKeepsManifestAndRawDigestsSeparate(t *testing.T) {
 				}
 				result, err := ObserveDiskPublicationPayload(ctx, plan, expected, artifacts)
 				if condition != "valid" {
-					if err == nil || !reflect.DeepEqual(result, delivery.Output{}) {
+					if factoryErrorCode(err) != want || !reflect.DeepEqual(result, delivery.Output{}) {
 						t.Fatalf("invalid projection = %+v, %v", result, err)
 					}
 					if condition == "canceled" && (!errors.Is(err, context.Canceled) || factoryErrorCode(err) != e.CodeTimeout) {
@@ -241,7 +272,9 @@ func TestPackageReconciledDiskRequiresLiveEvidenceBeforeOutput(t *testing.T) {
 		t.Run(condition, func(t *testing.T) {
 			ctx := t.Context()
 			owner, inspection := &LocalRunResult{}, &sbom.DiskInspectionRuntime{}
-			var receipt *DiskEvidenceReceipt
+			// Non-nil but inert: this isolates each required argument without
+			// pretending that a live evidence owner issued a receipt.
+			receipt := &DiskEvidenceReceipt{}
 			want := e.CodeProvenanceMissing
 			switch condition {
 			case "nil context":
@@ -255,6 +288,8 @@ func TestPackageReconciledDiskRequiresLiveEvidenceBeforeOutput(t *testing.T) {
 				owner = nil
 			case "missing runtime":
 				inspection = nil
+			case "missing receipt":
+				receipt = nil
 			}
 			path := filepath.Join(t.TempDir(), "never-created")
 			result, document, err := owner.PackageReconciledDisk(ctx, &Plan{}, LifecycleOutputPlan{}, inspection, receipt, Artifact{Path: path})

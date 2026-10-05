@@ -71,7 +71,8 @@ func TestBindObservedDiskRequiresExactPlanBoundObservation(t *testing.T) {
 		Name: "cli", Kind: OutputDiskImage, Digest: "sha256:" + strings.Repeat("4", 64),
 		BuildDigest: run.Expected[0].BuildDigest, Components: append([]string(nil), run.Expected[0].Components...),
 		Disk: &delivery.DiskOutput{
-			Producer: "build-image", Component: "image", Format: "qcow2", Encryption: "none",
+			PayloadDigest: "sha256:" + strings.Repeat("4", 64),
+			Producer:      "build-image", Component: "image", Format: "qcow2", Encryption: "none",
 			Size: 4096, PlanDigest: run.PlanDigest, Outcome: "succeeded",
 		},
 	}

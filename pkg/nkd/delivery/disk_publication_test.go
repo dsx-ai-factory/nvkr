@@ -70,6 +70,11 @@ func diskPublicationRequest(t *testing.T, arch string) (PublicationRequest, stri
 				bom.Metadata.Props = append(bom.Metadata.Props, sbom.Property{Name: key, Value: build})
 			}
 			sort.Slice(bom.Metadata.Props, func(i, j int) bool { return bom.Metadata.Props[i].Name < bom.Metadata.Props[j].Name })
+		} else {
+			bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "fixture-staged-package", Version: "1"}}, "disk-content/v1", build)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 		semantic, err := bom.Digest()
 		if err != nil {
@@ -171,6 +176,47 @@ func TestDiskPublicationPreservesManifestAndPayloadSubjects(t *testing.T) {
 			_, err = publication.WriteDiskPayload(t.Context(), "node-image", io.Discard)
 			assertRegistryCode(t, err, e.CodeGateUnmet)
 		})
+	}
+}
+
+func TestDiskPublicationLargeInventoryAttestationReadback(t *testing.T) {
+	request, _ := diskPublicationRequest(t, "amd64")
+	changeDiskFixtureBOM(&request, func(bom *sbom.BOM) {
+		bom.Metadata.Component.Properties = []sbom.Property{{Name: "fixture", Value: strings.Repeat("x", sbom.MaxDocumentBytes-4096)}}
+	})
+	prepared := filepath.Join(t.TempDir(), "prepared")
+	if _, err := BuildPublicationRoot(t.Context(), prepared, request); err != nil {
+		t.Fatal(err)
+	}
+	final := filepath.Join(t.TempDir(), "attested")
+	expanded := false
+	result, err := AttestEvidence(t.Context(), prepared, final, func(_ context.Context, subject string, document []byte) ([]byte, error) {
+		bundle := diskFixtureBundle(t, subject, document)
+		if len(bundle) > sbom.MaxDocumentBytes {
+			expanded = true
+		}
+		return bundle, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !expanded {
+		t.Fatal("fixture did not exercise an expanded signed bundle")
+	}
+	publication, err := OpenPublication(t.Context(), final, result.RootDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = publication.Close() }()
+	if err := publication.RequireAttestedEvidence(); err != nil {
+		t.Fatal(err)
+	}
+	_, document, err := EvidenceDocument(t.Context(), final, request.Objects[2].Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(document, request.Objects[2].Bytes) {
+		t.Fatal("large inventory changed during attestation and readback")
 	}
 }
 
@@ -416,13 +462,29 @@ func TestDiskPublicationRejectsMissingOrSubstitutedEvidence(t *testing.T) {
 }
 
 func changeDiskFixtureBOM(request *PublicationRequest, change func(*sbom.BOM)) {
-	input := &request.Objects[2]
+	changeDiskFixtureComponentBOM(request, "image", change)
+}
+
+func changeDiskFixtureComponentBOM(request *PublicationRequest, component string, change func(*sbom.BOM)) {
+	var input *ObjectInput
+	for index := range request.Objects {
+		candidate := &request.Objects[index]
+		if candidate.Evidence != nil && candidate.Evidence.Component == component {
+			input = candidate
+			break
+		}
+	}
+	if input == nil {
+		panic("fixture has no component evidence: " + component)
+	}
 	var bom sbom.BOM
 	if err := canonical.UnmarshalExact([]byte(strings.TrimSuffix(string(input.Bytes), "\n")), &bom); err != nil {
 		panic(err)
 	}
 	change(&bom)
 	var err error
+	// Negative fixtures deliberately bypass BOM.Validate so invalid inventory
+	// bytes reach the consumer's owning validation gate instead of failing here.
 	input.Bytes, err = canonical.Marshal(bom)
 	if err != nil {
 		panic(err)
@@ -432,6 +494,32 @@ func changeDiskFixtureBOM(request *PublicationRequest, change func(*sbom.BOM)) {
 		panic(err)
 	}
 	input.Name = "sbom-" + strings.TrimPrefix(input.SemanticDigest, "sha256:")
+}
+
+func TestDiskPublicationRequiresEveryInspectionIdentity(t *testing.T) {
+	for _, key := range []string{"nkd:diskInspectionRuntimeDigest", "nkd:diskInspectorDigest", "nkd:diskCodecDigest"} {
+		t.Run(key, func(t *testing.T) {
+			request, _ := diskPublicationRequest(t, "amd64")
+			changeDiskFixtureBOM(&request, func(bom *sbom.BOM) {
+				for index, property := range bom.Metadata.Props {
+					if property.Name == key {
+						bom.Metadata.Props = append(bom.Metadata.Props[:index], bom.Metadata.Props[index+1:]...)
+						return
+					}
+				}
+				t.Fatalf("fixture lacks %s", key)
+			})
+			out := filepath.Join(t.TempDir(), "rejected")
+			_, err := BuildPublicationRoot(t.Context(), out, request)
+			assertRegistryCode(t, err, e.CodeProvenanceMissing)
+			if !strings.Contains(err.Error(), "disk inventory lacks an exact "+key) {
+				t.Fatalf("did not reach exact inspection identity gate: %v", err)
+			}
+			if _, err := os.Stat(out); !os.IsNotExist(err) {
+				t.Fatalf("rejected request published output: %v", err)
+			}
+		})
+	}
 }
 
 func TestDiskRegistryRoundTrip(t *testing.T) {
