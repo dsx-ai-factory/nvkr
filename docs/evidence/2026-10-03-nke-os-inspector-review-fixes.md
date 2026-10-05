@@ -54,6 +54,9 @@ The real pipeline test exercised host-side runtime ownership and cancellation
 against this older helper. It did not exercise the later in-image XML/package
 validation or helper timeout classification. Local and native contract tests of
 those functions are not proof that the changed helper ran in the inspector image.
+This historical run also predates `--log-driver=none` and attached start by the
+validated create ID. Their separate native ARM64 replay is recorded on
+[Oct 5](2026-10-05-nke-os-inspector-launcher.md).
 
 `TestDiskInspectionRuntimeReal`, with its explicit pinned environment inputs
 and `-test.v -test.timeout=12m`, completed with exit zero:

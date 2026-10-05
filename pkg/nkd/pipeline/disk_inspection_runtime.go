@@ -3,7 +3,6 @@ package pipeline
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"math"
@@ -435,30 +434,30 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 // bounded cleanup context expires. An empty lookup alone cannot prove cleanup.
 func removeDiskInspectionContainer(ctx context.Context, runtime packerContainerRuntime, attempt string, creationUncertain bool) error {
 	var stdout, stderr diskInspectionBuffer
+	// Retain only the latest bounded diagnostic, not an error chain per poll.
+	// A warning cannot prove a failed create will never register with the daemon.
+	var diagnosticErr error
 	for {
 		stdout.Reset()
 		stderr.Reset()
-		if err := runtime.Cleanup(ctx, time.Second, &stdout, &stderr, diskInspectionCommandArgs(runtime.RuntimeName(), "ps", "--all", "--no-trunc",
-			"--filter", "label=nkd.dev/inspection-attempt="+attempt, "--format", "{{.ID}}")...); err != nil {
-			return e.Wrap(e.CodeInternal, err, "finding the owned disk inspection container")
-		}
-		var diagnosticErr error
+		err := runtime.Cleanup(ctx, time.Second, &stdout, &stderr, diskInspectionCommandArgs(runtime.RuntimeName(), "ps", "--all", "--no-trunc",
+			"--filter", "label=nkd.dev/inspection-attempt="+attempt, "--format", "{{.ID}}")...)
 		if stderr.Len() != 0 {
 			diagnosticErr = e.New(e.CodeVerifyFailed, "disk inspection cleanup discovery returned diagnostics: %s", diskInspectionDiagnostic(stderr.Bytes()))
 		}
+		if err != nil {
+			return errors.Join(diagnosticErr, e.Wrap(e.CodeInternal, err, "finding the owned disk inspection container"))
+		}
 		ids := strings.Fields(stdout.String())
 		if len(ids) == 0 {
-			if diagnosticErr != nil {
-				return diagnosticErr
-			}
 			if !creationUncertain {
-				return nil
+				return diagnosticErr
 			}
 			timer := time.NewTimer(100 * time.Millisecond)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
-				return e.Wrap(e.CodeInternal, ctx.Err(), "disk inspection creation outcome remains uncertain")
+				return errors.Join(diagnosticErr, e.Wrap(e.CodeInternal, ctx.Err(), "disk inspection creation outcome remains uncertain"))
 			case <-timer.C:
 				continue
 			}
@@ -504,18 +503,4 @@ func (buffer *diskInspectionBuffer) Write(raw []byte) (int, error) {
 		return 0, e.New(e.CodeEnvelopeDecode, "disk inspection output exceeds its bound")
 	}
 	return buffer.data.Write(raw)
-}
-
-func decodeDiskInspectionImageID(raw []byte) (string, error) {
-	var image struct {
-		ID string `json:"Id"`
-	}
-	if err := json.Unmarshal(bytes.TrimSpace(raw), &image); err != nil {
-		return "", e.Wrap(e.CodeEngineCapability, err, "decoding inspection image identity")
-	}
-	id := normalizeLocalImageID(image.ID)
-	if !canonical.IsDigest(id) {
-		return "", e.New(e.CodeEngineCapability, "runtime returned no exact inspection image identity")
-	}
-	return id, nil
 }

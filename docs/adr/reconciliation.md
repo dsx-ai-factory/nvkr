@@ -62,7 +62,8 @@ non-root caller but leaves the enclosing loader, libraries, emulator, appliance 
 runtime TCB. An optional concrete diagnostic runtime now admits an already-local exact OCI image, its held
 Linux Docker/Podman executable and observed daemon identity. Its fixed launcher enforces non-root execution,
 network-none, a read-only root, dropped capabilities, absent caller mounts/devices/credentials, bounded
-resources and cancellation/cleanup. Native Podman commands disable automatic `mounts.conf` inputs at start;
+resources and cancellation/cleanup. Native Podman commands disable automatic `mounts.conf` inputs on create,
+start and owned cleanup;
 daemon configuration, OCI hooks and FIPS mounts remain inside the trusted runtime boundary.
 The opaque installed inventory binds the exact subject, tools and complete
 runtime-reported image identity, not a repository-approved image pin or separately pinned runtime executable or daemon; the caller-selected runtime,
@@ -78,6 +79,10 @@ applies to its host-side test binary and unchanged inspector image, not all late
 records separate host-side source and unchanged in-image helper identities, native ARM64 runtime,
 successful SBOM-wrapper bindings and observed-running cancellation. Neither replay rebuilt the helper;
 later helper XML/package validation and timeout-code changes are contract-tested, not exercised in that image.
+The [Oct 5 native ARM64 launcher replay](../evidence/2026-10-05-nke-os-inspector-launcher.md)
+exercised `--log-driver=none` and attached start by validated create ID, again using the unchanged helper.
+Those launcher changes were not part of the earlier Oct 2/3 executions; Docker and native AMD64 remain
+unexercised. Warning/no-ID late-registration cleanup is bounded contract-test evidence only.
 These are retained-disk exercises, not acceptance of a later committed head. Native AMD64 execution, original
 live-Run integration, registry publication and license/security clearance remain unproved. This is an optional
 diagnostic capability, not a compiler Plan input or an authenticated production closure. The shared codec probe
@@ -412,6 +417,7 @@ Earlier verification does not transfer by renaming or reinterpreting records.
 | [Concrete local inspection runtime, 2026-10-02](../evidence/2026-10-02-nke-os-inspector-runtime.md) | Exact local OCI closure, held Podman/runtime/tool identities, non-root networkless inspection of one retained ARM64 QCOW2, 730 installed packages, timeout/no-retained-container assertion and native Linux race suites | Historical cancellation test did not observe the running phase; native AMD64 runtime and original live-Run integration are unexercised; no registry publication, NVIDIA license/security clearance, full-disk SBOM or qualified claim |
 | [Inspector review-fix replay, 2026-10-03](../evidence/2026-10-03-nke-os-inspector-review-fixes.md) | New host-side pipeline test binary used the unchanged Oct 2 ARM64 inspector image; retained-disk scan and observed-running cancellation/cleanup passed | No rebuilt helper or runtime exercise of later in-image XML/package validation and timeout classification; one historical host-side source blob is unavailable for independent recovery; no full-disk SBOM or production acceptance |
 | [Mount-suppression and inventory replay, 2026-10-03](../evidence/2026-10-03-nke-os-inspector-mount-suppression.md) | New host-side runtime and SBOM test binaries used the unchanged Oct 2 ARM64 helper; issued-inventory bindings, mutation detection and observed-running cancellation passed | Later helper subject-holding and timeout classification did not execute inside this image; no rebuilt closure, native AMD64 runtime, original live-Run integration or production acceptance |
+| [Launcher and inventory replay, 2026-10-05](../evidence/2026-10-05-nke-os-inspector-launcher.md) | Patched native ARM64 host launcher with log driver disabled and attached start by create ID delivered 730 packages; exact issued-inventory bindings and observed-running cancellation/cleanup passed | Unchanged Oct 2 helper, not a rebuilt closure or later helper validation proof; no real warning/no-ID cleanup failure, native AMD64/Docker, original live-Run integration or production acceptance |
 | [Shared VMDK codec admission, 2026-10-02](../evidence/2026-10-02-vmdk-codec-admission.md) | Opt-in ARM64 real-QEMU sparse and stream-optimized decoding, valid external-descriptor rejection and controlled probe/conversion markers | Earlier and linked follow-up replays retain their own exact source, executable and committed log identities; not ordinary CI, an AMD64 runtime result, an NKE image build or qualified reproduction |
 | [Corrected local installed-package inspection, 2026-10-02](../evidence/2026-10-02-nke-os-disk-inspection.md) | ARM64 ELF contract tests and non-root libguestfs scans, external-reference rejection and actual appliance cancellation at each replay's listed source blobs | Original and later checked-inventory rebuild retain separate source, test-binary and complete terminal-log identities. Diagnostic installed metadata only, not full SBOM, runtime authentication or qualified reproduction |
 | [Local installed-package inspection, 2026-10-01](../evidence/2026-10-01-nke-os-disk-inspection.md) | Historical ARM64 libguestfs diagnostic scan of a retained non-FDE disk, external-reference negatives and cancellation | Exact draft tree was not retained; not committed-candidate acceptance, full-disk SBOM, publication or qualified reproduction |
