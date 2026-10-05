@@ -18,11 +18,17 @@ import (
 type SourcePinRequest struct {
 	Directory string
 	Sources   []string
-	Tag       string
-	Runtime   string // Container executable for acquired image members; defaults to docker.
-	Bump      bool
-	All       bool
-	Check     bool
+	// SameRelease groups independent roots that must resolve the same repository
+	// release. It is a maintenance constraint, never derived pin provenance.
+	SameRelease [][]string
+	// RejectRepublishedVersions is an opt-in maintenance policy. Existing version
+	// identities must keep their source/artifact bytes; provenance may advance.
+	RejectRepublishedVersions bool
+	Tag                       string
+	Runtime                   string // Container executable for acquired image members; defaults to docker.
+	Bump                      bool
+	All                       bool
+	Check                     bool
 }
 
 // SourcePinChange describes one completed resolution, including no-op selections.
@@ -90,6 +96,9 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 		if src, ok := reg.Sources[n]; ok && src.PinnedBy != "" {
 			return update, pinSetMemberError(n, src.PinnedBy)
 		}
+	}
+	if err := validateSameReleaseSelection(reg.Sources, selected, request.SameRelease); err != nil {
+		return update, err
 	}
 	if lock.Artifacts == nil {
 		lock.Artifacts = map[string]ArtifactPin{}
@@ -177,6 +186,14 @@ func updateSourcePins(ctx context.Context, request SourcePinRequest,
 		if err := apply(name, tag, "", ""); err != nil {
 			return update, err
 		}
+	}
+	if request.RejectRepublishedVersions {
+		if err := validateUnchangedVersionBytes(update); err != nil {
+			return update, err
+		}
+	}
+	if err := validateSameReleasePins(lock.Pins, request.SameRelease); err != nil {
+		return update, err
 	}
 	// Validate the whole candidate before either reporting a diff or saving it.
 	if err := validateLockAgainstRegistry(reg, lock, true); err != nil {

@@ -87,6 +87,12 @@ The exact generated files and commit manifest that carry an execution plan to a 
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
+**Catalog maintenance candidate**:
+A review-only lock and regenerated execution-bundle change under explicit source-selection constraints.
+Static checks and optional complete local diagnostic execution precede candidate handoff; neither is release
+acceptance. Scheduling and source-role alignment are operational policy, not additional lifecycle objects.
+_Avoid_: Release, qualified reproduction, automatic promotion
+
 **Binary bundle**:
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive

@@ -126,6 +126,17 @@ are admitted before upstream calls. No-op updates preserve existing lock bytes. 
   entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
   prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
 
+Maintenance callers may additionally supply explicit `SameRelease` groups of selected independent sources.
+Each group must share the exact repository, tag prefix and constraint before upstream resolution; the complete
+candidate must share tag, commit, tree and source epoch before the lock commit. Toolchain and vendoring
+settings may differ. Disagreement aborts the entire transaction, including derived pins. This is an
+invocation-scoped consistency assertion, not `pinnedBy` or `derivedFrom` provenance and not a new catalog
+schema. Maintenance also opts into rejecting republished versions before preview or CAS: unchanged
+versions may not acquire different source identities or acquired payload bytes/chart identities. Derived
+provenance may advance to a new umbrella with unchanged member bytes. Interactive pin/bump semantics
+remain explicit and unchanged. No constraint is widened automatically. The maintenance workflow owner is
+defined in ADR-21.
+
 Every write follows ADR-21's same-filesystem stage, fsync, original-digest compare-and-swap, and atomic rename.
 Lock snapshots and writes share the bounded context-aware file boundary. Cancellation before rename aborts and
 removes the stage; after rename, commit wins and durability work completes. Concurrent same-checkout bumps never

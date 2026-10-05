@@ -81,7 +81,10 @@ verification and receipt-derived byte-CAS persistence before interpreting withdr
 and returned decision remain diagnostic; this operation adds no trusted-time or release authority.
 `catalog.UpdateSourcePins` and `UpdateArtifactPins` own selection, resolution, change detection and the existing
 lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
-not own the persisted status schema or reconstruct pin-update transactions.
+not own the persisted status schema or reconstruct pin-update transactions. `catalogmaintenance` composes
+that pin owner with normal lifecycle compilation/generation for review-only candidates and renders the
+explicitly configured maintenance workflow. `catalog refresh` and `catalog update-ci` remain thin adapters;
+these maintenance descriptions cannot grant execution or release authority.
 
 Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain

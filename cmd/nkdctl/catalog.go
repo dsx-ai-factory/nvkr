@@ -138,18 +138,8 @@ func cmdCatalog() *cli.Command {
 				},
 				Action: pinArtifacts,
 			},
-			{
-				Name:  "update-ci",
-				Usage: "emit a scheduled GitHub Actions workflow that bumps pins, verifies, and opens a PR",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "dir", Required: true, Usage: "catalog directory the workflow updates"},
-					&cli.StringFlag{Name: "cron", Value: "0 6 * * 1", Usage: "schedule (default: weekly Mon 06:00 UTC)"},
-				},
-				Action: func(c *cli.Context) error {
-					return e.New(e.CodeEngineCapability,
-						"catalog update-ci is unavailable until a provider adapter can regenerate, authenticate, reproduce, verify, and open a PR with every exact input transported")
-				},
-			},
+			cmdCatalogRefresh(),
+			cmdCatalogUpdateCI(),
 		},
 	}
 }

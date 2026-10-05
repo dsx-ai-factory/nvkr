@@ -481,6 +481,10 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+`catalogmaintenance` composes atomic source/pin-set updates with that generator for disposable review
+candidates. Explicit schedules and optional complete local diagnostic execution do not change the public
+lifecycle or grant release acceptance. Lock and bundle writes retain separate failure/recovery boundaries;
+a failed refresh never produces a publishable candidate.
 
 Execution consumes this closed plan through shared producer operations and the same launcher for local and
 hosted Runs. Local scheduling retains a source session; hosted jobs use the Plan dispatcher. Component
