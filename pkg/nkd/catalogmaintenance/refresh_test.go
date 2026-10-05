@@ -214,7 +214,7 @@ func TestRefreshFailureBoundaries(t *testing.T) {
 		code            e.Code
 	}{
 		{"resolution", false, e.CodeFetchFailed},
-		{"regeneration", true, e.CodePipelineDrift},
+		{"regeneration", true, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg, promote := maintenanceFixture(t)

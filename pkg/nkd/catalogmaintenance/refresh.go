@@ -2,6 +2,7 @@ package catalogmaintenance
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,15 +59,25 @@ func refresh(ctx context.Context, config Config, generatorVersion string, check 
 	if check {
 		return result, e.New(e.CodeDiff, "catalog pins would change")
 	}
-	digest, err := lifecycle.GenerateFiles(ctx, config.Definition, config.Environment, generatorVersion, factory.EngineGitHub, ".", false)
+	digest, err := regenerate(ctx, config, generatorVersion, lifecycle.GenerateFiles)
 	if err != nil {
-		return result, e.Wrap(e.CodePipelineDrift, err, "pins committed but regeneration failed; retain the disposable checkout for diagnosis")
-	}
-	if _, err := lifecycle.GenerateFiles(ctx, config.Definition, config.Environment, generatorVersion, factory.EngineGitHub, ".", true); err != nil {
-		return result, e.Wrap(e.CodePipelineDrift, err, "candidate regeneration did not reproduce")
+		return result, err
 	}
 	result.PlanDigest = digest
 	return result, nil
+}
+
+func regenerate(ctx context.Context, config Config, generatorVersion string,
+	generate func(context.Context, string, string, string, string, string, bool) (string, error),
+) (string, error) {
+	digest, err := generate(ctx, config.Definition, config.Environment, generatorVersion, factory.EngineGitHub, ".", false)
+	if err != nil {
+		return "", fmt.Errorf("pins committed but regeneration failed; retain the disposable checkout for diagnosis: %w", err)
+	}
+	if _, err := generate(ctx, config.Definition, config.Environment, generatorVersion, factory.EngineGitHub, ".", true); err != nil {
+		return "", fmt.Errorf("pins committed but candidate regeneration did not reproduce; retain the disposable checkout for diagnosis: %w", err)
+	}
+	return digest, nil
 }
 
 func prepare(ctx context.Context, config Config, generatorVersion string) (*factory.Plan, error) {
@@ -89,6 +100,7 @@ func prepare(ctx context.Context, config Config, generatorVersion string) (*fact
 		return nil, err
 	}
 	used := false
+	catalogs := map[string]bool{}
 	selections := []definition.Catalog{def.Catalog}
 	for _, output := range def.Outputs {
 		if output.Catalog != nil {
@@ -108,7 +120,10 @@ func prepare(ctx context.Context, config Config, generatorVersion string) (*fact
 			if err := admitPath(relative); err != nil {
 				return nil, err
 			}
-			used = used || (i == 0 && relative == config.Catalog)
+			if i == 0 {
+				catalogs[relative] = true
+				used = used || relative == config.Catalog
+			}
 		}
 	}
 	if !used {
@@ -131,9 +146,19 @@ func prepare(ctx context.Context, config Config, generatorVersion string) (*fact
 	if !sourceAccessUsed {
 		return nil, e.New(e.CodeUsage, "source checkout does not transport a selected maintenance root")
 	}
+	if err := admitSourceCheckoutCatalogs(ctx, config, sources, catalogs); err != nil {
+		return nil, err
+	}
 	plan, err := lifecycle.CompileFiles(ctx, config.Definition, config.Environment, generatorVersion)
 	if err != nil {
 		return nil, err
+	}
+	for _, build := range plan.Builds {
+		for _, node := range build.Graph.Nodes {
+			if err := admitSourceCheckoutRepo(config.SourceCheckout, node.Repo); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if config.Validation == "local-run" {
 		if err := factory.AdmitLocalPlan(ctx, plan); err != nil {
