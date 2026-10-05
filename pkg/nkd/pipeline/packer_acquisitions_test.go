@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -17,6 +18,27 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
+
+func TestAcquisitionWaitReturnsTheOwningCodedError(t *testing.T) {
+	for _, operation := range []string{"observe", "snapshot"} {
+		t.Run(operation, func(t *testing.T) {
+			artifact := &PackerArtifact{}
+			artifact.mu.Lock()
+			defer artifact.mu.Unlock()
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			var err error
+			if operation == "observe" {
+				_, err = artifact.ObserveAcquisitionsContext(ctx)
+			} else {
+				_, err = artifact.snapshotAcquisitionsContext(ctx)
+			}
+			if code(err) != e.CodeTimeout || strings.Count(err.Error(), string(e.CodeTimeout)) != 1 || !strings.Contains(err.Error(), "waiting for inspection runtime") {
+				t.Fatalf("wait error was lost or wrapped twice: %v", err)
+			}
+		})
+	}
+}
 
 func testPackerAcquisitionBytes(t *testing.T, architecture string) []byte {
 	t.Helper()

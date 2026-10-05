@@ -246,11 +246,10 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		}
 		components, files = inspection.Components(), inspection.Files()
 	case "oci-image":
-		inventory, err := inspectHeldDependencyReport(ctx, subject, "oci-image", scanner, true)
+		components, err = inspectContainerMaterial(ctx, subject, scanner)
 		if err != nil {
 			return err
 		}
-		components = withDiskContentClass(inventory.Components, diskClassContainer)
 	default:
 		return e.New(e.CodeEngineCapability, "unsupported disk content kind %q", kind)
 	}
@@ -278,6 +277,16 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		return e.Wrap(e.CodeInternal, err, "writing disk content report")
 	}
 	return nil
+}
+
+// The operation, not scanner-authored metadata, selects the observation class.
+// This descriptive scan cannot issue a sandbox result or a factory receipt.
+func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, scanner Scanner) ([]Component, error) {
+	inventory, err := inspectHeldDependencyReport(ctx, subject, "oci-image", scanner, true)
+	if err != nil {
+		return nil, err
+	}
+	return withDiskContentClass(inventory.Components, diskClassContainer), nil
 }
 
 func checkCapturedPackageMetadata(capture *material.AcquisitionObservation, packages map[string]diskPackageKey, platform string) error {

@@ -72,15 +72,16 @@ func TestReconcileDiskContentsExactSubjectsBothArchitectures(t *testing.T) {
 	}
 }
 
-func TestReconcileDiskContentsPreservesUnknownNonDebianVersions(t *testing.T) {
+func TestReconcileDiskContentsDoesNotEquateUnknownVersions(t *testing.T) {
 	for _, test := range []struct {
 		name, format, rootVersion, materialVersion string
 		code                                       e.Code
 	}{
-		{"same unknown version", "binary", "", "", ""},
+		{"same unknown version is not correspondence", "binary", "", "", e.CodeProvenanceMissing},
 		{"unknown is not known", "binary", "", "1.0", e.CodeProvenanceMissing},
 		{"known is not unknown", "binary", "1.0", "", e.CodeProvenanceMissing},
 		{"Debian still requires exact version", "deb", "", "", e.CodeProvenanceMissing},
+		{"same known version", "binary", "1.0", "1.0", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := contentFixture("disk-image", "arm64", "b")
@@ -104,12 +105,31 @@ func TestReconcileDiskContentsPreservesUnknownNonDebianVersions(t *testing.T) {
 				t.Fatalf("unknown-version component disappeared: %v", err)
 			}
 			for _, observed := range bom.Components {
-				if observed.Name == "observed" && observed.Version != "" {
-					t.Fatal("unknown version was invented")
+				if observed.Name == "observed" && observed.Version != test.rootVersion {
+					t.Fatal("observed version changed")
 				}
 			}
 		})
 	}
+}
+
+func TestDiskContentDocumentPreservesUnknownVersionsWithoutCorrespondence(t *testing.T) {
+	inspection := contentFixture("tarball", "arm64", "b")
+	inspection.report.Components[0].Version = ""
+	inspection.report.Components[0].Properties[2].Value = "binary"
+	document, err := DiskContentDocument("sha256:"+strings.Repeat("f", 64), "material", inspection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, component := range document.Components {
+		if component.Name == inspection.report.Components[0].Name {
+			if component.Version != "" {
+				t.Fatal("descriptive inventory invented an unknown version")
+			}
+			return
+		}
+	}
+	t.Fatal("unknown-version component disappeared from descriptive inventory")
 }
 
 func TestReconcileHostPackagesCannotUseContainerPackageDatabases(t *testing.T) {
@@ -211,7 +231,7 @@ func TestDiskContentClassesRejectMissingAmbiguousAndSubstitutedValues(t *testing
 		name string
 		code e.Code
 	}{
-		{"missing", e.CodeProvenanceMissing}, {"duplicate", e.CodeInvalidCatalog},
+		{"missing", e.CodeProvenanceMissing}, {"duplicate canonical property", e.CodeInvalidCatalog},
 		{"unknown", e.CodeEnvelopeDecode}, {"archive for non-Debian", e.CodeEnvelopeDecode},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -221,7 +241,7 @@ func TestDiskContentClassesRejectMissingAmbiguousAndSubstitutedValues(t *testing
 			switch test.name {
 			case "missing":
 				component.Properties = component.Properties[1:]
-			case "duplicate":
+			case "duplicate canonical property":
 				component.Properties = append([]Property{component.Properties[0]}, component.Properties...)
 			case "unknown":
 				component.Properties[0].Value = "scanner-claimed-origin"
@@ -235,6 +255,17 @@ func TestDiskContentClassesRejectMissingAmbiguousAndSubstitutedValues(t *testing
 				t.Fatal("invalid observation class returned a document")
 			}
 		})
+	}
+}
+
+func TestDiskComponentClassRejectsAmbiguousOwnerValues(t *testing.T) {
+	for _, values := range [][]string{{diskClassFilesystem, diskClassFilesystem}, {diskClassFilesystem, diskClassContainer}} {
+		component := Component{Properties: []Property{{Name: diskContentClassProperty, Value: values[0]}, {Name: diskContentClassProperty, Value: values[1]}}}
+		class, err := diskComponentClass(component)
+		assertDependencyCode(t, err, e.CodeEnvelopeDecode)
+		if class != "" || !strings.Contains(err.Error(), "ambiguous observation classes") {
+			t.Fatalf("ambiguous owner values returned class %q or wrong error: %v", class, err)
+		}
 	}
 }
 

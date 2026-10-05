@@ -67,12 +67,16 @@ func compressedMaterialBytes(t *testing.T, archive []byte) *generatedInspectionF
 }
 
 func compressedDockerFixture(t *testing.T) *generatedInspectionFile {
+	return compressedDockerPlatformFixture(t, "amd64")
+}
+
+func compressedDockerPlatformFixture(t *testing.T, architecture string) *generatedInspectionFile {
 	t.Helper()
 	configuration, err := empty.Image.ConfigFile()
 	if err != nil {
 		t.Fatal(err)
 	}
-	configuration.OS, configuration.Architecture = "linux", "amd64"
+	configuration.OS, configuration.Architecture = "linux", architecture
 	image, err := mutate.ConfigFile(empty.Image, configuration)
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +199,80 @@ func TestControlOnlyDebianMaterialRetainsObservedMetadata(t *testing.T) {
 			if inspection.subject != subject.Digest() || inspection.size != subject.Size() {
 				t.Fatal("metapackage subject changed to its empty data filesystem")
 			}
+			class, err := diskComponentClass(components[0])
+			if err != nil || class != diskClassDebianArchive {
+				t.Fatalf("actual package-reader operation issued class %q: %v", class, err)
+			}
 		})
+	}
+}
+
+// These invoke the actual held scanner operations with a controlled response.
+// They exercise owner class assignment, not native Syft discovery or the full
+// helper's ELF/tool admission and original-owner receipt handshake.
+func TestMaterialScanOperationsIssueTheirOwnClasses(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held scanner execution requires Linux")
+	}
+	scannerPath := filepath.Join(t.TempDir(), "scanner")
+	script := []byte("#!/bin/sh\nprintf '%s' '{\"schema\":{\"version\":\"16.1.10\"},\"artifacts\":[{\"name\":\"observed\",\"version\":\"1\",\"type\":\"deb\",\"metadata\":{\"architecture\":\"all\"},\"properties\":[{\"name\":\"nkd:diskContentClass\",\"value\":\"debian-archive\"}]}]}'\n")
+	if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scanner := Scanner{Path: scannerPath, Digest: rawDigest(script)}
+	for _, architecture := range []string{"amd64", "arm64"} {
+		for _, operation := range []string{"filesystem", "embedded-container", "direct-container"} {
+			t.Run(architecture+"/"+operation, func(t *testing.T) {
+				var components []Component
+				var err error
+				want := diskClassContainer
+				switch operation {
+				case "filesystem":
+					want = diskClassFilesystem
+					subject, createErr := createGeneratedInspectionFile(t.Context(), 1<<20, func(destination io.Writer) error {
+						archive := tar.NewWriter(destination)
+						if err := archive.WriteHeader(&tar.Header{Name: "payload", Typeflag: tar.TypeReg, Mode: 0o644, Size: 1}); err != nil {
+							return err
+						}
+						if _, err := io.WriteString(archive, "x"); err != nil {
+							return err
+						}
+						return archive.Close()
+					})
+					if createErr != nil {
+						t.Fatal(createErr)
+					}
+					defer subject.Close()
+					var inspection *FilesystemInspection
+					inspection, err = inspectMaterialArchive(t.Context(), subject, "linux/"+architecture, scanner, "", 1<<20)
+					if inspection != nil {
+						components = inspection.Components()
+					}
+				case "embedded-container":
+					var inspection *FilesystemInspection
+					inspection, err = inspectCompressedImages(t.Context(), compressedDockerPlatformFixture(t, architecture), "linux/"+architecture, scanner, 1<<20, 0)
+					if inspection != nil {
+						components = inspection.Components()
+					}
+				case "direct-container":
+					// The controlled scanner owns the native JSON projection;
+					// these subject bytes prove routing, not valid OCI discovery.
+					subject, createErr := heldfile.FromBytesContext(t.Context(), []byte("controlled OCI subject"), heldfile.Options{Label: "class-operation-test", MaxBytes: 1 << 20})
+					if createErr != nil {
+						t.Fatal(createErr)
+					}
+					defer subject.Close()
+					components, err = inspectContainerMaterial(t.Context(), subject, scanner)
+				}
+				if err != nil || len(components) != 1 {
+					t.Fatalf("actual scan components=%+v error=%v", components, err)
+				}
+				class, err := diskComponentClass(components[0])
+				if err != nil || class != want {
+					t.Fatalf("operation issued class %q, want %q: %v", class, want, err)
+				}
+			})
+		}
 	}
 }
 

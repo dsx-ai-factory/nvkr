@@ -43,6 +43,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub generation"); err != nil {
+		return nil, err
+	}
 	if err := rejectUnsupportedPlanRequirements(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}

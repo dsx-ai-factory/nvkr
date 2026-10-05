@@ -81,6 +81,11 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 	var components []Component
 	seenPackages := make(map[diskObservedPackageKey]bool)
 	for _, component := range root.report.Components {
+		// An unknown version stays unknown in descriptive inventory. Equal
+		// names and empty versions do not identify the same material bytes.
+		if component.Version == "" {
+			return nil, e.New(e.CodeProvenanceMissing, "disk package %q has no exact version for material correspondence", component.Name)
+		}
 		key, err := diskObservedComponentKey(component, root.report.Platform)
 		if err != nil {
 			return nil, err

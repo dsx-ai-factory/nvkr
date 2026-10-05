@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"os"
@@ -194,6 +193,9 @@ func validateDiskInspectionSelection(selection DiskInspectionSelection) error {
 	}
 	if !canonical.IsDigest(selection.InspectorDigest) || !canonical.IsDigest(selection.CodecDigest) {
 		return e.New(e.CodeUnpinnedInput, "disk inspection requires exact inspector and codec pins")
+	}
+	if selection.Resources.CPUMillis > uint64(math.MaxInt64)/100 {
+		return e.New(e.CodeEngineCapability, "disk inspection CPU request exceeds the exact runtime quota range")
 	}
 	if selection.Workspace == nil || selection.Resources.CPUMillis < 10 || selection.Resources.MemoryMiB < diskInspectionApplianceMiB || selection.TimeoutSeconds == 0 || selection.TimeoutSeconds > uint64(MaxDiskInspectionTimeout/time.Second) {
 		return e.New(e.CodeEngineCapability, "disk inspection requires a held workspace, at least 10 CPU millis, at least 2 GiB memory and a timeout of at most ten minutes")
@@ -695,7 +697,7 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 		"--label=nkd.dev/inspection-attempt=" + attempt,
 		"--network=none", "--log-driver=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
 		"--user=65534:65534", "--hostname=nkd-inspector", "--no-healthcheck", "--init", "--interactive",
-		"--cpus=" + strconv.FormatUint(selection.Resources.CPUMillis/1000, 10) + "." + fmt.Sprintf("%03d", selection.Resources.CPUMillis%1000),
+		diskInspectionCPUPeriodArg, diskInspectionCPUQuotaArg(selection.Resources.CPUMillis),
 		"--memory=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m", "--memory-swap=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m",
 		"--pids-limit=" + strconv.FormatUint(diskInspectionPIDsLimit, 10),
 	}
@@ -713,6 +715,14 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 	}
 	args = append(args, strconv.FormatUint(selection.Resources.CPUMillis, 10), strconv.FormatUint(selection.Resources.MemoryMiB, 10), strconv.FormatUint(diskInspectionPIDsLimit, 10))
 	return args
+}
+
+const diskInspectionCPUPeriodArg = "--cpu-period=100000"
+
+// Selection admission bounds cpuMillis before either launcher uses it. Integer
+// period/quota avoids runtime float conversion truncating an exact grant.
+func diskInspectionCPUQuotaArg(cpuMillis uint64) string {
+	return "--cpu-quota=" + strconv.FormatUint(cpuMillis*100, 10)
 }
 
 // removeDiskInspectionContainer removes only this attempt's immutable container

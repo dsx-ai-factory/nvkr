@@ -130,9 +130,13 @@ func TestDiskEvidenceCannotBeRestoredFromDescriptions(t *testing.T) {
 				t.Fatal(err)
 			}
 			receipt := &DiskEvidenceReceipt{owner: owner, trace: trace, root: raw, documents: map[string][]byte{"node": raw}}
-			view := receipt.ComponentDocuments()
+			view, err := receipt.ComponentDocuments()
+			if err != nil {
+				t.Fatal(err)
+			}
 			view["node"].Metadata.Component.Name = "changed"
-			if receipt.ComponentDocuments()["node"].Metadata.Component.Name != "node" {
+			again, err := receipt.ComponentDocuments()
+			if err != nil || again["node"].Metadata.Component.Name != "node" {
 				t.Fatal("document accessor mutates receipt")
 			}
 			encoded, err := canonical.Marshal(receipt)
@@ -145,6 +149,39 @@ func TestDiskEvidenceCannotBeRestoredFromDescriptions(t *testing.T) {
 				if factoryErrorCode(err) != e.CodeVerifyFailed || destination.Len() != 0 {
 					t.Fatalf("unissued/substituted receipt admitted: %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestDiskEvidenceComponentDocumentsReturnErrorsWithoutPartialMaps(t *testing.T) {
+	valid, err := sbom.NewSubject("sha256:"+strings.Repeat("a", 64), "node", "sha256:"+strings.Repeat("b", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := valid.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalid, err := canonical.Marshal(sbom.BOM{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name    string
+		receipt *DiskEvidenceReceipt
+		code    e.Code
+	}{
+		{"nil receipt", nil, e.CodeProvenanceMissing},
+		{"inert receipt", &DiskEvidenceReceipt{}, e.CodeProvenanceMissing},
+		{"malformed canonical document", &DiskEvidenceReceipt{owner: &LocalRunResult{}, documents: map[string][]byte{"a-valid": raw, "z-invalid": []byte("{")}}, e.CodeVerifyFailed},
+		{"invalid BOM", &DiskEvidenceReceipt{owner: &LocalRunResult{}, documents: map[string][]byte{"a-valid": raw, "z-invalid": invalid}}, e.CodeInvalidCatalog},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			documents, err := test.receipt.ComponentDocuments()
+			assertFactoryErrorCode(t, err, test.code)
+			if documents != nil {
+				t.Fatalf("failed projection returned partial documents: %+v", documents)
 			}
 		})
 	}

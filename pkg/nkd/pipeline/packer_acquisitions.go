@@ -25,7 +25,7 @@ func (artifact *PackerArtifact) ObserveAcquisitionsContext(ctx context.Context) 
 		return nil, e.New(e.CodeUsage, "observing acquisitions requires context and a held Packer artifact")
 	}
 	if err := lockDiskInspection(ctx, &artifact.mu); err != nil {
-		return nil, e.Wrap(e.CodeTimeout, err, "waiting to observe Packer acquisitions")
+		return nil, err
 	}
 	defer artifact.mu.Unlock()
 	if artifact.file == nil || artifact.acquisitions == nil {
@@ -41,7 +41,7 @@ func (artifact *PackerArtifact) snapshotAcquisitionsContext(ctx context.Context)
 		return nil, e.New(e.CodeUsage, "acquisition snapshot requires context and original artifact")
 	}
 	if err := lockDiskInspection(ctx, &artifact.mu); err != nil {
-		return nil, e.Wrap(e.CodeTimeout, err, "waiting to snapshot acquisitions")
+		return nil, err
 	}
 	defer artifact.mu.Unlock()
 	if artifact.file == nil || artifact.acquisitions == nil {

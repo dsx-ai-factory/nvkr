@@ -128,7 +128,8 @@ Environments require it. The graph then requires each observed payload and the a
 SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismatched bytes, scanner errors and
 empty inventories fail closed. Without `sbomTool`, ordinary declaration-only documents provide source
 metadata; they do not claim dependency inspection. The separate full-disk profile pins its own scanner
-and does not require a second catalog scanner selection; when both are selected their pins must agree.
+and does not require a second catalog scanner selection; when both select the same native platform their
+pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
 
 A `disk-image` admitted for execution or publication requires a full CycloneDX inventory whose subject is the
 exact delivered QCOW2 payload digest. It combines an authenticated trace of every fetched or built material with
@@ -153,6 +154,8 @@ metadata is accepted. Owner-issued content classes distinguish filesystem packag
 inventories and held Debian archives: a container database cannot justify an installed host Debian package.
 Correspondence is checked before public document deduplication; those internal classes do not assert
 installed origin or package ownership. Loose-file hashing observes bytes, not their derivation.
+Unknown package versions remain unknown in descriptive inventory. Final material correspondence requires
+an exact observed version: equal names with unknown versions do not prove identical package content.
 Per-material mixed scanner/package-reader/file-walk documents use the descriptive `disk-content/v1`
 inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operation uses
 `disk-reconciled/v1`; neither method string restores a runtime receipt or grants publication authority.

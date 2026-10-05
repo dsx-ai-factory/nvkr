@@ -84,7 +84,7 @@ func openDiskInspectionScratch(ctx context.Context, runtime packerContainerRunti
 		"--label=nkd.dev/inspection-attempt=" + attempt, "--network=none", "--log-driver=none", "--read-only",
 		"--cap-drop=ALL", "--cap-add=CHOWN", "--security-opt=no-new-privileges", "--user=0:0",
 		"--no-healthcheck", "--init", "--pids-limit=32", "--memory=64m", "--memory-swap=64m",
-		"--cpus=" + strconv.FormatFloat(float64(selection.Resources.CPUMillis)/1000, 'f', 3, 64),
+		diskInspectionCPUPeriodArg, diskInspectionCPUQuotaArg(selection.Resources.CPUMillis),
 		"--volume", volume + ":/tmp:nocopy", "--env", "PATH=/usr/bin:/bin", "--env", "LC_ALL=C",
 		"--entrypoint=/bin/sh", imageID, "-ec", diskInspectionScratchPrepare}
 	var output, diagnostic diskInspectionBuffer

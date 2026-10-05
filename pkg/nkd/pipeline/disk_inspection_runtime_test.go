@@ -398,6 +398,7 @@ func TestDiskInspectionSelectionFailsClosed(t *testing.T) {
 		{name: "missing codec", edit: func(s *DiskInspectionSelection) { s.CodecDigest = "" }, want: e.CodeUnpinnedInput},
 		{name: "no cpu", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 0 }, want: e.CodeEngineCapability},
 		{name: "below CPU runtime floor", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 9 }, want: e.CodeEngineCapability},
+		{name: "CPU quota overflow", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = uint64(math.MaxInt64)/100 + 1 }, want: e.CodeEngineCapability},
 		{name: "CPU runtime floor", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 10 }},
 		{name: "no appliance memory", edit: func(s *DiskInspectionSelection) { s.Resources.MemoryMiB = 1024 }, want: e.CodeEngineCapability},
 		{name: "no timeout", edit: func(s *DiskInspectionSelection) { s.TimeoutSeconds = 0 }, want: e.CodeEngineCapability},
@@ -462,15 +463,17 @@ func TestDiskInspectionCPUArgumentPreservesExactMillis(t *testing.T) {
 		cpu  uint64
 		want string
 	}{
-		{10, "--cpus=0.010"},
-		{2001, "--cpus=2.001"},
-		{math.MaxUint64, "--cpus=18446744073709551.615"},
+		{10, "--cpu-quota=1000"},
+		{2001, "--cpu-quota=200100"},
+		{2300, "--cpu-quota=230000"},
+		{4100, "--cpu-quota=410000"},
+		{uint64(math.MaxInt64) / 100, "--cpu-quota=9223372036854775800"},
 	} {
 		t.Run(strconv.FormatUint(tt.cpu, 10), func(t *testing.T) {
 			selection := testDiskInspectionSelection(t)
 			selection.Resources.CPUMillis = tt.cpu
 			args := diskInspectionCreateArgs(selection, selection.Image, "name", "attempt", subject)
-			if !slices.Contains(args, tt.want) || args[len(args)-3] != strconv.FormatUint(tt.cpu, 10) {
+			if !slices.Contains(args, tt.want) || !slices.Contains(args, "--cpu-period=100000") || args[len(args)-3] != strconv.FormatUint(tt.cpu, 10) {
 				t.Fatalf("CPU grant rounded during projection: %v", args)
 			}
 		})

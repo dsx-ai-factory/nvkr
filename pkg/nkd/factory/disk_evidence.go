@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
@@ -40,19 +42,23 @@ func (receipt *DiskEvidenceReceipt) Subject() (string, int64) {
 
 // ComponentDocuments returns independent descriptions, not restored authority.
 // Publication must first authenticate this receipt through its original owner.
-func (receipt *DiskEvidenceReceipt) ComponentDocuments() map[string]*sbom.BOM {
+func (receipt *DiskEvidenceReceipt) ComponentDocuments() (map[string]*sbom.BOM, error) {
 	if receipt == nil || receipt.owner == nil {
-		return nil
+		return nil, e.New(e.CodeProvenanceMissing, "component documents require an original receipt owner")
 	}
 	result := make(map[string]*sbom.BOM, len(receipt.documents))
-	for name, raw := range receipt.documents {
+	for _, name := range slices.Sorted(maps.Keys(receipt.documents)) {
+		raw := receipt.documents[name]
 		var bom sbom.BOM
-		if canonical.UnmarshalExact(raw, &bom) != nil || bom.Validate() != nil {
-			return nil
+		if err := canonical.UnmarshalExact(raw, &bom); err != nil {
+			return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding component document %q", name)
+		}
+		if err := bom.Validate(); err != nil {
+			return nil, err
 		}
 		result[name] = &bom
 	}
-	return result
+	return result, nil
 }
 
 // OpenDiskEvidenceRuntime selects observation infrastructure from the frozen

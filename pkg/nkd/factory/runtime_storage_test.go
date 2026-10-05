@@ -3,6 +3,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
@@ -44,6 +45,13 @@ func TestFactoryStorageOverrideAdmissionBeforeWork(t *testing.T) {
 					})
 				}
 				var logs bytes.Buffer
+				if driver != "" {
+					bundle, err := RenderGitHub(t.Context(), plan)
+					assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+					if bundle != nil || !strings.Contains(err.Error(), "podmanStorageDriver") {
+						t.Fatalf("unsupported storage reached rendering: bundle=%v err=%v", bundle, err)
+					}
+				}
 				err = ExecuteNode(t.Context(), plan, "not-a-node", &logs, &logs)
 				want := e.CodeInvalidCatalog
 				if driver != "" {

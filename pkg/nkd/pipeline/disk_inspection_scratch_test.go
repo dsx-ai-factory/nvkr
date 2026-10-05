@@ -170,6 +170,7 @@ func TestDiskInspectionScratchOwnsPrivateDiskVolume(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			selection := testDiskInspectionSelection(t)
+			selection.Resources.CPUMillis = 2300
 			selection.MaxFilesystemBytes = 1 << 20
 			selection.ScratchStorage = "private-volume"
 			selection.Resources.EphemeralStorageMiB = 4
@@ -210,7 +211,7 @@ func TestDiskInspectionScratchOwnsPrivateDiskVolume(t *testing.T) {
 					t.Fatalf("automatic mounts not suppressed: %v", args)
 				}
 				if len(args) > 1 && args[1] == "create" {
-					for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--cap-add=CHOWN", "--security-opt=no-new-privileges", "--user=0:0"} {
+					for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--cap-add=CHOWN", "--security-opt=no-new-privileges", "--user=0:0", "--cpu-period=100000", "--cpu-quota=230000"} {
 						if !slices.Contains(args, required) {
 							t.Fatalf("missing %s in %v", required, args)
 						}

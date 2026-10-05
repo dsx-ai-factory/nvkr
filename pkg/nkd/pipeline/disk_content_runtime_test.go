@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestDiskContentRejectsIncompleteProfileBeforeOriginalArtifactWork(t *testing.T) {
-	for _, kind := range []string{"disk", "acquisitions"} {
+	for _, kind := range []string{"disk", "acquisitions", "held"} {
 		t.Run(kind, func(t *testing.T) {
 			container := &DiskInspectionContainer{selection: testDiskInspectionSelection(t)}
 			artifact := &PackerArtifact{}
@@ -21,12 +22,20 @@ func TestDiskContentRejectsIncompleteProfileBeforeOriginalArtifactWork(t *testin
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
 			var err error
-			if kind == "disk" {
+			switch kind {
+			case "disk":
 				_, err = container.InspectPackerContent(ctx, artifact, "linux/amd64")
-			} else {
+			case "acquisitions":
 				_, err = container.InspectPackerAcquisitionsContent(ctx, artifact, "linux/amd64")
+			case "held":
+				subject, openErr := heldfile.FromBytesContext(ctx, []byte("held material"), heldfile.Options{Label: "profile-admission-test", MaxBytes: 32})
+				if openErr != nil {
+					t.Fatal(openErr)
+				}
+				defer subject.Close()
+				_, err = container.InspectHeldContent(ctx, subject, "tarball", "linux/amd64")
 			}
-			if code(err) != e.CodeEngineCapability {
+			if code(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "disk content operation lacks its complete inspection profile") {
 				t.Fatalf("unadmitted content reached original artifact: %v", err)
 			}
 		})
@@ -38,7 +47,7 @@ func TestDiskContentInvocationSeparatesNativeHostAndConsumer(t *testing.T) {
 		for _, consumer := range []string{"amd64", "arm64"} {
 			t.Run(host+"-"+consumer, func(t *testing.T) {
 				pin := "sha256:" + strings.Repeat("a", 64)
-				selection := DiskInspectionSelection{Platform: "linux/" + host, InspectorDigest: pin, CodecDigest: pin, GuestfishDigest: pin, ScannerDigest: pin, PackageReaderDigest: pin,
+				selection := DiskInspectionSelection{Platform: "linux/" + host, InspectorDigest: "sha256:" + strings.Repeat("b", 64), CodecDigest: "sha256:" + strings.Repeat("c", 64), GuestfishDigest: "sha256:" + strings.Repeat("d", 64), ScannerDigest: "sha256:" + strings.Repeat("e", 64), PackageReaderDigest: "sha256:" + strings.Repeat("f", 64),
 					MaxFilesystemBytes: 1 << 20, ScratchStorage: "memory", compositionKind: "disk-image", consumerPlatform: "linux/" + consumer,
 					Resources: execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 8192, EphemeralStorageMiB: 8192}}
 				held, err := heldfile.FromBytesContext(t.Context(), []byte("subject"), heldfile.Options{Label: "content-argv", MaxBytes: 32})
@@ -47,6 +56,10 @@ func TestDiskContentInvocationSeparatesNativeHostAndConsumer(t *testing.T) {
 				}
 				defer held.Close()
 				args := diskInspectionCreateArgs(selection, pin, "attempt", "unique", held)
+				want := []string{selection.InspectorDigest, selection.CodecDigest, held.Digest(), "7", "composition", "disk-image", selection.GuestfishDigest, selection.ScannerDigest, selection.PackageReaderDigest, "1048576", "linux/" + consumer, "1000", "8192", "256"}
+				if !slices.Equal(args[len(args)-14:], want) {
+					t.Fatalf("full frozen content invocation changed: got %v want %v", args[len(args)-14:], want)
+				}
 				if args[len(args)-4] != "linux/"+consumer || strings.Join(args[len(args)-3:], ",") != "1000,8192,256" {
 					t.Fatal("consumer architecture was replaced by host architecture")
 				}
