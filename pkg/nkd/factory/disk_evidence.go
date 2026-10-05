@@ -2,12 +2,12 @@ package factory
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -47,7 +47,7 @@ func (receipt *DiskEvidenceReceipt) ComponentDocuments() map[string]*sbom.BOM {
 	result := make(map[string]*sbom.BOM, len(receipt.documents))
 	for name, raw := range receipt.documents {
 		var bom sbom.BOM
-		if json.Unmarshal(raw, &bom) != nil {
+		if canonical.UnmarshalExact(raw, &bom) != nil || bom.Validate() != nil {
 			return nil
 		}
 		result[name] = &bom
@@ -75,8 +75,8 @@ func OpenDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable 
 	if err := profile.Validate(platform); err != nil {
 		return nil, err
 	}
-	if profile.ScratchStorage != "private-volume" {
-		return nil, e.New(e.CodeEngineCapability, "production disk evidence requires private disk-backed scratch")
+	if err := requireProductionDiskScratch(profile); err != nil {
+		return nil, err
 	}
 	if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
 		return nil, err
@@ -103,6 +103,9 @@ func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskI
 	if err := profile.Validate(selection.Platform); err != nil {
 		return definition.DiskInspectionProfile{}, err
 	}
+	if err := requireProductionDiskScratch(profile); err != nil {
+		return definition.DiskInspectionProfile{}, err
+	}
 	if err := validateDiskScannerSelection(plan, selection.Platform, profile.ScannerDigest); err != nil {
 		return definition.DiskInspectionProfile{}, err
 	}
@@ -116,12 +119,16 @@ func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskI
 	return profile, nil
 }
 
-// Reuse the Definition scanner when it targets this native host. A profile for
+// A frozen inspection profile owns its complete scanner pin. Reuse a separately
+// selected Definition scanner when it targets this native host. A profile for
 // the other supported host is explicit observation infrastructure, not an
 // invented platform substitution for a release asset compiled for another ISA.
 func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 	if plan.CatalogSnapshot == nil {
 		return e.New(e.CodeInvalidCatalog, "disk scanner selection requires its frozen catalog")
+	}
+	if plan.Definition.SBOMTool == "" {
+		return nil
 	}
 	selected, ok := plan.CatalogSnapshot.Tools[plan.Definition.SBOMTool]
 	if !ok {
@@ -140,6 +147,13 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 	if ctx == nil || owner == nil {
 		return nil, e.New(e.CodeUsage, "disk reconciliation requires context and original Run")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "disk reconciliation canceled before admission")
+	}
+	build, err := admitDiskEvidenceBuild(plan, expected)
+	if err != nil {
+		return nil, err
+	}
 	ctx, release, err := owner.beginDiskInspection(ctx)
 	if err != nil {
 		return nil, err
@@ -157,15 +171,6 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 	if subject.Encryption != "none" {
 		return nil, e.New(e.CodeEncryptedArtifact, "disk evidence requires unencrypted inspected contents")
 	}
-	var build BuildPlan
-	for _, candidate := range plan.Builds {
-		if candidate.Name == expected.Name {
-			build = candidate
-		}
-	}
-	if build.Platform != "linux/amd64" && build.Platform != "linux/arm64" {
-		return nil, e.New(e.CodeEngineCapability, "disk reconciliation requires an AMD64 or ARM64 consumer")
-	}
 	owner.diskMu.Lock()
 	var artifact *pipeline.PackerArtifact
 	for _, completion := range owner.diskCompletions {
@@ -176,6 +181,15 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 	owner.diskMu.Unlock()
 	if artifact == nil {
 		return nil, e.New(e.CodeVerifyFailed, "disk evidence lost its original held Packer artifact")
+	}
+	// Reject absent, changed or wrong-architecture capture before expensive
+	// filesystem discovery. This comes only from the original artifact owner.
+	acquisitions, err := artifact.ObserveAcquisitionsContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if acquisitions.Description().Architecture != strings.TrimPrefix(build.Platform, "linux/") {
+		return nil, e.New(e.CodeVerifyFailed, "retained acquisitions differ from the disk consumer architecture")
 	}
 	root, err := inspectOriginalDiskContent(ctx, inspection, artifact, subject.Size, build.Platform)
 	if err != nil {
@@ -190,10 +204,6 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 		return nil, err
 	}
 	inputs, documents, err := owner.inspectDiskEvidenceMaterials(ctx, plan, build, trace, inspection, sources)
-	if err != nil {
-		return nil, err
-	}
-	_, err = artifact.ObserveAcquisitionsContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -226,6 +236,55 @@ func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Pl
 		return nil, err
 	}
 	return &DiskEvidenceReceipt{owner: owner, runtime: inspection, trace: trace, profile: profile, root: raw, documents: documents}, nil
+}
+
+func requireProductionDiskScratch(profile definition.DiskInspectionProfile) error {
+	if profile.ScratchStorage != "private-volume" {
+		return e.New(e.CodeEngineCapability, "production disk evidence requires private disk-backed scratch")
+	}
+	return nil
+}
+
+// Admit Plan-decidable requirements before the Run permit, snapshots or scans.
+// Whether raw material bytes are a supported ISO is still checked by guestfish;
+// output kind alone grants no filesystem or installed-content proof.
+func admitDiskEvidenceBuild(plan *Plan, expected LifecycleOutputPlan) (BuildPlan, error) {
+	if plan == nil {
+		return BuildPlan{}, e.New(e.CodeUsage, "disk evidence requires its frozen Plan")
+	}
+	if err := plan.Validate(); err != nil {
+		return BuildPlan{}, err
+	}
+	for _, build := range plan.Builds {
+		if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest {
+			continue
+		}
+		if build.Platform != "linux/amd64" && build.Platform != "linux/arm64" {
+			return BuildPlan{}, e.New(e.CodeEngineCapability, "disk reconciliation requires an AMD64 or ARM64 consumer")
+		}
+		root, err := buildgraph.DiskRootName(build.ResolvedComponents)
+		if err != nil {
+			return BuildPlan{}, err
+		}
+		for _, node := range build.Graph.Nodes {
+			if node.Kind != ir.KindBuild && node.Kind != ir.KindPull {
+				continue
+			}
+			if node.Component == root {
+				if node.Packer == nil || node.Packer.AcquisitionArchive == "" {
+					return BuildPlan{}, e.New(e.CodeEngineCapability, "disk evidence requires a declared same-attempt acquisition carrier")
+				}
+				continue
+			}
+			switch node.OutputType {
+			case "raw", "host-package", "tarball", "oci-image":
+			default:
+				return BuildPlan{}, e.New(e.CodeEngineCapability, "disk material kind %q has no admitted content scanner", node.OutputType)
+			}
+		}
+		return build, nil
+	}
+	return BuildPlan{}, e.New(e.CodePipelineDrift, "disk evidence has no exact planned build")
 }
 
 func inspectOriginalDiskContent(ctx context.Context, inspection *sbom.DiskInspectionRuntime, artifact *pipeline.PackerArtifact, size int64, platform string) (*sbom.DiskContentInspection, error) {

@@ -24,12 +24,12 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 		return nil, err
 	}
 	base, capture, staged := false, false, false
-	basis := make(map[diskPackageKey]bool)
+	basis := make(map[diskObservedPackageKey]bool)
 	materialFiles := make(map[string][]string)
 	seenInputs := make(map[string]bool)
 	for _, input := range inputs {
 		if input == nil || !canonical.IsDigest(input.report.Subject) || input.report.Size <= 0 || input.runtimeDigest != root.runtimeDigest || input.report.Platform != root.report.Platform ||
-			input.report.Scanner != root.report.Scanner || input.report.Guestfish != root.report.Guestfish || input.report.PackageReader != root.report.PackageReader || input.report.Codec != root.report.Codec || input.report.Inspector != root.report.Inspector {
+			input.report.Scanner != root.report.Scanner || input.report.Guestfish != root.report.Guestfish || input.report.PackageReader != root.report.PackageReader || input.report.Codec != root.report.Codec || input.report.Inspector != root.report.Inspector || input.report.MaxFilesystemBytes != root.report.MaxFilesystemBytes {
 			return nil, e.New(e.CodeVerifyFailed, "disk material content differs from its exact inspection closure")
 		}
 		if seenInputs[input.report.Subject] {
@@ -50,11 +50,24 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 			return nil, e.New(e.CodeEngineCapability, "unsupported disk material observation kind %q", input.report.Kind)
 		}
 		for _, component := range input.report.Components {
-			key, err := diskComponentKey(component, root.report.Platform)
+			key, err := diskObservedComponentKey(component, root.report.Platform)
 			if err != nil {
 				return nil, err
 			}
+			if input.report.Kind == "oci-image" && key.class != diskClassContainer {
+				return nil, e.New(e.CodeVerifyFailed, "OCI material has a substituted content class")
+			}
+			// Only installer filesystem observations or authoritative held
+			// dpkg archive metadata may justify host Debian identities. A
+			// staged scanner DB is not a package-reader observation.
+			if key.format == "deb" && key.class == diskClassFilesystem && input.report.Kind != "installer-iso" {
+				continue
+			}
 			basis[key] = true
+			if key.class == diskClassDebianArchive {
+				key.class = diskClassFilesystem
+				basis[key] = true
+			}
 		}
 		for _, file := range input.report.Files {
 			if file.Kind == "regular" {
@@ -66,9 +79,9 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 		return nil, e.New(e.CodeProvenanceMissing, "disk reconciliation requires inspected base installer, retained acquisitions and staged component payloads")
 	}
 	var components []Component
-	seenPackages := make(map[diskPackageKey]bool)
+	seenPackages := make(map[diskObservedPackageKey]bool)
 	for _, component := range root.report.Components {
-		key, err := diskComponentKey(component, root.report.Platform)
+		key, err := diskObservedComponentKey(component, root.report.Platform)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +92,7 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 			continue
 		}
 		seenPackages[key] = true
-		components = append(components, cloneComponent(component))
+		components = append(components, diskDocumentComponent(component))
 	}
 	// Include every observed regular file, including loose binaries which package
 	// catalogers do not recognize. A material hash match describes correspondence;
@@ -114,6 +127,77 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 
 type diskPackageKey struct{ name, version, format, architecture string }
 
+const (
+	diskContentClassProperty = "nkd:diskContentClass"
+	diskClassFilesystem      = "filesystem"
+	diskClassContainer       = "container"
+	diskClassDebianArchive   = "debian-archive"
+)
+
+type diskObservedPackageKey struct {
+	diskPackageKey
+	class string
+}
+
+// This class describes the actual observation operation, not installed origin.
+// Native scanner fields are projected separately; they cannot author this key.
+func withDiskContentClass(components []Component, class string) []Component {
+	result := make([]Component, len(components))
+	for index, component := range components {
+		result[index] = cloneComponent(component)
+		result[index].Properties = append(result[index].Properties, Property{Name: diskContentClassProperty, Value: class})
+		slices.SortFunc(result[index].Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+	}
+	return result
+}
+
+func diskComponentClass(component Component) (string, error) {
+	class := ""
+	seen := false
+	for _, property := range component.Properties {
+		if property.Name != diskContentClassProperty {
+			continue
+		}
+		if seen {
+			return "", e.New(e.CodeEnvelopeDecode, "disk component has ambiguous observation classes")
+		}
+		seen = true
+		class = property.Value
+	}
+	switch class {
+	case diskClassFilesystem, diskClassContainer, diskClassDebianArchive:
+		return class, nil
+	case "":
+		return "", e.New(e.CodeProvenanceMissing, "disk component has no owner-issued observation class")
+	default:
+		return "", e.New(e.CodeEnvelopeDecode, "disk component has an unsupported observation class")
+	}
+}
+
+func diskObservedComponentKey(component Component, platform string) (diskObservedPackageKey, error) {
+	key, err := diskComponentKey(component, platform)
+	if err != nil {
+		return diskObservedPackageKey{}, err
+	}
+	class, err := diskComponentClass(component)
+	if err != nil {
+		return diskObservedPackageKey{}, err
+	}
+	if class == diskClassDebianArchive && key.format != "deb" {
+		return diskObservedPackageKey{}, e.New(e.CodeEnvelopeDecode, "package-reader observation is not Debian metadata")
+	}
+	return diskObservedPackageKey{diskPackageKey: key, class: class}, nil
+}
+
+// Class-sensitive checks precede de-duplication. Public CycloneDX package refs
+// remain unchanged: this private receipt classifier is not package provenance
+// and cannot create conflicting public properties for a host/container overlap.
+func diskDocumentComponent(component Component) Component {
+	result := cloneComponent(component)
+	result.Properties = slices.DeleteFunc(result.Properties, func(property Property) bool { return property.Name == diskContentClassProperty })
+	return result
+}
+
 // DiskContentDocument projects already-issued material discovery onto its exact
 // existing build-output subject. It is descriptive and cannot authorize a Run.
 func DiskContentDocument(buildDigest, name string, inspection *DiskContentInspection) (*BOM, error) {
@@ -128,12 +212,15 @@ func DiskContentDocument(buildDigest, name string, inspection *DiskContentInspec
 		return nil, err
 	}
 	components := inspection.Components()
+	for index := range components {
+		components[index] = diskDocumentComponent(components[index])
+	}
 	for _, file := range inspection.report.Files {
 		if file.Kind == "regular" {
 			components = append(components, Component{Type: "file", Name: file.Path, Hashes: []Hash{{Alg: "SHA-256", Content: strings.TrimPrefix(file.Digest, "sha256:")}}})
 		}
 	}
-	bom, err = WithDependencies(bom, components, "syft-cyclonedx/v1", inspection.report.Scanner)
+	bom, err = WithDependencies(bom, components, "disk-content/v1", inspection.report.Scanner)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +270,7 @@ func diskComponentKey(component Component, platform string) (diskPackageKey, err
 			key.architecture = property.Value
 		}
 	}
-	if key.name == "" || key.version == "" || key.format == "" {
+	if key.name == "" || key.format == "" || (key.format == "deb" && key.version == "") {
 		return diskPackageKey{}, e.New(e.CodeProvenanceMissing, "disk package lacks an exact semantic identity")
 	}
 	if key.format == "deb" && key.architecture != "all" && key.architecture != strings.TrimPrefix(platform, "linux/") {

@@ -188,6 +188,24 @@ func TestDiskEvidenceScannerUsesCompiledCanonicalToolPlatform(t *testing.T) {
 	}
 }
 
+func TestDiskEvidenceProfileOwnsScannerWithoutDefinitionSelection(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			definition, environment, stack := vmFactoryInputs(t, platform, execution.CapabilityPreferred)
+			if definition.SBOMTool != "" {
+				t.Fatal("fixture unexpectedly selects a separate scanner")
+			}
+			plan, err := Compile(t.Context(), definition, environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := validateDiskScannerSelection(plan, platform, "sha256:"+strings.Repeat("9", 64)); err != nil {
+				t.Fatalf("profile-owned scanner requires absent Definition tool: %v", err)
+			}
+		})
+	}
+}
+
 func TestDiskEvidenceAdmissionRequiresFrozenProfileBeforeRuntimeWork(t *testing.T) {
 	plan, owner := diskMaterialTraceFixture(t)
 	defer owner.Close()

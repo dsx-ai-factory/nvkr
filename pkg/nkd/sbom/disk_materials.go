@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -26,6 +27,12 @@ func inspectMaterialArchive(ctx context.Context, subject inspectionArchive, plat
 }
 
 func inspectMaterialArchiveDepth(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64, depth int) (*FilesystemInspection, error) {
+	return inspectMaterialArchiveContents(ctx, subject, platform, scanner, packageReaderDigest, maxBytes, depth, false)
+}
+
+// Empty payloads are admitted only by the Debian reader after exact package
+// metadata observation; generic materials and disk roots remain nonempty.
+func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64, depth int, allowEmptyDebianPayload bool) (*FilesystemInspection, error) {
 	if depth > 2 || subject == nil || subject.Size() <= 0 || subject.Size() > maxBytes {
 		return nil, e.New(e.CodeEngineCapability, "material archive exceeds bounded recursive inspection")
 	}
@@ -43,7 +50,12 @@ func inspectMaterialArchiveDepth(ctx context.Context, subject inspectionArchive,
 	if _, err := subject.WriteToContext(ctx, file); err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "copying held material archive")
 	}
-	files, err := filesystemFiles(ctx, file, maxBytes)
+	var files []DiskFile
+	if allowEmptyDebianPayload {
+		files, err = filesystemFileInventory(ctx, file, maxBytes)
+	} else {
+		files, err = filesystemFiles(ctx, file, maxBytes)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +90,7 @@ func inspectMaterialArchiveDepth(ctx context.Context, subject inspectionArchive,
 	if err != nil {
 		return nil, err
 	}
-	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest, exported: held.Digest(), components: inventory.Components, files: files}
+	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest, exported: held.Digest(), components: withDiskContentClass(inventory.Components, diskClassFilesystem), files: files}
 	// Release the scanner transport before recursively holding package/image
 	// archives. The original archive remains held and authenticated throughout.
 	if err := held.Close(); err != nil {
@@ -98,19 +110,21 @@ func inspectMaterialArchiveDepth(ctx context.Context, subject inspectionArchive,
 			continue
 		}
 		if strings.HasSuffix(header.Name, ".tgz") || strings.HasSuffix(header.Name, ".tar.gz") {
-			if depth >= 2 || header.Size <= 0 || header.Size > maxBytes {
+			if header.Size <= 0 || header.Size > maxBytes {
 				return nil, e.New(e.CodeEngineCapability, "compressed material exceeds recursive inspection budget")
 			}
 			member, err := createGeneratedInspectionFile(ctx, header.Size, func(destination io.Writer) error { _, err := io.Copy(destination, reader); return err })
 			if err != nil {
 				return nil, e.Wrap(e.CodeVerifyFailed, err, "holding compressed archive")
 			}
-			inspection, scanErr := inspectCompressedImages(ctx, member, platform, scanner, maxBytes)
+			inspection, scanErr := inspectCompressedImages(ctx, member, platform, scanner, maxBytes, depth)
 			closeErr := member.Close()
 			if err := errors.Join(scanErr, closeErr); err != nil {
 				return nil, err
 			}
-			result.components = append(result.components, inspection.components...)
+			if inspection != nil {
+				result.components = append(result.components, inspection.components...)
+			}
 			continue
 		}
 		if !strings.HasSuffix(header.Name, ".deb") {
@@ -151,10 +165,15 @@ func inspectMaterialArchiveDepth(ctx context.Context, subject inspectionArchive,
 	return result, nil
 }
 
-// Docker archive parsing and image selection belong to the existing pinned
-// go-containerregistry library. Scan every image, not whichever manifest occurs
-// first. Gzip expansion is bounded by the held-file owner before image decoding.
-func inspectCompressedImages(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, maxBytes int64) (*FilesystemInspection, error) {
+// Ordinary compressed data remains covered by its existing regular-file hash;
+// absence of an image marker makes no image claim. Once an image format is
+// indicated, decoder failures and depth limits must not silently omit it.
+// Docker decoding/selection belongs to pinned go-containerregistry. OCI layouts,
+// including mixed archives with an independent index, remain unsupported here.
+func inspectCompressedImages(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, maxBytes int64, depth int) (*FilesystemInspection, error) {
+	if depth > 2 {
+		return nil, e.New(e.CodeEngineCapability, "compressed material exceeds bounded recursive inspection")
+	}
 	compressed, err := gzip.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, 0, subject.Size()))})
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed image material")
@@ -165,23 +184,55 @@ func inspectCompressedImages(ctx context.Context, subject inspectionArchive, pla
 		return nil, e.Wrap(e.CodeEngineCapability, err, "holding bounded image archive")
 	}
 	defer func() { _ = archive.Close() }()
+	docker, oci, err := compressedImageMarkers(ctx, archive)
+	if err != nil {
+		return nil, err
+	}
+	if oci {
+		return nil, e.New(e.CodeEngineCapability, "compressed OCI layout requires an unsupported image archive adapter")
+	}
+	if !docker {
+		return nil, nil
+	}
+	if depth >= 2 {
+		return nil, e.New(e.CodeEngineCapability, "compressed image material exceeds recursive inspection budget")
+	}
 	opener := func() (io.ReadCloser, error) {
 		return filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(archive, 0, archive.Size()))}, nil
 	}
 	manifest, err := tarball.LoadManifest(opener)
-	if err != nil || len(manifest) == 0 || len(manifest) > 256 {
-		return nil, e.Wrap(e.CodeEngineCapability, err, "compressed material is not a bounded supported Docker image archive")
+	if err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding compressed Docker image manifest")
 	}
-	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest}
-	seen := make(map[string]bool)
-	for _, entry := range manifest {
+	if len(manifest) == 0 || len(manifest) > 256 {
+		return nil, e.New(e.CodeEngineCapability, "compressed material has no bounded supported Docker image manifest")
+	}
+	// tarball.Image selects the first manifest entry matching a normalized tag.
+	// Bind every alias to exactly one entry before scanning anything, otherwise a
+	// repeated tag could select the first image twice and omit the later image.
+	tags := make([]name.Tag, len(manifest))
+	owners := make(map[string]int)
+	for index, entry := range manifest {
 		if len(entry.RepoTags) == 0 {
 			return nil, e.New(e.CodeEngineCapability, "image material requires an unambiguous archive tag")
 		}
-		tag, err := name.NewTag(entry.RepoTags[0], name.StrictValidation)
-		if err != nil {
-			return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding image archive tag")
+		for alias, reference := range entry.RepoTags {
+			tag, err := name.NewTag(reference, name.StrictValidation)
+			if err != nil {
+				return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding image archive tag")
+			}
+			if previous, exists := owners[tag.Name()]; exists && previous != index {
+				return nil, e.New(e.CodeVerifyFailed, "image material tag selects multiple manifest entries")
+			}
+			owners[tag.Name()] = index
+			if alias == 0 {
+				tags[index] = tag
+			}
 		}
+	}
+	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest}
+	seen := make(map[string]bool)
+	for _, tag := range tags {
 		image, err := tarball.Image(opener, &tag)
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding image material")
@@ -210,9 +261,41 @@ func inspectCompressedImages(ctx context.Context, subject inspectionArchive, pla
 		if err := errors.Join(scanErr, closeErr); err != nil {
 			return nil, err
 		}
-		result.components = append(result.components, inventory.Components...)
+		result.components = append(result.components, withDiskContentClass(inventory.Components, diskClassContainer)...)
 	}
 	return result, nil
+}
+
+// archive/tar owns header decoding. This is only format selection: no entry is
+// extracted and no manifest grammar is reimplemented. Inspect the whole bounded
+// stream so a malformed tail or repeated format marker cannot become a fallback.
+func compressedImageMarkers(ctx context.Context, archive *generatedInspectionFile) (docker, oci bool, err error) {
+	reader := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(archive, 0, archive.Size()))})
+	for count := 0; ; count++ {
+		header, err := reader.Next()
+		if err == io.EOF {
+			return docker, oci, nil
+		}
+		if err != nil {
+			return false, false, e.Wrap(e.CodeVerifyFailed, err, "decoding compressed material tar headers")
+		}
+		if count >= 200000 {
+			return false, false, e.New(e.CodeEngineCapability, "compressed material exceeds its entry budget")
+		}
+		var marker *bool
+		switch path.Clean(header.Name) {
+		case "manifest.json":
+			marker = &docker
+		case "oci-layout":
+			marker = &oci
+		default:
+			continue
+		}
+		if *marker || header.Typeflag != tar.TypeReg {
+			return false, false, e.New(e.CodeVerifyFailed, "compressed image material has duplicate or non-regular format markers")
+		}
+		*marker = true
+	}
 }
 
 func writeBoundedArchive(ctx context.Context, output io.Writer, maxBytes int64, produce func(io.Writer) error) error {
@@ -295,12 +378,12 @@ func inspectDebianMaterialDepth(ctx context.Context, subject *heldfile.File, pla
 	if diagnostic.Len() != 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "package export returned diagnostics")
 	}
-	inspection, err := inspectMaterialArchiveDepth(ctx, filesystem, platform, scanner, packageReaderDigest, maxBytes, depth+1)
+	inspection, err := inspectMaterialArchiveContents(ctx, filesystem, platform, scanner, packageReaderDigest, maxBytes, depth+1, true)
 	if err != nil {
 		return nil, err
 	}
 	component := Component{Type: "library", Name: fields[0], Version: fields[1], Properties: []Property{
-		{Name: "nkd:packageArchitecture", Value: fields[2]}, {Name: "nkd:packageFormat", Value: "deb"},
+		{Name: diskContentClassProperty, Value: diskClassDebianArchive}, {Name: "nkd:packageArchitecture", Value: fields[2]}, {Name: "nkd:packageFormat", Value: "deb"},
 	}}
 	inspection.components = append(inspection.components, component)
 	if inspection.packageMetadataByDigest == nil {

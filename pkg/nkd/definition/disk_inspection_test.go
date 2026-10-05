@@ -32,36 +32,74 @@ func TestDiskInspectionProfilesAreExactNativeAndCloned(t *testing.T) {
 			}
 		})
 	}
-	for _, name := range []string{"tag", "missing scanner", "missing exporter", "missing package reader", "CPU below runtime minimum", "zero memory", "unbounded time", "unbounded filesystem", "wrong host", "unknown scratch"} {
-		t.Run(name, func(t *testing.T) {
-			profile := inspectionProfileFixture()
-			platform := "linux/arm64"
-			switch name {
-			case "tag":
-				profile.Image = "registry.example/nkd/inspect:latest"
-			case "missing scanner":
-				profile.ScannerDigest = ""
-			case "missing exporter":
-				profile.GuestfishDigest = ""
-			case "missing package reader":
-				profile.PackageReaderDigest = ""
-			case "zero memory":
-				profile.Resources.MemoryMiB = 0
-			case "CPU below runtime minimum":
-				profile.Resources.CPUMillis = 9
-			case "unbounded time":
-				profile.TimeoutSeconds = 601
-			case "unbounded filesystem":
-				profile.MaxFilesystemBytes = 1 << 40
-			case "wrong host":
-				platform = "darwin/arm64"
-			case "unknown scratch":
-				profile.ScratchStorage = "host-bind"
-			}
-			var coded *e.Error
-			if err := profile.Validate(platform); !errors.As(err, &coded) {
-				t.Fatalf("invalid profile did not fail coded: %v", err)
-			}
-		})
+	for _, host := range []string{"linux/amd64", "linux/arm64"} {
+		for _, name := range []string{"tag", "image CRLF", "missing inspector", "missing codec", "missing scanner", "missing exporter", "missing package reader", "pin CRLF", "CPU below runtime minimum", "zero CPU", "zero memory", "zero scratch capacity", "zero time", "unbounded time", "zero filesystem", "unbounded filesystem", "wrong host", "unknown scratch"} {
+			t.Run(host+"/"+name, func(t *testing.T) {
+				profile := inspectionProfileFixture()
+				platform := host
+				switch name {
+				case "tag":
+					profile.Image = "registry.example/nkd/inspect:latest"
+				case "image CRLF":
+					profile.Image += "\r\n"
+				case "missing inspector":
+					profile.InspectorDigest = ""
+				case "missing codec":
+					profile.CodecDigest = ""
+				case "missing scanner":
+					profile.ScannerDigest = ""
+				case "missing exporter":
+					profile.GuestfishDigest = ""
+				case "missing package reader":
+					profile.PackageReaderDigest = ""
+				case "pin CRLF":
+					profile.ScannerDigest += "\r\n"
+				case "zero memory":
+					profile.Resources.MemoryMiB = 0
+				case "CPU below runtime minimum":
+					profile.Resources.CPUMillis = 9
+				case "zero CPU":
+					profile.Resources.CPUMillis = 0
+				case "zero scratch capacity":
+					profile.Resources.EphemeralStorageMiB = 0
+				case "zero time":
+					profile.TimeoutSeconds = 0
+				case "unbounded time":
+					profile.TimeoutSeconds = 601
+				case "unbounded filesystem":
+					profile.MaxFilesystemBytes = 1 << 40
+				case "zero filesystem":
+					profile.MaxFilesystemBytes = 0
+				case "wrong host":
+					platform = "darwin/arm64"
+				case "unknown scratch":
+					profile.ScratchStorage = "host-bind"
+				}
+				var coded *e.Error
+				want := e.CodeEngineCapability
+				if name == "tag" || name == "image CRLF" || strings.HasPrefix(name, "missing ") || name == "pin CRLF" {
+					want = e.CodeUnpinnedInput
+				}
+				if err := profile.Validate(platform); !errors.As(err, &coded) || coded.Code != want {
+					t.Fatalf("invalid profile error = %v, want %s", err, want)
+				}
+			})
+		}
+	}
+}
+
+func TestEnvironmentDiskProfileFailureOrderIsDeterministic(t *testing.T) {
+	amd64, arm64 := inspectionProfileFixture(), inspectionProfileFixture()
+	amd64.ScannerDigest = ""
+	arm64.Resources.MemoryMiB = 0
+	environment := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind,
+		Metadata: Metadata{Name: "fixture"}, UtilityContainer: "busybox@sha256:" + strings.Repeat("a", 64), UtilityPlatform: "linux/amd64",
+		DiskInspectionProfiles: map[string]DiskInspectionProfile{"linux/arm64": arm64, "linux/amd64": amd64}}
+	for range 256 {
+		err := environment.Validate()
+		var coded *e.Error
+		if !errors.As(err, &coded) || coded.Code != e.CodeUnpinnedInput {
+			t.Fatalf("profile validation did not consistently select sorted AMD64 profile: %v", err)
+		}
 	}
 }

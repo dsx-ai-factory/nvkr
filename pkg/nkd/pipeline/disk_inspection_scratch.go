@@ -122,7 +122,7 @@ func (scratch *diskInspectionScratch) MountArgs() []string {
 
 // Close is idempotent across copies. Its bounded cleanup runs independently of
 // an already-canceled scan; a failed removal revokes success, never the subject.
-func (scratch *diskInspectionScratch) Close(ctx context.Context) error {
+func (scratch *diskInspectionScratch) Close(_ context.Context) error {
 	if scratch == nil || scratch.state == nil {
 		return nil
 	}
@@ -132,13 +132,7 @@ func (scratch *diskInspectionScratch) Close(ctx context.Context) error {
 	if state.volume == "" {
 		return nil
 	}
-	timeout := 10 * time.Second
-	if ctx != nil {
-		if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) > 0 && time.Until(deadline) < timeout {
-			timeout = time.Until(deadline)
-		}
-	}
-	cleanupCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := state.verifyVolume(cleanupCtx); err != nil {
 		return err

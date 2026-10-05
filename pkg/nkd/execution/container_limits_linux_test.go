@@ -44,7 +44,7 @@ func TestVerifyCgroupLimitsExactRealization(t *testing.T) {
 		{name: "ancestor unknown", directory: "parent", control: "pids.max", omit: true, want: e.CodeEngineCapability},
 		{name: "ancestor malformed", directory: "root", control: "memory.max", value: "unknown", want: e.CodeEngineCapability},
 		{name: "unbounded control file", directory: "leaf", control: "pids.max", value: strings.Repeat("1", 129), want: e.CodeEngineCapability},
-		{name: "canceled", canceled: true, want: e.CodeEngineCapability},
+		{name: "canceled", canceled: true, want: e.CodeTimeout},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root, parent, leaf := cgroupCapacityFixture(t)

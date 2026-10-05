@@ -90,7 +90,16 @@ func contentFromContainerObservation(observation *pipeline.DiskInspectionObserva
 	}
 	subject, size, image, inspector, codec := observation.Binding()
 	kind, guestfish, scanner, packageReader, platform, maxBytes := observation.ContentBinding()
-	raw := observation.Report()
+	return decodeBoundDiskContentReport(observation.Report(), image, diskContentReport{
+		Subject: subject, Size: size, Kind: kind, Platform: platform, Inspector: inspector,
+		Codec: codec, Guestfish: guestfish, Scanner: scanner, PackageReader: packageReader,
+		MaxFilesystemBytes: maxBytes,
+	})
+}
+
+// The production caller obtains binding only from the opaque runtime observation.
+// This private decoder seam tests projection, not runtime or receipt issuance.
+func decodeBoundDiskContentReport(raw []byte, image string, binding diskContentReport) (*DiskContentInspection, error) {
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return nil, e.Wrap(e.CodeEnvelopeDecode, err, "validating disk content report")
 	}
@@ -100,9 +109,9 @@ func contentFromContainerObservation(observation *pipeline.DiskInspectionObserva
 	if err := decoder.Decode(&report); err != nil {
 		return nil, e.Wrap(e.CodeEnvelopeDecode, err, "decoding disk content report")
 	}
-	if !canonical.IsDigest(image) || !canonical.IsDigest(guestfish) || !canonical.IsDigest(scanner) || !canonical.IsDigest(packageReader) ||
-		report.Subject != subject || report.Size != size || report.Kind != kind || report.Platform != platform || report.Inspector != inspector ||
-		report.Codec != codec || report.Guestfish != guestfish || report.Scanner != scanner || report.PackageReader != packageReader || report.MaxFilesystemBytes != maxBytes {
+	if !canonical.IsDigest(image) || !canonical.IsDigest(binding.Guestfish) || !canonical.IsDigest(binding.Scanner) || !canonical.IsDigest(binding.PackageReader) ||
+		report.Subject != binding.Subject || report.Size != binding.Size || report.Kind != binding.Kind || report.Platform != binding.Platform || report.Inspector != binding.Inspector ||
+		report.Codec != binding.Codec || report.Guestfish != binding.Guestfish || report.Scanner != binding.Scanner || report.PackageReader != binding.PackageReader || report.MaxFilesystemBytes != binding.MaxFilesystemBytes {
 		return nil, e.New(e.CodeVerifyFailed, "disk content report differs from its exact held subject or runtime")
 	}
 	if err := validateDiskContentReport(report); err != nil {
@@ -117,6 +126,9 @@ func validateDiskContentReport(report diskContentReport) error {
 	}
 	for _, component := range report.Components {
 		if err := validateSBOMComponent("disk content", component); err != nil {
+			return err
+		}
+		if _, err := diskComponentClass(component); err != nil {
 			return err
 		}
 	}
@@ -238,7 +250,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		if err != nil {
 			return err
 		}
-		components = inventory.Components
+		components = withDiskContentClass(inventory.Components, diskClassContainer)
 	default:
 		return e.New(e.CodeEngineCapability, "unsupported disk content kind %q", kind)
 	}

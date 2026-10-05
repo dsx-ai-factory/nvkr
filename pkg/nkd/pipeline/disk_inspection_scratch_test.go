@@ -72,10 +72,38 @@ func TestDiskInspectionScratchNativeVolume(t *testing.T) {
 		t.Fatal(err)
 	}
 	var output, diagnostic diskInspectionBuffer
-	if err := held.runIO(ctx, nil, &output, &diagnostic, "volume", "exists", volume); err == nil {
-		t.Fatal("private volume remains after checked cleanup")
+	if err := held.runIO(ctx, nil, &output, &diagnostic, "volume", "exists", volume); !scratchVolumeAbsent(err) {
+		t.Fatalf("private volume absence was not proven after checked cleanup: %v", err)
 	}
 	t.Logf("actual scratch creation, fixed capacity/preparation and cleanup passed: platform=%s uid=%d image=%s", selection.Platform, os.Getuid(), image)
+}
+
+// Podman's owning command defines 1 as absent, 0 as present. Runtime or
+// permission failures do not establish cleanup, even when they are nonzero.
+func scratchVolumeAbsent(err error) bool {
+	var exit *exec.ExitError
+	return errors.As(err, &exit) && exit.ExitCode() == 1
+}
+
+func TestScratchVolumeAbsenceRequiresExactExitStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name, command string
+		absent        bool
+	}{
+		{name: "present", command: "exit 0"},
+		{name: "absent", command: "exit 1", absent: true},
+		{name: "runtime failure", command: "exit 125"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := exec.CommandContext(t.Context(), "sh", "-c", tc.command).Run()
+			if got := scratchVolumeAbsent(err); got != tc.absent {
+				t.Fatalf("absence=%v, want %v: %v", got, tc.absent, err)
+			}
+		})
+	}
+	if scratchVolumeAbsent(errors.New("runtime unavailable")) {
+		t.Fatal("unclassified runtime error proved absence")
+	}
 }
 
 func (runtime *scratchTestRuntime) RuntimeName() string { return runtime.name }

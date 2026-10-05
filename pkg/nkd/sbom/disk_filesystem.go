@@ -340,6 +340,20 @@ func recheckFilesystemSnapshot(ctx context.Context, path string, original inspec
 }
 
 func filesystemFiles(ctx context.Context, file *os.File, maxBytes int64) ([]DiskFile, error) {
+	files, err := filesystemFileInventory(ctx, file, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, e.New(e.CodeProvenanceMissing, "filesystem inspection returned no files")
+	}
+	return files, nil
+}
+
+// The same bounded tar decoder serves disk roots and Debian data exports. Only
+// the package reader may pair an empty data filesystem with observed metadata;
+// filesystemFiles retains the nonempty requirement for all other subjects.
+func filesystemFileInventory(ctx context.Context, file *os.File, maxBytes int64) ([]DiskFile, error) {
 	info, err := file.Stat()
 	if err != nil || info.Size() <= 0 || info.Size() > maxBytes {
 		return nil, e.New(e.CodeVerifyFailed, "filesystem export is absent or oversized")
@@ -393,9 +407,6 @@ func filesystemFiles(ctx context.Context, file *os.File, maxBytes int64) ([]Disk
 			return nil, e.New(e.CodeEngineCapability, "filesystem export contains unsupported special files")
 		}
 		result = append(result, entry)
-	}
-	if len(result) == 0 {
-		return nil, e.New(e.CodeProvenanceMissing, "filesystem inspection returned no files")
 	}
 	slices.SortFunc(result, func(a, b DiskFile) int { return strings.Compare(a.Path, b.Path) })
 	return result, nil

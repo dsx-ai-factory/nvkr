@@ -126,8 +126,9 @@ Replacing the former Recipe binding changes document identity; old evidence is n
 A Definition may select a catalog-pinned Syft executable through `sbomTool`. Both maintained NKE
 Environments require it. The graph then requires each observed payload and the acquired scanner as explicit
 SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismatched bytes, scanner errors and
-empty inventories fail closed. Without `sbomTool`, the existing declaration-only documents provide source
-metadata; they do not claim dependency inspection.
+empty inventories fail closed. Without `sbomTool`, ordinary declaration-only documents provide source
+metadata; they do not claim dependency inspection. The separate full-disk profile pins its own scanner
+and does not require a second catalog scanner selection; when both are selected their pins must agree.
 
 A `disk-image` admitted for execution or publication requires a full CycloneDX inventory whose subject is the
 exact delivered QCOW2 payload digest. It combines an authenticated trace of every fetched or built material with
@@ -148,17 +149,31 @@ closure and permit release as one registered operation. Factory retains the orig
 through inspection of the disk, base installer, staged material closure and captured guest APT archives.
 Reconciliation rejects absent input classes and installed package identities absent from those inspected
 inputs. The exact captured package bytes are separately read by pinned dpkg-deb before source-reported
-metadata is accepted. Every supported regular file is hashed; exact material matches describe
-correspondence without inventing file origin or package ownership. Loose-file hashing observes bytes,
-not their derivation.
+metadata is accepted. Owner-issued content classes distinguish filesystem package databases, container
+inventories and held Debian archives: a container database cannot justify an installed host Debian package.
+Correspondence is checked before public document deduplication; those internal classes do not assert
+installed origin or package ownership. Loose-file hashing observes bytes, not their derivation.
+Per-material mixed scanner/package-reader/file-walk documents use the descriptive `disk-content/v1`
+inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operation uses
+`disk-reconciled/v1`; neither method string restores a runtime receipt or grants publication authority.
+
+The implemented QCOW2 reader exports libguestfs's inspected, mounted filesystem tree, not an independently
+enumerated inventory of every filesystem extent. Unmounted or unrecognized content is not proven covered.
+The installer reader supports ISO9660 and its recognized SquashFS payload; a generic raw material is not
+thereby known to be an installer. Nested Docker image discovery currently recognizes bounded gzip/tar
+archives with an unambiguous Docker manifest. Ordinary gzip/tar contents retain their outer file hash;
+OCI-layout and mixed OCI/Docker archives fail closed, and other compressed formats have no nested-image
+discovery. Synthetic archive-member paths describe inspection structure, not installed filesystem paths.
 
 The process-local reconciliation receipt binds the original Run, named output, complete Plan, Build,
 QCOW2 digest/size and admitted inspection closure. Export revalidates those owners before copying the
 exact disk and returning its deterministic CycloneDX document. Descriptive documents, decoded receipts,
 equal-byte sibling Runs and shallow copies after owner closure cannot restore authority. The full-content
-helper, semantic reconciliation, private scratch and negative receipt contracts are implemented and
-contract-tested; complete native NKE content runs, original live joins, publication and production acceptance
-remain unexercised. Documents exceeding the existing 8 MiB bound fail without truncation. The conservative
+helper, semantic reconciliation and private scratch paths are implemented. Contract tests cover modeled
+reconciliation observations, selected admission/decoder failures and export-owner revalidation; they do
+not establish full helper discovery or the complete original-owner receipt-issuance handshake. Complete
+native NKE content runs, original live joins, publication and production acceptance remain unexercised.
+Documents exceeding the existing 8 MiB bound fail without truncation. The conservative
 simultaneous export/RAM budget is an admission condition, not evidence of runner capacity or reservation.
 
 The helper checks the actual cgroup-v2 CPU, memory and process-count ceilings before reading the subject.

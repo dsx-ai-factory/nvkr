@@ -186,6 +186,9 @@ func admitGitHubPlan(ctx context.Context, plan *Plan) error {
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub execution"); err != nil {
+		return err
+	}
 	if err := rejectUnsupportedPlanRequirements(plan, "GitHub execution"); err != nil {
 		return err
 	}

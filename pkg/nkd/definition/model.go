@@ -253,7 +253,13 @@ func (environment Environment) Validate() error {
 	if err := execution.ValidateClasses(environment.ExecutionClasses); err != nil {
 		return err
 	}
-	for platform, profile := range environment.DiskInspectionProfiles {
+	profilePlatforms := make([]string, 0, len(environment.DiskInspectionProfiles))
+	for platform := range environment.DiskInspectionProfiles {
+		profilePlatforms = append(profilePlatforms, platform)
+	}
+	sort.Strings(profilePlatforms)
+	for _, platform := range profilePlatforms {
+		profile := environment.DiskInspectionProfiles[platform]
 		if err := profile.Validate(platform); err != nil {
 			return err
 		}

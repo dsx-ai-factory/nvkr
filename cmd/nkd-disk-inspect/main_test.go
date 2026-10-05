@@ -24,7 +24,6 @@ func TestInspectionHelperExitCodes(t *testing.T) {
 		{name: "overflow size", args: []string{digest, digest, digest, "9223372036854775808"}, ctx: t.Context(), want: e.CodeUsage},
 		{name: "invalid subject pin", args: []string{digest, digest, "invalid", "1"}, ctx: t.Context(), want: e.CodeUnpinnedInput},
 		{name: "zero size", args: []string{digest, digest, digest, "0"}, ctx: t.Context(), want: e.CodeUnpinnedInput},
-		{name: "nil context", args: []string{digest, digest, digest, "1"}, want: e.CodeUsage},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			args := tt.args
@@ -32,16 +31,23 @@ func TestInspectionHelperExitCodes(t *testing.T) {
 				args = append(append([]string(nil), args...), "2000", "2048", "256")
 			}
 			var output, diagnostic bytes.Buffer
-			got := runWithLimitCheck(tt.ctx, args, strings.NewReader("x"), &output, &diagnostic, func(ctx context.Context, _, _, _ uint64) error {
-				if ctx == nil {
-					return e.New(e.CodeUsage, "missing context")
-				}
+			got := runWithLimitCheck(tt.ctx, args, strings.NewReader("x"), &output, &diagnostic, func(_ context.Context, _, _, _ uint64) error {
 				return nil
 			})
 			if got != e.ExitCode(e.New(tt.want, "")) || output.Len() != 0 || diagnostic.Len() == 0 {
 				t.Fatalf("status=%d output=%q diagnostic=%q", got, output.String(), diagnostic.String())
 			}
 		})
+	}
+}
+
+func TestInspectionHelperNilContextUsesProductionAdmission(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("1", 64)
+	args := []string{digest, digest, digest, "1", "2000", "2048", "256"}
+	var output, diagnostic bytes.Buffer
+	got := run(nil, args, forbiddenSubjectRead{t}, &output, &diagnostic) //nolint:staticcheck // intentional nil-context production admission test
+	if got != e.ExitCode(e.New(e.CodeUsage, "")) || output.Len() != 0 || diagnostic.Len() == 0 {
+		t.Fatalf("status=%d output=%q diagnostic=%q", got, output.String(), diagnostic.String())
 	}
 }
 

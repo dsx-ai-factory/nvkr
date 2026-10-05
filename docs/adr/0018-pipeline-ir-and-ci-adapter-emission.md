@@ -127,6 +127,19 @@ or weaker isolation. Rootless operation still depends on supported user namespac
 cgroups and the provider's nesting policy. A mounted privileged Docker socket remains an explicit trust cost.
 Missing prerequisites fail capability admission. No bespoke/self-hosted runner labels are emitted.
 
+Held Linux Podman execution uses a package-owned, initially empty `XDG_CONFIG_HOME`, removed by the same
+runtime owner on close. It does not inherit caller Podman configuration or ambient storage-driver overrides;
+this is configuration isolation, not a new user-namespace or provider boundary. An explicit typed
+`podmanStorageDriver` is supported by the held inspector and Environment-bound direct-Packer admission,
+where command arguments and observed driver must agree. Complete-Plan local, GitHub and execute-node
+adapters reject nonempty overrides before work because other runner, utility and producer routes do not
+yet project that setting. Empty preserves the runtime's existing store selection.
+
+The observed Podman identity includes UID/GID mappings, remote-service status and OCI runtime name in
+addition to the existing host, storage, security and version fields. Adding these fields changes the
+`nkd.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
+or prove compatibility with previously recorded qualification profiles.
+
 The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
 a hosted VM adapter. Each push to `main` selects that exact commit for full AMD64 and ARM64 builds, boot smoke,
 and short-retention QCOW2 uploads. Manual dispatch from the default-branch workflow remains available for
