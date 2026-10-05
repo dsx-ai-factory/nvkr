@@ -115,3 +115,33 @@ jobs:
           podman run --rm --pull=never --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges \
             "${mappings[@]}" --user="$uid:$gid" "$PROBE_IMAGE" \
             sh -ec 'id; cat /proc/self/uid_map; cat /proc/self/gid_map; grep "^Seccomp:" /proc/self/status'
+      - name: Exercise explicit VFS route in exact sanitized runtime environment
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_path=$(command -v podman)
+          runtime_root=$(mktemp -d "$RUNNER_TEMP/nkd-vfs.XXXXXXXX")
+          runtime_env=(env -i PATH=/nonexistent LANG=C LC_ALL=C TZ=UTC
+            REGISTRY_AUTH_FILE=/nonexistent XDG_CONFIG_HOME=/nonexistent
+            "HOME=$HOME" "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+            "XDG_DATA_HOME=$runtime_root/data")
+          runtime=("${runtime_env[@]}" "$runtime_path" --storage-driver=vfs
+            "--root=$runtime_root/graph" "--runroot=$runtime_root/run")
+          "${runtime[@]}" info --format '{{json .}}' > "$RUNNER_TEMP/nkd-clean-podman-info.json"
+          jq '{host: (.host | {os, arch, cgroupVersion, serviceIsRemote, ociRuntime, security, idMappings}),
+            store: (.store | {graphDriverName, graphRoot, runRoot, graphOptions})}' \
+            "$RUNNER_TEMP/nkd-clean-podman-info.json"
+          jq -e --arg root "$runtime_root/graph" --arg run "$runtime_root/run" '
+            .store.graphDriverName == "vfs" and .store.graphRoot == $root and .store.runRoot == $run and
+            .host.security.rootless == true and .host.security.seccompEnabled == true and
+            .host.cgroupVersion == "v2" and .host.serviceIsRemote == false and .host.ociRuntime.name == "crun"' \
+            "$RUNNER_TEMP/nkd-clean-podman-info.json"
+          mapfile -t mappings < <(jq -r '.host.idMappings |
+            (.uidmap[] | "--uidmap=\(.container_id):\(.container_id):\(.size)"),
+            (.gidmap[] | "--gidmap=\(.container_id):\(.container_id):\(.size)")' \
+            "$RUNNER_TEMP/nkd-clean-podman-info.json")
+          "${runtime[@]}" pull "$PROBE_IMAGE"
+          "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges "${mappings[@]}" --user="$(id -u):$(id -g)" "$PROBE_IMAGE" \
+            sh -ec 'id; cat /proc/self/uid_map; cat /proc/self/gid_map; grep "^Seccomp:" /proc/self/status'
