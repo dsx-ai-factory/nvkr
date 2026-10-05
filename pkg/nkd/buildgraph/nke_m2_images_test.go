@@ -23,6 +23,9 @@ func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 	if len(environment.ExecutionClasses) != 0 {
 		t.Fatal("unmeasured execution classes must remain absent from candidate inputs")
 	}
+	if len(environment.DiskInspectionProfiles) != 0 {
+		t.Fatal("unmeasured native inspector profiles must remain absent from candidate inputs")
+	}
 }
 
 func TestMaintainedM2DeploymentImageMembership(t *testing.T) {

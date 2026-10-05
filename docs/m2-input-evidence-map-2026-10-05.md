@@ -1,9 +1,10 @@
 # M2 maintained input evidence map
 
 Initially checked against integration baseline `dde5fffea9e33d0922188cfb8d6019c889ae1fd9`.
-The isolated D extraction is based on `e816cd255bef0926caaa3ca4ac95097a888d0572`; the current A
-interface was rechecked at `e87974b830503eb3058c82808b33994301809722` plus its uncommitted trusted
-source-fetch additions. The final A stack parent and whole-stack gate remain pending.
+The isolated D extraction was based on `e816cd255bef0926caaa3ca4ac95097a888d0572`.
+The B/C/A stack supplies the capture schema and scoped trusted source-fetch interfaces;
+the native capture regression runs against those inherited interfaces. Exact-head local
+validation is recorded in the pull request separately from production acceptance.
 This is an input/configuration record. It grants no runtime, publication, signer or M2 acceptance claim.
 
 The refreshed catalog image-pin owner uses the existing pinned OCI library instead of
@@ -64,10 +65,10 @@ with a transport-only `insteadOf` mapping. No NKE checkout, source tag or source
 
 The source capture contract rejects disappeared repository metadata and any matching `file:`/`cdrom:` URI.
 Its installer-media behavior is explicitly unexercised in `os-image/docs/apt-acquisition-capture.md`.
-The capture graph regression is held separately until the final B/C/A schema is present in this extraction.
-Its asserted native target/toolchain architecture, capture opt-in, carrier path and material projection must
-pass on that exact parent before handoff. Existing image/operator graph tests do not establish that capture
-projection, a successful capture-enabled installer bake or a live evidence join.
+`TestMaintainedM2NativeCaptureGraph` asserts both native target/toolchain architectures,
+the capture opt-in, carrier path, exact source-owned material kinds and native producer bindings
+against the inherited B/C/A schema. This graph test does not establish a successful
+capture-enabled installer bake or a live evidence join.
 
 ## Runtime, inspector, registry and signer map
 
