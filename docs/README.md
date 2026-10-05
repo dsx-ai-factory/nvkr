@@ -4,6 +4,7 @@
 |---|---|
 | Build the NKE v0.21.0 deploy release | [NKE deploy pipeline](nke-deploy-pipeline.md) |
 | Automate reviewable pin updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
+| Manage shared catalogs and understand replacement identity | [Authoring analysis](catalog-definition-authoring.md), [local replacement lab](examples/authoring-lab/README.md) |
 | Derive several pins from one upstream version file | [Generic pin-set example](generic-pin-set-example.md) |
 | Use Definition → Run → Release | [Lifecycle guide](lifecycle.md) |
 | Choose and run a demo | [Demo index](../scripts/README.md) |
