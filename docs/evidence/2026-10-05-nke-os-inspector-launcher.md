@@ -90,4 +90,3 @@ size, image and tool bindings and caller-description mutation isolation.
 This successful runtime replay does not reproduce a warning/no-ID late-registration
 failure; that cleanup branch is covered separately by bounded fake-runtime
 regressions, not asserted as externally exercised here.
-
