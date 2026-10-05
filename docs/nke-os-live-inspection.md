@@ -36,9 +36,11 @@ The same-Run sibling-output test gives both outputs their own valid material tra
 completion before checking receipt replay. The production scan closure's concrete Packer type check and
 capacity-before-snapshot wiring have separate guard and owned-operation tests. Those tests cover admission
 before copying, snapshot failure, mid-copy cancellation and runtime close joining child cleanup before
-snapshot closure and permit release. The concrete lifecycle join has disk-only selection, ordering and
+snapshot closure and permit release. The private output loop has disk-only selection, ordering and
 failure tests. A successful opaque inventory still requires the real runtime harness; injected tests do not
-prove a live NKE bake followed by inspection.
+prove a live NKE bake followed by inspection. The `inspectLocalDisks` Observe/Validate/Description closure,
+exported factory Observe/Validate wrappers and successful runtime-inventory binding projection remain
+unexercised pending that harness.
 
 An opted-in inspection failure fails the Run and discards uncommitted delivery bytes; it is not a warning
 that leaves a successful build without its requested inventory. Failed Runs expose no installed inventories,
@@ -49,6 +51,8 @@ One ten-minute operation deadline covers queueing, material tracing, snapshottin
 rechecks. The runtime's configured timeout additionally bounds its complete owned admission, snapshot and
 scan operation; it does not reserve that entire duration after preparation. A shorter caller deadline and
 caller cancellation remain effective.
+Contention consumes that same declared budget; post-scan rechecks receive no fresh allowance. The mutex
+queue has no FIFO guarantee. These limits fail closed rather than silently extending an authored timeout.
 
 Real acceptance still requires both AMD64 and ARM64 NKE builds inspected through this same original live
 lifecycle, with the exact source, Plan, attempt, image/tool identities and terminal inventory observation

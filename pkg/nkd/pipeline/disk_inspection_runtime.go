@@ -44,16 +44,17 @@ type DiskInspectionSelection struct {
 // and complete immutable image closure. No caller command, mount or device can
 // be passed through it. The daemon is trusted, as in the local Packer adapter.
 type DiskInspectionContainer struct {
-	mu          sync.Mutex
-	lifetimeMu  sync.Mutex
-	lifetime    context.Context
-	stop        context.CancelFunc
-	closing     bool
-	operations  sync.WaitGroup
-	runtime     *heldRuntimeExecutable
-	selection   DiskInspectionSelection
-	imageID     string
-	observeHost func(context.Context, *os.File) (execution.ObservedHostFacts, error)
+	mu              sync.Mutex
+	lifetimeMu      sync.Mutex
+	lifetime        context.Context
+	stop            context.CancelFunc
+	closing         bool
+	operations      sync.WaitGroup
+	runtime         *heldRuntimeExecutable
+	selection       DiskInspectionSelection
+	imageID         string
+	observeHost     func(context.Context, *os.File) (execution.ObservedHostFacts, error)
+	waitForCapacity func(context.Context) error
 }
 
 const (
@@ -302,7 +303,7 @@ func (container *DiskInspectionContainer) InspectPackerArtifact(ctx context.Cont
 		return nil, err
 	}
 	defer func() { _ = reservation.Close() }()
-	subject, err := artifact.SnapshotHeldContext(ctx, MaxDiagnosticDiskBytes)
+	subject, err := artifact.snapshotHeldContext(ctx, MaxDiagnosticDiskBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +353,11 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 	defer finish()
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(container.selection.TimeoutSeconds)*time.Second)
 	defer cancel()
-	if err := lockDiskInspection(ctx, &diskInspectionCapacity); err != nil {
+	wait := container.waitForCapacity
+	if wait == nil {
+		wait = func(ctx context.Context) error { return lockDiskInspection(ctx, &diskInspectionCapacity) }
+	}
+	if err := wait(ctx); err != nil {
 		return nil, err
 	}
 	admitted := false
@@ -417,6 +422,11 @@ func (container *DiskInspectionContainer) InspectHeld(ctx context.Context, subje
 	if container == nil || subject == nil || subject.Size() <= 0 || subject.Size() > MaxDiagnosticDiskBytes {
 		return nil, e.New(e.CodeEngineCapability, "container inspection requires one bounded held disk")
 	}
+	ctx, finish, err := container.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(container.selection.TimeoutSeconds)*time.Second)
 	defer cancel()
 	reservation, err := container.reserveSubject(ctx, subject.Size(), false)

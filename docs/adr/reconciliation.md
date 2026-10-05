@@ -94,7 +94,9 @@ snapshot closure and permit release as one registered operation; neither its sna
 reservation escapes. Runtime close cancels and joins that complete lifetime before releasing capacity.
 Capacity queueing uses the declared inspection
 deadline, with host observation separately bounded to thirty seconds. Held-child, blocked-cleanup,
-registration-race and a real thirty-one-second queue regression cover these contracts, not a real daemon scan.
+registration-race and an observed queue-deadline regression cover these contracts, not a real daemon scan.
+The queue test checks the actual declared deadline and shorter caller deadline, then cancels and joins;
+it does not impose a thirty-one-second wait on the regular test gate.
 The held-runtime Linux regression exercises snapshot allocation, scan cleanup and subsequent admission,
 but its controlled runtime executable is not an actual inspection daemon or original NKE bake.
 The receipt bindings
@@ -111,11 +113,14 @@ the original artifact remains usable. The acceptance harness uses the lifecycle 
 The earlier aggregate Linux race run disclosed in PR #79 failed in the unchanged finalizer fixture's
 read-only-source storage setup; its separate rerun passed. After the review fixes, the native Linux ARM64
 race run of pipeline, factory, lifecycle and SBOM passed together with read-only source and private writable
-attempt tmpfs. This is contract evidence, not a real NKE bake or a newly built inspector image.
-The controlled scan tests do not exercise the production closure's concrete Packer assertion or
-capacity-before-snapshot wiring. The injected lifecycle ordering tests also do not exercise the concrete
-disk-only selection, receipt observation/validation and description collection. These paths remain
-source-reviewed until the real SDK acceptance run.
+attempt tmpfs. That run used the source at `0bd280dd6b5009761d226f241a3f80f83b95136e`
+and `go test -race ./pkg/nkd/pipeline ./pkg/nkd/sbom ./pkg/nkd/factory ./pkg/nkd/lifecycle -count=1`.
+The [hosted merge gate for that exact head](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37328812530)
+also passed. These are contract checks, not a real NKE bake or a newly built inspector image.
+Separate controlled tests exercise the concrete Packer assertion, capacity-before-snapshot operation and
+private disk-only output loop. The `inspectLocalDisks` Observe/Validate/Description closure, exported factory
+Observe/Validate wrappers and successful runtime-inventory binding projection remain unexercised pending
+the real SDK acceptance run.
 Diagnostic admission is QCOW2-only, and the shared codec rejects backing/data-file references. Shared VMDK decoding rejects
 descriptor layouts before the probe and admits only single-file VMDK4 sparse inputs whose QAPI extent binds
 the held input file (`/proc/self/fd/N`) and full virtual size, with an [actual ARM64 QEMU fixture replay](../evidence/2026-10-02-vmdk-codec-admission.md).

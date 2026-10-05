@@ -10,11 +10,10 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
-// SnapshotHeldContext lends an immutable snapshot of the originally collected
-// inode to a read-only inspector. It never reopens an artifact pathname. The
-// caller owns the returned snapshot and must Close it; artifact ownership stays
-// with the Run. Capacity admission must account for this additional exact copy.
-func (artifact *PackerArtifact) SnapshotHeldContext(ctx context.Context, maxBytes int64) (*heldfile.File, error) {
+// snapshotHeldContext copies the originally collected inode without reopening
+// an artifact pathname. The owning inspection operation admits capacity first
+// and closes the private snapshot before releasing it; Run owns the artifact.
+func (artifact *PackerArtifact) snapshotHeldContext(ctx context.Context, maxBytes int64) (*heldfile.File, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "snapshotting a Packer artifact requires a context")
 	}
@@ -47,7 +46,13 @@ func (artifact *PackerArtifact) SnapshotHeldContext(ctx context.Context, maxByte
 	if info.Size() != artifact.size {
 		return nil, e.New(e.CodeVerifyFailed, "collected Packer artifact size changed")
 	}
-	snapshot, err := heldfile.FromReaderContext(ctx, io.NewSectionReader(artifact.file, 0, artifact.size),
+	return snapshotHeldBytes(ctx, io.NewSectionReader(artifact.file, 0, artifact.size), maxBytes, artifact.digest, artifact.size)
+}
+
+// This private copy boundary permits an observed-read cancellation test without
+// changing the original-inode selection or exposing snapshot authority.
+func snapshotHeldBytes(ctx context.Context, source io.Reader, maxBytes int64, digest string, size int64) (*heldfile.File, error) {
+	snapshot, err := heldfile.FromReaderContext(ctx, source,
 		heldfile.Options{Label: "disk-inspection-subject", MaxBytes: maxBytes})
 	if err != nil {
 		if ctx.Err() != nil {
@@ -55,7 +60,7 @@ func (artifact *PackerArtifact) SnapshotHeldContext(ctx context.Context, maxByte
 		}
 		return nil, e.Wrap(e.CodeEngineCapability, err, "holding the collected Packer artifact for inspection")
 	}
-	if snapshot.Digest() != artifact.digest || snapshot.Size() != artifact.size {
+	if snapshot.Digest() != digest || snapshot.Size() != size {
 		return nil, e.Wrap(e.CodeVerifyFailed, snapshot.Close(), "collected Packer artifact bytes changed")
 	}
 	return snapshot, nil

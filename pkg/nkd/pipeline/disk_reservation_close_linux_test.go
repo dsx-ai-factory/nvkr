@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -173,65 +174,58 @@ func TestDiskRuntimeCloseOperationRegistrationRace(t *testing.T) {
 }
 
 func TestDiskRuntimeCapacityQueueUsesDeclaredTimeout(t *testing.T) {
-	if testing.Short() {
-		t.Skip("real queue wait exceeds the former 30-second ceiling")
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Second)
-	defer cancel()
-	container, _ := newReservedDiskInspectionFixture(t, ctx, "unchanged")
-	container.selection.TimeoutSeconds = 40
-	first, err := container.reserveSubject(ctx, 128, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer first.Close()
-	type admission struct {
-		permit *diskInspectionReservation
-		err    error
-	}
-	queued := make(chan admission, 1)
-	go func() { permit, err := container.reserveSubject(ctx, 128, true); queued <- admission{permit, err} }()
-	joined := false
-	defer func() {
-		cancel()
-		_ = first.Close()
-		if joined {
-			return
-		}
-		select {
-		case result := <-queued:
-			if result.permit != nil {
-				_ = result.permit.Close()
+	for _, callerTimeout := range []time.Duration{time.Minute, 5 * time.Second} {
+		t.Run(callerTimeout.String(), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), callerTimeout)
+			defer cancel()
+			callerDeadline, _ := ctx.Deadline()
+			container := &DiskInspectionContainer{selection: DiskInspectionSelection{TimeoutSeconds: 40}}
+			waiting := make(chan context.Context, 1)
+			container.waitForCapacity = func(queued context.Context) error {
+				waiting <- queued
+				return lockDiskInspection(queued, &diskInspectionCapacity)
 			}
-		case <-time.After(5 * time.Second):
-			t.Error("canceled capacity queue did not join")
-		}
-	}()
-	timer := time.NewTimer(31 * time.Second)
-	defer timer.Stop()
-	select {
-	case result := <-queued:
-		joined = true
-		if result.permit != nil {
-			_ = result.permit.Close()
-		}
-		t.Fatalf("declared 40-second queue ended before former ceiling: %v", result.err)
-	case <-timer.C:
-	}
-	if err := first.Close(); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case result := <-queued:
-		joined = true
-		if result.err != nil {
-			t.Fatalf("queued admission after31seconds: %v", result.err)
-		}
-		if err := result.permit.Close(); err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("queued admission failed to join")
+			diskInspectionCapacity.Lock()
+			defer diskInspectionCapacity.Unlock()
+			done := make(chan error, 1)
+			started := time.Now()
+			go func() {
+				permit, err := container.reserveSubject(ctx, 128, true)
+				if permit != nil {
+					_ = permit.Close()
+				}
+				done <- err
+			}()
+			joined := false
+			defer func() {
+				cancel()
+				if !joined {
+					_ = waitCloseTestResult(t, done, "deferred capacity queue")
+				}
+			}()
+			select {
+			case queued := <-waiting:
+				deadline, ok := queued.Deadline()
+				if !ok {
+					t.Fatal("capacity queue has no deadline")
+				}
+				if callerDeadline.Before(started.Add(40 * time.Second)) {
+					if !deadline.Equal(callerDeadline) {
+						t.Fatalf("shorter caller deadline changed: %s, want %s", deadline, callerDeadline)
+					}
+				} else if deadline.Before(started.Add(40*time.Second)) || deadline.After(time.Now().Add(40*time.Second)) {
+					t.Fatalf("capacity queue does not use declared 40-second timeout: %s", deadline)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("admission did not reach the capacity queue")
+			}
+			cancel()
+			err := waitCloseTestResult(t, done, "canceled capacity queue")
+			joined = true
+			if code(err) != e.CodeTimeout || !errors.Is(err, context.Canceled) {
+				t.Fatalf("queued cancellation: %v", err)
+			}
+		})
 	}
 }
 

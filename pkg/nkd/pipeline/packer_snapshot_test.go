@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,7 +32,7 @@ func TestPackerSnapshotBindsOriginalInode(t *testing.T) {
 	if err := os.WriteFile(path, []byte("substituted pathname"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := artifact.SnapshotHeldContext(t.Context(), 1024)
+	snapshot, err := artifact.snapshotHeldContext(t.Context(), 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,20 +46,17 @@ func TestPackerSnapshotBindsOriginalInode(t *testing.T) {
 	}
 }
 
-// Err is checked at admission, at the artifact lock, at held allocation, and
-// before each 1 MiB copy block. Cancel at the second block, after real source
-// bytes have been read, rather than at admission or while waiting for a lock.
-type snapshotCopyCancelContext struct {
-	context.Context
+// TeeReader invokes Write only after the real source has supplied bytes. This
+// makes mid-copy cancellation independent of the number of context checks.
+type snapshotCopyCancelWriter struct {
 	cancel context.CancelFunc
-	checks atomic.Uint32
+	bytes  int
 }
 
-func (ctx *snapshotCopyCancelContext) Err() error {
-	if ctx.checks.Add(1) == 5 {
-		ctx.cancel()
-	}
-	return ctx.Context.Err()
+func (writer *snapshotCopyCancelWriter) Write(raw []byte) (int, error) {
+	writer.bytes += len(raw)
+	writer.cancel()
+	return len(raw), nil
 }
 
 func TestPackerSnapshotCancellationDuringCopy(t *testing.T) {
@@ -76,12 +73,13 @@ func TestPackerSnapshotCancellationDuringCopy(t *testing.T) {
 	defer artifact.Close()
 	parent, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	ctx := &snapshotCopyCancelContext{Context: parent, cancel: cancel}
-	subject, err := artifact.SnapshotHeldContext(ctx, int64(len(raw)))
-	if subject != nil || packerErrorCode(err) != e.CodeTimeout || !errors.Is(err, context.Canceled) || ctx.checks.Load() < 5 {
-		t.Fatalf("mid-copy cancellation: snapshot=%v checks=%d error=%v", subject, ctx.checks.Load(), err)
+	observed := &snapshotCopyCancelWriter{cancel: cancel}
+	source := io.TeeReader(io.NewSectionReader(file, 0, artifact.size), observed)
+	subject, err := snapshotHeldBytes(parent, source, int64(len(raw)), artifact.digest, artifact.size)
+	if subject != nil || packerErrorCode(err) != e.CodeTimeout || !errors.Is(err, context.Canceled) || observed.bytes <= 0 || observed.bytes >= len(raw) {
+		t.Fatalf("mid-copy cancellation: snapshot=%v bytes-read=%d error=%v", subject, observed.bytes, err)
 	}
-	subject, err = artifact.SnapshotHeldContext(t.Context(), int64(len(raw)))
+	subject, err = artifact.snapshotHeldContext(t.Context(), int64(len(raw)))
 	if err != nil {
 		t.Fatalf("cancellation damaged original artifact: %v", err)
 	}
@@ -102,7 +100,7 @@ func TestPackerSnapshotQueueHonorsContext(t *testing.T) {
 			ctx := &snapshotQueueContext{Context: parent, waiting: make(chan struct{})}
 			result := make(chan error, 1)
 			go func() {
-				held, err := artifact.SnapshotHeldContext(ctx, 1024)
+				held, err := artifact.snapshotHeldContext(ctx, 1024)
 				if held != nil {
 					_ = held.Close()
 				}
@@ -212,7 +210,7 @@ func TestPackerSnapshotRejectsInvalidAndChangedSubjects(t *testing.T) {
 			case "changed bytes":
 				artifact.digest = FileDigest([]byte("different bytes"))
 			}
-			held, err := artifact.SnapshotHeldContext(ctx, budget)
+			held, err := artifact.snapshotHeldContext(ctx, budget)
 			if held != nil || packerErrorCode(err) != test.code {
 				t.Fatalf("rejected snapshot = %v, %v", held, err)
 			}

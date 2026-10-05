@@ -414,12 +414,40 @@ func TestLiveDiskInspectionDeadlineBoundsCompleteOperation(t *testing.T) {
 
 func TestLiveDiskInspectionCloseCancelsAndJoinsScan(t *testing.T) {
 	plan, owner := diskMaterialTraceFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
 	started := make(chan struct{})
 	canceled := make(chan struct{})
 	finish := make(chan struct{})
+	scanJoined := make(chan struct{})
+	closeJoined := make(chan struct{})
+	closeStarted := false
+	finishReleased := false
+	releaseScan := func() {
+		if !finishReleased {
+			close(finish)
+			finishReleased = true
+		}
+	}
+	t.Cleanup(func() {
+		cancel()
+		releaseScan()
+		select {
+		case <-scanJoined:
+		case <-time.After(5 * time.Second):
+			t.Error("inspection goroutine did not join during test cleanup")
+		}
+		if closeStarted {
+			select {
+			case <-closeJoined:
+			case <-time.After(5 * time.Second):
+				t.Error("Close goroutine did not join during test cleanup")
+			}
+		}
+	})
 	returned := make(chan error, 1)
 	go func() {
-		receipt, err := owner.observeDiskInstalledInventory(t.Context(), plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{}, testDiskInspectionBindings,
+		defer close(scanJoined)
+		receipt, err := owner.observeDiskInstalledInventory(ctx, plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{}, testDiskInspectionBindings,
 			func(ctx context.Context, _ *diskPayload, _, _ string) (diskInstalledScan, error) {
 				close(started)
 				<-ctx.Done()
@@ -439,20 +467,29 @@ func TestLiveDiskInspectionCloseCancelsAndJoinsScan(t *testing.T) {
 		t.Fatal("scan did not start")
 	}
 	closed := make(chan error, 1)
-	go func() { closed <- owner.Close() }()
+	closeStarted = true
+	go func() {
+		defer close(closeJoined)
+		closed <- owner.Close()
+	}()
 	select {
 	case <-canceled:
 	case <-time.After(5 * time.Second):
-		close(finish)
 		t.Fatal("Close did not cancel the active scan")
 	}
+	// Cancellation proves Close entered its production path. Keep the scan's
+	// cleanup blocked for a bounded observation window, rather than checking
+	// only the scheduling instant at which cancellation was delivered.
+	blocked := time.NewTimer(100 * time.Millisecond)
+	defer blocked.Stop()
 	select {
 	case err := <-closed:
-		close(finish)
 		t.Fatalf("Close returned before scan cleanup finished: %v", err)
-	default:
+	case <-blocked.C:
+	case <-ctx.Done():
+		t.Fatal("test context ended before Close waiting could be observed")
 	}
-	close(finish)
+	releaseScan()
 	select {
 	case err := <-returned:
 		if factoryErrorCode(err) != e.CodeTimeout {
