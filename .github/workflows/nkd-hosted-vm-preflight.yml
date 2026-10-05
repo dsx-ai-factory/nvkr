@@ -80,15 +80,17 @@ jobs:
           set -euo pipefail
           test "$(id -u)" != 0
           test "$(id -g)" != 0
-          if ! command -v podman >/dev/null || ! command -v crun >/dev/null; then
+          if ! command -v podman >/dev/null || ! command -v crun >/dev/null ||
+            ! dpkg-query -L catatonit >/dev/null; then
             sudo apt-get update -qq
             podman_version=$(apt-cache policy podman | awk '/Candidate:/ {print $2}')
             crun_version=$(apt-cache policy crun | awk '/Candidate:/ {print $2}')
             uidmap_version=$(apt-cache policy uidmap | awk '/Candidate:/ {print $2}')
+            catatonit_version=$(apt-cache policy catatonit | awk '/Candidate:/ {print $2}')
             printf 'Diagnostic runtime packages: podman=%s crun=%s uidmap=%s\n' \
               "$podman_version" "$crun_version" "$uidmap_version"
             sudo apt-get install --yes --no-install-recommends \
-              "podman=$podman_version" "crun=$crun_version" "uidmap=$uidmap_version"
+              "podman=$podman_version" "crun=$crun_version" "uidmap=$uidmap_version" "catatonit=$catatonit_version"
           fi
           podman --version
           crun --version
@@ -121,6 +123,10 @@ jobs:
         run: |
           set -euo pipefail
           runtime_path=$(command -v podman)
+          init_path=$(dpkg-query -L catatonit | awk '/\/catatonit$/ {print; exit}')
+          test -x "$init_path"
+          printf 'Measured init helper path: %s\n' "$init_path"
+          sha256sum "$init_path"
           runtime_root=$(mktemp -d "$RUNNER_TEMP/nkd-vfs.XXXXXXXX")
           mkdir "$runtime_root/config"
           runtime_env=(env -i PATH=/nonexistent LANG=C LC_ALL=C TZ=UTC
@@ -145,7 +151,8 @@ jobs:
           "${runtime[@]}" pull "$PROBE_IMAGE"
           # Inspector's required init helper must work independently of limits.
           "${runtime[@]}" run --rm --pull=never --network=none --read-only --cap-drop=ALL \
-            --security-opt=no-new-privileges --init "${mappings[@]}" --user="$(id -u):$(id -g)" \
+            --security-opt=no-new-privileges --init "--init-path=$init_path" \
+            "${mappings[@]}" --user="$(id -u):$(id -g)" \
             "$PROBE_IMAGE" sh -ec 'id; cat /proc/self/cgroup'
           # These command substitutions intentionally execute inside the child.
           # shellcheck disable=SC2016
