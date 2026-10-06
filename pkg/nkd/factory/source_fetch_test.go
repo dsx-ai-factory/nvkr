@@ -224,7 +224,9 @@ test -d /proc/self/fd/4/.
 test "$4" = --work-tree=/proc/self/fd/3/.
 test "$5" = -c
 test "$6" = core.hooksPath=/dev/null
-test "$7" = init
+test "$7" = -c
+test "$8" = core.fsmonitor=false
+test "$9" = init
 test "${GIT_CONFIG_GLOBAL}" = /dev/null
 test "${GIT_CONFIG_NOSYSTEM}" = 1
 test "${NKD_SOURCE_TOKEN}" = test-only-synthetic-token

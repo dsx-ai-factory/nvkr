@@ -15,50 +15,6 @@ import (
 
 // Source checkout and Git writes stay beneath opened directory capabilities.
 // These handles confer filesystem access only, not build or evidence authority.
-func holdSourceFetchDirectory(ctx context.Context, path string) (*os.File, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, e.Wrap(e.CodeTimeout, err, "opening source fetch directory")
-	}
-	root, relative := ".", path
-	if filepath.IsAbs(path) {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, e.Wrap(e.CodeFetchFailed, err, "locating source fetch workspace")
-		}
-		relative, err = filepath.Rel(cwd, path)
-		if err != nil {
-			return nil, e.Wrap(e.CodeFetchFailed, err, "locating source fetch directory")
-		}
-		if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			// Local callers can select an absolute workspace outside cwd. Hold its
-			// nearest existing directory as the explicit root; generated Plan paths
-			// instead stay beneath cwd and never use this branch.
-			root, relative = path, ""
-			for {
-				info, statErr := os.Lstat(root)
-				if statErr == nil {
-					if !info.IsDir() {
-						return nil, e.New(e.CodeFetchFailed, "source fetch workspace is not a real directory")
-					}
-					break
-				}
-				if !os.IsNotExist(statErr) {
-					return nil, e.Wrap(e.CodeFetchFailed, statErr, "locating source fetch workspace")
-				}
-				relative = filepath.Join(filepath.Base(root), relative)
-				root = filepath.Dir(root)
-			}
-		}
-	}
-	// CreateParent opens/creates every component with no-follow descriptor access;
-	// the final placeholder is never created or used as a source member.
-	directory, _, err := securepath.CreateParentBeneath(root, filepath.Join(relative, ".nkd-held-directory"))
-	if err != nil {
-		return nil, e.Wrap(e.CodeFetchFailed, err, "holding safe source fetch directory")
-	}
-	return directory, nil
-}
-
 func holdSourceFetchWorkspaceDirectory(ctx context.Context, workspace *os.File, relative string) (*os.File, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "opening source fetch directory")
