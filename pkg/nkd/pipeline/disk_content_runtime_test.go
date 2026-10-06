@@ -96,7 +96,7 @@ func TestDiskContentResourcesUseDeclaredExpansionBudget(t *testing.T) {
 				selection.ScratchStorage = "memory"
 				// Two 1MiB subject copies, the appliance, all three four-copy
 				// filesystem levels and 2GiB scanner metadata fit exactly.
-				selection.Resources.MemoryMiB = 2 + 2048 + 12 + 2048
+				selection.Resources.MemoryMiB = 2 + 2048 + 12 + 2048 + diskContentReportMemoryMiB
 				facts := execution.ObservedHostFacts{Platform: execution.HostPlatformLinuxAMD64,
 					Resources: execution.ResourceCapacity{CPUMillis: selection.Resources.CPUMillis, MemoryMiB: selection.Resources.MemoryMiB, EphemeralStorageMiB: selection.Resources.EphemeralStorageMiB}}
 				if before {
@@ -131,7 +131,7 @@ func TestDiskContentPrivateScratchUsesDiskInsteadOfExpandedRAM(t *testing.T) {
 					selection.Platform = platform
 					selection.MaxFilesystemBytes = 16 << 30
 					selection.ScratchStorage = "private-volume"
-					selection.Resources.MemoryMiB = uint64(int64(2*1024+2048+6144+2*1024) + tc.memoryDelta)
+					selection.Resources.MemoryMiB = uint64(int64(2*1024+2048+6144+2*1024+diskContentReportMemoryMiB) + tc.memoryDelta)
 					selection.Resources.EphemeralStorageMiB = uint64(int64(12*16384+2*1024+2048) + tc.storageDelta)
 					facts := execution.ObservedHostFacts{Platform: execution.HostPlatform(platform), Resources: execution.ResourceCapacity{CPUMillis: selection.Resources.CPUMillis, MemoryMiB: selection.Resources.MemoryMiB, EphemeralStorageMiB: selection.Resources.EphemeralStorageMiB}}
 					if before {

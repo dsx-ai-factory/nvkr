@@ -236,22 +236,37 @@ func (owner *LocalRunResult) validateDiskInstalledInventoryWhileHeld(ctx context
 // snapshotting, scanning and rechecks. The runtime's timeout is an additional
 // upper bound, not a guaranteed scan allowance beyond the remaining deadline.
 func (owner *LocalRunResult) beginDiskInspection(ctx context.Context) (context.Context, func(), error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	release, err := owner.acquireDiskPermit(ctx)
+	ctx, started, release, err := owner.beginDiskInspectionOperation(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	ctx, cancel := context.WithDeadline(ctx, started.Add(10*time.Minute))
+	return ctx, func() { cancel(); release() }, nil
+}
+
+// The permit and Close cancellation belong to this one operation. Callers add
+// their bounded work deadline as a child of this context, never of the original
+// caller context: replacing an admission deadline must not detach Run closure.
+func (owner *LocalRunResult) beginDiskInspectionOperation(ctx context.Context) (context.Context, time.Time, func(), error) {
+	started := time.Now()
+	ctx, cancel := context.WithCancel(ctx)
+	queue, queueCancel := context.WithDeadline(ctx, started.Add(10*time.Minute))
+	release, err := owner.acquireDiskPermit(queue)
+	queueCancel()
 	if err != nil {
 		cancel()
-		return nil, nil, err
+		return nil, time.Time{}, nil, err
 	}
 	owner.diskMu.Lock()
 	if owner.diskClosed || owner.diskClosing {
 		owner.diskMu.Unlock()
 		cancel()
 		release()
-		return nil, nil, e.New(e.CodeGateUnmet, "disk inspection requires the original open Run")
+		return nil, time.Time{}, nil, e.New(e.CodeGateUnmet, "disk inspection requires the original open Run")
 	}
 	owner.diskInspectionCancel = cancel
 	owner.diskMu.Unlock()
-	return ctx, func() {
+	return ctx, started, func() {
 		owner.diskMu.Lock()
 		owner.diskInspectionCancel = nil
 		owner.diskMu.Unlock()

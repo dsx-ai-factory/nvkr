@@ -73,6 +73,11 @@ const (
 	MaxDiagnosticDiskBytes = 8 << 30
 	// MaxDiskInspectionReportBytes bounds helper reports and runtime diagnostics.
 	MaxDiskInspectionReportBytes = 8 << 20
+	// Composition reports carry complete file inventories. Diagnostics and
+	// installed-package-only reports retain their independent smaller bound.
+	MaxDiskContentReportBytes = 16 << 20
+	// Buffer, returned report, observation copy and decoder input may overlap.
+	diskContentReportMemoryMiB = 4 * (MaxDiskContentReportBytes - MaxDiskInspectionReportBytes) >> 20
 	// MaxDiskInspectionTimeout bounds the complete operation, including revalidation.
 	MaxDiskInspectionTimeout = 10 * time.Minute
 )
@@ -549,6 +554,9 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 		}
 	}()
 	var created, createDiagnostic, diagnostic, report diskInspectionBuffer
+	if selection.compositionKind != "" {
+		report.limit = MaxDiskContentReportBytes
+	}
 	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(createDiagnostic.Bytes()), e.CodeEngineCapability, "creating disk inspection container")
 	}
@@ -648,6 +656,7 @@ func validateDiskInspectionResources(selection DiskInspectionSelection, facts ex
 	snapshotMiB := uint64((size + (1 << 20) - 1) >> 20)
 	needMemory := 2*snapshotMiB + diskInspectionApplianceMiB
 	if selection.MaxFilesystemBytes != 0 {
+		needMemory += diskContentReportMemoryMiB
 		filesystemMiB := (selection.MaxFilesystemBytes + (1 << 20) - 1) / (1 << 20)
 		if selection.ScratchStorage == "private-volume" {
 			// Linux heldfile snapshots are sealed memfds, accounted in RAM
@@ -790,7 +799,10 @@ func lockDiskInspection(ctx context.Context, mu *sync.Mutex) error {
 
 // Do not embed bytes.Buffer: promoted ReadFrom and WriteString would let
 // io.Copy and io.WriteString bypass the bounded Write operation below.
-type diskInspectionBuffer struct{ data bytes.Buffer }
+type diskInspectionBuffer struct {
+	data  bytes.Buffer
+	limit int
+}
 
 func (buffer *diskInspectionBuffer) Len() int       { return buffer.data.Len() }
 func (buffer *diskInspectionBuffer) Bytes() []byte  { return buffer.data.Bytes() }
@@ -798,7 +810,11 @@ func (buffer *diskInspectionBuffer) String() string { return buffer.data.String(
 func (buffer *diskInspectionBuffer) Reset()         { buffer.data.Reset() }
 
 func (buffer *diskInspectionBuffer) Write(raw []byte) (int, error) {
-	if buffer.Len()+len(raw) > MaxDiskInspectionReportBytes {
+	limit := buffer.limit
+	if limit == 0 {
+		limit = MaxDiskInspectionReportBytes
+	}
+	if len(raw) > limit-buffer.Len() {
 		return 0, e.New(e.CodeEnvelopeDecode, "disk inspection output exceeds its bound")
 	}
 	return buffer.data.Write(raw)

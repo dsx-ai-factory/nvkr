@@ -125,7 +125,11 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		if len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != object.ArtifactType {
 			return e.New(e.CodeVerifyFailed, "SBOM manifest has an invalid payload")
 		}
-		raw, err := readBlob(ctx, root, manifest.Layers[0], 8<<20)
+		limit := int64(sbom.MaxDocumentBytes)
+		if object.ArtifactType == sbom.BundleMediaType {
+			limit = sbom.MaxBundleBytes
+		}
+		raw, err := readBlob(ctx, root, manifest.Layers[0], limit)
 		if err != nil {
 			return err
 		}

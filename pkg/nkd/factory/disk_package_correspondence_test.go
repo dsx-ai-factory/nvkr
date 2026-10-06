@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,8 +18,11 @@ import (
 )
 
 func correspondenceCapture(t *testing.T, architecture string) diskAcquisitionScan {
+	return correspondenceCaptureBytes(t, architecture, []byte("captured package bytes, not validated package metadata"))
+}
+
+func correspondenceCaptureBytes(t *testing.T, architecture string, payload []byte) diskAcquisitionScan {
 	t.Helper()
-	payload := []byte("captured package bytes, not validated package metadata")
 	hash := sha256.Sum256(payload)
 	digest := hex.EncodeToString(hash[:])
 	manifest := material.AcquisitionManifest{SchemaVersion: material.AcquisitionSchemaVersion,
@@ -53,6 +57,62 @@ func correspondenceCapture(t *testing.T, architecture string) diskAcquisitionSca
 	t.Cleanup(func() { _ = held.Close() })
 	return func(ctx context.Context, _ *diskPayload) (*material.AcquisitionObservation, error) {
 		return material.ObserveAcquisitionArchive(ctx, held)
+	}
+}
+
+// The material owner observes both real held archive carriers. Only the stopped
+// installed scan is modeled; this does not establish native inspection proof.
+func TestDiskPackageCorrespondenceValidateRejectsChangedCarrierAndOwner(t *testing.T) {
+	for _, architecture := range []string{"amd64", "arm64"} {
+		for _, changedOwner := range []bool{false, true} {
+			t.Run(architecture+map[bool]string{false: "/changed carrier", true: "/different owner"}[changedOwner], func(t *testing.T) {
+				plan, owner := diskMaterialTraceFixtureForPlatform(t, false, false, "linux/"+architecture)
+				inspector := &sbom.DiskInspectionRuntime{}
+				output := plan.LifecycleOutputs[0]
+				inventory := correspondenceInventory(t, plan, owner, inspector, architecture)
+				scan := correspondenceCapture(t, architecture)
+				receipt, err := owner.observeDiskPackageCorrespondence(t.Context(), plan, output, inspector, inventory, testDiskInspectionBindings, scan)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := "package correspondence carrier changed"
+				called := false
+				changed := correspondenceCaptureBytes(t, architecture, []byte("different original held package bytes"))
+				if changedOwner {
+					_, owner = diskMaterialTraceFixtureForPlatform(t, false, false, "linux/"+architecture)
+					want = "package correspondence belongs to a different Run"
+				}
+				err = owner.validateDiskPackageCorrespondence(t.Context(), plan, output, inspector, receipt, testDiskInspectionBindings,
+					func(ctx context.Context, payload *diskPayload) (*material.AcquisitionObservation, error) {
+						called = true
+						return changed(ctx, payload)
+					})
+				if factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), want) || called == changedOwner {
+					t.Fatalf("wrong validation branch: called=%t error=%v want=%q", called, err, want)
+				}
+			})
+		}
+	}
+}
+
+func TestDiskPackageCorrespondencePublicWrappersRequireRuntimeBeforeWork(t *testing.T) {
+	for _, validate := range []bool{false, true} {
+		t.Run(map[bool]string{false: "observe", true: "validate"}[validate], func(t *testing.T) {
+			var owner *LocalRunResult
+			var err error
+			if validate {
+				err = owner.ValidateDiskPackageCorrespondence(t.Context(), nil, LifecycleOutputPlan{}, nil, nil)
+			} else {
+				var receipt *DiskPackageCorrespondenceReceipt
+				receipt, err = owner.ObserveDiskPackageCorrespondence(t.Context(), nil, LifecycleOutputPlan{}, nil, nil)
+				if receipt != nil {
+					t.Fatal("missing runtime returned a correspondence receipt")
+				}
+			}
+			if factoryErrorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "inspector") {
+				t.Fatalf("public wrapper did not reject missing runtime before nil owner/Plan work: %v", err)
+			}
+		})
 	}
 }
 

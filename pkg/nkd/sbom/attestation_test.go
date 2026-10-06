@@ -66,3 +66,11 @@ func TestAttestedDocumentRejectsAmbiguousOrUnboundStatements(t *testing.T) {
 		})
 	}
 }
+
+func TestAttestedDocumentBundleByteBoundBeforeDecoding(t *testing.T) {
+	raw, err := AttestedDocument([]byte(strings.Repeat(" ", MaxBundleBytes+1)), "sha256:"+strings.Repeat("a", 64))
+	assertDependencyCode(t, err, e.CodeVerifyFailed)
+	if raw != nil || !strings.Contains(err.Error(), "invalid SBOM attestation input") {
+		t.Fatalf("oversized bundle reached JSON decoding or returned a document: bytes=%d error=%v", len(raw), err)
+	}
+}

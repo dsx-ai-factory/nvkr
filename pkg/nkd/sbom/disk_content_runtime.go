@@ -100,6 +100,9 @@ func contentFromContainerObservation(observation *pipeline.DiskInspectionObserva
 // The production caller obtains binding only from the opaque runtime observation.
 // This private decoder seam tests projection, not runtime or receipt issuance.
 func decodeBoundDiskContentReport(raw []byte, image string, binding diskContentReport) (*DiskContentInspection, error) {
+	if len(raw) > pipeline.MaxDiskContentReportBytes {
+		return nil, e.New(e.CodeEnvelopeDecode, "disk content report exceeds its budget")
+	}
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return nil, e.Wrap(e.CodeEnvelopeDecode, err, "validating disk content report")
 	}
@@ -262,7 +265,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 	if err != nil {
 		return err
 	}
-	if len(raw) > maxDiskPackageReportBytes {
+	if len(raw) > pipeline.MaxDiskContentReportBytes {
 		return e.New(e.CodeEnvelopeDecode, "disk content report exceeds its budget")
 	}
 	closeErr := errors.Join(subject.Close(), codec.Close())

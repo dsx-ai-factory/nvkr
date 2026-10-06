@@ -323,6 +323,53 @@ func TestDiskInspectionBufferHasNoUnboundedWriteFastPaths(t *testing.T) {
 	}
 }
 
+func TestDiskContentReportBufferHasSeparateBound(t *testing.T) {
+	for _, content := range []bool{false, true} {
+		t.Run(strconv.FormatBool(content), func(t *testing.T) {
+			var buffer diskInspectionBuffer
+			limit := MaxDiskInspectionReportBytes
+			if content {
+				buffer.limit, limit = MaxDiskContentReportBytes, MaxDiskContentReportBytes
+			}
+			if n, err := buffer.Write([]byte(strings.Repeat("x", limit))); err != nil || n != limit {
+				t.Fatalf("exact report bound: bytes=%d error=%v", n, err)
+			}
+			if n, err := buffer.Write([]byte("x")); code(err) != e.CodeEnvelopeDecode || n != 0 || buffer.Len() != limit {
+				t.Fatalf("report bound+1: bytes=%d error=%v retained=%d", n, err, buffer.Len())
+			}
+		})
+	}
+}
+
+// Exercise the actual launcher projection, not merely a standalone buffer. The
+// controlled transport emits bytes; it is not Docker or content-discovery proof.
+func TestDiskInspectionLauncherSelectsContentReportBound(t *testing.T) {
+	for _, composition := range []bool{false, true} {
+		for _, runtimeName := range []string{"docker", "podman"} {
+			t.Run(runtimeName+"/"+strconv.FormatBool(composition), func(t *testing.T) {
+				subject, err := heldfile.FromBytesContext(t.Context(), []byte("held subject"), heldfile.Options{Label: "report-bound-subject", MaxBytes: 128})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer subject.Close()
+				selection := testDiskInspectionSelection(t)
+				if composition {
+					selection.compositionKind, selection.consumerPlatform = "disk-image", "linux/amd64"
+				}
+				runtime := &diskInspectionRunRuntime{name: runtimeName, report: strings.Repeat("x", MaxDiskInspectionReportBytes+1)}
+				raw, err := runDiskInspectionContainer(t.Context(), runtime, selection, "image", subject)
+				if composition {
+					if err != nil || len(raw) != len(runtime.report) || !runtime.copied {
+						t.Fatalf("composition report was truncated or used diagnostic policy: bytes=%d error=%v", len(raw), err)
+					}
+				} else if code(err) != e.CodeEnvelopeDecode || raw != nil {
+					t.Fatalf("diagnostic bound was weakened: bytes=%d error=%v", len(raw), err)
+				}
+			})
+		}
+	}
+}
+
 func TestDiskInspectionBufferProcessHelper(t *testing.T) {
 	mode := os.Getenv("NKD_DISK_INSPECTION_OUTPUT_HELPER")
 	if mode == "" {

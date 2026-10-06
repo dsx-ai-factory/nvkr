@@ -24,7 +24,7 @@ func (s *CosignOCISigner) AttestSBOM(ctx context.Context, digest string, predica
 	if err := s.admitSBOM(ctx, digest); err != nil {
 		return nil, err
 	}
-	if err := requireOCIPredicate(predicate); err != nil {
+	if err := requireOCIPredicateWithLimit(predicate, sbom.MaxDocumentBytes, e.CodeVerifyFailed, "SBOM inventory"); err != nil {
 		return nil, err
 	}
 	workspace, cleanup, err := newPrivateWorkspace("nkd-sbom-attest-*")
@@ -43,12 +43,12 @@ func (s *CosignOCISigner) AttestSBOM(ctx context.Context, digest string, predica
 	if err := assertPrivateFileUnchanged(input, predicate); err != nil {
 		return nil, err
 	}
-	held, err := heldfile.OpenContext(ctx, output, heldfile.Options{Label: "SBOM attestation", MaxBytes: 8 << 20})
+	held, err := heldfile.OpenContext(ctx, output, heldfile.Options{Label: "SBOM attestation", MaxBytes: sbom.MaxBundleBytes})
 	if err != nil {
 		return nil, e.Wrap(e.CodeSignatureInvalid, err, "reading SBOM attestation")
 	}
 	defer func() { _ = held.Close() }()
-	raw, err := held.ReadAllContext(ctx, 8<<20)
+	raw, err := held.ReadAllContext(ctx, sbom.MaxBundleBytes)
 	if err != nil {
 		return nil, e.Wrap(e.CodeSignatureInvalid, err, "reading SBOM attestation")
 	}

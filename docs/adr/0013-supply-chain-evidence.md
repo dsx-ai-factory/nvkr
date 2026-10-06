@@ -148,6 +148,10 @@ The original held Packer artifact retains its declared acquisition carrier befor
 The runtime owns capacity admission, snapshot creation, bounded offline content scanning, snapshot
 closure and permit release as one registered operation. Factory retains the original Run permit
 through inspection of the disk, base installer, staged material closure and captured guest APT archives.
+Queueing and profile/trace admission remain bounded to ten minutes. The selected authenticated profile's
+wall-time limit multiplied by the exact content-operation count (root, other trace members and the one
+complete acquisition carrier) sets the scan/recheck deadline from the original operation start. An earlier
+caller deadline or Run closure still cancels the entire join; recursive scans do not add allowances.
 Reconciliation rejects absent input classes and installed package identities absent from those inspected
 inputs. The exact captured package bytes are separately read by pinned dpkg-deb before source-reported
 metadata is accepted. Owner-issued content classes distinguish filesystem package databases, container
@@ -184,7 +188,13 @@ payload selection and material-trace checks concrete, while modeling stopped sca
 the public wrapper still requires the actual Packer capability and opaque inspection operations. Those
 tests do not establish full helper discovery or the public native original-owner issuance handshake. Complete
 native NKE content runs, original live joins, publication and production acceptance remain unexercised.
-Documents exceeding the existing 8 MiB bound fail without truncation. The conservative
+Complete inventory documents are bounded to 32 MiB, composition helper reports to 16 MiB,
+and signed SBOM transports to 64 MiB. Diagnostics and generic OCI records retain their independent
+8 MiB limits. A controlled 50,000-file projection measures approximately 9.15 MB of report and
+20.20 MB of CycloneDX; this is not Ubuntu discovery or native execution proof. The 200,000-file
+structural ceiling does not guarantee every such inventory fits the byte limits; oversized complete
+evidence still fails without truncation. Full-content admission charges four overlapping report
+copies for the increase over the diagnostic allowance. The conservative
 simultaneous export/RAM budget is an admission condition, not evidence of runner capacity or reservation.
 
 The helper checks the actual cgroup-v2 CPU, memory and process-count ceilings before reading the subject.

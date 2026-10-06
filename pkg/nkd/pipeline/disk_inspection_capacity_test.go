@@ -18,11 +18,11 @@ func TestDiskContentStorageAdmissionFollowsActualOwner(t *testing.T) {
 					selection := testDiskInspectionSelection(t)
 					selection.Platform, selection.ScratchStorage = platform, storage
 					selection.MaxFilesystemBytes = 16 << 30
-					selection.Resources.MemoryMiB = 2*1024 + 2048 + 12*16384 + 2048
+					selection.Resources.MemoryMiB = 2*1024 + 2048 + 12*16384 + 2048 + diskContentReportMemoryMiB
 					selection.Resources.EphemeralStorageMiB = 12*16384 + 2*1024 + 2048
 					workspace := selection.Resources.EphemeralStorageMiB
 					if storage == "private-volume" {
-						selection.Resources.MemoryMiB = 2*1024 + 2048 + 6144 + 2*1024
+						selection.Resources.MemoryMiB = 2*1024 + 2048 + 6144 + 2*1024 + diskContentReportMemoryMiB
 						// Production Linux held snapshots use memfd; helper scratch
 						// is owned by the separately admitted daemon volume.
 						workspace = 0

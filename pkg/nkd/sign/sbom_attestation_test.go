@@ -38,13 +38,23 @@ func TestSBOMAttestationCreationRequiresExactPredicateAndVerification(t *testing
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name             string
-		substitute, fail bool
-		code             e.Code
+		name                    string
+		substitute, fail, large bool
+		code                    e.Code
 	}{
-		{name: "verified"}, {name: "substituted subject", substitute: true, code: e.CodeVerifyFailed}, {name: "verification failure", fail: true, code: e.CodeSignatureInvalid},
+		{name: "verified"}, {name: "large complete inventory", large: true}, {name: "substituted subject", substitute: true, code: e.CodeVerifyFailed}, {name: "verification failure", fail: true, code: e.CodeSignatureInvalid},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			document := document
+			if tc.large {
+				large := *bom
+				large.Metadata.Props = append(append([]sbom.Property(nil), bom.Metadata.Props...), sbom.Property{Name: "nkd:zpayload", Value: strings.Repeat("x", 9<<20)})
+				var err error
+				document, err = large.Marshal()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 			var calls []string
 			runner := EnvRunnerFunc(func(_ context.Context, _ string, args, env []string, _, _ io.Writer) error {
 				calls = append(calls, args[0])

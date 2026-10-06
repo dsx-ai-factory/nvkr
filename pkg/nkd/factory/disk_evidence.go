@@ -5,11 +5,13 @@ import (
 	"errors"
 	"io"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -187,18 +189,30 @@ func (owner *LocalRunResult) reconcileDiskEvidence(ctx context.Context, plan *Pl
 	if err != nil {
 		return nil, err
 	}
-	ctx, release, err := owner.beginDiskInspection(ctx)
+	operation, started, release, err := owner.beginDiskInspectionOperation(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	profile, err := bindings(ctx)
+	admission, cancelAdmission := context.WithDeadline(operation, started.Add(10*time.Minute))
+	defer cancelAdmission()
+	profile, err := bindings(admission)
 	if err != nil {
 		return nil, err
 	}
-	trace, err := owner.observeDiskMaterialsWhileHeld(ctx, plan, expected)
+	trace, err := owner.observeDiskMaterialsWhileHeld(admission, plan, expected)
 	if err != nil {
 		return nil, err
+	}
+	deadline, err := diskEvidenceJoinDeadline(started, profile.TimeoutSeconds, len(trace.description.Members))
+	if err != nil {
+		return nil, err
+	}
+	cancelAdmission()
+	ctx, cancelJoin := context.WithDeadline(operation, deadline)
+	defer cancelJoin()
+	if err := ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "disk evidence admission consumed its join deadline")
 	}
 	subject := trace.description.Subject
 	if subject.Encryption != "none" {
@@ -249,6 +263,23 @@ func (owner *LocalRunResult) reconcileDiskEvidence(ctx context.Context, plan *Pl
 		return nil, err
 	}
 	return &DiskEvidenceReceipt{owner: owner, runtime: inspection, trace: trace, profile: profile, root: raw, documents: observed.documents}, nil
+}
+
+// There is one content operation for the root, one for each other authenticated
+// trace member, and one for the complete acquisition carrier. Recursive package
+// and archive scans run inside those operations, not as extra outer allowances.
+func diskEvidenceJoinDeadline(started time.Time, timeoutSeconds uint64, members int) (time.Time, error) {
+	if timeoutSeconds == 0 || timeoutSeconds > uint64(pipeline.MaxDiskInspectionTimeout/time.Second) {
+		return time.Time{}, e.New(e.CodeEngineCapability, "disk evidence join requires its selected bounded inspection timeout")
+	}
+	if members <= 0 {
+		return time.Time{}, e.New(e.CodeVerifyFailed, "disk evidence join has no authenticated root member")
+	}
+	operations := uint64(members) + 1
+	if operations > uint64(math.MaxInt64/int64(time.Second))/timeoutSeconds {
+		return time.Time{}, e.New(e.CodeEngineCapability, "disk evidence join timeout exceeds its duration bound")
+	}
+	return started.Add(time.Duration(operations*timeoutSeconds) * time.Second), nil
 }
 
 func (owner *LocalRunResult) scanDiskEvidence(ctx context.Context, plan *Plan, build BuildPlan, trace *diskMaterialTrace, payload *diskPayload,

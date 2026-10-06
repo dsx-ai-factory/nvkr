@@ -3,6 +3,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,86 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
+
+func TestDiskEvidenceJoinDeadlineCountsContentOperations(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		timeout uint64
+		members int
+		want    time.Duration
+		code    e.Code
+	}{
+		{"root and capture", 1, 1, 2 * time.Second, ""},
+		{"root two materials and capture", 600, 3, 40 * time.Minute, ""},
+		{"missing timeout", 0, 3, 0, e.CodeEngineCapability},
+		{"unbounded timeout", 601, 3, 0, e.CodeEngineCapability},
+		{"missing root", 600, 0, 0, e.CodeVerifyFailed},
+		{"invalid count", 600, -1, 0, e.CodeVerifyFailed},
+		{"duration overflow", 600, math.MaxInt, 0, e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			started := time.Unix(123, 0)
+			deadline, err := diskEvidenceJoinDeadline(started, test.timeout, test.members)
+			if factoryErrorCode(err) != test.code {
+				t.Fatalf("deadline error=%v, want%s", err, test.code)
+			}
+			if test.code != "" {
+				if !deadline.IsZero() {
+					t.Fatal("rejected budget returned a deadline")
+				}
+			} else if !deadline.Equal(started.Add(test.want)) {
+				t.Fatalf("deadline=%v, want%v", deadline, started.Add(test.want))
+			}
+		})
+	}
+}
+
+func TestDiskEvidenceIssuerDeadlineUsesSelectedProfileAndOriginalCaller(t *testing.T) {
+	for _, architecture := range []string{"amd64", "arm64"} {
+		for _, test := range []struct {
+			name    string
+			seconds uint64
+			caller  time.Duration
+		}{
+			{"long caller full profile", 600, time.Hour},
+			{"long caller shorter profile", 60, time.Hour},
+			{"short caller", 600, time.Minute},
+		} {
+			t.Run(architecture+"/"+test.name, func(t *testing.T) {
+				plan, owner := diskMaterialTraceFixtureWithCapture(t, false, false, "linux/"+architecture, "none", "acquisitions.tar")
+				// This private scan contract uses an owned, explicitly canceled
+				// long parent, not the test runner's potentially shorter deadline.
+				caller, cancel := context.WithTimeout(context.Background(), test.caller)
+				defer cancel()
+				profile := definition.DiskInspectionProfile{TimeoutSeconds: test.seconds}
+				before, called := time.Now(), false
+				_, err := owner.reconcileDiskEvidence(caller, plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{},
+					func(context.Context) (definition.DiskInspectionProfile, error) { return profile, nil },
+					func(ctx context.Context, _ BuildPlan, trace *diskMaterialTrace, _ *diskPayload, _ definition.DiskInspectionProfile) (diskEvidenceScan, error) {
+						called = true
+						deadline, ok := ctx.Deadline()
+						if !ok {
+							t.Fatal("issuer scan escaped its operation deadline")
+						}
+						allowance := time.Duration(test.seconds) * time.Second * time.Duration(len(trace.description.Members)+1)
+						if test.caller < allowance {
+							parent, _ := caller.Deadline()
+							if !deadline.Equal(parent) {
+								t.Fatal("join extended its original caller deadline")
+							}
+						} else if deadline.Before(before.Add(allowance)) || deadline.After(time.Now().Add(allowance)) {
+							t.Fatalf("join deadline %v does not match selected profile %d for %d operations", deadline, test.seconds, len(trace.description.Members)+1)
+						}
+						return diskEvidenceScan{}, e.New(e.CodeEnvelopeDecode, "controlled stopped scan")
+					})
+				assertFactoryErrorCode(t, err, e.CodeEnvelopeDecode)
+				if !called {
+					t.Fatal("admitted modeled scan was not invoked")
+				}
+			})
+		}
+	}
+}
 
 // This invokes the production issuer core, never a receipt literal. Private
 // scan/profile observations model already-stopped operations; they do not prove
