@@ -267,7 +267,12 @@ Inspection progress is a separate, non-authoritative channel. The inspection hel
 names, elapsed milliseconds and bounded numeric counters; stdout remains the complete report. The host rejects
 unknown diagnostics and, for full-content composition inspection, enriches accepted records with its original held subject's digest and content kind.
 Records are bounded to 512 bytes, the sanitized retained log to 32 KiB and forwarded records to 512 per helper
-operation. Rate limiting and truncation never hide the last accepted phase. Guest paths, raw tool output,
+operation. Parsing has a separate per-helper ceiling of 5,424,414 prefixed candidates, including malformed JSON.
+This conservative emission bound covers the outer filesystem and 32 installer members, each admitted archive's
+16,384 selected-member and 256 image limits, fixed phase pairs and the start preceding an excess-member rejection.
+After the ceiling the receiver drains without further framing or JSON parsing, rejects the inspection and retains
+its last accepted phase. This volume ceiling does not truncate or accept a partial report.
+Rate limiting and truncation never hide the last accepted phase. Guest paths, raw tool output,
 arguments and credentials are not retained. A non-timeout terminal error may contain a quoted, 4 KiB-bounded
 copy of unrecognized stderr; this error-only copy never enters the collector or uploaded diagnostic file.
 Sampling, record caps and byte eviction mark the snapshot as truncated. `filesystem-staging` measures the

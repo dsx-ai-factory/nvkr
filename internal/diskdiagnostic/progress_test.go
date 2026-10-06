@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -66,6 +67,9 @@ func TestInspectionProgressChild(t *testing.T) {
 	}
 	ctx := WithWriter(context.Background(), os.Stderr)
 	Emit(ctx, "nested-scan", "start", 1, 17)
+	if os.Getenv("NKD_INSPECTION_PROGRESS_TEST_VOLUME") == "1" {
+		Emit(ctx, "report-completion", "complete", 0, 0)
+	}
 	time.Sleep(10 * time.Second)
 }
 
@@ -235,5 +239,119 @@ func TestFailureBytesAreBoundedAndNeverRetained(t *testing.T) {
 				t.Fatal("caller mutated receiver cause")
 			}
 		})
+	}
+}
+
+func TestReceiverParsingCeiling(t *testing.T) {
+	const record = Prefix + `{"phase":"nested-scan","event":"start","elapsedMillis":1,"ordinal":17}` + "\n"
+	for _, test := range []struct {
+		name            string
+		previous, count int
+		chunk           int
+		rejected        bool
+	}{
+		{"ceiling minus one", MaxParsedRecords - 2, 1, len(record), false},
+		{"exact ceiling", MaxParsedRecords - 1, 1, len(record), false},
+		{"over ceiling", MaxParsedRecords - 1, 2, len(record), true},
+		{"over ceiling byte chunks", MaxParsedRecords - 1, 2, 1, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			collector := NewCollector()
+			receiver := NewReceiver(collector)
+			// Exercise the arithmetic boundary without millions of repeated JSON
+			// parses. The existing flood tests cover accumulation and sampling.
+			receiver.parsedRecords = test.previous
+			raw := []byte(strings.Repeat(record, test.count))
+			for len(raw) != 0 {
+				size := min(test.chunk, len(raw))
+				if count, err := receiver.Write(raw[:size]); count != size || err != nil {
+					t.Fatal("volume rejection stopped draining", count, err)
+				}
+				raw = raw[size:]
+			}
+			receiver.Finish()
+			if receiver.Unexpected() != test.rejected || receiver.exhausted != test.rejected || receiver.parsedRecords != min(MaxParsedRecords, test.previous+test.count) || !strings.Contains(receiver.Summary(), "ordinal=17") {
+				t.Fatalf("incorrect parsing ceiling: parsed=%d exhausted=%t summary=%s", receiver.parsedRecords, receiver.exhausted, receiver.Summary())
+			}
+			retained, truncated := collector.Snapshot()
+			if truncated != test.rejected || len(retained) > MaxRetainedBytes || len(receiver.FailureBytes()) != 0 {
+				t.Fatal("incorrect rejection retention", truncated, string(retained))
+			}
+		})
+	}
+}
+
+func TestReceiverChargesMalformedCandidatesBeforeParsing(t *testing.T) {
+	receiver := NewReceiver(nil)
+	receiver.parsedRecords = MaxParsedRecords - 1
+	_, _ = io.WriteString(receiver, Prefix+"{invalid-json}\n")
+	if receiver.parsedRecords != MaxParsedRecords || !receiver.Unexpected() || receiver.exhausted {
+		t.Fatal("malformed candidate escaped parsing allowance")
+	}
+	_, _ = io.WriteString(receiver, Prefix+"{invalid-json}\n")
+	if !receiver.exhausted || receiver.parsedRecords != MaxParsedRecords {
+		t.Fatal("malformed flood escaped ceiling")
+	}
+}
+
+func TestExhaustedReceiverDrainsFloodWithoutParsingOrRetaining(t *testing.T) {
+	collector := NewCollector()
+	receiver := NewReceiver(collector)
+	receiver.parsedRecords = MaxParsedRecords - 1
+	_, _ = io.WriteString(receiver, Prefix+`{"phase":"member-walk","event":"start","elapsedMillis":1}`+"\n")
+	_, _ = io.WriteString(receiver, Prefix+"{invalid-json}\n")
+	before, _ := collector.Snapshot()
+	for _, raw := range []string{strings.Repeat(Prefix+"{secret}\n", 10000), strings.Repeat("secret", MaxFailureBytes), "partial"} {
+		if count, err := io.WriteString(receiver, raw); count != len(raw) || err != nil {
+			t.Fatal("exhausted stream did not drain", count, err)
+		}
+	}
+	receiver.Finish()
+	after, truncated := collector.Snapshot()
+	if !receiver.Unexpected() || !receiver.exhausted || receiver.parsedRecords != MaxParsedRecords || len(receiver.line) != 0 || len(receiver.FailureBytes()) != 0 || !bytes.Equal(before, after) || !truncated || !strings.Contains(receiver.Summary(), "phase=member-walk") {
+		t.Fatal("exhausted stream parsed or retained rejected bytes", receiver.Summary())
+	}
+	// A shared retention collector does not share the helper's parsing allowance.
+	sibling := NewReceiver(collector)
+	_, _ = io.WriteString(sibling, Prefix+`{"phase":"report-completion","event":"complete","elapsedMillis":2}`+"\n")
+	sibling.Finish()
+	if sibling.Unexpected() || sibling.parsedRecords != 1 || !strings.Contains(sibling.Summary(), "phase=report-completion") {
+		t.Fatal("sibling helper inherited exhausted allowance", sibling.Summary())
+	}
+}
+
+func TestReceiverConcurrentWritesSaturateParsingCount(t *testing.T) {
+	receiver := NewReceiver(NewCollector())
+	receiver.parsedRecords = MaxParsedRecords - 4
+	var workers sync.WaitGroup
+	for range 16 {
+		workers.Go(func() {
+			_, _ = io.WriteString(receiver, Prefix+`{"phase":"nested-scan","event":"start","elapsedMillis":1}`+"\n")
+			_ = receiver.Summary()
+		})
+	}
+	workers.Wait()
+	receiver.Finish()
+	if !receiver.Unexpected() || receiver.parsedRecords != MaxParsedRecords || !receiver.exhausted || !strings.Contains(receiver.Summary(), "phase=nested-scan") {
+		t.Fatal("concurrent stream escaped parsing ceiling", receiver.Summary())
+	}
+}
+
+func TestNativeChildParsingCeilingStillDrainsAndJoins(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	receiver := NewReceiver(NewCollector())
+	receiver.parsedRecords = MaxParsedRecords - 1
+	command := exec.CommandContext(ctx, executable, "-test.run=^TestInspectionProgressChild$")
+	command.Env = append(os.Environ(), "NKD_INSPECTION_PROGRESS_TEST_CHILD=1", "NKD_INSPECTION_PROGRESS_TEST_VOLUME=1")
+	command.Stderr = receiver
+	err = command.Run()
+	receiver.Finish()
+	if err == nil || ctx.Err() != context.DeadlineExceeded || command.ProcessState == nil || !receiver.Unexpected() || !receiver.exhausted || !strings.Contains(receiver.Summary(), "phase=nested-scan") || strings.Contains(receiver.Summary(), "report-completion") {
+		t.Fatalf("volume rejection lost child joining or accepted a later phase: err=%v summary=%s", err, receiver.Summary())
 	}
 }

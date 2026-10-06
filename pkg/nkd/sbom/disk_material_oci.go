@@ -152,7 +152,7 @@ func nestedOCIImagesSeen(ctx context.Context, index v1.ImageIndex, platform stri
 			}
 			seen[descriptor.Digest] = true
 			budget.images++
-			if budget.images > 256 {
+			if budget.images > maxDiskNestedImages {
 				return nil, e.New(e.CodeEngineCapability, "nested material exceeds its cumulative image budget")
 			}
 			image, err := index.Image(descriptor.Digest)
