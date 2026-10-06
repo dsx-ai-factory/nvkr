@@ -351,7 +351,7 @@ owning signed protocol, never serialization of an in-process capability.
 The combined M2 Definition selects 34 named outputs: the existing ten CLI/controller/chart/operator/disk
 outputs plus twelve third-party runtime images for each native architecture. The human-selected image mode
 uses pinned NKE deployment values, not chart defaults; optional chart-test images remain separate. Native
-AMD64 and ARM64 native subjects are recorded in the artifact lock; external acquisition/media
+AMD64 and ARM64 subjects are recorded in the artifact lock; external acquisition/media
 read-back is not retained in this repository. The separate source-owner checkpoint for NKE images outside the
 disk remains an explicit ownership question. Configurable charts do not imply image delivery or topology.
 
@@ -370,7 +370,9 @@ creating a release tag. The generic commit-pin path shares Git acquisition and a
 GitHub actions and release-tool sources remain release-tag-only. Operator acquisition shares the source
 tool lock's separate archive and executable pins and the standard-library archive selector. Acquisition is
 contract-tested; external Helm/kubectl acquisition is not recorded here. Archive URL provenance binds the
-archive digest separately from the selected executable/member digest. Logical sparse-file sizes and physical
+archive digest separately from the selected executable/member digest in the pipeline-attested lane.
+The qualified emitter retains its existing bare prebuilt URI and does not bind the release archive/member;
+qualified release-executable provenance remains unsupported. Logical sparse-file sizes and physical
 expansion are both bounded, with cancellation checks during synthesized-member reads.
 
 The [input evidence map](../m2-input-evidence-map.md) records exact pins, media, matrix obligations,

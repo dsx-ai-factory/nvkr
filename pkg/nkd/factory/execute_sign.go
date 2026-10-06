@@ -431,8 +431,10 @@ func resolvedDependencies(plan *Plan) []provenance.Dependency {
 					memberURI := "nkd:prebuilt/" + url.PathEscape(node.Component) + "?" + url.Values{
 						"archive": {node.Artifact}, "member": {node.ExecutableArchive.Member},
 					}.Encode()
-					byURI[memberURI] = provenance.Dependency{URI: memberURI,
-						Digest: map[string]string{"sha256": strings.TrimPrefix(node.Digest, "sha256:")}}
+					if _, seen := byURI[memberURI]; !seen {
+						byURI[memberURI] = provenance.Dependency{URI: memberURI,
+							Digest: map[string]string{"sha256": strings.TrimPrefix(node.Digest, "sha256:")}}
+					}
 				}
 				dependency = provenance.Dependency{URI: node.Artifact,
 					Digest: map[string]string{"sha256": strings.TrimPrefix(digest, "sha256:")}}

@@ -105,7 +105,7 @@ func TestSelectTarGzipSparseScanCancellation(t *testing.T) {
 	ctx := &scanCancelContext{Context: t.Context()}
 	got, err := SelectTarGzip(ctx, bytes.NewReader(sparseReleaseArchive(t, 1<<20)), "bin/tool", Limits{ExecutableBytes: 8, ExpandedBytes: 2 << 20, Entries: 8})
 	var coded *e.Error
-	if !errors.As(err, &coded) || coded.Code != e.CodeTimeout || got != nil {
+	if !errors.As(err, &coded) || coded.Code != e.CodeTimeout || !strings.Contains(err.Error(), "reading remaining release member") || got != nil {
 		t.Fatalf("mid-scan cancellation: %q, %v (checks %d)", got, err, ctx.checks)
 	}
 }

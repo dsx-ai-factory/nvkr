@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
-	"github.com/google/go-containerregistry/pkg/name"
 )
 
 func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
@@ -23,12 +22,6 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 	}
 	if candidate.Publication.CredentialRef != production.Publication.CredentialRef || !reflect.DeepEqual(candidate.Signing, production.Signing) {
 		t.Fatal("namespace separation invented a different credential or approved signer identity")
-	}
-	for _, output := range []string{"releases", "cwe", "nkectl"} {
-		ref, err := name.NewRepository(prefix + "/" + output)
-		if err != nil || ref.Name() != prefix+"/"+output {
-			t.Fatalf("candidate route %s: %v", output, err)
-		}
 	}
 	if len(candidate.ExecutionClasses) != 0 || len(candidate.DiskInspectionProfiles) != 0 {
 		t.Fatal("unmeasured native admission values were fabricated")

@@ -5,11 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/provenance"
 )
 
 func TestReleaseExecutableResolvedDependencies(t *testing.T) {
@@ -28,6 +30,21 @@ func TestReleaseExecutableResolvedDependencies(t *testing.T) {
 				t.Fatal(err)
 			}
 			dependencies := resolvedDependencies(&Plan{Builds: []BuildPlan{{Graph: graph}}})
+			// These are synthetic provenance input identities, not a live Run.
+			digest := "sha256:" + strings.Repeat("a", 64)
+			started := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
+			run, err := provenance.NewLocalRunContext(digest, started, started.Add(time.Second))
+			if err != nil {
+				t.Fatal(err)
+			}
+			predicate := provenance.ProductionPredicate(run, provenance.ProductionInputs{
+				BuildType: provenance.BuildTypeAcquired, PlanDigest: digest, RunPlanReference: "release-member-fixture",
+				DefinitionDigest: digest, EnvironmentDigest: digest, CatalogDigest: digest,
+				GeneratorVersion: "fixture", SigningMode: provenance.SigningModeDryRun, ResolvedDependencies: dependencies,
+			})
+			if err := provenance.ValidateProduction(predicate); err != nil {
+				t.Fatalf("resolved dependencies rejected by production owner: %v", err)
+			}
 			for _, node := range graph.Nodes {
 				if node.Kind != ir.KindPull {
 					continue

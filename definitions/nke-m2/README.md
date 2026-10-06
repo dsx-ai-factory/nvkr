@@ -24,16 +24,18 @@ substituted, or bypassed; an execution-authorizing index/native protocol remains
 The operator catalog selects Helm 4.1.4 and kubectl 1.36.3 from the pinned NKE kubeadm-distribution lock:
 `dsx-ai-factory/nke@b30117c25b2dcdf6c16021dae88a2eafdafcae61`,
 `os-image/packages/kubeadm-distro/lock/amd64/v1.36.3.lock`.
-Their downloaded transport hashes match that source-owned lock. Helm's archive and selected executable
+The declared transport digests match that source-owned lock; no retained download diagnostic is claimed.
+Helm's archive and selected executable
 have distinct pins; the delivered file is `helm`, not its tar archive. Kubectl is a raw executable.
 The local lock is generated with the existing catalog pin/bump command, not hand-authored.
 
 The four NKE OS/material sources are machine-pinned to that exact commit using `catalog pin --commit`.
-NKE #1211 is still open and unmerged at that head; the pin is a review candidate, not
+The [October 5 source snapshot](../../docs/evidence/2026-10-05-m2-input-acquisition.md#read-only-source-review-snapshot)
+records NKE #1211 as open and unmerged at that head; the pin is a review candidate, not
 source-owner release approval. Exact commit acquisition does not establish reachability
 from a protected/default branch. Publication must not be treated as approved until that
 source-review gate and the independently missing execution/profile gates are resolved.
-Its source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
+The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde-apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
 under `nke.dev/os-image-materials/v1`; every selected material and disk target retains its own architecture.

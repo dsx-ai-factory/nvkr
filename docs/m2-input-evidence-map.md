@@ -1,7 +1,7 @@
 # M2 maintained input evidence map
 
-The source candidate is reviewed as PR #95, stacked on source-fetch PR #94,
-publication PR #92 and evidence PR #91. Those reviewed source dependencies supply
+The source candidate is under review as PR #95, stacked on source-fetch PR #94,
+publication PR #92 and evidence PR #91. Those open, under-review dependencies supply
 the capture schema and scoped trusted source-fetch interfaces;
 the native capture regression runs against those inherited interfaces. Exact-head local
 validation is recorded in the pull request separately from production acceptance.
@@ -148,8 +148,9 @@ license/security gates `not-recorded`. The Packer lock's `validatedNKE.commit` r
 `726f76944404e1106626b8333d3576bdf67b575b`, not the selected capture-capable source. Before claiming
 production readiness, native capture-enabled bakes must retain the selected
 `non-fde-apt-acquisitions.tar`, and original live Run owners must reconcile each exact final disk
-and complete material closure. Both selected NKE source PRs remain open at the recorded exact
-heads; pinning them establishes bytes, not source-review or merge acceptance. Final-parent graph
+and complete material closure. The dated snapshot records NKE #1211 as open at `b30117c`;
+the deployment selection `33fb71b` is on NKE main through merged #1096. Pinning establishes
+bytes, not source-owner release acceptance. Final-parent graph
 tests, the full repository/security gates, full signed publication and independent consumer
 verification remain required separately. No unavailable handoff value is filled by this record.
 
@@ -291,7 +292,7 @@ The source pin was generated with `catalog pin --commit 33fb71b2f4224b470ebc628a
 The image lock was generated atomically with `catalog pin-artifacts --all --arch amd64 --arch arm64`.
 No artifact digest was hand-authored. The informational source/artifact `tag` is the source-selection
 commit, not a claimed upstream image version. Registry refs below and native artifact digests own acquisition.
-The Bash declaration uses its exact source-owned index digest with the informational `latest` tag omitted:
+The Bash declaration uses its exact source-owned index digest with the informational `latest` tag omitted.
 The catalog refuses the PostgreSQL/Bash authored index declarations before resolving
 any image member. The current protocol does not authorize digest-qualified authored
 image references, including native references, and pin maintenance refuses them before
