@@ -95,6 +95,16 @@ func validateReconciledDiskDocument(plan *Plan, output, component, subject strin
 	if source == nil {
 		return e.New(e.CodeProvenanceMissing, "disk evidence has no source-bound component subject")
 	}
+	root := artifacts[expected.ArtifactID]
+	if component == root.Component {
+		// The reconciliation owner projects the source fields while retaining
+		// the inspected OS subject type. Material subjects still compare against
+		// their original producer type, not a caller-selected replacement.
+		source, err = sbom.WithSourceSubject(bom, source)
+		if err != nil {
+			return err
+		}
+	}
 	actual := bom.Metadata.Component
 	actual.BOMRef = source.Metadata.Component.BOMRef
 	if !reflect.DeepEqual(actual, source.Metadata.Component) {
@@ -105,7 +115,6 @@ func validateReconciledDiskDocument(plan *Plan, output, component, subject strin
 		properties[property.Name] = property.Value
 	}
 	method := "disk-content/v1"
-	root := artifacts[expected.ArtifactID]
 	if component == root.Component {
 		method = "disk-reconciled/v1"
 		if !canonical.IsDigest(properties["nkd:diskInspectionRuntimeDigest"]) ||

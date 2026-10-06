@@ -68,6 +68,7 @@ func TestDiskPublicationCollectionPinsLayoutNotPayload(t *testing.T) {
 			bom.Metadata.Component.BOMRef = "artifact:" + strings.TrimPrefix(payloadPin, "sha256:")
 			bom.Components = []sbom.Component{{Type: "library", Name: "collection-test", Version: "1", PURL: dependency, BOMRef: dependency}}
 			bom.Dependencies = []sbom.Dependency{{Ref: bom.Metadata.Component.BOMRef, DependsOn: []string{dependency}}}
+			bom.Metadata.Component.Type = "operating-system"
 			bom.Metadata.Props = append(bom.Metadata.Props, sbom.Property{Name: "nkd:dependencyInspection", Value: "disk-reconciled/v1"})
 			for _, key := range []string{"nkd:dependencyScannerDigest", "nkd:diskInspectionRuntimeDigest", "nkd:diskInspectorDigest", "nkd:diskCodecDigest"} {
 				bom.Metadata.Props = append(bom.Metadata.Props, sbom.Property{Name: key, Value: expected.BuildDigest})

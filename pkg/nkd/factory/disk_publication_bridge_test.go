@@ -106,6 +106,7 @@ func TestDiskPublicationSelectsFrozenExecutionHostProfile(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			bom.Metadata.Component.Type = "operating-system"
 			bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "controlled-package", Version: "1"}}, "disk-reconciled/v1", profile.ScannerDigest)
 			if err != nil {
 				t.Fatal(err)
@@ -118,6 +119,20 @@ func TestDiskPublicationSelectsFrozenExecutionHostProfile(t *testing.T) {
 			sort.Slice(bom.Metadata.Props, func(i, j int) bool { return bom.Metadata.Props[i].Name < bom.Metadata.Props[j].Name })
 			if err := validateReconciledDiskDocument(plan, expected.Name, component, pin, bom); err != nil {
 				t.Fatalf("native host evidence rejected: %v", err)
+			}
+			for _, field := range []string{"version", "purl"} {
+				changed := *bom
+				switch field {
+				case "version":
+					changed.Metadata.Component.Version = "substituted-version"
+				case "purl":
+					changed.Metadata.Component.PURL = "pkg:generic/substituted-source@1"
+				}
+				err := validateReconciledDiskDocument(plan, expected.Name, component, pin, &changed)
+				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+				if !strings.Contains(err.Error(), "frozen full component source subject") {
+					t.Fatalf("%s substitution missed source owner comparison: %v", field, err)
+				}
 			}
 			for index := range bom.Metadata.Props {
 				if bom.Metadata.Props[index].Name == "nkd:dependencyScannerDigest" {

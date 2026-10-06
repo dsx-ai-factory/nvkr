@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -132,6 +133,12 @@ func TestReleaseSBOMSubjectGateRejectsSelfPinnedChanges(t *testing.T) {
 					}
 				}
 			}
+			// Recomputed SBOM identities change names. Keep the outer envelope
+			// canonical so the selected semantic or subject defect reaches its gate.
+			sort.Slice(inspection.Root.Objects, func(i, j int) bool {
+				left, right := inspection.Root.Objects[i], inspection.Root.Objects[j]
+				return left.Name+"\x00"+left.Kind < right.Name+"\x00"+right.Kind
+			})
 			pin := rewriteDiskPublicationRoot(t, root, inspection, func(*PublicationRoot) {})
 			owner, err := openDiskPublicationFixture(t.Context(), root, pin)
 			code, diagnostic := e.CodeVerifyFailed, "SBOM document differs from its exact release subject"

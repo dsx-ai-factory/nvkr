@@ -64,6 +64,7 @@ func diskPublicationRequest(t *testing.T, arch string) (PublicationRequest, stri
 			t.Fatal(err)
 		}
 		if subject.Component == "image" {
+			bom.Metadata.Component.Type = "operating-system"
 			bom.Metadata.Component.BOMRef = "artifact:" + strings.TrimPrefix(rawPin, "sha256:")
 			dependency := "pkg:generic/fixture-installed-package@1"
 			bom.Components = []sbom.Component{{Type: "library", Name: "fixture-installed-package", Version: "1", PURL: dependency, BOMRef: dependency}}

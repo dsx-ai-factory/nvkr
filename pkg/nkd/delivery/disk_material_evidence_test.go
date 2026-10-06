@@ -17,6 +17,11 @@ func TestDiskPublicationRequiresMaterialContentInventory(t *testing.T) {
 			t.Run(architecture+"/"+method, func(t *testing.T) {
 				request, _ := diskPublicationRequest(t, architecture)
 				changeDiskFixtureComponentBOM(&request, "agent", func(bom *sbom.BOM) {
+					if method == "disk-reconciled/v1" {
+						// Keep the wrong-method document structurally valid so the
+						// release's material-specific gate rejects its membership.
+						bom.Metadata.Component.Type = "operating-system"
+					}
 					for index, property := range bom.Metadata.Props {
 						if property.Name == "nkd:dependencyInspection" {
 							bom.Metadata.Props[index].Value = method

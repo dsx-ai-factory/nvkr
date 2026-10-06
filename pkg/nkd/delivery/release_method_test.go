@@ -19,6 +19,11 @@ func TestNonDiskReleaseRejectsDiskInspectionMethods(t *testing.T) {
 			if err := canonical.UnmarshalExact(object.Bytes, &bom); err != nil {
 				t.Fatal(err)
 			}
+			if method == "disk-reconciled/v1" {
+				// Admit the disk method's document shape, then require the
+				// non-disk release output to reject that otherwise-valid method.
+				bom.Metadata.Component.Type = "operating-system"
+			}
 			withInventory, err := sbom.WithDependencies(&bom, []sbom.Component{{Type: "library", Name: "fixture", Version: "1"}}, method, request.Objects[0].Output.BuildDigest)
 			if err != nil {
 				t.Fatal(err)
