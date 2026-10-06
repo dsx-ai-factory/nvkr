@@ -38,7 +38,7 @@ func TestValidateGitHubBundleRejectsInspectionDiagnosticUploadTampering(t *testi
 					if step.Name == "Retain inspection diagnostics" {
 						diagnosticPath, diagnosticName = step.With["path"], step.With["name"]
 						for _, upload := range job.Steps {
-							if upload.Uses == step.Uses && upload.With["if-no-files-found"] == "error" {
+							if upload.Name != "Upload failed Packer diagnostics" && upload.Uses == step.Uses && upload.With["if-no-files-found"] == "error" {
 								payloadPath = upload.With["path"]
 								break
 							}

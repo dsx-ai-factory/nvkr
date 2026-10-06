@@ -2,7 +2,7 @@
 
 ## Scope
 
-This records an uncommitted patch based on upstream main
+This is a historical preparation-stage record of a then-uncommitted patch based on upstream main
 `61ec66fa4ffaf75fee291450f7572d244f2e624f`. The patch admits the explicit
 `native-kvm-v1` operator-trusted route under ADR-18. Contract tests render one
 Definition with both native disk groups, keep credential-bearing source fetches
@@ -11,7 +11,7 @@ unsupported policy/profile selections. They do not exercise a complete ARC job.
 
 The authored preparation workflow builds and measures on native AMD64/ARM64
 GitHub-hosted runners and retains exact image archives for later publication.
-It has not been dispatched. It requires a clean checkout, publishes nothing and
+At that preparation stage it had not been dispatched. It requires a clean checkout, publishes nothing and
 does not issue license/security approval or a production inspection profile.
 
 ## Candidate publication exception
@@ -189,14 +189,14 @@ The [nkd-arc Environment](2026-10-06-native-arc/publication/arc-environment.json
 was created with custom branch restrictions and exactly one
 [main branch policy](2026-10-06-native-arc/publication/arc-branches.json).
 The user subsequently authorized allowing the validation branch. The authored Environment
-now admits exactly `codex/m2-arc-validation` in addition to the default branch,
-and the signer regex admits exactly `main` or that branch at the existing workflow path.
+at that preparation stage admitted exactly `codex/m2-arc-validation` in addition to the default branch,
+and the signer regex admitted exactly `main` or that branch at the existing workflow path.
 ARC reuses the existing identity-bound exact-branch mechanism; tag/PR refs and
 wildcards remain rejected. Read-back confirms the branch was added to both
 [nkd-arc](2026-10-06-native-arc/publication/arc-validation-branches.json) and
 [nkd-release](2026-10-06-native-arc/publication/release-validation-branches.json).
 Existing deployment policies were preserved. The checkout is named for that branch;
-no commit or push was performed. Contract tests exercise both native ARC platforms,
+no commit or push had been performed at that preparation stage. Contract tests exercise both native ARC platforms,
 all execution/finalization job guards and substituted-branch rejection. Byte-exact
 regeneration, actionlint, yamllint, exact signer-ref checks and Linux-targeted lint
 passed for the branch change. The repeated full gate reaches the same five macOS
@@ -207,7 +207,11 @@ native ARC race tests then passed.
 The `NKE_SOURCE_TOKEN` repository secret name exists. Online ARC runner listings
 do not prove the KVM scale sets' capacity or access restrictions. Full generated
 M2 build, capture, inspection, reconciliation, publication, signing and consumer
-verification remain unexercised. Repository changes remain uncommitted.
+verification had not been exercised at that preparation stage. Repository changes were then uncommitted.
+Later generated execution and its failed aggregate delivery are separately recorded in the
+[release-carrier evidence](2026-10-06-m2-release-carrier-transport.md); those observations do not revise the
+original preparation results or constitute completed M2 acceptance. The maintained authored Environment
+subsequently returned to main-only dispatch/signing. External deployment-policy alignment remains pending.
 
 Validation used pinned Go 1.27.1. Fresh full uncached tests and the full race
 suite passed after the published pins, generated M2 bundle and private-pull
@@ -223,4 +227,5 @@ shellcheck, vulnerability scan and diff whitespace checks passed. `make check`
 remains blocked by five existing macOS staticcheck SA4023 reports in the non-Linux
 executable-runtime paths of `disk_inspection_runtime.go` and `source_vendor.go`;
 those functions were not changed. No repository-wide clean gate or production
-acceptance is claimed. No Git commit, push, PR or workflow dispatch was performed.
+acceptance is claimed by this preparation record. At that stage no Git commit, push, PR or workflow dispatch
+had been performed; this is not a present-tense assertion about subsequent PRs or executions.

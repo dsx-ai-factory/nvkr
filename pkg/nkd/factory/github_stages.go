@@ -1,31 +1,46 @@
 package factory
 
 import (
+	"slices"
 	"strings"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-// A stage is a scheduling choice, not a new graph or authority record. Only
-// consecutive compatible offline utility nodes share a runner. Contracting a
-// consecutive interval of a topological ordering cannot introduce a cycle.
+// A stage is a scheduling choice, not a new graph or authority record. Compatible
+// offline utilities group consecutively; a disk's operations share its live owner
+// even when interleaved with another output. Validate the contracted job graph
+// because grouping nonconsecutive nodes can otherwise introduce a cycle.
 type githubStage struct {
-	DiskOutput string
-	ID         string
-	Name       string
-	Nodes      []Node
+	DiskOutput            string
+	ID                    string
+	Name                  string
+	Nodes                 []Node
+	diskExecutionBudget   time.Duration
+	diskJobTimeoutMinutes int
 }
+
+const (
+	githubMaximumDiskJobTimeoutMinutes = 1440
+	githubDiskProviderOverheadMinutes  = githubSupportJobTimeoutMinutes
+	githubDiskCleanupHeadroomMinutes   = 5
+	githubDiskDiagnosticUploadMinutes  = 5
+)
 
 // githubStageTimeoutMinutes projects the producer-owned per-node timeout into
 // GitHub's whole-minute job limit. A stage with no declared timeout keeps the
 // bounded 60-minute adapter default. Grouped nodes execute serially, so their
 // declared budgets are added rather than taking only the largest value.
 func githubStageTimeoutMinutes(stage githubStage) (int, error) {
-	limit := uint64(githubMaximumJobTimeoutMinutes)
 	if stage.DiskOutput != "" {
-		limit = 1440
+		if stage.diskExecutionBudget <= 0 || stage.diskJobTimeoutMinutes <= 0 {
+			return 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q has no derived execution budget", stage.ID)
+		}
+		return stage.diskJobTimeoutMinutes, nil
 	}
+	limit := uint64(githubMaximumJobTimeoutMinutes)
 	var total uint64
 	declared := false
 	undeclared := 0
@@ -61,6 +76,79 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 		total += githubDefaultStageTimeoutMinutes
 	}
 	return int(total), nil
+}
+
+// Disk stages execute producers, then one live completion operation. Synthetic
+// SBOM/package nodes are recorded by completion, not separate hour-long jobs.
+// Bound each real producer and reuse the strict inspector's member accounting.
+func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, error) {
+	maximum := uint64(githubMaximumDiskJobTimeoutMinutes * 60)
+	total := uint64(githubDefaultStageTimeoutMinutes * 60) // terminal observation and packaging
+	members, roots := 0, 0
+	platform := ""
+	for _, node := range stage.Nodes {
+		if node.Kind != NodeBuild && node.Kind != NodeAcquire {
+			continue
+		}
+		seconds, err := githubDiskProducerTimeoutSeconds(node)
+		if err != nil {
+			return 0, 0, err
+		}
+		if seconds > maximum || total > maximum-seconds {
+			return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q exceeds its job duration bound", stage.ID)
+		}
+		total += seconds
+		members++
+		if node.ExecutionBinding != nil {
+			roots++
+			platform = string(node.ExecutionBinding.Class.HostPlatform)
+		}
+	}
+	if roots != 1 || members == 0 || plan == nil {
+		return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q requires one bound VM producer", stage.ID)
+	}
+	if !diskBuildProvenance(plan) {
+		started := time.Unix(0, 0)
+		deadline, err := diskEvidenceJoinDeadline(started, plan.Environment.DiskInspectionProfiles[platform].TimeoutSeconds, members)
+		if err != nil {
+			return 0, 0, err
+		}
+		inspectionSeconds := uint64(deadline.Sub(started) / time.Second)
+		if inspectionSeconds > maximum || total > maximum-inspectionSeconds {
+			return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q inspection exceeds its job duration bound", stage.ID)
+		}
+		total += inspectionSeconds
+	}
+	// The helper returns before the provider boundary, leaving time for owner
+	// cleanup and failure diagnostics. Earlier caller deadlines still win.
+	overhead := uint64((githubDiskProviderOverheadMinutes + githubDiskCleanupHeadroomMinutes + githubDiskDiagnosticUploadMinutes) * 60)
+	if total > maximum-overhead {
+		return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q has no provider/cleanup headroom", stage.ID)
+	}
+	return time.Duration(total) * time.Second, int((total + overhead + 59) / 60), nil
+}
+
+func githubDiskProducerTimeoutSeconds(node Node) (uint64, error) {
+	seconds := uint64(githubDefaultStageTimeoutMinutes * 60)
+	if node.Requirements != nil && node.Requirements.TimeoutSeconds != 0 {
+		seconds = node.Requirements.TimeoutSeconds
+	}
+	if node.ExecutionBinding != nil {
+		ceiling := node.ExecutionBinding.Class.MaxTimeoutSeconds
+		if ceiling == 0 {
+			return 0, e.New(e.CodeEngineCapability, "GitHub disk producer %q has no class timeout ceiling", node.ID)
+		}
+		if node.Requirements == nil || node.Requirements.TimeoutSeconds == 0 {
+			seconds = ceiling
+		}
+		if seconds > ceiling {
+			return 0, e.New(e.CodeEngineCapability, "GitHub disk producer %q exceeds its selected class timeout ceiling", node.ID)
+		}
+	}
+	if seconds > uint64(githubMaximumDiskJobTimeoutMinutes*60) {
+		return 0, e.New(e.CodeEngineCapability, "GitHub disk producer %q exceeds its duration bound", node.ID)
+	}
+	return seconds, nil
 }
 
 func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
@@ -107,12 +195,40 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 		if stage.DiskOutput != "" {
 			stage.ID = githubJobID("disk/" + stage.DiskOutput)
 			stage.Name = "Build, inspect and package " + stage.DiskOutput
+			if diskBuildProvenance(plan) {
+				stage.Name = "Build and package producer evidence for " + stage.DiskOutput
+			}
+			var err error
+			stage.diskExecutionBudget, stage.diskJobTimeoutMinutes, err = githubDiskStageBudget(plan, *stage)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		for _, node := range stage.Nodes {
 			jobs[node.ID] = stage.ID
 		}
 	}
+	if err := validateGitHubStageDAG(plan, stages, jobs); err != nil {
+		return nil, nil, err
+	}
 	return stages, jobs, nil
+}
+
+func validateGitHubStageDAG(plan *Plan, stages []githubStage, jobs map[string]string) error {
+	_, artifacts := planIndex(plan)
+	// Reuse the artifact scheduler's topological walk over the projected stage
+	// edges; this description does not replace or weaken complete Plan admission.
+	graph := ArtifactGraph{Artifacts: append([]Artifact(nil), plan.Graph.Artifacts...)}
+	for i := range graph.Artifacts {
+		graph.Artifacts[i].Producer = jobs[graph.Artifacts[i].Producer]
+	}
+	for _, stage := range stages {
+		graph.Nodes = append(graph.Nodes, Node{ID: stage.ID, Inputs: stage.inputs(artifacts, jobs)})
+	}
+	if len(topologicalFactoryNodes(graph)) != len(stages) {
+		return e.New(e.CodeEngineCapability, "GitHub grouped stages introduce a dependency cycle")
+	}
+	return nil
 }
 
 func githubUtilityNode(node Node) bool {
@@ -137,6 +253,27 @@ func (stage githubStage) inputs(artifacts map[string]Artifact, nodeJobs map[stri
 		}
 	}
 	return uniqueSorted(inputs)
+}
+
+// carrierInputs projects logical dependencies onto transported bytes. A compiled
+// disk's raw subject remains a graph input, but its bytes travel in the exact
+// publication wrapper, which publication observation rehashes against the raw
+// producer result. Never omit a raw subject unless both are also selected.
+func (stage githubStage) carrierInputs(plan *Plan, artifacts map[string]Artifact, nodeJobs map[string]string) ([]string, error) {
+	inputs := stage.inputs(artifacts, nodeJobs)
+	carriers := make([]string, 0, len(inputs))
+	for _, id := range inputs {
+		if output, raw := diskPublicationRequirement(plan, artifacts[id]); raw {
+			if !slices.Contains(inputs, diskPublicationWrapperID(output)) ||
+				!slices.Contains(inputs, diskPublicationProducerResultID(output, artifacts[id])) {
+				return nil, e.New(e.CodeEngineCapability,
+					"GitHub stage %q consumes raw disk %q without its publication wrapper and producer record", stage.ID, id)
+			}
+			continue
+		}
+		carriers = append(carriers, id)
+	}
+	return carriers, nil
 }
 
 func (stage githubStage) needs(artifacts map[string]Artifact, nodeJobs map[string]string, bootstrap string) []string {

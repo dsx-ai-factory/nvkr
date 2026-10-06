@@ -1,0 +1,17 @@
+formatting ok
+go vet ./...
+golangci-lint run
+0 issues.
+shellcheck -S warning scripts/*.sh toolchains/**/*.sh
+GOBIN="/Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-validation/bin" go -C toolchains/govulncheck install tool
+"/Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-validation/bin/govulncheck" ./...
+No vulnerabilities found.
+go build -ldflags '-X main.version=95fdd1e-dirty -X main.commit=95fdd1e' -o bin/nkdctl ./cmd/nkdctl
+CGO_ENABLED=0 go build -trimpath \
+		-ldflags '-X main.version=dev -X main.commit=unknown' \
+		-o bin/nkd-exec ./cmd/nkdctl
+bin/nkd-exec run generate --engine github \
+		--definition definitions/nke-m2/definition.yaml \
+		--environment definitions/nke-m2/environment-github.yaml \
+		--root . --check
+generated run is current: sha256:850cea27b78f621ccb48242b41a8210c4df6efaee139d4102bfc325270e6cb05

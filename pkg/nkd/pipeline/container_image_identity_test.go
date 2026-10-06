@@ -123,6 +123,31 @@ func TestPreparedImageRequiresSelectedToolchainPlatform(t *testing.T) {
 	}
 }
 
+func TestPreparedImageFallbackFailureStopsIdentityObservation(t *testing.T) {
+	ref := "ghcr.io/example/tool@sha256:" + strings.Repeat("a", 64)
+	for _, test := range []struct {
+		name      string
+		pullFails bool
+		wantCalls int
+	}{
+		{"pull fails", true, 2}, {"post-pull inspection fails", false, 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			got, err := observeContainerImageWith(t.Context(), ir.Node{ID: "tool", Toolchain: ref, Platform: "linux/amd64"}, func(args ...string) ([]byte, error) {
+				calls++
+				if args[0] == "pull" && !test.pullFails {
+					return nil, nil
+				}
+				return nil, errors.New("synthetic runtime failure")
+			})
+			if got != "" || code(err) != e.CodeEngineCapability || calls != test.wantCalls {
+				t.Fatalf("failed materialization continued: %q / %v, calls=%d", got, err, calls)
+			}
+		})
+	}
+}
+
 func TestLocalImageIdentityUsesPortableExactIDProjection(t *testing.T) {
 	want := "sha256:" + strings.Repeat("b", 64)
 	for _, test := range []struct {

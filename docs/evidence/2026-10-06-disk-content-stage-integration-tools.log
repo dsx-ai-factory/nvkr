@@ -1,0 +1,227 @@
+Linux aarch64
+uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
+200000 100000
+4294967296
+256
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/same_digest_repeated
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/foreign_descriptor
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/same_digest_later_foreign_descriptor
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/foreign_config
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/same_digest_repeated
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/foreign_descriptor
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/same_digest_later_foreign_descriptor
+=== RUN   TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/foreign_config
+--- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication (0.01s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/same_digest_repeated (0.00s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/foreign_descriptor (0.00s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/same_digest_later_foreign_descriptor (0.00s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/amd64/foreign_config (0.00s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/same_digest_repeated (0.00s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/foreign_descriptor (0.00s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/same_digest_later_foreign_descriptor (0.00s)
+    --- PASS: TestNestedOCIEnumerationPlatformDepthAndDeduplication/arm64/foreign_config (0.00s)
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/two_images_reach_scanner
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/other_platform_not_dropped
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/empty_layout_malformed_blob_directory
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/well-formed_empty_layout_has_no_image
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/multiple_roots_without_index_media_type
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/unreferenced_blob_rejected
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/two_images_reach_scanner
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/other_platform_not_dropped
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/empty_layout_malformed_blob_directory
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/well-formed_empty_layout_has_no_image
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/multiple_roots_without_index_media_type
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/unreferenced_blob_rejected
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/two_images_reach_scanner
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/other_platform_not_dropped
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/empty_layout_malformed_blob_directory
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/well-formed_empty_layout_has_no_image
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/multiple_roots_without_index_media_type
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/unreferenced_blob_rejected
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/two_images_reach_scanner
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/other_platform_not_dropped
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/empty_layout_malformed_blob_directory
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/well-formed_empty_layout_has_no_image
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/multiple_roots_without_index_media_type
+=== RUN   TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/unreferenced_blob_rejected
+--- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms (0.14s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/two_images_reach_scanner (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/other_platform_not_dropped (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/empty_layout_malformed_blob_directory (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/well-formed_empty_layout_has_no_image (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/multiple_roots_without_index_media_type (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/false/unreferenced_blob_rejected (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/two_images_reach_scanner (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/other_platform_not_dropped (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/empty_layout_malformed_blob_directory (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/well-formed_empty_layout_has_no_image (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/multiple_roots_without_index_media_type (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/amd64/true/unreferenced_blob_rejected (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/two_images_reach_scanner (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/other_platform_not_dropped (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/empty_layout_malformed_blob_directory (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/well-formed_empty_layout_has_no_image (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/multiple_roots_without_index_media_type (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/false/unreferenced_blob_rejected (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/two_images_reach_scanner (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/other_platform_not_dropped (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/empty_layout_malformed_blob_directory (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/well-formed_empty_layout_has_no_image (0.00s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/multiple_roots_without_index_media_type (0.01s)
+    --- PASS: TestNestedOCIUsesCompleteClosureAndAllPlatforms/arm64/true/unreferenced_blob_rejected (0.01s)
+=== RUN   TestNestedOCIValidationErrorPreservesTimeout
+=== RUN   TestNestedOCIValidationErrorPreservesTimeout/canceled_context
+=== RUN   TestNestedOCIValidationErrorPreservesTimeout/inner_coded_timeout
+=== RUN   TestNestedOCIValidationErrorPreservesTimeout/ordinary_validation_error
+--- PASS: TestNestedOCIValidationErrorPreservesTimeout (0.00s)
+    --- PASS: TestNestedOCIValidationErrorPreservesTimeout/canceled_context (0.00s)
+    --- PASS: TestNestedOCIValidationErrorPreservesTimeout/inner_coded_timeout (0.00s)
+    --- PASS: TestNestedOCIValidationErrorPreservesTimeout/ordinary_validation_error (0.00s)
+=== RUN   TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation
+=== RUN   TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation/unchanged_closure
+=== RUN   TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation/changed_config_after_scan
+=== RUN   TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation/changed_config_across_two_image_scans
+--- PASS: TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation (0.02s)
+    --- PASS: TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation/unchanged_closure (0.00s)
+    --- PASS: TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation/changed_config_after_scan (0.00s)
+    --- PASS: TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation/changed_config_across_two_image_scans (0.01s)
+=== RUN   TestNestedOCIInspectsEveryImage
+=== RUN   TestNestedOCIInspectsEveryImage/amd64
+=== RUN   TestNestedOCIInspectsEveryImage/arm64
+--- PASS: TestNestedOCIInspectsEveryImage (0.03s)
+    --- PASS: TestNestedOCIInspectsEveryImage/amd64 (0.01s)
+    --- PASS: TestNestedOCIInspectsEveryImage/arm64 (0.02s)
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/native
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/multiple_native_images
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/foreign_config
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/mixed_native_and_foreign
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/missing_manifest
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/corrupt_manifest
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/missing_config
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/corrupt_config
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/unreferenced_blob
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/mixed_transport_markers
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/docker_only
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/markerless
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/gzip_OCI_layout
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/native
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/multiple_native_images
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/foreign_config
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/mixed_native_and_foreign
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/missing_manifest
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/corrupt_manifest
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/missing_config
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/corrupt_config
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/unreferenced_blob
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/mixed_transport_markers
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/docker_only
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/markerless
+=== RUN   TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/gzip_OCI_layout
+--- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner (0.14s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/native (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/multiple_native_images (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/foreign_config (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/mixed_native_and_foreign (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/missing_manifest (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/corrupt_manifest (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/missing_config (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/corrupt_config (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/unreferenced_blob (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/mixed_transport_markers (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/docker_only (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/markerless (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/amd64/gzip_OCI_layout (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/native (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/multiple_native_images (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/foreign_config (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/mixed_native_and_foreign (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/missing_manifest (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/corrupt_manifest (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/missing_config (0.01s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/corrupt_config (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/unreferenced_blob (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/mixed_transport_markers (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/docker_only (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/markerless (0.00s)
+    --- PASS: TestDirectOCIMaterialAuthenticatesClosureBeforeScanner/arm64/gzip_OCI_layout (0.00s)
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/nil
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/empty_subject
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/zero_budget
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/negative_budget
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/oversize
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/unbounded
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/unsupported_linux
+=== RUN   TestDirectOCIMaterialAdmissionBeforeWork/unsupported_OS
+--- PASS: TestDirectOCIMaterialAdmissionBeforeWork (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/nil (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/empty_subject (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/zero_budget (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/negative_budget (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/oversize (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/unbounded (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/unsupported_linux (0.00s)
+    --- PASS: TestDirectOCIMaterialAdmissionBeforeWork/unsupported_OS (0.00s)
+=== RUN   TestOCIMarkerCancellationPreservesTimeout
+--- PASS: TestOCIMarkerCancellationPreservesTimeout (0.00s)
+=== RUN   TestDirectOCIMaterialPhaseCancellation
+=== RUN   TestDirectOCIMaterialPhaseCancellation/copy
+=== RUN   TestDirectOCIMaterialPhaseCancellation/marker
+=== RUN   TestDirectOCIMaterialPhaseCancellation/extraction
+=== RUN   TestDirectOCIMaterialPhaseCancellation/per-image_sealing
+--- PASS: TestDirectOCIMaterialPhaseCancellation (0.01s)
+    --- PASS: TestDirectOCIMaterialPhaseCancellation/copy (0.00s)
+    --- PASS: TestDirectOCIMaterialPhaseCancellation/marker (0.00s)
+    --- PASS: TestDirectOCIMaterialPhaseCancellation/extraction (0.00s)
+    --- PASS: TestDirectOCIMaterialPhaseCancellation/per-image_sealing (0.00s)
+=== RUN   TestFilesystemMemberProgressCoordinates
+=== RUN   TestFilesystemMemberProgressCoordinates/depth=0
+=== RUN   TestFilesystemMemberProgressCoordinates/depth=1
+--- PASS: TestFilesystemMemberProgressCoordinates (0.00s)
+    --- PASS: TestFilesystemMemberProgressCoordinates/depth=0 (0.00s)
+    --- PASS: TestFilesystemMemberProgressCoordinates/depth=1 (0.00s)
+=== RUN   TestMaterialMemberWalkProgress
+=== RUN   TestMaterialMemberWalkProgress/filesystemDepth=0
+=== RUN   TestMaterialMemberWalkProgress/filesystemDepth=1
+--- PASS: TestMaterialMemberWalkProgress (0.01s)
+    --- PASS: TestMaterialMemberWalkProgress/filesystemDepth=0 (0.01s)
+    --- PASS: TestMaterialMemberWalkProgress/filesystemDepth=1 (0.00s)
+=== RUN   TestContainerScanProgress
+=== RUN   TestContainerScanProgress/scanner_admission_failure
+=== RUN   TestContainerScanProgress/success
+=== RUN   TestContainerScanProgress/scanner_failure
+=== RUN   TestContainerScanProgress/timeout
+--- PASS: TestContainerScanProgress (0.04s)
+    --- PASS: TestContainerScanProgress/scanner_admission_failure (0.01s)
+    --- PASS: TestContainerScanProgress/success (0.01s)
+    --- PASS: TestContainerScanProgress/scanner_failure (0.01s)
+    --- PASS: TestContainerScanProgress/timeout (0.01s)
+=== RUN   TestDiskContentPinnedScannerReal
+=== RUN   TestDiskContentPinnedScannerReal/generated
+    disk_scanner_integration_test.go:104: scanner=sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573 subject=sha256:ea671f461292ca15681c208167fa7c6c5f858ba2aa1f05230be7ed8e0c091591 exact package=nkd-scanner-fixture version=2:1.0-1ubuntu4
+=== RUN   TestDiskContentPinnedScannerReal/held
+    disk_scanner_integration_test.go:104: scanner=sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573 subject=sha256:ea671f461292ca15681c208167fa7c6c5f858ba2aa1f05230be7ed8e0c091591 exact package=nkd-scanner-fixture version=2:1.0-1ubuntu4
+=== RUN   TestDiskContentPinnedScannerReal/nested/plain
+    disk_scanner_integration_test.go:141: scanner=sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573 carrier=sha256:ea671f461292ca15681c208167fa7c6c5f858ba2aa1f05230be7ed8e0c091591 bytes=4096 exact nested package=nkd-scanner-fixture version=2:1.0-1ubuntu4
+=== RUN   TestDiskContentPinnedScannerReal/nested/gzip
+    disk_scanner_integration_test.go:141: scanner=sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573 carrier=sha256:b9a47ef3f0c99fbed535249f254619916fd22dadac82a14f9db47a7e43409875 bytes=749 exact nested package=nkd-scanner-fixture version=2:1.0-1ubuntu4
+=== RUN   TestDiskContentPinnedScannerReal/oci-helper/arm64
+=== RUN   TestDiskContentPinnedScannerReal/oci-helper/amd64
+--- PASS: TestDiskContentPinnedScannerReal (4.23s)
+    --- PASS: TestDiskContentPinnedScannerReal/generated (0.99s)
+    --- PASS: TestDiskContentPinnedScannerReal/held (0.78s)
+    --- PASS: TestDiskContentPinnedScannerReal/nested/plain (0.69s)
+    --- PASS: TestDiskContentPinnedScannerReal/nested/gzip (0.74s)
+    --- PASS: TestDiskContentPinnedScannerReal/oci-helper/arm64 (0.89s)
+    --- PASS: TestDiskContentPinnedScannerReal/oci-helper/amd64 (0.14s)
+=== RUN   TestDiskCapturedPackagesPinnedToolsReal
+=== RUN   TestDiskCapturedPackagesPinnedToolsReal/valid
+    disk_scanner_integration_test.go:294: scanner=sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573 reader=sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6 archive=sha256:05a48c13b72ce108b03cb52eaa82b686848946638f248d2565ef333fa122a434 exact package subjects=2
+=== RUN   TestDiskCapturedPackagesPinnedToolsReal/sibling_metadata
+--- PASS: TestDiskCapturedPackagesPinnedToolsReal (4.47s)
+    --- PASS: TestDiskCapturedPackagesPinnedToolsReal/valid (2.19s)
+    --- PASS: TestDiskCapturedPackagesPinnedToolsReal/sibling_metadata (2.27s)
+PASS

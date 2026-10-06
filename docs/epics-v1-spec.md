@@ -1,6 +1,6 @@
 # NKD v1 — Milestone epics (specification, Jira-ready)
 
-Revised 2026-09-17. The earlier version was posted to Jira 2026-09-09 as NKX-15957 (M1), NKX-15958 (M2),
+Revised 2026-10-06. The earlier version was posted to Jira 2026-09-09 as NKX-15957 (M1), NKX-15958 (M2),
 NKX-15959 (M3), NKX-15960 (M4); these local revisions do not update those issues. Production acceptance for
 M1–M4 uses the six-object public model. This specifies
 required behavior; the implementation record separately identifies completed work and external evidence.
@@ -15,11 +15,14 @@ workflows; consumers verify the results with standard tooling and no NKD softwar
 
 **Facts the specification rests on.**
 - The NKE OS image build bakes in Kubernetes (node side and control-plane images), CNI, and node-agent. NKD wraps
-  that build; it does not build or separately deliver those embedded components. Before disk delivery is admitted,
-  NKD requires a full-disk inventory that reconciles traced build materials with read-only inspection of the
+  that build using selected material producers; embedded components need not be separately delivered.
+  The proposed strict target requires a full-disk inventory that reconciles traced build materials with read-only inspection of the
   delivered disk. This establishes composition, not correct behavior; the NKE OS image build team owns embedded
-  software correctness and runtime validation. Disk production and its inventory adapters remain deferred.
-- v1 production acceptance targets amd64 only. The selected GitHub-hosted runner must admit the OS build's
+  software correctness and runtime validation. Both native disk builds have recorded execution; successful
+  complete inspection and end-to-end release delivery remain unproven.
+- The October 6 proposed M2 engineering acceptance target covers both native AMD64 and ARM64 disks,
+  pending named-decider ratification; this revision does not record organizational approval or update Jira.
+  The selected execution route must admit the OS build's
   virtualization and privilege requirements; broader upstream architecture support does not expand this scope.
 - Every artifact is delivered in OCI, signed keyless with cosign from the workflow run that produced it, and
   carries an SLSA v1 provenance attestation describing how the bytes were produced. No reproduction or
@@ -38,7 +41,8 @@ workflows; consumers verify the results with standard tooling and no NKD softwar
 - Every built artifact has a per-artifact software bill of materials (CycloneDX), bound to the observed digest
   and published as a signed attestation. The signed release index binds required evidence membership; Run
   completion is a separate record. SBOMs assert composition and verify no upstream signature.
-- Workflows run on GitHub-hosted runners only.
+- Workflows use generic GitHub-hosted runners, with only the narrowly admitted operator-trusted native
+  virtualization-pool exception for disk jobs. Pool isolation and capacity require separate evidence.
 - Evidence for every acceptance criterion is a workflow run URL plus, where a consumer can check the criterion, a
   consumer-side verification transcript, and, for negative criteria, the run log showing the refusal and its error
   code. All of it is recorded in the evidence log and referenced from the implementation record.
@@ -162,21 +166,22 @@ any CI engine other than GitHub Actions.
 | **Jira key** | [NKX-15958](https://jirasw.nvidia.com/browse/NKX-15958) (created 2026-09-09) |
 | **Issue type** | Epic |
 | **Epic name** | NKD M2 Breadth |
-| **Summary** | The in-scope artifact set is delivered and signed in OCI with provenance, centred on the wrapped amd64 NKE OS image; every required output has exact digest-bound release membership |
+| **Summary** | Proposed target, pending ratification: the in-scope artifact set is delivered and signed in OCI with provenance, including inspected native AMD64 and ARM64 NKE OS images and exact output membership |
 | **Priority / Rank** | High / 2 |
-| **T-shirt size** | **M** — the wrapped-build lane and image/blob publication are real scope; OS-build feasibility still requires an admitted hosted environment. Re-size if capability testing fails, arm64 is pulled forward or wrapped-build isolation must be stricter |
+| **T-shirt size** | **M** — historical sizing, not a guarantee for the proposed both-architecture inspected target; runner capacity, complete evidence and publication acceptance remain separate |
 | **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m2-breadth` |
 | **Milestone label** | M2 — Breadth |
 | **Due date (best estimate)** | 2026-09-25 (signed OS image and the M2 core) |
 | **Linear status** | PRIORITIZED |
-| **Depends on** | M1; external: NKE OS build runnable from a single pinned entrypoint on a hosted amd64 runner, NKE image list and chart sources by 2026-09-12, spire-agent placement decision 2026-09-10 |
+| **Depends on** | M1; external: both native OS execution routes and capacity, intended embedded payload and verified materials, external image/chart membership, toolchain clearance and complete inspected delivery evidence |
 | **Blocks** | M3 (artifacts to qualify), M4 (artifacts to tag) |
 | **Related** | NKX-14794 |
 | **Eng PIC / Product PIC** | TBD / TBD |
-| **Status note** | Not started. Shape is fixed at the 2026-09-10 checkpoint (wrapped OS build or QCOW2 mirror; built or mirrored NKE images; spire-agent placement; which NKE images sit outside the OS image). |
+| **Status note** | Both disk builds have recorded execution, but complete delivery is unproven. The October 6 proposed strict inspected target remains pending named-decider ratification; the narrower producer-provenance candidate does not complete that target. |
 
-**Goal.** The in-scope artifact set is delivered. The centre is the NKE OS image for amd64, built by wrapping the
-NKE node-images build at a pinned commit and published as one signed disk-image artifact; it already contains
+**Goal.** Under the proposed target pending ratification, the in-scope artifact set is delivered, including
+native AMD64 and ARM64 NKE OS images, each built from its pinned source and published as a signed disk-image
+artifact with inspected content reconciled to its authenticated materials. The images already contain
 Kubernetes (node side and control-plane images), CNI, and node-agent. Around it: the CWE controller image and the
 NKE cluster images that are not baked into the OS image (enumerated by name in the definition as a Sep 10
 checkpoint output), the operator tooling package, and chart packages. The Release binds
@@ -184,27 +189,28 @@ these named outputs to the exact delivered artifacts.
 
 **Delivers**
 - **Wrapped external builds.** A source lane for pinned external builds: a declared entrypoint from a pinned
-  repository commit, run in a pinned container with declared privilege and network access, with build, re-hash,
-  run record, publish, sign, and verify fused into one job because the output is gigabytes. The provenance build
+  repository commit, run in a pinned container with declared privilege and network access. Build, re-hash,
+  run record and disk-evidence packaging retain the same live producer ownership; publication, signing and
+  verification use separate credential-scoped jobs. The provenance build
   type is `wrapped-build` and records the declared network and privilege, so a consumer can see NKD makes no
   hermeticity claim; no builder-profile preflight or byte-identity gate applies in v1. A wrapped build holds no
   credential of any kind during its build phase, network or not: private inputs are fetched into the workspace by
   a preceding fetch step that holds only the fetch credential, and registry and OIDC credentials are introduced
   only after the build phase has exited and the run record is written.
-- **The OS image artifact.** One disk-image artifact per OS image build, amd64, with provenance naming the NKE
+- **The OS image artifact.** Under the proposed target, one disk-image artifact per native AMD64 and ARM64 build, with provenance naming the NKE
   commit and tree hash. Pushed as a single-layer artifact if the registry's blob limit permits (verified at the
-  Sep 10 checkpoint), otherwise chunked, with the whole-image digest in the run record and provenance. M2 binds the exact delivered bytes to the successful producer and traced materials;
-  full installed-content inventory and reconciliation are deferred to M3. NKE owns the correctness and runtime
+  Sep 10 checkpoint), otherwise chunked, with the whole-image digest in the run record and provenance.
+  The proposed target binds those bytes to the successful producer, traced materials and reconciled installed-content inventory. NKE owns the correctness and runtime
   validation of embedded software; NKD attests production and composition under the admitted evidence contract.
   Matching dependency or inventory evidence never promotes this wrapped disk to a reproduction claim.
-- **Embedded-component declaration.** The OS image producer declares the components it embeds and NKD neither
-  builds nor separately delivers (node-agent, node-side Kubernetes, control-plane images, CNI, and spire-agent
+- **Embedded-component declaration.** The OS image producer declares the components it embeds, which may be
+  built or acquired by selected material producers without separate delivery (node-agent, node-side Kubernetes, control-plane images, CNI, and spire-agent
   if so decided), each with name, version and known source pin. The declaration flows into the provenance's
-  resolved dependencies and the aggregate SBOM as dependency edges from the image to its members, and M3
+  resolved dependencies and the aggregate SBOM as dependency edges from the image to its members, and the proposed M2 target
   cross-checks it against NKE's own version manifest at the pinned commit. The declared list alone cannot supply
-  the full-disk inventory. M3 adds read-only final-disk inspection and material reconciliation;
-  unreadable filesystems, inspection failure or disagreement fail that qualification gate. M2 requires
-  complete exact producer membership and reports the deferred inspection scope without claiming it passed.
+  the full-disk inventory. The proposed M2 target requires read-only final-disk inspection and material reconciliation;
+  unreadable filesystems, inspection failure or disagreement fail that acceptance path. The narrower
+  producer-provenance candidate reports inspection as not performed and does not complete this target.
 - **Image and blob publication.** Pushing container-image layouts by digest with the pinned digest preserved,
   and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
   digest and skips content that is already present, so re-runs are cheap and mirrors are idempotent.
@@ -225,18 +231,21 @@ these named outputs to the exact delivered artifacts.
 **Does not deliver.** Separate delivery of anything the definition marks "inside the OS image" (node-agent,
 node-side Kubernetes, control-plane images, CNI); independent runtime or functional validation of embedded
 software (NKE OS image build team); NKD-built Kubernetes; vulnerability scanning; verification of upstream signatures on acquired
-artifacts (acquisition is digest-pinned trust on first use); deployment topology or node-role assignment; arm64 and any other architecture.
+artifacts (acquisition is digest-pinned trust on first use); deployment topology or node-role assignment;
+architectures beyond the proposed native AMD64 and ARM64 targets.
 
 **Pre-authorized fallbacks.** Mirror the prebuilt signed QCOW2 by digest (`acquired`) if the OS build cannot run
-on a hosted runner. Mirror NKE-published CWE and NKE images (`acquired`) instead of building them. Enclose chart
+on an admitted execution route. The acquired-disk fallback is a product permission, not an implemented
+adapter: it cannot complete the current M2 candidate until its acquisition and exact-disk inspection contract
+is admitted. Mirror NKE-published CWE and NKE images (`acquired`) instead of building them. Enclose chart
 tarballs in the signed package instead of publishing CNCF OCI charts. Any approved deferred artifact remains
 explicit in the requirements and evidence with its reason and decision. The M3 gate records the deferral as a
 waiver, never a pass, and M4 preserves it in the release manifest. A missing required output still makes its Run
 incomplete; a build failure cannot create an implicit deferral.
 
 **Acceptance criteria**
-1. The OS image is published as one signed, attested amd64 disk-image artifact built from the pinned NKE commit; its provenance names that commit and tree hash with build type `wrapped-build`; consumer verification succeeds. (Under the fallback: the prebuilt QCOW2 is mirrored by digest, signed, consumer-verified, its `acquired` provenance names the upstream reference and digest, and the row is recorded as `acquired`.)
-2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, spire-agent if acquired, third-party images, NKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. The OS image's provenance lists its declared embedded components, and every embedded row in the milestone matrix appears in that declaration. Its producer evidence binds the exact delivered disk and all selected material subjects. Deep inspection and installed-content reconciliation are explicitly deferred to M3; missing producer evidence or a digest mismatch still fails delivery.
+1. Under the proposed target pending ratification, both native AMD64 and ARM64 OS images are published as signed, attested disk-image artifacts built from their pinned NKE commits. Their provenance identifies the source commit, tree hash and wrapped-build scope; exact-subject inspected inventory, material reconciliation and consumer verification succeed independently for each disk. Acquired-disk fallback remains unavailable until its acquisition and exact-disk inspection contract is admitted.
+2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, spire-agent if acquired, third-party images, NKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Both disks' provenance lists their declared embedded components, and every embedded row appears in that declaration. Under the proposed target, each disk also requires exact-subject installed inventory reconciled with its authenticated materials; producer-only evidence, a missing inventory or a digest mismatch cannot pass that target.
 3. CWE controller and NKE container images are either built (`wrapped-build`, provenance naming the NKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
 4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
 5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
@@ -412,10 +421,11 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 
 ## Cross-epic
 
-- **Sizes and order:** M1 XS → M2 M → M3 S → M4 S. M2 is the only epic whose size rests on assumptions (amd64
-  only; relaxed builder profile); if either tightens, it drifts toward L and should be re-sized before commitment.
+- **Sizes and order:** M1 XS → M2 M → M3 S → M4 S are historical estimates. The proposed both-architecture
+  inspected M2 target needs re-sizing against observed execution and delivery work before commitment.
 - **M2 core:** the OS image and the operator tooling package with exact output membership. Everything
-  else in M2 is covered by the pre-authorized fallbacks.
+  else remains required unless a recorded decision defers it. A permitted fallback still requires an implemented,
+  admitted path and exact-subject evidence; the acquired-disk adapter is not implemented.
 - **Never cut:** the independent reviews and the decision-record and evidence-log work.
 - **Checkpoints:** Thu Sep 10 decides the M2 shape (wrapped OS build or QCOW2 mirror; built or mirrored NKE
   images; spire-agent placement; which NKE images are outside the OS image). Tue Sep 16 is the M1 stop-loss; if
