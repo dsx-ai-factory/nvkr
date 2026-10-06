@@ -64,7 +64,7 @@ Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB
 224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
 include the held subject snapshot. These are admission budgets, not measured full-M2 usage.
 The inspector and Packer source locks retain their outstanding organizational approval gates;
-the [candidate exception and publication evidence](../../docs/evidence/2026-10-06-native-arc.md)
+the [candidate exception and publication evidence](https://github.com/dsx-ai-factory/nke-recipes/pull/106)
 records the narrower authorization and exact registry read-back.
 The candidate Environment selects Docker through the existing typed runtime controls;
 it declares no storage-driver field or ambient runtime-variable workaround. Storage behavior
@@ -96,7 +96,7 @@ still checks every job and every required output. The public release remains one
 `m2-candidate/releases`, with independently consumable output repositories. Per-output jobs still need room
 for their own payloads and copies; this change does not establish a measured runner-storage budget. The
 metadata transport and failure gates are locally contract-tested, and full candidate publication/finalization
-passed the [hosted validation run](../../docs/evidence/2026-10-06-m2-metadata-publication.md#successful-hosted-validation).
+passed the [hosted validation run](https://github.com/dsx-ai-factory/nke-recipes/pull/106).
 Mixed-attempt retry reuse and independent full-payload consumer acceptance remain unexercised.
 
 The generator checks the complete workflow against a 500,000-byte ceiling before writing. YAML anchors and

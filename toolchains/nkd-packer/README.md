@@ -39,9 +39,9 @@ capability-dropped container profile. A non-native image may be assembled with
 followed by the same validation and a real bake on a native host before
 publication.
 
-The [October 6 native preparation record](../../docs/evidence/2026-10-06-native-arc.md#native-amd64-assembly-and-validation)
+The [October 6 native preparation record](https://github.com/dsx-ai-factory/nke-recipes/pull/106)
 records a successful AMD64 Docker assembly and this script's native validation.
-It includes the retained image archive and exact identities; it grants no
+It includes exact image identities and native measurements; it grants no
 publication or redistribution approval.
 
 Use `--check` for the network-free source-lock validation. Building uses the
@@ -117,7 +117,7 @@ the lock records that the source is not ready for maintained catalog use; the
 required review remains an organizational publication gate, not a technical
 control implemented by this source lock.
 
-The [October 6 candidate record](../../docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
+The [October 6 candidate record](https://github.com/dsx-ai-factory/nke-recipes/pull/106)
 records the user's explicit exception for four measured native images used only by M2.
 That exception permits the candidate overlay; it does not mark these general review gates approved.
 

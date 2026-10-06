@@ -372,7 +372,7 @@ delivery, not independent full-payload consumer acceptance or mixed-attempt retr
 independent consumer contract and main-only workflow policy are unchanged. The generator, validator and
 bundle writer enforce a 500,000-byte workflow limit. Deterministic YAML compaction checks expanded semantic
 equivalence; byte-boundary and no-partial-write regressions cover oversized workflows. See the
-[contract and hosted evidence record](../evidence/2026-10-06-m2-metadata-publication.md) for check scope and remaining operational evidence.
+[contract and hosted evidence record](https://github.com/dsx-ai-factory/nke-recipes/pull/106) for check scope and remaining operational evidence.
 
 ## Native ARC disk route
 
@@ -390,10 +390,10 @@ Both native builds and terminal checks completed in run `37445475840`; both deep
 The user moved deep disk/content inspection and dependent reconciliation to M3. Explicit M2
 `diskEvidence: build-provenance-v1` now selects live producer/material evidence, with signed deferred-inspection
 scope, normal packaging/signing/publication, and unchanged subject/provenance/membership/completeness gates.
-The [inspection deferral record](../evidence/2026-10-06-m2-metadata-publication.md#inspection-deferral-and-temporary-source-selection) records the scope and validation.
+The [inspection deferral record](https://github.com/dsx-ai-factory/nke-recipes/pull/106) records the scope and validation.
 The strict inspection path remains available. New-mode full hosted candidate delivery passed in
 run `37533806963`, including both native OS outputs. Independent consumer acceptance remains unexercised.
-The [October 6 preparation record](../evidence/2026-10-06-native-arc.md) retains final-source
+The [October 6 preparation record](https://github.com/dsx-ai-factory/nke-recipes/pull/106) retains final-source
 ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
 and unprivileged libguestfs appliance filesystem probes. The maintained M2 Environment omits `githubDispatchBranches` and admits only `main` in its signer identity.
 The earlier `codex/m2-arc-validation` exception remains historical branch-run configuration, not an enabled
