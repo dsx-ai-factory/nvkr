@@ -94,7 +94,7 @@ func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
 				t.Fatal(err)
 			}
 			pin, exists := lock.Artifacts[component]
-			if !exists || len(pin.Digests) != 2 {
+			if !exists || len(pin.Digests) != 2 || pin.ImageParentDigest == "" {
 				t.Fatalf("%s must retain both native artifact pins", component)
 			}
 			fixtureRegistry := declarations
@@ -138,7 +138,7 @@ func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
 					}
 					pull, verify := graph.Nodes[0], graph.Nodes[1]
 					if pull.Kind != ir.KindPull || pull.Component != component || pull.Artifact != selected.Prebuilt.Image ||
-						pull.Platform != platform || pull.Digest != pin.Digests[arch] || pull.OutputType != "oci-image" ||
+						pull.Platform != platform || pull.Digest != pin.Digests[arch] || pull.ImageParentDigest != pin.ImageParentDigest || pull.OutputType != "oci-image" ||
 						pull.Network != ir.NetworkDefault || len(pull.Needs) != 0 {
 						t.Fatalf("wrong native pull identity/transport: %+v", pull)
 					}
@@ -280,7 +280,8 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 			t.Fatal(err)
 		}
 		pull := graph.Nodes[0]
-		if pull.Digest != native[component][index] || pull.Platform != output.Platform || pull.Artifact != want {
+		if pull.Digest != native[component][index] || pull.Platform != output.Platform || pull.Artifact != want ||
+			pull.ImageParentDigest == "" || pull.ImageParentDigest != lock.Artifacts[component].ImageParentDigest {
 			t.Fatalf("changed maintained image binding: %+v", pull)
 		}
 		if at := strings.LastIndex(want, "@"); at >= 0 && pull.ImageParentDigest != want[at+1:] {

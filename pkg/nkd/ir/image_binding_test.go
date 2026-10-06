@@ -20,6 +20,7 @@ func TestImageParentExecutableAdmission(t *testing.T) {
 		code   e.Code
 	}{
 		{"exact", func(*Node) {}, ""},
+		{"redundant tag plus exact parent", func(n *Node) { n.Artifact = "registry.example/tool:v1@" + parent }, ""},
 		{"malformed parent", func(n *Node) { n.ImageParentDigest = "invalid" }, e.CodeUnverifiedRef},
 		{"mismatched parent", func(n *Node) { n.ImageParentDigest = child }, e.CodeUnverifiedRef},
 		{"missing index binding", func(n *Node) { n.ImageParentDigest = "" }, e.CodeUnverifiedRef},
@@ -37,6 +38,10 @@ func TestImageParentExecutableAdmission(t *testing.T) {
 			if tc.code == "" {
 				if err != nil {
 					t.Fatal(err)
+				}
+				ref, err := NativeImageReference(node)
+				if err != nil || ref != "registry.example/tool@"+child {
+					t.Fatalf("normalized native reference = %q: %v", ref, err)
 				}
 			} else {
 				assertIRCode(t, err, tc.code)

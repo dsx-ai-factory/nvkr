@@ -27,8 +27,8 @@ func validateUnchangedVersionBytes(update SourcePinUpdate) error {
 		if before.Tag == "" || NormalizeVersion(before.Tag) != NormalizeVersion(after.Tag) {
 			continue
 		}
-		if !maps.Equal(before.Digests, after.Digests) || !reflect.DeepEqual(before.Chart, after.Chart) {
-			return e.New(e.CodeUnverifiedRef, "acquired component %q republished version %q with different bytes or chart identity; no pins committed", change.Name, before.Tag)
+		if before.ImageParentDigest != after.ImageParentDigest || !maps.Equal(before.Digests, after.Digests) || !reflect.DeepEqual(before.Chart, after.Chart) {
+			return e.New(e.CodeUnverifiedRef, "acquired component %q republished version %q with different parent, bytes or chart identity; no pins committed", change.Name, before.Tag)
 		}
 	}
 	return nil

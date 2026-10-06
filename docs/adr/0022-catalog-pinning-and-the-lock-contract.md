@@ -130,6 +130,14 @@ Repository, tag spelling and registry credentials remain transport-only. This op
 IR v4; empty legacy nodes preserve their prior canonical logical bytes, while old strict readers reject
 the unknown field rather than silently executing a weaker contract.
 
+Migrating a legacy tag pin that lacks `imageParentDigest` authenticates and records the current parent.
+That first maintenance operation intentionally changes Build identity, even if every native child
+digest is unchanged. Subsequent maintenance at the same parent and children preserves the exact lock
+bytes and Build identity. Maintained catalogs should complete this migration before establishing a
+release identity. A same-version republish policy compares the parent as well as native subjects.
+The pinned OCI library canonicalizes `repository:tag@digest` as `repository@digest`; the digest, not
+the redundant tag spelling, constrains selection. The original declaration remains descriptive transport.
+
 The built-in acquisition owner authenticates the exact parent again before output work and consumes its
 original selected native image through an original-owner, callback-scoped single-use handle. It rejects
 wrong parent/child/platform, duplicate or ambiguous native membership, constrained variants, nested
@@ -139,7 +147,10 @@ before creating output. Tag-only legacy transports remain compatible; new tag pi
 parent acquire that exact immutable parent, not a possibly moved tag. Native manifests are preserved,
 including Docker schema-2 media, and complete native closures are verified before atomic publication.
 
-Metadata responses remain bounded to 8 MiB and acquisition to five minutes. Only authenticated native
+Metadata responses remain bounded to 8 MiB and acquisition to five minutes, including membership,
+config and complete layer materialization within the callback. Large images that cannot finish within
+this fixed acquisition budget fail closed; extending it requires an owning capability change, not a
+caller bypass. Only authenticated native
 layer descriptors widen a compressed blob response; HTTPS redirect continuations retain that exact bound.
 The existing OCI library additionally limits and hashes each layer stream against its descriptor.
 No second fetch by a caller-supplied child, standalone unbounded layer client, or ambient credential

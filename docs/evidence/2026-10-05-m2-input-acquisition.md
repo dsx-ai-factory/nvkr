@@ -5,6 +5,13 @@ bake, publication, qualification or M2 acceptance record. The current handoff is
 the separate [input map](../m2-input-evidence-map.md); the maintained selection is
 in [the candidate Definition](../../definitions/nke-m2/README.md).
 
+Commands run from the recipe repository root. For local Git-backed replays, set
+`NKE_CLONE` to an absolute path to a complete, authorized NKE clone containing the
+locked revisions and blobs; a blobless clone is insufficient for the chart checks.
+`WORKDIR` below is a newly created private temporary directory, not a retained
+artifact or a prescribed personal path. The command forms are portable replay
+instructions; each historical result remains tied to its original source snapshot.
+
 ## Exact source and local gate
 
 Candidate repository head `9a7e1446bde5c14381b0e72f9ca9a41a29592816` was stacked
@@ -43,7 +50,7 @@ authenticate the earlier cross-compile observation. The helper is the CLI binary
 its lock-writing or image-assembly steps:
 
 ```sh
-validation_dir=$(mktemp -d /private/tmp/m2-pr95-crosscompile-XXXXXX)
+validation_dir=$(mktemp -d)
 for arch in amd64 arm64; do
   GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOTOOLCHAIN=local \
     SOURCE_DATE_EPOCH=1 GOFLAGS='' \
@@ -64,10 +71,11 @@ Cross-compilation is not native execution, image publication or runtime approval
 From that exact built source, this command used a fresh private output directory:
 
 ```sh
+WORKDIR=$(mktemp -d)
 bin/nkd-exec run generate --engine github \
   --definition definitions/nke-m2/definition.yaml \
   --environment definitions/nke-m2/environment-github.yaml \
-  --root /private/tmp/m2-candidate-admission-uuPChd
+  --root "$WORKDIR/admission"
 ```
 
 It exited 16, `CodeInvalidCatalog`, wrapping the catalog owner's
@@ -138,11 +146,12 @@ A clean private bare acquisition of the canonical repository provided exact Git
 object inspection without modifying the existing NKE checkout:
 
 ```sh
+WORKDIR=$(mktemp -d)
 git clone --bare --filter=blob:none --single-branch --branch main \
-  https://github.com/dsx-ai-factory/nke.git /private/tmp/m2-approved-nke-source.De8zbh
-git -C /private/tmp/m2-approved-nke-source.De8zbh show -s --format='%H %T %ct' \
+  https://github.com/dsx-ai-factory/nke.git "$WORKDIR/nke.git"
+git -C "$WORKDIR/nke.git" show -s --format='%H %T %ct' \
   ff21ba8c07cafff74b68e238a8876af11e5beded
-git -C /private/tmp/m2-approved-nke-source.De8zbh describe --match 'agent/v*' --tags --always \
+git -C "$WORKDIR/nke.git" describe --match 'agent/v*' --tags --always \
   ff21ba8c07cafff74b68e238a8876af11e5beded
 git ls-remote --tags https://github.com/dsx-ai-factory/nke.git 'refs/tags/agent/v*'
 ```
@@ -166,7 +175,7 @@ passed the following actual pinned-source graph integration with the race detect
 
 ```sh
 env GIT_CONFIG_COUNT=1 \
-  GIT_CONFIG_KEY_0=url./Users/ikislenko/Workspace/github/nke/.insteadOf \
+  GIT_CONFIG_KEY_0="url.$NKE_CLONE/.insteadOf" \
   GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nke \
   NKD_TEST_M2_ALL_OUTPUT_GRAPHS=1 \
   go test -race ./pkg/nkd/buildgraph \
@@ -188,10 +197,11 @@ each reported the exact commit already pinned and `no changes`. Current-source
 generation was then checked separately:
 
 ```sh
+WORKDIR=$(mktemp -d)
 go run ./cmd/nkdctl run generate --engine github \
   --definition definitions/nke-m2/definition.yaml \
   --environment definitions/nke-m2/environment-github.yaml \
-  --root /private/tmp/m2-merged-source-admission.Xhykeq
+  --root "$WORKDIR/admission"
 ```
 
 It reported `CodeEngineCapability`, CLI exit 29 (`go run` itself exits 1), because
@@ -239,8 +249,11 @@ native digest is not authorized by the protocol addition.
 
 ### Parent-binding maintenance and static integration observations
 
-On the source follow-up to repository head
+On the historical source follow-up to repository head
 `0b18ae1af2ad7383c8a8cdce3a2c3110c764274a`, the owner command above succeeded.
+That head was replayed as current-branch ancestor `bd20877cb9b249533e747043c514e90de79e2f61`; the applied protocol and
+lock are retained in `a8989402f317b941e2643ae81c606588ce3b4189`. Historical source
+names below identify the original runs, not current ancestry or a present-head gate.
 Compared with that head, its lock diff was exactly two added `imageParentDigest`
 fields, with no deleted or changed lines. All 24 existing native child digests and
 all source pins remained unchanged. Repeating the identical command reported both
@@ -258,7 +271,7 @@ NKE object store, without modifying its checkout or any pins:
 
 ```sh
 env GIT_CONFIG_COUNT=1 \
-  GIT_CONFIG_KEY_0=url./Users/ikislenko/Workspace/github/nke/.insteadOf \
+  GIT_CONFIG_KEY_0="url.$NKE_CLONE/.insteadOf" \
   GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nke \
   NKD_TEST_M2_ALL_OUTPUT_GRAPHS=1 \
   go test ./pkg/nkd/buildgraph -run '^TestMaintainedM2All34OutputGraphs$' -count=1 -v
@@ -273,10 +286,11 @@ unchanged, and no catalog-load authentication bypass or synthetic receipt was ad
 The same follow-up used a fresh private output directory for this command:
 
 ```sh
+WORKDIR=$(mktemp -d)
 go run ./cmd/nkdctl run generate --engine github \
   --definition definitions/nke-m2/definition.yaml \
   --environment definitions/nke-m2/environment-github.yaml \
-  --root /private/tmp/m2-bound-candidate-admission.aq8tF3
+  --root "$WORKDIR/admission"
 ```
 
 It progressed beyond image catalog loading and exited 29, `CodeEngineCapability`:
@@ -286,10 +300,12 @@ toolchain closures, full inspector profiles and source-review gates remain block
 
 ### Native ARM64 controlled-contract validation
 
-The repaired dirty source follow-up above head `0b18ae1` was frozen in a 37-entry
-source/test/lock/module manifest with SHA-256
-`29f57b3f379b025f8a7e34e25075d73b14e44673cae14dcdb60cfb25b94cd491`.
-All entries verified before and after the native run. The existing local diagnostic
+The repaired dirty source follow-up above historical head `0b18ae1` was checked
+against a private source/test/lock/module manifest before and after the native run.
+That complete manifest was not retained here, so its hash alone cannot reproduce
+the exact dirty source set. The applied source is retained in the current ancestor
+`a8989402f317b941e2643ae81c606588ce3b4189`, but this run is not a fresh gate of that commit.
+The existing local diagnostic
 image ID `266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6`
 was inspected as `linux/arm64`; observed execution reported `aarch64`, uid 502/gid
 20 and Go 1.27.1. This is a local test image identity, not an approved published
@@ -321,11 +337,11 @@ scanner, Packer bake, signing, publication, qualification or M2 launch proof.
 The final requested dead-wrapper cleanup removed the private `resolveImageDigests`
 function; its only caller was a test. The runtime guard now exercises actual
 `resolvePrebuiltTarget`, requiring `CodeUsage` and no child/parent pins for both
-unsupported-runtime rows. The final 38-entry frozen source manifest SHA-256 was
-`f3cc012029ce6704e28afd35bdb9ec7b6ac64f4c462c5b3dfcfc21c5cc37ed26`.
+unsupported-runtime rows. The additional private frozen source manifest was not
+retained here; its original before/after checks are not a reproducible file list.
 An actual Linux ARM64 race follow-up passed both guard rows in 1.014s with the same
-diagnostic image/user/default-HOME route, and all 38 hashes matched before and
-after. This narrow follow-up is distinct from the prior five-package native run.
+diagnostic image/user/default-HOME route. This narrow follow-up is distinct from
+the prior five-package native run.
 
 After cleanup, `make check` passed format, vet, lint (zero issues), shellcheck,
 the full repository race suite (71.0% coverage), and the pinned vulnerability
@@ -334,3 +350,37 @@ scan (no vulnerabilities). `make build`, `make workflows-check` and
 `sha256:7edadcb49c6ac7348c695e112f57df187c4de25efbb213cff26f20d4cb1b78a9`.
 These observations describe the frozen dirty follow-up, not a signed source head,
 current GitHub CI result or production release acceptance.
+
+### Legacy tag-parent migration and fixed point
+
+The follow-up working tree on `2cd17d46563f8fd52c64fd9c829a40475582a08d`
+used the normal maintenance owner for all image components:
+
+```sh
+go run ./cmd/nkdctl catalog pin-artifacts --dir definitions/nke-m2/image-catalog --all
+```
+
+The first invocation updated ten tag-backed parent bindings; the two digest-backed
+parents were already pinned. Its generated diff was ten added lines and no removals:
+every one of the 24 native child digests, source records and 34 output declarations
+remained unchanged. A repeat reported each of the twelve components already pinned
+for two architectures, followed by:
+
+```text
+no changes
+```
+
+The resulting lock SHA-256 is
+`100ac0accd588d3bd9089ba5cbd052d94981edb3d505f33a1b61e877fded9ee7`.
+The same generated lock was produced in an isolated catalog copy before updating
+the maintained catalog. This is real registry metadata authentication, not retained
+upstream layer acquisition. The first migration changes logical Build identity
+because the parent selection constraint is now explicit (ADR-02/22); subsequent
+maintenance at identical parent and native bytes is a fixed point.
+
+A separate controlled TLS fixture exercises the actual built-in bound acquisition
+and observation owner across OCI/Docker media, both platform selections and tag/
+digest declarations. It checks the complete staged and cached closure, tampered
+cache refusal and missing-membership absence of output. Stage-verification and
+cached-verification removal mutants both fail the fixture. These controlled
+registries do not establish live upstream layer transfer or M2 production acceptance.

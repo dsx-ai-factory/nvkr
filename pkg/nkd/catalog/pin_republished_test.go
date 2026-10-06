@@ -92,3 +92,30 @@ func TestMaintenanceRejectsRepublishedAcquiredMemberAtomically(t *testing.T) {
 		t.Fatal("unchanged members did not retain new umbrella provenance")
 	}
 }
+
+func TestMaintenanceRejectsRepublishedImageParent(t *testing.T) {
+	before := ArtifactPin{Tag: "v1.0.0", ImageParentDigest: "sha256:" + strings.Repeat("a", 64),
+		Digests: map[string]string{"amd64": "sha256:" + strings.Repeat("b", 64)}}
+	for _, test := range []struct {
+		name, tag, parent string
+		code              e.Code
+	}{
+		{"unchanged", "v1.0.0", before.ImageParentDigest, ""},
+		{"changed same version", "v1.0.0", "sha256:" + strings.Repeat("c", 64), e.CodeUnverifiedRef},
+		{"changed version alias", "1.0.0", "sha256:" + strings.Repeat("c", 64), e.CodeUnverifiedRef},
+		{"removed parent", "v1.0.0", "", e.CodeUnverifiedRef},
+		{"new version", "v1.1.0", "sha256:" + strings.Repeat("c", 64), ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			after := before
+			after.Tag, after.ImageParentDigest = test.tag, test.parent
+			after.DerivedFrom = "new-umbrella-provenance"
+			err := validateUnchangedVersionBytes(SourcePinUpdate{Artifacts: []ArtifactPinChange{{Name: "image", Before: before, After: after}}})
+			if test.code != "" {
+				assertCatalogContractCode(t, err, test.code)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

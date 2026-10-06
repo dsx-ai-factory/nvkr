@@ -112,6 +112,14 @@ Acquired provenance is NKD's acquisition record (upstream reference, lock pin, f
 build or signature-verification claim. Without declared digest-pinned upstream evidence it remains
 `evidence: none` under ADR-13. Live producer signing and consumer acceptance remain separate operational tests.
 
+In the pipeline-attested lane, an acquired image with a retained parent records two dependencies:
+the authored transport URI with the exact parent digest, and the normalized native digest URI with
+the selected native manifest digest. A tag URI is a descriptive origin locator, not a claim that
+the mutable tag was dereferenced at execution; acquisition consumes the immutable repository/parent
+reference authenticated under ADR-22. The pair records the parent selection constraint separately
+from the native artifact subject. The qualified emitter retains only its existing native prebuilt
+dependency; parent-bound qualified acquisition provenance is unsupported.
+
 In the pipeline-attested lane, for a selected release executable the transport URL dependency binds the archive's exact digest, never
 the extracted executable digest. A separate `nkd:prebuilt/<component>` URI with `archive` and `member` query
 parameters records the selected member's exact executable digest. This logical dependency distinguishes
