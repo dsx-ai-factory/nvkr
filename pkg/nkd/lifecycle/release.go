@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
@@ -65,6 +66,52 @@ func (verified *VerifiedRelease) Description() (Release, error) {
 	description := verified.release
 	description.Artifacts = cloneArtifacts(verified.release.Artifacts)
 	return description, nil
+}
+
+// RequireExactInputs checks that this already verified publication realizes the
+// exact authored Definition, selected Environment, and compiled Plan supplied by
+// an independent consumer. It grants no stronger release scope or evidence lane.
+func (verified *VerifiedRelease) RequireExactInputs(definition Definition, environment Environment, plan *factory.Plan) error {
+	if verified == nil {
+		return e.New(e.CodeGateUnmet, "release capability is not verified")
+	}
+	verified.mu.RLock()
+	defer verified.mu.RUnlock()
+	if !verified.valid || verified.publication == nil {
+		return e.New(e.CodeGateUnmet, "release capability is not verified")
+	}
+	description, err := verified.publication.Description(verified.release.Subject)
+	if err != nil {
+		return err
+	}
+	definitionDigest, err := definition.Digest()
+	if err != nil {
+		return err
+	}
+	environmentDigest, err := environment.Digest()
+	if err != nil {
+		return err
+	}
+	if description.Metadata.DefinitionDigest != definitionDigest || description.Metadata.EnvironmentDigest != environmentDigest {
+		return e.New(e.CodeVerifyFailed, "verified publication does not bind the supplied Definition and Environment")
+	}
+	prepared, err := PrepareRun(definition, environment, plan, "consumer-verification")
+	if err != nil {
+		return err
+	}
+	observed, err := bindObserved(prepared, verified.release.Artifacts)
+	if err != nil {
+		return err
+	}
+	bound, err := bindReleaseContent(plan, observed)
+	if err != nil {
+		return err
+	}
+	if bound.Status != RunComplete || bound.ContentSubject != verified.release.ContentSubject ||
+		description.Metadata.ContentSubject != verified.release.ContentSubject {
+		return e.New(e.CodeVerifyFailed, "verified publication content does not realize the exact compiled output set")
+	}
+	return nil
 }
 
 func (verified *VerifiedRelease) Close() error {

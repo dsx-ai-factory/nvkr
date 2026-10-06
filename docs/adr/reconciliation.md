@@ -341,6 +341,9 @@ closure. Actual default-network vendor acceptance is tracked separately from mod
 The common positive consumer scope is `pipeline-attested` / `artifact-publication`. It establishes exact
 published bytes and build evidence, not M3/M4 full-release acceptance. A stronger unavailable scope never falls
 back. Static/dry-run evidence cannot satisfy either production or qualified policy.
+The live consumer can additionally require an exact authored Definition, selected Environment and compiled
+Plan. That check reuses lifecycle Run preparation, required/observed output joining and release-content binding
+against the held verified publication. It is contract-tested only; no complete M2 publication has exercised it.
 
 Qualified interfaces require package-issued opaque receipts. Caller structs, paths, digest strings, parsed
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the

@@ -11,6 +11,9 @@ IDENTITY=${IDENTITY:-}
 ISSUER=${ISSUER:-}
 COSIGN=${COSIGN:-}
 COSIGN_DIGEST=${COSIGN_DIGEST:-}
+DEFINITION=${DEFINITION:-}
+ENVIRONMENT=${ENVIRONMENT:-}
+PLAN=${PLAN:-}
 WORK=${WORK:-.nkd/demo-release-consumer}
 PLAIN_HTTP=0
 ANONYMOUS=0
@@ -34,6 +37,9 @@ Required:
   --cosign-digest SHA256 exact executable digest
 
 Options:
+  --definition PATH      exact authored Definition to require
+  --environment PATH     exact selected Environment to require
+  --plan PATH            exact compiled Plan to require
   --work DIR             verification workspace below .nkd
   --plain-http           use a development HTTP registry
   --anonymous            use anonymous registry access
@@ -53,6 +59,9 @@ while [ "$#" -gt 0 ]; do
     --issuer) [ "$#" -ge 2 ] || demo_die "missing --issuer value"; ISSUER=$2; shift 2 ;;
     --cosign) [ "$#" -ge 2 ] || demo_die "missing --cosign value"; COSIGN=$2; shift 2 ;;
     --cosign-digest) [ "$#" -ge 2 ] || demo_die "missing --cosign-digest value"; COSIGN_DIGEST=$2; shift 2 ;;
+    --definition) [ "$#" -ge 2 ] || demo_die "missing --definition value"; DEFINITION=$2; shift 2 ;;
+    --environment) [ "$#" -ge 2 ] || demo_die "missing --environment value"; ENVIRONMENT=$2; shift 2 ;;
+    --plan) [ "$#" -ge 2 ] || demo_die "missing --plan value"; PLAN=$2; shift 2 ;;
     --work) [ "$#" -ge 2 ] || demo_die "missing --work value"; WORK=$2; shift 2 ;;
     --plain-http) PLAIN_HTTP=1; shift ;;
     --anonymous) ANONYMOUS=1; shift ;;
@@ -67,6 +76,13 @@ done
 [ -n "$COSIGN" ] || demo_die "--cosign is required"
 case "$COSIGN_DIGEST" in sha256:????????????????????????????????????????????????????????????????) ;; *) demo_die "--cosign-digest must be sha256:<64 lowercase hex>" ;; esac
 case "${COSIGN_DIGEST#sha256:}" in *[!0-9a-f]*) demo_die "--cosign-digest must be sha256:<64 lowercase hex>" ;; esac
+EXACT_INPUTS=0
+for value in "$DEFINITION" "$ENVIRONMENT" "$PLAN"; do
+  [ -z "$value" ] || EXACT_INPUTS=$((EXACT_INPUTS + 1))
+done
+if [ "$EXACT_INPUTS" -ne 0 ] && [ "$EXACT_INPUTS" -ne 3 ]; then
+  demo_die "--definition, --environment, and --plan must be supplied together"
+fi
 demo_require_nkd_child_path "$WORK"
 demo_prepare_nkdctl
 demo_prepare_work "$WORK" "release-consumer"
@@ -75,6 +91,10 @@ args=(release verify --reference "$REFERENCE" --lane pipeline-attested --scope a
   --identity "$IDENTITY" --issuer "$ISSUER" --cosign "$COSIGN" --cosign-digest "$COSIGN_DIGEST" --workspace "$WORK")
 [ "$PLAIN_HTTP" -eq 0 ] || args+=(--plain-http)
 [ "$ANONYMOUS" -eq 0 ] || args+=(--anonymous)
+[ "$EXACT_INPUTS" -eq 0 ] || args+=(--definition "$DEFINITION" --environment "$ENVIRONMENT" --plan "$PLAN")
 "$NKD" "${args[@]}"
 
 printf '\nARTIFACT PUBLICATION VERIFIED\n  reference: %s\n  policy: pipeline-attested/artifact-publication\n' "$REFERENCE"
+if [ "$EXACT_INPUTS" -eq 3 ]; then
+  printf '  exact inputs: Definition, Environment, and Plan verified\n'
+fi

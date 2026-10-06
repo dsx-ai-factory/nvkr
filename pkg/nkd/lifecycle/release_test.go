@@ -71,6 +71,111 @@ func TestConsumerVerifiesExactSignedArtifactPublicationClosure(t *testing.T) {
 	}
 }
 
+func TestVerifiedReleaseRequiresExactDefinitionEnvironmentAndPlan(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*Definition, *Environment, **factory.Plan, *VerifiedRelease)
+		want   nkderr.Code
+	}{
+		{name: "exact"},
+		{name: "different definition", mutate: func(definition *Definition, _ *Environment, _ **factory.Plan, _ *VerifiedRelease) {
+			definition.Metadata.Name = "other-product"
+		}, want: nkderr.CodeVerifyFailed},
+		{name: "different environment", mutate: func(_ *Definition, environment *Environment, _ **factory.Plan, _ *VerifiedRelease) {
+			environment.Metadata.Name = "other-environment"
+		}, want: nkderr.CodeVerifyFailed},
+		{name: "substituted plan", mutate: func(_ *Definition, _ *Environment, plan **factory.Plan, _ *VerifiedRelease) {
+			copyPlan := **plan
+			copyPlan.EnvironmentDigest = "sha256:" + repeat("9", 64)
+			*plan = &copyPlan
+		}, want: nkderr.CodeUnverifiedRef},
+		{name: "different release content", mutate: func(_ *Definition, _ *Environment, _ **factory.Plan, verified *VerifiedRelease) {
+			verified.release.ContentSubject = "sha256:" + repeat("9", 64)
+		}, want: nkderr.CodeVerifyFailed},
+		{name: "closed capability", mutate: func(_ *Definition, _ *Environment, _ **factory.Plan, verified *VerifiedRelease) {
+			if err := verified.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}, want: nkderr.CodeGateUnmet},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			verified, definition, environment, plan := exactInputVerifiedRelease(t)
+			defer func() { _ = verified.Close() }()
+			if test.mutate != nil {
+				test.mutate(&definition, &environment, &plan, verified)
+			}
+			err := verified.RequireExactInputs(definition, environment, plan)
+			if test.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			assertCode(t, err, test.want)
+		})
+	}
+}
+
+func exactInputVerifiedRelease(t *testing.T) (*VerifiedRelease, Definition, Environment, *factory.Plan) {
+	t.Helper()
+	definition, environment := testDefinition(t), testEnvironment()
+	plan, err := Compile(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte("exact kubectl bytes")
+	source := filepath.Join(t.TempDir(), "kubectl")
+	if err := os.WriteFile(source, payload, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bundlePath := filepath.Join(t.TempDir(), "bundle")
+	bundle, err := delivery.BuildBinaryBundle(t.Context(), bundlePath, delivery.BinaryBundleRequest{
+		OS: "linux", Arch: "amd64", Purpose: "cli",
+		Files: []delivery.BinaryFileInput{{Name: "kubectl", Path: source, InstallPath: "/usr/local/bin/kubectl", Mode: 0o755}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor, err := delivery.PayloadDescriptor(t.Context(), bundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := Artifact{Name: "cli", Kind: OutputExecutable, Digest: descriptor.Digest,
+		BuildDigest: plan.Builds[0].BuildDigest, Components: []string{"kubectl"}}
+	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{
+		Name: "cli", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true,
+		ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest,
+	}}, map[string]string{"kubectl": pipeline.FileDigest(payload)})
+	request.Release.DefinitionDigest, err = definition.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Release.EnvironmentDigest, err = environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := filepath.Join(t.TempDir(), "publication")
+	publication, err := delivery.BuildPublicationRoot(t.Context(), layout, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout, publication = attestFixtureLayout(t, layout)
+	reference := "registry.example.test/product@" + publication.RootDigest
+	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
+		Ref: reference, Digest: publication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
+		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
+	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
+		return delivery.OpenPublication(t.Context(), layout, publication.RootDigest)
+	}}
+	verified, err := consumer.Verify(t.Context(), reference, VerificationPolicy{
+		Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return verified, definition, environment, plan
+}
+
 func TestConsumerRejectsRecordForWrongObservedSigner(t *testing.T) {
 	_, digest := testPublicationLayout(t)
 	reference := "registry.example.test/product@" + digest

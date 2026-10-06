@@ -38,7 +38,7 @@ func TestReleaseConsumerRequiresOneReferenceAndExplicitPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := string(raw)
-	for _, required := range []string{"release verify", "--reference", "--lane pipeline-attested", "--scope artifact-publication", "--identity", "--issuer", "--cosign-digest"} {
+	for _, required := range []string{"release verify", "--reference", "--lane pipeline-attested", "--scope artifact-publication", "--identity", "--issuer", "--cosign-digest", "--definition", "--environment", "--plan"} {
 		if !strings.Contains(script, required) {
 			t.Errorf("consumer omits %q", required)
 		}
@@ -60,6 +60,7 @@ func TestReleaseConsumerRejectsUnsafeInputsBeforeExecution(t *testing.T) {
 	}{
 		{"path escape", []string{"--work", ".nkd/../outside", "--cosign-digest", validDigest}, "unsafe path component"},
 		{"nonhex digest", []string{"--work", ".nkd/release-input-test", "--cosign-digest", "sha256:" + strings.Repeat("g", 64)}, "64 lowercase hex"},
+		{"partial exact inputs", []string{"--work", ".nkd/release-input-test", "--cosign-digest", validDigest, "--definition", "definition.yaml"}, "must be supplied together"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

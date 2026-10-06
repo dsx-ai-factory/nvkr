@@ -40,3 +40,29 @@ func TestReleaseBrowseRejectsInvalidReferencesWithoutEffects(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseVerifyRequiresCompleteExactInputSetBeforeAcquisition(t *testing.T) {
+	for _, flags := range [][]string{
+		{"--definition", "definition.yaml"},
+		{"--environment", "environment.yaml"},
+		{"--plan", "plan.json"},
+		{"--definition", "definition.yaml", "--environment", "environment.yaml"},
+		{"--definition", "definition.yaml", "--plan", "plan.json"},
+		{"--environment", "environment.yaml", "--plan", "plan.json"},
+	} {
+		workspace := filepath.Join(t.TempDir(), "must-not-exist")
+		args := []string{"nkdctl", "release", "verify",
+			"--reference", "127.0.0.1:1/releases@sha256:" + strings.Repeat("a", 64),
+			"--lane", "pipeline-attested", "--scope", "artifact-publication",
+			"--identity", "^builder$", "--issuer", "issuer", "--workspace", workspace,
+		}
+		app := &cli.App{Commands: []*cli.Command{cmdRelease()}}
+		err := app.RunContext(t.Context(), append(args, flags...))
+		if cliErrorCode(err) != e.CodeUsage {
+			t.Fatalf("partial exact-input flags reached acquisition: flags=%v error=%v", flags, err)
+		}
+		if _, err := os.Stat(workspace); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("partial exact-input flags touched workspace: %v", err)
+		}
+	}
+}

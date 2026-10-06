@@ -73,6 +73,9 @@ Policy with `artifact-publication` scope. This does not establish M3 qualificati
 acceptance. Run it on Linux: it requires a real statically linked, digest-pinned Linux
 cosign executable and a signed GitHub publication; local dry-run output is
 deliberately insufficient.
+Supplying `--definition`, `--environment`, and `--plan` together additionally
+requires the verified publication to realize that exact authored and compiled
+output set. Partial exact-input selection fails before registry access.
 Signer-policy rejection is covered by the owning consumer contract tests.
 
 ## Focused supporting contracts

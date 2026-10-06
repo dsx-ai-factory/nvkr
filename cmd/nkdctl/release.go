@@ -8,6 +8,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/release"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/status"
@@ -82,9 +83,21 @@ func cmdRelease() *cli.Command {
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true}, &cli.StringFlag{Name: "scope", Required: true},
 					&cli.StringFlag{Name: "identity"}, &cli.StringFlag{Name: "issuer"}, &cli.StringFlag{Name: "cosign"}, &cli.StringFlag{Name: "cosign-digest"},
+					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require"},
+					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require"},
+					&cli.StringFlag{Name: "plan", Usage: "exact compiled Plan to require"},
 					&cli.StringFlag{Name: "workspace", Value: ".nkd/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
 				},
 				Action: func(c *cli.Context) error {
+					exactInputCount := 0
+					for _, name := range []string{"definition", "environment", "plan"} {
+						if c.String(name) != "" {
+							exactInputCount++
+						}
+					}
+					if exactInputCount != 0 && exactInputCount != 3 {
+						return e.New(e.CodeUsage, "release verification requires --definition, --environment, and --plan together")
+					}
 					policy := lifecycle.VerificationPolicy{Lane: c.String("lane"), Scope: c.String("scope"), IdentityRegexp: c.String("identity"), Issuer: c.String("issuer")}
 					if err := policy.Validate(); err != nil {
 						return err
@@ -92,6 +105,27 @@ func cmdRelease() *cli.Command {
 					if policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication {
 						_, err := (&lifecycle.Consumer{}).Verify(c.Context, c.String("reference"), policy)
 						return err
+					}
+					if err := delivery.ValidatePublicationReference(c.String("reference")); err != nil {
+						return err
+					}
+					var definition lifecycle.Definition
+					var environment lifecycle.Environment
+					var plan *factory.Plan
+					if exactInputCount == 3 {
+						var err error
+						definition, err = lifecycle.LoadDefinition(c.Context, c.String("definition"))
+						if err != nil {
+							return err
+						}
+						environment, err = lifecycle.LoadEnvironment(c.Context, c.String("environment"))
+						if err != nil {
+							return err
+						}
+						plan, err = factory.LoadPlanContext(c.Context, c.String("plan"))
+						if err != nil {
+							return err
+						}
 					}
 					consumer, err := lifecycle.NewConsumer(lifecycle.ConsumerOptions{CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"), Registry: delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")}, WorkspaceRoot: c.String("workspace")})
 					if err != nil {
@@ -102,6 +136,11 @@ func cmdRelease() *cli.Command {
 						return err
 					}
 					defer func() { _ = verified.Close() }()
+					if exactInputCount == 3 {
+						if err := verified.RequireExactInputs(definition, environment, plan); err != nil {
+							return err
+						}
+					}
 					description, err := verified.Description()
 					if err != nil {
 						return err
