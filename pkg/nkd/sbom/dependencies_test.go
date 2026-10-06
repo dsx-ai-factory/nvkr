@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -122,6 +123,26 @@ func TestDependencyMethodsKeepDiskInventorySemanticsScoped(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestDiskMethodsRequirePerArtifactSubjectOnSerializedAggregate(t *testing.T) {
+	for _, method := range []string{"disk-content/v1", "disk-reconciled/v1"} {
+		t.Run(method, func(t *testing.T) {
+			resolved, digest := resolveCP(t)
+			bom := fromBuild(resolved, digest, nil, false)
+			if err := bom.Validate(); err != nil {
+				t.Fatalf("aggregate fixture is invalid before assigning a method: %v", err)
+			}
+			bom.Metadata.Props = append(bom.Metadata.Props, Property{Name: "nkd:dependencyInspection", Value: method},
+				Property{Name: "nkd:dependencyScannerDigest", Value: "sha256:" + strings.Repeat("b", 64)})
+			slices.SortFunc(bom.Metadata.Props, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+			err := bom.Validate()
+			assertDependencyCode(t, err, e.CodeVerifyFailed)
+			if !strings.Contains(err.Error(), "disk inventory requires an exact per-artifact subject") {
+				t.Fatalf("wrong semantic guard: %v", err)
+			}
+		})
 	}
 }
 

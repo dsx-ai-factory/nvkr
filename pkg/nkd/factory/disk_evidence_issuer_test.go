@@ -93,6 +93,56 @@ func TestDiskEvidenceIssuerDeadlineUsesSelectedProfileAndOriginalCaller(t *testi
 	}
 }
 
+func TestDiskEvidenceQueueAndAdmissionConsumeOriginalClock(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		elapsed time.Duration
+		queued  bool
+		want    e.Code
+	}{
+		{"queue past ten minute bound", 11 * time.Minute, true, e.CodeTimeout},
+		{"admission past ten minute bound", 11 * time.Minute, false, e.CodeTimeout},
+		{"queue time consumes selected scan allowance", 9 * time.Minute, false, e.CodeEnvelopeDecode},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, owner := diskMaterialTraceFixtureWithCapture(t, false, false, "linux/amd64", "none", "acquisitions.tar")
+			if test.queued {
+				release, err := owner.acquireDiskPermit(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer release()
+			}
+			started := time.Now().Add(-test.elapsed)
+			bindingsCalled, scanned := false, false
+			receipt, err := owner.reconcileDiskEvidenceStarted(t.Context(), plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{},
+				func(ctx context.Context) (definition.DiskInspectionProfile, error) {
+					bindingsCalled = true
+					deadline, ok := ctx.Deadline()
+					if !ok || !deadline.Equal(started.Add(10*time.Minute)) {
+						t.Fatalf("admission escaped original ten minute bound: %v", deadline)
+					}
+					if ctx.Err() != nil {
+						return definition.DiskInspectionProfile{}, e.Wrap(e.CodeTimeout, ctx.Err(), "controlled expired admission")
+					}
+					return definition.DiskInspectionProfile{TimeoutSeconds: 600}, nil
+				}, func(ctx context.Context, _ BuildPlan, trace *diskMaterialTrace, _ *diskPayload, _ definition.DiskInspectionProfile) (diskEvidenceScan, error) {
+					scanned = true
+					deadline, ok := ctx.Deadline()
+					want := started.Add(time.Duration(len(trace.description.Members)+1) * 600 * time.Second)
+					if !ok || !deadline.Equal(want) {
+						t.Fatalf("join replenished queue/admission time: %v want%v", deadline, want)
+					}
+					return diskEvidenceScan{}, e.New(e.CodeEnvelopeDecode, "controlled stopped scan")
+				}, started)
+			assertFactoryErrorCode(t, err, test.want)
+			if receipt != nil || test.queued && bindingsCalled || scanned != (test.want == e.CodeEnvelopeDecode) {
+				t.Fatalf("expired operation performed work: bindings=%v scanned=%v", bindingsCalled, scanned)
+			}
+		})
+	}
+}
+
 // This invokes the production issuer core, never a receipt literal. Private
 // scan/profile observations model already-stopped operations; they do not prove
 // native Packer, opaque content discovery, or the public end-to-end runtime.
@@ -117,6 +167,7 @@ func TestDiskEvidenceIssuerCoreOwnsCompleteJoin(t *testing.T) {
 			{"missing original material", e.CodeVerifyFailed},
 			{"changed material edge", e.CodeVerifyFailed},
 			{"changed original payload", e.CodeVerifyFailed},
+			{"substituted original trace binding", e.CodeVerifyFailed},
 			{"scan failure", e.CodeEnvelopeDecode},
 			{"cancel before admission", e.CodeTimeout},
 			{"cancel during scan", e.CodeTimeout},
@@ -170,6 +221,9 @@ func TestDiskEvidenceIssuerCoreOwnsCompleteJoin(t *testing.T) {
 					}
 					observed := diskEvidenceScan{subject: subject.Digest, size: subject.Size, profile: selected, bom: bom, documents: map[string][]byte{}}
 					for _, member := range trace.description.Members {
+						if member.Component == subject.Component {
+							continue // Concrete scanning leaves the root for the issuer.
+						}
 						document, err := sbom.NewSubject(build.BuildDigest, member.Component, member.Digest)
 						if err != nil {
 							return diskEvidenceScan{}, err
@@ -193,6 +247,11 @@ func TestDiskEvidenceIssuerCoreOwnsCompleteJoin(t *testing.T) {
 						observed.bom = &sbom.BOM{}
 					case "missing original material":
 						delete(owner.materialConsumptions, "node-image/pull-runtime")
+					case "substituted original trace binding":
+						// Corrupt only the private stopped scanner's trace view.
+						// Re-observing the actual owner still yields the original
+						// subject; the final ValidateSubject must reject this.
+						trace.description.Subject.PlanDigest = "sha256:" + strings.Repeat("f", 64)
 					case "changed material edge":
 						owner.materialConsumptions["node-image/build-agent"].materials[0].Binding = "substituted"
 					case "changed original payload":
@@ -252,6 +311,10 @@ func TestDiskEvidenceIssuerCoreOwnsCompleteJoin(t *testing.T) {
 				documents, err := receipt.ComponentDocuments()
 				if err != nil || len(documents) != 3 {
 					t.Fatalf("issued documents: %v %v", documents, err)
+				}
+				rootDocument, err := documents[receipt.trace.description.Subject.Component].Marshal()
+				if err != nil || !bytes.Equal(receipt.root, rootDocument) || !bytes.Contains(rootDocument, []byte("disk-reconciled/v1")) {
+					t.Fatalf("issuer did not retain its reconciled root document: %v", err)
 				}
 				var destination bytes.Buffer
 				observed, document, err := owner.exportReconciledDisk(ctx, plan, expected, inspection, receipt, &destination, bindings)

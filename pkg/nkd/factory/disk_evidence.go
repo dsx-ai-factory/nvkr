@@ -179,6 +179,13 @@ func (owner *LocalRunResult) reconcileDiskEvidence(ctx context.Context, plan *Pl
 	bindings func(context.Context) (definition.DiskInspectionProfile, error),
 	scan func(context.Context, BuildPlan, *diskMaterialTrace, *diskPayload, definition.DiskInspectionProfile) (diskEvidenceScan, error),
 ) (*DiskEvidenceReceipt, error) {
+	return owner.reconcileDiskEvidenceStarted(ctx, plan, expected, inspection, bindings, scan, time.Now())
+}
+
+func (owner *LocalRunResult) reconcileDiskEvidenceStarted(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime,
+	bindings func(context.Context) (definition.DiskInspectionProfile, error),
+	scan func(context.Context, BuildPlan, *diskMaterialTrace, *diskPayload, definition.DiskInspectionProfile) (diskEvidenceScan, error), started time.Time,
+) (*DiskEvidenceReceipt, error) {
 	if ctx == nil || owner == nil || bindings == nil || scan == nil {
 		return nil, e.New(e.CodeUsage, "disk reconciliation requires context and original Run")
 	}
@@ -189,7 +196,7 @@ func (owner *LocalRunResult) reconcileDiskEvidence(ctx context.Context, plan *Pl
 	if err != nil {
 		return nil, err
 	}
-	operation, started, release, err := owner.beginDiskInspectionOperation(ctx)
+	operation, started, release, err := owner.beginDiskInspectionOperationAt(ctx, started)
 	if err != nil {
 		return nil, err
 	}

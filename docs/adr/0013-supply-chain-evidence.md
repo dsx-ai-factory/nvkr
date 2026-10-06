@@ -157,8 +157,9 @@ inputs. The exact captured package bytes are separately read by pinned dpkg-deb 
 metadata is accepted. Owner-issued content classes distinguish filesystem package databases, container
 inventories and held Debian archives: a container database cannot justify an installed host Debian package.
 The native Syft adapter retains real/access-path coordinates through admission. Its recursive database
-cataloger can find unpacked or containerd snapshot roots; those nested package databases return a distinct
-`CodeEngineCapability` until a separate held root/container observation exists. No path-based container
+cataloger can find unpacked or containerd snapshot roots; those nested package databases return
+`CodeEngineCapability` with a distinct diagnostic until a separate held root/container observation exists.
+This gate applies to filesystem, archive and container scans through the shared native report decoder. No path-based container
 identity is invented, no package is silently dropped, and this refusal does not establish functional
 nested-storage reconciliation. Scanner locations remain descriptions, not installed-origin authority.
 Correspondence is checked before public document deduplication; those internal classes do not assert
@@ -184,9 +185,18 @@ trace. Nested image discovery recognizes bounded gzip or plain tar
 contents, not image format from a filename. The pinned Docker decoder requires an unambiguous Docker
 manifest; OCI layouts reuse the existing safe transport extractor and complete offline closure verifier.
 Every accepted image is inspected, while foreign platforms, unsupported descriptors, missing or extra
-blobs and mixed OCI/Docker markers fail closed without partial inventory. One operation shares its
+blobs and mixed OCI/Docker markers fail closed without partial inventory. Modern mixed Docker-save
+archives, OCI member names prefixed with `./`, and OCI indexes carrying foreign/unknown-platform
+attestation manifests are unsupported; an attestation descriptor is not silently discarded as image evidence.
+The maintained NKE preparation at `b30117c25b2dcdf6c16021dae88a2eafdafcae61` uses pinned crane
+Docker-archive pulls followed by GNU-tar/gzip repacking, not modern Docker-save mixed layouts. This
+source inspection does not establish that retained prepared archive bytes were fully scanned. One operation shares its
 filesystem-byte expansion allowance across sibling archives and Debian exports, with 16,384 recursive
-members, 256 image entries and bounded nesting. Ordinary tar contents retain their outer file hash;
+members, 256 unique OCI images (Docker manifest entries remain bounded separately) and bounded nesting.
+Decoded root image markers select that inspection before member/expansion charging; ordinary gzip/tar,
+including empty or corrupt filename candidates without such a marker, retains only its outer file hash.
+Repeated OCI image digests are scanned once, but every descriptor/platform is checked; the pinned layout
+accessor still reparses its bounded index for each unique image/child lookup. Ordinary tar contents retain their outer file hash;
 other compressed formats have no nested-image discovery. These adapters are contract-tested with
 controlled archives; complete native Syft discovery remains unexercised. The root file inventory
 retains actual exported paths and the exact outer archive hash;
@@ -195,6 +205,10 @@ invented installed paths. Their discovered components carry descriptive `nkd:con
 binding the immediate held carrier path and digest. Repeated public package identities retain a
 sorted canonical string list of those carriers; no recursive ancestry, installed origin or package
 ownership is inferred. A contained payload's file inventory is not an independent root-file inventory.
+When public package refs combine contained and uncontained observations, `nkd:observedAtSubjectRoot`
+retains the latter explicitly; it is not an installed-origin claim. `nkd:materialSubjects` matches only
+top-level regular-file hashes in each material observation. Nested Debian/SquashFS/image file digests
+do not currently participate in that file correspondence, and absence of the property is not non-correspondence proof.
 
 The process-local reconciliation receipt binds the original Run, named output, complete Plan, Build,
 QCOW2 digest/size and admitted inspection closure. Export revalidates those owners before copying the
@@ -205,10 +219,17 @@ reconciliation observations, selected admission/decoder failures, private issuer
 consumer architectures and export-owner revalidation. The issuer tests keep complete Plan, original Run,
 payload selection and material-trace checks concrete, while modeling stopped scan/profile observations;
 the public wrapper still requires the actual Packer capability and opaque inspection operations. Those
-tests do not establish full helper discovery or the public native original-owner issuance handshake. Complete
-native NKE content runs, original live joins, publication and production acceptance remain unexercised.
+tests do not establish full helper discovery. A separate native ARM64 controlled ELF-protocol test
+exercises public producer/inspection owners, receipt issuance, exact export, six negative issuer rows
+and the concrete memory-profile guard; it is not actual Docker/Packer/guestfish/Syft discovery.
+Native AMD64 public positive issuance, complete native NKE content runs, original live NKE joins,
+publication and production acceptance remain unexercised.
 Complete inventory documents are bounded to 32 MiB, composition helper reports to 16 MiB,
-and signed SBOM transports to 64 MiB. Diagnostics and generic OCI records retain their independent
+and signed SBOM transports to 64 MiB. These document/bundle policies apply to every SBOM subject,
+not only disks; malformed or oversized SBOM evidence returns `CodeVerifyFailed` (exit 22) before
+cosign work. Provenance independently retains its 4 MiB predicate bound and `CodeProvenanceMissing`
+(exit 45). Sigstore upload/service acceptance at the larger inventory sizes is not established by local tests.
+Diagnostics and generic OCI records retain their independent
 8 MiB limits. A controlled 50,000-file projection measures approximately 9.15 MB of report and
 20.20 MB of CycloneDX; this is not Ubuntu discovery or native execution proof. The 200,000-file
 structural ceiling does not guarantee every such inventory fits the byte limits; oversized complete

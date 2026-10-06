@@ -48,7 +48,7 @@ func TestSBOMAttestationCreationRequiresExactPredicateAndVerification(t *testing
 			document := document
 			if tc.large {
 				large := *bom
-				large.Metadata.Props = append(append([]sbom.Property(nil), bom.Metadata.Props...), sbom.Property{Name: "nkd:zpayload", Value: strings.Repeat("x", 9<<20)})
+				large.Metadata.Props = append(append([]sbom.Property(nil), bom.Metadata.Props...), sbom.Property{Name: "nkd:zpayload", Value: strings.Repeat("x", 25<<20)})
 				var err error
 				document, err = large.Marshal()
 				if err != nil {
@@ -107,9 +107,76 @@ func TestSBOMAttestationCreationRequiresExactPredicateAndVerification(t *testing
 			if err != nil {
 				t.Fatal(err)
 			}
+			if tc.large && (len(document) > sbom.MaxDocumentBytes || len(bundle) <= sbom.MaxDocumentBytes || len(bundle) > sbom.MaxBundleBytes) {
+				t.Fatalf("fixture must separate document and bundle ceilings: document=%d bundle=%d", len(document), len(bundle))
+			}
 			if strings.Join(calls, ",") != "attest-blob,verify-blob-attestation" {
 				t.Fatal("missing verification", calls)
 			}
 		})
+	}
+}
+
+func TestSBOMAttestationDocumentPolicyBeforeCosign(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		size       int
+		raw        string
+		provenance bool
+		code       e.Code
+		calls      int
+	}{
+		{name: "empty inventory", code: e.CodeVerifyFailed},
+		{name: "malformed inventory", raw: "{not JSON", code: e.CodeVerifyFailed},
+		{name: "inventory exceeds former provenance ceiling", size: (4 << 20) + 1, code: e.CodeSignatureInvalid, calls: 1},
+		{name: "inventory at document ceiling", size: sbom.MaxDocumentBytes, code: e.CodeSignatureInvalid, calls: 1},
+		{name: "inventory one byte over ceiling", size: sbom.MaxDocumentBytes + 1, code: e.CodeVerifyFailed},
+		{name: "provenance one byte over its independent ceiling", size: (4 << 20) + 1, provenance: true, code: e.CodeProvenanceMissing},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			predicate := []byte(test.raw)
+			if test.size != 0 {
+				predicate = []byte(`{"payload":"` + strings.Repeat("x", test.size-len(`{"payload":""}`)) + `"}`)
+				if len(predicate) != test.size {
+					t.Fatal("fixture has wrong byte size")
+				}
+			}
+			calls := 0
+			runner := EnvRunnerFunc(func(_ context.Context, _ string, _, _ []string, _, _ io.Writer) error {
+				calls++
+				return io.ErrUnexpectedEOF // Stop after admission; no signing claim.
+			})
+			signer, err := NewCosignOCISigner(CosignOCIOptions{Identity: ociTestIdentity, Issuer: ociTestIssuer, Runner: runner})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.provenance {
+				_, err = signer.SignAndAttest(t.Context(), ociSubject(), predicate)
+			} else {
+				bundle, attestErr := signer.AttestSBOM(t.Context(), ociTestDigest, predicate)
+				err = attestErr
+				if bundle != nil {
+					t.Fatal("failed operation exposed a bundle")
+				}
+			}
+			requireSignCode(t, err, test.code)
+			if calls != test.calls {
+				t.Fatalf("cosign calls=%d, want %d", calls, test.calls)
+			}
+		})
+	}
+}
+
+func TestSBOMVerificationBundlePolicyBeforeCosign(t *testing.T) {
+	calls := 0
+	runner := EnvRunnerFunc(func(_ context.Context, _ string, _, _ []string, _, _ io.Writer) error { calls++; return nil })
+	signer, err := NewCosignOCISigner(CosignOCIOptions{Identity: ociTestIdentity, Issuer: ociTestIssuer, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = signer.VerifySBOM(t.Context(), ociTestDigest, []byte(strings.Repeat(" ", sbom.MaxBundleBytes+1)))
+	requireSignCode(t, err, e.CodeVerifyFailed)
+	if calls != 0 {
+		t.Fatal("oversized bundle reached cosign")
 	}
 }

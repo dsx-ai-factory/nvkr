@@ -20,13 +20,30 @@ import (
 // The scanner's Docker archive is only a private projection; the observation
 // remains bound to the original held material, not a rewritten image identity.
 func inspectNestedOCILayout(ctx context.Context, subject inspectionArchive, archive *generatedInspectionFile, platform string, scanner Scanner, maxBytes int64, budget *materialInspectionBudget) (*FilesystemInspection, error) {
+	return inspectNestedOCILayoutScan(ctx, subject, archive, platform, scanner, budget, func(ctx context.Context, _ string, image v1.Image) (DependencyInventory, error) {
+		held, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
+			return tarball.Write(name.MustParseReference("nkd.invalid/material:scan"), image, destination)
+		})
+		if err != nil {
+			return DependencyInventory{}, e.Wrap(e.CodeVerifyFailed, err, "sealing nested OCI scan transport")
+		}
+		inventory, scanErr := inspectGeneratedDependencies(ctx, held, scanner)
+		return inventory, errors.Join(scanErr, held.Close())
+	})
+}
+
+// Production supplies the concrete scanner owner. Tests can model a stopped
+// scan/mutation, but cannot bypass pre/post closure validation or issue receipts.
+func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, archive *generatedInspectionFile, platform string, scanner Scanner, budget *materialInspectionBudget,
+	scan func(context.Context, string, v1.Image) (DependencyInventory, error),
+) (*FilesystemInspection, error) {
 	workspace, err := os.MkdirTemp("/tmp", "nkd-material-oci-*")
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "creating private OCI material workspace")
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
 	if err := transportarchive.UnpackOpen(ctx, archive.file, workspace, []string{"oci-layout", "index.json", "blobs"}); err != nil {
-		return nil, err
+		return nil, nestedOCIValidationError(ctx, err, "extracting nested OCI layout")
 	}
 	index, err := layout.ImageIndexFromPath(workspace)
 	if err != nil {
@@ -48,7 +65,7 @@ func inspectNestedOCILayout(ctx context.Context, subject inspectionArchive, arch
 		want = manifest.Manifests[0].Digest.String()
 	}
 	if err := pipeline.VerifyOfflineOCILayout(ctx, workspace, want); err != nil {
-		return nil, err
+		return nil, nestedOCIValidationError(ctx, err, "validating nested OCI closure")
 	}
 	images, err := nestedOCIImages(ctx, index, platform, budget, 0)
 	if err != nil {
@@ -59,21 +76,14 @@ func inspectNestedOCILayout(ctx context.Context, subject inspectionArchive, arch
 	}
 	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest}
 	for _, image := range images {
-		held, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
-			return tarball.Write(name.MustParseReference("nkd.invalid/material:scan"), image, destination)
-		})
+		inventory, err := scan(ctx, workspace, image)
 		if err != nil {
-			return nil, e.Wrap(e.CodeVerifyFailed, err, "sealing nested OCI scan transport")
-		}
-		inventory, scanErr := inspectGeneratedDependencies(ctx, held, scanner)
-		closeErr := held.Close()
-		if err := errors.Join(scanErr, closeErr); err != nil {
 			return nil, err
 		}
 		result.components = append(result.components, withDiskContentClass(inventory.Components, diskClassContainer)...)
 	}
 	if err := pipeline.VerifyOfflineOCILayout(ctx, workspace, want); err != nil {
-		return nil, err
+		return nil, nestedOCIValidationError(ctx, err, "revalidating scanned OCI closure")
 	}
 	if err := archive.AssertUnchangedContext(ctx); err != nil {
 		return nil, err
@@ -84,9 +94,26 @@ func inspectNestedOCILayout(ctx context.Context, subject inspectionArchive, arch
 	return result, nil
 }
 
+// Extraction is transport and may use another owner's failure code. Translate
+// malformed inspected material at this boundary; cancellation remains timeout.
+func nestedOCIValidationError(ctx context.Context, err error, operation string) error {
+	var coded *e.Error
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s canceled", operation)
+	}
+	if errors.As(err, &coded) && coded.Code == e.CodeTimeout {
+		return err
+	}
+	return e.Wrap(e.CodeVerifyFailed, err, "%s", operation)
+}
+
 // Enumerate every descriptor before scanning. No platform selection silently
 // drops an image: an unsupported or non-consumer image rejects the whole input.
 func nestedOCIImages(ctx context.Context, index v1.ImageIndex, platform string, budget *materialInspectionBudget, depth int) ([]v1.Image, error) {
+	return nestedOCIImagesSeen(ctx, index, platform, budget, depth, make(map[v1.Hash]bool))
+}
+
+func nestedOCIImagesSeen(ctx context.Context, index v1.ImageIndex, platform string, budget *materialInspectionBudget, depth int, seen map[v1.Hash]bool) ([]v1.Image, error) {
 	if err := validateSBOMContext(ctx); err != nil {
 		return nil, err
 	}
@@ -114,12 +141,16 @@ func nestedOCIImages(ctx context.Context, index v1.ImageIndex, platform string, 
 			if err != nil {
 				return nil, e.Wrap(e.CodeVerifyFailed, err, "opening nested OCI child index")
 			}
-			children, err := nestedOCIImages(ctx, child, platform, budget, depth+1)
+			children, err := nestedOCIImagesSeen(ctx, child, platform, budget, depth+1, seen)
 			if err != nil {
 				return nil, err
 			}
 			images = append(images, children...)
 		case descriptor.MediaType.IsImage():
+			if seen[descriptor.Digest] {
+				continue // Descriptor membership/platform above is still checked.
+			}
+			seen[descriptor.Digest] = true
 			budget.images++
 			if budget.images > 256 {
 				return nil, e.New(e.CodeEngineCapability, "nested material exceeds its cumulative image budget")

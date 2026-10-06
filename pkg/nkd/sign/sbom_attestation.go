@@ -24,6 +24,8 @@ func (s *CosignOCISigner) AttestSBOM(ctx context.Context, digest string, predica
 	if err := s.admitSBOM(ctx, digest); err != nil {
 		return nil, err
 	}
+	// This inventory policy applies to every SBOM subject, not only disks.
+	// Provenance retains its separate 4 MiB / CodeProvenanceMissing admission.
 	if err := requireOCIPredicateWithLimit(predicate, sbom.MaxDocumentBytes, e.CodeVerifyFailed, "SBOM inventory"); err != nil {
 		return nil, err
 	}

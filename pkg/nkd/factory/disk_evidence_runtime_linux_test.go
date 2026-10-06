@@ -182,6 +182,21 @@ type publicDiskEvidenceFixture struct {
 func newPublicDiskEvidenceFixture(t *testing.T, ctx context.Context, mode string) publicDiskEvidenceFixture {
 	t.Helper()
 	root := t.TempDir()
+	// Retained diagnostics are deliberately sealed read-only by their owners.
+	// Run after those later-registered owner cleanups, before TempDir deletion.
+	t.Cleanup(func() {
+		if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				return os.Chmod(path, 0o700)
+			}
+			return nil
+		}); err != nil {
+			t.Errorf("restoring fixture directory permissions for cleanup: %v", err)
+		}
+	})
 	t.Chdir(root)
 	for name, raw := range map[string][]byte{"node.qcow2": testQCOW2HeaderPayload(), "agent.deb": []byte("controlled staged package"), "installer.iso": []byte("controlled installer"), "mode": []byte(mode)} {
 		if err := os.WriteFile(filepath.Join(root, name), raw, 0600); err != nil {

@@ -3,6 +3,7 @@ package sbom
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
@@ -44,6 +46,9 @@ func nestedOCIFixture(t *testing.T, architectures []string, compressed bool, cha
 	if change != nil {
 		change(root)
 	}
+	if err := os.MkdirAll(filepath.Join(root, "blobs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	carrier := filepath.Join(root, "layout.tar")
 	if err := transportarchive.Pack(t.Context(), carrier, root, []string{"oci-layout", "index.json", "blobs"}); err != nil {
 		t.Fatal(err)
@@ -63,6 +68,50 @@ func nestedOCIFixture(t *testing.T, architectures []string, compressed bool, cha
 	return file
 }
 
+func TestNestedOCIEnumerationPlatformDepthAndDeduplication(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		configuration, err := empty.Image.ConfigFile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		configuration.OS, configuration.Architecture = "linux", arch
+		image, err := mutate.ConfigFile(empty.Image, configuration)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, test := range []struct {
+			name  string
+			index v1.ImageIndex
+			code  e.Code
+			count int
+		}{
+			{"same digest repeated", mutate.AppendManifests(empty.Index, mutate.IndexAddendum{Add: image}, mutate.IndexAddendum{Add: image}), "", 1},
+			{"foreign descriptor", mutate.AppendManifests(empty.Index, mutate.IndexAddendum{Add: image, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "foreign"}}}), e.CodeVerifyFailed, 0},
+			{"same digest later foreign descriptor", mutate.AppendManifests(empty.Index, mutate.IndexAddendum{Add: image}, mutate.IndexAddendum{Add: image, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "foreign"}}}), e.CodeVerifyFailed, 0},
+			{"foreign config", mutate.AppendManifests(empty.Index, mutate.IndexAddendum{Add: empty.Image}), e.CodeVerifyFailed, 0},
+		} {
+			t.Run(arch+"/"+test.name, func(t *testing.T) {
+				budget := &materialInspectionBudget{remaining: 1 << 20}
+				images, err := nestedOCIImages(t.Context(), test.index, "linux/"+arch, budget, 0)
+				if test.code != "" {
+					assertDependencyCode(t, err, test.code)
+				} else if err != nil || len(images) != test.count || budget.images != test.count || budget.members != 2 {
+					t.Fatalf("duplicate descriptor rescanned image: %d %+v %v", len(images), budget, err)
+				}
+			})
+		}
+		index := mutate.AppendManifests(empty.Index, mutate.IndexAddendum{Add: image})
+		for range 9 {
+			index = mutate.AppendManifests(empty.Index, mutate.IndexAddendum{Add: index})
+		}
+		images, err := nestedOCIImages(t.Context(), index, "linux/"+arch, &materialInspectionBudget{remaining: 1 << 20}, 0)
+		assertDependencyCode(t, err, e.CodeEngineCapability)
+		if images != nil || !strings.Contains(err.Error(), "bounded depth") {
+			t.Fatalf("deep index returned partial images: %v", err)
+		}
+	}
+}
+
 func TestNestedOCIUsesCompleteClosureAndAllPlatforms(t *testing.T) {
 	for _, architecture := range []string{"amd64", "arm64"} {
 		for _, compressed := range []bool{false, true} {
@@ -74,6 +123,25 @@ func TestNestedOCIUsesCompleteClosureAndAllPlatforms(t *testing.T) {
 			}{
 				{"two images reach scanner", []string{architecture, architecture}, nil, e.CodeUnverifiedRef},
 				{"other platform not dropped", []string{architecture, "unsupported"}, nil, e.CodeVerifyFailed},
+				{"empty layout fails before scanner", nil, nil, e.CodeVerifyFailed},
+				{"multiple roots without index media type", []string{architecture, architecture}, func(root string) {
+					raw, err := os.ReadFile(filepath.Join(root, "index.json"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					var manifest v1.IndexManifest
+					if err := json.Unmarshal(raw, &manifest); err != nil {
+						t.Fatal(err)
+					}
+					manifest.MediaType = ""
+					raw, err = json.Marshal(manifest)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(filepath.Join(root, "index.json"), raw, 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}, e.CodeVerifyFailed},
 				{"unreferenced blob rejected", []string{architecture}, func(root string) {
 					raw := []byte("unreferenced")
 					if err := os.WriteFile(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(rawDigest(raw), "sha256:")), raw, 0o644); err != nil {
@@ -90,6 +158,50 @@ func TestNestedOCIUsesCompleteClosureAndAllPlatforms(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestNestedOCIClosureIsRevalidatedAfterCompletedScanOperation(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate bool
+		images int
+	}{
+		{"unchanged closure", false, 1}, {"changed config after scan", true, 1}, {"changed config across two image scans", true, 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			architectures := []string{"arm64"}
+			if test.images == 2 {
+				architectures = append(architectures, "arm64")
+			}
+			subject := nestedOCIFixture(t, architectures, false, nil)
+			calls := 0
+			inspection, err := inspectNestedOCILayoutScan(t.Context(), subject, subject, "linux/arm64", Scanner{}, &materialInspectionBudget{remaining: 1 << 20},
+				func(ctx context.Context, root string, image v1.Image) (DependencyInventory, error) {
+					calls++
+					if test.mutate {
+						digest, err := image.ConfigName()
+						if err != nil {
+							return DependencyInventory{}, err
+						}
+						if err := os.WriteFile(filepath.Join(root, "blobs", digest.Algorithm, digest.Hex), []byte("substituted"), 0o644); err != nil {
+							return DependencyInventory{}, err
+						}
+					}
+					return DependencyInventory{Components: []Component{{Type: "library", Name: "controlled", Version: "1"}}}, nil
+				})
+			if calls != test.images {
+				t.Fatalf("scan did not run: %d %v", calls, err)
+			}
+			if test.mutate {
+				assertDependencyCode(t, err, e.CodeVerifyFailed)
+				if inspection != nil {
+					t.Fatal("mutated closure returned inventory")
+				}
+			} else if err != nil || inspection == nil || len(inspection.components) != 1 {
+				t.Fatalf("unchanged controlled scan rejected: %v", err)
+			}
+		})
 	}
 }
 
@@ -118,9 +230,8 @@ func TestNestedMaterialCumulativeAdmission(t *testing.T) {
 		t.Fatalf("first ordinary expansion: %v", err)
 	}
 	inspection, err := inspectNestedImagesBudget(t.Context(), subject, "linux/amd64", Scanner{}, 1<<20, 0, budget)
-	assertDependencyCode(t, err, e.CodeEngineCapability)
-	if inspection != nil {
-		t.Fatal("second sibling exceeded aggregate budget")
+	if err != nil || inspection != nil || budget.remaining != 2048 || budget.members != 0 || budget.images != 0 {
+		t.Fatalf("ordinary sibling consumed an image budget: %+v %v", budget, err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -128,6 +239,11 @@ func TestNestedMaterialCumulativeAdmission(t *testing.T) {
 	assertDependencyCode(t, err, e.CodeTimeout)
 	if inspection != nil {
 		t.Fatal("canceled operation returned inventory")
+	}
+	inspection, err = inspectNestedImagesBudget(t.Context(), compressedDockerFixture(t), "linux/amd64", Scanner{}, 1<<20, 0, &materialInspectionBudget{remaining: 1 << 20, images: 256})
+	assertDependencyCode(t, err, e.CodeEngineCapability)
+	if inspection != nil || !strings.Contains(err.Error(), "cumulative image budget") {
+		t.Fatalf("Docker image bypassed shared image count: %v", err)
 	}
 }
 

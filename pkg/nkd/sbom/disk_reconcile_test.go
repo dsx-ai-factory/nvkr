@@ -81,6 +81,7 @@ func TestReconcileDiskContentsDoesNotEquateUnknownVersions(t *testing.T) {
 		{"unknown is not known", "binary", "", "1.0", e.CodeProvenanceMissing},
 		{"known is not unknown", "binary", "1.0", "", e.CodeProvenanceMissing},
 		{"Debian still requires exact version", "deb", "", "", e.CodeProvenanceMissing},
+		{"versioned root cannot use unversioned Debian material", "deb", "1.0", "", e.CodeProvenanceMissing},
 		{"same known version", "binary", "1.0", "1.0", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -96,6 +97,9 @@ func TestReconcileDiskContentsDoesNotEquateUnknownVersions(t *testing.T) {
 			bom, err := ReconcileDiskContents(t.Context(), "sha256:"+strings.Repeat("f", 64), "node", root, inputs)
 			if test.code != "" {
 				assertDependencyCode(t, err, test.code)
+				if test.format == "deb" && test.rootVersion != "" && !strings.Contains(err.Error(), "disk package lacks an exact semantic identity") {
+					t.Fatalf("material semantic identity guard was not reached: %v", err)
+				}
 				if bom != nil {
 					t.Fatal("failed correspondence returned a document")
 				}
@@ -130,6 +134,28 @@ func TestDiskContentDocumentPreservesUnknownVersionsWithoutCorrespondence(t *tes
 		}
 	}
 	t.Fatal("unknown-version component disappeared from descriptive inventory")
+}
+
+func TestNestedPayloadFileDigestsDoNotInventRootMaterialCorrespondence(t *testing.T) {
+	root := contentFixture("disk-image", "amd64", "b")
+	inputs := []*DiskContentInspection{contentFixture("installer-iso", "amd64", "c"), contentFixture("apt-acquisition", "amd64", "d"), contentFixture("tarball", "amd64", "e")}
+	root.report.Files[0].Digest = "sha256:" + strings.Repeat("9", 64)
+	for _, input := range inputs {
+		input.report.Files[0].Digest = "sha256:" + strings.Repeat("8", 64) // Actual outer carrier, not its payload file.
+	}
+	bom, err := ReconcileDiskContents(t.Context(), "sha256:"+strings.Repeat("f", 64), "node", root, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, component := range bom.Components {
+		if component.Type == "file" {
+			if component.Name != root.report.Files[0].Path || len(component.Hashes) != 1 || component.Hashes[0].Content != strings.Repeat("9", 64) || len(component.Properties) != 0 {
+				t.Fatalf("nested payload scope was invented: %+v", component)
+			}
+			return
+		}
+	}
+	t.Fatal("actual observed root file disappeared")
 }
 
 func TestReconcileHostPackagesCannotUseContainerPackageDatabases(t *testing.T) {

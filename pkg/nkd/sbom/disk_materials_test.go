@@ -109,6 +109,72 @@ func TestCompressedOrdinaryMaterialIsNotAnImage(t *testing.T) {
 	}
 }
 
+func TestOrdinaryArchiveProbeDoesNotChargeImageBudgets(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  []byte
+	}{
+		{"gzip manpage", bytes.Repeat([]byte("ordinary documentation\n"), 150000)},
+		{"large ordinary layer tar", helmTestArchive(t, map[string]string{"usr/share/doc/text": strings.Repeat("x", 3<<20)})},
+		{"corrupt tar candidate", []byte("not a tar")},
+		{"empty tar candidate", nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			subject := compressedMaterialBytes(t, test.raw)
+			budget := &materialInspectionBudget{remaining: 2 << 20, members: maxDiskInstalledPackages, images: 256}
+			inspection, err := inspectNestedImagesBudget(t.Context(), subject, "linux/amd64", Scanner{}, 2<<20, 2, budget)
+			if err != nil || inspection != nil || budget.remaining != 2<<20 || budget.members != maxDiskInstalledPackages || budget.images != 256 {
+				t.Fatalf("ordinary data charged image inventory: %+v %v", budget, err)
+			}
+		})
+	}
+	for _, raw := range [][]byte{nil, []byte("corrupt")} {
+		indicated, err := probeImageArchive(t.Context(), bytes.NewReader(raw))
+		if err != nil || indicated {
+			t.Fatalf("empty/corrupt candidate selected an image: %v", err)
+		}
+	}
+}
+
+type cancelProbeReader struct {
+	reader io.Reader
+	cancel context.CancelFunc
+}
+
+func (reader *cancelProbeReader) Read(raw []byte) (int, error) {
+	n, err := reader.reader.Read(raw)
+	reader.cancel()
+	return n, err
+}
+
+func TestImageArchiveProbeCancellationDuringOrdinaryExpansion(t *testing.T) {
+	// The tar header advertises a highly compressible large ordinary member.
+	// Cancel once compressed bytes enter bufio: discarding already-buffered
+	// expanded content must still observe cancellation, not finish the bomb.
+	var raw bytes.Buffer
+	compressed := gzip.NewWriter(&raw)
+	archive := tar.NewWriter(compressed)
+	if err := archive.WriteHeader(&tar.Header{Name: "ordinary", Typeflag: tar.TypeReg, Size: 8 << 20}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.CopyN(archive, strings.NewReader(strings.Repeat("0", 8<<20)), 8<<20); err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := compressed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	indicated, err := probeImageArchive(ctx, &cancelProbeReader{reader: bytes.NewReader(raw.Bytes()), cancel: cancel})
+	assertDependencyCode(t, err, e.CodeTimeout)
+	if indicated {
+		t.Fatal("canceled format probe selected an image")
+	}
+}
+
 // Empty Debian data filesystems still need the scanner and authoritative package
 // metadata. Reaching scanner admission is not proof of a native dpkg/Syft run.
 func TestDebianPayloadEmptyFilesystemReachesScannerAdmission(t *testing.T) {
@@ -364,7 +430,7 @@ func TestCompressedImageMaterialErrorsAreNotOrdinaryFallback(t *testing.T) {
 		{"excessive image manifest count", map[string]string{"manifest.json": "[" + strings.Repeat(`{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":[]},`, 256) + `{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":[]}]`}, e.CodeEngineCapability},
 		{"missing Docker tag", map[string]string{"manifest.json": `[{"Config":"config.json","Layers":[]}]`}, e.CodeEngineCapability},
 		{"missing Docker layer", map[string]string{"manifest.json": `[{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":["missing.tar"]}]`, "config.json": `{"os":"linux","architecture":"amd64"}`}, e.CodeVerifyFailed},
-		{"OCI layout not silently ignored", map[string]string{"oci-layout": `{"imageLayoutVersion":"1.0.0"}`, "index.json": `{"schemaVersion":2,"manifests":[]}`}, e.CodeReleaseIncomplete},
+		{"OCI layout not silently ignored", map[string]string{"oci-layout": `{"imageLayoutVersion":"1.0.0"}`, "index.json": `{"schemaVersion":2,"manifests":[]}`}, e.CodeVerifyFailed},
 		{"mixed Docker and OCI cannot omit independent index", map[string]string{"manifest.json": `[{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":[]}]`, "config.json": `{"os":"linux","architecture":"amd64"}`, "oci-layout": `{"imageLayoutVersion":"1.0.0"}`, "index.json": `{"schemaVersion":2,"manifests":[]}`}, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -407,7 +473,7 @@ func TestCompressedMaterialBoundsAndTarDecoding(t *testing.T) {
 		max  int64
 		code e.Code
 	}{
-		{"gzip expansion exceeds bound", bytes.Repeat([]byte{'a'}, 1<<20), 1024, e.CodeEngineCapability},
+		{"selected image expansion exceeds bound", helmTestArchive(t, map[string]string{"manifest.json": "[]", "padding": strings.Repeat("a", 1<<20)}), 1024, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			inspection, err := inspectCompressedImages(t.Context(), compressedMaterialBytes(t, test.raw), "linux/amd64", Scanner{}, test.max, 0)
@@ -535,5 +601,137 @@ func TestOrdinaryCompressedMaterialRetainsParentFileHash(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestRootArchiveImageMergeKeepsExactCarrierAndBudget(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held scanner execution requires Linux")
+	}
+	script := []byte("#!/bin/sh\nprintf '%s' '{\"schema\":{\"version\":\"16.1.10\"},\"artifacts\":[{\"name\":\"observed\",\"version\":\"1\",\"type\":\"binary\"}]}'\n")
+	scannerPath := filepath.Join(t.TempDir(), "scanner")
+	if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, format := range []string{"docker", "oci"} {
+		t.Run(format, func(t *testing.T) {
+			member := compressedDockerFixture(t)
+			if format == "oci" {
+				member = nestedOCIFixture(t, []string{"amd64"}, false, nil)
+			}
+			parent, err := createGeneratedInspectionFile(t.Context(), 1<<20, func(destination io.Writer) error {
+				archive := tar.NewWriter(destination)
+				if err := archive.WriteHeader(&tar.Header{Name: "cache/images.tar", Typeflag: tar.TypeReg, Mode: 0o644, Size: member.Size()}); err != nil {
+					return err
+				}
+				if _, err := member.WriteToContext(t.Context(), archive); err != nil {
+					return err
+				}
+				return archive.Close()
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer parent.Close()
+			budget := &materialInspectionBudget{remaining: 1 << 20}
+			inspection, err := inspectMaterialArchiveBudget(t.Context(), parent, "linux/amd64", Scanner{Path: scannerPath, Digest: rawDigest(script)}, "", 1<<20, 0, false, budget)
+			if err != nil || len(inspection.components) != 2 || len(inspection.files) != 1 || budget.remaining >= 1<<20 || budget.images != 1 || budget.members == 0 {
+				t.Fatalf("root archive merge or shared budget missing: %+v %v", budget, err)
+			}
+			contained := inspection.components[1]
+			if !slices.Contains(contained.Properties, Property{Name: "nkd:containedIn", Value: "cache/images.tar@" + member.Digest()}) ||
+				inspection.files[0].Path != "cache/images.tar" || inspection.files[0].Digest != member.Digest() {
+				t.Fatal("contained image lost immediate carrier or invented nested file paths")
+			}
+		})
+	}
+}
+
+func TestRootOrdinaryCandidatesDoNotExhaustNestedImageBudgets(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held scanner execution requires Linux")
+	}
+	script := []byte("#!/bin/sh\nprintf '%s' '{\"schema\":{\"version\":\"16.1.10\"},\"artifacts\":[]}'\n")
+	scannerPath := filepath.Join(t.TempDir(), "scanner")
+	if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	member := compressedMaterialBytes(t, []byte("ordinary manpage"))
+	parent, err := createGeneratedInspectionFile(t.Context(), 64<<20, func(destination io.Writer) error {
+		archive := tar.NewWriter(destination)
+		for index := range maxDiskInstalledPackages + 1 {
+			if err := archive.WriteHeader(&tar.Header{Name: "usr/share/man/page" + strconv.Itoa(index) + ".gz", Typeflag: tar.TypeReg, Mode: 0o644, Size: member.Size()}); err != nil {
+				return err
+			}
+			if _, err := member.WriteToContext(t.Context(), archive); err != nil {
+				return err
+			}
+		}
+		for _, name := range []string{"empty.tar", "corrupt.tar"} {
+			data := ""
+			if name == "corrupt.tar" {
+				data = "not a tar"
+			}
+			if err := archive.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(data))}); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(archive, data); err != nil {
+				return err
+			}
+		}
+		return archive.Close()
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parent.Close()
+	budget := &materialInspectionBudget{remaining: 2 << 20}
+	inspection, err := inspectMaterialArchiveBudget(t.Context(), parent, "linux/amd64", Scanner{Path: scannerPath, Digest: rawDigest(script)}, "", 64<<20, 0, false, budget)
+	if err != nil || len(inspection.files) != maxDiskInstalledPackages+3 || budget.remaining != 2<<20 || budget.members != 0 || budget.images != 0 {
+		t.Fatalf("ordinary root files were charged as nested images: %+v %v", budget, err)
+	}
+}
+
+func TestRootSiblingArchivesAndDebianExportsShareExpansionBudget(t *testing.T) {
+	packageFile, scanner, packageReader := debianMaterialOperationFixture(t, true)
+	for _, kind := range []string{"oci", "deb"} {
+		t.Run(kind, func(t *testing.T) {
+			var raw bytes.Buffer
+			if kind == "deb" {
+				if _, err := packageFile.WriteToContext(t.Context(), &raw); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				archive := nestedOCIFixture(t, []string{runtime.GOARCH}, false, nil)
+				if _, err := archive.WriteToContext(t.Context(), &raw); err != nil {
+					t.Fatal(err)
+				}
+			}
+			members := helmTestArchive(t, map[string]string{"first." + kind: raw.String(), "second." + kind: raw.String()})
+			parent, err := createGeneratedInspectionFile(t.Context(), 1<<20, func(destination io.Writer) error { _, err := destination.Write(members); return err })
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer parent.Close()
+			// Each first export fits; the second cannot replenish the operation.
+			remaining := int64(raw.Len()) + int64(raw.Len()/2)
+			if kind == "deb" {
+				sample := &materialInspectionBudget{remaining: 1 << 20}
+				if _, err := inspectDebianMaterialBudget(t.Context(), packageFile, "linux/"+runtime.GOARCH, scanner, packageReader, 1<<20, 1, sample); err != nil {
+					t.Fatal(err)
+				}
+				used := (1 << 20) - sample.remaining
+				if used <= 0 {
+					t.Fatal("actual Debian export did not charge its byte budget")
+				}
+				remaining = used + used/2
+			}
+			budget := &materialInspectionBudget{remaining: remaining}
+			inspection, err := inspectMaterialArchiveBudget(t.Context(), parent, "linux/"+runtime.GOARCH, scanner, packageReader, 1<<20, 0, false, budget)
+			assertDependencyCode(t, err, e.CodeEngineCapability)
+			if inspection != nil || budget.members < 2 || budget.remaining >= remaining {
+				t.Fatalf("sibling operations replenished or did not exercise shared expansion: %+v %v", budget, err)
+			}
+		})
 	}
 }

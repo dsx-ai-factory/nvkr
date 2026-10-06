@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -69,6 +70,51 @@ func TestVerifyOCILayoutHonorsCancellation(t *testing.T) {
 	cancel()
 	if err := verifyOCILayout(ctx, root, want); code(err) != nkderr.CodeTimeout {
 		t.Fatalf("canceled verification must return timeout code: %v", err)
+	}
+}
+
+func TestOfflineOCIValidationCodesOversizedDescriptorReads(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		mediaType string
+		message   string
+	}{
+		{"index", "application/vnd.oci.image.index.v1+json", "reading OCI index blob"},
+		{"image", "application/vnd.oci.image.manifest.v1+json", "reading OCI image manifest blob"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			// The descriptor and blob agree on digest and size. Rejection must
+			// therefore come from the bounded read, not a stale digest fixture.
+			blob := bytes.Repeat([]byte(" "), maxOCIManifestBytes+1)
+			copy(blob, []byte(`{"schemaVersion":2}`))
+			digest := digestBytes(blob)
+			index, err := json.Marshal(ociIndexDocument{
+				SchemaVersion: 2,
+				MediaType:     "application/vnd.oci.image.index.v1+json",
+				Manifests: []ociDescriptor{{MediaType: test.mediaType,
+					Digest: digest, Size: int64(len(blob))}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Join(root, "blobs", "sha256"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			for name, raw := range map[string][]byte{
+				"oci-layout": []byte(`{"imageLayoutVersion":"1.0.0"}`),
+				"index.json": index,
+				"blobs/sha256/" + strings.TrimPrefix(digest, "sha256:"): blob,
+			} {
+				if err := os.WriteFile(filepath.Join(root, name), raw, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = VerifyOfflineOCILayout(t.Context(), root, digest)
+			if code(err) != nkderr.CodeVerifyFailed || !strings.Contains(err.Error(), test.message) {
+				t.Fatalf("bounded descriptor read must retain verification code: %v", err)
+			}
+		})
 	}
 }
 

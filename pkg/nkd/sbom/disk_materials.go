@@ -145,12 +145,10 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "addressing held archive member")
 		}
-		prefix := make([]byte, min(header.Size, 2))
-		if _, err := subject.ReadAt(prefix, offset); err != nil {
-			return nil, e.Wrap(e.CodeVerifyFailed, err, "reading nested material prefix")
+		archiveContent, err := probeImageArchive(ctx, io.NewSectionReader(subject, offset, header.Size))
+		if err != nil {
+			return nil, err
 		}
-		_, tarErr := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, offset, header.Size))}).Next()
-		archiveContent := len(prefix) >= 2 && prefix[0] == 0x1f && prefix[1] == 0x8b || tarErr == nil || strings.HasSuffix(header.Name, ".tar") || strings.HasSuffix(header.Name, ".tgz") || strings.HasSuffix(header.Name, ".tar.gz")
 		if archiveContent {
 			if err := budget.member(); err != nil {
 				return nil, err
@@ -242,6 +240,13 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 	if depth > 2 || subject == nil || subject.Size() <= 0 || maxBytes <= 0 || budget == nil {
 		return nil, e.New(e.CodeEngineCapability, "compressed material exceeds bounded recursive inspection")
 	}
+	indicated, err := probeImageArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
+	if err != nil {
+		return nil, err
+	}
+	if !indicated {
+		return nil, subject.AssertUnchangedContext(ctx)
+	}
 	source := bufio.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, 0, subject.Size()))})
 	prefix, _ := source.Peek(2)
 	var expanded io.Reader = source
@@ -263,16 +268,6 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 	defer func() { _ = archive.Close() }()
 	if err := budget.expanded(archive.Size()); err != nil {
 		return nil, err
-	}
-	// A gzip stream is not necessarily tar (for example a compressed manpage).
-	// With no tar header there is no image-format claim; retain the outer hash.
-	// Once tar decoding succeeds, the complete marker pass below must succeed.
-	probe := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(archive, 0, archive.Size()))})
-	if _, err := probe.Next(); err != nil && err != io.EOF {
-		if ctx.Err() != nil {
-			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "nested material format selection canceled")
-		}
-		return nil, subject.AssertUnchangedContext(ctx)
 	}
 	docker, oci, err := compressedImageMarkers(ctx, archive)
 	if err != nil {
@@ -367,6 +362,41 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 		return nil, err
 	}
 	return result, nil
+}
+
+// This streaming probe avoids full materialization and makes no inventory claim. Ordinary bytes
+// remain covered by their outer file hash, even if a filename suggests tar/gzip.
+// Only a decoded root image marker selects image inspection; that operation
+// then holds, charges and strictly validates the complete archive. Both grammar
+// and decompression belong to the standard library and reads remain cancelable.
+func probeImageArchive(ctx context.Context, source io.Reader) (bool, error) {
+	reader := bufio.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(source)})
+	prefix, _ := reader.Peek(2)
+	var expanded io.Reader = reader
+	if len(prefix) == 2 && prefix[0] == 0x1f && prefix[1] == 0x8b {
+		compressed, err := gzip.NewReader(reader)
+		if err != nil {
+			if ctx.Err() != nil {
+				return false, e.Wrap(e.CodeTimeout, ctx.Err(), "nested material format selection canceled")
+			}
+			return false, nil
+		}
+		defer func() { _ = compressed.Close() }()
+		expanded = compressed
+	}
+	archive := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(expanded)})
+	for {
+		header, err := archive.Next()
+		if err != nil {
+			if ctx.Err() != nil {
+				return false, e.Wrap(e.CodeTimeout, ctx.Err(), "nested material format selection canceled")
+			}
+			return false, nil
+		}
+		if name := path.Clean(header.Name); name == "manifest.json" || name == "oci-layout" {
+			return true, nil
+		}
+	}
 }
 
 // archive/tar owns header decoding. This is only format selection: no entry is

@@ -262,6 +262,14 @@ func validateInstallerFilesystemType(filesystem, diagnostic string) error {
 // Their compression/filesystem grammar is decoded by libguestfs, not by Go.
 // Every member is scanned; an absent or unreadable base filesystem fails closed.
 func inspectInstallerMembers(ctx context.Context, archive *os.File, platform, guestfishDigest, packageReaderDigest string, scanner Scanner, codec *assemble.QemuImgCodec, maxBytes int64) (*FilesystemInspection, error) {
+	return inspectInstallerMembersWith(ctx, archive, func(member inspectionArchive) (*FilesystemInspection, error) {
+		return inspectFilesystem(ctx, member, "raw", platform, guestfishDigest, packageReaderDigest, scanner, codec, maxBytes)
+	})
+}
+
+// The production caller supplies the concrete filesystem owner. This private
+// seam tests held SquashFS member/correspondence projection, not native decoding.
+func inspectInstallerMembersWith(ctx context.Context, archive *os.File, inspect func(inspectionArchive) (*FilesystemInspection, error)) (*FilesystemInspection, error) {
 	info, err := archive.Stat()
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening installer filesystem export")
@@ -289,7 +297,7 @@ func inspectInstallerMembers(ctx context.Context, archive *os.File, platform, gu
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "holding installer base filesystem")
 		}
 		digest := member.Digest()
-		inspection, scanErr := inspectFilesystem(ctx, member, "raw", platform, guestfishDigest, packageReaderDigest, scanner, codec, maxBytes)
+		inspection, scanErr := inspect(member)
 		closeErr := member.Close()
 		if err := errors.Join(scanErr, closeErr); err != nil {
 			return nil, err
@@ -454,8 +462,8 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 		if artifact.Type == "deb" {
 			// Syft v1.51.1's dpkg-db-cataloger deliberately searches **/lib/dpkg.
 			// A nested database has no independently held filesystem/image owner
-			// here. Refuse it explicitly rather than stamping its packages as host
-			// filesystem evidence or guessing container identity from the path.
+			// here. This shared decoder serves filesystem and container scans;
+			// refuse nested DBs in either rather than guessing their child owner.
 			for _, location := range artifact.Locations {
 				for _, coordinate := range []string{location.Path, location.AccessPath} {
 					clean := path.Clean("/" + coordinate)

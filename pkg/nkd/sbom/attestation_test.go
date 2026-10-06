@@ -74,3 +74,28 @@ func TestAttestedDocumentBundleByteBoundBeforeDecoding(t *testing.T) {
 		t.Fatalf("oversized bundle reached JSON decoding or returned a document: bytes=%d error=%v", len(raw), err)
 	}
 }
+
+func TestAttestedDocumentInnerInventoryBound(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	// A valid statement and bundle remain below the transport bound. The
+	// independent inner limit must reject before decoding the BOM fields.
+	predicate := `{"padding":"` + strings.Repeat("x", MaxDocumentBytes-len(`{"padding":""}`)+1) + `"}`
+	if len(predicate) != MaxDocumentBytes+1 || !json.Valid([]byte(predicate)) {
+		t.Fatal("fixture does not exceed exactly the inner document bound")
+	}
+	statement, err := json.Marshal(map[string]any{"_type": "https://in-toto.io/Statement/v1", "predicateType": CycloneDXPredicateType,
+		"subject": []any{map[string]any{"digest": map[string]string{"sha256": strings.TrimPrefix(digest, "sha256:")}}}, "predicate": json.RawMessage(predicate)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := json.Marshal(map[string]any{"mediaType": BundleMediaType, "verificationMaterial": map[string]any{},
+		"dsseEnvelope": map[string]any{"payloadType": "application/vnd.in-toto+json", "payload": base64.StdEncoding.EncodeToString(statement), "signatures": []any{map[string]string{"sig": "Zml4dHVyZQ=="}}}})
+	if err != nil || len(bundle) >= MaxBundleBytes {
+		t.Fatalf("fixture reached the outer bound: %d %v", len(bundle), err)
+	}
+	raw, err := AttestedDocument(bundle, digest)
+	assertDependencyCode(t, err, e.CodeVerifyFailed)
+	if raw != nil || !strings.Contains(err.Error(), "attested SBOM exceeds the inventory document limit") {
+		t.Fatalf("inner byte admission was bypassed: %v", err)
+	}
+}

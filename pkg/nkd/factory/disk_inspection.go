@@ -248,7 +248,12 @@ func (owner *LocalRunResult) beginDiskInspection(ctx context.Context) (context.C
 // their bounded work deadline as a child of this context, never of the original
 // caller context: replacing an admission deadline must not detach Run closure.
 func (owner *LocalRunResult) beginDiskInspectionOperation(ctx context.Context) (context.Context, time.Time, func(), error) {
-	started := time.Now()
+	return owner.beginDiskInspectionOperationAt(ctx, time.Now())
+}
+
+// Only the private test seam supplies a clock value. Production records its
+// actual start before queueing, and queue time consumes the same work budget.
+func (owner *LocalRunResult) beginDiskInspectionOperationAt(ctx context.Context, started time.Time) (context.Context, time.Time, func(), error) {
 	ctx, cancel := context.WithCancel(ctx)
 	queue, queueCancel := context.WithDeadline(ctx, started.Add(10*time.Minute))
 	release, err := owner.acquireDiskPermit(queue)

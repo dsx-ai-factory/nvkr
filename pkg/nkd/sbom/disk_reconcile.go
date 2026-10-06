@@ -221,7 +221,8 @@ func diskDocumentComponents(observed []Component) ([]Component, error) {
 	result := make([]Component, len(observed))
 	for index, component := range observed {
 		component = diskDocumentComponent(component)
-		if values := carriers[dependencyRef(component)]; len(values) > 0 {
+		contained := slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == "nkd:containedIn" })
+		if values := carriers[dependencyRef(component)]; contained && len(values) > 0 {
 			values = slices.Clone(values)
 			slices.Sort(values)
 			values = slices.Compact(values)
@@ -231,8 +232,13 @@ func diskDocumentComponents(observed []Component) ([]Component, error) {
 			}
 			component.Properties = slices.DeleteFunc(component.Properties, func(property Property) bool { return property.Name == "nkd:containedIn" })
 			component.Properties = append(component.Properties, Property{Name: "nkd:containedIn", Value: string(raw)})
-			slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+		} else if component.Type != "file" {
+			// Public package refs may combine root and contained observations.
+			// Keep the actual root observation explicit without claiming that
+			// it was installed, originated here, or was supplied by a carrier.
+			component.Properties = append(component.Properties, Property{Name: "nkd:observedAtSubjectRoot", Value: "true"})
 		}
+		slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 		result[index] = component
 	}
 	return result, nil

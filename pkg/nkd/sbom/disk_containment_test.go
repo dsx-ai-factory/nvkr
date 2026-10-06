@@ -1,6 +1,8 @@
 package sbom
 
 import (
+	"bytes"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -69,6 +71,37 @@ func TestContainedArchiveKeepsActualRootPathsAndImmediateCarrier(t *testing.T) {
 	}
 }
 
+func TestInstallerMemberMergeRetainsImmediateSquashFSCarrier(t *testing.T) {
+	raw := helmTestArchive(t, map[string]string{"casper/base.squashfs": "controlled base", "casper/additional.squashfs": "controlled additional"})
+	archive, err := os.CreateTemp(t.TempDir(), "installer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	if _, err := archive.Write(raw); err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	inspection, err := inspectInstallerMembersWith(t.Context(), archive, func(member inspectionArchive) (*FilesystemInspection, error) {
+		count++
+		var payload bytes.Buffer
+		if _, err := member.WriteToContext(t.Context(), &payload); err != nil {
+			return nil, err
+		}
+		return &FilesystemInspection{components: withDiskContentClass([]Component{{Type: "library", Name: payload.String(), Version: "1"}}, diskClassFilesystem),
+			files: []DiskFile{{Path: "usr/bin/tool", Kind: "regular", Digest: member.Digest(), Size: member.Size()}}}, nil
+	})
+	if err != nil || count != 2 || len(inspection.components) != 2 || len(inspection.files) != 0 {
+		t.Fatalf("installer merge lost components or invented installed paths: %v", err)
+	}
+	want := map[string]string{"controlled base": "casper/base.squashfs@" + rawDigest([]byte("controlled base")), "controlled additional": "casper/additional.squashfs@" + rawDigest([]byte("controlled additional"))}
+	for _, component := range inspection.components {
+		if !slices.Contains(component.Properties, Property{Name: "nkd:containedIn", Value: want[component.Name]}) {
+			t.Fatalf("installer member lost exact carrier: %+v", component)
+		}
+	}
+}
+
 func TestReconcileContainedPackagesRetainsCarriersBeforePublicDeduplication(t *testing.T) {
 	for _, architecture := range []string{"amd64", "arm64"} {
 		for _, conflict := range []bool{false, true} {
@@ -83,7 +116,7 @@ func TestReconcileContainedPackagesRetainsCarriersBeforePublicDeduplication(t *t
 				installed.Properties = append(installed.Properties, Property{Name: "cataloger", Value: "one"})
 				root.report.Components = []Component{installed}
 				pin := "sha256:" + strings.Repeat("a", 64)
-				carriers := []string{"var/cache/first.deb@" + pin, "var/cache/second.deb@" + pin}
+				carriers := []string{"var/cache/second.deb@" + pin, "var/cache/first.deb@" + pin, "var/cache/second.deb@" + pin}
 				for _, carrier := range carriers {
 					contained := cloneComponent(installed)
 					contained.Properties[0].Value = diskClassDebianArchive
@@ -107,22 +140,59 @@ func TestReconcileContainedPackagesRetainsCarriersBeforePublicDeduplication(t *t
 				if err != nil || len(bom.Components) != 2 {
 					t.Fatalf("installed/contained overlap failed public deduplication: %v", err)
 				}
-				wanted, err := canonical.Marshal(carriers)
+				wanted, err := canonical.Marshal([]string{carriers[1], carriers[0]})
 				if err != nil {
 					t.Fatal(err)
 				}
-				found := false
+				found, rootObserved := false, false
 				for _, component := range bom.Components {
 					for _, property := range component.Properties {
 						if property.Name == "nkd:containedIn" {
 							found = property.Value == string(wanted)
 						}
+						if property.Name == "nkd:observedAtSubjectRoot" {
+							rootObserved = property.Value == "true"
+						}
 					}
 				}
-				if !found {
-					t.Fatal("final document lost one of the exact immediate carriers")
+				if !found || !rootObserved {
+					t.Fatal("final document lost a carrier or the separate subject-root observation")
 				}
 			})
 		}
+	}
+}
+
+func TestRootAndContainedImagePackageWithSamePURLRemainDescriptivelyDistinct(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			root := contentFixture("disk-image", arch, "b")
+			inputs := []*DiskContentInspection{contentFixture("installer-iso", arch, "c"), contentFixture("apt-acquisition", arch, "d"), contentFixture("oci-image", arch, "e")}
+			contained := cloneComponent(root.report.Components[0])
+			contained.Properties[0].Value = diskClassContainer
+			contained.Properties = append(contained.Properties, Property{Name: "nkd:containedIn", Value: "images/save.tar@" + inputs[2].report.Subject})
+			slices.SortFunc(contained.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+			root.report.Components = append(root.report.Components, contained)
+			inputs[2].report.Components[0].Properties[0].Value = diskClassContainer
+			projected, err := diskDocumentComponents(root.report.Components)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if slices.ContainsFunc(projected[0].Properties, func(p Property) bool { return p.Name == "nkd:containedIn" }) ||
+				!slices.Contains(projected[0].Properties, Property{Name: "nkd:observedAtSubjectRoot", Value: "true"}) ||
+				slices.ContainsFunc(projected[1].Properties, func(p Property) bool { return p.Name == "nkd:observedAtSubjectRoot" }) {
+				t.Fatal("containment was copied to a root observation or root observation to a contained package")
+			}
+			bom, err := ReconcileDiskContents(t.Context(), "sha256:"+strings.Repeat("f", 64), "disk", root, inputs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, component := range bom.Components {
+				if component.Type != "file" && (!slices.Contains(component.Properties, Property{Name: "nkd:observedAtSubjectRoot", Value: "true"}) ||
+					!slices.ContainsFunc(component.Properties, func(p Property) bool { return p.Name == "nkd:containedIn" })) {
+					t.Fatal("public deduplication erased the host/image overlap")
+				}
+			}
+		})
 	}
 }
