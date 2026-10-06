@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -307,6 +308,7 @@ func TestSourceFetchDelegatesOnlyExactSelectedInstruction(t *testing.T) {
 }
 
 func TestSourceFetchChildEnvironmentContainsOnlySelectedSourceConfiguration(t *testing.T) {
+	t.Setenv("PATH", "node_modules/.bin"+string(os.PathListSeparator)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	for _, private := range []bool{false, true} {
 		t.Run(map[bool]string{false: "public", true: "private"}[private], func(t *testing.T) {
 			plan, node, _ := authenticatedSourcePlan(t)
@@ -328,7 +330,11 @@ func TestSourceFetchChildEnvironmentContainsOnlySelectedSourceConfiguration(t *t
 			if !private {
 				allowed = map[string]string{"GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "credential.helper", "GIT_CONFIG_VALUE_0": ""}
 			}
-			allowed["PATH"], allowed["LC_ALL"] = os.Getenv("PATH"), "C"
+			selectedPath, err := sourcegit.SearchPath(environment)
+			if err != nil {
+				t.Fatal(err)
+			}
+			allowed["PATH"], allowed["LC_ALL"] = selectedPath, "C"
 			if private {
 				allowed[sourceTokenEnv] = "test-only-synthetic-token"
 			}
