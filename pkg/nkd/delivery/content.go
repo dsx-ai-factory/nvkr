@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"regexp"
+	"slices"
 	"sort"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -68,19 +69,10 @@ func (output Output) Validate() error {
 		(output.Disk.Encryption != "none" && output.Disk.Encryption != "luks2") ||
 		output.Disk.Size <= 0 || !canonical.IsDigest(output.Disk.PlanDigest) ||
 		!canonical.IsDigest(output.Disk.PayloadDigest) ||
-		output.Disk.Outcome != "succeeded" || !containsOutputComponent(output.Components, output.Disk.Component) {
+		output.Disk.Outcome != "succeeded" || !slices.Contains(output.Components, output.Disk.Component) {
 		return e.New(e.CodeVerifyFailed, "disk artifact %q lacks an exact successful QCOW2 producer binding", output.Name)
 	}
 	return nil
-}
-
-func containsOutputComponent(components []string, component string) bool {
-	for _, candidate := range components {
-		if candidate == component {
-			return true
-		}
-	}
-	return false
 }
 
 // ContentDigest is the sole owner of release-content canonical bytes. It sorts
