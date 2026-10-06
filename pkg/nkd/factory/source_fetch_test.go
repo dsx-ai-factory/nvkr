@@ -29,7 +29,7 @@ func sourceFetchTestEnvironment(plan *Plan, node Node) []string {
 	return environment
 }
 
-func TestSourceFetchRejectsDependencyVendoringBeforeWork(t *testing.T) {
+func TestSourceFetchDelegatesDependencyVendoringToHeldSourceOwner(t *testing.T) {
 	original := githubTestPlan(t)
 	base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
 	if err != nil {
@@ -62,13 +62,19 @@ func TestSourceFetchRejectsDependencyVendoringBeforeWork(t *testing.T) {
 	t.Chdir(t.TempDir())
 	called := false
 	err = executeSourceFetch(t.Context(), plan, node.ID, nil, nil, nil,
-		func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) { called = true; return nil, nil })
-	if called || factoryErrorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "vendoring") {
-		t.Fatalf("unheld vendor mount delegated=%t error=%v", called, err)
+		func(instruction ir.Node, options pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
+			called = true
+			if options.SourceWorkspace == nil || !options.Launch || !slices.Equal(instruction.VendorCmd, []string{"go", "mod", "vendor"}) {
+				t.Fatalf("vendor declaration lost held source-owner routing: %+v / %+v", instruction, options)
+			}
+			return nil, nil
+		})
+	if !called || err != nil {
+		t.Fatalf("held vendor route delegated=%t error=%v", called, err)
 	}
 	entries, err := os.ReadDir(".")
 	if err != nil || len(entries) != 0 {
-		t.Fatalf("vendoring rejection wrote output: %v / %v", entries, err)
+		t.Fatalf("description-only delegation wrote output: %v / %v", entries, err)
 	}
 }
 
@@ -206,7 +212,12 @@ set -eu
 test "$1" = -C
 test "$2" = /proc/self/fd/3/.
 test -d "$2"
-test "$3" = init
+test "$3" = --git-dir=/proc/self/fd/4/.
+test -d /proc/self/fd/4/.
+test "$4" = --work-tree=/proc/self/fd/3/.
+test "$5" = -c
+test "$6" = core.hooksPath=/dev/null
+test "$7" = init
 test "${GIT_CONFIG_GLOBAL}" = /dev/null
 test "${GIT_CONFIG_NOSYSTEM}" = 1
 test "${NKD_SOURCE_TOKEN}" = test-only-synthetic-token

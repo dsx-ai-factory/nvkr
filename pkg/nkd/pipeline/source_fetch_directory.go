@@ -89,12 +89,26 @@ func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (string, err
 	if err != nil {
 		return "", err
 	}
-	cmd := execCmd(opts, "git", append([]string{"-C", path}, args...)...)
+	command := []string{"-C", path}
+	files := []*os.File{opts.fetchDirectory}
+	if opts.fetchGitDirectory != nil {
+		if err := recheckSourceFetchGitDirectory(opts); err != nil {
+			return "", err
+		}
+		// ExtraFiles starts at FD3: checkout is FD3 and Git metadata is FD4.
+		gitPath, err := sourceFetchDescriptorPath(4)
+		if err != nil {
+			return "", err
+		}
+		command = append(command, "--git-dir="+gitPath, "--work-tree="+path, "-c", "core.hooksPath=/dev/null")
+		files = append(files, opts.fetchGitDirectory)
+	}
+	cmd := execCmd(opts, "git", append(command, args...)...)
 	cmd.Env = append([]string(nil), opts.SourceGitEnvironment...)
 	if cmd.Env == nil {
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=credential.helper", "GIT_CONFIG_VALUE_0="}
 	}
-	cmd.ExtraFiles = []*os.File{opts.fetchDirectory}
+	cmd.ExtraFiles = files
 	out, err := outputOwnedCommand(opts.ctx(), cmd)
 	if err != nil {
 		if opts.ctx().Err() != nil {
@@ -102,5 +116,23 @@ func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (string, err
 		}
 		return "", err
 	}
+	if opts.fetchGitDirectory != nil {
+		if err := recheckSourceFetchGitDirectory(opts); err != nil {
+			return "", err
+		}
+	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func recheckSourceFetchGitDirectory(opts RunOptions) error {
+	current, info, err := securepath.OpenChild(opts.fetchDirectory, ".git", true)
+	if err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "rechecking held source Git directory")
+	}
+	defer current.Close()
+	held, err := opts.fetchGitDirectory.Stat()
+	if err != nil || !os.SameFile(info, held) {
+		return e.Wrap(e.CodeFetchFailed, err, "source Git directory changed after admission")
+	}
+	return nil
 }

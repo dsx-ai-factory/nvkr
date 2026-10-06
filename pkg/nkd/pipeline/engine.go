@@ -60,6 +60,7 @@ type RunOptions struct {
 	sources *preparedSourceCache
 	// fetchDirectory is the current fetch owner's held checkout, not a caller path.
 	fetchDirectory        *os.File
+	fetchGitDirectory     *os.File
 	fetchReceiptDirectory *os.File
 	// BuildMaterials is a process-local capability over the exact manifest and
 	// producer bytes selected by the factory Plan. It is required for a build node

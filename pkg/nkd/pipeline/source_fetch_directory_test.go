@@ -158,7 +158,7 @@ func TestSourceFetchHeldWorkspaceRealLocalGit(t *testing.T) {
 
 func TestSourceFetchRealLocalGitCreatesAndReusesReceipt(t *testing.T) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		t.Skip("inherited directory paths are capability-gated on this platform")
+		t.Skip("ordinary Local fetch compatibility is exercised on Linux and Darwin")
 	}
 	node, repository, _ := pristineClosureFixture(t)
 	node.Repo = repository
@@ -175,6 +175,124 @@ func TestSourceFetchRealLocalGitCreatesAndReusesReceipt(t *testing.T) {
 	receipt, exists, err := readSourceReceiptContext(t.Context(), path)
 	if err != nil || !exists || receipt.Commit != node.Commit || receipt.TreeHash != node.TreeHash {
 		t.Fatalf("real fetch receipt mismatch: %+v exists=%t error=%v", receipt, exists, err)
+	}
+}
+
+func TestSourceFetchHeldCheckoutDoesNotReuseEnclosingRepository(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("actual held Git execution requires Linux")
+	}
+	node, repository, _ := pristineClosureFixture(t)
+	node.Repo = repository
+	t.Chdir(repository)
+	workspace, _, err := securepath.OpenDirectory(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer workspace.Close()
+	opts := withDefaults(RunOptions{Ctx: t.Context(), SourceRoot: "src", SourceWorkspace: workspace, Stdout: io.Discard, Stderr: io.Discard})
+	if err := (Local{}).fetch(node, opts); err != nil {
+		t.Fatal(err)
+	}
+	checkout := filepath.Join("src", node.Dest)
+	if info, err := os.Stat(filepath.Join(checkout, ".git")); err != nil || !info.IsDir() {
+		t.Fatalf("fresh held source lacks its own Git directory: %v", err)
+	}
+	for _, name := range []string{"input", ".gitignore"} {
+		if bytes, err := os.ReadFile(filepath.Join(checkout, name)); err != nil || len(bytes) == 0 {
+			t.Fatalf("fresh held fetch reused the enclosing repo without source member %s: %v", name, err)
+		}
+	}
+}
+
+func TestSourceFetchHeldWorkspaceRejectsUnsafeRelativePathsBeforeCreation(t *testing.T) {
+	for _, path := range []string{"/absolute", "../outside", "a/../b"} {
+		t.Run(path, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			workspace, _, err := securepath.OpenDirectory(".")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer workspace.Close()
+			directory, err := holdSourceFetchWorkspaceDirectory(t.Context(), workspace, path)
+			if code(err) != e.CodeEngineCapability || directory != nil {
+				t.Fatalf("unsafe held path returned directory=%v, error=%v", directory, err)
+			}
+			entries, err := os.ReadDir(".")
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("unsafe held path created output: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestSourceFetchHeldWorkspaceMisuseFailsBeforeWork(t *testing.T) {
+	for _, misuse := range []string{"build", "not launched", "qualified", "whole graph", "environment without workspace"} {
+		t.Run(misuse, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			workspace, _, err := securepath.OpenDirectory(".")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer workspace.Close()
+			node := testFetchNode("fetch-source", "https://example.test/source", testSourceCommit, testSourceTree,
+				"source", "registry.example/toolchain@sha256:"+repeatHex("c"), "")
+			opts := RunOptions{Ctx: t.Context(), SourceRoot: "src", SourceWorkspace: workspace, Launch: true}
+			switch misuse {
+			case "build":
+				node = completeTestBuild(ir.Node{ID: "build-source", Kind: ir.KindBuild, Component: "source"}, node)
+			case "not launched":
+				opts.Launch = false
+			case "qualified":
+				opts.Qualification = &QualifiedExecution{}
+			case "environment without workspace":
+				opts.SourceWorkspace = nil
+				opts.SourceGitEnvironment = []string{"LC_ALL=C"}
+			}
+			if err := node.Validate(); err != nil {
+				t.Fatalf("misuse fixture must otherwise be a valid producer: %v", err)
+			}
+			if misuse == "whole graph" {
+				_, err = (Local{}).Run(nil, "", opts)
+			} else {
+				_, err = (Local{}).ExecNode(node, opts)
+			}
+			if code(err) != e.CodeEngineCapability {
+				t.Fatalf("held capability misuse admitted: %v", err)
+			}
+			entries, err := os.ReadDir(".")
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("misuse created output: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestSourceFetchHeldReceiptDirectoryRejectsSubstitutionBeforeGit(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("actual held source fetch requires Linux")
+	}
+	node, repository, _ := pristineClosureFixture(t)
+	node.Repo = repository
+	t.Chdir(t.TempDir())
+	outside := t.TempDir()
+	if err := os.Symlink(outside, "source-receipts"); err != nil {
+		t.Fatal(err)
+	}
+	workspace, _, err := securepath.OpenDirectory(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer workspace.Close()
+	err = (Local{}).fetch(node, RunOptions{Ctx: t.Context(), SourceRoot: "src", SourceWorkspace: workspace})
+	if code(err) != e.CodeFetchFailed {
+		t.Fatalf("substituted receipt root admitted: %v", err)
+	}
+	for _, root := range []string{outside, filepath.Join("src", node.Dest)} {
+		entries, err := os.ReadDir(root)
+		if err != nil || len(entries) != 0 {
+			t.Fatalf("receipt rejection allowed Git or outside output: %v, %v", entries, err)
+		}
 	}
 }
 

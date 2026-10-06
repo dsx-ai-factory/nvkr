@@ -22,13 +22,18 @@ import (
 // Hosted run-node fetch dispatch now uses this admission. Ordinary ExecuteNode
 // and RunLocal retain their existing developer-fetch behavior; they do not acquire
 // this route's additional environment and held-directory isolation guarantees.
-// Live fetching requires Linux's inherited-directory path and excludes dependency
-// vendoring until that runtime's bind mount can authenticate the held checkout.
+// Live fetching requires Linux's inherited-directory path. Dependency vendoring
+// uses the source owner's pinned runtime and private-volume transport, not a host bind.
 func executeGitHubSourceFetch(ctx context.Context, plan *Plan, nodeID string, stdout, stderr io.Writer) error {
 	if err := admitGitHubPlan(ctx, plan); err != nil {
 		return err
 	}
-	return executeSourceFetch(ctx, plan, nodeID, os.Environ(), stdout, stderr, (pipeline.Local{}).ExecNode)
+	bounded, cancel, err := githubUtilityContext(ctx, plan, nodeID)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	return executeSourceFetch(bounded, plan, nodeID, os.Environ(), stdout, stderr, (pipeline.Local{}).ExecNode)
 }
 
 func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environment []string, stdout, stderr io.Writer,
@@ -66,9 +71,6 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	// This guard is defensive, not an independently reachable valid-Plan branch.
 	if instruction.Kind != ir.KindFetch {
 		return e.New(e.CodePipelineDrift, "source fetch %q does not bind a fetch instruction", nodeID)
-	}
-	if len(instruction.VendorCmd) != 0 {
-		return e.New(e.CodeEngineCapability, "source fetching cannot authenticate a held checkout mount for dependency vendoring")
 	}
 	childEnvironment, err := admitSourceFetchEnvironment(plan, node, environment)
 	if err != nil {

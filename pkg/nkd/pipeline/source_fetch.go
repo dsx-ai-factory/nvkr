@@ -2,11 +2,13 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -15,10 +17,23 @@ import (
 // tree hash, failing closed on any mismatch (NKD-FR-BLD-022, NKD-FR-RC-023). An
 // already-checked-out matching source closure is reused only through a re-hashed
 // source receipt; HEAD alone is never sufficient.
-func (l Local) fetch(n ir.Node, opts RunOptions) error {
+func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
+	var vendor *sourceVendor
 	if opts.SourceWorkspace != nil {
 		if _, err := sourceFetchDescriptorPath(3); err != nil {
 			return err
+		}
+		if len(n.VendorCmd) != 0 && !opts.DryRun {
+			var err error
+			vendor, err = admitSourceVendor(opts.ctx(), n, opts.Runtime)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if err := vendor.held.close(); err != nil {
+					returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "closing source vendor runtime"))
+				}
+			}()
 		}
 	}
 	dir, err := pathWithin(opts.SourceRoot, n.Dest)
@@ -50,11 +65,35 @@ func (l Local) fetch(n ir.Node, opts RunOptions) error {
 		opts.fetchReceiptDirectory = receipts
 	}
 
-	if head, err := sourceFetchGitOut(opts, dir, "rev-parse", "HEAD"); err == nil && head == n.Commit {
-		if err := l.verifyTree(dir, n, opts); err != nil {
-			return err
+	probeExisting := true
+	if opts.fetchDirectory != nil {
+		// A newly created held checkout has no repository yet. Git must not walk
+		// upward and mistake the enclosing workflow checkout for this source.
+		repository, _, err := securepath.OpenChild(opts.fetchDirectory, ".git", true)
+		if os.IsNotExist(err) {
+			probeExisting = false
+			repository, _, err = securepath.CreateParent(opts.fetchDirectory, ".git/.nkd-held-directory")
+			if err != nil {
+				return e.Wrap(e.CodeFetchFailed, err, "creating held source Git directory")
+			}
+		} else if err != nil {
+			return e.Wrap(e.CodeFetchFailed, err, "held source checkout has an unsafe Git directory")
 		}
-		return l.vendor(n, dir, opts)
+		opts.fetchGitDirectory = repository
+		defer func() {
+			if err := repository.Close(); err != nil {
+				returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "closing held source Git directory"))
+			}
+		}()
+	}
+	if probeExisting {
+		head, err := sourceFetchGitOut(opts, dir, "rev-parse", "HEAD")
+		if err == nil && head == n.Commit {
+			if err := l.verifyTree(dir, n, opts); err != nil {
+				return err
+			}
+			return l.completeFetch(n, dir, opts, vendor)
+		}
 	}
 
 	// Fetch exactly the pinned commit (shallow). GitHub serves reachable SHAs.
@@ -84,7 +123,16 @@ func (l Local) fetch(n ir.Node, opts RunOptions) error {
 	if err := l.verifyTree(dir, n, opts); err != nil {
 		return err
 	}
-	return l.vendor(n, dir, opts)
+	return l.completeFetch(n, dir, opts, vendor)
+}
+
+func (l Local) completeFetch(n ir.Node, dir string, opts RunOptions, vendor *sourceVendor) error {
+	if opts.SourceWorkspace == nil || len(n.VendorCmd) == 0 {
+		return l.vendor(n, dir, opts)
+	}
+	return ensureSourceClosure(n, dir, opts, func() error {
+		return vendor.run(opts.ctx(), opts.SourceWorkspace, opts.fetchDirectory, opts.Stdout, opts.Stderr)
+	})
 }
 
 // vendor completes the fetch closure. The optional vendor command runs in the

@@ -162,6 +162,7 @@ func (c *preparedSourceCache) materialize(n ir.Node, opts RunOptions) (*material
 // Existing receipts are reusable only when both their declaration and current bytes
 // still match. Any drift fails closed; this function never silently blesses it.
 func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func() error) error {
+	logicalDir := dir
 	if opts.fetchDirectory != nil {
 		var err error
 		dir, err = sourceFetchDescriptorPath(opts.fetchDirectory.Fd())
@@ -203,7 +204,7 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 		if opts.ctx().Err() != nil {
 			return err
 		}
-		return e.Wrap(e.CodeFetchFailed, err, "checking source cleanliness in %s", dir)
+		return e.Wrap(e.CodeFetchFailed, err, "checking source cleanliness in %s", logicalDir)
 	}
 	if status != "" {
 		return e.New(e.CodeFetchFailed, "source %q has unreceipted tracked, untracked, or ignored files; use a fresh source root", n.Dest)
@@ -805,7 +806,7 @@ func readSourceReceiptContext(ctx context.Context, path string, directories ...*
 	}
 	b, err := readRegularBeneathContext(ctx, root, filepath.Base(path), 1<<20)
 	if err != nil {
-		// readRegularLimitedContext descriptor-wraps a missing parent/final path.
+		// The descriptor reader wraps a missing parent/final path.
 		// os.IsNotExist only recognizes a limited set of legacy wrappers; errors.Is
 		// preserves the fresh-workspace cache-miss contract through %w wrapping.
 		if errors.Is(err, fs.ErrNotExist) {
