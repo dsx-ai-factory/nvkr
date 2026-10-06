@@ -157,10 +157,11 @@ func TestImagePinTransportBoundsMetadataBeforeParsing(t *testing.T) {
 		length   int64
 		body     string
 		insecure bool
+		message  string
 	}{
-		{name: "oversized declared response", length: maxPinImageMetadataBytes + 1},
-		{name: "oversized streaming response", length: -1, body: strings.Repeat("x", maxPinImageMetadataBytes+1)},
-		{name: "plain HTTP rejected", insecure: true},
+		{name: "oversized declared response", length: maxPinImageMetadataBytes + 1, message: "image pin metadata response exceeds size bound"},
+		{name: "oversized streaming response", length: -1, body: strings.Repeat("x", maxPinImageMetadataBytes+1), message: "helm OCI response exceeds size bound"},
+		{name: "plain HTTP rejected", insecure: true, message: "must use HTTPS"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			scheme := "https"
@@ -179,8 +180,8 @@ func TestImagePinTransportBoundsMetadataBeforeParsing(t *testing.T) {
 				defer response.Body.Close()
 				_, err = io.ReadAll(response.Body)
 			}
-			if err == nil {
-				t.Fatal("unbounded or insecure response admitted")
+			if err == nil || !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("wrong metadata/transport guard: %v, want %q", err, tc.message)
 			}
 		})
 	}

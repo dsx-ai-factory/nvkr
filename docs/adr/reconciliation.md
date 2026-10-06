@@ -373,7 +373,7 @@ contract-tested; external Helm/kubectl acquisition is not recorded here. Archive
 archive digest separately from the selected executable/member digest. Logical sparse-file sizes and physical
 expansion are both bounded, with cancellation checks during synthesized-member reads.
 
-The [input evidence map](../m2-input-evidence-map-2026-10-05.md) records exact pins, media, matrix obligations,
+The [input evidence map](../m2-input-evidence-map.md) records exact pins, media, matrix obligations,
 the separate candidate publication prefix, existing signing identity and remaining gaps. Native capture graph contracts depend on the
 separately reviewed acquisition-carrier schema and runtime implementation. The rebased maintained-input
 slice has focused acquisition, pinning and image-membership contract tests; full integrated and Linux gates

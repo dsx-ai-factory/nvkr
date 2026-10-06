@@ -54,7 +54,7 @@ A complete generated Run must admit execution, inspect and reconcile both
 disks, generate exact-subject evidence, publish/sign all required outputs, and pass independent consumer
 verification before these inputs can be called an accepted M2 release.
 
-The [input evidence map](../../docs/m2-input-evidence-map-2026-10-05.md#native-acquisition-build-and-measurement-commands)
+The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current
 source-review gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands; no source lock currently

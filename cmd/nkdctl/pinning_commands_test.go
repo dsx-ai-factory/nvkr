@@ -148,7 +148,12 @@ func TestCatalogSourcePinCommandOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := readLock()
-	out, err := invoke("bump", "--dir", data, "--all", "--check")
+	out, err := invoke("pin", "--dir", data, "--commit", git("rev-parse", "HEAD"), "--check", "source")
+	assertLifecycleCommandCode(t, err, e.CodeDiff)
+	if !bytes.Equal(before, readLock()) || !strings.Contains(string(out), git("rev-parse", "HEAD")) {
+		t.Fatal("commit flag did not reach exact revision check or changed lock")
+	}
+	out, err = invoke("bump", "--dir", data, "--all", "--check")
 	assertLifecycleCommandCode(t, err, e.CodeDiff)
 	if !bytes.Equal(before, readLock()) || !strings.Contains(string(out), "v1.1.0") {
 		t.Fatal("dry run changed lock or failed to report newer tag")
@@ -208,7 +213,32 @@ func TestCatalogArtifactPinCommandRejectsArchitectureSubset(t *testing.T) {
 	}
 }
 
+func TestCatalogPinCommandsRejectNondefaultLegacyRuntime(t *testing.T) {
+	for _, args := range [][]string{
+		{"pin", "--runtime", "podman", "source"},
+		{"bump", "--runtime", "podman", "--all"},
+		{"pin-artifacts", "--runtime", "podman", "--all"},
+		{"pin-artifacts", "--docker", "podman", "--all"},
+	} {
+		t.Run(strings.Join(args, "-"), func(t *testing.T) {
+			command := append([]string{"nkdctl", "catalog", args[0], "--dir", "must-not-be-read"}, args[1:]...)
+			_, err := runCLIWithCapturedStdout(t, newApp(), command...)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+		})
+	}
+}
+
 func TestCatalogDerivedImageRegistryAndNoOpOutput(t *testing.T) {
+	// Keep the real CLI-to-owner fixture's transport configuration in an isolated
+	// process, never in the parent test process shared by other command tests.
+	if os.Getenv("NKD_TEST_ISOLATED_IMAGE_PIN") != "1" {
+		command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestCatalogDerivedImageRegistryAndNoOpOutput$")
+		command.Env = append(os.Environ(), "NKD_TEST_ISOLATED_IMAGE_PIN=1")
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("isolated command fixture: %v\n%s", err, output)
+		}
+		return
+	}
 	// Exercise the real registry codec/transport without an external service or
 	// daemon. Only this sequential command fixture trusts its private TLS server.
 	server := httptest.NewTLSServer(registry.New())
@@ -276,7 +306,7 @@ components:
 	if err := os.WriteFile(filepath.Join(data, catalog.RegistryFile), []byte(registry), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	runtime := "nonexistent-legacy-runtime"
+	runtime := "docker"
 	for _, tc := range []struct {
 		command string
 		check   bool

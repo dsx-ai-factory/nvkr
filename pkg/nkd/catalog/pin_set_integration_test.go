@@ -388,16 +388,24 @@ func TestPinSetImageRuntimeSelection(t *testing.T) {
 					request.Runtime = "unused-legacy-runtime"
 				}
 				resolveArtifact := func(ctx context.Context, selected PrebuiltTarget, runtime string) (ArtifactPin, error) {
-					wantRuntime := "docker"
 					if custom {
-						wantRuntime = request.Runtime
+						t.Fatal("non-default legacy runtime reached acquisition")
 					}
-					if runtime != wantRuntime || selected.Image != "example.invalid/tool:"+version {
+					if runtime != "docker" || selected.Image != "example.invalid/tool:"+version {
 						t.Fatalf("maintenance projection = %q, %q", runtime, selected.Image)
 					}
 					return ArtifactPin{Tag: selected.Tag, Digests: map[string]string{"amd64": digest}}, nil
 				}
-				if _, err := updateSourcePinsWithArtifacts(t.Context(), request, ListTags, ResolvePin, resolveArtifact); err != nil {
+				update, err := updateSourcePinsWithArtifacts(t.Context(), request, ListTags, ResolvePin, resolveArtifact)
+				if custom {
+					assertCatalogContractCode(t, err, e.CodeUsage)
+					_, lockErr := os.Stat(filepath.Join(fixture.dir, LockFile))
+					if !os.IsNotExist(lockErr) || update.Changed != 0 || len(update.Pins) != 0 || len(update.Artifacts) != 0 {
+						t.Fatalf("non-default runtime produced a partial update: %+v, %v", update, lockErr)
+					}
+					return
+				}
+				if err != nil {
 					t.Fatal(err)
 				}
 				if got := fixture.lock(t).Artifacts["image"].Digests["amd64"]; got != digest {

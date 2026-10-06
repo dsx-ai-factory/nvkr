@@ -258,6 +258,12 @@ layers or grant image-delivery, scanner or publication acceptance.
 `catalog pin`, `catalog bump` and `catalog pin-artifacts` retain `--runtime` (and the
 artifact command's `--docker` alias) only for maintenance API compatibility; it no longer
 selects a process or ambient runtime credentials for image pinning.
+Only the empty/default `docker` spelling is admitted; non-default values return
+`CodeUsage` before catalog reads or upstream work rather than silently ignoring
+a requested runtime's credential store.
+This anonymous native client owns acquired `prebuilt.image` artifact pins only.
+Source `toolchainBaseImage` resolution remains a separate existing Docker path;
+it does not inherit these native selection or anonymous registry guarantees.
 
 **Explicit membership.** Each member names exactly one source or acquired artifact, with a reciprocal
 `pinnedBy` declaration. An acquired member has no `source`. Every record in a selector-addressed collection
@@ -420,6 +426,16 @@ pins participate in logical Build identity; transport locations do not.
 The shared source-tool selector admits at most 4,096 members and 1 GiB of both
 physical expanded stream bytes and aggregate logical member bytes; sparse holes
 cannot evade the latter. Reads of synthesized member bytes remain cancellation-aware.
+The selector replaces the former 65,536-entry/256 MiB expanded policy with this
+4,096-entry/1 GiB policy shared by catalog pinning and executable acquisition;
+transport and selected-executable bounds remain 256 MiB. A focused contract test
+freezes the catalog selector limits. Production archive acquisition uses the existing
+anonymous immutable held-file owner to authenticate the already-open HTTP stream,
+then selects from that descriptor rather than reopening a pathname. The bounded
+carrier is never created beside the published executable and is closed before
+the selected executable's atomic digest-checked publication. Linux uses a sealed
+memfd; Darwin supports diagnostic anonymous read-only holding, not Linux execution
+authority. These finite byte bounds do not constitute runner capacity reservation.
 Production provenance records archive and selected-member digests independently (ADR-09).
 
 ## GitHub action dependencies

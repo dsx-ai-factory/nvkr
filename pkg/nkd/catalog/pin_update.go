@@ -69,6 +69,9 @@ func updateSourcePinsWithArtifacts(ctx context.Context, request SourcePinRequest
 ) (SourcePinUpdate, error) {
 	// Read one snapshot and select the independent sources to update.
 	var update SourcePinUpdate
+	if err := validatePinRuntime(request.Runtime); err != nil {
+		return update, err
+	}
 	if request.Commit != "" && (request.Tag != "" || request.Bump || !fullSHA.MatchString(request.Commit)) {
 		return update, e.New(e.CodeUsage, "pin --commit requires one full Git commit and cannot be combined with --tag or bump")
 	}
@@ -262,6 +265,9 @@ type ArtifactPinUpdate struct {
 // contacting an upstream and commits every resolved pin against one lock snapshot.
 func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (ArtifactPinUpdate, error) {
 	var update ArtifactPinUpdate
+	if err := validatePinRuntime(request.Runtime); err != nil {
+		return update, err
+	}
 	reg, lock, err := pinUpdateInputs(ctx, request.Directory)
 	if err != nil {
 		return update, err
@@ -340,6 +346,14 @@ func UpdateArtifactPins(ctx context.Context, request ArtifactPinRequest) (Artifa
 		return update, nil
 	}
 	return update, WriteLockContext(ctx, request.Directory, lock)
+}
+
+// Legacy flags do not select daemon credentials for anonymous native pinning.
+func validatePinRuntime(runtime string) error {
+	if runtime != "" && runtime != "docker" {
+		return e.New(e.CodeUsage, "catalog pin runtime is a legacy default-only option; image pins use anonymous HTTPS, not %q credentials", runtime)
+	}
+	return nil
 }
 
 func updateDerivedArtifact(ctx context.Context, raw rawComponent, name string, version Pin, provenance, chartVersion, runtime string, lock *PinLock, update *SourcePinUpdate, resolveArtifact func(context.Context, PrebuiltTarget, string) (ArtifactPin, error)) error {

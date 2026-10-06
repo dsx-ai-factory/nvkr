@@ -8,6 +8,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	"sigs.k8s.io/yaml"
 )
 
@@ -46,6 +47,23 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 		"temporal-admin-tools-image":      "temporalio/admin-tools:1.30.3",
 		"temporal-server-image":           "temporalio/server:1.30.3",
 		"temporal-ui-image":               "temporalio/ui:2.48.1",
+	}
+	// Literal maintained lock bindings, not executable admission or registry
+	// proof. Explicit architecture pairs catch accidental native pin swaps even
+	// while the entire catalog is refused at its owning index-reference gate.
+	native := map[string][2]string{
+		"csi-node-driver-registrar-image": {"sha256:1ca23bdbb1504e41233d527e826d02dac98571c45a6cd74c5fb28be485d680fa", "sha256:0898bf569379e23a39b9dbd640934c4b9e2563b2c023cbad3e8f686167fd8b99"},
+		"postgresql-image":                {"sha256:9ca5fe8db49a439acdfda55fcbd6ff1c44bc84facf5e775b7e170434d61ce18c", "sha256:b3dec5235745879ca095c08c230e5a53825f7cd795bcee6e6ac88eed91267d28"},
+		"spiffe-csi-image":                {"sha256:b98766c90387033702ef64a3a4dce1aae252cb741b3ac2ef13f271dd7660bb1e", "sha256:6bfd786d4ffd3f7435659a7b923d819a7a0bcc55cd05673908915d433e86c0a2"},
+		"spire-agent-image":               {"sha256:0d9c792d7f409b748d3a1fc93fe70b6d1450474c177d2a731ddc36e97a17e9fe", "sha256:0c94e29f29a13c885294ae73755033040438117ca6c1e257318c5df0868290ac"},
+		"spire-bash-image":                {"sha256:d49c2b6585ac8e6341adfe8cb214a656914ab5390fb7804a7ed9e90a5b785fba", "sha256:8d29611142077489b9863426dfccf935c5ee9a27a3548d726c16de32692e71e3"},
+		"spire-controller-manager-image":  {"sha256:fb3bfc8f98f24c769004543d6b760142380c8f2d3a0354391ee2bfdd48039e59", "sha256:99dae65b7e207a7d34f9bef2aff901d6cbba40bd5ed31093ebf51e6a063783bc"},
+		"spire-oidc-image":                {"sha256:32f5e7d7b6329ed9dff97ad374e11d9156c43611ecfcb0693b7ca085b5328cdf", "sha256:6adc68d480f285e586edb67f4053bfb8923816a02486bf22d117e29bdee54a78"},
+		"spire-server-image":              {"sha256:3aa2dce70fc1098d6718a87c629aa8cadb83e4672c71dd63c5575ea5d0603789", "sha256:b2fb59ac8ec292b2d0e3685008b4a72726fc2298923a569ada9b2700f8b86380"},
+		"spire-tpm-server-image":          {"sha256:0ba43be0bd5cee7afc54fb351989692ddd07c106111ecda3cf6e9cbe23da137c", "sha256:d5a0bd84d06ce4a7cd8d0cc5f7f05ca041ed3e1cdd0f8fd129831d871669f2bf"},
+		"temporal-admin-tools-image":      {"sha256:f24c619953ba5724f36446cca514ba7dd865c2367873cbad70977caf58a02448", "sha256:2f90b7c95151bb7a3ddf41749681918f70528fd6c90b160a89e05970b678144a"},
+		"temporal-server-image":           {"sha256:1a71947754cd244b3e6f1beb61e2eb2408e9180f7f092fd30182849625db0ac7", "sha256:77c887f311db18f086ce2b8ac3144e7f0ad59d73765d01c3e412dea9b8fb6e2c"},
+		"temporal-ui-image":               {"sha256:6734b3988aa3615286ac8edc83f4d40f10fba587b7109570702efe09478807f9", "sha256:0e7478fad0eebac6d135a9c1efcc21f50f5026e017064b32f034585b13674788"},
 	}
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
 	if err != nil {
@@ -90,6 +108,7 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 		t.Fatal("deployment selection source pin changed")
 	}
 	seen := map[string]map[string]bool{}
+	selections := 0
 	for _, output := range authored.Outputs {
 		if output.Catalog == nil || output.Catalog.Base != "./image-catalog" {
 			continue
@@ -113,6 +132,20 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 			t.Fatalf("duplicate native image member %s/%s", component, output.Platform)
 		}
 		seen[component][output.Platform] = true
+		arch := target.Arch(output.Platform)
+		index := 0
+		if arch == "arm64" {
+			index = 1
+		} else if arch != "amd64" {
+			t.Fatalf("unexpected native platform %q", output.Platform)
+		}
+		if got := lock.Artifacts[component].Digests[arch]; got != native[component][index] {
+			t.Fatalf("native lock binding for %s/%s=%s, want %s", component, arch, got, native[component][index])
+		}
+		selections++
+	}
+	if selections != 24 {
+		t.Fatalf("got %d literal image selections; all 24 must remain selected and admission-refused", selections)
 	}
 	for component := range expected {
 		if !seen[component]["linux/amd64"] || !seen[component]["linux/arm64"] {

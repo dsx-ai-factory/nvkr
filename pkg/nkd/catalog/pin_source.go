@@ -56,6 +56,12 @@ func ResolveCommitPin(ctx context.Context, src Source, commit string) (Pin, erro
 }
 
 func resolveSourceRevision(ctx context.Context, src Source, tag, commit string) (Pin, error) {
+	return resolveSourceRevisionWithGit(ctx, src, tag, commit, gitAt)
+}
+
+func resolveSourceRevisionWithGit(ctx context.Context, src Source, tag, commit string,
+	gitAt func(context.Context, string, ...string) (string, error),
+) (Pin, error) {
 	tmp, err := os.MkdirTemp("", "nkd-pin-")
 	if err != nil {
 		return Pin{}, e.Wrap(e.CodeFetchFailed, err, "temp dir")

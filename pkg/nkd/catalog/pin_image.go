@@ -28,8 +28,11 @@ type pinImageReader func(context.Context, name.Reference) (pinImageSource, error
 
 // The runtime argument remains source-compatible with the maintenance API. Image
 // pins use registry-native bytes, not a daemon's manifest JSON projection.
-func resolveImageDigests(ctx context.Context, _ string, ref string, arches []string) (map[string]string, error) {
+func resolveImageDigests(ctx context.Context, runtime string, ref string, arches []string) (map[string]string, error) {
 	if err := validateAcquiredImageReference("image pin", ref); err != nil {
+		return nil, err
+	}
+	if err := validatePinRuntime(runtime); err != nil {
 		return nil, err
 	}
 	return resolveImageDigestsWith(ctx, ref, arches, readPinImage)

@@ -16,6 +16,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/releaseasset"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"golang.org/x/sys/unix"
 )
@@ -103,7 +104,7 @@ func (l Local) pullBinary(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	var sum string
 	var size int64
 	if n.ExecutableArchive != nil {
-		sum, size, err = downloadReleaseExecutable(opts.ctx(), n, dir, name)
+		sum, size, err = downloadReleaseExecutableWithTransport(opts.ctx(), n, dir, name, opts.releaseExecutableTransport)
 	} else if strings.HasPrefix(n.Artifact, ir.OCIBlobScheme) {
 		sum, size, err = downloadOCIBlobVerify(opts.ctx(), n.Artifact, dir, name, n.Digest)
 	} else {
@@ -134,7 +135,11 @@ func (l Local) pullBinary(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 // then verifies the executable separately before atomic output publication.
 // The carrier remains private and is never passed to a shell or extracted to disk.
 func downloadReleaseExecutable(ctx context.Context, node ir.Node, root, relative string) (string, int64, error) {
-	client := &http.Client{Timeout: 10 * time.Minute, CheckRedirect: func(request *http.Request, via []*http.Request) error {
+	return downloadReleaseExecutableWithTransport(ctx, node, root, relative, nil)
+}
+
+func downloadReleaseExecutableWithTransport(ctx context.Context, node ir.Node, root, relative string, transport http.RoundTripper) (string, int64, error) {
+	client := &http.Client{Transport: transport, Timeout: 10 * time.Minute, CheckRedirect: func(request *http.Request, via []*http.Request) error {
 		if request.URL.Scheme != "https" || request.URL.User != nil || len(via) >= 10 {
 			return e.New(e.CodeFetchFailed, "unsafe release executable redirect")
 		}
@@ -153,11 +158,6 @@ func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root
 	if err := node.Validate(); err != nil {
 		return "", 0, err
 	}
-	carrier, err := os.MkdirTemp(root, ".release-executable-")
-	if err != nil {
-		return "", 0, e.Wrap(e.CodeFetchFailed, err, "creating private release carrier")
-	}
-	defer func() { _ = os.Remove(carrier) }()
 	const maxReleaseBytes = 256 << 20
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, node.Artifact, nil)
 	if err != nil {
@@ -168,25 +168,26 @@ func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root
 		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeFetchFailed, err, "fetching release archive"), "acquiring release executable")
 	}
 	defer response.Body.Close()
-	const archiveName = "asset.tar.gz"
-	defer func() { _ = os.Remove(filepath.Join(carrier, archiveName)) }()
 	if response.StatusCode != http.StatusOK {
 		return "", 0, e.New(e.CodeFetchFailed, "release archive returned HTTP %d", response.StatusCode)
 	}
-	if _, _, err := writeVerifiedDownload(ctx, response.Body, node.Artifact, carrier, archiveName,
-		node.ExecutableArchive.Digest, maxReleaseBytes); err != nil {
-		return "", 0, err
-	}
-	held, _, err := securepath.OpenRegular(filepath.Join(carrier, archiveName))
+	// The existing owner authenticates and freezes the already-open stream. No
+	// archive pathname is published or reopened, including in the output root.
+	held, err := heldfile.FromReaderContext(ctx, response.Body, heldfile.Options{
+		Label: "release-archive", MaxBytes: maxReleaseBytes, ExpectedDigest: node.ExecutableArchive.Digest,
+	})
 	if err != nil {
-		return "", 0, e.Wrap(e.CodeVerifyFailed, err, "opening authenticated release carrier")
+		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeVerifyFailed, err, "authenticating release carrier"), "acquiring release executable")
 	}
-	defer held.Close()
-	member, err := releaseasset.SelectTarGzip(ctx, held, node.ExecutableArchive.Member, releaseasset.Limits{
+	defer func() { _ = held.Close() }()
+	member, err := releaseasset.SelectTarGzip(ctx, io.NewSectionReader(held, 0, held.Size()), node.ExecutableArchive.Member, releaseasset.Limits{
 		ExecutableBytes: maxReleaseBytes, ExpandedBytes: 1 << 30, Entries: 4096,
 	})
 	if err != nil {
 		return "", 0, err
+	}
+	if err := held.Close(); err != nil {
+		return "", 0, e.Wrap(e.CodeFetchFailed, err, "closing authenticated release carrier")
 	}
 	return writeVerifiedDownload(ctx, bytes.NewReader(member), node.Artifact, root, relative, node.Digest, maxReleaseBytes)
 }

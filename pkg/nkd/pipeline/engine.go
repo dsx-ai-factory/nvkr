@@ -7,6 +7,7 @@ package pipeline
 import (
 	"context"
 	"io"
+	"net/http"
 	"os"
 	"time"
 
@@ -65,6 +66,9 @@ type RunOptions struct {
 	fetchRepository       string
 	fetchReceiptDirectory *os.File
 	fetchWorkspace        *os.File
+	// Private transport seam for acquisition contract tests; production retains
+	// the default HTTPS transport and the owning redirect policy.
+	releaseExecutableTransport http.RoundTripper
 	// BuildMaterials is a process-local capability over the exact manifest and
 	// producer bytes selected by the factory Plan. It is required for a build node
 	// with material bindings and rejected by every other node.

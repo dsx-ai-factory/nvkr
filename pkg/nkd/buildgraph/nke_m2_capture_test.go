@@ -2,6 +2,7 @@ package buildgraph
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
@@ -32,6 +33,10 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(inputRoot, output.Catalog.Base)))
 			if err != nil {
 				t.Fatal(err)
+			}
+			agent := cat.Components["nke-agent"]
+			if len(agent.Commit) != 40 || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.2.1-68-g"+agent.Commit[:8]) {
+				t.Fatal("handwritten agent version no longer matches its exact source pin; revalidate owning source version before repinning")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
 			if err != nil {

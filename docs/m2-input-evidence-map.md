@@ -6,6 +6,8 @@ the capture schema and scoped trusted source-fetch interfaces;
 the native capture regression runs against those inherited interfaces. Exact-head local
 validation is recorded in the pull request separately from production acceptance.
 This is an input/configuration record. It grants no runtime, publication, signer or M2 acceptance claim.
+It is an evergreen handoff; dated source/admission observations belong in the separate
+[October 5 diagnostic record](evidence/2026-10-05-m2-input-acquisition.md).
 
 The refreshed catalog image-pin owner uses the existing pinned OCI library instead of
 Docker's manifest JSON projection. Fixture tests cover both native media formats,
@@ -233,10 +235,9 @@ This repository does not contain `nkd-inspector-closure-diagnostic.yml`. No comm
 native workflow run is established by that command. The controlled accessor test does
 not exercise a full SDK scan or produce measured native image pins.
 
-Read-only GitHub checks on October 5 establish that NKE #1211 remains open at
-`b30117c25b2dcdf6c16021dae88a2eafdafcae61`, unmerged and BLOCKED. Comparing main
-with that exact commit reports diverged, ahead 9/behind 19. This source pin is an
-explicit review candidate, not main-reachable approval or protected-ref evidence.
+The selected NKE #1211 source pin is an explicit review candidate, not
+main-reachable approval or protected-ref evidence. Its dated GitHub state is
+recorded separately and must be refreshed before accepting source approval.
 The existing missing execution-class/profile capability gate still disables candidate
 launch; the publication/signing configuration does not grant source approval.
 No historical host-probe or installed-package replay is claimed as current evidence
@@ -261,68 +262,24 @@ at exact NKE `b30117c25b2dcdf6c16021dae88a2eafdafcae61`:
 SPIRE's chart deploys a **different** SPIRE agent container at 1.15.3; the embedded 1.14.1 executable
 cannot satisfy that chart image row. A source declaration alone is not containment evidence.
 
-## Historical chart-default comparison without retained diagnostic evidence
+## Chart-package membership limits
 
-The maintained chart locks select these archive digests:
-PostgreSQL `c350143d2e21c1e1a3670dd32ab64fd11d49198a66fae87c63a3112531c0cd17`,
-SPIRE `7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac`,
-Temporal `14a8efe1cc92c91befac151db91f20f9a13962788e9d710c86655add6d966d37`.
-The following references transcribe a historical private default-rendering comparison.
-No complete chart acquisition, renderer command, payload or terminal read-back is
-retained here; the table is not authenticated chart evidence. It must be rederived
-and recorded before supporting an acceptance claim. Names lacking a registry retain
-their transcribed spellings, not inferred registry canonicalizations.
+Unretained historical chart-default comparisons do not establish image selection
+or execution evidence and are not reproduced as facts here. The required native
+image set remains the explicit source-selected Definition membership below.
+Optional chart-test references are separate from non-test runtime membership;
+there is no retained render/acquisition evidence for either mode in this record.
 
-The following default-mode references are retained only as a comparison to the human-selected
-deployment-value mode. They are **not** the required runtime set frozen for this attempt. No exact
-final-disk containment evidence is yet recorded. A chart archive digest is not an image manifest digest.
+The current `Definition.HelmOutput` supports image-slot bindings only, not deployment
+values or overlays. Acquired charts therefore do not freeze the human-selected NKE
+deployment values. The 24 explicit native image outputs record that selection;
+the chart packages remain configurable under their normal component contract.
+No unsupported values field or deployment-topology assertion is introduced.
 
-| Chart | Exact default runtime/install-hook image reference | Effect of exact NKE deploy values |
-| --- | --- | --- |
-| PostgreSQL 18.5.15 | `registry-1.docker.io/bitnami/postgresql:latest` | Source values replace tag with `@sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71` |
-| SPIRE 0.30.1 | `busybox:1.37.0-uclibc` | Not rendered in non-test deploy-value mode |
-| SPIRE 0.30.1 | `cgr.dev/chainguard/bash:latest@sha256:90041f375e30f41aa7e0390075d8a69dc61900771d52fa98d63ee5d03d866a58` | Still rendered |
-| SPIRE 0.30.1 | `ghcr.io/spiffe/oidc-discovery-provider:1.15.3` | Still rendered |
-| SPIRE 0.30.1 | `ghcr.io/spiffe/spiffe-csi-driver:0.2.7` | Still rendered |
-| SPIRE 0.30.1 | `ghcr.io/spiffe/spiffe-helper:0.11.0` | Not rendered in deploy-value mode |
-| SPIRE 0.30.1 | `ghcr.io/spiffe/spire-agent:1.15.3` | Still rendered; not equivalent to embedded executable |
-| SPIRE 0.30.1 | `ghcr.io/spiffe/spire-controller-manager:0.7.0` | Still rendered |
-| SPIRE 0.30.1 | `ghcr.io/spiffe/spire-server:1.15.3` | Still rendered |
-| SPIRE 0.30.1 | `registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0` | Still rendered |
-| SPIRE 0.30.1 | `registry.k8s.io/kubectl:v1.37.0` | Not rendered in deploy-value mode; not the operator kubectl 1.36.3 |
-| Temporal 0.74.0 | `cassandra:3.11.3` | Disabled by source values |
-| Temporal 0.74.0 | `docker.io/curlimages/curl:7.85.0` | Disabled by source values |
-| Temporal 0.74.0 | `docker.io/grafana/grafana:11.0.0` | Disabled by source values |
-| Temporal 0.74.0 | `quay.io/prometheus-operator/prometheus-config-reloader:v0.74.0` | Disabled by source values |
-| Temporal 0.74.0 | `quay.io/prometheus/alertmanager:v0.27.0` | Disabled by source values |
-| Temporal 0.74.0 | `quay.io/prometheus/prometheus:v2.53.0` | Disabled by source values |
-| Temporal 0.74.0 | `quay.io/prometheus/pushgateway:v1.8.0` | Disabled by source values |
-| Temporal 0.74.0 | `quay.io/prometheus/node-exporter:v1.8.1` | Disabled by source values |
-| Temporal 0.74.0 | `registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.12.0` | Disabled by source values |
-| Temporal 0.74.0 | `docker.elastic.co/elasticsearch/elasticsearch:7.17.3` | Disabled by source values |
-| Temporal 0.74.0 | `temporalio/admin-tools:1.30.3` | Still rendered |
-| Temporal 0.74.0 | `temporalio/server:1.30.3` | Still rendered |
-| Temporal 0.74.0 | `temporalio/ui:2.48.1` | Still rendered |
-
-Exact NKE `33fb71b2f4224b470ebc628a9165fc4b92870406` deploy values additionally render
-`ghcr.io/spiffe/spire-tpm-plugin-tpm-attestor-server:v1.9.0`. With chart tests included they also
-reference `cgr.dev/chainguard/min-toolkit-debug:latest@sha256:9e45e6836c28489a6e57ca1210ec66927e88eca2409e403616a1278e210e86c9`
-and `docker.io/smallstep/step-cli:0.30.2` (plus the shared busybox/bash/agent references).
-These test-only rows are separate from the non-test runtime selection.
-
-The current `Definition.HelmOutput` supports image-slot bindings only, not deployment values or
-overlays. Thus the acquired charts **do not freeze** the source deploy values above. The human
-selected the pinned NKE deployment-value mode for non-test runtime image membership; Definition
-metadata and its 24 explicit native image outputs record that selection. The chart packages remain
-configurable under their existing component contract; no unsupported values field or assertion
-that the package fixes deployment topology is introduced. Optional chart-test references remain
-separate, not silently promoted to mandatory runtime members.
-
-
-## Native deployment image pins and media read-back
+## Native deployment image lock data
 
 `definitions/nke-m2/image-catalog` selects the exact NKE deploy tree above, source values in
-`controller/deploy/nke-sbom/{postgresql,spire,temporal}/values.yaml` and the three verified chart payloads.
+`controller/deploy/nke-sbom/{postgresql,spire,temporal}/values.yaml` and the three owning chart lock selections.
 The human-selected non-test runtime set is PostgreSQL (one), SPIRE (eight, including TPM server),
 and Temporal (three). Each image is independently required for both native architectures; the
 formal v1 AMD64 restriction is expanded here by the sprint's native runtime-image requirement.

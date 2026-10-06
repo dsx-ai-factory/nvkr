@@ -36,6 +36,12 @@ type ToolPin struct {
 	ExecutableDigest string `json:"executableDigest"`
 }
 
+const maxToolArchiveBytes = 256 << 20
+
+func toolArchiveLimits() releaseasset.Limits {
+	return releaseasset.Limits{ExecutableBytes: maxToolArchiveBytes, ExpandedBytes: 1 << 30, Entries: 4096}
+}
+
 func validateToolSource(tool ToolSource) error {
 	if tool.Format != "raw" && tool.Format != "tar-gzip" {
 		return e.New(e.CodeInvalidCatalog, "unsupported tool format %q", tool.Format)
@@ -128,7 +134,7 @@ func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, clie
 	if response.StatusCode != http.StatusOK {
 		return ToolPin{}, e.New(e.CodeFetchFailed, "tool download returned HTTP %d", response.StatusCode)
 	}
-	const limit = 256 << 20
+	const limit = maxToolArchiveBytes
 	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {
 		if ctx.Err() != nil {
@@ -142,9 +148,7 @@ func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, clie
 	archiveDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
 	executableDigest := archiveDigest
 	if source.Format == "tar-gzip" {
-		member, err := releaseasset.SelectTarGzip(ctx, bytes.NewReader(raw), source.ExecutablePath, releaseasset.Limits{
-			ExecutableBytes: limit, ExpandedBytes: 1 << 30, Entries: 4096,
-		})
+		member, err := releaseasset.SelectTarGzip(ctx, bytes.NewReader(raw), source.ExecutablePath, toolArchiveLimits())
 		if err != nil {
 			return ToolPin{}, err
 		}
