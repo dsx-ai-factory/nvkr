@@ -16,11 +16,12 @@ live diagnostic or production runtime approval.
 
 The source-owned PostgreSQL index `sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71`
 and SPIRE Bash index `sha256:90041f375e30f41aa7e0390075d8a69dc61900771d52fa98d63ee5d03d866a58`
-differ from all four selected native child pins. The inherited executable compiler
-rejects those four rows with `CodeUnverifiedRef`: index membership was authenticated
-at pin maintenance, but no retained membership receipt reaches execution.
-`TestMaintainedM2DeploymentImageMembership` preserves and checks those exact refusals,
-while checking the other twenty native acquired-image graphs. All 34 authored outputs
+differ from all four selected native child pins. The inherited catalog admission
+owner rejects authored digest-qualified references with `CodeUnverifiedRef` before
+resolution and before pin acquisition. The entire image catalog therefore cannot
+load; its other twenty native selections cannot compile through this catalog either.
+`TestMaintainedM2DeploymentImageMembership` checks this earliest refusal and separately
+checks the literal authored membership, not a partially accepted catalog. All 34 authored outputs
 remain selected. This additional launch blocker cannot be solved by silently stripping
 the source-owned index or changing its pin to a child without the owning contract.
 
@@ -90,13 +91,13 @@ capture-enabled installer bake or a live evidence join.
 | Syft inspector scanner | Source lock selects v1.51.1 and schemaVersion `16.1.10` | Native image execution and a retained external acquisition record remain separate |
 | Inspector architecture | Profile key must equal native `linux/amd64` or `linux/arm64` execution host | Both measured native full profiles and capacity grants remain required |
 | Scratch and memory | B's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
-| Registry namespace | Existing `definitions/nke-v1/environment-github.yaml` | M2 production target preserves `ghcr.io/dsx-ai-factory/nke-recipes`; live blob limits, retention and package access not verified here |
+| Registry namespace | M2 candidate Environment explicitly authors `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` | Separate from production `cwe`/`nkectl` routes; live blob limits, retention and package access not verified here |
 | Registry credential | Existing `github:GITHUB_TOKEN` reference | Runtime values are not inspected or serialized; production credential admission/read-back required |
 | Signing identity | Existing main `nkd-run.yml` identity regex and Actions issuer | Existing policy copied byte-for-byte; protected publication environment and current keyless run remain unverified |
 | Private source transport | Exact `https://github.com/dsx-ai-factory/nke` CLI/controller and `https://github.com/dsx-ai-factory/nke.git` OS keys, sharing the existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
 | Generated runner route | ADR-18 generic-hosted-only rule | Native KVM capability for both routes remains unresolved; historical ARC diagnostics cannot establish generated production admission |
 
-`definitions/nke-m2/environment-github.yaml` records the existing production publication/signing target and
+`definitions/nke-m2/environment-github.yaml` records the separate candidate publication prefix, existing signing policy and
 producer-declared build network permission. It omits unavailable native execution classes and inspector
 profiles. This is intentionally incomplete for production admission; no placeholder digest or invented runner
 class is supplied. Every missing field must be resolved before generation/production launch.
@@ -260,16 +261,17 @@ at exact NKE `b30117c25b2dcdf6c16021dae88a2eafdafcae61`:
 SPIRE's chart deploys a **different** SPIRE agent container at 1.15.3; the embedded 1.14.1 executable
 cannot satisfy that chart image row. A source declaration alone is not containment evidence.
 
-## Chart image matrix from authenticated chart payloads
+## Historical chart-default comparison without retained diagnostic evidence
 
-Each chart was acquired by the repository-native downloader and re-hashed against its existing lock:
+The maintained chart locks select these archive digests:
 PostgreSQL `c350143d2e21c1e1a3670dd32ab64fd11d49198a66fae87c63a3112531c0cd17`,
 SPIRE `7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac`,
 Temporal `14a8efe1cc92c91befac151db91f20f9a13962788e9d710c86655add6d966d37`.
-Diagnostic `helm template` with Helm `v4.3.0+gbec5b06`, `--skip-tests`, no deployment values,
-produced the following runtime/install-hook references. This renderer is diagnostic, not the pinned
-M2 operator executable and not production execution. Names lacking a registry below are the exact
-chart spellings, not inferred registry canonicalizations.
+The following references transcribe a historical private default-rendering comparison.
+No complete chart acquisition, renderer command, payload or terminal read-back is
+retained here; the table is not authenticated chart evidence. It must be rederived
+and recorded before supporting an acceptance claim. Names lacking a registry retain
+their transcribed spellings, not inferred registry canonicalizations.
 
 The following default-mode references are retained only as a comparison to the human-selected
 deployment-value mode. They are **not** the required runtime set frozen for this attempt. No exact
@@ -333,9 +335,11 @@ The image lock was generated atomically with `catalog pin-artifacts --all --arch
 No artifact digest was hand-authored. The informational source/artifact `tag` is the source-selection
 commit, not a claimed upstream image version. Registry refs below and native artifact digests own acquisition.
 The Bash declaration uses its exact source-owned index digest with the informational `latest` tag omitted:
-The compiler refuses the four PostgreSQL/Bash native rows because the authored index differs from the
-native manifest pin. The current contract does not authorize separating an authored index selection
-from native transport without retained membership evidence. No index digest is silently discarded.
+The catalog refuses the PostgreSQL/Bash authored index declarations before resolving
+any image member. The current protocol does not authorize digest-qualified authored
+image references, including native references, and pin maintenance refuses them before
+network work. No index digest is silently discarded. The command above is therefore
+blocked by `CodeUnverifiedRef` for this maintained catalog, not a runnable refresh.
 
 The following digest table transcribes the maintained lock. Its historical media annotations have no
 retained external diagnostic and are descriptive, not verified live acquisition evidence. `Docker v2` means

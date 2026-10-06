@@ -105,6 +105,9 @@ func updateSourcePinsWithArtifacts(ctx context.Context, request SourcePinRequest
 			return update, e.New(e.CodeUsage, "source %q selected more than once", n)
 		}
 		selected[n] = true
+		if pin, exists := lock.Pins[n]; request.Bump && exists && fullSHA.MatchString(pin.Commit) && pin.Tag == pin.Commit {
+			return update, e.New(e.CodeUnsupported, "source %q has an exact commit-mode pin; use explicit pin --commit or --tag instead of bump", n)
+		}
 		if src, ok := reg.Sources[n]; ok && src.PinnedBy != "" {
 			return update, pinSetMemberError(n, src.PinnedBy)
 		}

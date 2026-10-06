@@ -1,11 +1,11 @@
 apiVersion: nkd.dev/environment/v1
 kind: Environment
 metadata:
-  description: M2 publication target; native disk execution classes and measured inspection profiles must pass admission before use.
+  description: M2 candidate publication namespace; native disk execution classes and measured inspection profiles must pass admission before use.
   name: nke-m2-github
 publication:
   credentialRef: github:GITHUB_TOKEN
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nke-recipes
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate
 runtime:
   runtime: podman
   buildNetworkPolicy: producer-declared

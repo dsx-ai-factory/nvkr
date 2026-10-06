@@ -15,11 +15,11 @@ no unsupported deployment-values field is added or inferred. Optional test image
 owned external NKE-image checkpoint are documented in the input evidence map.
 
 The PostgreSQL and SPIRE Bash source references are digest-pinned upstream indexes.
-Their four native output rows retain real child-manifest pins, but executable graph
-lowering currently rejects them with `CodeUnverifiedRef`: pin maintenance authenticates
-index membership without retaining an execution-authorizing membership receipt.
-No index digest is dropped or replaced to bypass this gate. The other twenty
-native acquired-image graphs compile; that is not image publication or acceptance.
+Their four native output rows retain child-manifest pins, but the inherited catalog
+owner now rejects authored digest-qualified references with `CodeUnverifiedRef`
+before resolution or pin acquisition. Consequently the entire image catalog cannot
+load, including its other twenty native image selections. No index digest is dropped,
+substituted, or bypassed; an execution-authorizing index/native protocol remains absent.
 
 The operator catalog selects Helm 4.1.4 and kubectl 1.36.3 from the pinned NKE kubeadm-distribution lock:
 `dsx-ai-factory/nke@b30117c25b2dcdf6c16021dae88a2eafdafcae61`,
@@ -39,7 +39,9 @@ The selected material projection binds `image-inputs` as `archive` and `installe
 under `nke.dev/os-image-materials/v1`; every selected material and disk target retains its own architecture.
 
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
-the existing registry credential, namespace, source access and workflow signing policy. Native disk
+the existing registry credential, source access and workflow signing policy, but publishes only under
+the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The reused signer
+identity is existing configuration, not a new source or publication approval. Native disk
 execution classes and measured native inspection profiles are absent, so admission must fail before a Run.
 OS toolchain digests remain the inherited local runtime identities, not approved published OCI pins.
 The inspector and Packer source locks retain their outstanding publication approval gates.

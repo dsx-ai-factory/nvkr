@@ -131,6 +131,9 @@ their owning catalog boundary before maintenance validates the resulting referen
   GitHub actions and release-tool sources retain their exact release-tag contract
   and reject this option before source acquisition. This permits candidate source
   integration without making a release or governance approval claim.
+  `bump` rejects selected commit-mode pins (`tag == commit`) before upstream work;
+  moving one requires explicit `pin --commit` or `pin --tag` intent, not a routine
+  automatic conversion to the newest release tag.
 - `catalog bump --dir <catalog> [--all] [source...]` — resolve the newest tag matching each selected source's
   `constraint` (e.g. `1.32.x`). `--all` selects independent roots and visits each explicitly nested set once.
 - `catalog pin-artifacts --dir <catalog> [--all] [component...]` — resolve the complete declared architecture
@@ -142,15 +145,17 @@ their owning catalog boundary before maintenance validates the resulting referen
   entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
   prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
 
-Image pin maintenance may authenticate an authored upstream index and resolve
-its exact native children through the existing OCI library. The artifact lock
-records the native digests, but does not retain an index-membership receipt.
-Executable lowering therefore accepts a digest-qualified reference only when
-its authored digest equals the selected native subject; a distinct index digest
-fails with `CodeUnverifiedRef` until an owning retained membership contract is
-implemented. It neither discards the authored digest nor concatenates digest
-suffixes. Fixed source-reviewed image refs are ordinary acquired producers, not
-automatically extracted chart pin-set members.
+Image pin maintenance selects an upstream index or native image through the
+existing OCI library and records exact native digests. Authored digest-qualified
+image references are currently rejected with `CodeUnverifiedRef` at catalog and
+maintenance admission, including native references equal to a selected pin.
+The lock does not retain an index-membership receipt; no distinct index digest
+may be discarded or silently replaced by a child. An authenticated authored
+index/native protocol remains deferred. Fixed source-reviewed tag references
+are ordinary acquired producers, not automatically extracted chart pin-set members.
+The native pinning profile requires an explicit body `mediaType` matching the
+served image/index media type, even where upstream OCI permits its omission;
+missing or mismatched markers fail closed rather than being inferred.
 
 Maintenance callers may additionally supply explicit `SameRelease` groups of selected independent sources.
 Each group must share the exact repository, tag prefix and constraint before upstream resolution; the complete

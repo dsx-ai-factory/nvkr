@@ -8,7 +8,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"sigs.k8s.io/yaml"
 )
 
 func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
@@ -54,12 +54,40 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	if len(authored.Outputs) != 34 {
 		t.Fatalf("got %d outputs, want original ten plus 24 native image members", len(authored.Outputs))
 	}
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "image-catalog")))
+	provider := catalog.Dir(filepath.Join(root, "image-catalog")).(catalog.ContextDataProvider)
+	cat, err := catalog.LoadContext(t.Context(), provider)
+	var coded *e.Error
+	if cat != nil || !errors.As(err, &coded) || coded.Code != e.CodeUnverifiedRef {
+		t.Fatalf("authored indexes must fail at catalog admission: catalog=%+v error=%v", cat, err)
+	}
+	// This is a literal selection check, not an alternate resolved catalog. The
+	// owner above rejects the entire catalog before any component can execute.
+	raw, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cat.Components) != len(expected) {
-		t.Fatalf("got %d image components, want %d", len(cat.Components), len(expected))
+	var declarations struct {
+		Components map[string]struct {
+			Source   string
+			Prebuilt struct{ Image string }
+		}
+	}
+	if err := yaml.Unmarshal(raw, &declarations); err != nil {
+		t.Fatal(err)
+	}
+	if len(declarations.Components) != len(expected) {
+		t.Fatalf("got %d image declarations, want %d", len(declarations.Components), len(expected))
+	}
+	raw, err = provider.ReadFileContext(t.Context(), catalog.LockFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lock catalog.PinLock
+	if err := yaml.Unmarshal(raw, &lock); err != nil {
+		t.Fatal(err)
+	}
+	if lock.Pins["nke-deployment-selection"].Commit != commit {
+		t.Fatal("deployment selection source pin changed")
 	}
 	seen := map[string]map[string]bool{}
 	for _, output := range authored.Outputs {
@@ -74,8 +102,8 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 		if !ok {
 			t.Fatalf("undeclared deployment image %s", component)
 		}
-		selected := cat.Components[component]
-		if selected.FromSource || selected.Commit != commit || selected.Prebuilt == nil || selected.Prebuilt.Image != want {
+		selected := declarations.Components[component]
+		if selected.Source != "nke-deployment-selection" || selected.Prebuilt.Image != want {
 			t.Fatalf("wrong source/selection for %s", component)
 		}
 		if seen[component] == nil {
@@ -85,24 +113,6 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 			t.Fatalf("duplicate native image member %s/%s", component, output.Platform)
 		}
 		seen[component][output.Platform] = true
-		resolved, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
-		if err != nil {
-			t.Fatal(err)
-		}
-		graph, err := Compile(resolved)
-		if component == "postgresql-image" || component == "spire-bash-image" {
-			var coded *e.Error
-			if graph != nil || !errors.As(err, &coded) || coded.Code != e.CodeUnverifiedRef {
-				t.Fatalf("source-owned index lost its unresolved native membership gate: graph=%+v error=%v", graph, err)
-			}
-			continue
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(graph.Nodes) != 2 || graph.Nodes[0].Kind != ir.KindPull || graph.Nodes[0].Platform != output.Platform || graph.Nodes[0].Digest == "" || graph.Nodes[1].Kind != ir.KindVerify {
-			t.Fatalf("native acquisition closure for %s is not a pinned pull plus terminal verification: %+v", output.Name, graph)
-		}
 	}
 	for component := range expected {
 		if !seen[component]["linux/amd64"] || !seen[component]["linux/arm64"] {

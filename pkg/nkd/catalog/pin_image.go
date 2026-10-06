@@ -35,8 +35,14 @@ func resolveImageDigests(ctx context.Context, _ string, ref string, arches []str
 }
 
 func readPinImage(ctx context.Context, ref name.Reference) (pinImageSource, error) {
+	return readPinImageWithTransport(ctx, ref, remote.DefaultTransport)
+}
+
+// The private seam lets registry contract tests retain the production HTTPS and
+// metadata bounds without changing a process-global transport or ambient auth.
+func readPinImageWithTransport(ctx context.Context, ref name.Reference, transport http.RoundTripper) (pinImageSource, error) {
 	d, err := remote.Get(ref, remote.WithContext(ctx), remote.WithAuth(authn.Anonymous),
-		remote.WithTransport(pinImageTransport{remote.DefaultTransport}), remote.WithUserAgent("nkdctl/image-pin"))
+		remote.WithTransport(pinImageTransport{transport}), remote.WithUserAgent("nkdctl/image-pin"))
 	if err != nil {
 		return pinImageSource{}, err
 	}

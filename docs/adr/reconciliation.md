@@ -360,10 +360,10 @@ transport. It authenticates native manifest/config bytes, rejects ambiguous or s
 preserves OCI/Docker schema-2 subjects under contract tests. No external acquisition diagnostic is recorded
 for this candidate; layer scans and publication remain separate acceptance gates.
 PostgreSQL and SPIRE Bash retain their source-owned index digests and independently locked native
-children. Their four native executable graphs fail `CodeUnverifiedRef` until index membership is retained
-at the owning execution boundary; transient pin-maintenance validation is not an execution receipt.
-The membership regression checks those refusals and the other twenty native acquired-image graphs
-without removing any of the 34 authored output selections.
+children. Authored digest-qualified image declarations now fail `CodeUnverifiedRef` at catalog admission
+before resolution or pin acquisition. The entire maintained image catalog cannot load, including its
+other twenty native selections. The regression checks that earliest refusal and separately checks literal
+membership without removing any of the 34 selections or constructing a partially accepted catalog.
 
 Four OS/material source entries are machine-pinned at the exact capture-capable NKE commit without
 creating a release tag. The generic commit-pin path shares Git acquisition and atomic lock writing;
@@ -374,7 +374,7 @@ archive digest separately from the selected executable/member digest. Logical sp
 expansion are both bounded, with cancellation checks during synthesized-member reads.
 
 The [input evidence map](../m2-input-evidence-map-2026-10-05.md) records exact pins, media, matrix obligations,
-the existing publication/signing target and remaining gaps. Native capture graph contracts depend on the
+the separate candidate publication prefix, existing signing identity and remaining gaps. Native capture graph contracts depend on the
 separately reviewed acquisition-carrier schema and runtime implementation. The rebased maintained-input
 slice has focused acquisition, pinning and image-membership contract tests; full integrated and Linux gates
 remain separate. Published approved toolchain pins, native execution classes, full inspection profiles,
