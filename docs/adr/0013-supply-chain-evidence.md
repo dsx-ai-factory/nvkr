@@ -131,12 +131,25 @@ metadata; they do not claim dependency inspection. The separate full-disk profil
 and does not require a second catalog scanner selection; when both select the same native platform their
 pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
 
-A `disk-image` admitted for execution or publication requires a full CycloneDX inventory whose subject is the
+The pipeline-attested M2 route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
+It retains the original held disk, exact producer results and authenticated transitive material handoffs,
+and publishes source-bound per-component CycloneDX producer documents under the existing signed evidence
+closure. These documents have no inspected dependency inventory and explicitly bind `nkd:diskEvidence`
+to `build-provenance-v1` and `nkd:diskInspection` to `deferred-m3`. The signed release disk binding carries
+the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
+mandatory. This is ordinary pipeline-attested M2 delivery, not diagnostic or qualified evidence.
+Deep disk/content inspection and material-to-filesystem reconciliation are M3 qualification requirements.
+Unknown modes fail closed; an omitted mode retains the strict contract. Consumers verify the declared mode
+against each document and reject invented inspection claims. Mode changes affect Environment/Plan and signed
+release metadata, not raw payload identity. Only the explicit native ARC publication route admits this mode.
+
+The strict `disk-image` inspection route requires a full CycloneDX inventory whose subject is the
 exact delivered QCOW2 payload digest. It combines an authenticated trace of every fetched or built material with
 read-only inspection of the final disk, then reconciles both views. The material collector, disk codec/inspector,
 and package scanner are pinned tools and explicit Plan inputs. Missing tools or trace members, unreadable
 filesystems, unsupported encryption, scanner failure, or disagreement fails closed at admission or inspection.
-A catalog declaration may validate without those tools, but it is not a disk SBOM and cannot compile or publish.
+A catalog declaration alone supplies neither inventory nor publication authority; the explicit M2 route above
+requires authenticated live producer evidence instead of an inspected inventory.
 The authoring schema alone grants no disk evidence. The full-content operation selects an explicit
 Environment-native `diskInspectionProfiles` entry frozen in the Plan: the complete OCI image, inspector,
 codec, guestfish, Syft and dpkg-deb executable pins, CPU/RAM ceilings (at least 2 GiB for the appliance), scratch capacity minima,

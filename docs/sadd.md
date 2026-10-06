@@ -259,9 +259,9 @@ NKE OS producer owns its embedded contents. IR/Plan lowering binds the exact sou
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
 verdict. Production VM execution and held-result population remain capability-gated; direct producer selection
-does not introduce independently built OS layers. Before
-disk delivery is admitted, ADR-13 also requires a full inventory reconciling traced materials with read-only
-inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
+does not introduce independently built OS layers. M2 disk delivery uses exact live producer and material
+evidence with explicit deferred-inspection scope. ADR-13's strict mode and M3 qualification require a full
+inventory reconciling traced materials with read-only inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.

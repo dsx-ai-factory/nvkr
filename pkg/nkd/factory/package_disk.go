@@ -284,6 +284,9 @@ func reconciledDiskPackageBinding(plan *Plan, expected LifecycleOutputPlan, outp
 		if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest {
 			continue
 		}
+		if diskBuildProvenance(plan) {
+			return build.Platform, definition.DiskInspectionProfile{}, nil
+		}
 		_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
 		if err != nil {
 			return "", definition.DiskInspectionProfile{}, err

@@ -30,6 +30,8 @@ type Output struct {
 // decoded RAW reproduction identity, compatibility, inspection, SBOM, or
 // publication authority.
 type DiskOutput struct {
+	// EvidenceMode is signed release metadata; empty retains the inspected contract.
+	EvidenceMode string `json:"evidenceMode,omitempty"`
 	// PayloadDigest always identifies raw QCOW2 bytes. Output.Digest separately
 	// identifies the observed deliverable: raw locally, its manifest when wrapped.
 	PayloadDigest string `json:"payloadDigest"`
@@ -69,6 +71,7 @@ func (output Output) Validate() error {
 		(output.Disk.Encryption != "none" && output.Disk.Encryption != "luks2") ||
 		output.Disk.Size <= 0 || !canonical.IsDigest(output.Disk.PlanDigest) ||
 		!canonical.IsDigest(output.Disk.PayloadDigest) ||
+		(output.Disk.EvidenceMode != "" && output.Disk.EvidenceMode != "build-provenance-v1") ||
 		output.Disk.Outcome != "succeeded" || !slices.Contains(output.Components, output.Disk.Component) {
 		return e.New(e.CodeVerifyFailed, "disk artifact %q lacks an exact successful QCOW2 producer binding", output.Name)
 	}

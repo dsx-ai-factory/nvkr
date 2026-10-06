@@ -49,6 +49,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			if err := admitDiskPublicationProducer(build); err != nil {
 				return ArtifactGraph{}, err
 			}
+			if diskBuildProvenance(&plan) {
+				continue
+			}
 			host, profile, err := diskPublicationInspectionProfile(build, delivery)
 			if err != nil {
 				return ArtifactGraph{}, err

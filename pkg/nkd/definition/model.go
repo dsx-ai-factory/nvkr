@@ -87,6 +87,8 @@ type Environment struct {
 	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
 	// configuration, not provider isolation or runtime-capacity evidence.
 	GitHubARC string `json:"githubARC,omitempty"`
+	// DiskEvidence selects the M2 producer-evidence contract; empty requires deep inspection.
+	DiskEvidence string `json:"diskEvidence,omitempty"`
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
 	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`
 	APIVersion             string                           `json:"apiVersion"`
@@ -243,6 +245,9 @@ func (environment Environment) Validate() error {
 	}
 	if environment.GitHubARC != "" && environment.GitHubARC != "native-kvm-v1" {
 		return e.New(e.CodeEngineCapability, "unsupported GitHub ARC policy %q", environment.GitHubARC)
+	}
+	if environment.DiskEvidence != "" && (environment.DiskEvidence != "build-provenance-v1" || environment.GitHubARC != "native-kvm-v1" || environment.Publication == nil) {
+		return e.New(e.CodeEngineCapability, "disk evidence mode requires the explicit native ARC publication route")
 	}
 	previousBranch := ""
 	for _, branch := range environment.GitHubDispatchBranches {

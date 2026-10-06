@@ -92,8 +92,13 @@ verified in one payload pass. Every copy/export still rehashes its held bytes; s
 and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
-Production packaging consumes the original live Run's exact-subject reconciliation receipt, not a restored
-path or decoded receipt. The compiler describes the wrapper's output-repository and evidence edges.
+Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
+The explicit M2 `build-provenance-v1` mode instead consumes the original live held disk and authenticated
+transitive material trace. Both paths rehash the exported QCOW2, use the same atomic package/evidence
+transaction, preserve every producer evidence slot and bind raw payload separately from OCI identity.
+The M2 disk binding carries its evidence mode in signed release metadata; consumer verification requires
+matching source-bound documents and refuses inspection claims in that mode. Neither path accepts a
+restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation; full generated production execution remains unexercised. The ordinary
 local scheduler still rejects disk publication.
