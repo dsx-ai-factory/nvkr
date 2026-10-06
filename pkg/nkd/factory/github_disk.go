@@ -2,7 +2,6 @@ package factory
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -62,17 +61,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	var inspectionLog *diskdiagnostic.Collector
 	if !diskBuildProvenance(plan) {
 		inspectionLog = diskdiagnostic.NewCollector()
-		defer func() {
-			// A diagnostic retention failure must not replace the inspection verdict.
-			raw, truncated := inspectionLog.Snapshot()
-			retentionCtx, stopRetention := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-			defer stopRetention()
-			if err := retainGitHubInspectionLog(retentionCtx, workspace, output, raw, truncated); err != nil {
-				if options.Stderr != nil {
-					_, _ = fmt.Fprintln(options.Stderr, "Unable to retain inspection diagnostics.")
-				}
-			}
-		}()
+		defer finishGitHubInspectionDiagnostics(ctx, workspace, output, inspectionLog, options)
 	}
 	var root Node
 	for _, node := range stage.Nodes {
@@ -183,10 +172,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 				err := CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)
 				// Logging occurs after the owned inspection stops. Subprocess
 				// draining never invokes a caller-provided writer.
-				if inspectionLog != nil && progress.options.Stdout != nil {
-					raw, _ := inspectionLog.Snapshot()
-					_, _ = progress.options.Stdout.Write(raw)
-				}
+				reportGitHubInspectionDiagnostics(progress, inspectionLog, err)
 				return err
 			})
 		}

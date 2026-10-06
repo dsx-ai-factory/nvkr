@@ -585,7 +585,7 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	if err := errors.Join(err, copyErr); err != nil {
 		// Preserve allowlisted phase/timing information even when the context
 		// branch of the shared runtime error mapper omits child stderr.
-		return nil, runtimeCommandError(ctx, err, "", diskInspectionHelperCode(err), "inspecting held disk: %s", diagnostic.Summary())
+		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.FailureBytes()), diskInspectionHelperCode(err), "inspecting held disk: %s", diagnostic.Summary())
 	}
 	if diagnostic.Unexpected() || report.Len() == 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection returned diagnostics or no report")

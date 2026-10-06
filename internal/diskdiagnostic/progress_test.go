@@ -3,6 +3,7 @@ package diskdiagnostic
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,8 @@ func TestReceiverOnlyAcceptsAllowlistedRecords(t *testing.T) {
 		{"unknown field", Prefix + `{"phase":"root-scan","event":"start","elapsedMillis":1,"secret":"token"}` + "\n", true},
 		{"duplicate field", Prefix + `{"phase":"root-scan","phase":"nested-scan","event":"start","elapsedMillis":1}` + "\n", true},
 		{"negative elapsed", strings.Replace(valid, "123", "-1", 1), true},
+		{"installer nested depth", Prefix + `{"phase":"nested-scan","event":"start","elapsedMillis":1,"depth":4}` + "\n", false},
+		{"excessive depth", Prefix + `{"phase":"nested-scan","event":"start","elapsedMillis":1,"depth":5}` + "\n", true},
 		{"missing elapsed", Prefix + `{"phase":"root-scan","event":"start"}` + "\n", true},
 		{"null elapsed", strings.Replace(valid, "123", "null", 1), true},
 		{"huge elapsed", strings.Replace(valid, "123", "9223372036854775808", 1), true},
@@ -161,5 +164,76 @@ func TestSubjectMetadataComesOnlyFromHeldOwner(t *testing.T) {
 	raw, _ := collector.Snapshot()
 	if receiver.Unexpected() || !bytes.Contains(raw, []byte(pin)) || bytes.Contains(raw, []byte(wrong)) || bytes.Contains(raw, []byte(`"kind":"tarball"`)) {
 		t.Fatalf("helper substituted subject coordinates: %s", raw)
+	}
+}
+
+func TestReceiverPreservesBoundariesAndMarksSampling(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		second    string
+		truncated bool
+	}{
+		{"event boundary", `"event":"complete","ordinal":1`, false},
+		{"member boundary", `"event":"start","ordinal":2`, false},
+		{"sampled repeat", `"event":"start","ordinal":1`, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			collector := NewCollector()
+			receiver := NewReceiver(collector)
+			_, _ = io.WriteString(receiver, Prefix+`{"phase":"nested-scan","event":"start","elapsedMillis":0,"ordinal":1}`+"\n")
+			_, _ = io.WriteString(receiver, Prefix+`{"phase":"nested-scan","elapsedMillis":1,`+test.second+"}\n")
+			receiver.Finish()
+			raw, truncated := collector.Snapshot()
+			if receiver.Unexpected() || truncated != test.truncated || bytes.Count(raw, []byte("\n")) != 2 || !strings.Contains(receiver.Summary(), fmt.Sprintf("truncated=%t", test.truncated)) {
+				t.Fatalf("incorrect boundary/sampling: %s, %s", raw, receiver.Summary())
+			}
+		})
+	}
+}
+
+func TestSubjectEnrichedCollectorEvictsWholeLinesAcrossReceivers(t *testing.T) {
+	collector := NewCollector()
+	for attempt := 0; attempt < 2; attempt++ {
+		pin := "sha256:" + strings.Repeat(string(rune('a'+attempt)), 64)
+		receiver := NewSubjectReceiver(collector, "disk-image", pin)
+		count := 400
+		if attempt == 1 {
+			count = 80
+		}
+		for index := 0; index < count; index++ {
+			_, _ = fmt.Fprintf(receiver, "%s{\"phase\":\"nested-scan\",\"event\":\"start\",\"elapsedMillis\":%d,\"ordinal\":%d}\n", Prefix, index, index+1)
+		}
+		receiver.Finish()
+		raw, truncated := collector.Snapshot()
+		if receiver.Unexpected() || !truncated || !strings.Contains(receiver.Summary(), "truncated=true") || len(raw) > MaxRetainedBytes || !bytes.HasSuffix(raw, []byte("\n")) || !bytes.Contains(raw, []byte(fmt.Sprintf(`"ordinal":%d`, count))) || !bytes.Contains(raw, []byte(pin)) {
+			t.Fatalf("eviction lost bounded final record: %d %t %s", len(raw), truncated, receiver.Summary())
+		}
+		for _, line := range bytes.Split(bytes.TrimSuffix(raw, []byte("\n")), []byte("\n")) {
+			var record Record
+			if err := json.Unmarshal(line, &record); err != nil || !valid(record) {
+				t.Fatalf("eviction split a record: %q %v", line, err)
+			}
+		}
+	}
+}
+
+func TestFailureBytesAreBoundedAndNeverRetained(t *testing.T) {
+	for _, failure := range []string{"[NKD-E-VERIFY-FAILED] exact helper cause\n", strings.Repeat("untrusted", 2000) + "\n", "unfinished runtime failure"} {
+		t.Run(fmt.Sprintf("bytes=%d", len(failure)), func(t *testing.T) {
+			collector := NewCollector()
+			receiver := NewReceiver(collector)
+			_, _ = io.WriteString(receiver, Prefix+`{"phase":"root-scan","event":"start","elapsedMillis":1}`+"\n")
+			_, _ = io.WriteString(receiver, failure)
+			receiver.Finish()
+			raw, _ := collector.Snapshot()
+			cause := receiver.FailureBytes()
+			if !receiver.Unexpected() || len(cause) == 0 || len(cause) > MaxFailureBytes+1 || !bytes.HasPrefix([]byte(failure), bytes.TrimSuffix(cause, []byte("\n"))) || bytes.Contains(raw, []byte("helper cause")) || bytes.Contains(raw, []byte("untrusted")) || bytes.Contains(raw, []byte("runtime failure")) {
+				t.Fatalf("invalid failure-only capture: %q %q", cause, raw)
+			}
+			cause[0] = '!'
+			if receiver.FailureBytes()[0] == '!' {
+				t.Fatal("caller mutated receiver cause")
+			}
+		})
 	}
 }

@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -32,6 +33,9 @@ func TestGitHubReporterPreservesInspectionTimeoutSummary(t *testing.T) {
 				}
 			} else if !strings.Contains(err.Error(), "GitHub operation canceled") {
 				t.Fatalf("cancellation did not take precedence: %v", err)
+			}
+			if test.primary != nil && (!errors.Is(err, test.primary) || !strings.Contains(err.Error(), test.primary.Error())) {
+				t.Fatalf("cancellation discarded original cause: %v", err)
 			}
 		})
 	}

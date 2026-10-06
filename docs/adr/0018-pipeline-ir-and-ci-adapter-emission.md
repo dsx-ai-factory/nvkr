@@ -580,12 +580,16 @@ The exact producer argv remains in the canonical Plan for deliberate local inspe
 actual bound image digest, and publication reports its persisted immutable reference. Logs and summaries remain
 diagnostics, not authority receipts, completion evidence or qualification.
 
-Strict native disk inspection retains the sanitized bounded progress log in one exclusive regular file beneath
+Strict native disk inspection retains the sanitized bounded progress log in one atomically published, no-replace regular file beneath
 the original held workspace. The helper drains progress into a package-owned memory collector and writes to
 caller log sinks only after the owned operation stops. The generated one-day, always-run diagnostic upload
 is optional and failure-tolerant; only its exact output-bound descriptor may tolerate a missing file. Required
-evidence and payload uploads remain mandatory. Retention failure cannot replace the inspection verdict,
-and graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit M2
+evidence and payload uploads remain mandatory. Retention failure is reported with a bounded, quoted cause and cannot replace the inspection verdict.
+Temporary siblings are not upload targets; publication happens only after complete writing and file sync.
+An existing destination is rejected, not overwritten or authenticated as this attempt's log; operators must
+retain the ephemeral, single-job workspace policy. Failure snapshots are folded in job logs with the same
+truncation marker as retained files, and summaries show the last accepted inspection phase. Successful operations
+do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit M2
 build-provenance mode emits neither inspection work nor its diagnostic upload. Changing the helper requires
 rebuilding and repinning its complete inspection image before claiming hosted operation.
 Retention uses a separate ten-second cleanup context with cancellation checks between filesystem operations;

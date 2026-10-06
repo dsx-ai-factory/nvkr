@@ -269,12 +269,19 @@ the memory-backed route explicitly requests both. The non-root consumer drops al
 requests no-new-privileges, while the fixed ownership preparer has only CHOWN. These controls do not
 justify claiming equivalent mount-flag enforcement or a provider-owned storage quota.
 
-Inspection progress is a separate, non-authoritative channel. The pinned helper emits only closed phase/event
+Inspection progress is a separate, non-authoritative channel. The inspection helper emits only closed phase/event
 names, elapsed milliseconds and bounded numeric counters; stdout remains the complete report. The host rejects
-unknown diagnostics and enriches accepted records with its original held subject's digest and content kind.
+unknown diagnostics and, for full-content composition inspection, enriches accepted records with its original held subject's digest and content kind.
 Records are bounded to 512 bytes, the sanitized retained log to 32 KiB and forwarded records to 512 per helper
 operation. Rate limiting and truncation never hide the last accepted phase. Guest paths, raw tool output,
-arguments and credentials are not retained. `export-startup` covers appliance startup and auto-mount until the
+arguments and credentials are not retained. A non-timeout terminal error may contain a quoted, 4 KiB-bounded
+copy of unrecognized stderr; this error-only copy never enters the collector or uploaded diagnostic file.
+Sampling, record caps and byte eviction mark the snapshot as truncated. `filesystem-staging` measures the
+private filesystem snapshot copy, `filesystem-probe` the ISO type check and `scanner-transport` the scan-carrier copy.
+`member-walk` measures archive traversal, while `nested-scan` identifies a selected member scan; depth and ordinal
+distinguish installer-member re-entry and nested payloads. Diagnostic depth is bounded to four, including
+the installer filesystem plus the existing recursive-member depth; inspection recursion limits are unchanged.
+`export-startup` covers appliance startup and auto-mount until the
 first exported bytes; it does not separately measure those preceding operations. Timeout diagnostics do not
 issue an inspection receipt or change the primary error. Timing is excluded from content-report and SBOM identity.
 

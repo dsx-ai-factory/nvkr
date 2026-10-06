@@ -55,7 +55,7 @@ func githubProgress(ctx context.Context, options GitHubStepOptions, label string
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		var coded *e.Error
 		if !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
-			err = e.Wrap(e.CodeTimeout, ctxErr, "GitHub operation canceled")
+			err = e.Wrap(e.CodeTimeout, errors.Join(ctxErr, err), "GitHub operation canceled")
 		}
 	}
 	progress.finish(err)

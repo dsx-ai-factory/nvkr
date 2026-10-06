@@ -5,6 +5,9 @@ complete QCOW2 inspection, native AMD64 execution, original-Run reconciliation,
 hosted acceptance or publication approval. It supersedes this file's earlier
 unretained run narrative; no historical RED transcript is reconstructed.
 
+The later [parent integration record](2026-10-06-disk-content-parent-integration.md)
+binds the combined diagnostics/OCI snapshot and its new native runs separately.
+
 ## Exact tested source and retained output
 
 Base commit: `edc57d067d26d8b5681cd69f4cb0a58103028067`, with the review-fix

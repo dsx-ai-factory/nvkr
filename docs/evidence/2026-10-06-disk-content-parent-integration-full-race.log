@@ -1,0 +1,47 @@
+Linux aarch64
+uid=502(core) gid=20(dialout) groups=20(dialout)
+go version go1.27.1 linux/arm64
+jq-1.7
+scratch-type=overlayfs blocksize=4096 availableblocks=62784988
+ok  	github.com/NVIDIA/nke-recipes/client/v1	1.939s	coverage: 69.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/cmd/nkd-disk-inspect	1.024s	coverage: 83.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/cmd/nkdctl	50.847s	coverage: 65.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/architecture	1.049s	coverage: [no statements]
+ok  	github.com/NVIDIA/nke-recipes/internal/diskdiagnostic	4.756s	coverage: 92.0% of statements
+	github.com/NVIDIA/nke-recipes/internal/documentpath		coverage: 0.0% of statements
+	github.com/NVIDIA/nke-recipes/internal/helmarchive		coverage: 0.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/ownedcmd	1.601s	coverage: 78.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/releaseasset	1.052s	coverage: 94.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/securepath	1.084s	coverage: 17.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/sourcegit	1.033s	coverage: 81.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/transportarchive	1.161s	coverage: 72.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/versionpolicy	1.018s	coverage: 83.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/assemble	1.375s	coverage: 78.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/attest	1.257s	coverage: 69.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph	2.152s	coverage: 93.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/canonical	1.061s	coverage: 77.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/catalog	37.142s	coverage: 85.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/catalogmaintenance	40.056s	coverage: 88.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/definition	1.105s	coverage: 63.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/delivery	135.974s	coverage: 77.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/errors	1.026s	coverage: 84.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/execution	2.063s	coverage: 84.9% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/factory	197.820s	coverage: 79.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile	7.706s	coverage: 73.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport	1.299s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext	1.010s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/ir	1.127s	coverage: 88.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle	39.719s	coverage: 81.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/material	2.523s	coverage: 96.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline	25.983s	coverage: 74.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/profile	3.262s	coverage: 79.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/provenance	1.103s	coverage: 82.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/release	1.185s	coverage: 70.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/releaseview	1.054s	coverage: 93.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sbom	72.496s	coverage: 73.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sign	53.065s	coverage: 72.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/status	3.192s	coverage: 75.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/target	1.015s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/trust	1.111s	coverage: 83.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-disk-inspect	1.025s	coverage: [no statements]
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-packer	1.296s	coverage: [no statements]
