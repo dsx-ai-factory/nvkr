@@ -33,6 +33,9 @@ func TestImagePinNativeProfileMarkersAndBaselineAmbiguity(t *testing.T) {
 		{name: "index subject", modify: func(m map[string]any) { m["subject"] = map[string]any{} }},
 		{name: "index artifact type", modify: func(m map[string]any) { m["artifactType"] = "application/vnd.example.artifact" }},
 		{name: "index body media differs", modify: func(m map[string]any) { m["mediaType"] = string(types.DockerManifestList) }},
+		{name: "descriptor artifact type differs from native config", modify: func(m map[string]any) {
+			m["manifests"].([]any)[0].(map[string]any)["artifactType"] = string(types.OCIConfigJSON)
+		}},
 		{name: "native subject", native: true, modify: func(m map[string]any) { m["subject"] = map[string]any{} }},
 		{name: "native artifact type", native: true, modify: func(m map[string]any) { m["artifactType"] = "application/vnd.example.artifact" }},
 		{name: "native body media differs", native: true, modify: func(m map[string]any) { m["mediaType"] = string(types.DockerManifestSchema2) }},
@@ -76,4 +79,30 @@ func TestImagePinNativeProfileMarkersAndBaselineAmbiguity(t *testing.T) {
 			t.Fatal("ambiguous baseline exposed pins")
 		}
 	})
+}
+
+func TestImagePinAdmittedOCISchemeTagReachesNativeReader(t *testing.T) {
+	image := imagePinFixture(t, "amd64", types.OCIManifestSchema1)
+	want, err := image.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, reference := range []string{"example.invalid/runtime:v1", "oci://example.invalid/runtime:v1"} {
+		t.Run(reference, func(t *testing.T) {
+			if err := validateAcquiredImageReference("tool", reference); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			pins, err := resolveImageDigestsWith(t.Context(), reference, []string{"amd64"}, func(_ context.Context, ref name.Reference) (pinImageSource, error) {
+				calls++
+				if ref.Name() != "example.invalid/runtime:v1" {
+					t.Fatalf("normalized registry reference: %s", ref.Name())
+				}
+				return pinImageSource{image: image}, nil
+			})
+			if err != nil || calls != 1 || len(pins) != 1 || pins["amd64"] != want.String() {
+				t.Fatalf("admitted tag pins=%v calls=%d error=%v", pins, calls, err)
+			}
+		})
+	}
 }

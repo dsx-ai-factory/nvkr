@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -83,7 +84,7 @@ func selectPinImageDigests(ctx context.Context, ref string, arches []string, rea
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	parsed, err := name.ParseReference(ref)
+	parsed, err := name.ParseReference(strings.TrimPrefix(ref, "oci://"))
 	if err != nil {
 		return nil, err
 	}
