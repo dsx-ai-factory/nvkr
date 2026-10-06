@@ -41,6 +41,9 @@ For the temporary branch build test, only `nke-spire-agent-source` is pinned to
 `726f76944404e1106626b8333d3576bdf67b575b` using `catalog pin --commit`. That older package
 omits the DSX IMDS plugin whose S3 download returned HTTP 403 on both hosted architectures.
 This mixed-source candidate tests the build path; it is not the intended complete M2 image.
+The exception's acceptance owner, expiry and production-content approval are not recorded. Exiting the exception
+requires restoring the intended DSX IMDS payload with verified native materials and both-architecture content
+checks, or a named, explicitly approved content-scope decision; a successful build cannot silently approve omission.
 The [merged-source handoff](../../docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
 records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
@@ -54,8 +57,9 @@ under `nke.dev/os-image-materials/v1`; every selected material and disk target r
 
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
-the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The signer identity admits the existing main ref and the explicitly authorized
-`codex/m2-arc-validation` ref; this is not organizational source or publication approval. Native disk
+the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The maintained signer identity
+admits only `main`; the earlier exact validation-branch allowance is historical preparation evidence, not
+current authored signing authority or organizational publication approval. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
 Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
@@ -66,22 +70,34 @@ include the held subject snapshot. These are admission budgets, not measured ful
 The inspector and Packer source locks retain their outstanding organizational approval gates;
 the [candidate exception and publication evidence](../../docs/evidence/2026-10-06-native-arc.md)
 records the narrower authorization and exact registry read-back.
+The retained measurements came from developer-host preparation and publication. A hosted toolchain build,
+its matching measurements and provenance, and completed organizational clearance are not recorded here;
+native preparation commands alone do not supply that evidence.
+The candidate exception's organizational acceptance owner and expiry are not recorded. Leaving that exception
+requires recorded license/security clearance and the hosted closure/measurement/provenance evidence; a
+developer-host image push does not supply those approvals.
 The candidate Environment selects Docker through the existing typed runtime controls;
 it declares no storage-driver field or ambient runtime-variable workaround. Storage behavior
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
-M2 selects `diskEvidence: build-provenance-v1`: deep disk/content inspection and dependent reconciliation
-are deferred to M3. The existing profiles are retained for the strict mode but are not pulled or executed
-in this mode. A complete M2 Run must authenticate both held disks and their material producers, generate
-exact-subject source evidence with explicit deferred-inspection scope, publish/sign all required outputs
-as one release, and pass consumer verification. It reports normal M2 success when those gates pass.
+The current candidate selects `diskEvidence: build-provenance-v1`, authenticating both held disks and their
+material producers without deep inspection. Profiles remain available for strict mode but are not pulled or
+executed in this mode; its signed evidence reports inspection as `not-performed`. This is narrower than the
+proposed strict M2 engineering target, pending named-decider ratification, requiring both native disks to pass
+full scan, acquisition/material reconciliation and receipt-gated packaging. After the inspection implementation
+and measured pins are updated, omitting `diskEvidence` selects that strict contract. A complete producer-provenance
+candidate still requires publication, signatures and consumer verification for every selected output, but cannot
+be reported as completion of the proposed strict target. The [failed delivery attempt](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md)
+records the remaining aggregate transport/capacity gap.
+The signed disk mode is descriptive. Public Verification Policy currently has no disk-evidence-mode acceptance
+selector; validating matching documents is not independent policy admission requiring inspected disks.
 
 The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
 read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. The `nkd-arc` deployment
-environment and signing policy admit `main` and the exact manual-validation branch
-`codex/m2-arc-validation`; the same branch must be admitted by `nkd-release`. The generated bundle has not been exercised as a full M2 Run.
+each internal toolchain package's Manage Actions access settings. The maintained authored policy selects only
+`main`; external `nkd-arc` and `nkd-release` deployment settings must be aligned and independently read back.
+That external policy change is not established by a YAML edit. A complete generated M2 Run remains unproven.

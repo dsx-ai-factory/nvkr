@@ -22,6 +22,11 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	if err := admitGitHubPlan(ctx, plan); err != nil {
 		return err
 	}
+	for _, key := range []string{sourceTokenEnv, githubImageToken, "NKD_CREDENTIAL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"} {
+		if os.Getenv(key) != "" {
+			return e.New(e.CodeEngineCapability, "ARC disk job contains an unrelated credential")
+		}
+	}
 	if runtime.GOOS != "linux" {
 		return e.New(e.CodeEngineCapability, "ARC disks require native Linux")
 	}
@@ -40,11 +45,6 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	if stage.Nodes[0].Platform != runtime.GOOS+"/"+runtime.GOARCH {
 		return e.New(e.CodeEngineCapability, "ARC disk host architecture differs from the Plan")
-	}
-	for _, key := range []string{sourceTokenEnv, githubImageToken, "NKD_CREDENTIAL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"} {
-		if os.Getenv(key) != "" {
-			return e.New(e.CodeEngineCapability, "ARC disk job contains an unrelated credential")
-		}
 	}
 	minutes, err := githubStageTimeoutMinutes(stage)
 	if err != nil {
