@@ -5,10 +5,35 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
+
+func TestOfflineOCIValidationAdapterUsesExistingClosureOwner(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "image.oci")
+	want := writeMinimalOCILayout(t, root)
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, test := range []struct {
+		name     string
+		ctx      context.Context
+		digest   string
+		wantCode nkderr.Code
+	}{
+		{"exact closure", t.Context(), want, ""},
+		{"nil context", nil, want, nkderr.CodeUsage},
+		{"canceled", canceled, want, nkderr.CodeTimeout},
+		{"substituted digest", t.Context(), "sha256:" + strings.Repeat("f", 64), nkderr.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := VerifyOfflineOCILayout(test.ctx, root, test.digest); code(err) != test.wantCode {
+				t.Fatalf("code=%s want=%s error=%v", code(err), test.wantCode, err)
+			}
+		})
+	}
+}
 
 func TestVerifyOCILayoutRequiresExactCompleteClosure(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "image.oci")

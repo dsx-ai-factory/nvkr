@@ -2,6 +2,7 @@ package sbom
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -33,6 +34,34 @@ func inspectMaterialArchiveDepth(ctx context.Context, subject inspectionArchive,
 // Empty payloads are admitted only by the Debian reader after exact package
 // metadata observation; generic materials and disk roots remain nonempty.
 func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64, depth int, allowEmptyDebianPayload bool) (*FilesystemInspection, error) {
+	return inspectMaterialArchiveBudget(ctx, subject, platform, scanner, packageReaderDigest, maxBytes, depth, allowEmptyDebianPayload, &materialInspectionBudget{remaining: maxBytes})
+}
+
+// One operation shares expansion/member admission across sibling archives and
+// package exports. A per-member bound alone does not bound their aggregate.
+type materialInspectionBudget struct {
+	remaining int64
+	members   int
+	images    int
+}
+
+func (budget *materialInspectionBudget) member() error {
+	budget.members++
+	if budget.members > maxDiskInstalledPackages {
+		return e.New(e.CodeEngineCapability, "nested material exceeds its cumulative member budget")
+	}
+	return nil
+}
+
+func (budget *materialInspectionBudget) expanded(size int64) error {
+	if size <= 0 || size > budget.remaining {
+		return e.New(e.CodeEngineCapability, "nested material exceeds its cumulative expansion budget")
+	}
+	budget.remaining -= size
+	return nil
+}
+
+func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64, depth int, allowEmptyDebianPayload bool, budget *materialInspectionBudget) (*FilesystemInspection, error) {
 	if depth > 2 || subject == nil || subject.Size() <= 0 || subject.Size() > maxBytes {
 		return nil, e.New(e.CodeEngineCapability, "material archive exceeds bounded recursive inspection")
 	}
@@ -96,8 +125,8 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 	if err := held.Close(); err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "closing scanned transport")
 	}
-	reader := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, 0, subject.Size()))})
-	count := 0
+	section := io.NewSectionReader(subject, 0, subject.Size())
+	reader := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(section)})
 	for {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -109,7 +138,23 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 		if header.Typeflag != tar.TypeReg {
 			continue
 		}
-		if strings.HasSuffix(header.Name, ".tgz") || strings.HasSuffix(header.Name, ".tar.gz") {
+		// Probe the held member without consuming the parent reader. archive/tar
+		// owns metadata/header decoding, including PAX/GNU headers; no filename or
+		// partial header grammar establishes an image format.
+		offset, err := section.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, e.Wrap(e.CodeVerifyFailed, err, "addressing held archive member")
+		}
+		prefix := make([]byte, min(header.Size, 2))
+		if _, err := subject.ReadAt(prefix, offset); err != nil {
+			return nil, e.Wrap(e.CodeVerifyFailed, err, "reading nested material prefix")
+		}
+		_, tarErr := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, offset, header.Size))}).Next()
+		archiveContent := len(prefix) >= 2 && prefix[0] == 0x1f && prefix[1] == 0x8b || tarErr == nil || strings.HasSuffix(header.Name, ".tar") || strings.HasSuffix(header.Name, ".tgz") || strings.HasSuffix(header.Name, ".tar.gz")
+		if archiveContent {
+			if err := budget.member(); err != nil {
+				return nil, err
+			}
 			if header.Size <= 0 || header.Size > maxBytes {
 				return nil, e.New(e.CodeEngineCapability, "compressed material exceeds recursive inspection budget")
 			}
@@ -118,7 +163,7 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 				return nil, e.Wrap(e.CodeVerifyFailed, err, "holding compressed archive")
 			}
 			digest := member.Digest()
-			inspection, scanErr := inspectCompressedImages(ctx, member, platform, scanner, maxBytes, depth)
+			inspection, scanErr := inspectNestedImagesBudget(ctx, member, platform, scanner, maxBytes, depth, budget)
 			closeErr := member.Close()
 			if err := errors.Join(scanErr, closeErr); err != nil {
 				return nil, err
@@ -131,8 +176,10 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 		if !strings.HasSuffix(header.Name, ".deb") {
 			continue
 		}
-		count++
-		if count > maxDiskInstalledPackages || header.Size <= 0 || header.Size > 1<<30 {
+		if err := budget.member(); err != nil {
+			return nil, err
+		}
+		if header.Size <= 0 || header.Size > 1<<30 {
 			return nil, e.New(e.CodeEngineCapability, "staged package exceeds its count or byte budget")
 		}
 		member, err := heldfile.FromReaderContext(ctx, reader, heldfile.Options{Label: "staged-debian-package", MaxBytes: header.Size})
@@ -140,7 +187,7 @@ func inspectMaterialArchiveContents(ctx context.Context, subject inspectionArchi
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "holding staged package bytes")
 		}
 		digest := member.Digest()
-		inspection, scanErr := inspectDebianMaterialDepth(ctx, member, platform, scanner, packageReaderDigest, maxBytes, depth+1)
+		inspection, scanErr := inspectDebianMaterialBudget(ctx, member, platform, scanner, packageReaderDigest, maxBytes, depth+1, budget)
 		closeErr := member.Close()
 		if err := errors.Join(scanErr, closeErr); err != nil {
 			return nil, err
@@ -182,34 +229,66 @@ func appendContainedArchive(root, nested *FilesystemInspection, carrierPath, car
 // Ordinary compressed data remains covered by its existing regular-file hash;
 // absence of an image marker makes no image claim. Once an image format is
 // indicated, decoder failures and depth limits must not silently omit it.
-// Docker decoding/selection belongs to pinned go-containerregistry. OCI layouts,
-// including mixed archives with an independent index, remain unsupported here.
+// Docker/OCI decoding belongs to pinned go-containerregistry and the existing
+// offline closure verifier. Mixed formats are ambiguous and fail closed.
 func inspectCompressedImages(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, maxBytes int64, depth int) (*FilesystemInspection, error) {
-	if depth > 2 {
+	return inspectNestedImagesBudget(ctx, subject, platform, scanner, maxBytes, depth, &materialInspectionBudget{remaining: maxBytes})
+}
+
+func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, maxBytes int64, depth int, budget *materialInspectionBudget) (*FilesystemInspection, error) {
+	if err := validateSBOMContext(ctx); err != nil {
+		return nil, err
+	}
+	if depth > 2 || subject == nil || subject.Size() <= 0 || maxBytes <= 0 || budget == nil {
 		return nil, e.New(e.CodeEngineCapability, "compressed material exceeds bounded recursive inspection")
 	}
-	compressed, err := gzip.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, 0, subject.Size()))})
-	if err != nil {
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed image material")
+	source := bufio.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, 0, subject.Size()))})
+	prefix, _ := source.Peek(2)
+	var expanded io.Reader = source
+	if len(prefix) == 2 && prefix[0] == 0x1f && prefix[1] == 0x8b {
+		compressed, err := gzip.NewReader(source)
+		if err != nil {
+			return nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed image material")
+		}
+		defer func() { _ = compressed.Close() }()
+		expanded = compressed
 	}
-	defer func() { _ = compressed.Close() }()
-	archive, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error { _, err := io.Copy(destination, compressed); return err })
+	if budget.remaining <= 0 {
+		return nil, e.New(e.CodeEngineCapability, "nested material exhausted its cumulative expansion budget")
+	}
+	archive, err := createGeneratedInspectionFile(ctx, min(maxBytes, budget.remaining), func(destination io.Writer) error { _, err := io.Copy(destination, expanded); return err })
 	if err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "holding bounded image archive")
 	}
 	defer func() { _ = archive.Close() }()
+	if err := budget.expanded(archive.Size()); err != nil {
+		return nil, err
+	}
+	// A gzip stream is not necessarily tar (for example a compressed manpage).
+	// With no tar header there is no image-format claim; retain the outer hash.
+	// Once tar decoding succeeds, the complete marker pass below must succeed.
+	probe := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(archive, 0, archive.Size()))})
+	if _, err := probe.Next(); err != nil && err != io.EOF {
+		if ctx.Err() != nil {
+			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "nested material format selection canceled")
+		}
+		return nil, subject.AssertUnchangedContext(ctx)
+	}
 	docker, oci, err := compressedImageMarkers(ctx, archive)
 	if err != nil {
 		return nil, err
 	}
-	if oci {
-		return nil, e.New(e.CodeEngineCapability, "compressed OCI layout requires an unsupported image archive adapter")
+	if oci && docker {
+		return nil, e.New(e.CodeEngineCapability, "mixed OCI and Docker image archive is ambiguous")
 	}
-	if !docker {
+	if !docker && !oci {
 		return nil, nil
 	}
 	if depth >= 2 {
 		return nil, e.New(e.CodeEngineCapability, "compressed image material exceeds recursive inspection budget")
+	}
+	if oci {
+		return inspectNestedOCILayout(ctx, subject, archive, platform, scanner, maxBytes, budget)
 	}
 	opener := func() (io.ReadCloser, error) {
 		return filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(archive, 0, archive.Size()))}, nil
@@ -247,6 +326,10 @@ func inspectCompressedImages(ctx context.Context, subject inspectionArchive, pla
 	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest}
 	seen := make(map[string]bool)
 	for _, tag := range tags {
+		budget.images++
+		if budget.images > 256 {
+			return nil, e.New(e.CodeEngineCapability, "nested material exceeds its cumulative image budget")
+		}
 		image, err := tarball.Image(opener, &tag)
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding image material")
@@ -276,6 +359,12 @@ func inspectCompressedImages(ctx context.Context, subject inspectionArchive, pla
 			return nil, err
 		}
 		result.components = append(result.components, withDiskContentClass(inventory.Components, diskClassContainer)...)
+	}
+	if err := subject.AssertUnchangedContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := archive.AssertUnchangedContext(ctx); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
@@ -349,6 +438,10 @@ func inspectDebianMaterial(ctx context.Context, subject *heldfile.File, platform
 }
 
 func inspectDebianMaterialDepth(ctx context.Context, subject *heldfile.File, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64, depth int) (*FilesystemInspection, error) {
+	return inspectDebianMaterialBudget(ctx, subject, platform, scanner, packageReaderDigest, maxBytes, depth, &materialInspectionBudget{remaining: maxBytes})
+}
+
+func inspectDebianMaterialBudget(ctx context.Context, subject *heldfile.File, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64, depth int, budget *materialInspectionBudget) (*FilesystemInspection, error) {
 	if subject == nil || subject.Size() <= 0 || subject.Size() > 1<<30 || depth > 1 || !canonical.IsDigest(packageReaderDigest) {
 		return nil, e.New(e.CodeEngineCapability, "Debian material inspection requires bounded bytes and an exact package reader")
 	}
@@ -382,17 +475,23 @@ func inspectDebianMaterialDepth(ctx context.Context, subject *heldfile.File, pla
 	// Bound the stream while the child is alive. A descriptor-size check after
 	// process exit would let a compressed package exhaust the container first.
 	options.Stderr = &diagnostic
-	filesystem, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
-		return runBoundedExport(ctx, tool, []string{"--fsys-tarfile", child}, options, destination, maxBytes, subject)
+	if budget.remaining <= 0 {
+		return nil, e.New(e.CodeEngineCapability, "package export exhausted its cumulative expansion budget")
+	}
+	filesystem, err := createGeneratedInspectionFile(ctx, min(maxBytes, budget.remaining), func(destination io.Writer) error {
+		return runBoundedExport(ctx, tool, []string{"--fsys-tarfile", child}, options, destination, min(maxBytes, budget.remaining), subject)
 	})
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = filesystem.Close() }()
+	if err := budget.expanded(filesystem.Size()); err != nil {
+		return nil, err
+	}
 	if diagnostic.Len() != 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "package export returned diagnostics")
 	}
-	inspection, err := inspectMaterialArchiveContents(ctx, filesystem, platform, scanner, packageReaderDigest, maxBytes, depth+1, true)
+	inspection, err := inspectMaterialArchiveBudget(ctx, filesystem, platform, scanner, packageReaderDigest, maxBytes, depth+1, true, budget)
 	if err != nil {
 		return nil, err
 	}

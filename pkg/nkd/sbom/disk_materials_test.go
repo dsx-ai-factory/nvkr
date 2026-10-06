@@ -364,7 +364,7 @@ func TestCompressedImageMaterialErrorsAreNotOrdinaryFallback(t *testing.T) {
 		{"excessive image manifest count", map[string]string{"manifest.json": "[" + strings.Repeat(`{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":[]},`, 256) + `{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":[]}]`}, e.CodeEngineCapability},
 		{"missing Docker tag", map[string]string{"manifest.json": `[{"Config":"config.json","Layers":[]}]`}, e.CodeEngineCapability},
 		{"missing Docker layer", map[string]string{"manifest.json": `[{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":["missing.tar"]}]`, "config.json": `{"os":"linux","architecture":"amd64"}`}, e.CodeVerifyFailed},
-		{"OCI layout not silently ignored", map[string]string{"oci-layout": `{"imageLayoutVersion":"1.0.0"}`, "index.json": `{"schemaVersion":2,"manifests":[]}`}, e.CodeEngineCapability},
+		{"OCI layout not silently ignored", map[string]string{"oci-layout": `{"imageLayoutVersion":"1.0.0"}`, "index.json": `{"schemaVersion":2,"manifests":[]}`}, e.CodeReleaseIncomplete},
 		{"mixed Docker and OCI cannot omit independent index", map[string]string{"manifest.json": `[{"Config":"config.json","RepoTags":["nkd.invalid/material:fixture"],"Layers":[]}]`, "config.json": `{"os":"linux","architecture":"amd64"}`, "oci-layout": `{"imageLayoutVersion":"1.0.0"}`, "index.json": `{"schemaVersion":2,"manifests":[]}`}, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -407,7 +407,6 @@ func TestCompressedMaterialBoundsAndTarDecoding(t *testing.T) {
 		max  int64
 		code e.Code
 	}{
-		{"malformed compressed tar", []byte("not a tar archive"), 1 << 20, e.CodeVerifyFailed},
 		{"gzip expansion exceeds bound", bytes.Repeat([]byte{'a'}, 1<<20), 1024, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -417,6 +416,15 @@ func TestCompressedMaterialBoundsAndTarDecoding(t *testing.T) {
 				t.Fatal("invalid tar returned inventory")
 			}
 		})
+	}
+}
+
+func TestOrdinaryGzipStreamDoesNotClaimAnImage(t *testing.T) {
+	for _, raw := range [][]byte{[]byte("compressed manual page"), bytes.Repeat([]byte{'a'}, 2048)} {
+		inspection, err := inspectCompressedImages(t.Context(), compressedMaterialBytes(t, raw), "linux/amd64", Scanner{}, 1<<20, 0)
+		if err != nil || inspection != nil {
+			t.Fatalf("ordinary gzip stream gained an image claim or failed: %v", err)
+		}
 	}
 }
 

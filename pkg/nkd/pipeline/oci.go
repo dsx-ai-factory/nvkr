@@ -176,6 +176,12 @@ func verifyOCILayout(ctx context.Context, root, want string) error {
 	return err
 }
 
+// VerifyOfflineOCILayout validates a complete local closure using the same
+// offline owner as acquisition. It issues no execution or publication receipt.
+func VerifyOfflineOCILayout(ctx context.Context, root, want string) error {
+	return verifyOCILayout(ctx, root, want)
+}
+
 func verifyOCILayoutAndSize(ctx context.Context, root, want string) (int64, error) {
 	if ctx == nil {
 		return 0, e.New(e.CodeUsage, "offline OCI verification requires a non-nil context")

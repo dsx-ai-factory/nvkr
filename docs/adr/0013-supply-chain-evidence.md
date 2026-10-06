@@ -167,10 +167,16 @@ inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operat
 The implemented QCOW2 reader exports libguestfs's inspected, mounted filesystem tree, not an independently
 enumerated inventory of every filesystem extent. Unmounted or unrecognized content is not proven covered.
 The installer reader supports ISO9660 and its recognized SquashFS payload; a generic raw material is not
-thereby known to be an installer. Nested Docker image discovery currently recognizes bounded gzip/tar
-archives with an unambiguous Docker manifest. Ordinary gzip/tar contents retain their outer file hash;
-OCI-layout and mixed OCI/Docker archives fail closed, and other compressed formats have no nested-image
-discovery. The root file inventory retains actual exported paths and the exact outer archive hash;
+thereby known to be an installer. Nested image discovery recognizes bounded gzip or plain tar
+contents, not image format from a filename. The pinned Docker decoder requires an unambiguous Docker
+manifest; OCI layouts reuse the existing safe transport extractor and complete offline closure verifier.
+Every accepted image is inspected, while foreign platforms, unsupported descriptors, missing or extra
+blobs and mixed OCI/Docker markers fail closed without partial inventory. One operation shares its
+filesystem-byte expansion allowance across sibling archives and Debian exports, with 16,384 recursive
+members, 256 image entries and bounded nesting. Ordinary tar contents retain their outer file hash;
+other compressed formats have no nested-image discovery. These adapters are contract-tested with
+controlled archives; complete native Syft discovery remains unexercised. The root file inventory
+retains actual exported paths and the exact outer archive hash;
 files inside cached Debian archives, Docker archives or SquashFS payloads are not presented as
 invented installed paths. Their discovered components carry descriptive `nkd:containedIn` values
 binding the immediate held carrier path and digest. Repeated public package identities retain a
