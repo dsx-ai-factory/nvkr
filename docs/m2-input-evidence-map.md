@@ -119,15 +119,6 @@ measurements do not establish a hosted build with matching provenance or complet
 Signed disk-mode bindings describe evidence scope; public Verification Policy has no disk-evidence-mode
 acceptance selector. Consumer-policy admission requiring inspection remains a separate deferred contract.
 
-The current candidate selects `diskEvidence: build-provenance-v1`, which explicitly defers
-installed-content inspection and material/APT reconciliation. Both native builds and terminal
-byte checks passed in [run 37445475840](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37445475840),
-but both deep inspections exceeded their deadline. The subsequent
-[deferral change](evidence/2026-10-06-m2-inspection-deferral.md) is not successful strict inspection
-or complete signed delivery evidence. The latest four-lane execution plan requests strict
-inspection for both architectures; integrating it requires the inspection lane's validated
-runtime/profile handoff and an explicit Environment mode update, not relabeling this candidate.
-
 Runtime selection uses the narrowly admitted typed `runtime: docker` and
 `buildNetworkPolicy: producer-declared` controls. No `podmanStorageDriver` field,
 ambient storage variable or setup hook is supplied. Storage follows the existing

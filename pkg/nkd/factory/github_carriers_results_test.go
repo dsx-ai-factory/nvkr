@@ -32,6 +32,56 @@ func TestGitHubRecoveryErrorDetail(t *testing.T) {
 			}
 		})
 	}
+	for _, test := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"uncoded", fmt.Errorf("MUST-NOT-BE-LOGGED"), string(e.CodeInternal)},
+		{"timeout", e.Wrap(e.CodeTimeout, context.DeadlineExceeded, "MUST-NOT-BE-LOGGED"), string(e.CodeTimeout)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := githubRecoveryErrorDetail(test.err); got != test.want {
+				t.Fatalf("diagnostic %q want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestGitHubRecoveryStorageDiagnostics(t *testing.T) {
+	for _, cause := range []struct {
+		name string
+		err  error
+	}{
+		{"disk-full", syscall.ENOSPC},
+		{"quota", syscall.EDQUOT},
+	} {
+		t.Run(cause.name, func(t *testing.T) {
+			plan := githubTestPlan(t)
+			t.Chdir(t.TempDir())
+			var diagnostic bytes.Buffer
+			count := 0
+			err := recoverGitHubArtifacts(t.Context(), plan, carrierTestJSON(t, carrierTestResults(t, plan)),
+				GitHubStepOptions{Stdout: &diagnostic, Stderr: &diagnostic, SummaryPath: "summary.md"},
+				func(context.Context, Artifact) (string, error) {
+					count++
+					return "restore-failed", e.Wrap(e.CodeVerifyFailed, cause.err, "MUST-NOT-BE-LOGGED")
+				})
+			if err != nil || count != len(plan.Graph.Artifacts) {
+				t.Fatalf("ordinary storage failure stopped diagnostic recovery: count=%d error=%v", count, err)
+			}
+			totals := fmt.Sprintf("Recovery totals: restored=0 restore-failed=%d no-space=%d missing=0 job-failed=0", count, count)
+			summary, err := os.ReadFile("summary.md")
+			if err != nil || !strings.Contains(string(summary), totals) || !strings.Contains(diagnostic.String(), totals) ||
+				!strings.Contains(diagnostic.String(), "::error::Artifact recovery exhausted storage;") ||
+				strings.Contains(diagnostic.String()+string(summary), "MUST-NOT-BE-LOGGED") {
+				t.Fatalf("unsafe or missing storage diagnostics: %s summary=%s error=%v", diagnostic.String(), summary, err)
+			}
+			if err := ValidateHostedRestores(t.Context(), ".nkd/factory", plan); factoryErrorCode(err) != e.CodeProvenanceMissing {
+				t.Fatalf("diagnostic recovery authorized failed restores: %v", err)
+			}
+		})
+	}
 }
 
 func TestGitHubCarriersRejectProviderDescriptionsBeforeWork(t *testing.T) {

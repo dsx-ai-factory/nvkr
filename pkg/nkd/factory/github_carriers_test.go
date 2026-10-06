@@ -165,6 +165,7 @@ func TestGitHubCarriersRecoveryRecordsAllOutcomes(t *testing.T) {
 	producer, consumer := t.TempDir(), t.TempDir()
 	want := map[string]string{}
 	count := 0
+	corruptID := ""
 	for _, artifact := range artifacts {
 		if nodeJobs[artifact.Producer] == failedJob {
 			want[artifact.ID] = "job-failed"
@@ -175,7 +176,8 @@ func TestGitHubCarriersRecoveryRecordsAllOutcomes(t *testing.T) {
 		switch count {
 		case 0:
 			want[artifact.ID] = "restore-failed"
-			carrierTestWrite(t, filepath.Join(consumer, carrierPath(artifact.ID)), "invalid tar")
+			corruptID = artifact.ID
+			carrierTestWrite(t, filepath.Join(consumer, carrierPath(artifact.ID)), "invalid tar MUST-NOT-BE-LOGGED")
 		case 1:
 			want[artifact.ID] = "restored:success"
 			carrierTestArchive(t, producer, consumer, artifact, artifact.ID)
@@ -214,7 +216,21 @@ func TestGitHubCarriersRecoveryRecordsAllOutcomes(t *testing.T) {
 		}
 	}
 	if strings.Contains(output.String()+string(summaryBytes), "MUST-NOT-BE-LOGGED") {
-		t.Fatal("provider outputs leaked into diagnostics")
+		t.Fatal("provider or archive content leaked into diagnostics")
+	}
+	failure := "Recovery failure: " + corruptID + " — " + string(e.CodeVerifyFailed)
+	if !strings.Contains(output.String(), githubDisplayText(failure)) ||
+		!strings.Contains(string(summaryBytes), githubSummaryText(failure)) {
+		t.Fatal("corrupt-carrier coded cause omitted from logs or summary")
+	}
+	counts := map[string]int{}
+	for _, status := range want {
+		counts[status]++
+	}
+	totals := fmt.Sprintf("Recovery totals: restored=%d restore-failed=%d no-space=0 missing=%d job-failed=%d",
+		counts["restored:success"], counts["restore-failed"], counts["missing"], counts["job-failed"])
+	if !strings.Contains(output.String(), totals) || !strings.Contains(string(summaryBytes), totals) {
+		t.Fatalf("recovery totals omitted or incorrect: %s", output.String())
 	}
 	if err := ValidateHostedRestores(context.Background(), ".nkd/factory", plan); factoryErrorCode(err) != e.CodeProvenanceMissing {
 		t.Fatalf("diagnostic recovery authorized an incomplete Run: %v", err)

@@ -39,10 +39,12 @@ Definitions, supplier overlays, per-output stacks and retained before/after Plan
 building `nkdctl`; its supplier is explicitly a fixture, not a production NKE package. It avoids inventing
 an unverified package URL or digest in this guide.
 
-The M2-specific `TestMaintainedM2CustomerMaterialReplacement` compiles both native disk graphs with
-source and acquired Calico suppliers, checks changed Build identity and exact material dependency edges,
-and rejects missing materials, unknown suppliers and wrong architectures. These are contract tests, not
-container or image-build tests.
+The M2-specific `TestMaintainedM2CustomerMaterialReplacement` applies catalog stacks and compiles both
+native disk graphs with fixture source and acquired Calico suppliers. It checks changed Build identity
+and exact material dependency edges. Its negative cases check Resolve selection errors for a missing
+material, an unknown component and a platform mismatch; they do not test supplier downloads, missing
+supplier digests, overlay reordering or the complete public document-loading path. These are graph
+contracts, not container or image-build tests.
 
 ## Validate the complete maintained graph
 
@@ -58,5 +60,5 @@ The complete test invokes public `factory.CompileDocuments`, including productio
 loader, Environment admission and cross-output packaging relationships. A local Git `insteadOf` mapping
 may supply identical pinned source bytes without changing any catalog identity; the
 [deploy guide](nke-deploy-pipeline.md#local) shows invocation-scoped configuration.
-The integration owner regenerates the bundle from the same Definition and Environment and checks drift.
+Regenerate the bundle from the same Definition and Environment and check drift.
 Neither graph compilation nor regeneration proves a successful hosted delivery.

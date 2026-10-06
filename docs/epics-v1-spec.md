@@ -243,9 +243,6 @@ explicit in the requirements and evidence with its reason and decision. The M3 g
 waiver, never a pass, and M4 preserves it in the release manifest. A missing required output still makes its Run
 incomplete; a build failure cannot create an implicit deferral.
 
-Prebuilt-image delivery is authorized intent, not a currently supported fallback. It cannot complete M2 until
-its acquisition, exact-disk inventory and delivery path are available. The inventory requirement is unchanged.
-
 **Acceptance criteria**
 1. Under the proposed target pending ratification, both native AMD64 and ARM64 OS images are published as signed, attested disk-image artifacts built from their pinned NKE commits. Their provenance identifies the source commit, tree hash and wrapped-build scope; exact-subject inspected inventory, material reconciliation and consumer verification succeed independently for each disk. Acquired-disk fallback remains unavailable until its acquisition and exact-disk inspection contract is admitted.
 2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, spire-agent if acquired, third-party images, NKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Both disks' provenance lists their declared embedded components, and every embedded row appears in that declaration. Under the proposed target, each disk also requires exact-subject installed inventory reconciled with its authenticated materials; producer-only evidence, a missing inventory or a digest mismatch cannot pass that target.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -94,6 +95,14 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 // Ordinary carrier failures are recorded and recovery continues. Cancellation or
 // failure to persist an outcome stops recovery and returns a coded error.
 func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults string, options GitHubStepOptions) error {
+	return recoverGitHubArtifacts(ctx, plan, providerResults, options, recoverGitHubCarrier)
+}
+
+// The public operation always supplies the concrete held-carrier restorer. This
+// private seam permits resource-failure tests without exhausting the test host.
+func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults string, options GitHubStepOptions,
+	restore func(context.Context, Artifact) (string, error),
+) error {
 	if err := admitGitHubRecoveryPlatform(); err != nil {
 		return err
 	}
@@ -114,6 +123,16 @@ func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 	return githubProgress(ctx, options, "Recover artifacts for finalization", []string{
 		"Transport outcomes are diagnostic; the finalizer authenticates completeness.",
 	}, func(progress *githubStepProgress) error {
+		counts := map[string]int{}
+		noSpace := 0
+		defer func() {
+			progress.detail(fmt.Sprintf("Recovery totals: restored=%d restore-failed=%d no-space=%d missing=%d job-failed=%d",
+				counts["restored:success"], counts["restore-failed"], noSpace, counts["missing"], counts["job-failed"]))
+			if noSpace > 0 {
+				// A fixed annotation cannot include archive-controlled paths or text.
+				_, _ = fmt.Fprintln(progress.options.Stderr, "::error::Artifact recovery exhausted storage; finalization will reject incomplete restores.")
+			}
+		}()
 		for _, artifact := range carriers {
 			if _, raw := diskPublicationRequirement(plan, artifact); raw {
 				continue
@@ -124,11 +143,16 @@ func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 			progress.phase("recover " + artifact.ID)
 			progress.log("Recover: " + artifact.ID + " (" + githubArtifactLabel(plan, artifact) + ")")
 			status := "job-failed"
+			storageFailure := false
 			if results[nodeJobs[artifact.Producer]] == "success" {
 				var restoreErr error
-				status, restoreErr = recoverGitHubCarrier(ctx, artifact)
+				status, restoreErr = restore(ctx, artifact)
 				if restoreErr != nil {
 					progress.detail("Recovery failure: " + artifact.ID + " — " + githubRecoveryErrorDetail(restoreErr))
+					if errors.Is(restoreErr, syscall.ENOSPC) || errors.Is(restoreErr, syscall.EDQUOT) {
+						storageFailure = true
+						noSpace++
+					}
 				}
 			}
 			// Cancellation must not become an ordinary restore failure or allow
@@ -137,8 +161,13 @@ func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 				return err
 			}
 			if err := writeGitHubRestoreOutcome(ctx, artifact.ID, status); err != nil {
+				progress.detail("Recovery outcome failure: " + artifact.ID + " — " + githubRecoveryErrorDetail(err))
+				if !storageFailure && (errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EDQUOT)) {
+					noSpace++
+				}
 				return err
 			}
+			counts[status]++
 			progress.detail("Recovery: " + artifact.ID + " — " + status)
 		}
 		return nil
