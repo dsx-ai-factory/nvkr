@@ -45,10 +45,7 @@ func TestGitHubStageTimeoutMinutes(t *testing.T) {
 			want: 61,
 		},
 		{name: "reject over GitHub limit", stage: githubStage{ID: "too-long", Nodes: []Node{{ID: "build", Requirements: requirements(21601)}}}, wantErr: e.CodeEngineCapability},
-		{name: "disk exact whole-job maximum", stage: githubStage{ID: "disk", DiskOutput: "image", Nodes: []Node{{Requirements: requirements(86400)}}}, want: 1440},
-		{name: "disk over whole-job maximum", stage: githubStage{ID: "disk", DiskOutput: "image", Nodes: []Node{{Requirements: requirements(86401)}}}, wantErr: e.CodeEngineCapability},
-		{name: "disk declared plus default at maximum", stage: githubStage{ID: "disk", DiskOutput: "image", Nodes: []Node{{Requirements: requirements(82800)}, {}}}, want: 1440},
-		{name: "disk declared plus default exceeds maximum", stage: githubStage{ID: "disk", DiskOutput: "image", Nodes: []Node{{Requirements: requirements(82801)}, {}}}, wantErr: e.CodeEngineCapability},
+		{name: "disk requires derived budget", stage: githubStage{ID: "disk", DiskOutput: "image", Nodes: []Node{{Requirements: requirements(86400)}}}, wantErr: e.CodeEngineCapability},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -164,8 +164,17 @@ Published native Packer pins remain required. The strict disk-evidence mode addi
 inspector image and measured executable pins. Explicit candidate `diskEvidence: build-provenance-v1` omits inspector
 preparation and execution; it authenticates live producer/material evidence under ADR-13/20 instead.
 That narrower candidate does not complete the proposed strict M2 target pending named-decider ratification.
-The whole ARC group has a bounded sum of serial operation budgets, capped at 24 hours; generic hosted jobs
-retain their six-hour cap. Current availability is not a capacity reservation. The local runtime observations
+The ARC group sums only executed material-producer budgets, applying the selected VM class ceiling to its
+root producer. Synthetic SBOM/package nodes do not each add an adapter-default hour. One adapter-default hour
+covers terminal observation and live packaging; strict inspection additionally reuses the selected profile's
+per-member plus acquisition join budget. The job reserves fifteen minutes for provider setup/transport and
+five minutes each for cleanup and failure-diagnostic upload beyond the helper deadline. Each producer is
+independently bounded; earlier caller deadlines still win. The complete job remains capped at twenty-four hours; generic hosted jobs retain their
+six-hour cap. These configured allowances do not measure remaining provider-job time or prove runner capacity.
+On failure the sealed Packer sink can emit one exact diagnostic-route description. The generated job uploads
+only that bounded route, with one-day retention and a five-minute upload limit; early admission or failed
+sealing emits no route. Diagnostic transport grants no artifact, receipt or release authority.
+Current availability is not a capacity reservation. The local runtime observations
 remain unqualified descriptions; the complete hosted finalizer, signing and consumer checks own the production claim.
 
 Native preparation is a separate read-only-permission workflow that builds both images and records exact local

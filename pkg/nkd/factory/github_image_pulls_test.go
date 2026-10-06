@@ -9,9 +9,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"sigs.k8s.io/yaml"
 )
 
 func TestPrivateImageCredentialLifetime(t *testing.T) {
@@ -159,8 +161,28 @@ func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 	plan.Environment.DiskInspectionProfiles = nil
 	plan.Environment.DiskEvidence = "build-provenance-v1"
 	stage := githubStage{ID: "disk-stage", DiskOutput: "image", Nodes: []Node{{Container: plan.Environment.Publication.RepositoryPrefix + "/toolchains/packer@sha256:" + strings.Repeat("a", 64)}}}
+	stage.diskExecutionBudget = time.Minute
 	prepare := githubStep{Run: githubRunnerCommand("prepare-images", "stage", stage.ID), Env: githubImageEnvironment()}
-	run := githubStep{Run: githubRunnerCommand("run-disk", "output", stage.DiskOutput)}
+	run := githubStep{ID: "run-disk", Run: githubRunnerCommand("run-disk", "output", stage.DiskOutput), TimeoutMinutes: 1 + githubDiskCleanupHeadroomMinutes}
+	actions, err := resolveGitHubActions(plan.Actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fragment bytes.Buffer
+	writeGitHubPackerDiagnosticStep(&fragment, stage, actions)
+	var diagnostic struct {
+		Steps []githubStep `json:"steps"`
+	}
+	if err := yaml.UnmarshalStrict([]byte("steps:\n"+fragment.String()), &diagnostic); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateGitHubStageExecution(plan, stage, []githubStep{prepare, run, diagnostic.Steps[0]}); err != nil {
+		t.Fatalf("valid private preparation/executor/diagnostic fixture rejected: %v", err)
+	}
+	conditional, ignored, credential := run, run, run
+	conditional.If = "false"
+	ignored.ContinueOnError = true
+	credential.Env = map[string]string{sourceTokenEnv: "token"}
 	for _, test := range []struct {
 		name   string
 		steps  []githubStep
@@ -169,10 +191,10 @@ func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 		{"before prepare", []githubStep{run, prepare}, "must precede"},
 		{"duplicate prepare", []githubStep{prepare, prepare, run}, "exactly once"},
 		{"missing prepare", nil, "preparation is missing"},
-		{"missing disk executor", []githubStep{prepare}, "grouped live executor"},
-		{"conditional disk executor", []githubStep{prepare, {Run: run.Run, If: "false"}}, "grouped live executor"},
-		{"ignored disk failure", []githubStep{prepare, {Run: run.Run, ContinueOnError: true}}, "grouped live executor"},
-		{"disk executor credential", []githubStep{prepare, {Run: run.Run, Env: map[string]string{sourceTokenEnv: "token"}}}, "grouped live executor"},
+		{"missing disk executor", []githubStep{prepare, diagnostic.Steps[0]}, "sealed route transport"},
+		{"conditional disk executor", []githubStep{prepare, conditional, diagnostic.Steps[0]}, "bounded unconditional live executor"},
+		{"ignored disk failure", []githubStep{prepare, ignored, diagnostic.Steps[0]}, "bounded unconditional live executor"},
+		{"disk executor credential", []githubStep{prepare, credential, diagnostic.Steps[0]}, "bounded unconditional live executor"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			err := validateGitHubStageExecution(plan, stage, test.steps)

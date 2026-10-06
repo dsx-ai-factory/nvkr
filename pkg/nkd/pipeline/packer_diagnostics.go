@@ -56,17 +56,20 @@ var errPackerDiagnosticsIncomplete = errors.New("packer diagnostics are incomple
 // attempt directory. It accepts no path and cannot be recreated from serialized
 // data. The lifecycle owner closes it before committing the immutable Run record.
 type PackerDiagnosticSink struct {
-	mu          sync.Mutex
-	attemptRoot *os.File
-	diagnostics *os.File
-	packer      *os.File
-	closed      bool
+	mu            sync.Mutex
+	attemptRoot   *os.File
+	diagnostics   *os.File
+	packer        *os.File
+	closed        bool
+	sealed        bool
+	retainedPaths map[string]*packerDiagnosticTarget
 }
 
 type packerDiagnosticTarget struct {
 	mu     sync.Mutex
 	root   *os.File
 	closed bool
+	sealed bool
 }
 
 // NewPackerDiagnosticSink retains the exact held attempt-directory inode. It is
@@ -158,7 +161,35 @@ func (sink *PackerDiagnosticSink) start(ctx context.Context, subject string, man
 		return nil, e.Wrap(e.CodeImmutableViolation, err,
 			"persisting Packer diagnostic route")
 	}
-	return &packerDiagnosticTarget{root: root}, nil
+	target := &packerDiagnosticTarget{root: root}
+	if sink.retainedPaths == nil {
+		sink.retainedPaths = make(map[string]*packerDiagnosticTarget)
+	}
+	sink.retainedPaths[path.Join(packerDiagnosticDirectory, packerDiagnosticProducerDir, name)] = target
+	return target, nil
+}
+
+// RetainedPath describes one successfully sealed, sink-issued diagnostic route,
+// never an artifact or receipt. It is absent before Close, after failed retention
+// or sealing, and when several producers would make the route ambiguous.
+func (sink *PackerDiagnosticSink) RetainedPath() string {
+	if sink == nil {
+		return ""
+	}
+	sink.mu.Lock()
+	defer sink.mu.Unlock()
+	if !sink.closed || !sink.sealed || len(sink.retainedPaths) != 1 {
+		return ""
+	}
+	for route, target := range sink.retainedPaths {
+		target.mu.Lock()
+		sealed := target.closed && target.sealed
+		target.mu.Unlock()
+		if sealed {
+			return route
+		}
+	}
+	return ""
 }
 
 func (sink *PackerDiagnosticSink) ensureRoots() error {
@@ -655,6 +686,7 @@ func (target *packerDiagnosticTarget) close() error {
 		return e.Wrap(e.CodeImmutableViolation, closeErr,
 			"sealing Packer diagnostic route")
 	}
+	target.sealed = true
 	return nil
 }
 
@@ -695,6 +727,7 @@ func (sink *PackerDiagnosticSink) Close() error {
 		return e.Wrap(e.CodeImmutableViolation, closeErr,
 			"closing Packer diagnostic retention")
 	}
+	sink.sealed = true
 	return nil
 }
 
