@@ -160,7 +160,7 @@ func TestImagePinTransportBoundsMetadataBeforeParsing(t *testing.T) {
 		message  string
 	}{
 		{name: "oversized declared response", length: maxPinImageMetadataBytes + 1, message: "image pin metadata response exceeds size bound"},
-		{name: "oversized streaming response", length: -1, body: strings.Repeat("x", maxPinImageMetadataBytes+1), message: "helm OCI response exceeds size bound"},
+		{name: "oversized streaming response", length: -1, body: strings.Repeat("x", maxPinImageMetadataBytes+1), message: "image pin metadata response exceeds size bound"},
 		{name: "plain HTTP rejected", insecure: true, message: "must use HTTPS"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

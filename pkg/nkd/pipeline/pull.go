@@ -158,7 +158,7 @@ func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root
 	if err := node.Validate(); err != nil {
 		return "", 0, err
 	}
-	const maxReleaseBytes = 256 << 20
+	const maxReleaseBytes = releaseasset.MaxToolTransportBytes
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, node.Artifact, nil)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeFetchFailed, err, "creating release request")
@@ -174,15 +174,16 @@ func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root
 	// The existing owner authenticates and freezes the already-open stream. No
 	// archive pathname is published or reopened, including in the output root.
 	held, err := heldfile.FromReaderContext(ctx, response.Body, heldfile.Options{
-		Label: "release-archive", MaxBytes: maxReleaseBytes, ExpectedDigest: node.ExecutableArchive.Digest,
+		Label: "release-archive", MaxBytes: maxReleaseBytes,
 	})
 	if err != nil {
-		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeVerifyFailed, err, "authenticating release carrier"), "acquiring release executable")
+		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeFetchFailed, err, "snapshotting release carrier"), "acquiring release executable")
 	}
 	defer func() { _ = held.Close() }()
-	member, err := releaseasset.SelectTarGzip(ctx, io.NewSectionReader(held, 0, held.Size()), node.ExecutableArchive.Member, releaseasset.Limits{
-		ExecutableBytes: maxReleaseBytes, ExpandedBytes: 1 << 30, Entries: 4096,
-	})
+	if held.Digest() != node.ExecutableArchive.Digest {
+		return "", 0, e.New(e.CodeVerifyFailed, "release carrier digest %s does not match pinned %s", held.Digest(), node.ExecutableArchive.Digest)
+	}
+	member, err := releaseasset.SelectTarGzip(ctx, io.NewSectionReader(held, 0, held.Size()), node.ExecutableArchive.Member, releaseasset.ToolLimits())
 	if err != nil {
 		return "", 0, err
 	}

@@ -36,10 +36,10 @@ type ToolPin struct {
 	ExecutableDigest string `json:"executableDigest"`
 }
 
-const maxToolArchiveBytes = 256 << 20
+const maxToolArchiveBytes = releaseasset.MaxToolTransportBytes
 
 func toolArchiveLimits() releaseasset.Limits {
-	return releaseasset.Limits{ExecutableBytes: maxToolArchiveBytes, ExpandedBytes: 1 << 30, Entries: 4096}
+	return releaseasset.ToolLimits()
 }
 
 func validateToolSource(tool ToolSource) error {

@@ -20,6 +20,16 @@ type Limits struct {
 	Entries         int
 }
 
+// MaxToolTransportBytes bounds a source tool's compressed or raw release carrier.
+const MaxToolTransportBytes = 256 << 20
+
+// ToolLimits returns a fresh copy of the source-tool archive policy shared by
+// maintenance pinning and executable acquisition. Callers cannot mutate a global
+// policy value and make the two acquisition boundaries diverge.
+func ToolLimits() Limits {
+	return Limits{ExecutableBytes: MaxToolTransportBytes, ExpandedBytes: 1 << 30, Entries: 4096}
+}
+
 // SelectTarGzip uses the standard library's tar and gzip decoders. It scans the
 // complete archive, never extracts paths, and rejects duplicate names, links,
 // special files, metadata-only global headers and malformed or oversized trailing

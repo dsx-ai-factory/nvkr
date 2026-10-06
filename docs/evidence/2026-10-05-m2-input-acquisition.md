@@ -16,11 +16,48 @@ on source-fetch head `5fdf8338838be785bcc7e2026de131345f24f906`. On macOS,
 runtime or external registry proof. The native helper/CLI cross-compiles passed
 for Linux AMD64 and ARM64; cross-compilation does not exercise those runtimes.
 
-The unchanged maintained bundle drift check returned:
+The unchanged maintained bundle drift check was `make workflows-check`, whose
+Makefile owner builds the generator with `main.version=dev` and
+`main.commit=unknown` and then executes:
+
+```sh
+bin/nkd-exec run generate --engine github \
+  --definition definitions/nke-deploy/definition.yaml \
+  --environment definitions/nke-deploy/environment-github.yaml \
+  --root . --check
+```
+
+It returned:
 
 ```text
 sha256:7edadcb49c6ac7348c695e112f57df187c4de25efbb213cff26f20d4cb1b78a9
 ```
+
+### Reproducibility-command follow-up
+
+The earlier snapshot did not retain its cross-compile command lines. The following
+commands were therefore rerun separately on the five-review-finding working-tree
+follow-up to `bb69f066bc85e81ec42ec1bc1bf0d0ef792110e2`. They do not retroactively
+authenticate the earlier cross-compile observation. The helper is the CLI binary
+(`cmd/nkdctl`); these flags follow the existing helper build owner without running
+its lock-writing or image-assembly steps:
+
+```sh
+validation_dir=$(mktemp -d /private/tmp/m2-pr95-crosscompile-XXXXXX)
+for arch in amd64 arm64; do
+  GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOTOOLCHAIN=local \
+    SOURCE_DATE_EPOCH=1 GOFLAGS='' \
+    go build -trimpath -buildvcs=false -ldflags=-buildid= \
+      -o "$validation_dir/nkd-exec-$arch" ./cmd/nkdctl
+  file "$validation_dir/nkd-exec-$arch"
+done
+make workflows-check
+```
+
+Both builds passed with the repository-pinned Go 1.27.1. `file` identified ELF
+Linux x86-64 and AArch64 binaries respectively. The drift check again returned
+the same digest above for the exact `nke-deploy` inputs, not the `nke-v1` inputs.
+Cross-compilation is not native execution, image publication or runtime approval.
 
 ## Candidate admission refusal
 

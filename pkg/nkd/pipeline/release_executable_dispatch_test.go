@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -55,6 +56,15 @@ func TestReleaseExecutableProductionDispatch(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var requests atomic.Int32
+			var unsafeRequests atomic.Int32
+			unsafeHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				unsafeRequests.Add(1)
+				_, _ = w.Write(archive.Bytes())
+			})
+			plainTarget := httptest.NewServer(unsafeHandler)
+			defer plainTarget.Close()
+			userTarget := httptest.NewTLSServer(unsafeHandler)
+			defer userTarget.Close()
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requests.Add(1)
 				if r.URL.Path == "/final" {
@@ -65,9 +75,9 @@ func TestReleaseExecutableProductionDispatch(t *testing.T) {
 				case "404":
 					w.WriteHeader(http.StatusNotFound)
 				case "HTTP redirect":
-					http.Redirect(w, r, "http://must-not-be-contacted.invalid/archive", http.StatusFound)
+					http.Redirect(w, r, plainTarget.URL+"/archive", http.StatusFound)
 				case "userinfo redirect":
-					http.Redirect(w, r, "https://user@must-not-be-contacted.invalid/archive", http.StatusFound)
+					http.Redirect(w, r, strings.Replace(userTarget.URL, "https://", "https://user@", 1)+"/archive", http.StatusFound)
 				case "redirect loop":
 					http.Redirect(w, r, "/archive", http.StatusFound)
 				case "HTTPS redirect":
@@ -106,6 +116,11 @@ func TestReleaseExecutableProductionDispatch(t *testing.T) {
 			if code(err) != tc.code {
 				t.Fatalf("result=%+v error=%v, want %s", result, err, tc.code)
 			}
+			if tc.name == "HTTP redirect" || tc.name == "userinfo redirect" {
+				if unsafeRequests.Load() != 0 || err == nil || !strings.Contains(err.Error(), "unsafe release executable redirect") {
+					t.Fatalf("unsafe redirect guard did not reject before contacting live target: requests=%d error=%v", unsafeRequests.Load(), err)
+				}
+			}
 			want := prior
 			if tc.code == "" {
 				want = executable
@@ -132,6 +147,74 @@ func TestReleaseExecutableProductionDispatch(t *testing.T) {
 		})
 	}
 }
+
+type releaseExecutableZeroReader struct{}
+
+func (releaseExecutableZeroReader) Read(p []byte) (int, error) {
+	clear(p)
+	return len(p), nil
+}
+
+func TestReleaseExecutableCarrierFailureCodes(t *testing.T) {
+	const transportLimit = 256 << 20
+	for _, tc := range []struct {
+		name string
+		code e.Code
+	}{
+		{name: "truncated body", code: e.CodeFetchFailed},
+		{name: "oversized streaming body", code: e.CodeFetchFailed},
+		{name: "archive digest mismatch", code: e.CodeVerifyFailed},
+		{name: "mid-body cancellation", code: e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if tc.name == "truncated body" {
+					w.Header().Set("Content-Length", "100000")
+				}
+				_, _ = w.Write([]byte("short"))
+			}))
+			defer server.Close()
+			transport := server.Client().Transport
+			if tc.name == "oversized streaming body" || tc.name == "mid-body cancellation" {
+				transport = releaseExecutableRoundTripper(func(*http.Request) (*http.Response, error) {
+					body := io.LimitReader(releaseExecutableZeroReader{}, transportLimit+1)
+					if tc.name == "mid-body cancellation" {
+						body = releaseExecutableRoundTripReader(func(p []byte) (int, error) {
+							cancel()
+							return copy(p, "short"), context.Canceled
+						})
+					}
+					return &http.Response{StatusCode: http.StatusOK, ContentLength: -1, Body: io.NopCloser(body)}, nil
+				})
+			}
+			node := ir.Node{ID: "pull-tool", Kind: ir.KindPull, Component: "tool", Artifact: server.URL + "/archive",
+				Digest: sha256Of([]byte("executable")), Platform: "linux/amd64", Network: ir.NetworkDefault,
+				OutputType: "host-package", ArtifactPath: "tool", Version: "1.2.3",
+				Env:               []ir.EnvVar{{Name: "SOURCE_DATE_EPOCH", Value: "1"}},
+				ExecutableArchive: &ir.ExecutableArchive{Digest: sha256Of([]byte("expected carrier")), Member: "bin/tool"}}
+			root := t.TempDir()
+			prior := []byte("previous executable")
+			if err := os.WriteFile(filepath.Join(root, "tool"), prior, 0600); err != nil {
+				t.Fatal(err)
+			}
+			digest, size, err := downloadReleaseExecutableWithTransport(ctx, node, root, "tool", transport)
+			if code(err) != tc.code || digest != "" || size != 0 {
+				t.Fatalf("failure returned %s/%d, %v; want %s", digest, size, err, tc.code)
+			}
+			got, readErr := os.ReadFile(filepath.Join(root, "tool"))
+			entries, listErr := os.ReadDir(root)
+			if readErr != nil || !bytes.Equal(got, prior) || listErr != nil || len(entries) != 1 {
+				t.Fatalf("failure changed existing output or left carrier: bytes=%q entries=%v errors=%v/%v", got, entries, readErr, listErr)
+			}
+		})
+	}
+}
+
+type releaseExecutableRoundTripReader func([]byte) (int, error)
+
+func (reader releaseExecutableRoundTripReader) Read(p []byte) (int, error) { return reader(p) }
 
 func TestReleaseExecutableDefaultClientPreCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())

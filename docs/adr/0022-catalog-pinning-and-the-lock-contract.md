@@ -429,7 +429,9 @@ cannot evade the latter. Reads of synthesized member bytes remain cancellation-a
 The selector replaces the former 65,536-entry/256 MiB expanded policy with this
 4,096-entry/1 GiB policy shared by catalog pinning and executable acquisition;
 transport and selected-executable bounds remain 256 MiB. A focused contract test
-freezes the catalog selector limits. Production archive acquisition uses the existing
+freezes the selector limits at the shared `internal/releaseasset` owner; catalog
+pinning and executable acquisition consume that owner's immutable policy.
+Production archive acquisition uses the existing
 anonymous immutable held-file owner to authenticate the already-open HTTP stream,
 then selects from that descriptor rather than reopening a pathname. The bounded
 carrier is never created beside the published executable and is closed before

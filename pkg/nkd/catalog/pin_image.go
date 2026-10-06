@@ -255,6 +255,6 @@ func (transport pinImageTransport) RoundTrip(request *http.Request) (*http.Respo
 		_ = response.Body.Close()
 		return nil, fmt.Errorf("image pin metadata response exceeds size bound")
 	}
-	response.Body = &helmBoundedBody{ReadCloser: response.Body, remaining: maxPinImageMetadataBytes}
+	response.Body = &helmBoundedBody{ReadCloser: response.Body, remaining: maxPinImageMetadataBytes, label: "image pin metadata"}
 	return response, nil
 }
