@@ -261,6 +261,14 @@ func verifyDescriptor(ctx context.Context, root string, descriptor Descriptor, v
 }
 
 func verifyDescriptorForInspection(ctx context.Context, root string, descriptor Descriptor, visited map[string]bool, disks map[string]DiskArtifactInspection) error {
+	return verifyDescriptorHoldingDisks(ctx, root, descriptor, visited, disks, nil)
+}
+
+// Retained owners belong to the importing walk, not to a caller's observations.
+// They keep the verified inode open until its copy-time stream recheck completes.
+func verifyDescriptorHoldingDisks(ctx context.Context, root string, descriptor Descriptor, visited map[string]bool,
+	disks map[string]DiskArtifactInspection, retained map[string]*DiskArtifact,
+) error {
 	if visited[descriptor.Digest] {
 		return nil
 	}
@@ -282,7 +290,7 @@ func verifyDescriptorForInspection(ctx context.Context, root string, descriptor 
 			return e.New(e.CodeVerifyFailed, "nested OCI index has an invalid schema")
 		}
 		for _, child := range index.Manifests {
-			if err := verifyDescriptorForInspection(ctx, root, child, visited, disks); err != nil {
+			if err := verifyDescriptorHoldingDisks(ctx, root, child, visited, disks, retained); err != nil {
 				return err
 			}
 		}
@@ -307,8 +315,12 @@ func verifyDescriptorForInspection(ctx context.Context, root string, descriptor 
 				return err
 			}
 			observed := artifact.Inspection()
-			if err := artifact.Close(); err != nil {
-				return err
+			if retained == nil || retained[observed.PayloadDigest] != nil {
+				if err := artifact.Close(); err != nil {
+					return err
+				}
+			} else {
+				retained[observed.PayloadDigest] = artifact
 			}
 			if disks != nil {
 				disks[descriptor.Digest] = observed

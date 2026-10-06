@@ -2,7 +2,6 @@ package lifecycle
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -68,10 +67,13 @@ func observeHostedOutputs(ctx context.Context, workspace string, slots []require
 				continue
 			}
 			matches++
-			if object.Output == nil || object.DescriptorDigest != artifact.Digest || object.BlobDigest != artifact.Disk.PayloadDigest ||
-				object.Output.BuildDigest != slot.BuildDigest || !equalStrings(object.Output.Components, slot.Components) ||
-				!reflect.DeepEqual(object.Output.Disk, artifact.Disk) {
+			if object.Output == nil || object.BlobDigest != artifact.Disk.PayloadDigest {
 				return nil, e.New(e.CodeVerifyFailed, "publication substitutes its exact observed disk member")
+			}
+			member := delivery.Output{Name: object.Name, Kind: object.Kind, Digest: object.DescriptorDigest,
+				BuildDigest: object.Output.BuildDigest, Components: object.Output.Components, Disk: object.Output.Disk}
+			if err := requireHostedOutputMembership(artifact, member); err != nil {
+				return nil, err
 			}
 		}
 		if matches != 1 {

@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -130,27 +131,19 @@ func ReadArtifact(ctx context.Context, root string) (Descriptor, []byte, error) 
 	return descriptor, raw, err
 }
 
-func (writer layoutWriter) copyClosure(ctx context.Context, source string, descriptor Descriptor) error {
+func (writer layoutWriter) copyClosure(ctx context.Context, source string, descriptor Descriptor) (err error) {
 	visited := map[string]bool{}
-	if err := verifyDescriptor(ctx, source, descriptor, visited); err != nil {
+	disks := map[string]*DiskArtifact{}
+	defer func() {
+		for _, disk := range disks {
+			err = errors.Join(err, disk.Close())
+		}
+	}()
+	if err := verifyDescriptorHoldingDisks(ctx, source, descriptor, visited, nil, disks); err != nil {
 		return err
 	}
-	var disk *DiskArtifact
-	if descriptor.MediaType == MediaOCIManifest {
-		manifest, err := flatManifest(ctx, source, PublishedObject{DescriptorDigest: descriptor.Digest, Size: descriptor.Size})
-		if err != nil {
-			return err
-		}
-		if manifest.Config.MediaType == MediaImageConfig && len(manifest.Layers) == 1 && manifest.Layers[0].MediaType == MediaQCOW2 {
-			disk, err = openDiskManifest(ctx, source, descriptor, "", maxDeliveryFileBytes)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = disk.Close() }()
-		}
-	}
 	for digest := range visited {
-		if disk != nil && disk.Inspection().PayloadDigest == digest {
+		if disk := disks[digest]; disk != nil {
 			if err := writer.copyDiskPayload(ctx, disk); err != nil {
 				return err
 			}

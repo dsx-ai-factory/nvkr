@@ -156,6 +156,30 @@ func BuildDiskArtifact(ctx context.Context, out string, request DiskArtifactRequ
 	return Result{LayoutPath: out, RootDigest: root, SemanticDigest: request.Digest}, nil
 }
 
+// OpenSingleDiskArtifact selects and verifies the sole disk in a producer's OCI
+// layout in one payload pass. The index only selects an expected manifest;
+// OpenDiskArtifact authenticates that manifest and the complete bounded closure.
+// The returned owner proves transport integrity, not producer or release authority.
+func OpenSingleDiskArtifact(ctx context.Context, root, expectedPlatform string, maxPayloadBytes int64) (*DiskArtifact, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := diskPlatform(expectedPlatform); err != nil {
+		return nil, err
+	}
+	if maxPayloadBytes <= 0 || maxPayloadBytes > maxDeliveryFileBytes {
+		return nil, e.New(e.CodeVerifyFailed, "disk reader requires a positive bounded payload budget")
+	}
+	index, _, err := readIndex(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	if len(index.Manifests) != 1 {
+		return nil, e.New(e.CodeVerifyFailed, "disk layout must select exactly one manifest")
+	}
+	return OpenDiskArtifact(ctx, root, index.Manifests[0].Digest, expectedPlatform, maxPayloadBytes)
+}
+
 // OpenDiskArtifact checks one exact manifest/config/QCOW2-layer closure and owns
 // the no-follow payload descriptor. The platform config uses image-spec's
 // Platform, the same representation ORAS --artifact-platform writes. No bytes

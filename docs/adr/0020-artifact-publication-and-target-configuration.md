@@ -86,6 +86,10 @@ The pipeline-attested disk transport uses a distinct OCI manifest over the uncha
 guest platform; the layer media type and manifest annotations declare the QCOW2 format and encryption.
 Production consumption requires the explicit unencrypted declaration to match the release binding;
 the diagnostic reader keeps a missing encryption declaration unknown. Manifest identity and payload identity are separate.
+An importing descriptor walk retains its verified disk owner through the same phase's payload copy instead
+of reopening and hashing that inode again for selection. A standalone producer wrapper is selected and
+verified in one payload pass. Every copy/export still rehashes its held bytes; separate hosted publication
+and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Production packaging consumes the original live Run's exact-subject reconciliation receipt, not a restored

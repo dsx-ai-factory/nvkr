@@ -26,11 +26,7 @@ func inspectFactoryDisk(ctx context.Context, plan *Plan, expected LifecycleOutpu
 	if platform == "" {
 		return delivery.DiskArtifactInspection{}, e.New(e.CodePipelineDrift, "disk wrapper has no exact planned build")
 	}
-	descriptor, err := delivery.PayloadDescriptor(ctx, artifact.Path)
-	if err != nil {
-		return delivery.DiskArtifactInspection{}, err
-	}
-	held, err := delivery.OpenDiskArtifact(ctx, artifact.Path, descriptor.Digest, platform, 64<<30)
+	held, err := delivery.OpenSingleDiskArtifact(ctx, artifact.Path, platform, 64<<30)
 	if err != nil {
 		return delivery.DiskArtifactInspection{}, err
 	}
