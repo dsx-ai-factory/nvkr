@@ -167,7 +167,12 @@ inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operat
 The implemented QCOW2 reader exports libguestfs's inspected, mounted filesystem tree, not an independently
 enumerated inventory of every filesystem extent. Unmounted or unrecognized content is not proven covered.
 The installer reader supports ISO9660 and its recognized SquashFS payload; a generic raw material is not
-thereby known to be an installer. Nested image discovery recognizes bounded gzip or plain tar
+thereby known to be a base installer. The exact authenticated root consumer's declared `installer-iso`
+edge selects that purpose; raw output type alone does not. Transitive and other raw ISO inputs retain
+staged `installer-content` inspection and per-component documents, without satisfying the mandatory
+base or supplying base-filesystem package correspondence. Both operations use the existing ISO/SquashFS
+reader: other raw formats remain unsupported at its format boundary rather than disappearing from the
+trace. Nested image discovery recognizes bounded gzip or plain tar
 contents, not image format from a filename. The pinned Docker decoder requires an unambiguous Docker
 manifest; OCI layouts reuse the existing safe transport extractor and complete offline closure verifier.
 Every accepted image is inspected, while foreign platforms, unsupported descriptors, missing or extra

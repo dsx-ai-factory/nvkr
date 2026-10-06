@@ -10,7 +10,7 @@ import (
 
 func diskContentKind(kind string) bool {
 	switch kind {
-	case "disk-image", "installer-iso", "tarball", "apt-acquisition", "host-package", "oci-image":
+	case "disk-image", "installer-iso", "installer-content", "tarball", "apt-acquisition", "host-package", "oci-image":
 		return true
 	default:
 		return false

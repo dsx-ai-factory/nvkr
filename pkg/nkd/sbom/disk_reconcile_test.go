@@ -168,7 +168,7 @@ func TestReconcileHostPackagesCannotUseContainerPackageDatabases(t *testing.T) {
 func TestDiskPackageContentClassMatrixBothArchitectures(t *testing.T) {
 	classes := []string{diskClassFilesystem, diskClassContainer, diskClassDebianArchive}
 	for _, architecture := range []string{"amd64", "arm64"} {
-		for _, kind := range []string{"installer-iso", "apt-acquisition", "tarball", "host-package", "oci-image"} {
+		for _, kind := range []string{"installer-iso", "installer-content", "apt-acquisition", "tarball", "host-package", "oci-image"} {
 			for _, rootClass := range classes {
 				for _, materialClass := range classes {
 					t.Run(strings.Join([]string{architecture, kind, rootClass, materialClass}, "/"), func(t *testing.T) {

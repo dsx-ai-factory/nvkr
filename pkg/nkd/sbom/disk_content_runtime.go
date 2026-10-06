@@ -218,7 +218,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 			return err
 		}
 		components, files = inspection.Components(), inspection.Files()
-	case "installer-iso":
+	case "installer-iso", "installer-content":
 		inspection, err := inspectInstallerFilesystem(ctx, subject, platform, guestfishDigest, packageReaderDigest, scanner, codec, int64(maxBytes))
 		if err != nil {
 			return err

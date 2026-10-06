@@ -415,12 +415,9 @@ func (owner *LocalRunResult) inspectDiskEvidenceMaterials(ctx context.Context, p
 		if observed.SHA256 != member.Digest || observed.Size != member.Size || observed.AbsPath == "" || observed.TransportPath != "" {
 			return nil, nil, e.New(e.CodeVerifyFailed, "disk material differs from retained producer consumption")
 		}
-		kind := member.Kind
-		if kind == "raw" {
-			kind = "installer-iso"
-		}
-		if kind != "installer-iso" && kind != "host-package" && kind != "tarball" && kind != "oci-image" {
-			return nil, nil, e.New(e.CodeEngineCapability, "disk material kind %q has no admitted content scanner", member.Kind)
+		kind, err := diskMaterialContentKind(trace.description.Subject.Producer, trace.description.Edges, member)
+		if err != nil {
+			return nil, nil, err
 		}
 		held, err := heldfile.OpenContext(ctx, observed.AbsPath, heldfile.Options{Label: "live-disk-material", MaxBytes: member.Size, ExpectedDigest: member.Digest})
 		if err != nil {
@@ -447,6 +444,28 @@ func (owner *LocalRunResult) inspectDiskEvidenceMaterials(ctx context.Context, p
 		documents[member.Component] = raw
 	}
 	return inputs, documents, nil
+}
+
+// Role selection consumes edges already authenticated by the original material
+// trace. This description-only helper grants no authority: raw output type is
+// never sufficient to classify a material as the root's base installer.
+func diskMaterialContentKind(subjectProducer string, edges []diskMaterialEdge, member diskMaterialMember) (string, error) {
+	if member.Kind == "raw" {
+		for _, edge := range edges {
+			if edge.Consumer == subjectProducer && edge.Binding == "installer-iso" && edge.Producer == member.Producer {
+				return "installer-iso", nil
+			}
+		}
+		// The existing ISO reader still inspects staged/transitive installer
+		// payloads, but their observation cannot stand in for the declared base.
+		return "installer-content", nil
+	}
+	switch member.Kind {
+	case "host-package", "tarball", "oci-image":
+		return member.Kind, nil
+	default:
+		return "", e.New(e.CodeEngineCapability, "disk material kind %q has no admitted content scanner", member.Kind)
+	}
 }
 
 // ExportReconciledDisk holds the same Run lifetime permit through validation,

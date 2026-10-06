@@ -44,7 +44,7 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 			base = true
 		case "apt-acquisition":
 			capture = true
-		case "tarball", "host-package", "oci-image":
+		case "tarball", "host-package", "oci-image", "installer-content":
 			staged = true
 		default:
 			return nil, e.New(e.CodeEngineCapability, "unsupported disk material observation kind %q", input.report.Kind)
