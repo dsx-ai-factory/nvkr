@@ -147,6 +147,8 @@ successful response includes a package-issued exact-input description bound to
 the publication subject, consumer policy, and its Definition, Environment, Plan
 and content digests. This narrows what the consumer accepted; it does not grant a stronger
 lane, full Release scope, qualification, or deployment acceptance.
+The Plan is generated pipeline state; an unreadable or invalid Plan reports
+pipeline drift rather than being reclassified by the command adapter.
 
 `RELEASE_REF` is a registry reference pinned with `@sha256:…`; the identity and issuer belong to the
 consumer's trusted build policy. Signature and production-attestation verification are both required by this

@@ -132,7 +132,7 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 					&cli.StringFlag{Name: "identity"}, &cli.StringFlag{Name: "issuer"}, &cli.StringFlag{Name: "cosign"}, &cli.StringFlag{Name: "cosign-digest"},
 					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require with --environment and --plan"},
 					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require with --definition and --plan"},
-					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment"},
+					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment; unreadable or invalid Plan bytes report pipeline drift"},
 					&cli.StringFlag{Name: "workspace", Value: ".nkd/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
 				},
 				Action: func(c *cli.Context) error {
