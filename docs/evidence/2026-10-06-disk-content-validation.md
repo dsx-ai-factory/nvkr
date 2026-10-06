@@ -7,6 +7,16 @@ unretained run narrative; no historical RED transcript is reconstructed.
 
 The later [parent integration record](2026-10-06-disk-content-parent-integration.md)
 binds the combined diagnostics/OCI snapshot and its new native runs separately.
+The [stage integration record](2026-10-06-disk-content-stage-integration.md)
+binds the later snapshot incorporating the ARC parent. Each record's complete
+Go/module/version manifest digest is its authoritative executable-snapshot
+identity; commit SHAs are pre-merge branch references and are not promised to
+remain reachable after a squash merge. This record retains its historical rows,
+including the then-duplicated held/plain scanner path, not current coverage counts.
+
+The [later cancellation review record](2026-10-06-disk-content-review-cancellation.md)
+binds the subsequent callback/hash-owner repairs and their fresh native results;
+this record's source hashes remain historical.
 
 ## Exact tested source and retained output
 
@@ -164,8 +174,9 @@ The original carrier remains the observation subject.
 
 Copy, extraction, closure verification and per-image transport diagnostics are
 distinct from actual scanner execution. Per-image `scanner-transport` records
-carry an ordinal; `root-scan` remains ordinal 0 and describes actual scanner
-work only. Instrumentation grants no authority. Cancellation retains
+carry an image ordinal; `root-scan` start uses ordinal 0 and its complete record
+carries the component count. Both describe actual scanner work only.
+Instrumentation grants no authority. Cancellation retains
 `CodeTimeout`; the synchronized scanner row observes child readiness before
 canceling and joins its test-owned goroutine. Private scanner admission uses
 `CodeUnverifiedRef` and tests its exact authentication reason. The public helper
@@ -175,7 +186,10 @@ The direct lane's byte ceiling applies **per sequential copy/projection**, not
 as cumulative expansion accounting. Shared member/image limits still apply.
 The 16,384-component report limit is enforced before public deduplication; a
 shared-base layout can fail even when its unique inventory would fit.
-Multi-GB material timing remains **unmeasured**. KB-scale fixtures do not prove
+Multi-GB material timing was **unmeasured at this snapshot**; the subsequent
+[controlled dense 2 GiB ARM64 measurement](2026-10-06-large-oci-material-timing.md)
+records a separate source-bound run, not real NKE or cold-cache acceptance.
+KB-scale fixtures do not prove
 completion within the authenticated per-operation deadline. No performance
 redesign, package removal or partial report was used to bypass these limits.
 

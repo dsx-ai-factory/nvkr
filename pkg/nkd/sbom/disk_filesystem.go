@@ -361,6 +361,9 @@ func filesystemArchiveDigest(ctx context.Context, file *os.File) (string, error)
 	}
 	hash := sha256.New()
 	if _, err := io.Copy(hash, filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(file, 0, info.Size()))}); err != nil {
+		if ctx.Err() != nil {
+			return "", e.Wrap(e.CodeTimeout, ctx.Err(), "hashing filesystem archive canceled")
+		}
 		return "", e.Wrap(e.CodeVerifyFailed, err, "hashing filesystem archive")
 	}
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil

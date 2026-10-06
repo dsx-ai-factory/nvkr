@@ -6,6 +6,16 @@ not complete QCOW2 inspection, native AMD64 execution, hosted acceptance or
 publication approval. The [earlier content record](2026-10-06-disk-content-validation.md)
 and its logs retain their original executable snapshot; their results are not
 relabeled as evidence for this integration.
+The later [stage integration record](2026-10-06-disk-content-stage-integration.md)
+binds the snapshot incorporating the subsequent ARC parent. The complete
+Go/module/version manifest digest below is this record's authoritative
+executable-snapshot identity; SHAs are pre-merge branch references, not a promise
+of post-squash reachability. Historical scanner rows retain their original scope,
+including the then-duplicated held/plain path, not current coverage counts.
+
+The [later cancellation review record](2026-10-06-disk-content-review-cancellation.md)
+binds the subsequent callback/hash-owner repairs and their fresh native results;
+this record's source hashes remain historical.
 
 ## Executable snapshot
 
@@ -19,7 +29,6 @@ The sole manual conflict resolution unions the imports in
 code retains diagnostic phases/depth from the diagnostics parent and marker
 cancellation classification from the OCI parent. No new production behavior,
 Definition, pin, generated bundle or deadline was introduced during integration.
-Independent review compared the union against both parents and found no blocker.
 
 The sorted tracked Go/module/version manifest has 794 entries and SHA-256
 `5632e710b7be0fad98c35658738ebce002a0de61af66437076d96a3180c0a01b`.
@@ -108,8 +117,11 @@ Generated Run digest remains
 `sha256:2c2bf59ad5b300c55da19e2068006562f8ddf60b8899444dbdfd88cc058081f2`.
 
 Complete NKE QCOW2 reconciliation, native AMD64 execution, the full retained
-input matrix and multi-GB timing remain unmeasured. Per-operation byte limits,
+input matrix remained unmeasured at this snapshot. Multi-GB timing was also
+unmeasured then; the later [controlled dense 2 GiB ARM64 measurement](2026-10-06-large-oci-material-timing.md)
+has a separate executable identity and does not establish real NKE complexity.
+Per-operation byte limits,
 member/image caps, pre-deduplication component limits and authenticated
 inspection deadlines remain unchanged. The optional large-material timing
-review request is not claimed fixed. A later merge/evidence commit identifies
+review request was not claimed fixed by this snapshot. A later merge/evidence commit identifies
 the retained records, not a different tested executable snapshot.

@@ -220,13 +220,13 @@ func (writer *cancelOCIPhaseWriter) Write(raw []byte) (int, error) {
 
 func TestDirectOCIMaterialPhaseCancellation(t *testing.T) {
 	for _, test := range []struct {
-		name, phase string
-		occurrence  int
+		name, phase, message string
+		occurrence           int
 	}{
-		{"copy", "subject-copy", 1},
-		{"marker", "subject-revalidation", 1},
-		{"extraction", "filesystem-extraction", 1},
-		{"per-image sealing", "scanner-transport", 1},
+		{"copy admission", "subject-copy", "building verified SBOM evidence", 1},
+		{"marker", "subject-revalidation", "compressed material marker scan canceled", 1},
+		{"extraction", "filesystem-extraction", "extracting nested OCI layout canceled", 1},
+		{"per-image sealing", "scanner-transport", "sealing nested OCI scan transport canceled", 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			archive := nestedOCIFixture(t, []string{"amd64"}, false, nil)
@@ -240,7 +240,7 @@ func TestDirectOCIMaterialPhaseCancellation(t *testing.T) {
 			writer := &cancelOCIPhaseWriter{phase: test.phase, remaining: test.occurrence, cancel: cancel}
 			components, err := inspectContainerMaterial(diskdiagnostic.WithWriter(ctx, writer), subject, "linux/amd64", Scanner{Path: "must-not-execute"}, 1<<20)
 			assertDependencyCode(t, err, e.CodeTimeout)
-			if writer.remaining != 0 || components != nil {
+			if writer.remaining != 0 || components != nil || !strings.Contains(err.Error(), test.message) {
 				t.Fatalf("did not cancel the intended phase: %v", err)
 			}
 		})

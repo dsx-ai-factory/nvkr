@@ -1,4 +1,4 @@
-# OCI content validation with derived ARC stage budgets
+# OCI content validation integrated with ARC parent ba87e27
 
 Observed October 6, 2026, completed by 21:24:08 UTC. This records the same-base
 integration of the OCI correctness fixes with the updated diagnostics/ARC parent.
@@ -6,6 +6,15 @@ It does not establish full NKE QCOW2 inspection, native AMD64 execution, hosted
 delivery or publication approval. The [earlier parent-integration record](2026-10-06-disk-content-parent-integration.md)
 and [initial content record](2026-10-06-disk-content-validation.md) retain their
 original snapshots and results.
+The complete Go/module/version manifest digest below is the authoritative
+identity of this executable snapshot; SHAs are pre-merge branch references,
+not a promise of post-squash reachability. Historical scanner rows retain their
+original scope, including the then-duplicated held/plain path, not current counts.
+
+The [later cancellation review record](2026-10-06-disk-content-review-cancellation.md)
+binds the subsequent callback/hash-owner repairs and their fresh native results;
+the `3decca` manifest below identifies this historical parent-integration snapshot,
+not the later shipping source.
 
 ## Exact tested snapshot
 
@@ -102,9 +111,12 @@ harness failures remain in their original records; this is not a macOS
 ## Remaining acceptance
 
 Complete NKE QCOW2 reconciliation, native AMD64 execution, the complete retained
-material/capture matrix and multi-GB timing remain unmeasured. Per-operation
+material/capture matrix remained unmeasured at this snapshot. Multi-GB timing
+was also unmeasured then; the later [controlled dense 2 GiB ARM64 measurement](2026-10-06-large-oci-material-timing.md)
+has a separate executable identity and does not establish real NKE complexity.
+Per-operation
 byte bounds, shared member/image caps, pre-deduplication report limits and
 authenticated inspection deadlines were not relaxed. The optional large-material
-timing request remains open. A later merge/evidence commit identifies these
+timing request was still open at this snapshot. A later merge/evidence commit identifies these
 retained records; its documentation bytes are not a separate tested executable
 snapshot.

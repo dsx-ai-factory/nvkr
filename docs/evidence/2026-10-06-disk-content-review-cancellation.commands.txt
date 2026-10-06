@@ -1,0 +1,19 @@
+# Complete native race/coverage
+
+content_source="$(pwd -P)"; content_modules="$(go env GOMODCACHE)"; content_outputs="$(mktemp -d /private/tmp/pr103-review-native-output.XXXXXX)"; podman run --rm --pull=never --network none --user 502:20 --entrypoint /bin/sh --volume "${content_source}:/src:ro" --volume "${content_modules}:/go/pkg/mod:ro" --volume "${content_outputs}:/src/.nkd:rw" --workdir /src --env GOTOOLCHAIN=local --env GIT_CEILING_DIRECTORIES=/src 1f87906be577585bff2bc2bf05662972bd9ddd2ddae29975f05e0501090d3abb -c 'validation_root=$(mktemp -d /var/tmp/pr103-review-complete.XXXXXX) || exit; export TMPDIR="$validation_root" GOCACHE="$validation_root/cache"; uname -sm; id; go version; jq --version; stat -f -c "scratch-type=%T blocksize=%S availableblocks=%a" "$validation_root"; go test -race -covermode=atomic -coverprofile="$validation_root/coverage.out" ./... -count=1'
+
+# Native race SBOM binary build
+
+content_source="$(pwd -P)"; content_modules="$(go env GOMODCACHE)"; podman run --rm --pull=never --network none --read-only --user 502:20 --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=2g --volume "${content_source}:/src:ro" --volume "${content_modules}:/go/pkg/mod:ro" --volume /private/tmp/pr103-reviewed-content.ZuTHgN:/validation:rw --workdir /src --env GOTOOLCHAIN=local --env GIT_CEILING_DIRECTORIES=/src --env GOCACHE=/validation/go-cache --entrypoint go 266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6 test -race -trimpath -c -o /validation/sbom-race.test ./pkg/nkd/sbom
+
+# Pinned-tool and controlled cancellation regressions
+
+podman run --rm --pull=never --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --cpus 2 --memory 4g --pids-limit 256 --tmpfs /tmp:rw,nosuid,nodev,size=1g --volume /private/tmp/pr103-reviewed-content.ZuTHgN/sbom-race.test:/nkd-validation/sbom-race.test:ro --env NKD_SBOM_SCANNER=/usr/local/bin/syft --env NKD_SBOM_SCANNER_DIGEST=sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573 --env NKD_SBOM_PACKAGE_READER_DIGEST=sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6 --env NKD_SBOM_INSPECTOR_DIGEST=sha256:e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b --env NKD_SBOM_CODEC_DIGEST=sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e --env NKD_SBOM_GUESTFISH_DIGEST=sha256:db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb --entrypoint /bin/sh 6fe5b341957b02b266610fdec2b7fdb11403a8f0160d7b5b03fcda8c76d8e15d -c 'date -u; uname -sm; id; cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max /sys/fs/cgroup/pids.max; sha256sum /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish /usr/local/bin/syft /usr/bin/dpkg-deb; exec /nkd-validation/sbom-race.test -test.run "^(TestDirectOCI.*|TestGeneratedInspectionPostCopyHashCancellation|TestOCIMarker.*|TestContainerScanProgress|TestDiskContentPinnedScannerReal|TestDiskCapturedPackagesPinnedToolsReal|TestNestedOCI.*)$" -test.v -test.timeout 5m'
+
+# Host non-test gates
+
+PATH="/opt/homebrew/bin:$PATH" make fmt-check vet lint shellcheck vulncheck build workflows-check
+
+# Executable-source manifest
+
+git -c core.fsmonitor=false ls-files '*.go' go.mod go.sum .go-version | xargs shasum -a 256 | shasum -a 256

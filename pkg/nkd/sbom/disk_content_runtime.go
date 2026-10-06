@@ -310,9 +310,6 @@ func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, platf
 		return err
 	})
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "OCI material copy canceled")
-		}
 		return nil, err
 	}
 	defer func() { _ = archive.Close() }()

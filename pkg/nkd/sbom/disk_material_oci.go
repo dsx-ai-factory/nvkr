@@ -89,6 +89,10 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 	for _, image := range images {
 		inventory, err := scan(ctx, workspace, image)
 		if err != nil {
+			var coded *e.Error
+			if ctx.Err() != nil && (!errors.As(err, &coded) || coded.Code != e.CodeTimeout) {
+				return nil, nestedOCIValidationError(ctx, err, "scanning nested OCI image")
+			}
 			return nil, err
 		}
 		result.components = append(result.components, withDiskContentClass(inventory.Components, diskClassContainer)...)

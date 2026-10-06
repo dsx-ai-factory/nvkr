@@ -24,8 +24,9 @@ import (
 )
 
 // This opt-in regression executes the selected digest-pinned scanner on a small
-// real Docker archive and the plain/gzip nested-image owner. With all five
-// native tool pins it also runs OCI helper platform/report-binding rows. It
+// real Docker archive and the plain/gzip nested-image owner. Once opted in with
+// NKD_SBOM_SCANNER, all five native tool pins are required for the OCI helper
+// platform/report-binding rows. It
 // does not prove libguestfs execution or complete NKE image coverage.
 func TestDiskContentPinnedScannerReal(t *testing.T) {
 	path := os.Getenv("NKD_SBOM_SCANNER")
@@ -74,40 +75,25 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer transport.Close()
-	for _, mode := range []string{"generated", "held"} {
-		t.Run(mode, func(t *testing.T) {
-			var inventory DependencyInventory
-			var err error
-			if mode == "generated" {
-				inventory, err = inspectGeneratedDependencies(t.Context(), transport, scanner)
-			} else {
-				subject, openErr := heldfile.FromReaderContext(t.Context(), io.NewSectionReader(transport, 0, transport.Size()), heldfile.Options{Label: "real-scanner-archive", MaxBytes: 1 << 20})
-				if openErr != nil {
-					t.Fatal(openErr)
-				}
-				defer subject.Close()
-				var inspection *FilesystemInspection
-				inspection, err = inspectCompressedImages(t.Context(), subject, "linux/"+runtime.GOARCH, scanner, 1<<20, 0)
-				if err == nil {
-					inventory.Components = inspection.Components()
-				}
-			}
+	t.Run("generated", func(t *testing.T) {
+		var inventory DependencyInventory
+		var err error
+		inventory, err = inspectGeneratedDependencies(t.Context(), transport, scanner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, component := range inventory.Components {
+			key, err := diskComponentKey(component, "linux/"+runtime.GOARCH)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, component := range inventory.Components {
-				key, err := diskComponentKey(component, "linux/"+runtime.GOARCH)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if key == (diskPackageKey{name: "nkd-scanner-fixture", version: "2:1.0-1ubuntu4", format: "deb", architecture: "all"}) {
-					t.Logf("scanner=%s subject=%s exact package=%s version=%s", scanner.Digest, transport.Digest(), component.Name, component.Version)
-					return
-				}
+			if key == (diskPackageKey{name: "nkd-scanner-fixture", version: "2:1.0-1ubuntu4", format: "deb", architecture: "all"}) {
+				t.Logf("scanner=%s subject=%s exact package=%s version=%s", scanner.Digest, transport.Digest(), component.Name, component.Version)
+				return
 			}
-			t.Fatalf("real scanner omitted exact fixture package: %+v", inventory.Components)
-		})
-	}
+		}
+		t.Fatalf("real scanner omitted exact fixture package: %+v", inventory.Components)
+	})
 	for _, test := range []struct {
 		name       string
 		compressed bool
@@ -183,8 +169,8 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 				io.NewSectionReader(subject, 0, subject.Size()), &report)
 			if architecture != runtime.GOARCH {
 				assertDependencyCode(t, err, e.CodeVerifyFailed)
-				if report.Len() != 0 {
-					t.Fatal("foreign OCI configuration returned a partial content report")
+				if report.Len() != 0 || !strings.Contains(err.Error(), "nested OCI image platform differs from consumer") {
+					t.Fatalf("foreign OCI configuration reached the wrong boundary or returned a partial report: %v", err)
 				}
 				return
 			}
