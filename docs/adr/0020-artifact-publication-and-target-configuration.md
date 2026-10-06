@@ -253,6 +253,11 @@ construction and consumption. A protected pre-publication stage creates and veri
 assembling the final release metadata; production publication and authenticated consumption reject raw
 preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
 
+For disk-root and material inventories, document byte integrity is checked before provenance properties are
+read. Missing provenance is reported as `CodeProvenanceMissing` before the semantic identity and exact-subject
+gate; if both defects exist, that first error does not imply the subject is valid. A provenance-complete document
+with a substituted semantic identity or subject fails with `CodeVerifyFailed`. Both gates remain mandatory.
+
 Signatures, SLSA provenance and SBOMs use the same standard Sigstore v0.3 bundle format as OCI referrers
 (ADR-04); their predicate types remain distinct. One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
 same root. Signature/attestation attachments stay outside the signed index to avoid circular identity. Each deliverable manifest also receives its own signature and subject-bound production attestation in its

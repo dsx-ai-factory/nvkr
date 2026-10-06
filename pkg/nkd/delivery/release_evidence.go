@@ -164,6 +164,9 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		}
 		// Missing disk-root and material provenance share the release's owning
 		// gate, including the scanner pin required by generic BOM validation.
+		// After authenticating document bytes, report missing provenance before
+		// semantic/subject mismatch when both defects exist. The error identifies
+		// the first failed gate, not the absence of any other integrity defect.
 		// This grants no authority: the exact semantic/subject checks still follow.
 		for _, outputName := range binding.Outputs {
 			diskRoot := diskRoots[outputName]

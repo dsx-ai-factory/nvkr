@@ -35,10 +35,13 @@ func TestReleaseDiskTypeAdmissionRejectsOtherArtifactFamilies(t *testing.T) {
 }
 
 func TestReleaseSBOMSubjectGateRejectsSelfPinnedChanges(t *testing.T) {
-	for _, scenario := range []string{"semantic digest", "object name", "subject hash", "component name", "invalid non-disk document"} {
+	for _, scenario := range []string{"semantic digest", "object name", "subject hash", "no subject hash", "two subject hashes", "component name", "invalid non-disk document", "subject hash missing provenance", "material subject hash missing provenance"} {
 		t.Run(scenario, func(t *testing.T) {
 			request, _ := diskPublicationRequest(t, "amd64")
 			component := "image"
+			if scenario == "material subject hash missing provenance" {
+				component = "agent"
+			}
 			if scenario == "invalid non-disk document" {
 				request = releasePublicationRequestFixture(t, "linux", "amd64")
 				component = "cli"
@@ -75,12 +78,24 @@ func TestReleaseSBOMSubjectGateRejectsSelfPinnedChanges(t *testing.T) {
 						t.Fatal(err)
 					}
 					switch scenario {
-					case "subject hash":
+					case "subject hash", "subject hash missing provenance", "material subject hash missing provenance":
 						changed, err := sbom.ForSubject(&bom, digestBytes([]byte("sibling bytes")), "build-output", "")
 						if err != nil {
 							t.Fatal(err)
 						}
 						bom = *changed
+						if strings.HasSuffix(scenario, "missing provenance") {
+							for index, property := range bom.Metadata.Props {
+								if property.Name == "nkd:dependencyScannerDigest" {
+									bom.Metadata.Props = append(bom.Metadata.Props[:index], bom.Metadata.Props[index+1:]...)
+									break
+								}
+							}
+						}
+					case "no subject hash":
+						bom.Metadata.Component.Hashes = nil
+					case "two subject hashes":
+						bom.Metadata.Component.Hashes = append(bom.Metadata.Component.Hashes, bom.Metadata.Component.Hashes[0])
 					case "component name":
 						bom.Metadata.Component.Name = "sibling"
 					case "invalid non-disk document":
@@ -119,8 +134,12 @@ func TestReleaseSBOMSubjectGateRejectsSelfPinnedChanges(t *testing.T) {
 			}
 			pin := rewriteDiskPublicationRoot(t, root, inspection, func(*PublicationRoot) {})
 			owner, err := openDiskPublicationFixture(t.Context(), root, pin)
-			assertRegistryCode(t, err, e.CodeVerifyFailed)
-			if owner != nil || !strings.Contains(err.Error(), "SBOM document differs from its exact release subject") {
+			code, diagnostic := e.CodeVerifyFailed, "SBOM document differs from its exact release subject"
+			if strings.HasSuffix(scenario, "missing provenance") {
+				code, diagnostic = e.CodeProvenanceMissing, "disk inventory lacks an exact nkd:dependencyScannerDigest"
+			}
+			assertRegistryCode(t, err, code)
+			if owner != nil || !strings.Contains(err.Error(), diagnostic) {
 				t.Fatalf("self-pinned substitution missed subject gate: %v, %v", owner, err)
 			}
 		})
