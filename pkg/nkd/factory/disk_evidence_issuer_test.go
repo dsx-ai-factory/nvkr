@@ -163,6 +163,7 @@ func TestDiskEvidenceIssuerCoreOwnsCompleteJoin(t *testing.T) {
 					if err != nil {
 						return diskEvidenceScan{}, err
 					}
+					bom.Metadata.Component.Type = "operating-system"
 					bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "modeled-inventory", Version: "1"}}, "disk-reconciled/v1", "sha256:"+strings.Repeat("b", 64))
 					if err != nil {
 						return diskEvidenceScan{}, err

@@ -16,11 +16,12 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 )
 
 func TestAcquisitionWaitReturnsTheOwningCodedError(t *testing.T) {
-	for _, operation := range []string{"observe", "snapshot"} {
+	for _, operation := range []string{"observe", "snapshot", "size"} {
 		t.Run(operation, func(t *testing.T) {
 			artifact := &PackerArtifact{}
 			artifact.mu.Lock()
@@ -28,13 +29,64 @@ func TestAcquisitionWaitReturnsTheOwningCodedError(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 			var err error
-			if operation == "observe" {
+			switch operation {
+			case "observe":
 				_, err = artifact.ObserveAcquisitionsContext(ctx)
-			} else {
+			case "snapshot":
 				_, err = artifact.snapshotAcquisitionsContext(ctx)
+			default:
+				_, err = artifact.acquisitionSizeContext(ctx)
 			}
 			if code(err) != e.CodeTimeout || strings.Count(err.Error(), string(e.CodeTimeout)) != 1 || !strings.Contains(err.Error(), "waiting for inspection runtime") {
 				t.Fatalf("wait error was lost or wrapped twice: %v", err)
+			}
+		})
+	}
+}
+
+func TestAcquisitionSizingIsNotContentAuthority(t *testing.T) {
+	for _, condition := range []string{"retained", "absent", "closed", "nil artifact", "nil context"} {
+		t.Run(condition, func(t *testing.T) {
+			disk, err := os.CreateTemp(t.TempDir(), "disk")
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Invalid archive bytes deliberately prove sizing does not parse or
+			// authenticate acquisition metadata before capacity admission.
+			raw := []byte("not an acquisition archive")
+			capture, err := heldfile.FromBytesContext(t.Context(), raw, heldfile.Options{Label: "size-only", MaxBytes: 64})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer capture.Close()
+			artifact := &PackerArtifact{file: disk, acquisitions: capture}
+			defer artifact.Close()
+			ctx := t.Context()
+			want := e.CodeGateUnmet
+			switch condition {
+			case "retained":
+				want = ""
+			case "absent":
+				artifact.acquisitions = nil
+			case "closed":
+				if err := artifact.Close(); err != nil {
+					t.Fatal(err)
+				}
+			case "nil artifact":
+				artifact = nil
+				want = e.CodeUsage
+			case "nil context":
+				ctx = nil //nolint:staticcheck // intentional context admission regression
+				want = e.CodeUsage
+			}
+			size, err := artifact.acquisitionSizeContext(ctx)
+			if code(err) != want || want == "" && size != int64(len(raw)) || want != "" && size != 0 {
+				t.Fatalf("size=%d,error=%v; want%s", size, err, want)
+			}
+			if condition == "retained" {
+				if _, err := artifact.ObserveAcquisitionsContext(t.Context()); code(err) != e.CodeVerifyFailed {
+					t.Fatalf("size-only description admitted invalid capture content: %v", err)
+				}
 			}
 		})
 	}

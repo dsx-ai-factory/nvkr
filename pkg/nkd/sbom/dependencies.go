@@ -92,6 +92,30 @@ func dependencyRef(component Component) string {
 	return "urn:nkd:dependency:" + url.PathEscape(component.Type+"/"+component.Name+"@"+component.Version)
 }
 
+// This is descriptive vocabulary validation, not evidence authentication. The
+// original content/Run owners still issue receipts and authenticate subjects.
+func validateInventorySemantics(bom *BOM, artifact string) error {
+	method := ""
+	for _, property := range bom.Metadata.Props {
+		if property.Name == "nkd:dependencyInspection" {
+			method = property.Value
+		}
+	}
+	diskInventory := method == "disk-content/v1" || method == "disk-reconciled/v1"
+	if diskInventory && artifact == "" {
+		return e.New(e.CodeVerifyFailed, "disk inventory requires an exact per-artifact subject")
+	}
+	if method == "disk-reconciled/v1" && bom.Metadata.Component.Type != "operating-system" {
+		return e.New(e.CodeVerifyFailed, "reconciled disk inventory requires an operating-system subject")
+	}
+	for _, component := range bom.Components {
+		if component.Type == "file" && !diskInventory {
+			return e.New(e.CodeVerifyFailed, "file inventory requires its descriptive disk-content or reconciled disk method")
+		}
+	}
+	return nil
+}
+
 func validateDependencies(bom *BOM) error {
 	method, scanner := "", ""
 	for _, property := range bom.Metadata.Props {

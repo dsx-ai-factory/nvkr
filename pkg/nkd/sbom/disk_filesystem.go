@@ -413,18 +413,24 @@ type filesystemContextReader struct {
 }
 
 // Syft owns Debian version and architecture parsing. Its native report retains
-// fields which the CycloneDX encoding deliberately omits; project only semantic
-// package identity, never scanner locations, timestamps or random IDs.
+// fields which the CycloneDX encoding deliberately omits. Retain native location
+// coordinates through capability admission, then project semantic package identity;
+// locations describe scanner input, not installed origin or a container owner.
 func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (DependencyInventory, error) {
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return DependencyInventory{}, e.Wrap(e.CodeEnvelopeDecode, err, "validating filesystem package report")
 	}
 	var report struct {
 		Artifacts []struct {
-			Name     string `json:"name"`
-			Version  string `json:"version"`
-			Type     string `json:"type"`
-			PURL     string `json:"purl"`
+			Name      string `json:"name"`
+			Version   string `json:"version"`
+			Type      string `json:"type"`
+			PURL      string `json:"purl"`
+			Locations []struct {
+				Path       string `json:"path"`
+				AccessPath string `json:"accessPath"`
+				LayerID    string `json:"layerID"`
+			} `json:"locations"`
 			Metadata struct {
 				Architecture string `json:"architecture"`
 			} `json:"metadata"`
@@ -446,6 +452,29 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 		component := Component{Type: "library", Name: artifact.Name, Version: artifact.Version, PURL: artifact.PURL,
 			Properties: []Property{{Name: "nkd:packageFormat", Value: artifact.Type}}}
 		if artifact.Type == "deb" {
+			// Syft v1.51.1's dpkg-db-cataloger deliberately searches **/lib/dpkg.
+			// A nested database has no independently held filesystem/image owner
+			// here. Refuse it explicitly rather than stamping its packages as host
+			// filesystem evidence or guessing container identity from the path.
+			for _, location := range artifact.Locations {
+				for _, coordinate := range []string{location.Path, location.AccessPath} {
+					clean := path.Clean("/" + coordinate)
+					for _, database := range []string{"dpkg/status", "dpkg/status.d/", "opkg/status", "opkg/info/"} {
+						marker := "/lib/" + database
+						fragment := strings.HasSuffix(marker, "/")
+						if !strings.HasSuffix(clean, marker) && !(fragment && strings.Contains(clean, marker)) {
+							continue
+						}
+						rooted := false
+						for _, prefix := range []string{"/var", "/usr", ""} {
+							rooted = rooted || clean == prefix+marker || fragment && strings.HasPrefix(clean, prefix+marker)
+						}
+						if !rooted {
+							return DependencyInventory{}, e.New(e.CodeEngineCapability, "filesystem scanner found an unsupported nested package database at %q; separate held root/container inspection is required", coordinate)
+						}
+					}
+				}
+			}
 			if artifact.Metadata.Architecture == "" || artifact.Version == "" {
 				return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "Debian filesystem package lacks exact version or architecture")
 			}

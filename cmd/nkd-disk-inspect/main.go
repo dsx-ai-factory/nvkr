@@ -34,6 +34,15 @@ func run(ctx context.Context, args []string, input io.Reader, output, diagnostic
 // The private seam tests that admission precedes subject reads. Production always
 // invokes the kernel owner above; no caller can replace its enforcement check.
 func runWithLimitCheck(ctx context.Context, args []string, input io.Reader, output, diagnostic io.Writer, verify func(context.Context, uint64, uint64, uint64) error) int {
+	return runWithContentHelper(ctx, args, input, output, diagnostic, verify, sbom.RunDiskContentHelper)
+}
+
+// Only the command's positional mapping is replaceable in tests. Production
+// always delegates to the concrete SBOM owner after kernel-limit admission.
+func runWithContentHelper(ctx context.Context, args []string, input io.Reader, output, diagnostic io.Writer,
+	verify func(context.Context, uint64, uint64, uint64) error,
+	content func(context.Context, string, string, string, int64, string, string, string, string, uint64, string, io.Reader, io.Writer) error,
+) int {
 	if len(args) != 7 && len(args) != 14 {
 		err := e.New(e.CodeUsage, "inspection helper requires exact tool, subject and resource pins")
 		fmt.Fprintln(diagnostic, err)
@@ -62,7 +71,7 @@ func runWithLimitCheck(ctx context.Context, args []string, input io.Reader, outp
 		if args[4] != "composition" || parseErr != nil {
 			err = e.New(e.CodeUsage, "invalid disk content helper operation or budget")
 		} else {
-			err = sbom.RunDiskContentHelper(ctx, args[0], args[1], args[2], size, args[5], args[6], args[7], args[8], budget, args[10], input, output)
+			err = content(ctx, args[0], args[1], args[2], size, args[5], args[6], args[7], args[8], budget, args[10], input, output)
 		}
 	} else {
 		err = sbom.RunDiskInspectionHelper(ctx, args[0], args[1], args[2], size, input, output)

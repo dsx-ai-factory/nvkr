@@ -79,11 +79,10 @@ func (container *DiskInspectionContainer) inspectPackerContent(ctx context.Conte
 	defer cancel()
 	size := artifact.Size()
 	if kind == "apt-acquisition" {
-		capture, err := artifact.ObserveAcquisitionsContext(ctx)
+		size, err = artifact.acquisitionSizeContext(ctx)
 		if err != nil {
 			return nil, err
 		}
-		_, size, _ = capture.Binding()
 	}
 	reservation, err := container.reserveSubject(ctx, size, true)
 	if err != nil {

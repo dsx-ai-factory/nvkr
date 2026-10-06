@@ -114,6 +114,7 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 	if err != nil {
 		return nil, err
 	}
+	bom.Metadata.Component.Type = "operating-system"
 	components, err = diskDocumentComponents(components)
 	if err != nil {
 		return nil, err
@@ -290,8 +291,12 @@ func WithSourceSubject(document, source *BOM) (*BOM, error) {
 	}
 	result := cloneBOM(document)
 	reference := result.Metadata.Component.BOMRef
+	inspectedType := result.Metadata.Component.Type
 	result.Metadata.Component = cloneComponent(source.Metadata.Component)
 	result.Metadata.Component.BOMRef = reference
+	// Source declarations supply recipe metadata, not a replacement for the
+	// content operation's subject vocabulary (in particular its disk OS type).
+	result.Metadata.Component.Type = inspectedType
 	if err := result.Validate(); err != nil {
 		return nil, err
 	}

@@ -352,9 +352,8 @@ func admitDiskEvidenceBuild(plan *Plan, expected LifecycleOutputPlan) (BuildPlan
 		if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest {
 			continue
 		}
-		if build.Platform != "linux/amd64" && build.Platform != "linux/arm64" {
-			return BuildPlan{}, e.New(e.CodeEngineCapability, "disk reconciliation requires an AMD64 or ARM64 consumer")
-		}
+		// Complete Plan validation admits the IR target domain and binds this
+		// copied BuildPlan's platform to that graph before any Run permit/work.
 		root, err := buildgraph.DiskRootName(build.ResolvedComponents)
 		if err != nil {
 			return BuildPlan{}, err

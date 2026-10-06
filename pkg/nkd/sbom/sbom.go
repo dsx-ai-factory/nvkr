@@ -355,6 +355,9 @@ func (b *BOM) Validate() error {
 	if err != nil {
 		return err
 	}
+	if err := validateInventorySemantics(b, artifact); err != nil {
+		return err
+	}
 	serialSeed := buildDigest
 	if artifact != "" {
 		serialSeed += "/" + artifact

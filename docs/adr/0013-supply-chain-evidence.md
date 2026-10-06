@@ -156,13 +156,21 @@ Reconciliation rejects absent input classes and installed package identities abs
 inputs. The exact captured package bytes are separately read by pinned dpkg-deb before source-reported
 metadata is accepted. Owner-issued content classes distinguish filesystem package databases, container
 inventories and held Debian archives: a container database cannot justify an installed host Debian package.
+The native Syft adapter retains real/access-path coordinates through admission. Its recursive database
+cataloger can find unpacked or containerd snapshot roots; those nested package databases return a distinct
+`CodeEngineCapability` until a separate held root/container observation exists. No path-based container
+identity is invented, no package is silently dropped, and this refusal does not establish functional
+nested-storage reconciliation. Scanner locations remain descriptions, not installed-origin authority.
 Correspondence is checked before public document deduplication; those internal classes do not assert
 installed origin or package ownership. Loose-file hashing observes bytes, not their derivation.
 Unknown package versions remain unknown in descriptive inventory. Final material correspondence requires
 an exact observed version: equal names with unknown versions do not prove identical package content.
 Per-material mixed scanner/package-reader/file-walk documents use the descriptive `disk-content/v1`
 inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operation uses
-`disk-reconciled/v1`; neither method string restores a runtime receipt or grants publication authority.
+`disk-reconciled/v1` with an `operating-system` subject. File dependency inventories are admitted only
+for these per-artifact disk methods, not ordinary Helm/Syft dependency documents. Source declarations
+cannot relabel the inspected disk subject. This is descriptive vocabulary validation: neither a subject
+type nor a method string restores a runtime receipt or grants publication authority.
 
 The implemented QCOW2 reader exports libguestfs's inspected, mounted filesystem tree, not an independently
 enumerated inventory of every filesystem extent. Unmounted or unrecognized content is not proven covered.
@@ -207,6 +215,11 @@ structural ceiling does not guarantee every such inventory fits the byte limits;
 evidence still fails without truncation. Full-content admission charges four overlapping report
 copies for the increase over the diagnostic allowance. The conservative
 simultaneous export/RAM budget is an admission condition, not evidence of runner capacity or reservation.
+Disk-backed scratch authenticates an empty attempt-owned daemon volume, its local driver/options and
+observed free space before streaming. It does not observe `nosuid` or `nodev` mount flags on that volume;
+the memory-backed route explicitly requests both. The non-root consumer drops all capabilities and
+requests no-new-privileges, while the fixed ownership preparer has only CHOWN. These controls do not
+justify claiming equivalent mount-flag enforcement or a provider-owned storage quota.
 
 The helper checks the actual cgroup-v2 CPU, memory and process-count ceilings before reading the subject.
 The leaf must exactly match the frozen CPU/RAM values and the launcher's 256-process ceiling; unknown,

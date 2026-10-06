@@ -34,6 +34,23 @@ func (artifact *PackerArtifact) ObserveAcquisitionsContext(ctx context.Context) 
 	return material.ObserveAcquisitionArchive(ctx, artifact.acquisitions)
 }
 
+// Size is only a capacity description of this original retained carrier. It is
+// not an acquisition observation: the later snapshot authenticates exact bytes,
+// and the material/helper owners still validate their complete archive content.
+func (artifact *PackerArtifact) acquisitionSizeContext(ctx context.Context) (int64, error) {
+	if ctx == nil || artifact == nil {
+		return 0, e.New(e.CodeUsage, "acquisition sizing requires context and original artifact")
+	}
+	if err := lockDiskInspection(ctx, &artifact.mu); err != nil {
+		return 0, err
+	}
+	defer artifact.mu.Unlock()
+	if artifact.file == nil || artifact.acquisitions == nil {
+		return 0, e.New(e.CodeGateUnmet, "original disk has no retained acquisitions")
+	}
+	return artifact.acquisitions.Size(), nil
+}
+
 // snapshotAcquisitionsContext copies the original collected carrier. Only the
 // runtime's registered operation admits capacity and closes this private copy.
 func (artifact *PackerArtifact) snapshotAcquisitionsContext(ctx context.Context) (*heldfile.File, error) {
