@@ -23,6 +23,9 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	}
 	switch node.PackageKind {
 	case PackageImage:
+		if node.ImageIndex != nil {
+			return executeImageIndexPackage(ctx, plan, node, output, artifacts, stdout)
+		}
 		return executeImagePackage(ctx, plan, node, output, inputs, artifacts, stdout)
 	case PackageBinaryBundle:
 		return executeBinaryPackage(ctx, plan, output, inputs)

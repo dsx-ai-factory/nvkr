@@ -27,13 +27,14 @@ type OutputBinding struct {
 	// Publication retains the authenticated output-local handoff selected by assembly.
 	Publication *PublicationOrigin `json:"publication,omitempty"`
 	// Repository is a sibling repository name relative to the release repository namespace.
-	Repository    string         `json:"repository"`
-	Format        string         `json:"format"`
-	BuildDigest   string         `json:"buildDigest"`
-	Components    []string       `json:"components"`
-	TransportPath string         `json:"transportPath,omitempty"`
-	BuildSubjects []BuildSubject `json:"buildSubjects,omitempty"`
-	Disk          *DiskOutput    `json:"disk,omitempty"`
+	Repository    string             `json:"repository"`
+	Format        string             `json:"format"`
+	BuildDigest   string             `json:"buildDigest"`
+	Components    []string           `json:"components"`
+	TransportPath string             `json:"transportPath,omitempty"`
+	BuildSubjects []BuildSubject     `json:"buildSubjects,omitempty"`
+	Disk          *DiskOutput        `json:"disk,omitempty"`
+	ImageIndex    *ImageIndexBinding `json:"imageIndex,omitempty"`
 }
 
 // PublicationOrigin preserves preparation and signing identities across retries.
@@ -52,6 +53,7 @@ type BuildSubject struct {
 // EvidenceBinding describes exactly which stage and bytes a document inventories.
 // DescriptorDigest and BlobDigest on the enclosing object bind the document.
 type EvidenceBinding struct {
+	Platform              string   `json:"platform,omitempty"`
 	DocumentDigest        string   `json:"documentDigest"`
 	Outputs               []string `json:"outputs"`
 	Component             string   `json:"component"`
@@ -63,6 +65,11 @@ type EvidenceBinding struct {
 
 func validateReleaseMetadata(root PublicationRoot) error {
 	if root.Release == nil {
+		for _, object := range root.Objects {
+			if object.Output != nil && object.Output.ImageIndex != nil {
+				return e.New(e.CodeVerifyFailed, "aggregate image requires exact release membership")
+			}
+		}
 		return nil
 	}
 	m := root.Release
@@ -105,13 +112,20 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			return e.New(e.CodeVerifyFailed, "output requires a unique canonical sibling repository")
 		}
 		repositories[o.Output.Repository] = true
+		if o.Output.ImageIndex != nil {
+			if err := validateImageIndexObject(o); err != nil {
+				return err
+			}
+		}
 		var kind, media string
 		switch o.Output.Format {
 		case "executable":
 			kind, media = "binary-bundle", MediaBinaryBundle
 		case "oci":
 			kind, media = "container-image", o.ArtifactType
-			if !types.MediaType(media).IsImage() {
+			if o.Output.ImageIndex != nil {
+				media = MediaOCIIndex
+			} else if !types.MediaType(media).IsImage() {
 				return e.New(e.CodeVerifyFailed, "container output requires a native OCI or Docker schema-2 image manifest")
 			}
 		case outputFormatHelm:

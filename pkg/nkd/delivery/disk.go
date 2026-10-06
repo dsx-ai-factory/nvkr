@@ -542,7 +542,30 @@ func publicationDiskPayloads(ctx context.Context, root, expectedRoot string) (ma
 			return nil, e.New(e.CodeVerifyFailed, "publication has no exact release metadata")
 		}
 		reachable[descriptor.Digest], reachable[manifest.Config.Digest] = true, true
-		for _, object := range publication.Objects {
+		objects := append([]PublishedObject(nil), publication.Objects...)
+		for i := 0; i < len(objects); i++ {
+			object := objects[i]
+			if publishedManifestMediaType(object) == MediaOCIIndex {
+				raw, err := readBlob(ctx, root, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+				if err != nil {
+					return nil, err
+				}
+				var children runnableIndex
+				if err := canonical.UnmarshalExact(raw, &children); err != nil {
+					return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding image index storage selection")
+				}
+				if children.SchemaVersion != 2 || children.MediaType != MediaOCIIndex || len(children.Manifests) == 0 || len(children.Manifests)+len(objects) > maxDeliveryObjects {
+					return nil, e.New(e.CodeVerifyFailed, "image index storage selection exceeds supported bounds")
+				}
+				reachable[object.DescriptorDigest] = true
+				for _, child := range children.Manifests {
+					if child.MediaType != MediaOCIManifest && child.MediaType != MediaDockerManifest {
+						return nil, e.New(e.CodeVerifyFailed, "image index storage selection requires native manifests")
+					}
+					objects = append(objects, PublishedObject{DescriptorDigest: child.Digest, Size: child.Size, ArtifactType: child.MediaType})
+				}
+				continue
+			}
 			// Select storage from the byte profile, not untrusted output labels:
 			// a substituted kind must not force a raw disk into a whole-file memfd
 			// before the later authoritative binding check rejects that label.

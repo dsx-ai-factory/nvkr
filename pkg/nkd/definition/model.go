@@ -16,12 +16,12 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/discoverytags"
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
 const (
-	DefinitionAPIVersion         = "nkd.dev/definition/v4"
+	DefinitionAPIVersion         = "nkd.dev/definition/v5"
 	DefinitionKind               = "Definition"
 	EnvironmentAPIVersion        = "nkd.dev/environment/v1"
 	EnvironmentKind              = "Environment"
@@ -65,7 +65,8 @@ type Catalog struct {
 // selects exact outputs of one build; format selects the standard envelope.
 type DefinitionOutput struct {
 	Name       string      `json:"name"`
-	Platform   string      `json:"platform"`
+	Platform   string      `json:"platform,omitempty"`
+	Platforms  []string    `json:"platforms,omitempty"`
 	Catalog    *Catalog    `json:"catalog,omitempty"`
 	Components []string    `json:"components,omitempty"`
 	Format     string      `json:"format"`
@@ -122,11 +123,13 @@ type SourceAccess struct {
 // Publication selects one OCI namespace. Release metadata/evidence use /releases; outputs use named sibling repositories.
 type Publication struct {
 	// Mode selects output-local publication and metadata-only release assembly.
-	Mode             string `json:"mode,omitempty"`
-	RepositoryPrefix string `json:"repositoryPrefix"`
-	CredentialRef    string `json:"credentialRef,omitempty"`
-	Anonymous        bool   `json:"anonymous,omitempty"`
-	PlainHTTP        bool   `json:"plainHTTP,omitempty"`
+	Mode string `json:"mode,omitempty"`
+	// ImageTags selects mutable discovery aliases for exact aggregate OCI outputs.
+	ImageTags        map[string]string `json:"imageTags,omitempty"`
+	RepositoryPrefix string            `json:"repositoryPrefix"`
+	CredentialRef    string            `json:"credentialRef,omitempty"`
+	Anonymous        bool              `json:"anonymous,omitempty"`
+	PlainHTTP        bool              `json:"plainHTTP,omitempty"`
 }
 
 type Runtime struct {
@@ -170,7 +173,7 @@ func (definition Definition) Validate() error {
 		if !namePattern.MatchString(output.Name) || output.Name <= previous || outputs[output.Name] {
 			return e.New(e.CodeInvalidCatalog, "definition output %q is invalid, repeated, empty, or has an invalid platform", output.Name)
 		}
-		if err := target.ValidatePlatform(output.Platform); err != nil {
+		if err := output.validatePlatforms(); err != nil {
 			return err
 		}
 		if output.Catalog != nil && output.Catalog.Base == "" {
@@ -208,7 +211,7 @@ func (definition Definition) Validate() error {
 				binding := output.Helm.Images[slot]
 				found := false
 				for _, candidate := range definition.Outputs {
-					if candidate.Name == binding && candidate.Format == OutputOCI && candidate.Platform == output.Platform {
+					if candidate.Name == binding && candidate.Format == OutputOCI && candidate.SupportsPlatform(output.Platform) {
 						found = true
 					}
 				}
@@ -300,6 +303,9 @@ func (environment Environment) Validate() error {
 	if publication := environment.Publication; publication != nil {
 		if publication.Mode != "" && (publication.Mode != "per-output-v1" || environment.Signing == nil || environment.Signing.Mode != "cosign") {
 			return e.New(e.CodeEngineCapability, "per-output publication requires production cosign signing")
+		}
+		if err := discoverytags.Validate(publication.ImageTags); err != nil {
+			return err
 		}
 		if strings.ContainsAny(publication.CredentialRef, "\r\n\x00") {
 			return e.New(e.CodeInvalidCatalog, "publication credentialRef must not contain control characters")

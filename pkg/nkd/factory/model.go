@@ -25,8 +25,8 @@ import (
 
 const (
 	MaxPlanBytes        = int64(4 << 20)
-	PlanSchemaVersion   = "nkd.dev/run-plan/v4"
-	ArtifactGraphSchema = "nkd.dev/artifact-graph/v4"
+	PlanSchemaVersion   = "nkd.dev/run-plan/v5"
+	ArtifactGraphSchema = "nkd.dev/artifact-graph/v5"
 	// DefaultRunsOn is the runner an unset Environment.runsOn falls back to. ADR-18 §8
 	// runs on a GENERIC hosted runner — the helper orchestrates the pinned container itself —
 	// so no bespoke self-hosted runner label is required. Ordinary native ARM64
@@ -89,6 +89,7 @@ const (
 // packageSpec describes dataflow, not ordering. Inputs are artifact selectors:
 // target/component, target/*, or package/name.
 type packageSpec struct {
+	ImageIndex   *ImageIndexPlan   `json:"imageIndex,omitempty"`
 	HelmImage    *HelmImageBinding `json:"helmImage,omitempty"`
 	Name         string            `json:"name"`
 	Kind         string            `json:"kind"`
@@ -110,11 +111,12 @@ type HelmImageBinding struct {
 }
 
 type Target struct {
-	Kind          string `json:"kind"`
-	Ref           string `json:"ref"`
-	CredentialRef string `json:"credentialRef,omitempty"`
-	Anonymous     bool   `json:"anonymous,omitempty"`
-	PlainHTTP     bool   `json:"plainHTTP,omitempty"`
+	ImageTags     map[string]string `json:"imageTags,omitempty"`
+	Kind          string            `json:"kind"`
+	Ref           string            `json:"ref"`
+	CredentialRef string            `json:"credentialRef,omitempty"`
+	Anonymous     bool              `json:"anonymous,omitempty"`
+	PlainHTTP     bool              `json:"plainHTTP,omitempty"`
 }
 
 type Route struct {
@@ -161,11 +163,12 @@ type Plan struct {
 }
 
 type LifecycleOutputPlan struct {
-	Name        string   `json:"name"`
-	Kind        string   `json:"kind"`
-	ArtifactID  string   `json:"artifactId"`
-	BuildDigest string   `json:"buildDigest"`
-	Components  []string `json:"components"`
+	ImageIndex  *ImageIndexPlan `json:"imageIndex,omitempty"`
+	Name        string          `json:"name"`
+	Kind        string          `json:"kind"`
+	ArtifactID  string          `json:"artifactId"`
+	BuildDigest string          `json:"buildDigest"`
+	Components  []string        `json:"components"`
 }
 
 type LifecycleBoundOutput = delivery.Output
@@ -194,6 +197,7 @@ type ArtifactGraph struct {
 }
 
 type Node struct {
+	ImageIndex       *ImageIndexPlan   `json:"imageIndex,omitempty"`
 	HelmImage        *HelmImageBinding `json:"helmImage,omitempty"`
 	ID               string            `json:"id"`
 	Kind             string            `json:"kind"`

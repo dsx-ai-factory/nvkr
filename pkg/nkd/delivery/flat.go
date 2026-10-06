@@ -63,6 +63,9 @@ func PayloadDescriptor(ctx context.Context, root string) (Descriptor, error) {
 }
 
 func (writer layoutWriter) importFlatLayout(ctx context.Context, input ObjectInput) (Descriptor, string, error) {
+	if input.Output != nil && input.Output.ImageIndex != nil {
+		return writer.importImageIndexLayout(ctx, input)
+	}
 	_, indexRaw, err := readIndex(ctx, input.Path)
 	if err != nil {
 		return Descriptor{}, "", err

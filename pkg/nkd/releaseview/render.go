@@ -103,6 +103,13 @@ func renderText(selected view) string {
 			}
 			fmt.Fprintf(&out, "  Declared disk evidence: %s (metadata; consumer policy not applied)\n", terminal(mode))
 		}
+		if output.ImageIndex != nil {
+			fmt.Fprintf(&out, "  Required platforms: %s\n", terminal(strings.Join(output.ImageIndex.RequiredPlatforms, ", ")))
+			for _, child := range output.ImageIndex.Children {
+				fmt.Fprintf(&out, "  Platform: %s\n    Manifest: %s\n    Build: %s\n    Component: %s\n    Inspected export: %s\n",
+					terminal(child.Platform), terminal(child.ManifestDigest), terminal(child.BuildDigest), terminal(child.Component), terminal(child.BuildSubject))
+			}
+		}
 		for _, subject := range output.BuildSubjects {
 			fmt.Fprintf(&out, "  Component: %s @ %s\n", terminal(subject.Component), terminal(subject.Digest))
 		}
@@ -112,6 +119,9 @@ func renderText(selected view) string {
 				continue
 			}
 			fmt.Fprintf(&out, "  Evidence: %s (%s, %s)\n    Derived reference: %s\n    Subject: %s %s\n", terminal(evidence.Name), terminal(binding.Component), terminal(binding.Stage), terminal(evidence.Reference), terminal(binding.SubjectKind), terminal(binding.SubjectDigest))
+			if binding.Platform != "" {
+				fmt.Fprintf(&out, "    Platform: %s\n", terminal(binding.Platform))
+			}
 			fmt.Fprintf(&out, "    Members: %s\n", terminal(strings.Join(binding.Outputs, ", ")))
 		}
 	}
@@ -123,6 +133,8 @@ func renderMermaid(selected view) string {
 	fmt.Fprintf(&out, "flowchart TD\n  %%%% %s.\n", selected.Inspection)
 	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid("Release "+shortDigest(selected.RootDigest)+" | metadata inspection"))
 	outputs := make(map[string]string, len(selected.Outputs))
+	type imageChildKey struct{ output, platform, digest string }
+	imageChildren := make(map[imageChildKey]string)
 	for i, output := range selected.Outputs {
 		id := fmt.Sprintf("o%d", i)
 		outputs[output.Name] = id
@@ -138,14 +150,37 @@ func renderMermaid(selected view) string {
 			label += " | declared disk evidence: " + mode
 		}
 		fmt.Fprintf(&out, "  %s[\"%s\"]\n  root --> %s\n", id, mermaid(label), id)
+		if output.ImageIndex != nil {
+			for j, child := range output.ImageIndex.Children {
+				childID := fmt.Sprintf("%s_p%d", id, j)
+				imageChildren[imageChildKey{output.Name, child.Platform, child.ManifestDigest}] = childID
+				fmt.Fprintf(&out, "  %s[\"%s\"]\n  %s -->|contains platform| %s\n", childID,
+					mermaid(child.Platform+" | "+child.Component+" | "+shortDigest(child.ManifestDigest)), id, childID)
+			}
+		}
 		for j, subject := range output.BuildSubjects {
 			fmt.Fprintf(&out, "  %s_c%d[\"%s\"]\n  %s -->|contains| %s_c%d\n", id, j, mermaid(subject.Component+" | "+shortDigest(subject.Digest)), id, id, j)
 		}
 	}
 	for i, evidence := range selected.Evidence {
 		binding := evidence.Binding
-		fmt.Fprintf(&out, "  e%d[\"%s\"]\n", i, mermaid(evidence.Kind+" | "+binding.Component+" | "+binding.Stage))
-		fmt.Fprintf(&out, "  e%d_s[\"%s\"]\n  e%d -->|inventories| e%d_s\n", i, mermaid(binding.SubjectKind+" | "+shortDigest(binding.SubjectDigest)), i, i)
+		label := evidence.Kind + " | " + binding.Component + " | " + binding.Stage
+		if binding.Platform != "" {
+			label += " | " + binding.Platform
+		}
+		fmt.Fprintf(&out, "  e%d[\"%s\"]\n", i, mermaid(label))
+		linked := false
+		if binding.SubjectKind == "oci-manifest" && binding.Platform != "" {
+			for _, member := range binding.Outputs {
+				if childID, ok := imageChildren[imageChildKey{member, binding.Platform, binding.SubjectDigest}]; ok {
+					fmt.Fprintf(&out, "  e%d -->|inventories| %s\n", i, childID)
+					linked = true
+				}
+			}
+		}
+		if !linked {
+			fmt.Fprintf(&out, "  e%d_s[\"%s\"]\n  e%d -->|inventories| e%d_s\n", i, mermaid(binding.SubjectKind+" | "+shortDigest(binding.SubjectDigest)), i, i)
+		}
 		for _, member := range binding.Outputs {
 			if id, ok := outputs[member]; ok {
 				fmt.Fprintf(&out, "  e%d -->|supports| %s\n", i, id)

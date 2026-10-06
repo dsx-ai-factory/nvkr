@@ -13,7 +13,7 @@ import (
 )
 
 func TestDefinitionRejectsRemovedAuthoringModel(t *testing.T) {
-	const direct = `apiVersion: nkd.dev/definition/v4
+	const direct = `apiVersion: nkd.dev/definition/v5
 kind: Definition
 metadata:
   name: example
@@ -36,7 +36,7 @@ outputs:
 		name string
 		raw  string
 	}{
-		{name: "prior major", raw: strings.Replace(direct, "definition/v4", "definition/v3", 1)},
+		{name: "prior major", raw: strings.Replace(direct, "definition/v5", "definition/v4", 1)},
 		{name: "authored recipes", raw: direct + "recipes: []\n"},
 		{name: "output recipe reference", raw: direct + "    recipe: worker\n"},
 		{name: "criteria matcher", raw: direct + "    criteria: {arch: amd64}\n"},

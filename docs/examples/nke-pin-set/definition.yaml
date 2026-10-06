@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/definition/v4
+apiVersion: nkd.dev/definition/v5
 kind: Definition
 metadata:
   name: nke-acquired-charts

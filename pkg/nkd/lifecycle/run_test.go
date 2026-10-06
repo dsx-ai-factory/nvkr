@@ -69,7 +69,7 @@ func TestBindObservedDiskRequiresExactPlanBoundObservation(t *testing.T) {
 	run := testRun()
 	run.Expected[0].Kind = OutputDiskImage
 	run.Expected[0].Components = []string{"agent", "image"}
-	run.Expected[0].ComponentResults = []string{"result/node-image/agent", "result/node-image/image"}
+	run.Expected[0].ComponentResults = []string{"result/cli/agent", "result/cli/image"}
 	artifact := Artifact{
 		Name: "cli", Kind: OutputDiskImage, Digest: "sha256:" + strings.Repeat("4", 64),
 		BuildDigest: run.Expected[0].BuildDigest, Components: append([]string(nil), run.Expected[0].Components...),

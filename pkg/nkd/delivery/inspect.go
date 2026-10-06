@@ -159,8 +159,8 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 			descriptor.Annotations["org.opencontainers.image.title"] != object.Name) {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "publication object %q descriptor annotations do not match root semantics", object.Name)
 		}
-		if publication.Release != nil && !types.MediaType(descriptor.MediaType).IsImage() {
-			return Inspection{}, e.New(e.CodeVerifyFailed, "release objects must be direct manifests")
+		if publication.Release != nil && descriptor.MediaType != publishedManifestMediaType(object) {
+			return Inspection{}, e.New(e.CodeVerifyFailed, "release descriptor differs from its admitted output format")
 		}
 		if err := verifyPublishedObjectBinding(ctx, root, object, descriptor, disks); err != nil {
 			return Inspection{}, err
@@ -181,6 +181,13 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 
 func verifyPublishedObjectBinding(ctx context.Context, root string, object PublishedObject, descriptor Descriptor, disks map[string]DiskArtifactInspection) error {
 	if descriptor.MediaType == MediaOCIIndex {
+		if object.Output != nil {
+			index, err := openPublishedImageIndex(ctx, root, object)
+			if err != nil {
+				return err
+			}
+			return index.Close()
+		}
 		if object.BlobDigest != descriptor.Digest {
 			return e.New(e.CodeVerifyFailed, "nested publication object %q root digest does not match its blob binding", object.Name)
 		}

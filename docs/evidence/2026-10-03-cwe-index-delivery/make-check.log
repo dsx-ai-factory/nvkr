@@ -1,0 +1,46 @@
+formatting ok
+go vet ./...
+golangci-lint run
+0 issues.
+shellcheck -S warning scripts/*.sh toolchains/**/*.sh
+go test -race -covermode=atomic -coverprofile=coverage.out ./...
+ok  	github.com/NVIDIA/nke-recipes/client/v1	2.702s	coverage: 69.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/cmd/nkdctl	44.288s	coverage: 65.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/architecture	2.911s	coverage: [no statements]
+	github.com/NVIDIA/nke-recipes/internal/documentpath		coverage: 0.0% of statements
+	github.com/NVIDIA/nke-recipes/internal/helmarchive		coverage: 0.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/ownedcmd	3.350s	coverage: 78.5% of statements
+	github.com/NVIDIA/nke-recipes/internal/securepath		coverage: 0.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/transportarchive	5.944s	coverage: 72.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/versionpolicy	1.314s	coverage: 83.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/assemble	4.482s	coverage: 55.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/attest	3.895s	coverage: 69.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph	2.488s	coverage: 92.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/canonical	1.574s	coverage: 77.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/catalog	144.149s	coverage: 85.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/definition	3.824s	coverage: 59.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/delivery	74.079s	coverage: 72.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/errors	3.641s	coverage: 84.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/execution	6.887s	coverage: 88.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/factory	200.108s	coverage: 81.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile	4.182s	coverage: 49.9% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport	3.415s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext	3.020s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/ir	2.981s	coverage: 87.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle	233.644s	coverage: 79.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/material	2.812s	coverage: 91.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline	34.984s	coverage: 57.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/profile	3.727s	coverage: 79.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/provenance	2.510s	coverage: 82.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/release	3.918s	coverage: 70.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sbom	5.494s	coverage: 72.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sign	14.077s	coverage: 64.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/status	16.354s	coverage: 75.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/target	2.696s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/trust	8.413s	coverage: 83.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-disk-inspect	2.102s	coverage: [no statements]
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-packer	4.308s	coverage: [no statements]
+total:											(statements)					71.4%
+GOBIN="/Users/nhensley/.codex/worktrees/nkd-multiarch-cwe/nke-recipes/bin" go -C toolchains/govulncheck install tool
+"/Users/nhensley/.codex/worktrees/nkd-multiarch-cwe/nke-recipes/bin/govulncheck" ./...
+No vulnerabilities found.

@@ -20,10 +20,17 @@ routes. Neither requires an NKD Recipe, deployment topology, or a generic criter
 
 ### 1. Concrete target platforms
 
-Every Definition output declares `platform: linux/amd64` or `linux/arm64`; no wildcard, missing value or
+Every native Definition output declares `platform: linux/amd64` or `linux/arm64`; no wildcard, missing value or
 host-derived default is admitted. Catalog components declare sorted supported `platforms`, with complete exact
 pin/toolchain routes for those declarations. Selecting an unsupported route fails before external work.
 `pkg/nkd/target` owns the platform and architecture domains.
+
+An OCI output may instead declare `platforms`, a nonempty sorted unique subset of the supported platform
+domain. It is mutually exclusive with `platform` and selects exactly one image component. The single public
+output is a standard OCI image index whose concrete native children exhaust that frozen set; no
+`platform: multi`, architecture inference, or extra attestation descriptor is admitted. A chart referring to
+this output must declare a platform contained in the required set. Executable outputs remain separate named
+native artifacts; the image-index contract does not create an executable aggregate.
 
 Targets remain distinct from execution-host requirements. A VM producer's eligible host, KVM/TCG route and
 capability policy are execution contracts, not target defaults. Source builds retain the native-target container

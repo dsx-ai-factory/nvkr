@@ -291,6 +291,14 @@ and cannot restore a live verification capability. Explicit Release verification
 policy checks. [Release navigation](release-navigation.md) documents the registry and local entry points and
 their validation scope.
 
+Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
+unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
+one image output with a sorted finite platform set; the compiler freezes a native Build, result and SBOM use
+for every member and derives a separate logical aggregate Build Digest. Run completeness and publication
+metadata retain that exact membership. Helm binds the complete index digest. Native image bytes and native
+IR identity are unchanged. Contract tests cover these joins; they do not establish native dual-architecture
+hosted execution, registry services, signing or operational release acceptance (ADR-11/12/16/20).
+
 | Identity or record | Owner and purpose | Boundary |
 |---|---|---|
 | Definition | Product author → definition admission → compiler | Named output intent; the single product-authoring input |

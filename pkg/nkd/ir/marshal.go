@@ -57,7 +57,7 @@ type LogicalNode struct {
 	Version           string             `json:"version,omitempty"`
 }
 
-// LogicalGraph is the only shape accepted by build identity computation. The
+// LogicalGraph is the native graph shape accepted by build identity computation. The
 // transport-bearing Graph is fully validated first and then projected into this
 // structurally transport-free DTO.
 type LogicalGraph struct {

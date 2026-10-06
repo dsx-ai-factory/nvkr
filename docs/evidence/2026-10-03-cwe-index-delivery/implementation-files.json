@@ -1,0 +1,11 @@
+{
+  "description": "Exact stage-one implementation bytes after contract/review corrections; diagnostic integrity only, not authenticated provenance.",
+  "baseCommit": "d1a4ec9403a936b154b16f4c53e3d3f6daa4c739",
+  "files": {
+    "pkg/nkd/delivery/image.go": "sha256:6636b62e9b4faacd12ac84fef9cbe1364af6e7b1324446c3aeebe4bb673b0ee5",
+    "pkg/nkd/delivery/image_index.go": "sha256:7b562837fe5f6fd6982eb4784ab3f34cce868286d24ab1247888e3082a8843f2",
+    "pkg/nkd/delivery/image_index_snapshot.go": "sha256:1696158926d1170c2b985d7163f76c4218f02f6270317aed22425364b92c55be",
+    "pkg/nkd/delivery/image_index_test.go": "sha256:7cb208cb561cc55036b98d86c01b3cd6d9962a41cf13dc676f107d8c5528b6db",
+    "pkg/nkd/delivery/image_index_write.go": "sha256:b98d44d668e8b1a310a819b5f5852e5d94929c48c687dede76464bb8be4250ae"
+  }
+}

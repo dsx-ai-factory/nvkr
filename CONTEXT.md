@@ -29,6 +29,14 @@ _Avoid_: Plan, release, proof of qualification
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
 _Avoid_: Producer, expected output, release
 
+**Runnable OCI image index**:
+A standard OCI index selecting exact native child image manifests by explicit platform. Its blob digest is
+separate from each child's identity and from logical Build identity. Delivery can hold and verify its byte
+closure. One named output can freeze an explicit platform set, an aggregate logical Build Digest and each
+child's native build and evidence bindings (ADR-11/12/20). The aggregate recipe identity remains distinct
+from the runnable index digest.
+_Avoid_: Release publication root, native image manifest, qualification receipt
+
 **Release**:
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
 Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
@@ -42,8 +50,8 @@ _Avoid_: Signing configuration, verification result, producer assertion
 ## Definition and production relationships
 
 **Named output**:
-A Definition's declaration of exact selected producers, concrete target platform, and the artifact format they
-must produce. Each named output is an independent required use, even when two outputs share a Build Digest.
+A Definition's declaration of exact selected producers, concrete target platform or explicit aggregate image
+platform set, and the artifact format they must produce. Each named output is an independent required use, even when two outputs share a Build Digest.
 _Avoid_: Observed artifact, delivery route
 
 **Disk-image output**:

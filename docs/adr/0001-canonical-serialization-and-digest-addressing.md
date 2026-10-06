@@ -118,23 +118,29 @@ changed shapes are:
 
 | Object | Schema |
 |---|---|
-| Definition | `nkd.dev/definition/v4` |
+| Definition | `nkd.dev/definition/v5` |
 | Component catalog and snapshot | `nkd.dev/catalog/v3`, `nkd.dev/catalog-snapshot/v3` |
 | Component catalog overlay | `nkd.dev/catalog-overlay/v3` |
 | Executable and logical build graph | `nkd.dev/ir/v4` |
-| Run plan and artifact graph | `nkd.dev/run-plan/v4`, `nkd.dev/artifact-graph/v4` |
-| Run and Release views | `nkd.dev/run/v3`, `nkd.dev/release/v3` |
+| Run plan and artifact graph | `nkd.dev/run-plan/v5`, `nkd.dev/artifact-graph/v5` |
+| Run and Release views | `nkd.dev/run/v4`, `nkd.dev/release/v4` |
 
-Definition v4 removes cluster views. Catalog v3 removes delivery categories and node-role affinities. IR v4
+Definition v5 retains removal of cluster views and adds an explicit required platform set for an aggregate OCI image. Catalog v3 removes delivery categories and node-role affinities. IR v4
 binds typed VM disk, producer, selected toolchain-host platform,
 public-variable and material-edge inputs into Build Digest. Old
 major versions fail closed; the migration does not reinterpret or repair existing signed records.
 
-Run plan v4 embeds the admitted Definition and Environment directly. The compiler owns complete output,
+Run plan v5 embeds the admitted Definition and Environment directly. The compiler owns complete output,
 package, route and evidence binding; there is no separately versioned compile specification or execution-settings
 document. Producer scheduling records reference the authoritative embedded IR instruction and cannot carry a
 second copy of its runner, network, container, platform, execution requirements or class binding. Artifact graph
-v4 makes that reference contract explicit. Required output slots remain separate from observations.
+v5 retains that reference contract and freezes every native child build, producer result and evidence slot for an image index. Required output slots remain separate from observations.
+
+The logical image-index build projection uses `nkd.dev/image-index-build/v1` inside the existing
+`nkd.build` family: sorted `requiredPlatforms` plus sorted children containing only `platform`, `buildDigest`
+and `component`. It is distinct from native IR v4 and from OCI manifest observations. Native IR bytes and
+binary-bundle v1 remain unchanged. Publication-root metadata and media use v4 (ADR-20); Definition v4,
+Plan/artifact-graph v4 and Run/Release v3 are rejected rather than reinterpreted with aggregate membership.
 
 Production SLSA build-type URIs use `/v2` for the replacement of compiler-handoff parameters by the original
 `definitionDigest` and `environmentDigest`. SLSA provenance/v1 and in-toto Statement/v1 remain unchanged.

@@ -182,6 +182,39 @@ Full publication inspection verifies structural and content closure but does not
 root. Qualified consumption requires an implemented clearance verifier and the operator's trust policy;
 no current diagnostic operation grants that authority.
 
+### Runnable image indexes — delivery stage, lifecycle integration disabled
+
+The delivery module can assemble and open a standard runnable OCI image index over an explicit, nonempty,
+unique set drawn from `linux/amd64` and `linux/arm64`. This is an independently testable integrity capability;
+it does not add aggregate Definition outputs or enable index production, signing, release publication or
+consumption. ADR-12's current single-platform output admission remains in force.
+
+Each assembly input names one platform, one single-manifest OCI layout and its exact native manifest digest.
+The complete request is admitted before filesystem access. Delivery captures bounded regular files through
+held directory descriptors into anonymous immutable capabilities, then verifies every manifest, config,
+compressed layer and expanded layer identity. Native config platform must equal its requested platform;
+platform metadata on input descriptors, when present, must agree. An opened aggregate requires platform
+metadata on every child. Only baseline ARM64 is admitted (an omitted variant or `v8`); other variants,
+unknown structural index/manifest fields, duplicate JSON keys, nested indexes, artifact/attestation manifests,
+subject-bearing manifests, missing or repeated platforms/descriptors, unreachable blobs, wrong sizes,
+symlinks and nonregular files fail closed. Standard image-config metadata is retained without rewriting it.
+
+Assembly emits canonical index bytes with one descriptor per platform in sorted order. The index and native
+child manifest digests are exact OCI blob identities, not logical Build Digests. Child manifest/config/layer
+bytes remain unchanged; identical blobs shared by children are stored once. A held `ImageIndex` exposes
+only defensive descriptions and an atomic no-replace layout writer; caller paths and descriptions cannot
+substitute another child after validation. Closing joins active operations and releases the held files.
+The writer requires an existing parent directory, writes and syncs a private sibling through directory
+descriptors, and atomically commits without replacing an existing destination, then syncs the parent.
+Cancellation before commit removes the private stage. A directory-sync failure after commit is reported as
+failure even though a complete layout may exist; callers must inspect that result before retrying.
+
+The next integration stage must freeze every required platform/producer use and its exact evidence before
+assembly; bind aggregate identity, signed metadata and consumer membership to every child; and make Helm
+bindings and release navigation describe the index and its complete platform set. No public index producer,
+post-build manifest command, mutable alias or `platform: multi` is admitted by this stage. The implementation
+and remaining contracts are described in [multi-architecture CWE delivery](../multiarch-cwe-delivery.md).
+
 ### 5. Credentials by reference, never embedded
 
 The target config names a registry or repository plus a **credential reference** resolved from the CI engine's

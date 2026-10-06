@@ -27,8 +27,8 @@ const (
 	DefinitionKind        = definition.DefinitionKind
 	EnvironmentAPIVersion = definition.EnvironmentAPIVersion
 	EnvironmentKind       = definition.EnvironmentKind
-	RunSchemaVersion      = "nkd.dev/run/v3"
-	ReleaseSchemaVersion  = "nkd.dev/release/v3"
+	RunSchemaVersion      = "nkd.dev/run/v4"
+	ReleaseSchemaVersion  = "nkd.dev/release/v4"
 )
 
 const (
@@ -92,13 +92,14 @@ type Run struct {
 }
 
 type requiredOutput struct {
-	Name             string   `json:"name"`
-	Kind             string   `json:"kind"`
-	ArtifactID       string   `json:"artifactId"`
-	MemberArtifactID string   `json:"memberArtifactId"`
-	BuildDigest      string   `json:"buildDigest"`
-	Components       []string `json:"components"`
-	ComponentResults []string `json:"componentResults"`
+	ImageIndex       *factory.ImageIndexPlan `json:"imageIndex,omitempty"`
+	Name             string                  `json:"name"`
+	Kind             string                  `json:"kind"`
+	ArtifactID       string                  `json:"artifactId"`
+	MemberArtifactID string                  `json:"memberArtifactId"`
+	BuildDigest      string                  `json:"buildDigest"`
+	Components       []string                `json:"components"`
+	ComponentResults []string                `json:"componentResults"`
 }
 
 type runFailure struct {

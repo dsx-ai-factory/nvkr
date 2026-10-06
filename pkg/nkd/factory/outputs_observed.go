@@ -21,6 +21,7 @@ import (
 // lifecycle package. It is descriptive only; callers still bind it to a Run
 // or signed publication through the owning lifecycle module.
 type LifecyclePayloadObservation struct {
+	ImageIndex     *delivery.ImageIndexBinding
 	Digest         string
 	SemanticDigest string
 	Components     []string
@@ -73,6 +74,15 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 	node := planNode(plan, artifact.Producer)
 	if node.ID == "" {
 		return LifecyclePayloadObservation{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no package producer", expected.Name)
+	}
+	if expected.ImageIndex != nil {
+		if artifact.Kind != PackageImage {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "image index on non-image output")
+		}
+		return observeImageIndex(ctx, plan, expected, artifact, artifacts)
+	}
+	if node.ImageIndex != nil {
+		return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "native output cannot omit image index requirements")
 	}
 	components := append([]string(nil), expected.Components...)
 	buildName := ""
@@ -232,7 +242,7 @@ func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, art
 			return nil, e.New(e.CodeVerifyFailed, "lifecycle output %q payload differs from its exact plan binding", expected.Name)
 		}
 		bound := delivery.Output{Name: expected.Name, Kind: expected.Kind,
-			Digest: payloadDigest, BuildDigest: expected.BuildDigest, Components: append([]string(nil), components...)}
+			Digest: payloadDigest, BuildDigest: expected.BuildDigest, ImageIndex: observation.ImageIndex.Clone(), Components: append([]string(nil), components...)}
 		outputs = append(outputs, bound)
 	}
 	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
@@ -301,6 +311,9 @@ func ValidateLifecycleOutputs(expected []LifecycleOutputPlan, observed []Lifecyc
 			!canonical.IsDigest(output.BuildDigest) || (output.Kind != "helm-oci" && len(output.Components) == 0) {
 			return e.New(e.CodeVerifyFailed, "lifecycle outputs are not unique exact payload bindings")
 		}
+		if err := output.Validate(); err != nil {
+			return err
+		}
 		outputs[output.Name] = output
 	}
 	if len(outputs) != len(expected) {
@@ -308,6 +321,26 @@ func ValidateLifecycleOutputs(expected []LifecycleOutputPlan, observed []Lifecyc
 	}
 	for _, want := range expected {
 		got, ok := outputs[want.Name]
+		if (want.ImageIndex == nil) != (got.ImageIndex == nil) {
+			return e.New(e.CodeVerifyFailed, "output %q changes aggregate membership", want.Name)
+		}
+		if want.ImageIndex != nil {
+			if err := want.ImageIndex.ValidateFor(want.Name, want.BuildDigest, want.Components); err != nil {
+				return err
+			}
+			if err := got.ImageIndex.Validate(); err != nil {
+				return err
+			}
+			if !equalFactoryStrings(want.ImageIndex.RequiredPlatforms, got.ImageIndex.RequiredPlatforms) {
+				return e.New(e.CodeVerifyFailed, "output %q changes required platforms", want.Name)
+			}
+			for i, child := range want.ImageIndex.Children {
+				observed := got.ImageIndex.Children[i]
+				if child.Platform != observed.Platform || child.BuildDigest != observed.BuildDigest || child.Component != observed.Component {
+					return e.New(e.CodeVerifyFailed, "output %q changes native build binding", want.Name)
+				}
+			}
+		}
 		if !ok || got.Kind != want.Kind || got.BuildDigest != want.BuildDigest || !equalFactoryStrings(got.Components, want.Components) {
 			return e.New(e.CodeVerifyFailed, "lifecycle output %q changes its build or component binding", want.Name)
 		}

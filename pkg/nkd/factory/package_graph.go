@@ -5,6 +5,7 @@ package factory
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -43,13 +44,26 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 			continue
 		}
 		selectors := make([]string, 0, len(output.Components))
-		for _, component := range output.Components {
-			selectors = append(selectors, output.Name+"/"+component)
+		for _, selection := range nativeOutputSelections(output) {
+			for _, component := range selection.Components {
+				selectors = append(selectors, selection.Name+"/"+component)
+			}
 		}
 		spec := packageSpec{Name: output.Name, Kind: PackageBinaryBundle, Inputs: selectors}
 		switch output.Format {
 		case authored.OutputOCI:
 			spec.Kind = PackageImage
+			if len(output.Platforms) > 0 {
+				byName := make(map[string]BuildPlan, len(builds))
+				for _, build := range builds {
+					byName[build.Name] = build
+				}
+				required, err := outputRequirements(output, byName)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				spec.ImageIndex = required.ImageIndex
+			}
 		case authored.OutputAPT:
 			spec.Kind = PackageAPT
 			spec.Distribution = output.APT.Distribution
@@ -87,7 +101,7 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 		}
 	}
 	publication := environment.Publication
-	targets := map[string]Target{"release": {Kind: TargetOCI, Ref: publication.RepositoryPrefix + "/releases", CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}}
+	targets := map[string]Target{"release": {ImageTags: maps.Clone(publication.ImageTags), Kind: TargetOCI, Ref: publication.RepositoryPrefix + "/releases", CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}}
 	routes := []Route{{Name: "release", Input: "package/release", Target: "release"}}
 	packages = append(packages, packageSpec{Name: "release", Kind: PackageOCI, Inputs: closureInputs})
 	return deriveOutputPublication(definition, environment, packages, targets, routes)
@@ -295,11 +309,27 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 	if spec.Kind == PackageHelm && len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", spec.Name)
 	}
-	if spec.Kind == PackageImage && len(inputs) != 1 {
+	if spec.Kind == PackageImage && spec.ImageIndex == nil && len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "container image package %q requires exactly one OCI export", spec.Name)
 	}
 	if spec.Kind == PackageDiskImage && len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "disk package %q requires exactly one raw disk subject", spec.Name)
+	}
+	if spec.ImageIndex != nil {
+		if spec.Kind != PackageImage {
+			return e.New(e.CodeInvalidCatalog, "image index on non-image package")
+		}
+		if _, err := spec.ImageIndex.buildDigest(); err != nil {
+			return err
+		}
+		if len(inputs) != len(spec.ImageIndex.Children) {
+			return e.New(e.CodeInvalidCatalog, "image index inputs differ from exact required platform set")
+		}
+		for i, child := range spec.ImageIndex.Children {
+			if inputs[i] != child.ArtifactID {
+				return e.New(e.CodeInvalidCatalog, "image index input differs from required native producer")
+			}
+		}
 	}
 	for _, id := range inputs {
 		artifact := artifacts[id]
@@ -432,4 +462,11 @@ func (h HelmImageBinding) ValidateBindings() error {
 		mapping.Images[slot] = catalog.HelmImage{Values: image.Values}
 	}
 	return mapping.Validate()
+}
+
+func packageSpecMediaType(spec packageSpec) string {
+	if spec.ImageIndex != nil {
+		return delivery.MediaOCIIndex
+	}
+	return packageMediaType(spec.Kind)
 }

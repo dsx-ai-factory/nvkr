@@ -112,6 +112,15 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 			}
 			object.OS, object.Arch = "linux", strings.TrimPrefix(disk.Platform, "linux/")
 		case PackageImage:
+			if planNode(plan, input.Producer).ImageIndex != nil {
+				index, err := inspectFactoryImageIndex(ctx, plan, input)
+				if err != nil {
+					return nil, nil, err
+				}
+				object.Layout, object.SemanticDigest, object.BlobDigest = true, index.Digest, index.Digest
+				object.ArtifactType = delivery.MediaOCIIndex
+				break
+			}
 			image, err := inspectFactoryImage(ctx, plan, input)
 			if err != nil {
 				return nil, nil, err
@@ -214,12 +223,16 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 			if !found {
 				continue
 			}
-			subjects, err := publicationBuildSubjects(ctx, output, node.Inputs, artifacts)
-			if err != nil {
-				return nil, err
+			var subjects []delivery.BuildSubject
+			if output.ImageIndex == nil {
+				var err error
+				subjects, err = publicationBuildSubjects(ctx, output, node.Inputs, artifacts)
+				if err != nil {
+					return nil, err
+				}
 			}
 			objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind,
-				BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects, Disk: output.Disk}
+				BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects, Disk: output.Disk, ImageIndex: output.ImageIndex.Clone()}
 			if output.Kind == PackageAPT {
 				objects[i].Output.TransportPath = transportPaths[output.Name]
 			}
