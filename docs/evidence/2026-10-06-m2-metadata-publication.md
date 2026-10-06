@@ -82,12 +82,9 @@ executes validation commit `5e218774f145256b8ea48a35be0ae5924910e9b8` with the e
   Linux race contracts exercise held completion and prepared publication for both platform fixtures;
   generated-graph tests reject hosted disk-material downloads and credentialed ARC operations.
 
-The run completed with failure. The finalizer rejected the incomplete provider-job closure. Monitoring
-was paused after reporting completion. No replacement hosted run has exercised the fixes below.
-
-These fixes are local; this run's immutable commit does not contain them. A successful
-replacement hosted run is still required. The earlier full-gate results above apply to
-`c049b36`, not to these follow-up fixes.
+The run completed with failure. The finalizer rejected the incomplete provider-job closure. These fixes
+were committed as `b294906` and included in validation commit `42d5ee0`. The subsequent hosted run is
+described below. The earlier full-gate results above apply to `c049b36`; follow-up validation is separate.
 
 Follow-up validation: provenance/signing race tests and the targeted factory Helm,
 publication, metadata and generated-workflow race contracts passed. Linux-targeted
@@ -99,3 +96,28 @@ After the disk storage fix, full uncached macOS tests passed. Linux race tests p
 contracts. Linux-targeted lint, full vet, shellcheck, vulnerability scanning, formatting,
 diff checks, workflow linters and byte-exact regeneration passed. The full uncached macOS
 race gate also passed; the previously recorded macOS lint limitation still applies.
+
+## Partial retry admission
+
+[Run 37517716998, attempt 2](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37517716998/attempts/2)
+reached [release assembly](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37517716998/job/112496174271),
+which rejected a production predicate as belonging to another workflow Run. The implementation required
+every output's preparation and signing invocation to equal the consuming attempt, preventing reuse of
+successful earlier work. The run completed with failure and its monitor was paused.
+
+The local retry change admits only current or earlier attempts of the same exact GitHub server,
+repository, run and workflow builder, retaining exact Plan/input, named-output, signature and evidence
+checks. Preparation must precede or equal signing, which must precede or equal consumption. The aggregate
+records its current assembly invocation and each output's original digest-pinned publication reference,
+preparation invocation and signing invocation. Original output roots and predicates are not rewritten.
+
+The regression reproduced the old rejection before the fix. Focused contracts cover earlier-attempt
+reuse, mixed-attempt assembly, re-signing an older package and retrying finalization; negative cases cover
+foreign runs/workflows, future or malformed attempts, changed predicates and invalid signatures/evidence.
+These use explicit signing adapters, not a live registry/signing-service acceptance run. Full uncached
+macOS tests and full Linux race tests initially found one negative-fixture error: its changed Plan digest
+disagreed with its own dependency record, so validation correctly rejected it earlier than the asserted
+error code. The fixture now constructs an internally consistent wrong-Plan predicate. Its focused tests
+and the full factory package reruns passed on both platforms; every other package passed in the original
+full runs. Linux-targeted lint, full vet, shellcheck, vulnerability scanning, formatting, diff checks and
+exact M2 workflow regeneration also passed. No hosted run contains this retry change yet.

@@ -19,10 +19,11 @@ import (
 )
 
 // This receipt can only be issued after exact remote signature/provenance
-// verification and full control-document/evidence validation for this attempt.
+// verification and full control-document/evidence validation for this GitHub run.
 type authenticatedOutputMetadata struct {
 	inspection delivery.Inspection
 	source     string
+	origin     delivery.PublicationOrigin
 }
 
 // authenticateReferenceMetadata uses persisted records only as expectations.
@@ -70,13 +71,36 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 		return fail(err)
 	}
 	var claimed provenance.Predicate
-	if err := canonical.UnmarshalExact(bytes.TrimSuffix(predicate, []byte{'\n'}), &claimed); err != nil || claimed.RunDetails.Metadata["invocationId"] != run.InvocationID() || claimed.RunDetails.Builder.ID != run.BuilderID() {
+	if err := canonical.UnmarshalExact(bytes.TrimSuffix(predicate, []byte{'\n'}), &claimed); err != nil || claimed.RunDetails.Builder.ID != run.BuilderID() {
 		return fail(e.New(e.CodeVerifyFailed, "production predicate belongs to another workflow Run"))
 	}
+	invocation := claimed.RunDetails.Metadata["invocationId"]
+	if err := admitReferenceInvocation(invocation, run.InvocationID()); err != nil {
+		return fail(err)
+	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != digest || metadata.InvocationID != run.InvocationID() ||
+	if metadata == nil || metadata.PlanDigest != digest ||
 		metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
 		return fail(e.New(e.CodeVerifyFailed, "publication metadata belongs to another Plan or Run"))
+	}
+	if err := admitReferenceInvocation(metadata.InvocationID, invocation); err != nil {
+		return fail(err)
+	}
+	for _, object := range inspection.Root.Objects {
+		if object.Output == nil || object.Output.Publication == nil {
+			continue
+		}
+		origin := object.Output.Publication
+		target, ok := plan.Targets[outputPublicationRoute(object.Name)]
+		if !ok || !strings.HasPrefix(origin.Ref, target.Ref+"@") {
+			return fail(e.New(e.CodeVerifyFailed, "output origin differs from planned publication repository"))
+		}
+		if err := admitReferenceInvocation(origin.PreparedInvocationID, origin.SignedInvocationID); err != nil {
+			return fail(err)
+		}
+		if err := admitReferenceInvocation(origin.SignedInvocationID, metadata.InvocationID); err != nil {
+			return fail(err)
+		}
 	}
 	node := planNode(plan, NodeVerifyPublication+"/"+route.Name)
 	signer, err := newSigner(ctx, plan, node, artifacts)
@@ -101,7 +125,9 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 	if err := verifyMetadataSBOMs(ctx, signer, source, inspection); err != nil {
 		return fail(err)
 	}
-	return authenticatedOutputMetadata{inspection: inspection, source: source}, nil
+	return authenticatedOutputMetadata{inspection: inspection, source: source, origin: delivery.PublicationOrigin{
+		Ref: subject.Ref, PreparedInvocationID: metadata.InvocationID, SignedInvocationID: invocation,
+	}}, nil
 }
 
 func verifyMetadataSBOMs(ctx context.Context, signer sign.OCISigner, source string, inspection delivery.Inspection) error {
@@ -139,6 +165,14 @@ func executeReferenceRelease(ctx context.Context, plan *Plan, node Node, artifac
 }
 
 func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, receipts []authenticatedOutputMetadata) error {
+	digest, err := plan.IdentityDigest()
+	if err != nil {
+		return err
+	}
+	run, err := factoryRunContext(digest, time.Now().UTC(), time.Now().UTC())
+	if err != nil {
+		return err
+	}
 	root := delivery.PublicationRoot{SchemaVersion: delivery.PublicationRootSchema, Qualification: delivery.QualificationDiagnostic}
 	sources := map[string]string{}
 	objects := map[string]delivery.PublishedObject{}
@@ -151,11 +185,19 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 			value := *receipt.inspection.Root.Release
 			root.Release = &value
 		}
-		if root.Release.PlanDigest != receipt.inspection.Root.Release.PlanDigest || root.Release.InvocationID != receipt.inspection.Root.Release.InvocationID ||
+		if root.Release.PlanDigest != receipt.inspection.Root.Release.PlanDigest ||
 			root.Release.DefinitionDigest != receipt.inspection.Root.Release.DefinitionDigest || root.Release.EnvironmentDigest != receipt.inspection.Root.Release.EnvironmentDigest {
-			return e.New(e.CodeVerifyFailed, "output metadata belongs to different release attempts")
+			return e.New(e.CodeVerifyFailed, "output metadata belongs to different release plans")
+		}
+		if err := admitReferenceInvocation(receipt.origin.SignedInvocationID, run.InvocationID()); err != nil {
+			return err
 		}
 		for _, object := range receipt.inspection.Root.Objects {
+			if object.Output != nil {
+				binding, origin := *object.Output, receipt.origin
+				binding.Publication = &origin
+				object.Output = &binding
+			}
 			if previous, exists := objects[object.Name]; exists {
 				if previous.Output != nil || object.Output != nil || previous.Evidence == nil || object.Evidence == nil {
 					return e.New(e.CodeVerifyFailed, "repeated release output")
@@ -194,6 +236,7 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 		return e.New(e.CodeReleaseIncomplete, "release has no output receipts")
 	}
 	root.Release.ContentSubject = subject
+	root.Release.InvocationID = run.InvocationID()
 	for _, name := range sortedKeys(objects) {
 		root.Objects = append(root.Objects, objects[name])
 	}

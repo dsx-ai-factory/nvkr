@@ -351,12 +351,16 @@ owning signed protocol, never serialization of an in-process capability.
 ADR-18/20 admit the explicit GitHub `publication.mode: per-output-v1` selected by the M2 Environment.
 Each output retains full payload/producer/evidence checks, publication, signing and verification. Aggregate
 assembly and finalization authenticate bounded control documents and SBOM bundles against the exact compiled
-Plan, current workflow run attempt and frozen output set, without downloading payload layers. The finalizer
+Plan, same GitHub workflow run and frozen output set, without downloading payload layers. Current or earlier
+attempts are admitted in preparation/signing/consumption order; source publication references and original
+attempt identities remain in the aggregate, which identifies its current assembly attempt. The finalizer
 restores six carriers and still requires all provider jobs to succeed. Metadata inspection is descriptive and
 cannot issue the full-payload consumer capability. Local execution and dry-run signing reject this mode.
 Contract tests exercise both disk architectures through a loopback registry with zero metadata-path payload
-GETs and successful full consumer pull-back; shared-evidence assembly, signature rejection, run-attempt
-substitution and dry-run rejection are covered with explicit signing adapters. These are not live signing or
+GETs and successful full consumer pull-back; shared-evidence assembly, signature rejection, cross-run/future-attempt
+substitution and dry-run rejection are covered with explicit signing adapters. Retry support, mixed-attempt
+assembly, re-signing and finalizer reuse passed local contracts and Linux race checks; hosted retry
+acceptance remains unexercised. These are not live signing or
 GitHub operational evidence. Hosted run `37504454272` exposed timestamp serialization, bound-chart
 dependency and disk-publication storage defects; local fixes retain strict predicate comparison and exact output membership.
 Offline disk publication preparation now shares the existing ARC group; hosted stages no longer restore its

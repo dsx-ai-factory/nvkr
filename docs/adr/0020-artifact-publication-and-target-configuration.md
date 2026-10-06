@@ -203,6 +203,12 @@ required output, retaining the full compiled Plan. Each route observes its exact
 attests its required SBOMs, publishes the output and evidence, then signs and verifies its own metadata root
 at `<prefix>/releases-<output>`. These roots are internal publication handoffs, not additional product outputs.
 Their signed metadata binds the exact Plan digest and workflow invocation, including run attempt.
+Partial retries may reuse an authenticated output-local root from an earlier attempt of the same GitHub
+run. The server, repository, run ID and workflow builder must match exactly; canonical positive attempt
+numbers must satisfy preparation ≤ signing ≤ the consuming attempt. Different runs, future attempts,
+changed Plans or missing evidence fail closed. Signing may retry against an earlier prepared root without
+rewriting its metadata or original predicate. This exception is limited to pipeline-attested metadata
+assembly/finalization; it does not relax qualified execution or live disk ownership.
 Output-local chart reproduction transports its bound image packages and their producer/evidence
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.
@@ -211,6 +217,11 @@ Release assembly authenticates every output-local root and its exact production 
 workflow identity/issuer, verifies its SBOM bundles, and joins its named output to the independently frozen
 requirements. It merges shared evidence only when document, subject and stage bindings agree, choosing the
 first sorted output's existing bundle and repository. It publishes a single aggregate root at `<prefix>/releases`.
+The aggregate identifies its current assembly invocation. Each output's `publication` binding preserves
+the digest-pinned output-local root reference and its original preparation and signing invocation IDs.
+These descriptions acquire authority only through the authenticated release; assembly derives them from
+the verified output receipt. A finalizer retry may authenticate an unchanged aggregate from an earlier
+attempt of the same run under the same ordering and Plan checks.
 Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
 and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
 verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.

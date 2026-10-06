@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -49,7 +50,7 @@ func referenceSignerFactory(s *referenceSigner) signerFor {
 	return func(context.Context, *Plan, Node, map[string]Artifact) (sign.OCISigner, error) { return s, nil }
 }
 
-func referenceMetadataFixture(t *testing.T) (*Plan, map[string]Artifact, *referenceSigner) {
+func referenceMetadataFixture(t *testing.T, attempts ...string) (*Plan, map[string]Artifact, *referenceSigner) {
 	t.Helper()
 	plan := referenceTestPlan(t)
 	t.Chdir(t.TempDir())
@@ -71,7 +72,10 @@ func referenceMetadataFixture(t *testing.T) (*Plan, map[string]Artifact, *refere
 		}
 	}
 	signer := &referenceSigner{}
-	for _, output := range plan.LifecycleOutputs {
+	for i, output := range plan.LifecycleOutputs {
+		if i < len(attempts) {
+			t.Setenv("GITHUB_RUN_ATTEMPT", attempts[i])
+		}
 		if err := executeSBOM(t.Context(), plan, nodes[output.Name+"/sbom"], artifacts, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -90,24 +94,7 @@ func referenceMetadataFixture(t *testing.T) (*Plan, map[string]Artifact, *refere
 		if err != nil {
 			t.Fatal(err)
 		}
-		ref := plan.Targets[route].Ref + "@" + result.RootDigest
-		writeReferenceFile(t, artifacts["publication/"+route].Path, ref)
-		predicate, err := productionPredicateFor(plan, plan.Environment.Signing, time.Now().UTC(), time.Now().UTC())
-		if err != nil {
-			t.Fatal(err)
-		}
-		predicate = append(predicate, '\n')
-		record := sign.SigningRecord{SchemaVersion: sign.SigningRecordSchemaVersion, Ref: ref, Digest: result.RootDigest, PredicateSHA256: pipeline.FileDigest(predicate), PredicateType: sign.ProvenancePredicateType, Identity: plan.Environment.Signing.Identity, Issuer: plan.Environment.Signing.Issuer, Ran: [][]string{{"fixture-sign"}}}
-		raw, err := record.Canonical()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := writeFactoryFile(t.Context(), artifacts["signature/"+route].Path, raw, 0644); err != nil {
-			t.Fatal(err)
-		}
-		if err := writeFactoryFile(t.Context(), artifacts["predicate/"+route].Path, predicate, 0644); err != nil {
-			t.Fatal(err)
-		}
+		writeReferenceSigningFixture(t, plan, artifacts, route, result.RootDigest)
 	}
 	return plan, artifacts, signer
 }
@@ -119,8 +106,43 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 		code   e.Code
 	}{
 		{name: "complete"},
-		{name: "different attempt", change: func(t *testing.T, _ *Plan, _ map[string]Artifact, _ *referenceSigner) {
+		{name: "earlier attempt", change: func(t *testing.T, _ *Plan, _ map[string]Artifact, _ *referenceSigner) {
 			t.Setenv("GITHUB_RUN_ATTEMPT", "2")
+		}},
+		{name: "different run", change: func(t *testing.T, _ *Plan, _ map[string]Artifact, _ *referenceSigner) {
+			t.Setenv("GITHUB_RUN_ID", "12346")
+		}, code: e.CodeVerifyFailed},
+		{name: "different workflow", change: func(t *testing.T, _ *Plan, _ map[string]Artifact, _ *referenceSigner) {
+			t.Setenv("GITHUB_WORKFLOW_REF", "example/nkd/.github/workflows/other.yml@refs/heads/main")
+		}, code: e.CodeVerifyFailed},
+		{name: "changed plan predicate", change: func(t *testing.T, plan *Plan, artifacts map[string]Artifact, _ *referenceSigner) {
+			route := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
+			digest, err := plan.IdentityDigest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := artifacts["predicate/"+route].Path
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw = []byte(strings.ReplaceAll(string(raw), strings.TrimPrefix(digest, "sha256:"), strings.Repeat("f", 64)))
+			if err := writeFactoryFile(t.Context(), path, raw, 0644); err != nil {
+				t.Fatal(err)
+			}
+			recordPath := artifacts["signature/"+route].Path
+			record, err := readSigningRecord(t.Context(), recordPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record.PredicateSHA256 = pipeline.FileDigest(raw)
+			encoded, err := record.Canonical()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := writeFactoryFile(t.Context(), recordPath, encoded, 0644); err != nil {
+				t.Fatal(err)
+			}
 		}, code: e.CodeVerifyFailed},
 		{name: "root signature rejected", change: func(_ *testing.T, _ *Plan, _ map[string]Artifact, s *referenceSigner) {
 			s.verifyErr = e.New(e.CodeSignatureInvalid, "rejected")
@@ -159,9 +181,18 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, object := range result.Root.Objects {
+				if object.Output != nil {
+					origin := object.Output.Publication
+					if origin == nil || origin.PreparedInvocationID != "https://github.com/example/nkd/actions/runs/12345/attempts/1" || origin.SignedInvocationID != origin.PreparedInvocationID {
+						t.Fatal("output lost original invocation")
+					}
+				}
 				if object.Evidence != nil && len(object.Evidence.Outputs) != 2 {
 					t.Fatal("shared evidence lost an output")
 				}
+			}
+			if result.Root.Release.InvocationID != "https://github.com/example/nkd/actions/runs/12345/attempts/"+os.Getenv("GITHUB_RUN_ATTEMPT") {
+				t.Fatal("assembly retained an earlier invocation")
 			}
 			if _, err := delivery.Inspect(t.Context(), artifacts[node.Outputs[0]].Path); err == nil {
 				t.Fatal("assembly copied all payloads")
@@ -171,4 +202,102 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 			}
 		})
 	}
+}
+
+func writeReferenceSigningFixture(t *testing.T, plan *Plan, artifacts map[string]Artifact, route, digest string) {
+	t.Helper()
+	ref := plan.Targets[route].Ref + "@" + digest
+	writeReferenceFile(t, artifacts["publication/"+route].Path, ref)
+	predicate, err := productionPredicateFor(plan, plan.Environment.Signing, time.Now().UTC(), time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	predicate = append(predicate, '\n')
+	record := sign.SigningRecord{SchemaVersion: sign.SigningRecordSchemaVersion, Ref: ref, Digest: digest, PredicateSHA256: pipeline.FileDigest(predicate), PredicateType: sign.ProvenancePredicateType, Identity: plan.Environment.Signing.Identity, Issuer: plan.Environment.Signing.Issuer, Ran: [][]string{{"fixture-sign"}}}
+	raw, err := record.Canonical()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFactoryFile(t.Context(), artifacts["signature/"+route].Path, raw, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFactoryFile(t.Context(), artifacts["predicate/"+route].Path, predicate, 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReferenceReleaseMixedAttemptsAndResigning(t *testing.T) {
+	const invocation = "https://github.com/example/nkd/actions/runs/12345/attempts/"
+	plan, artifacts, signer := referenceMetadataFixture(t, "1", "2")
+	first := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
+	before, err := delivery.InspectMetadata(t.Context(), artifacts["metadata/"+first].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Re-signing an existing package is also a legitimate partial retry.
+	t.Setenv("GITHUB_RUN_ATTEMPT", "3")
+	writeReferenceSigningFixture(t, plan, artifacts, first, before.RootDigest)
+	if err := executeReferenceRelease(t.Context(), plan, planNode(plan, "package/release"), artifacts, referenceSignerFactory(signer)); err != nil {
+		t.Fatal(err)
+	}
+	source := artifacts["package/release"].Path
+	result, err := delivery.InspectMetadata(t.Context(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Root.Release.InvocationID != invocation+"3" {
+		t.Fatal("aggregate does not identify its assembly attempt")
+	}
+	for i, output := range plan.LifecycleOutputs {
+		found := false
+		for _, object := range result.Root.Objects {
+			if object.Name != output.Name || object.Output == nil {
+				continue
+			}
+			found = true
+			prepared, signed := "1", "3"
+			if i == 1 {
+				prepared, signed = "2", "2"
+			}
+			origin := object.Output.Publication
+			subject, err := readPublicationSubject(t.Context(), artifacts["publication/"+outputPublicationRoute(output.Name)].Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if origin == nil || origin.PreparedInvocationID != invocation+prepared || origin.SignedInvocationID != invocation+signed || origin.Ref != subject.Ref {
+				t.Fatalf("lost original output binding: %+v", origin)
+			}
+		}
+		if !found {
+			t.Fatal("missing output")
+		}
+	}
+	// A finalizer retry authenticates the unchanged aggregate from attempt 3.
+	sources := map[string]string{}
+	for _, object := range result.Root.Objects {
+		sources[object.Name] = source
+	}
+	if _, err := delivery.BuildMetadataRoot(t.Context(), artifacts["metadata/release"].Path, result.Root, sources); err != nil {
+		t.Fatal(err)
+	}
+	writeReferenceSigningFixture(t, plan, artifacts, "release", result.RootDigest)
+	t.Setenv("GITHUB_RUN_ATTEMPT", "4")
+	if _, err := authenticateReferenceMetadata(t.Context(), plan, Route{Name: "release", Target: "release"}, artifacts, referenceSignerFactory(signer)); err != nil {
+		t.Fatal(err)
+	}
+	// Earlier consumers cannot accept future evidence, even when the Plan matches.
+	t.Setenv("GITHUB_RUN_ATTEMPT", "2")
+	_, err = authenticateReferenceMetadata(t.Context(), plan, Route{Name: "release", Target: "release"}, artifacts, referenceSignerFactory(signer))
+	assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+	// Signing cannot precede preparation, even within the same run.
+	t.Setenv("GITHUB_RUN_ATTEMPT", "1")
+	second := outputPublicationRoute(plan.LifecycleOutputs[1].Name)
+	prior, err := delivery.InspectMetadata(t.Context(), artifacts["metadata/"+second].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeReferenceSigningFixture(t, plan, artifacts, second, prior.RootDigest)
+	t.Setenv("GITHUB_RUN_ATTEMPT", "4")
+	_, err = authenticateReferenceMetadata(t.Context(), plan, Route{Name: second, Target: second}, artifacts, referenceSignerFactory(signer))
+	assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
 }
