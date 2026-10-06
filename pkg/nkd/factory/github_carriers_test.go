@@ -227,10 +227,13 @@ func TestGitHubCarriersRecoveryRecordsAllOutcomes(t *testing.T) {
 	for _, status := range want {
 		counts[status]++
 	}
-	totals := fmt.Sprintf("Recovery totals: restored=%d restore-failed=%d no-space=0 missing=%d job-failed=%d",
-		counts["restored:success"], counts["restore-failed"], counts["missing"], counts["job-failed"])
+	totals := fmt.Sprintf("Recovery totals: visited=%d restored=%d restore-failed=%d (no-space=0) missing=%d job-failed=%d; persistence: outcome-write-failed=0 (no-space=0)",
+		len(want), counts["restored:success"], counts["restore-failed"], counts["missing"], counts["job-failed"])
 	if !strings.Contains(output.String(), totals) || !strings.Contains(string(summaryBytes), totals) {
 		t.Fatalf("recovery totals omitted or incorrect: %s", output.String())
+	}
+	if strings.Contains(output.String(), "::error::") {
+		t.Fatal("recovery without storage failures emitted a storage annotation")
 	}
 	if err := ValidateHostedRestores(context.Background(), ".nkd/factory", plan); factoryErrorCode(err) != e.CodeProvenanceMissing {
 		t.Fatalf("diagnostic recovery authorized an incomplete Run: %v", err)

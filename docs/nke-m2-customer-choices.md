@@ -22,15 +22,22 @@ compatibility or publication acceptance.
 
 ## Replace a supplier without changing NKD
 
-1. Copy the Definition into your project and select your catalog explicitly. Retain every required disk
+1. Copy the Definition into your project and copy or re-point its referenced catalogs and overlays:
+   relative catalog base and overlay paths are resolved from the Definition's directory.
+   Select your catalog explicitly. Retain every required disk
    material, or deliberately change the disk producer's complete material contract and selection together.
 2. Pin sources and acquired bytes with `catalog pin` / `catalog pin-artifacts`. Do not edit lock hashes or
-   replace them with floating tags. A source release update is not a producer override.
+   replace them with floating tags. These commands maintain a catalog directory's lock, not supplier-overlay
+   `prebuilt.digests`. Those inline digests are reviewed, authored values for the exact supplier bytes,
+   as shown in the authoring lab. A source release update is not a producer override.
 3. To keep a logical component name but change how it is supplied, use a whole-producer catalog overlay.
    A source-built `nke-cni-calico` can become a digest-pinned acquired tarball with the same output type and
    supported platforms. Its contents must still satisfy NKE's image-input composition interface.
 4. Apply the supplier overlay **after** `native-toolchains.yaml`. Its predecessor is the resulting native
-   catalog snapshot, not the earlier base snapshot. Omitting or reordering an overlay fails admission.
+   catalog snapshot, not the earlier base snapshot. Changing any OS-catalog pin changes its snapshot:
+   reissue `native-toolchains.yaml` and each later overlay against its new exact predecessor through a
+   reviewed decision. The current predecessor digests do not survive a repin; admission rejects them.
+   Omitting or reordering an overlay fails admission.
 5. Put that catalog stack on only the outputs that should use it. ARM64 and AMD64 are independent output
    selections, so a customer can retain the original supplier for one and substitute the other.
 

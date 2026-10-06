@@ -432,7 +432,7 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
   images; spire-agent placement; which NKE images are outside the OS image). Tue Sep 16 is the M1 stop-loss; if
   M1 is not green on GitHub, the M2 fallbacks are taken immediately.
 - **External dependencies that decide the outcome:** NKE source reachable from GitHub-hosted runners through
-  private mirrors with vendored inputs; the NKE OS build and complete inspection runnable on admitted native
+  private mirrors with vendored inputs; under the proposed target, the NKE OS build and complete inspection runnable on admitted native
   AMD64 and ARM64 execution routes; a GitHub organization, registry namespace, OIDC identities, and a GitHub App for the pin bot;
   registry-side tag immutability on the release repository or a namespace whose only push credential is the
   release workflow's; product-security approval of public Sigstore before NKE bytes are signed.

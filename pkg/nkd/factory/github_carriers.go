@@ -95,13 +95,15 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 // Ordinary carrier failures are recorded and recovery continues. Cancellation or
 // failure to persist an outcome stops recovery and returns a coded error.
 func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults string, options GitHubStepOptions) error {
-	return recoverGitHubArtifacts(ctx, plan, providerResults, options, recoverGitHubCarrier)
+	return recoverGitHubArtifacts(ctx, plan, providerResults, options, recoverGitHubCarrier, writeGitHubRestoreOutcome)
 }
 
-// The public operation always supplies the concrete held-carrier restorer. This
-// private seam permits resource-failure tests without exhausting the test host.
+// The public operation always supplies the concrete held-carrier restorer and
+// outcome writer. These private seams permit resource-failure tests without
+// exhausting the test host.
 func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults string, options GitHubStepOptions,
 	restore func(context.Context, Artifact) (string, error),
+	writeOutcome func(context.Context, string, string) error,
 ) error {
 	if err := admitGitHubRecoveryPlatform(); err != nil {
 		return err
@@ -124,13 +126,13 @@ func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 		"Transport outcomes are diagnostic; the finalizer authenticates completeness.",
 	}, func(progress *githubStepProgress) error {
 		counts := map[string]int{}
-		noSpace := 0
+		visited, restoreNoSpace, outcomeWriteFailed, outcomeNoSpace := 0, 0, 0, 0
 		defer func() {
-			progress.detail(fmt.Sprintf("Recovery totals: restored=%d restore-failed=%d no-space=%d missing=%d job-failed=%d",
-				counts["restored:success"], counts["restore-failed"], noSpace, counts["missing"], counts["job-failed"]))
-			if noSpace > 0 {
+			progress.detail(fmt.Sprintf("Recovery totals: visited=%d restored=%d restore-failed=%d (no-space=%d) missing=%d job-failed=%d; persistence: outcome-write-failed=%d (no-space=%d)",
+				visited, counts["restored:success"], counts["restore-failed"], restoreNoSpace, counts["missing"], counts["job-failed"], outcomeWriteFailed, outcomeNoSpace))
+			if restoreNoSpace+outcomeNoSpace > 0 {
 				// A fixed annotation cannot include archive-controlled paths or text.
-				_, _ = fmt.Fprintln(progress.options.Stderr, "::error::Artifact recovery exhausted storage; finalization will reject incomplete restores.")
+				_, _ = fmt.Fprintln(progress.options.Stderr, "::error::Artifact recovery exhausted storage; restoration or outcome persistence is incomplete.")
 			}
 		}()
 		for _, artifact := range carriers {
@@ -143,31 +145,33 @@ func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 			progress.phase("recover " + artifact.ID)
 			progress.log("Recover: " + artifact.ID + " (" + githubArtifactLabel(plan, artifact) + ")")
 			status := "job-failed"
-			storageFailure := false
 			if results[nodeJobs[artifact.Producer]] == "success" {
 				var restoreErr error
 				status, restoreErr = restore(ctx, artifact)
 				if restoreErr != nil {
 					progress.detail("Recovery failure: " + artifact.ID + " — " + githubRecoveryErrorDetail(restoreErr))
 					if errors.Is(restoreErr, syscall.ENOSPC) || errors.Is(restoreErr, syscall.EDQUOT) {
-						storageFailure = true
-						noSpace++
+						restoreNoSpace++
 					}
 				}
 			}
+			// Restoration describes every visited carrier, independently of whether
+			// its diagnostic status can subsequently be persisted.
+			visited++
+			counts[status]++
 			// Cancellation must not become an ordinary restore failure or allow
 			// a partially visited carrier set to appear complete.
 			if err := githubCarrierContext(ctx); err != nil {
 				return err
 			}
-			if err := writeGitHubRestoreOutcome(ctx, artifact.ID, status); err != nil {
+			if err := writeOutcome(ctx, artifact.ID, status); err != nil {
+				outcomeWriteFailed++
 				progress.detail("Recovery outcome failure: " + artifact.ID + " — " + githubRecoveryErrorDetail(err))
-				if !storageFailure && (errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EDQUOT)) {
-					noSpace++
+				if errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EDQUOT) {
+					outcomeNoSpace++
 				}
 				return err
 			}
-			counts[status]++
 			progress.detail("Recovery: " + artifact.ID + " — " + status)
 		}
 		return nil

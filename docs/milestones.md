@@ -47,7 +47,7 @@ separate required outputs or let one output's evidence satisfy another.
 | nke-agent | NKE OS build | Inside OS image / M2 |
 | CWE controller | Pinned NKE build; recorded acquisition fallback | OCI image / M2 |
 | NKE container images | OS-embedded or separately built/acquired, enumerated in Definition | Inside OS image or OCI images / M2 |
-| NKE OS image | Pinned wrapped NKE build; historical prebuilt-image fallback is not currently supported | OCI disk-image artifact / M2 |
+| NKE OS image | Pinned wrapped NKE build; pre-authorized prebuilt-image fallback not implemented | OCI disk-image artifact / M2 |
 | Kubernetes node and control-plane components | NKE OS build | Inside OS image / M2 |
 | CNI | NKE OS build | Inside OS image / M2 |
 | Helm | Digest-pinned acquisition | Operator tooling package / M2 |
