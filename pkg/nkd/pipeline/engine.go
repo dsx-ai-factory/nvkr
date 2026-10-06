@@ -62,6 +62,7 @@ type RunOptions struct {
 	// fetchDirectory is the current fetch owner's held checkout, not a caller path.
 	fetchDirectory        *os.File
 	fetchGitDirectory     *os.File
+	fetchRepository       string
 	fetchReceiptDirectory *os.File
 	fetchWorkspace        *os.File
 	// BuildMaterials is a process-local capability over the exact manifest and

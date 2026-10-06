@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
@@ -19,7 +20,13 @@ import (
 )
 
 func sourceFetchTestEnvironment(plan *Plan, node Node) []string {
-	var environment []string
+	var paths []string
+	for _, path := range filepath.SplitList(os.Getenv("PATH")) {
+		if filepath.IsAbs(path) {
+			paths = append(paths, path)
+		}
+	}
+	environment := []string{"PATH=" + strings.Join(paths, string(os.PathListSeparator))}
 	for key, value := range githubSourceEnvironment(plan, node) {
 		if key == sourceTokenEnv {
 			value = "test-only-synthetic-token"
@@ -226,11 +233,17 @@ test "$5" = -c
 test "$6" = core.hooksPath=/dev/null
 test "$7" = -c
 test "$8" = core.fsmonitor=false
-test "$9" = init
+test "$9" = -c
+test "${10}" = diff.ignoreSubmodules=all
+test "${11}" = -c
+test "${12}" = submodule.recurse=false
+test "${13}" = init
 test "${GIT_CONFIG_GLOBAL}" = /dev/null
 test "${GIT_CONFIG_NOSYSTEM}" = 1
-test "${NKD_SOURCE_TOKEN}" = test-only-synthetic-token
-test "${HOME+x}" != x
+test "${NKD_SOURCE_TOKEN+x}" != x
+test "${HOME}" = /proc/self/fd/5/.
+test "${XDG_CONFIG_HOME}" = "$HOME"
+test -d "$HOME"
 test "${SSH_AUTH_SOCK+x}" != x
 test "${HTTPS_PROXY+x}" != x
 printf held > %q
@@ -349,6 +362,64 @@ func TestSourceFetchRequiresEverySelectedGitConfigurationField(t *testing.T) {
 			entries, err := os.ReadDir(".")
 			if err != nil || len(entries) != 0 {
 				t.Fatalf("missing selected field wrote output: %v / %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestSourceFetchDelegationCarriesSelectedDeadline(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("actual source delegation requires an issued Linux workspace")
+	}
+	plan, node, _ := authenticatedSourcePlan(t)
+	t.Chdir(t.TempDir())
+	expected, cancel, err := githubUtilityContext(t.Context(), plan, node.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cancel()
+	deadline, ok := expected.Deadline()
+	if !ok {
+		t.Fatal("selected utility stage has no deadline")
+	}
+	called := false
+	err = executeSourceFetch(t.Context(), plan, node.ID, sourceFetchTestEnvironment(plan, node), nil, nil,
+		func(_ ir.Node, options pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
+			called = true
+			observed, ok := options.Ctx.Deadline()
+			if !ok || observed.Before(deadline) || observed.Sub(deadline) > time.Second {
+				t.Fatalf("source owner lost selected stage deadline: want %v got %v / %t", deadline, observed, ok)
+			}
+			return nil, nil
+		})
+	if err != nil || !called {
+		t.Fatalf("deadline callback not admitted: called=%t error=%v", called, err)
+	}
+}
+
+func TestSourceFetchRejectsInvalidPathAndProxyBeforeDelegation(t *testing.T) {
+	plan, node, _ := authenticatedSourcePlan(t)
+	for _, test := range []struct{ name, key, value string }{
+		{"relative PATH", "PATH", ".:/usr/bin"},
+		{"empty PATH component", "PATH", "/usr/bin:"},
+		{"missing Git", "PATH", t.TempDir()},
+		{"HTTP proxy", "HTTP_PROXY", "http://proxy.invalid"},
+		{"HTTPS proxy", "HTTPS_PROXY", "http://proxy.invalid"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			environment := sourceFetchTestEnvironment(plan, node)
+			environment = slices.DeleteFunc(environment, func(pair string) bool { return strings.HasPrefix(pair, test.key+"=") })
+			environment = append(environment, test.key+"="+test.value)
+			called := false
+			err := executeSourceFetch(t.Context(), plan, node.ID, environment, nil, nil,
+				func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) { called = true; return nil, nil })
+			if called || factoryErrorCode(err) != e.CodeEngineCapability {
+				t.Fatalf("unsupported environment reached work: called=%t error=%v", called, err)
+			}
+			entries, err := os.ReadDir(".")
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("environment rejection wrote output: %v / %v", entries, err)
 			}
 		})
 	}

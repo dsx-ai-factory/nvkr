@@ -265,7 +265,7 @@ func TestObserveContainerImageMeasuresBareLocalImageID(t *testing.T) {
 	want := "sha256:" + repeatHex("c")
 	runtimePath := filepath.Join(t.TempDir(), "runtime")
 	script := "#!/bin/sh\n" +
-		"if [ \"$1\" = image ] && [ \"$2\" = inspect ]; then printf '\"" + want + "\"'; exit 0; fi\n" +
+		"if [ \"$1\" = image ] && [ \"$2\" = inspect ]; then printf '{\"Id\":\"" + want + "\"}'; exit 0; fi\n" +
 		"exit 41\n"
 	if err := os.WriteFile(runtimePath, []byte(script), 0o755); err != nil {
 		t.Fatal(err)

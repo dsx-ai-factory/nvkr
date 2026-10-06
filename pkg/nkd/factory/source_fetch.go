@@ -5,11 +5,11 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -29,12 +29,7 @@ func executeGitHubSourceFetch(ctx context.Context, plan *Plan, nodeID string, st
 	if err := admitGitHubPlan(ctx, plan); err != nil {
 		return err
 	}
-	bounded, cancel, err := githubUtilityContext(ctx, plan, nodeID)
-	if err != nil {
-		return err
-	}
-	defer cancel()
-	return executeSourceFetch(bounded, plan, nodeID, os.Environ(), stdout, stderr, (pipeline.Local{}).ExecNode)
+	return executeSourceFetch(ctx, plan, nodeID, os.Environ(), stdout, stderr, (pipeline.Local{}).ExecNode)
 }
 
 func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environment []string, stdout, stderr io.Writer,
@@ -73,6 +68,12 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	if instruction.Kind != ir.KindFetch {
 		return e.New(e.CodePipelineDrift, "source fetch %q does not bind a fetch instruction", nodeID)
 	}
+	bounded, cancel, err := githubUtilityContext(ctx, plan, nodeID)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	ctx = bounded
 	childEnvironment, err := admitSourceFetchEnvironment(plan, node, environment)
 	if err != nil {
 		return err
@@ -131,20 +132,20 @@ func admitSourceFetchEnvironment(plan *Plan, node Node, environment []string) ([
 	expected := githubSourceEnvironment(plan, node)
 	// Even public sources must not consult a runner's credential helper or global
 	// Git configuration. Only the exact selected private helper overrides this
-	// baseline. HOME, SSH, proxy, registry and CI variables never reach Git.
-	child := map[string]string{
-		"PATH": os.Getenv("PATH"), "LC_ALL": "C",
-		"GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
-		"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "credential.helper", "GIT_CONFIG_VALUE_0": "",
+	// baseline. The pipeline supplies its own empty child HOME; host HOME, SSH,
+	// proxy, registry and CI variables are not forwarded.
+	path, err := sourcegit.SearchPath(environment)
+	if err != nil {
+		return nil, err
 	}
-	for _, directory := range filepath.SplitList(child["PATH"]) {
-		if !filepath.IsAbs(directory) {
-			return nil, e.New(e.CodeEngineCapability, "source fetch requires an absolute Git executable search path")
-		}
+	baseline, err := sourcegit.Baseline(path)
+	if err != nil {
+		return nil, err
 	}
-	git, err := exec.LookPath("git")
-	if err != nil || !filepath.IsAbs(git) {
-		return nil, e.New(e.CodeEngineCapability, "source fetch requires Git on its admitted executable search path")
+	child := make(map[string]string, len(baseline)+len(expected))
+	for _, pair := range baseline {
+		key, value, _ := strings.Cut(pair, "=")
+		child[key] = value
 	}
 	for key, value := range expected {
 		child[key] = value
@@ -197,5 +198,10 @@ func admitSourceFetchEnvironment(plan *Plan, node Node, environment []string) ([
 	for _, key := range sortedKeys(child) {
 		result = append(result, key+"="+child[key])
 	}
-	return result, nil
+	_, instruction, err := plan.producerInstruction(node)
+	if err != nil {
+		return nil, err
+	}
+	_, result, err = sourcegit.Admit(instruction.Repo, result)
+	return result, err
 }

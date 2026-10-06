@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -18,8 +19,29 @@ import (
 // already-checked-out matching source closure is reused only through a re-hashed
 // source receipt; HEAD alone is never sufficient.
 func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
+	return l.fetchWithSourceVendorAdmission(n, opts, admitSourceVendor)
+}
+
+// The private core keeps the complete Git/closure lifecycle testable with a
+// modeled daemon. The production entry above always supplies concrete admission.
+func (l Local) fetchWithSourceVendorAdmission(n ir.Node, opts RunOptions,
+	admitVendor func(context.Context, ir.Node, string) (*sourceVendor, error),
+) (returnErr error) {
 	var vendor *sourceVendor
 	if opts.SourceWorkspace != nil {
+		environment := opts.SourceGitEnvironment
+		if environment == nil {
+			var err error
+			environment, err = sourcegit.Baseline(os.Getenv("PATH"))
+			if err != nil {
+				return err
+			}
+		}
+		_, admitted, err := sourcegit.Admit(n.Repo, environment)
+		if err != nil {
+			return err
+		}
+		opts.SourceGitEnvironment, opts.fetchRepository = admitted, n.Repo
 		ctx, workspace, release, err := opts.SourceWorkspace.borrow(opts.ctx())
 		if err != nil {
 			return err
@@ -28,11 +50,14 @@ func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
 		opts.Ctx, opts.fetchWorkspace = ctx, workspace
 		if len(n.VendorCmd) != 0 && !opts.DryRun {
 			var err error
-			vendor, err = admitSourceVendor(opts.ctx(), n, opts.Runtime)
+			vendor, err = admitVendor(opts.ctx(), n, opts.Runtime)
 			if err != nil {
 				return err
 			}
 			defer func() {
+				if vendor.held == nil {
+					return // The vendor callback closed its owner before receipt commit.
+				}
 				if err := vendor.held.close(); err != nil {
 					returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "closing source vendor runtime"))
 				}
@@ -111,6 +136,10 @@ func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
 		{"fetch", "-q", "--depth", "1", "origin", n.Commit},
 		{"checkout", "-q", "--detach", "FETCH_HEAD"},
 	}
+	if opts.fetchDirectory != nil {
+		// The held route fetches the selected source, never a retained origin.
+		steps = [][]string{{"init", "-q"}, {"fetch", "-q", "--depth", "1", n.Repo, n.Commit}, {"checkout", "-q", "--detach", "FETCH_HEAD"}}
+	}
 	for _, s := range steps {
 		if _, err := sourceFetchGitOut(opts, dir, s...); err != nil {
 			if opts.ctx().Err() != nil {
@@ -134,7 +163,14 @@ func (l Local) completeFetch(n ir.Node, dir string, opts RunOptions, vendor *sou
 		return l.vendor(n, dir, opts)
 	}
 	return ensureSourceClosure(n, dir, opts, func() error {
-		return vendor.run(opts.ctx(), opts.fetchWorkspace, opts.fetchDirectory, opts.Stdout, opts.Stderr)
+		err := vendor.run(opts.ctx(), opts.fetchWorkspace, opts.fetchDirectory, opts.Stdout, opts.Stderr)
+		// Runtime cleanup is part of the closure operation, not a post-commit
+		// advisory failure. A failed Close cannot leave a newly issued receipt.
+		if closeErr := vendor.held.close(); closeErr != nil {
+			err = errors.Join(err, e.Wrap(e.CodeFetchFailed, closeErr, "closing source vendor runtime before receipt"))
+		}
+		vendor.held = nil
+		return err
 	})
 }
 

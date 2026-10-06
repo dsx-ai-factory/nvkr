@@ -13,11 +13,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
+func sourceGitPrivateTestEnvironment(t *testing.T, repository, searchPath string) []string {
+	t.Helper()
+	baseline, err := sourcegit.Baseline(searchPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := make(map[string]string)
+	for _, pair := range baseline {
+		key, value, _ := strings.Cut(pair, "=")
+		fields[key] = value
+	}
+	for key, value := range map[string]string{
+		"GIT_CONFIG_COUNT": "4", "GIT_CONFIG_KEY_0": "url.https://example.test/mirror.insteadOf", "GIT_CONFIG_VALUE_0": repository,
+		"GIT_CONFIG_KEY_1": "credential.helper", "GIT_CONFIG_VALUE_1": "", "GIT_CONFIG_KEY_2": "credential.https://example.test/mirror.helper",
+		"GIT_CONFIG_VALUE_2": sourcegit.CredentialHelper, "GIT_CONFIG_KEY_3": "credential.useHttpPath", "GIT_CONFIG_VALUE_3": "true",
+		sourcegit.Token: "test-only-synthetic-source-token",
+	} {
+		fields[key] = value
+	}
+	result := make([]string, 0, len(fields))
+	for key, value := range fields {
+		result = append(result, key+"="+value)
+	}
+	return result
+}
+
 type sourceVendorTestRuntime struct {
+	name        string
 	image       string
 	version     []byte
 	identity    string
@@ -26,10 +54,16 @@ type sourceVendorTestRuntime struct {
 	commands    [][]string
 	cleaned     [][]string
 	beforeStart func() error
+	cleanupErr  error
 }
 
-func (r *sourceVendorTestRuntime) Endpoint() string    { return qualifiedRuntimeEndpoint }
-func (r *sourceVendorTestRuntime) RuntimeName() string { return "docker" }
+func (r *sourceVendorTestRuntime) Endpoint() string { return qualifiedRuntimeEndpoint }
+func (r *sourceVendorTestRuntime) RuntimeName() string {
+	if r.name == "" {
+		return "docker"
+	}
+	return r.name
+}
 func (r *sourceVendorTestRuntime) AdmittedIdentity() (string, string) {
 	return "sha256:" + strings.Repeat("a", 64), r.identity
 }
@@ -71,7 +105,7 @@ func (r *sourceVendorTestRuntime) Run(ctx context.Context, stdin io.Reader, stdo
 }
 func (r *sourceVendorTestRuntime) Cleanup(_ context.Context, _ time.Duration, _, _ io.Writer, args ...string) error {
 	r.cleaned = append(r.cleaned, append([]string(nil), args...))
-	return nil
+	return r.cleanupErr
 }
 
 func sourceVendorRuntimeFixture(t *testing.T, platform string) *sourceVendorTestRuntime {
@@ -93,7 +127,7 @@ func TestSourceVendorArgumentsPreserveMaintainedEntrypointAndExcludeCredentials(
 	for _, arch := range []string{"amd64", "arm64"} {
 		for _, network := range []string{ir.NetworkDefault, ir.NetworkNone} {
 			t.Run(arch+"/"+network, func(t *testing.T) {
-				vendor := &sourceVendor{image: "sha256:" + strings.Repeat("b", 64), platform: "linux/" + arch,
+				vendor := &sourceVendor{runtime: &sourceVendorTestRuntime{}, image: "sha256:" + strings.Repeat("b", 64), platform: "linux/" + arch,
 					network: network, command: []string{"dependency", "build", "controller/deploy/charts/controller"}}
 				args := vendor.createArgs("container", "private-volume")
 				if !slices.Equal(args[len(args)-3:], vendor.command) || args[len(args)-4] != vendor.image {
@@ -115,6 +149,25 @@ func TestSourceVendorArgumentsPreserveMaintainedEntrypointAndExcludeCredentials(
 				}
 			})
 		}
+	}
+}
+
+func TestSourceVendorRuntimeSpecificVolumeArguments(t *testing.T) {
+	for _, test := range []struct{ name, flag, mount string }{
+		{"docker", "--mount", "type=volume,source=private-volume,destination=/src,volume-nocopy"},
+		{"podman", "--volume", "private-volume:/src:nocopy"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			vendor := &sourceVendor{runtime: &sourceVendorTestRuntime{name: test.name}}
+			args := vendor.createArgs("container", "private-volume")
+			index := slices.Index(args, test.flag)
+			if index < 0 || index+1 >= len(args) || args[index+1] != test.mount {
+				t.Fatalf("wrong private volume syntax for %s: %v", test.name, args)
+			}
+			if test.name == "podman" && strings.Contains(strings.Join(args, " "), "volume-nocopy") {
+				t.Fatalf("Docker-only mount option reached Podman: %v", args)
+			}
+		})
 	}
 }
 
@@ -165,6 +218,38 @@ func TestSourceVendorRejectsIncompleteAdmission(t *testing.T) {
 	got, err := admitSourceVendor(ctx, ir.Node{}, "missing-runtime")
 	if got != nil || code(err) != e.CodeTimeout {
 		t.Fatalf("canceled admission passed: %v, %v", got, err)
+	}
+}
+
+func TestSourceVendorAdmissionRejectsUnboundedNetworkAndRuntime(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("concrete source runtime admission requires Linux")
+	}
+	for _, test := range []struct {
+		name, network, executable string
+		bounded                   bool
+	}{
+		{"unbounded", ir.NetworkDefault, "docker", false},
+		{"host network", "host", "docker", true},
+		{"unselected runtime", ir.NetworkDefault, "/usr/bin/runc", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			ctx := t.Context()
+			if test.bounded {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, time.Minute)
+				defer cancel()
+			}
+			vendor, err := admitSourceVendor(ctx, ir.Node{Network: test.network}, test.executable)
+			if vendor != nil || code(err) != e.CodeEngineCapability {
+				t.Fatalf("invalid vendor admission returned %v / %v", vendor, err)
+			}
+			entries, err := os.ReadDir(".")
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("invalid vendor admission wrote outputs: %v / %v", entries, err)
+			}
+		})
 	}
 }
 

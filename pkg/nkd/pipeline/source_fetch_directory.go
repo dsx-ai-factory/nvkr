@@ -2,13 +2,16 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -38,9 +41,37 @@ func sourceFetchDescriptorPath(fd uintptr) (string, error) {
 	}
 }
 
-func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (string, error) {
+func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (result string, returnErr error) {
 	if opts.fetchDirectory == nil {
 		return gitOut(opts.ctx(), dir, args...)
+	}
+	if len(args) > 0 && args[0] == "fetch" && opts.fetchRepository == "" {
+		return "", e.New(e.CodeEngineCapability, "held source fetching requires its exact selected repository")
+	}
+	defer func() { returnErr = mapCancellation(opts.ctx(), returnErr, "held source Git") }()
+	environment := opts.SourceGitEnvironment
+	if environment == nil {
+		var err error
+		environment, err = sourcegit.Baseline(os.Getenv("PATH"))
+		if err != nil {
+			return "", err
+		}
+	}
+	executable, admitted, err := sourcegit.Admit(opts.fetchRepository, environment)
+	if err != nil {
+		return "", err
+	}
+	// Credentials and repository mirror rewriting are needed only for network
+	// fetching. Local init/checkout/status cannot receive the source token.
+	if len(args) == 0 || args[0] != "fetch" {
+		path, err := sourcegit.SearchPath(admitted)
+		if err != nil {
+			return "", err
+		}
+		admitted, err = sourcegit.Baseline(path)
+		if err != nil {
+			return "", err
+		}
 	}
 	path, err := sourceFetchDescriptorPath(3)
 	if err != nil {
@@ -58,14 +89,71 @@ func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (string, err
 			return "", err
 		}
 		command = append(command, "--git-dir="+gitPath, "--work-tree="+path,
-			"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false")
+			"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+			"-c", "diff.ignoreSubmodules=all", "-c", "submodule.recurse=false")
 		files = append(files, opts.fetchGitDirectory)
 	}
-	cmd := execCmd(opts, "git", append(command, args...)...)
-	cmd.Env = append([]string(nil), opts.SourceGitEnvironment...)
-	if cmd.Env == nil {
-		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=credential.helper", "GIT_CONFIG_VALUE_0="}
+	parent := opts.fetchWorkspace
+	if parent == nil {
+		// Package-private descriptor fixtures have no workspace owner. Public
+		// SourceWorkspace fetch always supplies its borrowed held root.
+		var err error
+		parent, _, err = securepath.OpenDirectory(os.TempDir())
+		if err != nil {
+			return "", e.Wrap(e.CodeFetchFailed, err, "holding source Git home parent")
+		}
+		defer parent.Close()
 	}
+	attempt, err := packerAttemptID()
+	if err != nil {
+		return "", e.Wrap(e.CodeFetchFailed, err, "allocating private source Git home")
+	}
+	// Reuse the existing descriptor-relative temporary-directory owner; its
+	// directory is empty and remains held until command stop/join and cleanup.
+	home, err := createPackerWorkspaceRoot(parent, attempt)
+	if err != nil {
+		return "", e.Wrap(e.CodeFetchFailed, err, "holding private source Git home")
+	}
+	defer func() {
+		if err := home.cleanup(); err != nil {
+			returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "cleaning private source Git home"))
+		}
+	}()
+	homePath, err := sourceFetchDescriptorPath(uintptr(3 + len(files)))
+	if err != nil {
+		return "", err
+	}
+	files = append(files, home.root)
+	// Git parses its own local configuration. Refuse callback/delegation families
+	// before status/checkout can execute them; never parse or rewrite Git config.
+	if opts.fetchGitDirectory != nil {
+		if err := admitSourceFetchGitConfiguration(opts, executable, command, files, homePath, admitted); err != nil {
+			return "", err
+		}
+		if err := recheckSourceFetchGitDirectory(opts); err != nil {
+			return "", err
+		}
+	}
+	if len(args) > 0 && args[0] == "fetch" {
+		// Repository-local upload-pack and fetch-recurse settings cannot select
+		// a different host program or additional repositories for this fetch.
+		command = append(command, "fetch", "--upload-pack=git-upload-pack", "--no-recurse-submodules")
+		command = append(command, args[1:]...)
+	} else {
+		command = append(command, args...)
+	}
+	cmd := execCmd(opts, executable, command...)
+	cmd.Env = append(admitted, "HOME="+homePath, "XDG_CONFIG_HOME="+homePath)
+	// Also bound transports on non-fetch commands: object reads in a reused
+	// partial repository must not activate a configured external helper.
+	protocols := "https:file"
+	for _, field := range admitted {
+		if strings.HasPrefix(field, sourcegit.Token+"=") {
+			protocols = "https"
+			break
+		}
+	}
+	cmd.Env = append(cmd.Env, "GIT_ALLOW_PROTOCOL="+protocols)
 	cmd.ExtraFiles = files
 	out, err := outputOwnedCommand(opts.ctx(), cmd)
 	if err != nil {
@@ -80,6 +168,59 @@ func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (string, err
 		}
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// This output sink records presence only and rejects the first byte. No config
+// names/values are retained, unboundedly buffered, parsed or exposed in errors.
+type sourceGitConfigPresence struct{ found bool }
+
+func (output *sourceGitConfigPresence) Write(raw []byte) (int, error) {
+	if len(raw) == 0 {
+		return 0, nil
+	}
+	output.found = true
+	return 0, e.New(e.CodeEngineCapability, "held source Git configuration query returned unsupported data")
+}
+
+func admitSourceFetchGitConfiguration(opts RunOptions, executable string, prefix []string, files []*os.File, homePath string, admitted []string) error {
+	configuration, _, err := securepath.OpenChild(opts.fetchGitDirectory, "config", false)
+	if os.IsNotExist(err) {
+		return nil // Fresh init has no local configuration yet.
+	}
+	if err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "holding source Git configuration")
+	}
+	_ = configuration.Close()
+	path, err := sourcegit.SearchPath(admitted)
+	if err != nil {
+		return err
+	}
+	baseline, err := sourcegit.Baseline(path)
+	if err != nil {
+		return err
+	}
+	// --no-includes does not hide delegating include keys: those keys themselves
+	// are refused. Worktree/partial-clone configuration is not a held v1 source.
+	query := append([]string{"--no-pager"}, prefix...)
+	query = append(query, "config", "--local", "--no-includes", "--name-only", "--null", "--get-regexp",
+		`^(filter|include|includeif|hook|url)\.|^extensions\.(worktreeconfig|partialclone)$|^remote\..*\.promisor$|^core\.alternaterefscommand$`)
+	cmd := execCmd(opts, executable, query...)
+	cmd.Env = append(baseline, "HOME="+homePath, "XDG_CONFIG_HOME="+homePath, "GIT_ALLOW_PROTOCOL=https:file")
+	cmd.ExtraFiles = files
+	var stdout, stderr sourceGitConfigPresence
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	err = runOwnedCommand(opts.ctx(), cmd)
+	if opts.ctx().Err() != nil {
+		return e.Wrap(e.CodeTimeout, opts.ctx().Err(), "source Git configuration query canceled")
+	}
+	var exit *exec.ExitError
+	if !stdout.found && !stderr.found && errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return nil // Git's documented no-match status; no data was emitted.
+	}
+	if stdout.found || stderr.found || err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "held source Git configuration contains unsupported callbacks, includes or object sources")
+	}
+	return nil
 }
 
 func recheckSourceFetchGitDirectory(opts RunOptions) error {

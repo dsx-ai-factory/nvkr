@@ -60,9 +60,16 @@ func admitSourceVendor(ctx context.Context, node ir.Node, runtimeName string) (_
 	}
 	defer func() {
 		if returnErr != nil {
-			returnErr = errors.Join(returnErr, held.close())
+			if err := held.close(); err != nil {
+				returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "closing rejected source vendor runtime"))
+			}
 		}
 	}()
+	if held.name == "podman" && node.Network == ir.NetworkDefault {
+		if err := admitSourceVendorPodmanHelpers(ctx, held); err != nil {
+			return nil, err
+		}
+	}
 	held.identity, err = observeHeldRuntimeIdentity(ctx, held)
 	if err != nil {
 		return nil, err
@@ -102,6 +109,7 @@ func sourceVendorImage(ctx context.Context, runtime packerContainerRuntime, refe
 	if err := json.Unmarshal(stdout.Bytes(), &image); err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "decoding source vendor image")
 	}
+	image.ID = normalizeLocalImageID(image.ID)
 	if validateSHA256(image.ID) != nil || image.OS+"/"+image.Architecture != platform || len(image.Config.Volumes) != 0 {
 		return "", e.New(e.CodeEngineCapability, "source vendor image has a mismatched native platform, invalid identity or implicit volumes")
 	}
@@ -112,10 +120,16 @@ func (vendor *sourceVendor) createArgs(name, volume string) []string {
 	args := []string{"create", "--name", name, "--pull=never", "--platform", vendor.platform,
 		"--label", "nkd.dev/role=source-vendor",
 		"--network=" + vendor.network, "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-		"--no-healthcheck", "--mount", "type=volume,source=" + volume + ",destination=/src,volume-nocopy",
+		"--no-healthcheck"}
+	if vendor.runtime.RuntimeName() == "podman" {
+		args = append(args, "--volume", volume+":/src:nocopy")
+	} else {
+		args = append(args, "--mount", "type=volume,source="+volume+",destination=/src,volume-nocopy")
+	}
+	args = append(args,
 		"--tmpfs", "/tmp:rw,nosuid,nodev,mode=1777", "--workdir", "/src/source",
 		"--env", "HOME=/tmp/home", "--env", "TMPDIR=/tmp", "--env", "GOCACHE=/tmp/go-build",
-		"--env", "GOPATH=/tmp/go", "--env", "GOMODCACHE=/tmp/go/pkg/mod", vendor.image}
+		"--env", "GOPATH=/tmp/go", "--env", "GOMODCACHE=/tmp/go/pkg/mod", vendor.image)
 	return append(args, vendor.command...)
 }
 
@@ -142,7 +156,11 @@ func (vendor *sourceVendor) run(ctx context.Context, workspace, checkout *os.Fil
 		return e.Wrap(e.CodeInternal, err, "allocating source vendor attempt")
 	}
 	resources := &packerContainerResources{runtime: vendor.runtime}
-	defer func() { returnErr = errors.Join(returnErr, resources.cleanup()) }()
+	defer func() {
+		if err := resources.cleanup(); err != nil {
+			returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "cleaning source vendor resources"))
+		}
+	}()
 	resources.workspace, err = createPackerWorkspaceRoot(workspace, attempt)
 	if err != nil {
 		return err
@@ -179,7 +197,11 @@ func (vendor *sourceVendor) run(ctx context.Context, workspace, checkout *os.Fil
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "holding vendor source carrier")
 	}
-	defer func() { returnErr = errors.Join(returnErr, archive.Close()) }()
+	defer func() {
+		if err := archive.Close(); err != nil {
+			returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "closing source vendor input carrier"))
+		}
+	}()
 	carrierDigest, err := sourceVendorCarrierDigest(ctx, archive)
 	if err != nil {
 		return err
@@ -217,13 +239,17 @@ func (vendor *sourceVendor) run(ctx context.Context, workspace, checkout *os.Fil
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "creating held source vendor result carrier")
 	}
-	defer func() { returnErr = errors.Join(returnErr, returned.Close()) }()
+	defer func() {
+		if err := returned.Close(); err != nil {
+			returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "closing source vendor result carrier"))
+		}
+	}()
 	limit := &packerContainerLimitWriter{writer: returned, remaining: returnLimit}
 	if err := vendor.runtime.Run(ctx, nil, limit, stderr, "cp", container+":/src/source", "-"); err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "collecting bounded source vendor closure")
 	}
 	if err := transportarchive.UnpackOpen(ctx, returned, output, []string{"source"}); err != nil {
-		return err
+		return e.Wrap(e.CodeFetchFailed, err, "decoding source vendor return carrier")
 	}
 	if err := observePackerRuntimeFreshness(ctx, vendor.runtime); err != nil {
 		return err
@@ -268,9 +294,20 @@ func replaceVendoredSource(ctx context.Context, checkout *os.File, source, befor
 	if !os.IsNotExist(err) {
 		return e.Wrap(e.CodeFetchFailed, err, "vendor result contains an unsafe Git member")
 	}
-	want, err := sourceTreeDigestContext(ctx, source)
+	manifest, err := sourceTreeManifestContext(ctx, source)
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "validating complete vendor source before copy-back")
+	}
+	for _, entry := range manifest.Entries {
+		for _, component := range strings.Split(entry.Path, "/") {
+			if component == ".git" {
+				return e.New(e.CodeFetchFailed, "vendor result contains forbidden nested Git metadata")
+			}
+		}
+	}
+	want, err := canonical.Digest(canonical.KindSourceClosure, manifest)
+	if err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "identifying validated vendor closure")
 	}
 	path, err := sourceFetchDescriptorPath(checkout.Fd())
 	if err != nil {

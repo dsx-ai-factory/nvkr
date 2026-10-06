@@ -381,16 +381,21 @@ func observeContainerImageWith(ctx context.Context, node ir.Node, output func(..
 			return "", e.New(e.CodeInvalidCatalog,
 				"node %q toolchain image ID is not a canonical digest", node.ID)
 		}
-		raw, err := output("image", "inspect", "--format", "{{json .Id}}", node.Toolchain)
+		raw, err := output("image", "inspect", "--format", "{{json .}}", node.Toolchain)
 		if err != nil {
 			return "", e.Wrap(e.CodeEngineCapability, err,
 				"inspecting local toolchain image ID for node %q", node.ID)
 		}
-		var observedID string
-		if err := json.Unmarshal(bytes.TrimSpace(raw), &observedID); err != nil {
+		if err := canonical.ValidateJSONDocument(raw); err != nil {
 			return "", e.Wrap(e.CodeEngineCapability, err,
 				"decoding local toolchain image ID for node %q", node.ID)
 		}
+		var inspection packerImageInspection
+		if err := json.Unmarshal(bytes.TrimSpace(raw), &inspection); err != nil {
+			return "", e.Wrap(e.CodeEngineCapability, err,
+				"decoding local toolchain image ID for node %q", node.ID)
+		}
+		observedID := normalizeLocalImageID(inspection.ID)
 		if observedID != node.Toolchain {
 			return "", e.New(e.CodePreflightFailed,
 				"runtime selected local toolchain image ID %q for node %q, want %q",

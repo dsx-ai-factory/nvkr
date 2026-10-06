@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -14,7 +15,7 @@ const sourceTokenEnv = "NKD_SOURCE_TOKEN"
 
 // Git invokes this helper through a pipe. The token remains in the invoking step's
 // environment, never in an argument, remote URL, persisted config or carrier.
-const sourceCredentialHelper = `!f() { if [ "$1" = get ]; then printf '%s\n' 'username=x-access-token' "password=$NKD_SOURCE_TOKEN"; fi; }; f`
+const sourceCredentialHelper = sourcegit.CredentialHelper
 
 const requireSourceToken = `[ -n "${NKD_SOURCE_TOKEN:-}" ] || { printf '%s\n' 'nkdctl: [NKD-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }`
 

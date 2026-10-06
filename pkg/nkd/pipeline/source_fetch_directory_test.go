@@ -78,12 +78,10 @@ func TestSourceFetchHeldGitDoesNotInheritAmbientCredentials(t *testing.T) {
 	for _, key := range []string{"HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK", "ACTIONS_RUNTIME_TOKEN", "REGISTRY_AUTH_FILE", "HTTPS_PROXY", "UNSELECTED_SECRET"} {
 		t.Setenv(key, "ambient-secret")
 	}
-	for _, private := range []bool{false, true} {
-		opts := RunOptions{Ctx: t.Context(), fetchDirectory: checkout}
-		if private {
-			opts.SourceGitEnvironment = []string{"PATH=" + path, "LC_ALL=C", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "NKD_SOURCE_TOKEN=selected-test-token"}
-		}
-		output, err := sourceFetchGitOut(opts, ".", "status")
+	for _, operation := range []string{"fetch", "init", "checkout", "status"} {
+		opts := RunOptions{Ctx: t.Context(), fetchDirectory: checkout, fetchRepository: "https://example.test/source",
+			SourceGitEnvironment: sourceGitPrivateTestEnvironment(t, "https://example.test/source", path)}
+		output, err := sourceFetchGitOut(opts, ".", operation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,8 +89,11 @@ func TestSourceFetchHeldGitDoesNotInheritAmbientCredentials(t *testing.T) {
 		if strings.Contains(output, "ambient-secret") || !slices.Contains(fields, "GIT_CONFIG_GLOBAL=/dev/null") || !slices.Contains(fields, "GIT_CONFIG_NOSYSTEM=1") {
 			t.Fatal("held Git child inherited ambient state or lacked its fixed baseline")
 		}
-		if slices.Contains(fields, "NKD_SOURCE_TOKEN=selected-test-token") != private {
-			t.Fatal("selected source credential escaped its private child scope")
+		if slices.Contains(fields, "NKD_SOURCE_TOKEN=test-only-synthetic-source-token") != (operation == "fetch") {
+			t.Fatal("selected source credential escaped its network-fetch-only child scope")
+		}
+		if !slices.Contains(fields, "HOME=/proc/self/fd/4/.") || !slices.Contains(fields, "XDG_CONFIG_HOME=/proc/self/fd/4/.") {
+			t.Fatal("Git child did not receive its owned empty home descriptor")
 		}
 	}
 }
@@ -264,11 +265,22 @@ func TestSourceFetchHeldWorkspaceRejectsUnsafeRelativePathsBeforeCreation(t *tes
 }
 
 func TestSourceFetchHeldWorkspaceMisuseFailsBeforeWork(t *testing.T) {
-	for _, misuse := range []string{"build", "not launched", "qualified", "whole graph", "environment without workspace"} {
+	for _, misuse := range []string{"build", "not launched", "qualified", "whole graph", "environment-only whole graph", "environment without workspace"} {
 		t.Run(misuse, func(t *testing.T) {
+			issued := misuse == "build" || misuse == "not launched" || misuse == "qualified"
+			if issued && runtime.GOOS != "linux" {
+				t.Skip("misuse of an issued source workspace requires Linux")
+			}
 			t.Chdir(t.TempDir())
 			workspace := &SourceWorkspace{}
 			var err error
+			if issued {
+				workspace, err = HoldSourceWorkspace(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = workspace.Close() })
+			}
 			node := testFetchNode("fetch-source", "https://example.test/source", testSourceCommit, testSourceTree,
 				"source", "registry.example/toolchain@sha256:"+repeatHex("c"), "")
 			opts := RunOptions{Ctx: t.Context(), SourceRoot: "src", SourceWorkspace: workspace, Launch: true}
@@ -279,14 +291,14 @@ func TestSourceFetchHeldWorkspaceMisuseFailsBeforeWork(t *testing.T) {
 				opts.Launch = false
 			case "qualified":
 				opts.Qualification = &QualifiedExecution{}
-			case "environment without workspace":
+			case "environment without workspace", "environment-only whole graph":
 				opts.SourceWorkspace = nil
 				opts.SourceGitEnvironment = []string{"LC_ALL=C"}
 			}
 			if err := node.Validate(); err != nil {
 				t.Fatalf("misuse fixture must otherwise be a valid producer: %v", err)
 			}
-			if misuse == "whole graph" {
+			if misuse == "whole graph" || misuse == "environment-only whole graph" {
 				_, err = (Local{}).Run(nil, "", opts)
 			} else {
 				_, err = (Local{}).ExecNode(node, opts)
