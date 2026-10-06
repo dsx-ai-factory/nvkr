@@ -86,7 +86,8 @@ func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHu
 		return e.Wrap(e.CodeEngineCapability, err, "resolve GitHub utility workspace")
 	}
 	location := utilityRunnerLocation{runtime: plan.Environment.RuntimeBinary(), mountSource: root, mountTarget: "/workspace",
-		helper: "/workspace/nkd-exec", plan: FactoryPlanPath, planDigest: expected}
+		helper: "/workspace/nkd-exec", plan: FactoryPlanPath, planDigest: expected,
+		publicationRunContext: PerOutputPublication(plan) && node.PackageKind == PackageOCI}
 	if location.runtime == "docker" {
 		location.user, location.home = localContainerUser(), true
 	}

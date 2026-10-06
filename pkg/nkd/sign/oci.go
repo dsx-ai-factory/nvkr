@@ -148,6 +148,8 @@ type VerificationRecord struct {
 // fields are mandatory: an unpinned identity or issuer would accept any Fulcio
 // certificate and is therefore not a trust decision at all.
 type VerifyPolicy struct {
+	// ExpectedPredicate optionally binds the exact production predicate, including Plan and invocation.
+	ExpectedPredicate  []byte
 	IdentityRegexp     string
 	Issuer             string
 	RequireAttestation bool
@@ -269,6 +271,15 @@ func requireOCIPredicateWithLimit(predicate []byte, limit int64, code e.Code, la
 // resolvePolicy fills a policy from the adapter's configured identity/issuer and
 // then requires both. An unpinned identity can never authorize a publication.
 func resolvePolicy(policy VerifyPolicy, identity, issuer string) (VerifyPolicy, error) {
+	if len(policy.ExpectedPredicate) > 0 {
+		if !policy.RequireAttestation || int64(len(policy.ExpectedPredicate)) > maxOCIPredicateBytes {
+			return VerifyPolicy{}, e.New(e.CodeTrustPolicyMissing, "exact predicate requires bounded attestation verification")
+		}
+		if err := canonical.ValidateJSONDocument(policy.ExpectedPredicate); err != nil {
+			return VerifyPolicy{}, e.Wrap(e.CodeTrustPolicyMissing, err, "invalid expected predicate")
+		}
+		policy.ExpectedPredicate = append([]byte(nil), policy.ExpectedPredicate...)
+	}
 	if strings.TrimSpace(policy.IdentityRegexp) == "" {
 		policy.IdentityRegexp = identity
 	}
@@ -813,8 +824,9 @@ func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 // ---------------------------------------------------------------------------
 
 type inTotoStatement struct {
-	Type          string `json:"_type"`
-	PredicateType string `json:"predicateType"`
+	Predicate     json.RawMessage `json:"predicate"`
+	Type          string          `json:"_type"`
+	PredicateType string          `json:"predicateType"`
 	Subject       []struct {
 		Digest map[string]string `json:"digest"`
 	} `json:"subject"`

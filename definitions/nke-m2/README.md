@@ -54,8 +54,7 @@ under `nke.dev/os-image-materials/v1`; every selected material and disk target r
 
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
-the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The signer identity admits the existing main ref and the explicitly authorized
-`codex/m2-arc-validation` ref; this is not organizational source or publication approval. Native disk
+the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The signer identity admits only the `main` ref; this is not organizational source or publication approval. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
 Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
@@ -82,6 +81,16 @@ lists repository-owned native preparation and measurement commands, their curren
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
 read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. The `nkd-arc` deployment
-environment and signing policy admit `main` and the exact manual-validation branch
-`codex/m2-arc-validation`; the same branch must be admitted by `nkd-release`. The generated bundle has not been exercised as a full M2 Run.
+each internal toolchain package's Manage Actions access settings. The generated workflow has no feature-branch execution exception. Its signing policy admits only
+`main`, which must also be admitted by the `nkd-arc` and `nkd-release` deployment environments. The generated bundle has not been exercised as a full M2 Run.
+
+The Environment selects `publication.mode: per-output-v1`. Each output is packaged, published, signed and
+verified independently. Release assembly combines authenticated references and evidence from the same Plan
+and workflow run attempt; aggregate verification and finalization do not download output payloads. Finalization
+still checks every job and every required output. The public release remains one signed entry point under
+`m2-candidate/releases`, with independently consumable output repositories. Per-output jobs still need room
+for their own payloads and copies; this change does not establish a measured runner-storage budget. The
+metadata transport and failure gates are locally contract-tested; a successful hosted run remains unrecorded.
+
+The generator checks the complete workflow against a 500,000-byte ceiling before writing. YAML anchors and
+inline step maps compact repeated configuration without changing the expanded job graph or credentials.

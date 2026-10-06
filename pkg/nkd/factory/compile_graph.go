@@ -187,6 +187,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 	}
 
+	if err := bindReferenceReleaseGraph(&plan, nodes, artifacts); err != nil {
+		return ArtifactGraph{}, err
+	}
 	plan.Graph.Nodes = mapNodes(nodes)
 	plan.Graph.Artifacts = mapArtifacts(artifacts)
 	if err := bindEvidenceAttestation(&plan); err != nil {

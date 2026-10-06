@@ -11,6 +11,8 @@ import (
 func githubNodeLabel(plan *Plan, node Node) string {
 	name := strings.TrimPrefix(node.ID, node.Kind+"/")
 	switch node.Kind {
+	case NodeAssembleRelease:
+		return "Assemble release from verified output references"
 	case NodeFetch:
 		return "Fetch pinned source for " + githubSourceConsumers(plan, node)
 	case NodeBuild:

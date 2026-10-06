@@ -148,7 +148,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	// believe were published. Re-deriving the index digest from the layout and
 	// refusing any disagreement is what keeps a signature from binding an identity
 	// nobody in this run actually produced.
-	inspection, err := delivery.Inspect(ctx, layoutArtifact.Path)
+	inspect := delivery.Inspect
+	if PerOutputPublication(plan) && node.Target == "release" {
+		inspect = delivery.InspectMetadata
+	}
+	inspection, err := inspect(ctx, layoutArtifact.Path)
 	if err != nil {
 		return err
 	}
@@ -183,7 +187,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	}
 	// Each output is independently consumable from its own repository. Derive all
 	// subjects from the inspected closure before the first signing side effect.
-	if err := signPublicationOutputs(ctx, signer, subject.Ref, inspection, predicate, signing, stdout); err != nil {
+	if PerOutputPublication(plan) && node.Target == "release" {
+		if err := verifyPublicationOutputs(ctx, signer, subject.Ref, inspection, signing, stdout); err != nil {
+			return err
+		}
+	} else if err := signPublicationOutputs(ctx, signer, subject.Ref, inspection, predicate, signing, stdout); err != nil {
 		return err
 	}
 	record, err := signer.SignAndAttest(ctx, subject, predicate)
@@ -264,9 +272,18 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if signer == nil {
 		return e.New(e.CodeInternal, "factory verification node %q resolved no signing adapter", node.ID)
 	}
-	verification, err := signer.Verify(ctx, subject, sign.VerifyPolicy{
-		IdentityRegexp: signing.Identity, Issuer: signing.Issuer, RequireAttestation: true,
-	})
+	policy := sign.VerifyPolicy{IdentityRegexp: signing.Identity, Issuer: signing.Issuer, RequireAttestation: true}
+	if PerOutputPublication(plan) {
+		raw, err := readSmallFactoryFile(ctx, artifacts["predicate/"+strings.TrimPrefix(node.ID, NodeVerifyPublication+"/")].Path, "production predicate")
+		if err != nil {
+			return err
+		}
+		if err := validateHostedProductionPredicate(raw, plan, signing); err != nil {
+			return err
+		}
+		policy.ExpectedPredicate = raw
+	}
+	verification, err := signer.Verify(ctx, subject, policy)
 	if err != nil {
 		// Fail closed and write NOTHING: an absent verification record is an honest
 		// "unverified", while a written one would be read as a checked publication.
@@ -283,17 +300,45 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 		return e.Wrap(e.CodeInternal, err, "creating release verification workspace")
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
-	inspection, err := delivery.Pull(ctx, subject.Ref, filepath.Join(workspace, "closure"), registryOptions)
+	pull := delivery.Pull
+	if PerOutputPublication(plan) && node.Target == "release" {
+		pull = delivery.PullMetadata
+	}
+	inspection, err := pull(ctx, subject.Ref, filepath.Join(workspace, "closure"), registryOptions)
 	if err != nil {
 		return err
 	}
 	if signing.Mode == SigningModeCosign && inspection.Root.Release != nil {
-		if err := verifySBOMAttestations(ctx, signer, filepath.Join(workspace, "closure"), inspection); err != nil {
+		verifyEvidence := verifySBOMAttestations
+		if PerOutputPublication(plan) && node.Target == "release" {
+			verifyEvidence = verifyMetadataSBOMs
+		}
+		if err := verifyEvidence(ctx, signer, filepath.Join(workspace, "closure"), inspection); err != nil {
 			return err
 		}
 	}
 	if err := verifyPublicationOutputs(ctx, signer, subject.Ref, inspection, signing, stdout); err != nil {
 		return err
+	}
+	if PerOutputPublication(plan) {
+		route := strings.TrimPrefix(node.ID, NodeVerifyPublication+"/")
+		output := artifacts["metadata/"+route]
+		if output.Kind != ArtifactPublicationMetadata {
+			return e.New(e.CodePipelineDrift, "verification has no metadata output")
+		}
+		var err error
+		if route == "release" {
+			sources := map[string]string{}
+			for _, object := range inspection.Root.Objects {
+				sources[object.Name] = filepath.Join(workspace, "closure")
+			}
+			_, err = delivery.BuildMetadataRoot(ctx, output.Path, inspection.Root, sources)
+		} else {
+			_, err = delivery.ExportMetadata(ctx, filepath.Join(workspace, "closure"), output.Path)
+		}
+		if err != nil {
+			return err
+		}
 	}
 	raw, err := verification.Canonical()
 	if err != nil {

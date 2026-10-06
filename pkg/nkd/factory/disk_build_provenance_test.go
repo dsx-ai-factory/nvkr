@@ -42,9 +42,10 @@ func TestDiskBuildProvenancePublication(t *testing.T) {
 				}
 				if failure != "" {
 					want := e.CodeVerifyFailed
-					if failure == "closed owner" {
+					switch failure {
+					case "closed owner":
 						want = e.CodeGateUnmet
-					} else if failure == "changed result" {
+					case "changed result":
 						want = e.CodePipelineDrift
 					}
 					assertFactoryErrorCode(t, err, want)

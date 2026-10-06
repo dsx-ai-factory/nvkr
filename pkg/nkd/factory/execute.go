@@ -98,6 +98,8 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 		return executeObservation(ctx, plan, node, artifacts)
 	case NodeSBOM:
 		return executeSBOM(ctx, plan, node, artifacts, stdout)
+	case NodeAssembleRelease:
+		return executeReferenceRelease(ctx, plan, node, artifacts, productionOCISigner)
 	case NodePackage:
 		return executePackage(ctx, plan, node, artifacts, stdout)
 	case NodePublish:
@@ -341,7 +343,11 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			"factory publication target %q requires its configured username and credential", node.Target)
 	}
 	if plan.Environment.Signing != nil && plan.Environment.Signing.Mode == SigningModeCosign && len(plan.LifecycleOutputs) > 0 {
-		inspection, err := delivery.Inspect(ctx, artifacts[node.Inputs[0]].Path)
+		inspect := delivery.Inspect
+		if PerOutputPublication(plan) && node.Target == "release" {
+			inspect = delivery.InspectMetadata
+		}
+		inspection, err := inspect(ctx, artifacts[node.Inputs[0]].Path)
 		if err != nil {
 			return err
 		}
@@ -349,7 +355,11 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			return err
 		}
 	}
-	ref, err := delivery.Push(ctx, artifacts[node.Inputs[0]].Path, target.Ref, delivery.RegistryOptions{
+	push := delivery.Push
+	if PerOutputPublication(plan) && node.Target == "release" {
+		push = delivery.PushMetadata
+	}
+	ref, err := push(ctx, artifacts[node.Inputs[0]].Path, target.Ref, delivery.RegistryOptions{
 		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,
 		Username: username, Password: password,
 	})

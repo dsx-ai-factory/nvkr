@@ -87,7 +87,7 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 	targets := map[string]Target{"release": {Kind: TargetOCI, Ref: publication.RepositoryPrefix + "/releases", CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}}
 	routes := []Route{{Name: "release", Input: "package/release", Target: "release"}}
 	packages = append(packages, packageSpec{Name: "release", Kind: PackageOCI, Inputs: closureInputs})
-	return packages, targets, routes, nil
+	return deriveOutputPublication(definition, environment, packages, targets, routes)
 }
 
 func packageProducerResults(inputs []string, nodes map[string]Node, artifacts map[string]Artifact) []string {

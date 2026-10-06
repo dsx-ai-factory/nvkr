@@ -15,6 +15,7 @@ import (
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -217,7 +218,36 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			for name, raw := range bundle.Files {
 				changed.Files[name] = raw
 			}
-			changed.Files[GitHubWorkflowPath] = bytes.Replace(bundle.Files[GitHubWorkflowPath], []byte(tc.old), []byte(tc.replacement), 1)
+			var tree yamlv3.Node
+			if err := yamlv3.Unmarshal(bundle.Files[GitHubWorkflowPath], &tree); err != nil {
+				t.Fatal(err)
+			}
+			mutated := false
+			var mutate func(*yamlv3.Node)
+			mutate = func(node *yamlv3.Node) {
+				if !mutated && node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, tc.old) {
+					node.Value = strings.Replace(node.Value, tc.old, tc.replacement, 1)
+					mutated = true
+				}
+				for _, child := range node.Content {
+					mutate(child)
+				}
+			}
+			mutate(&tree)
+			if !mutated {
+				t.Fatal("mutation did not apply")
+			}
+			raw, err := yamlv3.Marshal(&tree)
+			if err != nil {
+				t.Fatal(err)
+			}
+			changed.Files[GitHubWorkflowPath], err = compactGitHubWorkflow(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := validateGitHubWorkflowSize(changed.Files[GitHubWorkflowPath]); err != nil {
+				t.Fatal(err)
+			}
 			if bytes.Equal(changed.Files[GitHubWorkflowPath], bundle.Files[GitHubWorkflowPath]) {
 				t.Fatal("mutation did not apply")
 			}

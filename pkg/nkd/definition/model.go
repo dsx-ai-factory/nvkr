@@ -116,6 +116,8 @@ type SourceAccess struct {
 
 // Publication selects one OCI namespace. Release metadata/evidence use /releases; outputs use named sibling repositories.
 type Publication struct {
+	// Mode selects output-local publication and metadata-only release assembly.
+	Mode             string `json:"mode,omitempty"`
 	RepositoryPrefix string `json:"repositoryPrefix"`
 	CredentialRef    string `json:"credentialRef,omitempty"`
 	Anonymous        bool   `json:"anonymous,omitempty"`
@@ -288,6 +290,9 @@ func (environment Environment) Validate() error {
 		}
 	}
 	if publication := environment.Publication; publication != nil {
+		if publication.Mode != "" && (publication.Mode != "per-output-v1" || environment.Signing == nil || environment.Signing.Mode != "cosign") {
+			return e.New(e.CodeEngineCapability, "per-output publication requires production cosign signing")
+		}
 		if strings.ContainsAny(publication.CredentialRef, "\r\n\x00") {
 			return e.New(e.CodeInvalidCatalog, "publication credentialRef must not contain control characters")
 		}

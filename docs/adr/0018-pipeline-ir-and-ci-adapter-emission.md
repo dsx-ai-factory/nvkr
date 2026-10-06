@@ -601,7 +601,7 @@ part of the requested set. Each operation prepares its outputs in one step and r
 for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
 artifacts. Logical commands, transport authentication and isolation remain unchanged.
 
-The finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits
+The legacy finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits
 every carrier and records its producer and restore outcome separately; it continues after missing carriers,
 failed producer jobs and returned restore failures. A diagnostic summary names every outcome. A successful batch
 download or recovery step proves no completeness: the finalizer consumes those unchanged per-carrier records
@@ -609,8 +609,24 @@ and authenticates the complete output and evidence closure. The helper accepts b
 through a step environment value, with an exact stage/bootstrap job set, known statuses, duplicate rejection
 and bounded parsing before filesystem work. Unknown, missing or malformed job results fail closed. Individual
 carrier failure does not stop later recovery; cancellation or failed outcome persistence does.
+With `publication.mode: per-output-v1`, the compiler emits independent output publication routes and a
+metadata-only aggregate operation (ADR-20 §6). Output publication packages cannot be grouped with other
+utility nodes, so grouping cannot recreate an all-output payload download. Offline packaging receives only
+the public GitHub workflow/run identity variables, never registry, source or OIDC credentials. Each output's
+verification exports a bounded metadata carrier. The finalizer downloads only the aggregate metadata,
+published reference, signing record, predicate, verification record and pinned cosign tool. Provider-result
+admission still covers every stage and bootstrap job; any failed, skipped or missing required job prevents
+completion. Assembly and finalization have registry-read permission and no OIDC minting or package-write
+permission. All credentials and signing remain outside ARC producer jobs.
+
 Every generated run script remains checked against GitHub's 21,000-character ceiling, conservatively measured
-as UTF-8 bytes, including explicit operator setup and bootstrap commands.
+as UTF-8 bytes, including explicit operator setup and bootstrap commands. The generator also rejects a
+workflow file over 500,000 UTF-8 bytes before returning a bundle or writing generated files; validation and
+bundle persistence enforce the same bound. Per-output workflows compact repeated values with YAML anchors
+and inline step maps, then compare the fully expanded JSON to the uncompressed workflow before acceptance.
+Compaction changes presentation only, not jobs, scripts or permissions. The limit follows GitHub's
+[500 KB workflow-file ceiling](https://docs.github.com/en/actions/reference/limits#workflow-file-size);
+files that remain oversized fail closed instead of generating an unstartable workflow.
 Provider outage or failed local outcome storage can
 still prevent finalization.
 

@@ -195,7 +195,7 @@ func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, art
 		declared[input] = true
 	}
 	var outputs []delivery.Output
-	for _, expected := range plan.LifecycleOutputs {
+	for _, expected := range selectedPublicationOutputs(plan, node) {
 		if expected.Kind == PackageDiskImage {
 			if !declared["package/"+expected.Name] || !declared[expected.ArtifactID] {
 				return nil, e.New(e.CodeReleaseIncomplete, "publication omits exact disk wrapper and raw subject")
@@ -230,7 +230,7 @@ func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, art
 		outputs = append(outputs, bound)
 	}
 	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
-	if err := ValidateLifecycleOutputs(plan.LifecycleOutputs, outputs); err != nil {
+	if err := ValidateLifecycleOutputs(selectedPublicationOutputs(plan, node), outputs); err != nil {
 		return nil, err
 	}
 	return outputs, nil

@@ -198,6 +198,31 @@ standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras p
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
+The explicit GitHub-only `publication.mode: per-output-v1` uses one output-local publication route per
+required output, retaining the full compiled Plan. Each route observes its exact payload and producer records,
+attests its required SBOMs, publishes the output and evidence, then signs and verifies its own metadata root
+at `<prefix>/releases-<output>`. These roots are internal publication handoffs, not additional product outputs.
+Their signed metadata binds the exact Plan digest and workflow invocation, including run attempt.
+
+Release assembly authenticates every output-local root and its exact production predicate under the configured
+workflow identity/issuer, verifies its SBOM bundles, and joins its named output to the independently frozen
+requirements. It merges shared evidence only when document, subject and stage bindings agree, choosing the
+first sorted output's existing bundle and repository. It publishes a single aggregate root at `<prefix>/releases`.
+Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
+and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
+verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.
+Each output route still verifies its full payload closure. The independent Release consumer still retrieves
+and verifies full payloads through its existing held owner.
+
+In this mode finalization requires every provider job to succeed, then reauthenticates the aggregate root,
+exact Plan/invocation-bound production predicate, output signatures/provenance and SBOM bundles. Persisted
+success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
+it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
+read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
+Legacy publication without this mode retains its full-closure assembly/finalization path. Local execution and
+dry-run signing do not admit the new mode. Interrupted runs can leave independently published outputs; no
+cross-run reuse, rollback, retention protocol or atomic multi-repository transaction is added.
+
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
 output names, sibling repository locators, descriptor identities, output-to-Build-Digest/component mappings, content subject and
 required evidence membership. There is no separately published lifecycle-binding object. Output identity is
@@ -257,7 +282,8 @@ after each output's exact producer/evidence handoff is validated. Equal Build Di
 output uses. Per-build indexes stay internal. Missing, substituted, duplicate or unbound evidence fails
 construction and consumption. A protected pre-publication stage creates and verifies the bundles before
 assembling the final release metadata; production publication and authenticated consumption reject raw
-preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
+preparation evidence. Legacy finalization regenerates canonical documents from raw handoffs. Per-output finalization authenticates
+the same exact document bindings through the current Run's signed metadata and independently verifies their bundles.
 
 For disk-root and material inventories, document byte integrity is checked before provenance properties are
 read. Missing provenance is reported as `CodeProvenanceMissing` before the semantic identity and exact-subject
@@ -273,7 +299,8 @@ membership and SBOM coverage through the root. Standalone verification does not 
 record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace, fetch every pinned manifest
 and verify its full payload/evidence closure before exposing accepted views. Metadata cannot redirect credentials
 to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their
-repositories, then publishes the release index last; hosted verification pulls the full distributed closure. Plain `release inspect` is descriptive and exposes deliverables, not
+repositories, then publishes the release index last; output-local and legacy hosted verification pull the full distributed closure.
+Per-output aggregate verification fetches only control documents and evidence. Plain `release inspect` is descriptive and exposes deliverables, not
 SBOMs as extra products. No tag-based cosign signature substitutes for qualified clearance. The full graph and
 wrapper rationale are in [publication architecture](../publication-architecture.md).
 

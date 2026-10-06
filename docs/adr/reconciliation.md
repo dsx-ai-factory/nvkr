@@ -346,6 +346,23 @@ Qualified interfaces require package-issued opaque receipts. Caller structs, pat
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the
 owning signed protocol, never serialization of an in-process capability.
 
+## Output-local publication and metadata assembly
+
+ADR-18/20 admit the explicit GitHub `publication.mode: per-output-v1` selected by the M2 Environment.
+Each output retains full payload/producer/evidence checks, publication, signing and verification. Aggregate
+assembly and finalization authenticate bounded control documents and SBOM bundles against the exact compiled
+Plan, current workflow run attempt and frozen output set, without downloading payload layers. The finalizer
+restores six carriers and still requires all provider jobs to succeed. Metadata inspection is descriptive and
+cannot issue the full-payload consumer capability. Local execution and dry-run signing reject this mode.
+Contract tests exercise both disk architectures through a loopback registry with zero metadata-path payload
+GETs and successful full consumer pull-back; shared-evidence assembly, signature rejection, run-attempt
+substitution and dry-run rejection are covered with explicit signing adapters. These are not live signing or
+GitHub operational evidence. M2 hosted publication/finalization remains unexercised with this mode. The
+independent consumer contract and main-only workflow policy are unchanged. The generator, validator and
+bundle writer enforce a 500,000-byte workflow limit. Deterministic YAML compaction checks expanded semantic
+equivalence; byte-boundary and no-partial-write regressions cover oversized workflows. See the
+[local contract record](../evidence/2026-10-06-m2-metadata-publication.md) for check scope and remaining operational evidence.
+
 ## Native ARC disk route
 
 ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted policy for the two native KVM pools.
@@ -367,9 +384,10 @@ The strict inspection path remains available. New-mode full hosted delivery and 
 acceptance remain unexercised.
 The [October 6 preparation record](../evidence/2026-10-06-native-arc.md) retains final-source
 ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
-and unprivileged libguestfs appliance filesystem probes. The M2 Environment reuses the exact
-`githubDispatchBranches` mechanism for `codex/m2-arc-validation`, with a matching signer identity.
-Both `nkd-arc` and `nkd-release` deployment policies admit that exact branch; the source secret name exists. Package Actions read access, native pool capacity
+and unprivileged libguestfs appliance filesystem probes. The maintained M2 Environment omits `githubDispatchBranches` and admits only `main` in its signer identity.
+The earlier `codex/m2-arc-validation` exception remains historical branch-run configuration, not an enabled
+exception in the PR-preparation inputs. Repository-side deployment grants for that validation branch
+are separate from the generated gates; the source secret name exists. Package Actions read access, native pool capacity
 and generated M2 execution remain external acceptance requirements.
 
 ## Maintained M2 input candidate

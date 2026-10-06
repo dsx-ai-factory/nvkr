@@ -1,7 +1,6 @@
 package factory
 
 import (
-	"reflect"
 	"regexp"
 	"testing"
 
@@ -24,8 +23,8 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 	if candidate.Publication.CredentialRef != production.Publication.CredentialRef || candidate.Signing.Mode != production.Signing.Mode || candidate.Signing.Issuer != production.Signing.Issuer {
 		t.Fatal("candidate changed registry credential or signing mode/issuer")
 	}
-	if !reflect.DeepEqual(candidate.GitHubDispatchBranches, []string{"codex/m2-arc-validation"}) {
-		t.Fatal("candidate must admit only the exact validation branch in addition to main")
+	if len(candidate.GitHubDispatchBranches) != 0 {
+		t.Fatal("maintained M2 must execute only on the default branch")
 	}
 	identity := regexp.MustCompile(candidate.Signing.Identity)
 	for _, test := range []struct {
@@ -33,8 +32,10 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 		allowed bool
 	}{
 		{"refs/heads/main", true},
-		{"refs/heads/codex/m2-arc-validation", true},
+		{"refs/heads/codex/m2-arc-validation", false},
 		{"refs/heads/codex/m2-arc-validation-other", false},
+		{"refs/heads/feat/m2-native-arc", false},
+		{"refs/heads/main-other", false},
 		{"refs/heads/other", false},
 		{"refs/tags/codex/m2-arc-validation", false},
 		{"refs/pull/1/merge", false},

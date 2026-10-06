@@ -32,7 +32,7 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 	}
 	var carriers []Artifact
 	for _, artifact := range plan.Graph.Artifacts {
-		if _, raw := diskPublicationRequirement(plan, artifact); !raw {
+		if finalizerArtifact(plan, artifact) {
 			carriers = append(carriers, artifact)
 		}
 	}

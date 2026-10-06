@@ -184,3 +184,34 @@ func TestGitHubDispatchBranchAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestPerOutputPublicationAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name, mode, signing string
+		valid               bool
+	}{
+		{"legacy", "", "", true},
+		{"per output", "per-output-v1", "cosign", true},
+		{"unknown", "future", "cosign", false},
+		{"unsigned", "per-output-v1", "", false},
+		{"dry run", "per-output-v1", "dry-run", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "fixture"}, UtilityContainer: "golang@sha256:" + strings.Repeat("a", 64), UtilityPlatform: "linux/amd64", Publication: &Publication{Mode: tc.mode, RepositoryPrefix: "ghcr.io/example/nkd", CredentialRef: "github:REGISTRY_AUTH"}}
+			if tc.signing != "" {
+				env.Signing = &Signing{Mode: tc.signing, Identity: "^https://github.com/example/repo/.*$", Issuer: "https://token.actions.githubusercontent.com"}
+			}
+			err := env.Validate()
+			if tc.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+					t.Fatalf("expected capability error, got %v", err)
+				}
+			}
+		})
+	}
+}

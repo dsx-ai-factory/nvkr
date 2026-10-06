@@ -5,8 +5,6 @@ metadata:
   name: nke-m2-github
 githubARC: native-kvm-v1
 diskEvidence: build-provenance-v1
-githubDispatchBranches:
-  - codex/m2-arc-validation
 executionClasses:
   - name: arc-amd64-kvm
     runsOn: arc-amd64-kvm
@@ -61,13 +59,14 @@ diskInspectionProfiles:
     maxFilesystemBytes: 17179869184
     scratchStorage: private-volume
 publication:
+  mode: per-output-v1
   credentialRef: github:GITHUB_TOKEN
   repositoryPrefix: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
 signing:
-  identity: ^https://github\.com/dsx-ai-factory/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/(main|codex/m2-arc-validation)$
+  identity: ^https://github\.com/dsx-ai-factory/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/main$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
 sourceAccess:
