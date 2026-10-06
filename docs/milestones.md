@@ -67,7 +67,9 @@ the QCOW2, decoded RAW stream, or FDE ciphertext.
 | Qualification owner | Separate signing identity, explicit waivers and independent negative verification transcripts |
 | Release owner | Pin-bot permissions, immutable-tag enforcement, rerun/concurrency behavior and channel policy |
 
-Generated pipelines never require self-hosted runners. If an OS build cannot run on the admitted hosted
+Generated pipelines use generic hosted runners except for OS disk jobs on the explicitly admitted native ARC
+KVM pools. This pipeline-attested exception does not admit arbitrary self-hosted runners or qualification.
+If an OS build cannot run on the admitted hosted
 environment, the recorded M2 fallback is digest-pinned acquisition of a prebuilt image. This changes the
 source claim and must be visible in provenance and the acceptance record.
 

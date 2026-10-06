@@ -98,11 +98,11 @@ capture-enabled installer bake or a live evidence join.
 | Scratch and memory | B's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
 | Registry namespace | M2 candidate Environment explicitly authors `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` | Separate from production `cwe`/`nkectl` routes; live blob limits, retention and package access not verified here |
 | Registry credential | Existing `github:GITHUB_TOKEN` reference | Runtime values are not inspected or serialized; production credential admission/read-back required |
-| Signing identity | Existing main `nkd-run.yml` identity regex and Actions issuer | Existing policy copied byte-for-byte; protected publication environment and current keyless run remain unverified |
+| Signing identity | M2 `nkd-run.yml` identity regex admits `main` and `codex/m2-arc-validation`; Actions issuer | M2 adds the exact manual-validation branch to the main-only policy; protected publication environment and current keyless run remain unverified |
 | Private source transport | Exact `https://github.com/dsx-ai-factory/nke` CLI/controller and `https://github.com/dsx-ai-factory/nke.git` OS keys, sharing the existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
 | Generated runner route | ADR-18 explicit `native-kvm-v1` exception, native AMD64/ARM64 classes in the M2 Environment | Protected `nkd-arc` environment, ephemeral pool isolation and full grouped execution remain unverified; historical ARC diagnostics do not establish production acceptance |
 
-`definitions/nke-m2/environment-github.yaml` records the separate candidate publication prefix, existing signing policy and
+`definitions/nke-m2/environment-github.yaml` records the separate candidate publication prefix, explicitly scoped signing policy and
 producer-declared build network permission. It selects both native ARC classes and measured inspection profiles. The same 34-output Definition
 now generates M2 with the candidate-only native toolchain overlay. Generation is not runtime admission
 or release acceptance; package Actions read access and full native execution remain separate checks.
