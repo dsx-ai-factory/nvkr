@@ -15,10 +15,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
+
+func TestDiagnosticContentKindParity(t *testing.T) {
+	for _, kind := range []string{"disk-image", "installer-iso", "installer-content", "tarball", "apt-acquisition", "host-package", "oci-image", "", "unknown"} {
+		t.Run(kind, func(t *testing.T) {
+			receiver := diskdiagnostic.NewReceiver(nil)
+			_, _ = io.WriteString(receiver, diskdiagnostic.Prefix+`{"phase":"root-scan","event":"start","elapsedMillis":1,"kind":"`+kind+`"}`+"\n")
+			receiver.Finish()
+			// Empty helper metadata is valid but not a content operation.
+			if receiver.Unexpected() == (kind == "" || diskContentKind(kind)) {
+				t.Fatalf("diagnostic/operation kind vocabulary differs for %q", kind)
+			}
+		})
+	}
+}
 
 type diskInspectionRunRuntime struct {
 	packerContainerRuntime
@@ -286,6 +301,9 @@ func TestDiskInspectionRunPreservesHelperErrorClasses(t *testing.T) {
 			raw, err := runDiskInspectionContainer(ctx, runtime, testDiskInspectionSelection(t), "image", subject)
 			if raw != nil || code(err) != tt.want || !errors.As(err, &exit) {
 				t.Fatalf("helper status=%s returned raw=%q err=%v", tt.status, raw, err)
+			}
+			if !tt.cancel && !strings.Contains(err.Error(), `"helper failure"`) {
+				t.Fatalf("non-timeout failure lost quoted cause: %v", err)
 			}
 		})
 	}

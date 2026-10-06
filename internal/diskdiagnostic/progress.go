@@ -19,6 +19,7 @@ const (
 	MaxRecordBytes      = 512
 	MaxRetainedBytes    = 32 << 10
 	MaxForwardedRecords = 512
+	MaxFailureBytes     = 4096
 )
 
 // Record is diagnostic only. All text fields have a closed vocabulary.
@@ -34,11 +35,11 @@ type Record struct {
 
 func valid(record Record) bool {
 	switch record.Phase {
-	case "tool-authentication", "subject-copy", "subject-revalidation", "export-startup", "filesystem-extraction", "file-inventory", "scanner-transport", "root-scan", "nested-scan", "report-completion":
+	case "tool-authentication", "subject-copy", "filesystem-staging", "filesystem-probe", "subject-revalidation", "export-startup", "filesystem-extraction", "file-inventory", "scanner-transport", "root-scan", "member-walk", "nested-scan", "report-completion":
 	default:
 		return false
 	}
-	return (record.Event == "start" || record.Event == "complete") && record.ElapsedMillis >= 0 && record.ElapsedMillis <= 24*60*60*1000 && record.Depth >= 0 && record.Depth <= 3 && record.Ordinal >= 0 && record.Ordinal <= 200000 && (record.Kind == "" || validKind(record.Kind)) && (record.Subject == "" || canonical.IsDigest(record.Subject))
+	return (record.Event == "start" || record.Event == "complete") && record.ElapsedMillis >= 0 && record.ElapsedMillis <= 24*60*60*1000 && record.Depth >= 0 && record.Depth <= 4 && record.Ordinal >= 0 && record.Ordinal <= 200000 && (record.Kind == "" || validKind(record.Kind)) && (record.Subject == "" || canonical.IsDigest(record.Subject))
 }
 
 func validKind(kind string) bool {
@@ -102,6 +103,7 @@ type Receiver struct {
 	lastForward   time.Time
 	lastForwarded Record
 	kind, subject string
+	failure       []byte
 }
 
 func NewReceiver(collector *Collector) *Receiver { return &Receiver{collector: collector} }
@@ -133,10 +135,14 @@ func (receiver *Receiver) Write(raw []byte) (int, error) {
 		if !receiver.dropping {
 			if len(receiver.line) >= MaxRecordBytes {
 				receiver.dropping = true
+				receiver.rememberFailure(receiver.line)
+				receiver.rememberFailure([]byte{value})
 				receiver.line = receiver.line[:0]
 			} else {
 				receiver.line = append(receiver.line, value)
 			}
+		} else {
+			receiver.rememberFailure([]byte{value})
 		}
 	}
 	return len(raw), nil
@@ -145,6 +151,7 @@ func (receiver *Receiver) Write(raw []byte) (int, error) {
 func (receiver *Receiver) accept(line []byte) {
 	if !bytes.HasPrefix(line, []byte(Prefix)) {
 		receiver.unexpected = true
+		receiver.rememberFailure(append(bytes.Clone(line), '\n'))
 		return
 	}
 	raw := line[len(Prefix):]
@@ -172,7 +179,7 @@ func (receiver *Receiver) accept(line []byte) {
 	// Re-encode only the allowlisted projection; never forward sender bytes.
 	encoded, _ := json.Marshal(record)
 	encoded = append(encoded, '\n')
-	phaseChanged := !receiver.haveLast || record.Phase != receiver.last.Phase
+	boundaryChanged := !receiver.haveLast || record.Phase != receiver.last.Phase || record.Event != receiver.last.Event || record.Depth != receiver.last.Depth || record.Ordinal != receiver.last.Ordinal
 	receiver.last, receiver.haveLast = record, true
 	if receiver.collector != nil {
 		receiver.collector.remember(record)
@@ -187,12 +194,13 @@ func (receiver *Receiver) accept(line []byte) {
 	}
 	// Reserve one record for Finish so a capped stream still delivers the
 	// actual terminal phase to the persistent diagnostic sink.
-	if receiver.collector != nil && receiver.forwarded < MaxForwardedRecords-1 && (phaseChanged || time.Since(receiver.lastForward) >= 100*time.Millisecond) {
+	if receiver.collector != nil && receiver.forwarded < MaxForwardedRecords-1 && (boundaryChanged || time.Since(receiver.lastForward) >= 100*time.Millisecond) {
 		receiver.collector.append(encoded)
 		receiver.forwarded++
 		receiver.lastForward = time.Now()
 		receiver.lastForwarded = record
-	} else if receiver.collector != nil && receiver.forwarded >= MaxForwardedRecords-1 {
+	} else if receiver.collector != nil {
+		receiver.truncated = true
 		receiver.collector.markTruncated()
 	}
 }
@@ -203,12 +211,31 @@ func (receiver *Receiver) Finish() {
 	defer receiver.mu.Unlock()
 	if len(receiver.line) != 0 || receiver.dropping {
 		receiver.unexpected = true
+		if !receiver.dropping {
+			receiver.rememberFailure(receiver.line)
+		}
 	}
 	if receiver.collector != nil && receiver.haveLast && receiver.last != receiver.lastForwarded && receiver.forwarded < MaxForwardedRecords {
 		raw, _ := json.Marshal(receiver.last)
 		receiver.collector.append(append(raw, '\n'))
 		receiver.lastForwarded = receiver.last
 		receiver.forwarded++
+	}
+}
+
+// FailureBytes returns a bounded raw copy only for the caller's quoted terminal
+// error. It is never a retained progress record or inventory. One extra byte
+// lets the owning renderer report truncation without retaining an unbounded log.
+func (receiver *Receiver) FailureBytes() []byte {
+	receiver.mu.Lock()
+	defer receiver.mu.Unlock()
+	return bytes.Clone(receiver.failure)
+}
+
+func (receiver *Receiver) rememberFailure(raw []byte) {
+	remaining := MaxFailureBytes + 1 - len(receiver.failure)
+	if remaining > 0 {
+		receiver.failure = append(receiver.failure, raw[:min(len(raw), remaining)]...)
 	}
 }
 
@@ -222,10 +249,14 @@ func (receiver *Receiver) Unexpected() bool {
 func (receiver *Receiver) Summary() string {
 	receiver.mu.Lock()
 	defer receiver.mu.Unlock()
+	truncated := receiver.truncated
+	if receiver.collector != nil {
+		truncated = truncated || receiver.collector.isTruncated()
+	}
 	if !receiver.haveLast {
 		return fmt.Sprintf("inspection progress unavailable (unexpectedDiagnostics=%t)", receiver.unexpected)
 	}
-	return fmt.Sprintf("inspection kind=%s subject=%s phase=%s event=%s elapsedMillis=%d depth=%d ordinal=%d truncated=%t unexpectedDiagnostics=%t", receiver.last.Kind, receiver.last.Subject, receiver.last.Phase, receiver.last.Event, receiver.last.ElapsedMillis, receiver.last.Depth, receiver.last.Ordinal, receiver.truncated, receiver.unexpected)
+	return fmt.Sprintf("inspection kind=%s subject=%s phase=%s event=%s elapsedMillis=%d depth=%d ordinal=%d truncated=%t unexpectedDiagnostics=%t", receiver.last.Kind, receiver.last.Subject, receiver.last.Phase, receiver.last.Event, receiver.last.ElapsedMillis, receiver.last.Depth, receiver.last.Ordinal, truncated, receiver.unexpected)
 }
 
 // Collector is a package-issued bounded memory sink, not a caller callback.
@@ -243,6 +274,12 @@ func (collector *Collector) markTruncated() {
 	collector.mu.Lock()
 	defer collector.mu.Unlock()
 	collector.truncated = true
+}
+
+func (collector *Collector) isTruncated() bool {
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	return collector.truncated
 }
 
 func (collector *Collector) remember(record Record) {
@@ -277,4 +314,15 @@ func (collector *Collector) Snapshot() ([]byte, bool) {
 		raw = append(raw, collector.last...)
 	}
 	return raw, collector.truncated
+}
+
+// LastPhase returns the closed-vocabulary phase only, never helper text.
+func (collector *Collector) LastPhase() string {
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	var record Record
+	if json.Unmarshal(collector.last, &record) != nil {
+		return ""
+	}
+	return record.Phase
 }

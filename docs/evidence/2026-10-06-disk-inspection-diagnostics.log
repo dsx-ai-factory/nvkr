@@ -1,0 +1,114 @@
+Review-fix snapshot: base a9dfaedd861ad3f5deda6f1ecf076e4bf07ea015 plus the recorded Go diff.
+Whole changed-Go diff SHA-256: 58594e7b2cbfeaeb1ee5dbc2fdef1f70dd4b2024006760af996dd0a7533e50d4
+
+Native image inspection command:
+podman image inspect 266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6 --format '{{.Id}} {{.Os}}/{{.Architecture}}'
+Actual output:
+266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6 linux/arm64
+
+Focused native race command (session 15896):
+podman run --rm --init --pull=never --network none --read-only --user 502:20 --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=256m --volume /Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-timeout:/src:ro --volume /Users/ikislenko/go/pkg/mod:/go/pkg/mod:ro --volume /private/tmp/nkd-diagnostic-native.MK7RpD:/validation:rw --workdir /src --env GOTOOLCHAIN=local --env GOCACHE=/validation/go-cache --env GIT_CEILING_DIRECTORIES=/src --entrypoint go 266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6 test -race ./internal/diskdiagnostic ./pkg/nkd/factory ./pkg/nkd/sbom -run 'TestReceiver|TestSubject|TestFailureBytes|TestNativeChildTimeout|TestInspectionDiagnostic|TestARCInspectionDiagnostic|TestValidateGitHubBundleRejectsInspectionDiagnosticUploadTampering|TestGitHubReporter|TestExportProgress|TestFilesystemMemberProgress|TestMaterialMemberWalk|TestContainerScanProgress' -count=1
+Actual terminal output (chunk c083f3, exit 0):
+ok  	github.com/NVIDIA/nke-recipes/internal/diskdiagnostic	3.376s
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/factory	9.268s
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sbom	1.190s
+
+Full native pipeline race command (session 81297):
+podman run --rm --init --pull=never --network none --read-only --user 502:20 --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=256m --volume ddfa96ed84490b78f960bf3ced1ce011a9ec8cc9a8e665f5554f239ab5d5fe84:/native:rw --volume /Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-timeout:/src:ro --volume /Users/ikislenko/go/pkg/mod:/go/pkg/mod:ro --volume /private/tmp/nkd-diagnostic-native.MK7RpD:/validation:rw --workdir /src --env TMPDIR=/native --env GOTOOLCHAIN=local --env GOCACHE=/validation/go-cache --env GIT_CEILING_DIRECTORIES=/src --entrypoint go 266d5d7746a154e2325a9650f759035641d09673eb6e2b3ccdb23cfb1b49f3d6 test -race ./pkg/nkd/pipeline -count=1
+Actual terminal output (chunk 8a2720, exit 0):
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline	23.280s
+
+Generated drift/build command (session 50894):
+make workflows-check; make build; git diff --check
+Actual terminal output (chunk 821001, exit 0):
+bin/nkd-exec run generate --engine github \
+	--definition definitions/nke-m2/definition.yaml \
+	--environment definitions/nke-m2/environment-github.yaml \
+	--root . --check
+generated run is current: sha256:2c2bf59ad5b300c55da19e2068006562f8ddf60b8899444dbdfd88cc058081f2
+go build -ldflags '-X main.version=a9dfaed-dirty -X main.commit=a9dfaed' -o bin/nkdctl ./cmd/nkdctl
+
+The native commands used no helper-image rebuild or retained-disk input. Controlled
+scanner contract execution does not establish full guestfish/Syft disk inspection.
+The temporary native volume was removed after an empty container-filter readback.
+
+Full local gate command (session 92169):
+make check
+Actual terminal excerpt (chunk bdae4a, exit 2; excerpt, not the complete panic dump):
+panic: test timed out after 10m0s
+	running tests:
+		TestLifecyclePackageBindsExactProducerEvidence (17s)
+		TestLifecyclePackageBindsExactProducerEvidence/apt-repository (5s)
+		TestLifecyclePackageBindsExactProducerEvidence/apt-repository/missing_package_node (1s)
+FAIL	github.com/NVIDIA/nke-recipes/pkg/nkd/factory	600.846s
+panic: test timed out after 10m0s
+	running tests:
+		TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference (52s)
+FAIL	github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle	601.144s
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline	78.597s	coverage: 56.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sbom	86.332s	coverage: 63.0% of statements
+FAIL
+make: *** [test] Error 1
+
+The captured factory stack was in Darwin Rmdir during test temporary-directory
+cleanup, and the lifecycle stack was in Darwin Open/heldfile.freezeMutable. Several
+whole-package suites were concurrently running on this host. Those observations
+do not establish the timeout cause. No test assertion or deadline was changed.
+
+Isolated active factory test command (session 34908):
+go test -race ./pkg/nkd/factory -run '^TestLifecyclePackageBindsExactProducerEvidence$' -count=1 -v
+Actual terminal output (chunk e067d1, exit 0):
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/factory	17.697s
+
+Standalone vulnerability command (session 78007):
+make vulncheck
+Actual terminal output (chunk cd1877, exit 0):
+"/Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-timeout/bin/govulncheck" ./...
+No vulnerabilities found.
+
+The isolated factory pass does not establish why the aggregate gate timed out.
+
+Complete native equivalent test-stage command (session 22093):
+#!/bin/sh
+set -eu
+cd /Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-timeout
+diagnostic_source="$(pwd -P)"
+diagnostic_modules="$(go env GOMODCACHE)"
+diagnostic_outputs="$(mktemp -d /private/tmp/pr99-native-ignored-output.XXXXXX)"
+podman run --rm --init --pull=never --network none --user 502:20 --entrypoint /bin/sh --volume "${diagnostic_source}:/src:ro" --volume "${diagnostic_modules}:/go/pkg/mod:ro" --volume "${diagnostic_outputs}:/src/.nkd:rw" --workdir /src --env GOTOOLCHAIN=local --env GIT_CEILING_DIRECTORIES=/src 1f87906be577585bff2bc2bf05662972bd9ddd2ddae29975f05e0501090d3abb -c 'diagnostic_root=$(mktemp -d /var/tmp/pr99-full.XXXXXX) || exit; export TMPDIR="$diagnostic_root" GOCACHE="$diagnostic_root/cache"; uname -sm; id; go version; jq --version; stat -f -c "scratch-type=%T blocksize=%S availableblocks=%a" "$diagnostic_root"; go test -race -covermode=atomic -coverprofile="$diagnostic_root/coverage.out" ./... -count=1'
+
+Actual startup output (chunk 15ebf9):
+Linux aarch64
+uid=502(core) gid=20(dialout) groups=20(dialout)
+go version go1.27.1 linux/arm64
+jq-1.7
+scratch-type=overlayfs blocksize=4096 availableblocks=62784858
+
+Actual terminal output (chunk ebdfee, exit 0; final chunk, preceding package results are not repeated):
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/delivery	128.703s	coverage: 77.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/errors	1.009s	coverage: 84.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/execution	2.052s	coverage: 84.9% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/factory	194.702s	coverage: 79.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile	7.487s	coverage: 73.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport	1.257s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext	1.008s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/ir	1.105s	coverage: 88.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle	30.032s	coverage: 81.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/material	2.105s	coverage: 96.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline	21.603s	coverage: 74.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/profile	1.874s	coverage: 79.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/provenance	1.038s	coverage: 82.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/release	1.033s	coverage: 70.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/releaseview	1.016s	coverage: 93.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sbom	69.420s	coverage: 73.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sign	53.511s	coverage: 72.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/status	3.585s	coverage: 75.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/target	1.010s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/trust	1.144s	coverage: 83.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-disk-inspect	1.036s	coverage: [no statements]
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-packer	1.336s	coverage: [no statements]
+
+The full test command exited 0 with unchanged assertions and default deadlines.
+Host format/vet/lint/shellcheck/build/drift and standalone vulnerability checks also
+passed. This is an equivalent Linux ARM64 test stage, not a passed macOS aggregate
+make check, native AMD64 execution or real full-disk acceptance.
