@@ -49,3 +49,53 @@ with a lifecycle test. The replacement Linux run uses a writable isolated source
 Hosted storage peaks, execution time, internal-registry permissions and live signing
 for this publication mode remain unmeasured. Per-output jobs still need sufficient
 space for their individual payloads.
+
+## Hosted validation failures
+
+[Run 37504454272](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37504454272)
+executes validation commit `5e218774f145256b8ea48a35be0ae5924910e9b8` with the exact
+`codex/m2-arc-validation` config exception. Three independent failure causes were observed:
+
+- [OIDC-image verification](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37504454272/job/112411567985)
+  rejected the production predicate before cryptographic verification. Comparing the saved predicate
+  carrier with the registry DSSE payload at
+  `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases-spire-oidc-image-arm64@sha256:1f425f902c5057f90d0d0575abd58cb6bd2e21afbf9a369aeddebc1d4a9e10ab`
+  showed exactly one difference: `finishedOn` changed from
+  `2026-10-06T17:37:51.08561615Z` to `2026-10-06T17:37:51.085616150Z`.
+  Cosign's SLSA serialization uses protobuf timestamp precision. The emitter now uses
+  [protobuf JSON's 0/3/6/9 fractional digits](https://protobuf.dev/programming-guides/json/)
+  without rounding; the exact predicate comparison remains unchanged. Regression cases
+  cover every fractional precision and timezone normalization, including the captured failure.
+- [Controller-chart publication](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37504454272/job/112413523662)
+  failed independent reproduction because the output-local publication omitted the bound
+  image package. The declared dependency closure now includes that package and its producer
+  evidence. Collection keeps it out of the chart route's output membership. A regression
+  reproduces the failure with only declared publication inputs visible, then checks that
+  successful collection includes only the chart. Underlying reproduction errors are now retained.
+- Disk publication preparation exhausted hosted-runner storage while restoring producer materials:
+  [ARM64](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37504454272/job/112422529892)
+  and [AMD64](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37504454272/job/112428935919).
+  The ARM64 job downloaded approximately 13 GB of carriers before restoration. Both OS build jobs
+  completed successfully. Offline publication preparation now runs in the existing ARC disk group,
+  reusing its material files. Hosted attestation, publication and signing consume the prepared layout;
+  their credential boundary is unchanged. Successful restoration also removes its exact carrier file.
+  Linux race contracts exercise held completion and prepared publication for both platform fixtures;
+  generated-graph tests reject hosted disk-material downloads and credentialed ARC operations.
+
+The run completed with failure. The finalizer rejected the incomplete provider-job closure. Monitoring
+was paused after reporting completion. No replacement hosted run has exercised the fixes below.
+
+These fixes are local; this run's immutable commit does not contain them. A successful
+replacement hosted run is still required. The earlier full-gate results above apply to
+`c049b36`, not to these follow-up fixes.
+
+Follow-up validation: provenance/signing race tests and the targeted factory Helm,
+publication, metadata and generated-workflow race contracts passed. Linux-targeted
+lint, changed-package vet, actionlint, yamllint and exact regeneration passed. The
+corrected main-only workflow is 461,745 bytes with Plan digest
+`sha256:6cfd876ea915b6b3f42de7b697306dc4f138d31cfafb8773b486eb611090f391`.
+After the disk storage fix, full uncached macOS tests passed. Linux race tests passed for
+`provenance`, `sign`, `factory` and `lifecycle`, including the new held disk preparation
+contracts. Linux-targeted lint, full vet, shellcheck, vulnerability scanning, formatting,
+diff checks, workflow linters and byte-exact regeneration passed. The full uncached macOS
+race gate also passed; the previously recorded macOS lint limitation still applies.

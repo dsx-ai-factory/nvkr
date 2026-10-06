@@ -92,7 +92,15 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 
 func packageProducerResults(inputs []string, nodes map[string]Node, artifacts map[string]Artifact) []string {
 	var results []string
-	for _, inputID := range inputs {
+	pending := append([]string(nil), inputs...)
+	seen := map[string]bool{}
+	for len(pending) > 0 {
+		inputID := pending[0]
+		pending = pending[1:]
+		if seen[inputID] {
+			continue
+		}
+		seen[inputID] = true
 		input := artifacts[inputID]
 		switch input.Kind {
 		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageImage, PackageDiskImage:
@@ -104,6 +112,13 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 			member := artifacts[memberID]
 			if member.Kind == string(TierTerminalObservation) {
 				continue
+			}
+			// A bound chart must reopen its selected image when independently
+			// reproducing the chart. Transport that package and its producer
+			// records; it remains a dependency, not another published output.
+			if producer.HelmImage != nil && member.Kind == PackageImage {
+				results = append(results, memberID)
+				pending = append(pending, memberID)
 			}
 			if member.BuildTarget != "" {
 				results = append(results, memberID)

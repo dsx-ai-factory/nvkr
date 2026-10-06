@@ -357,7 +357,12 @@ cannot issue the full-payload consumer capability. Local execution and dry-run s
 Contract tests exercise both disk architectures through a loopback registry with zero metadata-path payload
 GETs and successful full consumer pull-back; shared-evidence assembly, signature rejection, run-attempt
 substitution and dry-run rejection are covered with explicit signing adapters. These are not live signing or
-GitHub operational evidence. M2 hosted publication/finalization remains unexercised with this mode. The
+GitHub operational evidence. Hosted run `37504454272` exposed timestamp serialization, bound-chart
+dependency and disk-publication storage defects; local fixes retain strict predicate comparison and exact output membership.
+Offline disk publication preparation now shares the existing ARC group; hosted stages no longer restore its
+producer material closure, and successful input restoration deletes each consumed carrier. Linux contracts
+exercise preparation for both disk architectures; hosted storage peaks remain unmeasured. Complete
+M2 hosted publication/finalization remains unproven with this mode. The
 independent consumer contract and main-only workflow policy are unchanged. The generator, validator and
 bundle writer enforce a 500,000-byte workflow limit. Deterministic YAML compaction checks expanded semantic
 equivalence; byte-boundary and no-partial-write regressions cover oversized workflows. See the

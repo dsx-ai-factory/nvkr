@@ -115,6 +115,11 @@ func githubDiskOutput(plan *Plan, node Node) string {
 		return ""
 	}
 	for _, output := range plan.LifecycleOutputs {
+		if output.Kind == PackageDiskImage && PerOutputPublication(plan) &&
+			node.ID == "package/"+outputPublicationPackage(output.Name) &&
+			node.Kind == NodePackage && node.PackageKind == PackageOCI && node.Network == ir.NetworkNone {
+			return output.Name
+		}
 		if (output.Name != node.BuildTarget && node.ID != "package/"+output.Name) || output.Kind != PackageDiskImage {
 			continue
 		}

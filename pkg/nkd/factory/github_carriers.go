@@ -43,6 +43,9 @@ func RestoreGitHubInputs(ctx context.Context, plan *Plan, stageID string, option
 			if err := transportarchive.Unpack(ctx, carrierPath(id), ".", []string{artifacts[id].Path}); err != nil {
 				return err
 			}
+			if err := removeFactoryCarrier(carrierPath(id)); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

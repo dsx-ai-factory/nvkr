@@ -76,8 +76,14 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 			cleanup()
 		}
 	}()
+	selected := map[string]bool{}
+	if PerOutputPublication(plan) {
+		for _, expected := range selectedPublicationOutputs(plan, planNode(plan, output.Producer)) {
+			selected[expected.Name] = true
+		}
+	}
 	for _, input := range inputs {
-		if input.BuildTarget != "" {
+		if input.BuildTarget != "" || (PerOutputPublication(plan) && !selected[input.Name]) {
 			continue
 		}
 		object := delivery.ObjectInput{Name: input.Name, Kind: input.Kind, Path: input.Path,

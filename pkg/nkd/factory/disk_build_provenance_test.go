@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,6 +13,38 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
+
+func TestARCCompletesPreparedDiskPublication(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held disk publication requires Linux")
+	}
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			plan, owner := diskMaterialTraceFixtureWithPublicationMode(t, false, false, platform, "none", "test-acquisitions.tar", true, "per-output-v1")
+			nodes, artifacts := planIndex(plan)
+			if err := executeHeldDiskObservation(t.Context(), plan, nodes["node-image/terminal-observe"], artifacts, owner); err != nil {
+				t.Fatal(err)
+			}
+			if err := completeGitHubDiskPublication(t.Context(), plan, plan.LifecycleOutputs[0], owner, nil, GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
+				t.Fatal(err)
+			}
+			node := nodes["package/"+outputPublicationPackage("node-image")]
+			inspection, err := delivery.Inspect(t.Context(), artifacts[node.Outputs[0]].Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			disks := 0
+			for _, object := range inspection.Root.Objects {
+				if object.Kind == PackageDiskImage && object.Name == "node-image" {
+					disks++
+				}
+			}
+			if disks != 1 {
+				t.Fatalf("prepared publication contains %d selected disks", disks)
+			}
+		})
+	}
+}
 
 func TestDiskBuildProvenancePublication(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {

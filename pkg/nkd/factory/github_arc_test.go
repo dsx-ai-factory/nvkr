@@ -175,3 +175,59 @@ func TestARCOneDefinitionBothNativeArchitectures(t *testing.T) {
 		t.Fatalf("combined definition has %d disk groups", groups)
 	}
 }
+
+func TestARCPreparesOutputPublicationWithoutHostedMaterialDownloads(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			base := arcTestPlan(t, platform)
+			env := base.Environment.Clone()
+			env.Publication.Mode = "per-output-v1"
+			stack, err := catalog.ApplyStack(base.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := Compile(t.Context(), base.Definition, env, stack, "dev (unknown)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.DefinitionPath, plan.EnvironmentPath = base.DefinitionPath, base.EnvironmentPath
+			output := plan.LifecycleOutputs[0].Name
+			stages, jobs, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prep := "package/" + outputPublicationPackage(output)
+			if jobs[prep] != jobs["package/"+output] {
+				t.Fatal("publication preparation downloads disk materials onto a second runner")
+			}
+			_, artifacts := planIndex(plan)
+			for _, stage := range stages {
+				if stage.DiskOutput != "" {
+					for _, node := range stage.Nodes {
+						if node.Kind == NodePublish || signFamilyNode(node.Kind) {
+							t.Fatal("credentialed operation entered ARC group")
+						}
+					}
+					continue
+				}
+				for _, id := range stage.inputs(artifacts, jobs) {
+					if strings.HasPrefix(id, "artifact/"+output+"/") || strings.HasPrefix(id, "result/"+output+"/") || id == "sbom/"+output || id == "package/"+output {
+						t.Fatalf("hosted stage restores disk producer input %s", id)
+					}
+				}
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateGitHubBundle(t.Context(), plan, bundle); err != nil {
+				t.Fatal(err)
+			}
+			doc := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			job := doc.Jobs[jobs[prep]]
+			if job.RunsOn != githubARCRunner(platform) || job.Permissions["id-token"] != "" || job.Permissions["packages"] == "write" || job.Env["NKD_CREDENTIAL"] != "" {
+				t.Fatal("ARC preparation changed credential boundary")
+			}
+		})
+	}
+}

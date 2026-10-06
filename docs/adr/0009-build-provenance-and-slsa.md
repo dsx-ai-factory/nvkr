@@ -103,7 +103,11 @@ URI major; a `/v1` production predicate cannot be interpreted with `/v2` paramet
 build types retain their separate semantics and validators.
 
 Cosign wraps the predicate in an in-toto statement whose subjects are the independently re-derived published
-digests. Signing mode remains inside the predicate so dry-run evidence cannot lose its meaning when copied.
+digests. Production start/finish timestamps use UTC with 0, 3, 6 or 9 fractional digits,
+matching Cosign's protobuf JSON serialization without losing nanoseconds. This prevents the signer
+from changing the saved predicate's timestamp strings; exact-predicate verification remains strict.
+Local invocation identifiers retain their existing rendering. Signing mode remains inside the predicate
+so dry-run evidence cannot lose its meaning when copied.
 Production and reproduction validators reject each other's shapes; coercion is forbidden. Hosted finalization
 reconstructs expected production semantics from the admitted plan and checks dependencies, build metadata,
 workflow identity, and exact subject rather than accepting any well-formed predicate.

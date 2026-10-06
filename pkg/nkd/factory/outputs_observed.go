@@ -180,7 +180,10 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 			return LifecyclePayloadObservation{}, err
 		}
 		expectedDigest, err := reproduceLifecyclePackage(ctx, plan, artifact, artifacts)
-		if err != nil || expectedDigest != descriptor.Digest {
+		if err != nil {
+			return LifecyclePayloadObservation{}, e.Wrap(e.CodeVerifyFailed, err, "independently reproduce lifecycle Helm output %q", expected.Name)
+		}
+		if expectedDigest != descriptor.Digest {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced package (%s != %s)", expected.Name, descriptor.Digest, expectedDigest)
 		}
 		return LifecyclePayloadObservation{Digest: descriptor.Digest, SemanticDigest: descriptor.Digest, Components: components}, nil

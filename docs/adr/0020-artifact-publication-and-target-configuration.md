@@ -203,6 +203,9 @@ required output, retaining the full compiled Plan. Each route observes its exact
 attests its required SBOMs, publishes the output and evidence, then signs and verifies its own metadata root
 at `<prefix>/releases-<output>`. These roots are internal publication handoffs, not additional product outputs.
 Their signed metadata binds the exact Plan digest and workflow invocation, including run attempt.
+Output-local chart reproduction transports its bound image packages and their producer/evidence
+closure. Those packages are validation dependencies; only the selected chart enters that route's
+published output membership.
 
 Release assembly authenticates every output-local root and its exact production predicate under the configured
 workflow identity/issuer, verifies its SBOM bundles, and joins its named output to the independently frozen

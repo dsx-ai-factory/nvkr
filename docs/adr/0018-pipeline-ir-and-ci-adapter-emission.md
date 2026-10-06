@@ -139,13 +139,17 @@ not establish those facts.
 The route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
 `nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
-Docker is the initial admitted runtime. Bootstrap, source fetch, publication, signing and finalization remain
+Docker is the initial admitted runtime. Bootstrap, source fetch, registry publication, signing and finalization remain
 on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
 and packaging operations into one bounded helper invocation against the complete Plan. The original producer
 session and held disk survive through packaging; strict mode additionally requires reconciliation. The raw disk has no independent
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
 remain required. Only fixed source-fetch steps receive private-source credentials; ARC disk jobs receive no
-source token, registry-write credential or OIDC signing token.
+source token, registry-write credential or OIDC signing token. With `publication.mode: per-output-v1`, the
+same ARC group also prepares that disk's offline publication layout using its existing material files. The
+exact derived OCI package node is admitted only with network disabled; SBOM attestation and all credentialed
+publication operations remain on hosted runners. Those runners restore the prepared layout rather than the
+disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and `packages: read`.
@@ -597,7 +601,9 @@ command argument is added.
 
 Each stage downloads one exact set of external input carriers, then restores each required carrier in one
 helper step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
-part of the requested set. Each operation prepares its outputs in one step and retains an independent upload
+part of the requested set. After a successful restore, the helper deletes that exact regular carrier file to
+avoid retaining both the archive and its unpacked contents. Failed and unrequested carriers remain untouched.
+Each operation prepares its outputs in one step and retains an independent upload
 for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
 artifacts. Logical commands, transport authentication and isolation remain unchanged.
 

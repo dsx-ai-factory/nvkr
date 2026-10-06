@@ -51,9 +51,15 @@ func TestGitHubCarriersRestoreOnlyExternalStageInputs(t *testing.T) {
 		if err != nil || string(raw) != id {
 			t.Fatalf("input %s: bytes=%q error=%v", id, raw, err)
 		}
+		if _, err := os.Stat(carrierPath(id)); !os.IsNotExist(err) {
+			t.Fatalf("restored carrier retained duplicate storage: %v", err)
+		}
 	}
 	if _, err := os.Stat(internal.Path); !os.IsNotExist(err) {
 		t.Fatalf("stage-internal input restored: %v", err)
+	}
+	if _, err := os.Stat(carrierPath(internal.ID)); err != nil {
+		t.Fatalf("unrequested carrier removed: %v", err)
 	}
 	if !strings.Contains(output.String(), "Completed: Restore stage inputs") {
 		t.Fatalf("missing completion: %s", output.String())

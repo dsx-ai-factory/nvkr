@@ -157,8 +157,27 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	for _, expected := range plan.LifecycleOutputs {
 		if expected.Name == output {
-			return CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)
+			return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, options)
 		}
 	}
 	return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
+}
+
+func completeGitHubDiskPublication(ctx context.Context, plan *Plan, expected LifecycleOutputPlan,
+	owner *LocalRunResult, inspector *sbom.DiskInspectionRuntime, options GitHubStepOptions,
+) error {
+	if err := CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector); err != nil {
+		return err
+	}
+	if !PerOutputPublication(plan) {
+		return nil
+	}
+	node := planNode(plan, "package/"+outputPublicationPackage(expected.Name))
+	if githubDiskOutput(plan, node) != expected.Name {
+		return e.New(e.CodePipelineDrift, "ARC output has no admitted offline publication preparation")
+	}
+	_, artifacts := planIndex(plan)
+	return githubProgress(ctx, options, githubNodeLabel(plan, node), githubNodeDetails(plan, node), func(_ *githubStepProgress) error {
+		return executePackage(ctx, plan, node, artifacts, options.Stdout)
+	})
 }
