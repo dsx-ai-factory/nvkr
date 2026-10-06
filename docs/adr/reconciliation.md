@@ -360,17 +360,19 @@ Contract tests exercise both disk architectures through a loopback registry with
 GETs and successful full consumer pull-back; shared-evidence assembly, signature rejection, cross-run/future-attempt
 substitution and dry-run rejection are covered with explicit signing adapters. Retry support, mixed-attempt
 assembly, re-signing and finalizer reuse passed local contracts and Linux race checks; hosted retry
-acceptance remains unexercised. These are not live signing or
+acceptance remains unexercised. Those contracts alone are not live signing or
 GitHub operational evidence. Hosted run `37504454272` exposed timestamp serialization, bound-chart
 dependency and disk-publication storage defects; local fixes retain strict predicate comparison and exact output membership.
 Offline disk publication preparation now shares the existing ARC group; hosted stages no longer restore its
 producer material closure, and successful input restoration deletes each consumed carrier. Linux contracts
-exercise preparation for both disk architectures; hosted storage peaks remain unmeasured. Complete
-M2 hosted publication/finalization remains unproven with this mode. The
+exercise preparation for both disk architectures; hosted storage peaks remain unmeasured. Hosted run
+`37533806963` subsequently passed all 34 outputs and aggregate publication, signing,
+verification and finalization on validation commit `625980e`; this is candidate pipeline-attested
+delivery, not independent full-payload consumer acceptance or mixed-attempt retry validation. The
 independent consumer contract and main-only workflow policy are unchanged. The generator, validator and
 bundle writer enforce a 500,000-byte workflow limit. Deterministic YAML compaction checks expanded semantic
 equivalence; byte-boundary and no-partial-write regressions cover oversized workflows. See the
-[local contract record](../evidence/2026-10-06-m2-metadata-publication.md) for check scope and remaining operational evidence.
+[contract and hosted evidence record](../evidence/2026-10-06-m2-metadata-publication.md) for check scope and remaining operational evidence.
 
 ## Native ARC disk route
 
@@ -389,15 +391,16 @@ The user moved deep disk/content inspection and dependent reconciliation to M3. 
 `diskEvidence: build-provenance-v1` now selects live producer/material evidence, with signed deferred-inspection
 scope, normal packaging/signing/publication, and unchanged subject/provenance/membership/completeness gates.
 The [inspection deferral record](../evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
-The strict inspection path remains available. New-mode full hosted delivery and independent consumer
-acceptance remain unexercised.
+The strict inspection path remains available. New-mode full hosted candidate delivery passed in
+run `37533806963`, including both native OS outputs. Independent consumer acceptance remains unexercised.
 The [October 6 preparation record](../evidence/2026-10-06-native-arc.md) retains final-source
 ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
 and unprivileged libguestfs appliance filesystem probes. The maintained M2 Environment omits `githubDispatchBranches` and admits only `main` in its signer identity.
 The earlier `codex/m2-arc-validation` exception remains historical branch-run configuration, not an enabled
 exception in the PR-preparation inputs. Repository-side deployment grants for that validation branch
-are separate from the generated gates; the source secret name exists. Package Actions read access, native pool capacity
-and generated M2 execution remain external acceptance requirements.
+are separate from the generated gates; the source secret name exists. The successful candidate run
+exercised package Actions read access and both native pools; it does not
+establish a general capacity bound or organizational toolchain approval.
 
 ## Maintained M2 input candidate
 

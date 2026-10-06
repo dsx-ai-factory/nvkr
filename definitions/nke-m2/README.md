@@ -45,7 +45,8 @@ The [merged-source handoff](../../docs/evidence/2026-10-05-m2-input-acquisition.
 records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
 `agent/v*` tag pattern. Exact commit acquisition itself is not protected-ref or source-review
-proof; that acceptance is separately recorded. Runtime, publication and consumer gates remain unresolved.
+proof; that acceptance is separately recorded. The hosted candidate publication result is recorded below;
+independent consumer acceptance remains unresolved.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde/apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
 The source's composition command receives the required explicit native `--architecture` argument.
@@ -82,15 +83,21 @@ toolchain license/security gates, and the missing production inputs. The inspect
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
 read-only image preparation with the ephemeral GitHub token; grant this repository Read under
 each internal toolchain package's Manage Actions access settings. The generated workflow has no feature-branch execution exception. Its signing policy admits only
-`main`, which must also be admitted by the `nkd-arc` and `nkd-release` deployment environments. The generated bundle has not been exercised as a full M2 Run.
+`main`, which must also be admitted by the `nkd-arc` and `nkd-release` deployment environments.
+The equivalent validation-branch bundle completed all jobs in
+[run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963);
+that run used an exact branch exception absent from these maintained inputs.
 
 The Environment selects `publication.mode: per-output-v1`. Each output is packaged, published, signed and
 verified independently. Release assembly combines authenticated references and evidence from the same Plan
-and workflow run attempt; aggregate verification and finalization do not download output payloads. Finalization
+and workflow run, admitting current or earlier attempts with original preparation/signing identities.
+Aggregate verification and finalization do not download output payloads. Finalization
 still checks every job and every required output. The public release remains one signed entry point under
 `m2-candidate/releases`, with independently consumable output repositories. Per-output jobs still need room
 for their own payloads and copies; this change does not establish a measured runner-storage budget. The
-metadata transport and failure gates are locally contract-tested; a successful hosted run remains unrecorded.
+metadata transport and failure gates are locally contract-tested, and full candidate publication/finalization
+passed the [hosted validation run](../../docs/evidence/2026-10-06-m2-metadata-publication.md#successful-hosted-validation).
+Mixed-attempt retry reuse and independent full-payload consumer acceptance remain unexercised.
 
 The generator checks the complete workflow against a 500,000-byte ceiling before writing. YAML anchors and
 inline step maps compact repeated configuration without changing the expanded job graph or credentials.

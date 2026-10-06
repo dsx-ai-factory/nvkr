@@ -1,8 +1,8 @@
 # M2 metadata publication contracts
 
-This records local contract validation for the uncommitted `feat/m2-native-arc` changes
-based on `73395149a8fd3435c7cda7ba466a566bffc79b7d`. It is not a hosted release or
-live signing acceptance record.
+This records local contract validation and subsequent hosted validation for `feat/m2-native-arc`.
+The initial local results below are based on `73395149a8fd3435c7cda7ba466a566bffc79b7d`;
+the successful hosted run and its narrower acceptance scope are recorded at the end.
 
 The M2 Environment selects `publication.mode: per-output-v1`. Its generated Plan has
 34 named outputs and 35 publication routes: one per output and one aggregate release.
@@ -47,7 +47,7 @@ runs timed out; an initial Linux run also used a read-only source mount incompat
 with a lifecycle test. The replacement Linux run uses a writable isolated source copy.
 
 Hosted storage peaks, execution time, internal-registry permissions and live signing
-for this publication mode remain unmeasured. Per-output jobs still need sufficient
+for this publication mode were unmeasured at the initial local checkpoint. Per-output jobs still need sufficient
 space for their individual payloads.
 
 ## Hosted validation failures
@@ -120,4 +120,29 @@ disagreed with its own dependency record, so validation correctly rejected it ea
 error code. The fixture now constructs an internally consistent wrong-Plan predicate. Its focused tests
 and the full factory package reruns passed on both platforms; every other package passed in the original
 full runs. Linux-targeted lint, full vet, shellcheck, vulnerability scanning, formatting, diff checks and
-exact M2 workflow regeneration also passed. No hosted run contains this retry change yet.
+exact M2 workflow regeneration also passed. The subsequent full hosted run includes this retry change;
+mixed-attempt reuse remains locally contract-tested only.
+
+
+## Successful hosted validation
+
+[Run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963)
+completed successfully on October 6, 2026, at 23:03:19 UTC, on attempt 1 of validation commit
+`625980e30b1a9f5ef27a9b46534de65eefff385a`. It contains clean-branch implementation commit
+`1b89d656` and all preceding publication fixes. All jobs succeeded: native AMD64 and ARM64
+OS builds, all 34 output publications and their signing/verification, metadata-only release
+assembly, aggregate publication/signing/verification, and
+[Run completeness finalization](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/job/112541818732).
+
+The validation Environment admitted only the additional exact `codex/m2-arc-validation` branch.
+Its Plan digest is `sha256:4a7215ab77d219d2695e2eae15d6546c102d808de8b4f229b52868935e98ba63`.
+The PR branch retains main-only dispatch/signing and Plan digest
+`sha256:6cfd876ea915b6b3f42de7b697306dc4f138d31cfafb8773b486eb611090f391`.
+Branch comparison confirmed no implementation differences: only the exception's authored
+Environment, generated bundle, policy regression and explanatory README differed before this
+evidence update. The main-only configuration itself has not yet run on main.
+
+This establishes hosted pipeline-attested candidate delivery with live signing and finalization.
+It does not establish mixed-attempt retry acceptance, independent full-payload consumer acceptance,
+M3 deep disk inspection, organizational toolchain approval, or a measured storage-capacity bound.
+The temporary older SPIRE-agent source pin and internal candidate publication namespace remain.
