@@ -182,6 +182,6 @@ host diagnostic race suite passed in 4.459 seconds. Two independent source revie
 The complete changed-Go diff, including tests, is SHA-256
 `1526bc078de0b0b765eb8fa5436cd570866c1ae1dd415456037def015b9603f4` relative to the stated base.
 The [verbatim command/terminal record](2026-10-06-disk-inspection-volume.log) has SHA-256
-`1647802ffaf50b5328d7aa5d1872c614635a857d83d6b52ba2f0eae78c82741e`.
+`678a28d10235113ede88b9884de7c4b60fbc2d9c9730114deec872c329bc1337` (trailing blank separator normalized).
 This is contract validation, not native AMD64 execution, a new Mac aggregate-gate pass, rebuilt-helper
 deployment, full NKE disk inspection or hosted acceptance. Historical limitations above remain separately scoped.

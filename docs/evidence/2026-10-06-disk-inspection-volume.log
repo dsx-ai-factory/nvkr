@@ -88,4 +88,3 @@ Focused host command:
 GOTOOLCHAIN=local go test -race ./internal/diskdiagnostic -count=1
 Actual terminal output (exit 0):
 ok  	github.com/NVIDIA/nke-recipes/internal/diskdiagnostic	4.459s
-
