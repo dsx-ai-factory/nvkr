@@ -1,10 +1,10 @@
 package factory
 
 import (
-	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -12,28 +12,39 @@ import (
 
 func imageIndexTestPlan(t *testing.T) *Plan {
 	t.Helper()
-	root, err := filepath.Abs("../../..")
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(root)
-	definitionPath := "definitions/nke-deploy/definition.yaml"
-	definition, err := authored.LoadDefinition(t.Context(), definitionPath)
+	return compileImageIndexFixture(t, plan, plan.Environment)
+}
+
+// Compile from checked-in resolved snapshots, without fetching private pin sets.
+func compileImageIndexFixture(t *testing.T, original *Plan, environment authored.Environment) *Plan {
+	t.Helper()
+	stack, err := catalog.ApplyStack(original.CatalogSnapshot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentPath := "definitions/nke-deploy/environment-github.yaml"
-	environment, err := authored.LoadEnvironment(t.Context(), environmentPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := range definition.Outputs {
-		if definition.Outputs[i].Name == "cwe" {
-			definition.Outputs[i].Platform = ""
-			definition.Outputs[i].Platforms = []string{"linux/amd64", "linux/arm64"}
+	targetStacks := make(map[string]*catalog.Stack)
+	for _, output := range original.Definition.Outputs {
+		if output.Catalog == nil {
+			continue
+		}
+		for _, build := range original.Builds {
+			if build.Name == output.Name {
+				targetStacks[output.Name], err = catalog.ApplyStack(build.CatalogSnapshot)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		if targetStacks[output.Name] == nil {
+			t.Fatalf("missing catalog for %s", output.Name)
 		}
 	}
-	plan, err := CompileDocuments(t.Context(), definitionPath, definition, environmentPath, environment, "v0.0.0 (test)")
+	plan, err := compileWithTargetStacks(t.Context(), original.Definition, environment, stack, targetStacks,
+		original.GeneratorVersion, original.DefinitionPath, original.EnvironmentPath)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,7 +1,6 @@
 package lifecycle
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
@@ -82,30 +81,12 @@ func TestImageIndexRunRejectsMissingAndSiblingBindings(t *testing.T) {
 }
 
 func TestPrepareRunFreezesExplicitNativeImageUses(t *testing.T) {
-	root, err := filepath.Abs("../../..")
+	// Preparation consumes the validated frozen plan and does not need source credentials.
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(root)
-	definitionPath, environmentPath := "definitions/nke-deploy/definition.yaml", "definitions/nke-deploy/environment-github.yaml"
-	definition, err := LoadDefinition(t.Context(), definitionPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	environment, err := LoadEnvironment(t.Context(), environmentPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := range definition.Outputs {
-		if definition.Outputs[i].Name == "cwe" {
-			definition.Outputs[i].Platform = ""
-			definition.Outputs[i].Platforms = []string{"linux/amd64", "linux/arm64"}
-		}
-	}
-	plan, err := factory.CompileDocuments(t.Context(), definitionPath, definition, environmentPath, environment, "test (test)")
-	if err != nil {
-		t.Fatal(err)
-	}
+	definition, environment := plan.Definition, plan.Environment
 	run, err := PrepareRun(definition, environment, plan, "fixture")
 	if err != nil {
 		t.Fatal(err)

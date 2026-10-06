@@ -40,10 +40,7 @@ func TestImageTagsRemainTransportOnlyAndIndependentlyOwned(t *testing.T) {
 	original := imageIndexTestPlan(t)
 	environment := original.Environment.Clone()
 	environment.Publication.ImageTags = map[string]string{"cwe": "candidate-two"}
-	changed, err := CompileDocuments(t.Context(), original.DefinitionPath, original.Definition, original.EnvironmentPath, environment, original.GeneratorVersion)
-	if err != nil {
-		t.Fatal(err)
-	}
+	changed := compileImageIndexFixture(t, original, environment)
 	if changed.EnvironmentDigest == original.EnvironmentDigest {
 		t.Fatal("image tags absent from transport identity")
 	}
