@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -52,7 +53,10 @@ func githubProgress(ctx context.Context, options GitHubStepOptions, label string
 	// Cancellation must not turn a killed child or interrupted transport into an
 	// ordinary byte/verification failure. A failed diagnostic never reaches here.
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		err = e.Wrap(e.CodeTimeout, ctxErr, "GitHub operation canceled")
+		var coded *e.Error
+		if !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
+			err = e.Wrap(e.CodeTimeout, ctxErr, "GitHub operation canceled")
+		}
 	}
 	progress.finish(err)
 	return err
