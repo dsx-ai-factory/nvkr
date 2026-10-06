@@ -46,7 +46,7 @@ recorded here. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
 
-### Local measurement, not publication admission
+## Local measurement, not publication admission
 
 On each native host, set `inspection_arch` to `amd64` or `arm64` for the image
 just built. Inspect its OS/architecture and retain its observed local ID, then
