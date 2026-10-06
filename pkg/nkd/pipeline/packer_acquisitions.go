@@ -57,9 +57,9 @@ func (artifact *PackerArtifact) snapshotAcquisitionsContext(ctx context.Context)
 // transport contains exactly one declared file; the material owner validates the
 // inner capture without extraction. Both handles are closed on every failure.
 func collectPackerContainerAcquisitions(ctx context.Context, runtime packerContainerRuntime,
-	container, sourcePath, root string, budget execution.ResourceRequest, diskBytes int64,
+	container, sourcePath, root string, budget execution.ResourceRequest, observed execution.ResourceCapacity, diskBytes int64,
 ) (capture *heldfile.File, returnErr error) {
-	limit, err := packerAcquisitionCollectionLimit(budget, diskBytes)
+	limit, err := packerAcquisitionCollectionLimit(budget, observed, diskBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -111,18 +111,22 @@ func collectPackerContainerAcquisitions(ctx context.Context, runtime packerConta
 // Outer transport and inner capture can coexist as sealed RAM-backed files on
 // Linux. Reserve 64 MiB for bounded manifest decoding and bookkeeping, then
 // account for both copies separately from the three scratch copies and the
-// already-held disk. This is a point-in-time budget, not a kernel reservation.
-func packerAcquisitionCollectionLimit(budget execution.ResourceRequest, diskBytes int64) (int64, error) {
+// already-held disk. Observed workspace free space already excludes that disk;
+// subtract it only from the declared total. Neither observation nor this budget
+// is a kernel reservation.
+func packerAcquisitionCollectionLimit(budget execution.ResourceRequest, observed execution.ResourceCapacity, diskBytes int64) (int64, error) {
 	const metadataMiB = 64
-	if diskBytes <= 0 || budget.MemoryMiB <= metadataMiB {
+	memory := min(budget.MemoryMiB, observed.MemoryMiB)
+	if diskBytes <= 0 || memory <= metadataMiB {
 		return 0, e.New(e.CodeEngineCapability, "acquisition collection has no admitted disk or metadata memory budget")
 	}
 	diskMiB := uint64((diskBytes-1)/(1<<20)) + 1
 	if budget.EphemeralStorageMiB <= diskMiB {
 		return 0, e.New(e.CodeEngineCapability, "no admitted scratch capacity remains for acquisitions")
 	}
-	limit := min(packerArtifactArchiveLimit(budget.EphemeralStorageMiB-diskMiB), material.MaxAcquisitionArchiveBytes)
-	memoryMiB := budget.MemoryMiB - metadataMiB
+	storage := min(budget.EphemeralStorageMiB-diskMiB, observed.EphemeralStorageMiB)
+	limit := min(packerArtifactArchiveLimit(storage), material.MaxAcquisitionArchiveBytes)
+	memoryMiB := memory - metadataMiB
 	if memoryMiB <= uint64(math.MaxInt64>>20) {
 		limit = min(limit, (int64(memoryMiB)<<20)/2)
 	}

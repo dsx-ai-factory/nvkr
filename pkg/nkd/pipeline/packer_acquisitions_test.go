@@ -85,7 +85,7 @@ func TestCollectPackerAcquisitionsHoldsSameArtifactAndRevokesOnClose(t *testing.
 				_, err := stdout.Write(carrier)
 				return err
 			}}
-			capture, err := collectPackerContainerAcquisitions(t.Context(), runtime, "build", "/nkd/work/output/capture.tar", t.TempDir(), execution.ResourceRequest{MemoryMiB: 128, EphemeralStorageMiB: 4}, 1024)
+			capture, err := collectPackerContainerAcquisitions(t.Context(), runtime, "build", "/nkd/work/output/capture.tar", t.TempDir(), execution.ResourceRequest{MemoryMiB: 128, EphemeralStorageMiB: 4}, execution.ResourceCapacity{MemoryMiB: 128, EphemeralStorageMiB: 4}, 1024)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -138,7 +138,7 @@ func TestCollectPackerAcquisitionsFailsClosed(t *testing.T) {
 				_, err := stdout.Write(testPackerArtifactCarrier(t, name, tt.payload))
 				return err
 			}}
-			capture, err := collectPackerContainerAcquisitions(ctx, runtime, "build", "/nkd/work/output/capture.tar", t.TempDir(), execution.ResourceRequest{MemoryMiB: 128, EphemeralStorageMiB: tt.storage}, 1024)
+			capture, err := collectPackerContainerAcquisitions(ctx, runtime, "build", "/nkd/work/output/capture.tar", t.TempDir(), execution.ResourceRequest{MemoryMiB: 128, EphemeralStorageMiB: tt.storage}, execution.ResourceCapacity{MemoryMiB: 128, EphemeralStorageMiB: tt.storage}, 1024)
 			want := e.CodeVerifyFailed
 			if tt.name == "absent capacity" {
 				want = e.CodeEngineCapability
@@ -168,7 +168,7 @@ func TestPackerAcquisitionCollectionBudgetsMemoryAndAllConcurrentCopies(t *testi
 		{name: "no scratch after disk", memory: 128, storage: 1, disk: 1 << 20, reject: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := packerAcquisitionCollectionLimit(execution.ResourceRequest{MemoryMiB: tt.memory, EphemeralStorageMiB: tt.storage}, tt.disk)
+			got, err := packerAcquisitionCollectionLimit(execution.ResourceRequest{MemoryMiB: tt.memory, EphemeralStorageMiB: tt.storage}, execution.ResourceCapacity{MemoryMiB: tt.memory, EphemeralStorageMiB: tt.storage}, tt.disk)
 			if tt.reject {
 				if code(err) != e.CodeEngineCapability {
 					t.Fatalf("missing admission: %v", err)
@@ -182,8 +182,52 @@ func TestPackerAcquisitionCollectionBudgetsMemoryAndAllConcurrentCopies(t *testi
 	}
 	called := false
 	runtime := &recordingPackerRuntime{run: func(io.Reader, io.Writer, io.Writer, []string) error { called = true; return nil }}
-	_, err := collectPackerContainerAcquisitions(t.Context(), runtime, "build", "/nkd/work/output/capture.tar", t.TempDir(), execution.ResourceRequest{MemoryMiB: 64, EphemeralStorageMiB: 32768}, 1024)
+	_, err := collectPackerContainerAcquisitions(t.Context(), runtime, "build", "/nkd/work/output/capture.tar", t.TempDir(), execution.ResourceRequest{MemoryMiB: 64, EphemeralStorageMiB: 32768}, execution.ResourceCapacity{MemoryMiB: 64, EphemeralStorageMiB: 32768}, 1024)
 	if called || code(err) != e.CodeEngineCapability {
 		t.Fatalf("low-memory collector started runtime: %t,%v", called, err)
+	}
+}
+
+func TestPackerAcquisitionFreeCapacityDoesNotChargeHeldDiskTwice(t *testing.T) {
+	for _, test := range []struct {
+		name                    string
+		declared, free, diskMiB uint64
+		want                    int64
+	}{
+		{"measured free already excludes disk", 10, 6, 4, 2 << 20},
+		{"declaration remains tighter", 10, 20, 4, 2 << 20},
+		{"observed shortage remains tighter", 10, 3, 4, 1 << 20},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			budget := execution.ResourceRequest{MemoryMiB: 128, EphemeralStorageMiB: test.declared}
+			observed := execution.ResourceCapacity{MemoryMiB: 128, EphemeralStorageMiB: test.free}
+			got, err := packerAcquisitionCollectionLimit(budget, observed, int64(test.diskMiB<<20))
+			if err != nil || got != test.want {
+				t.Fatalf("limit=%d, error=%v; want%d without charging observed free for the held disk again", got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestPackerAcquisitionObservedCapacityCannotRelaxDeclaredLimits(t *testing.T) {
+	for _, test := range []struct {
+		name                                 string
+		declaredMemory, observedMemory, free uint64
+		want                                 int64
+		code                                 e.Code
+	}{
+		{"observed memory tighter", 128, 66, 32768, 1 << 20, ""},
+		{"declared memory tighter", 66, 128, 32768, 1 << 20, ""},
+		{"observed metadata shortage", 128, 64, 32768, 0, e.CodeEngineCapability},
+		{"observed scratch shortage", 128, 128, 0, 0, e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := packerAcquisitionCollectionLimit(
+				execution.ResourceRequest{MemoryMiB: test.declaredMemory, EphemeralStorageMiB: 32768},
+				execution.ResourceCapacity{MemoryMiB: test.observedMemory, EphemeralStorageMiB: test.free}, 1<<20)
+			if code(err) != test.code || got != test.want {
+				t.Fatalf("limit=%d,error=%v; want%d,%s", got, err, test.want, test.code)
+			}
+		})
 	}
 }

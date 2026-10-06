@@ -273,10 +273,8 @@ func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packer
 			return artifact, err
 		}
 		budget := *request.node.Requirements.Resources
-		budget.MemoryMiB = min(budget.MemoryMiB, facts.Resources.MemoryMiB)
-		budget.EphemeralStorageMiB = min(budget.EphemeralStorageMiB, facts.Resources.EphemeralStorageMiB)
 		artifact.acquisitions, err = collectPackerContainerAcquisitions(ctx, request.runtime, buildName,
-			path.Join(packerContainerOutputPath, name), runRoot, budget, artifact.Size())
+			path.Join(packerContainerOutputPath, name), runRoot, budget, facts.Resources, artifact.Size())
 		if err != nil {
 			return artifact, err
 		}
