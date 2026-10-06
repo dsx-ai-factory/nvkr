@@ -7,6 +7,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -329,7 +330,7 @@ func packageMediaType(kind string) string {
 	case PackageImage:
 		return "application/vnd.oci.image.manifest.v1+json"
 	case PackageDiskImage:
-		return "application/vnd.nkd.disk-image.v1"
+		return delivery.MediaDiskImage
 	case PackageBinaryBundle:
 		return "application/vnd.nkd.binary-bundle.v1"
 	case PackageAPT:

@@ -38,6 +38,9 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
 	}
+	if len(diskObservations) != 0 {
+		return Inspection{}, e.New(e.CodeUsage, "publication inspection requires an empty disk observation map")
+	}
 	index, raw, err := readIndex(ctx, root)
 	if err != nil {
 		return Inspection{}, err

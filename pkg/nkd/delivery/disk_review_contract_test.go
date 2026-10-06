@@ -10,6 +10,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 func TestReleaseDiskTypeAdmissionRejectsOtherArtifactFamilies(t *testing.T) {
@@ -30,6 +31,108 @@ func TestReleaseDiskTypeAdmissionRejectsOtherArtifactFamilies(t *testing.T) {
 				t.Fatalf("refusal exposed output: %v", err)
 			}
 		})
+	}
+}
+
+func TestReleaseSBOMSubjectGateRejectsSelfPinnedChanges(t *testing.T) {
+	for _, scenario := range []string{"semantic digest", "object name", "subject hash", "component name", "invalid non-disk document"} {
+		t.Run(scenario, func(t *testing.T) {
+			request, _ := diskPublicationRequest(t, "amd64")
+			component := "image"
+			if scenario == "invalid non-disk document" {
+				request = releasePublicationRequestFixture(t, "linux", "amd64")
+				component = "cli"
+			}
+			root := filepath.Join(t.TempDir(), "publication")
+			if _, err := BuildPublicationRoot(t.Context(), root, request); err != nil {
+				t.Fatal(err)
+			}
+			inspection, err := Inspect(t.Context(), root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for index := range inspection.Root.Objects {
+				object := &inspection.Root.Objects[index]
+				if object.Evidence == nil || object.Evidence.Component != component {
+					continue
+				}
+				switch scenario {
+				case "semantic digest":
+					object.SemanticDigest = digestBytes([]byte("sibling semantic identity"))
+				case "object name":
+					object.Name += "x"
+				default:
+					manifest, err := flatManifest(t.Context(), root, *object)
+					if err != nil {
+						t.Fatal(err)
+					}
+					raw, err := readBlob(t.Context(), root, manifest.Layers[0], sbom.MaxDocumentBytes)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var bom sbom.BOM
+					if err := canonical.UnmarshalExact([]byte(strings.TrimSuffix(string(raw), "\n")), &bom); err != nil {
+						t.Fatal(err)
+					}
+					switch scenario {
+					case "subject hash":
+						changed, err := sbom.ForSubject(&bom, digestBytes([]byte("sibling bytes")), "build-output", "")
+						if err != nil {
+							t.Fatal(err)
+						}
+						bom = *changed
+					case "component name":
+						bom.Metadata.Component.Name = "sibling"
+					case "invalid non-disk document":
+						bom.SpecVersion = "unsupported"
+					}
+					// Bypass only validated construction in this hostile wire fixture.
+					// Every byte, document and outer-root identity is recomputed.
+					encoded, err := canonical.Marshal(bom)
+					if err != nil {
+						t.Fatal(err)
+					}
+					semantic, err := canonical.Digest(canonical.KindSBOM, bom)
+					if err != nil {
+						t.Fatal(err)
+					}
+					writer := layoutWriter{root: root}
+					payload, err := writer.addBlobBytes(encoded, manifest.Layers[0].MediaType)
+					if err != nil {
+						t.Fatal(err)
+					}
+					oldPayload, oldManifest := manifest.Layers[0].Digest, object.DescriptorDigest
+					manifest.Layers[0] = payload
+					descriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
+					if err != nil {
+						t.Fatal(err)
+					}
+					object.DescriptorDigest, object.Size, object.BlobDigest = descriptor.Digest, descriptor.Size, payload.Digest
+					object.SemanticDigest, object.Evidence.DocumentDigest = semantic, payload.Digest
+					object.Name = "sbom-" + strings.TrimPrefix(semantic, "sha256:")
+					for _, pin := range []string{oldPayload, oldManifest} {
+						if err := os.Remove(diskBlobPath(root, pin)); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+			pin := rewriteDiskPublicationRoot(t, root, inspection, func(*PublicationRoot) {})
+			owner, err := openDiskPublicationFixture(t.Context(), root, pin)
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			if owner != nil || !strings.Contains(err.Error(), "SBOM document differs from its exact release subject") {
+				t.Fatalf("self-pinned substitution missed subject gate: %v, %v", owner, err)
+			}
+		})
+	}
+}
+
+func TestInspectionRejectsPreseededDiskObservationsBeforeIO(t *testing.T) {
+	observations := map[string]DiskArtifactInspection{digestBytes([]byte("forged")): {Size: 1}}
+	_, err := inspectPublicationWithDisks(t.Context(), "missing-publication", nil, observations)
+	assertRegistryCode(t, err, e.CodeUsage)
+	if !strings.Contains(err.Error(), "empty disk observation map") || len(observations) != 1 {
+		t.Fatalf("inspection did not reject pre-seeding before I/O: %v", err)
 	}
 }
 

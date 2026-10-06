@@ -3,6 +3,7 @@ package delivery
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -32,5 +33,27 @@ func TestDiskPublicationRequiresMaterialContentInventory(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestDiskEvidenceScannerPinUsesOneProvenanceGate(t *testing.T) {
+	for _, component := range []string{"image", "agent"} {
+		t.Run(component, func(t *testing.T) {
+			request, _ := diskPublicationRequest(t, "amd64")
+			changeDiskFixtureComponentBOM(&request, component, func(bom *sbom.BOM) {
+				for index, property := range bom.Metadata.Props {
+					if property.Name == "nkd:dependencyScannerDigest" {
+						bom.Metadata.Props = append(bom.Metadata.Props[:index], bom.Metadata.Props[index+1:]...)
+						return
+					}
+				}
+				t.Fatal("fixture has no scanner pin")
+			})
+			_, err := BuildPublicationRoot(t.Context(), filepath.Join(t.TempDir(), "refused"), request)
+			assertRegistryCode(t, err, e.CodeProvenanceMissing)
+			if !strings.Contains(err.Error(), "exact nkd:dependencyScannerDigest") {
+				t.Fatalf("wrong scanner provenance gate: %v", err)
+			}
+		})
 	}
 }

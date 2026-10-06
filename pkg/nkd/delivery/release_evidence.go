@@ -162,18 +162,26 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		for _, p := range bom.Metadata.Props {
 			props[p.Name] = p.Value
 		}
-		// Missing disk provenance is rejected at the release's owning gate,
-		// including the scanner pin also required by generic BOM validation.
+		// Missing disk-root and material provenance share the release's owning
+		// gate, including the scanner pin required by generic BOM validation.
 		// This grants no authority: the exact semantic/subject checks still follow.
 		for _, outputName := range binding.Outputs {
-			if diskRoots[outputName] == binding.Component {
+			diskRoot := diskRoots[outputName]
+			if diskRoot == "" {
+				continue
+			}
+			keys := []string{"nkd:dependencyScannerDigest"}
+			if diskRoot == binding.Component {
 				if len(bom.Components) == 0 || props["nkd:dependencyInspection"] != "disk-reconciled/v1" {
 					return e.New(e.CodeProvenanceMissing, "disk root requires a full reconciled inventory")
 				}
-				for _, key := range []string{"nkd:dependencyScannerDigest", "nkd:diskInspectionRuntimeDigest", "nkd:diskInspectorDigest", "nkd:diskCodecDigest"} {
-					if !isDigest(props[key]) {
-						return e.New(e.CodeProvenanceMissing, "disk inventory lacks an exact %s", key)
-					}
+				keys = append(keys, "nkd:diskInspectionRuntimeDigest", "nkd:diskInspectorDigest", "nkd:diskCodecDigest")
+			} else if len(bom.Components) == 0 || props["nkd:dependencyInspection"] != "disk-content/v1" {
+				return e.New(e.CodeProvenanceMissing, "disk material requires its exact inspected content inventory")
+			}
+			for _, key := range keys {
+				if !isDigest(props[key]) {
+					return e.New(e.CodeProvenanceMissing, "disk inventory lacks an exact %s", key)
 				}
 			}
 		}
@@ -187,11 +195,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			}
 			diskRoot := diskRoots[outputName]
 			method := props["nkd:dependencyInspection"]
-			if diskRoot != "" && diskRoot != binding.Component {
-				if len(bom.Components) == 0 || method != "disk-content/v1" || !isDigest(props["nkd:dependencyScannerDigest"]) {
-					return e.New(e.CodeProvenanceMissing, "disk material requires its exact inspected content inventory")
-				}
-			} else if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1") {
+			if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1") {
 				return e.New(e.CodeVerifyFailed, "disk inspection method is not valid for a non-disk output")
 			}
 		}
