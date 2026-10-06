@@ -74,8 +74,11 @@ acceptance. Run it on Linux: it requires a real statically linked, digest-pinned
 cosign executable and a signed GitHub publication; local dry-run output is
 deliberately insufficient.
 Supplying `--definition`, `--environment`, and `--plan` together additionally
-requires the verified publication to realize that exact authored and compiled
-output set. Partial exact-input selection fails before registry access.
+requires the verified publication to bind those exact authored and compiled
+identities and realize their complete output set. Partial or empty exact-input
+selection fails before registry access. Relative input paths resolve from the
+caller's working directory. A successful exact-input check emits a package-issued
+descriptive receipt; it grants no stronger evidence lane or Release scope.
 Signer-policy rejection is covered by the owning consumer contract tests.
 
 ## Focused supporting contracts

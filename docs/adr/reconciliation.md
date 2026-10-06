@@ -342,8 +342,10 @@ The common positive consumer scope is `pipeline-attested` / `artifact-publicatio
 published bytes and build evidence, not M3/M4 full-release acceptance. A stronger unavailable scope never falls
 back. Static/dry-run evidence cannot satisfy either production or qualified policy.
 The live consumer can additionally require an exact authored Definition, selected Environment and compiled
-Plan. That check reuses lifecycle Run preparation, required/observed output joining and release-content binding
-against the held verified publication. It is contract-tested only; no complete M2 publication has exercised it.
+Plan. Lifecycle prepares and freezes that expectation before external work, then matches publication-root v4's
+authenticated Definition, Environment, Plan and content identities and reuses required/observed output joining.
+A package-issued descriptive receipt records the matched identities without strengthening lane or scope. Missing,
+extra, duplicate and substituted output joins are contract-tested. No complete M2 publication has exercised it.
 
 Qualified interfaces require package-issued opaque receipts. Caller structs, paths, digest strings, parsed
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the

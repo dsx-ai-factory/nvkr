@@ -129,9 +129,29 @@ bin/nkdctl release verify \
   --anonymous
 ```
 
+An independent consumer can additionally require the publication to realize
+exact authored and compiled inputs by supplying all three paths:
+
+```sh
+bin/nkdctl release verify \
+  --reference "$RELEASE_REF" \
+  --lane pipeline-attested --scope artifact-publication \
+  --identity "$BUILD_IDENTITY_REGEXP" --issuer "$OIDC_ISSUER" \
+  --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST" \
+  --definition definition.yaml --environment environment.yaml --plan plan.json \
+  --anonymous
+```
+
+The three inputs are admitted together before signature or registry work. A
+successful response includes a package-issued exact-input description bound to
+the publication subject, consumer policy, and its Definition, Environment, Plan
+and content digests. This narrows what the consumer accepted; it does not grant a stronger
+lane, full Release scope, qualification, or deployment acceptance.
+
 `RELEASE_REF` is a registry reference pinned with `@sha256:…`; the identity and issuer belong to the
 consumer's trusted build policy. Signature and production-attestation verification are both required by this
-scope. The CLI prints the verified description; the SDK retains a live, policy-bound capability until closed.
+scope. The CLI prints the verified description; exact-input mode wraps it with
+the descriptive receipt. The SDK retains a live, policy-bound capability until closed.
 The stock verifier remains Linux-only, and unit tests do not establish live signing-service
 acceptance. Full v1 release scope (`--scope release`) and qualified acceptance remain capability-gated.
 

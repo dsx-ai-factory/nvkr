@@ -83,7 +83,9 @@ func renderText(selected view) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "Release %s\nInspection: %s\nDeclared qualification: %s\n", terminal(selected.Reference), selected.Inspection, terminal(selected.DeclaredQualification))
 	fmt.Fprintf(&out, "References: %s\n", terminal(selected.ReferenceScope))
-	fmt.Fprintf(&out, "Content: %s\nDefinition: %s\nEnvironment: %s\n", terminal(selected.Metadata.ContentSubject), terminal(selected.Metadata.DefinitionDigest), terminal(selected.Metadata.EnvironmentDigest))
+	fmt.Fprintf(&out, "Content: %s\nDefinition: %s\nEnvironment: %s\nPlan: %s\n",
+		terminal(selected.Metadata.ContentSubject), terminal(selected.Metadata.DefinitionDigest),
+		terminal(selected.Metadata.EnvironmentDigest), terminal(selected.Metadata.PlanDigest))
 	fmt.Fprintf(&out, "Outputs: %d of %d\n", len(selected.Outputs), selected.TotalOutputs)
 	for _, output := range selected.Outputs {
 		platform := ""

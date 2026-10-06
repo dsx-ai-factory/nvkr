@@ -48,7 +48,8 @@ func diskPublicationRequest(t *testing.T, arch string) (PublicationRequest, stri
 		t.Fatal(err)
 	}
 	agentPin := digestBytes([]byte("exact staged agent"))
-	request := PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: []ObjectInput{
+	request := PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build,
+		PlanDigest: disk.PlanDigest, ContentSubject: content}, Objects: []ObjectInput{
 		{Name: output.Name, Kind: "disk-image", Path: layout, Layout: true, ArtifactType: MediaDiskImage, SemanticDigest: rawPin,
 			BlobDigest: digestBytes(indexRaw), OS: "linux", Arch: arch, Output: &OutputBinding{Repository: "node-image", Format: "disk-image",
 				BuildDigest: build, Components: append([]string(nil), output.Components...), Disk: disk,

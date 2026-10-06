@@ -190,7 +190,8 @@ func hostedDiskPublicationRequest(t *testing.T, wrapper, arch string, output Art
 		t.Fatal(err)
 	}
 	request := delivery.PublicationRequest{Release: &delivery.ReleaseMetadata{
-		DefinitionDigest: output.BuildDigest, EnvironmentDigest: output.BuildDigest, ContentSubject: content},
+		DefinitionDigest: output.BuildDigest, EnvironmentDigest: output.BuildDigest,
+		PlanDigest: output.Disk.PlanDigest, ContentSubject: content},
 		Objects: []delivery.ObjectInput{{Name: output.Name, Kind: factory.PackageDiskImage, Path: wrapper, Layout: true,
 			OS: "linux", Arch: arch,
 			ArtifactType: delivery.MediaDiskImage, SemanticDigest: output.Disk.PayloadDigest, BlobDigest: pipeline.FileDigest(index),

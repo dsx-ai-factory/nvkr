@@ -71,82 +71,200 @@ func TestConsumerVerifiesExactSignedArtifactPublicationClosure(t *testing.T) {
 	}
 }
 
+func TestConsumerRejectsNoncanonicalReferenceBeforeAdapters(t *testing.T) {
+	verifier := &releaseVerifier{}
+	materializeCalls := 0
+	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
+		materializeCalls++
+		return nil, nkderr.New(nkderr.CodeInternal, "materializer must not run")
+	}}
+	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
+		IdentityRegexp: "^builder$", Issuer: "issuer"}
+	for _, reference := range []string{
+		"ubuntu@sha256:" + repeat("a", 64),
+		"docker.io/library/ubuntu@sha256:" + repeat("a", 64),
+		"ghcr.io/example/release:v1@sha256:" + repeat("a", 64),
+	} {
+		t.Run(reference, func(t *testing.T) {
+			_, err := consumer.Verify(t.Context(), reference, policy)
+			assertCode(t, err, nkderr.CodeUnverifiedRef)
+		})
+	}
+	if verifier.calls != 0 || materializeCalls != 0 {
+		t.Fatalf("noncanonical reference reached adapters: verifier=%d materializer=%d", verifier.calls, materializeCalls)
+	}
+}
+
+func TestExactInputCapabilitiesMustBePackageIssued(t *testing.T) {
+	verified := &VerifiedRelease{valid: true, publication: &delivery.Publication{}}
+	if _, err := verified.RequireExactInputs(&ExactInputExpectation{}); err == nil {
+		t.Fatal("caller-minted exact-input expectation was accepted")
+	} else {
+		assertCode(t, err, nkderr.CodeGateUnmet)
+	}
+	if _, err := (&ExactInputReceipt{}).Description(); err == nil {
+		t.Fatal("caller-minted exact-input receipt was accepted")
+	} else {
+		assertCode(t, err, nkderr.CodeGateUnmet)
+	}
+	consumer := &Consumer{verifier: &releaseVerifier{}, materialize: func(context.Context, string) (*delivery.Publication, error) {
+		t.Fatal("caller-minted expectation reached publication adapters")
+		return nil, nil
+	}}
+	_, _, err := consumer.VerifyExactInputs(t.Context(), verified.release.Subject, VerificationPolicy{
+		Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer",
+	}, &ExactInputExpectation{})
+	assertCode(t, err, nkderr.CodeGateUnmet)
+}
+
 func TestVerifiedReleaseRequiresExactDefinitionEnvironmentAndPlan(t *testing.T) {
+	fixture := newExactInputFixture(t)
 	for _, test := range []struct {
-		name   string
-		mutate func(*Definition, *Environment, **factory.Plan, *VerifiedRelease)
-		want   nkderr.Code
+		name           string
+		mutateInputs   func(*testing.T, *Definition, *Environment, **factory.Plan)
+		mutateVerified func(*testing.T, *VerifiedRelease)
+		prepareCode    nkderr.Code
+		verifyCode     nkderr.Code
 	}{
 		{name: "exact"},
-		{name: "different definition", mutate: func(definition *Definition, _ *Environment, _ **factory.Plan, _ *VerifiedRelease) {
+		{name: "different definition", mutateInputs: func(_ *testing.T, definition *Definition, _ *Environment, _ **factory.Plan) {
 			definition.Metadata.Name = "other-product"
-		}, want: nkderr.CodeVerifyFailed},
-		{name: "different environment", mutate: func(_ *Definition, environment *Environment, _ **factory.Plan, _ *VerifiedRelease) {
+		}, prepareCode: nkderr.CodeUnverifiedRef},
+		{name: "different environment", mutateInputs: func(_ *testing.T, _ *Definition, environment *Environment, _ **factory.Plan) {
 			environment.Metadata.Name = "other-environment"
-		}, want: nkderr.CodeVerifyFailed},
-		{name: "substituted plan", mutate: func(_ *Definition, _ *Environment, plan **factory.Plan, _ *VerifiedRelease) {
+		}, prepareCode: nkderr.CodeUnverifiedRef},
+		{name: "plan environment inconsistency", mutateInputs: func(_ *testing.T, _ *Definition, _ *Environment, plan **factory.Plan) {
 			copyPlan := **plan
 			copyPlan.EnvironmentDigest = "sha256:" + repeat("9", 64)
 			*plan = &copyPlan
-		}, want: nkderr.CodeUnverifiedRef},
-		{name: "different release content", mutate: func(_ *Definition, _ *Environment, _ **factory.Plan, verified *VerifiedRelease) {
-			verified.release.ContentSubject = "sha256:" + repeat("9", 64)
-		}, want: nkderr.CodeVerifyFailed},
-		{name: "closed capability", mutate: func(_ *Definition, _ *Environment, _ **factory.Plan, verified *VerifiedRelease) {
+		}, prepareCode: nkderr.CodeUnverifiedRef},
+		{name: "different valid plan", mutateInputs: func(t *testing.T, definition *Definition, environment *Environment, plan **factory.Plan) {
+			other, err := Compile(t.Context(), "definition.yaml", *definition, "environment.yaml", *environment, "other-generator")
+			if err != nil {
+				t.Fatal(err)
+			}
+			*plan = other
+		}, verifyCode: nkderr.CodeVerifyFailed},
+		{name: "missing output", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts = verified.release.Artifacts[:1]
+		}, verifyCode: nkderr.CodeReleaseIncomplete},
+		{name: "unexpected output", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			unexpected := cloneArtifact(verified.release.Artifacts[0])
+			unexpected.Name = "unexpected"
+			verified.release.Artifacts = append(verified.release.Artifacts, unexpected)
+		}, verifyCode: nkderr.CodeReleaseIncomplete},
+		{name: "duplicate output", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts = append(verified.release.Artifacts, cloneArtifact(verified.release.Artifacts[0]))
+		}, verifyCode: nkderr.CodeReleaseIncomplete},
+		{name: "wrong build digest", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts[0].BuildDigest = "sha256:" + repeat("9", 64)
+		}, verifyCode: nkderr.CodeVerifyFailed},
+		{name: "wrong component", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts[0].Components[0] = "substituted"
+		}, verifyCode: nkderr.CodeVerifyFailed},
+		{name: "closed capability", mutateVerified: func(t *testing.T, verified *VerifiedRelease) {
 			if err := verified.Close(); err != nil {
 				t.Fatal(err)
 			}
-		}, want: nkderr.CodeGateUnmet},
+		}, verifyCode: nkderr.CodeGateUnmet},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			verified, definition, environment, plan := exactInputVerifiedRelease(t)
+			t.Parallel()
+			verified, definition, environment, plan := fixture.open(t)
 			defer func() { _ = verified.Close() }()
-			if test.mutate != nil {
-				test.mutate(&definition, &environment, &plan, verified)
+			if test.mutateInputs != nil {
+				test.mutateInputs(t, &definition, &environment, &plan)
 			}
-			err := verified.RequireExactInputs(definition, environment, plan)
-			if test.want == "" {
-				if err != nil {
-					t.Fatal(err)
-				}
+			expectation, err := PrepareExactInputs(definition, environment, plan)
+			if test.prepareCode != "" {
+				assertCode(t, err, test.prepareCode)
 				return
 			}
-			assertCode(t, err, test.want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.mutateVerified != nil {
+				test.mutateVerified(t, verified)
+			}
+			receipt, err := verified.RequireExactInputs(expectation)
+			if test.verifyCode != "" {
+				assertCode(t, err, test.verifyCode)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			description, err := receipt.Description()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if description.ReleaseSubject != verified.release.Subject ||
+				description.PolicyDigest != verified.release.PolicyDigest ||
+				description.PlanDigest != expectation.planDigest ||
+				description.ContentSubject != verified.release.ContentSubject {
+				t.Fatalf("incomplete exact-input receipt: %+v", description)
+			}
 		})
 	}
 }
 
-func exactInputVerifiedRelease(t *testing.T) (*VerifiedRelease, Definition, Environment, *factory.Plan) {
+type exactInputFixture struct {
+	definition  Definition
+	environment Environment
+	plan        *factory.Plan
+	layout      string
+	rootDigest  string
+	reference   string
+}
+
+func newExactInputFixture(t *testing.T) exactInputFixture {
 	t.Helper()
 	definition, environment := testDefinition(t), testEnvironment()
+	definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: "runtime", Platform: "linux/amd64",
+		Components: []string{"kubeadm"}, Format: OutputExecutable})
 	plan, err := Compile(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	payload := []byte("exact kubectl bytes")
-	source := filepath.Join(t.TempDir(), "kubectl")
-	if err := os.WriteFile(source, payload, 0o755); err != nil {
-		t.Fatal(err)
+	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
+	for _, build := range plan.Builds {
+		builds[build.Name] = build
 	}
-	bundlePath := filepath.Join(t.TempDir(), "bundle")
-	bundle, err := delivery.BuildBinaryBundle(t.Context(), bundlePath, delivery.BinaryBundleRequest{
-		OS: "linux", Arch: "amd64", Purpose: "cli",
-		Files: []delivery.BinaryFileInput{{Name: "kubectl", Path: source, InstallPath: "/usr/local/bin/kubectl", Mode: 0o755}},
-	})
-	if err != nil {
-		t.Fatal(err)
+	artifacts := make([]Artifact, 0, len(definition.Outputs))
+	objects := make([]delivery.ObjectInput, 0, len(definition.Outputs))
+	subjects := make(map[string]string, len(definition.Outputs))
+	for _, output := range definition.Outputs {
+		component := output.Components[0]
+		payload := []byte("exact " + component + " bytes")
+		source := filepath.Join(t.TempDir(), component)
+		if err := os.WriteFile(source, payload, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		bundlePath := filepath.Join(t.TempDir(), "bundle")
+		bundle, err := delivery.BuildBinaryBundle(t.Context(), bundlePath, delivery.BinaryBundleRequest{
+			OS: "linux", Arch: "amd64", Purpose: output.Name,
+			Files: []delivery.BinaryFileInput{{Name: component, Path: source, InstallPath: "/usr/local/bin/" + component, Mode: 0o755}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		descriptor, err := delivery.PayloadDescriptor(t.Context(), bundlePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		artifacts = append(artifacts, Artifact{Name: output.Name, Kind: OutputExecutable, Digest: descriptor.Digest,
+			BuildDigest: builds[output.Name].BuildDigest, Components: []string{component}})
+		objects = append(objects, delivery.ObjectInput{Name: output.Name, Kind: factory.PackageBinaryBundle,
+			Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle,
+			SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest})
+		subjects[component] = pipeline.FileDigest(payload)
 	}
-	descriptor, err := delivery.PayloadDescriptor(t.Context(), bundlePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	artifact := Artifact{Name: "cli", Kind: OutputExecutable, Digest: descriptor.Digest,
-		BuildDigest: plan.Builds[0].BuildDigest, Components: []string{"kubectl"}}
-	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{
-		Name: "cli", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true,
-		ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest,
-	}}, map[string]string{"kubectl": pipeline.FileDigest(payload)})
+	request := testReleaseRequest(t, artifacts, objects, subjects)
 	request.Release.DefinitionDigest, err = definition.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Release.PlanDigest, err = plan.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,19 +279,32 @@ func exactInputVerifiedRelease(t *testing.T) (*VerifiedRelease, Definition, Envi
 	}
 	layout, publication = attestFixtureLayout(t, layout)
 	reference := "registry.example.test/product@" + publication.RootDigest
+	return exactInputFixture{definition: definition, environment: environment, plan: plan,
+		layout: layout, rootDigest: publication.RootDigest, reference: reference}
+}
+
+func (fixture exactInputFixture) open(t *testing.T) (*VerifiedRelease, Definition, Environment, *factory.Plan) {
+	t.Helper()
 	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
-		Ref: reference, Digest: publication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
+		Ref: fixture.reference, Digest: fixture.rootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
 		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
 	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
-		return delivery.OpenPublication(t.Context(), layout, publication.RootDigest)
+		return delivery.OpenPublication(t.Context(), fixture.layout, fixture.rootDigest)
 	}}
-	verified, err := consumer.Verify(t.Context(), reference, VerificationPolicy{
-		Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer",
-	})
+	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return verified, definition, environment, plan
+	verified, receipt, err := consumer.VerifyExactInputs(t.Context(), fixture.reference, VerificationPolicy{
+		Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer",
+	}, expectation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := receipt.Description(); err != nil {
+		t.Fatal(err)
+	}
+	return verified, fixture.definition, fixture.environment, fixture.plan
 }
 
 func TestConsumerRejectsRecordForWrongObservedSigner(t *testing.T) {
@@ -461,7 +592,8 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := delivery.PublicationRequest{Release: &delivery.ReleaseMetadata{DefinitionDigest: "sha256:" + repeat("6", 64), EnvironmentDigest: "sha256:" + repeat("7", 64), ContentSubject: content}, Objects: objects}
+	request := delivery.PublicationRequest{Release: &delivery.ReleaseMetadata{DefinitionDigest: "sha256:" + repeat("6", 64),
+		EnvironmentDigest: "sha256:" + repeat("7", 64), PlanDigest: "sha256:" + repeat("8", 64), ContentSubject: content}, Objects: objects}
 	add := func(bom *sbom.BOM, output, component, stage, kind, subject, input string) {
 		bound, err := sbom.ForSubject(bom, subject, stage, input)
 		if err != nil {
