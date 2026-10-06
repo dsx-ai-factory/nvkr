@@ -292,7 +292,6 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 // The operation, not scanner-authored metadata, selects the observation class.
 // This descriptive scan cannot issue a sandbox result or a factory receipt.
 func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, platform string, scanner Scanner, maxBytes int64) ([]Component, error) {
-	diskdiagnostic.Emit(ctx, "root-scan", "start", 0, 0)
 	if err := validateSBOMContext(ctx); err != nil {
 		return nil, err
 	}
@@ -302,29 +301,42 @@ func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, platf
 	}
 	// Syft may select an image from a multi-image layout. That selection is not
 	// complete membership or platform proof. Reuse the nested OCI owner before
-	// any scan; it authenticates every blob/descriptor, scans every native image
+	// any scan; it authenticates every blob/descriptor, scans each unique image
+	// only after every descriptor/config matches the consumer platform,
 	// and revalidates the complete closure and original held carrier afterward.
+	diskdiagnostic.Emit(ctx, "subject-copy", "start", 0, 0)
 	archive, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
 		_, err := subject.WriteToContext(ctx, destination)
 		return err
 	})
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "OCI material copy canceled")
+		}
 		return nil, err
 	}
 	defer func() { _ = archive.Close() }()
+	diskdiagnostic.Emit(ctx, "subject-copy", "complete", 0, 0)
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "start", 0, 0)
 	docker, oci, err := compressedImageMarkers(ctx, archive)
 	if err != nil {
 		return nil, err
 	}
+	if docker && oci {
+		return nil, e.New(e.CodeEngineCapability, "mixed OCI and Docker image archive is ambiguous")
+	}
 	if docker || !oci {
 		return nil, e.New(e.CodeVerifyFailed, "OCI material requires an unmixed OCI layout")
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "complete", 0, 0)
+	// Direct OCI material is already uncompressed. Member/image counts share
+	// this budget; bytes are bounded per sequential copy/projection, not charged
+	// cumulatively. Components are capped before downstream public deduplication.
 	inventory, err := inspectNestedOCILayout(ctx, subject, archive, platform, scanner, maxBytes, &materialInspectionBudget{remaining: maxBytes})
 	if err != nil {
 		return nil, err
 	}
 	components := inventory.Components()
-	diskdiagnostic.Emit(ctx, "root-scan", "complete", 0, len(components))
 	return components, nil
 }
 

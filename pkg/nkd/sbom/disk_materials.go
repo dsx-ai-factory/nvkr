@@ -425,6 +425,9 @@ func compressedImageMarkers(ctx context.Context, archive *generatedInspectionFil
 			return docker, oci, nil
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				return false, false, e.Wrap(e.CodeTimeout, ctx.Err(), "compressed material marker scan canceled")
+			}
 			return false, false, e.Wrap(e.CodeVerifyFailed, err, "decoding compressed material tar headers")
 		}
 		if count >= 200000 {

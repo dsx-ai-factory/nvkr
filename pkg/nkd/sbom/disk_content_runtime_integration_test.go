@@ -77,6 +77,9 @@ func TestDiskContentRuntimeReconciliationReal(t *testing.T) {
 		t.Fatal("matrix must contain one root, one base installer, one complete capture and every staged input")
 	}
 	// Keep every original held subject live across both scans and reconciliation.
+	// These snapshots require aggregate input-size memory in addition to the
+	// runtime's independently admitted profile. They are not covered by its RAM
+	// reservation. The cancellation row below is pre-operation admission only.
 	// Missing or substituted bytes fail before launching any content operation.
 	held := make([]*heldfile.File, len(selected.Inputs))
 	for i, input := range selected.Inputs {

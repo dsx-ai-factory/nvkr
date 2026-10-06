@@ -24,9 +24,9 @@ import (
 )
 
 // This opt-in regression executes the selected digest-pinned scanner on a small
-// real Docker archive. It proves both scanner command paths and the plain/gzip
-// nested-image owner accept the selected cataloger, not libguestfs execution or
-// complete NKE image coverage.
+// real Docker archive and the plain/gzip nested-image owner. With all five
+// native tool pins it also runs OCI helper platform/report-binding rows. It
+// does not prove libguestfs execution or complete NKE image coverage.
 func TestDiskContentPinnedScannerReal(t *testing.T) {
 	path := os.Getenv("NKD_SBOM_SCANNER")
 	if path == "" {
@@ -86,7 +86,11 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 					t.Fatal(openErr)
 				}
 				defer subject.Close()
-				inventory, err = inspectHeldDependencyReport(t.Context(), subject, "docker-image", scanner, true)
+				var inspection *FilesystemInspection
+				inspection, err = inspectCompressedImages(t.Context(), subject, "linux/"+runtime.GOARCH, scanner, 1<<20, 0)
+				if err == nil {
+					inventory.Components = inspection.Components()
+				}
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -147,7 +151,7 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 		t.Run("oci-helper/"+architecture, func(t *testing.T) {
 			for _, variable := range []string{"NKD_SBOM_INSPECTOR_DIGEST", "NKD_SBOM_CODEC_DIGEST", "NKD_SBOM_GUESTFISH_DIGEST", "NKD_SBOM_PACKAGE_READER_DIGEST"} {
 				if os.Getenv(variable) == "" {
-					t.Skip("full helper platform regression requires every selected native tool pin")
+					t.Fatalf("opted-in OCI helper regression requires selected native tool pin %s", variable)
 				}
 			}
 			config := configuration.DeepCopy()
@@ -191,7 +195,9 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 			if err := canonical.UnmarshalExact(report.Bytes(), &observed); err != nil {
 				t.Fatal(err)
 			}
-			if observed.Subject != subject.Digest() || observed.Size != subject.Size() || observed.Platform != "linux/"+runtime.GOARCH || observed.Kind != "oci-image" || observed.Scanner != scanner.Digest {
+			if observed.Subject != subject.Digest() || observed.Size != subject.Size() || observed.Platform != "linux/"+runtime.GOARCH || observed.Kind != "oci-image" || observed.Scanner != scanner.Digest ||
+				observed.Inspector != os.Getenv("NKD_SBOM_INSPECTOR_DIGEST") || observed.Codec != os.Getenv("NKD_SBOM_CODEC_DIGEST") || observed.Guestfish != os.Getenv("NKD_SBOM_GUESTFISH_DIGEST") ||
+				observed.PackageReader != os.Getenv("NKD_SBOM_PACKAGE_READER_DIGEST") || observed.MaxFilesystemBytes != 1<<20 {
 				t.Fatal("OCI helper lost exact carrier, platform, operation or scanner binding")
 			}
 			for _, component := range observed.Components {
