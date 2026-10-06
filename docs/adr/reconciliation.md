@@ -389,8 +389,10 @@ ordinary tests still check declared 34/24 membership without private-source cred
 Missing or substituted parent descriptions still fail closed.
 Controlled TLS fixture materialization is not recorded upstream layer, scanner or production release proof.
 
-Four OS/material source entries are machine-pinned at the exact capture-capable NKE commit without
-creating a release tag. The selected merge commit `ff21ba8c07cafff74b68e238a8876af11e5beded`
+The OS, Calico and kubeadm source entries retain the capture-capable NKE commit.
+The explicitly authorized temporary branch test pins only SPIRE to `726f76944404e1106626b8333d3576bdf67b575b`,
+omitting the DSX IMDS plugin after both hosted downloads returned HTTP 403. This mixed-source test
+candidate does not establish complete M2 payload acceptance. Pins are machine-written without creating a release tag. The selected merge commit `ff21ba8c07cafff74b68e238a8876af11e5beded`
 is separately recorded as approved NKE #1211 and protected-main reachable in the
 [merged-source handoff](../evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff).
 The native declarations follow its required composition architecture and variant-relative capture path;

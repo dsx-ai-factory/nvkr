@@ -36,7 +36,11 @@ Helm's archive and selected executable
 have distinct pins; the delivered file is `helm`, not its tar archive. Kubectl is a raw executable.
 The local lock is generated with the existing catalog pin/bump command, not hand-authored.
 
-The four NKE OS/material sources are machine-pinned to that exact commit using `catalog pin --commit`.
+The OS, Calico and kubeadm sources remain machine-pinned to that capture-capable commit.
+For the temporary branch build test, only `nke-spire-agent-source` is pinned to
+`726f76944404e1106626b8333d3576bdf67b575b` using `catalog pin --commit`. That older package
+omits the DSX IMDS plugin whose S3 download returned HTTP 403 on both hosted architectures.
+This mixed-source candidate tests the build path; it is not the intended complete M2 image.
 The [merged-source handoff](../../docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
 records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
