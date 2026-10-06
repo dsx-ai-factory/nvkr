@@ -1,0 +1,14 @@
+# Executed build (Go1.27.1 darwin/arm64; existing modules/cache; no production source edit)
+env GOTOOLCHAIN=local GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go test -trimpath -overlay=/private/tmp/pr103-large-oci-overlay.json -c -o /private/tmp/pr103-large-oci.test ./pkg/nkd/sbom
+
+# Executed native measurement (all images already local; no network/pull/install)
+podman run --rm --pull=never --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 502:20 --cpus 2 --memory 10g --memory-swap 10g --pids-limit 256 --volume /tmp --volume /private/tmp/pr103-large-oci.test:/nkd-validation/large-oci.test:ro --env NKD_SBOM_SCANNER_DIGEST=sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573 --env NKD_SBOM_PACKAGE_READER_DIGEST=sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6 --env NKD_SBOM_INSPECTOR_DIGEST=sha256:e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b --env NKD_SBOM_CODEC_DIGEST=sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e --env NKD_SBOM_GUESTFISH_DIGEST=sha256:db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb --entrypoint /bin/sh 6fe5b341957b02b266610fdec2b7fdb11403a8f0160d7b5b03fcda8c76d8e15d -c 'set -eu; date -u; uname -sm; id; cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory.swap.max /sys/fs/cgroup/pids.max; stat -f -c "scratch-type=%T blocksize=%S availableblocks=%a" /tmp; sha256sum /nkd-validation/large-oci.test /usr/local/bin/syft /usr/bin/dpkg-deb /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish; exec /nkd-validation/large-oci.test -test.run "^TestDirectOCIMaterialLargeTiming$" -test.v -test.timeout 20m'
+
+# Executed before/after source proof from repository root
+git -c core.fsmonitor=false rev-parse HEAD
+git -c core.fsmonitor=false ls-files '*.go' go.mod go.sum .go-version | xargs shasum -a 256 | shasum -a 256
+shasum -a 256 /private/tmp/pr103-large-oci-measurement_test.go /private/tmp/pr103-large-oci.test
+
+# Reproduction using the retained identical harness/relative overlay from repository root
+env GOTOOLCHAIN=local GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go test -trimpath -overlay=docs/evidence/2026-10-06-large-oci-material-timing.overlay.json -c -o /private/tmp/pr103-large-oci.test ./pkg/nkd/sbom
+# Then execute the same native measurement command above. Requires the exact already-local ARM64 image.

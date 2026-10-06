@@ -213,7 +213,10 @@ descriptor/configuration matches the consumer platform, with the observation bou
 carrier and closure revalidated afterward. Direct OCI copies and sequential per-image projections are
 bounded separately, not charged to cumulative expansion bytes; shared member/image limits still apply.
 The 16,384-component report ceiling applies before downstream public deduplication, so shared-base
-inventories can fail closed even when their unique inventory would fit. Large-material timing is unmeasured.
+inventories can fail closed even when their unique inventory would fit. A
+[controlled dense 2 GiB single-image material](../evidence/2026-10-06-large-oci-material-timing.md)
+passed the native ARM64 public helper in 33.824 seconds within its unchanged 600-second limit;
+real NKE material complexity, cold-cache timing and full-matrix inspection remain unverified.
 Modern mixed Docker-save
 archives, OCI member names prefixed with `./`, and OCI indexes carrying foreign/unknown-platform
 attestation manifests are unsupported; an attestation descriptor is not silently discarded as image evidence.

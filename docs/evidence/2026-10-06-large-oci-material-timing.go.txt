@@ -1,0 +1,196 @@
+package sbom
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"io"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/layout"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
+)
+
+// This retained measurement harness is applied only through a test overlay.
+// It exercises the unchanged public helper with real pinned tools, not a
+// factory receipt, complete NKE disk, or an AMD64 execution.
+func TestDirectOCIMaterialLargeTiming(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
+		t.Fatal("measurement requires genuine native Linux ARM64")
+	}
+	for _, variable := range []string{"NKD_SBOM_SCANNER_DIGEST", "NKD_SBOM_INSPECTOR_DIGEST", "NKD_SBOM_CODEC_DIGEST", "NKD_SBOM_GUESTFISH_DIGEST", "NKD_SBOM_PACKAGE_READER_DIGEST"} {
+		if !canonical.IsDigest(os.Getenv(variable)) {
+			t.Fatalf("measurement requires exact tool pin %s", variable)
+		}
+	}
+	const paddingSize = int64(2 << 30)
+	const maxBytes = uint64(3 << 30)
+	preparation := time.Now()
+	root := t.TempDir()
+	layerPath := filepath.Join(root, "layer.tar")
+	layerFile, err := os.OpenFile(layerPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tarWriter := tar.NewWriter(layerFile)
+	status := []byte("Package: nkd-scanner-fixture\nStatus: install ok installed\nArchitecture: all\nVersion: 2:1.0-1ubuntu4\nDescription: synthetic large-material timing fixture\n\n")
+	for _, member := range []struct {
+		name  string
+		size  int64
+		input io.Reader
+	}{
+		{"var/lib/dpkg/status", int64(len(status)), bytes.NewReader(status)},
+		// Seeded dense bytes prevent a tiny compressed carrier or sparse memfd
+		// from standing in for multi-GiB material I/O. No compressed caching.
+		{"opt/nkd-fixture/padding.bin", paddingSize, rand.New(rand.NewSource(103))},
+	} {
+		if err := tarWriter.WriteHeader(&tar.Header{Name: member.name, Mode: 0o644, Size: member.size}); err != nil {
+			t.Fatal(err)
+		}
+		if count, err := io.CopyN(tarWriter, member.input, member.size); err != nil || count != member.size {
+			t.Fatalf("fixture member copy: bytes=%d error=%v", count, err)
+		}
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := layerFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+	layer, err := tarball.LayerFromFile(layerPath, tarball.WithCompressionLevel(gzip.NoCompression))
+	if err != nil {
+		t.Fatal(err)
+	}
+	image, err := mutate.AppendLayers(empty.Image, layer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := image.ConfigFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.OS, config.Architecture = "linux", runtime.GOARCH
+	image, err = mutate.ConfigFile(image, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layoutRoot := filepath.Join(root, "layout")
+	index, err := layout.Write(layoutRoot, empty.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := index.AppendImage(image); err != nil {
+		t.Fatal(err)
+	}
+	carrier := filepath.Join(layoutRoot, "image.tar")
+	if err := transportarchive.Pack(t.Context(), carrier, layoutRoot, []string{"oci-layout", "index.json", "blobs"}); err != nil {
+		t.Fatal(err)
+	}
+	subject, err := createGeneratedInspectionFile(t.Context(), int64(maxBytes), func(destination io.Writer) error {
+		file, err := os.Open(carrier)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		_, err = io.Copy(destination, file)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	if subject.Size() < paddingSize {
+		t.Fatalf("carrier is not multi-GiB: %d", subject.Size())
+	}
+	layerDigest, err := layer.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	diffID, err := layer.DiffID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	imageDigest, err := image.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	configDigest, err := image.ConfigName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootManifest, err := os.ReadFile(filepath.Join(layoutRoot, "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("fixture=dense synthetic seed=103 padding=%d gzip-level=%d prep=%s carrier=%s bytes=%d layer=%s diffID=%s image=%s config=%s index-json=sha256:%x", paddingSize, gzip.NoCompression, time.Since(preparation), subject.Digest(), subject.Size(), layerDigest, diffID, imageDigest, configDigest, sha256.Sum256(rootManifest))
+	precheck := time.Now()
+	if err := subject.AssertUnchangedContext(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("original carrier precheck=%s digest=%s bytes=%d", time.Since(precheck), subject.Digest(), subject.Size())
+	var progress, report bytes.Buffer
+	for _, name := range []string{"cpu.stat", "memory.current", "memory.peak"} {
+		value, readErr := os.ReadFile(filepath.Join("/sys/fs/cgroup", name))
+		t.Logf("before-helper cgroup %s=%q read-error=%v", name, strings.TrimSpace(string(value)), readErr)
+	}
+	ctx := diskdiagnostic.WithWriter(t.Context(), &progress)
+	started := time.Now()
+	err = RunDiskContentHelper(ctx, os.Getenv("NKD_SBOM_INSPECTOR_DIGEST"), os.Getenv("NKD_SBOM_CODEC_DIGEST"), subject.Digest(), subject.Size(), "oci-image",
+		os.Getenv("NKD_SBOM_GUESTFISH_DIGEST"), os.Getenv("NKD_SBOM_SCANNER_DIGEST"), os.Getenv("NKD_SBOM_PACKAGE_READER_DIGEST"), maxBytes, "linux/arm64", io.NewSectionReader(subject, 0, subject.Size()), &report)
+	elapsed := time.Since(started)
+	for _, line := range strings.Split(strings.TrimSpace(progress.String()), "\n") {
+		t.Log(line)
+	}
+	t.Logf("helper terminal elapsed=%s internal-deadline=600s error=%v report-bytes=%d", elapsed, err, report.Len())
+	for _, name := range []string{"cpu.max", "cpu.stat", "memory.max", "memory.current", "memory.peak", "memory.events", "pids.max", "pids.peak"} {
+		value, readErr := os.ReadFile(filepath.Join("/sys/fs/cgroup", name))
+		t.Logf("cgroup %s=%q read-error=%v", name, strings.TrimSpace(string(value)), readErr)
+	}
+	postcheck := time.Now()
+	if checkErr := subject.AssertUnchangedContext(t.Context()); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	t.Logf("original carrier postcheck=%s digest=%s bytes=%d", time.Since(postcheck), subject.Digest(), subject.Size())
+	if err != nil {
+		if report.Len() != 0 {
+			t.Fatal("failed helper exposed partial report")
+		}
+		t.Fatal(err)
+	}
+	var observed diskContentReport
+	if err := canonical.UnmarshalExact(report.Bytes(), &observed); err != nil {
+		t.Fatal(err)
+	}
+	if observed.Subject != subject.Digest() || observed.Size != subject.Size() || observed.Kind != "oci-image" || observed.Platform != "linux/arm64" ||
+		observed.Inspector != os.Getenv("NKD_SBOM_INSPECTOR_DIGEST") || observed.Codec != os.Getenv("NKD_SBOM_CODEC_DIGEST") || observed.Guestfish != os.Getenv("NKD_SBOM_GUESTFISH_DIGEST") ||
+		observed.Scanner != os.Getenv("NKD_SBOM_SCANNER_DIGEST") || observed.PackageReader != os.Getenv("NKD_SBOM_PACKAGE_READER_DIGEST") || observed.MaxFilesystemBytes != maxBytes {
+		t.Fatal("helper report lost exact original material/tool/platform/budget binding")
+	}
+	var found bool
+	for _, component := range observed.Components {
+		key, keyErr := diskComponentKey(component, observed.Platform)
+		class, classErr := diskComponentClass(component)
+		if keyErr != nil || classErr != nil {
+			t.Fatalf("invalid report component: %v %v", keyErr, classErr)
+		}
+		if key == (diskPackageKey{name: "nkd-scanner-fixture", version: "2:1.0-1ubuntu4", format: "deb", architecture: "all"}) && class == diskClassContainer {
+			found = true
+		}
+	}
+	if !found || len(observed.Files) != 0 {
+		t.Fatalf("missing exact contained package or invented root files: components=%d files=%d", len(observed.Components), len(observed.Files))
+	}
+	t.Logf("complete report subject=%s size=%d components=%d files=%d sha256:%x", observed.Subject, observed.Size, len(observed.Components), len(observed.Files), sha256.Sum256(report.Bytes()))
+}

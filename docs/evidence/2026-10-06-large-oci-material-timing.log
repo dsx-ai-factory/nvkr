@@ -1,0 +1,53 @@
+Tue Oct  6 22:46:44 UTC 2026
+Linux aarch64
+uid=502(core) gid=20(dialout) groups=20(dialout)
+200000 100000
+10737418240
+0
+256
+scratch-type=xfs blocksize=4096 availableblocks=62784689
+435df02de80dea9093a9bc042ddc6f06273d5a75ead64cd7b42d190b6f7a8625  /nkd-validation/large-oci.test
+617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573  /usr/local/bin/syft
+3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6  /usr/bin/dpkg-deb
+e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b  /usr/bin/virt-inspector
+f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e  /usr/bin/qemu-img
+db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb  /usr/bin/guestfish
+=== RUN   TestDirectOCIMaterialLargeTiming
+    pr103_large_oci_measurement_test.go:137: fixture=dense synthetic seed=103 padding=2147483648 gzip-level=0 prep=12.305059569s carrier=sha256:3731f2babaef118d72d3f091a54a7098554177e3f7e24076e4765f22e81958ab bytes=2147657216 layer=sha256:1164f05ea7585149dbddab341c62897ecba67ea71d573168e909dea2f11ab927 diffID=sha256:73dce11c5d74c4567af64cf823ae3bf9096ae9f6f348acbf02f7ccb016d32c55 image=sha256:80ba26e349cc4f31d1eada8c31c3a33b50271b9680d77c75ce542b0c3e58a280 config=sha256:d7e17016f70b37f8f29adf9369e3fae1f78123ef77906b6555aaa568fb1ce32b index-json=sha256:5514f572729ac06e590103371bc73745b619f4ff12e5455061be97d0de3258bb
+    pr103_large_oci_measurement_test.go:142: original carrier precheck=766.779835ms digest=sha256:3731f2babaef118d72d3f091a54a7098554177e3f7e24076e4765f22e81958ab bytes=2147657216
+    pr103_large_oci_measurement_test.go:146: before-helper cgroup cpu.stat="usage_usec 10559449\nuser_usec 5420537\nsystem_usec 5138912\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 111\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0" read-error=<nil>
+    pr103_large_oci_measurement_test.go:146: before-helper cgroup memory.current="8626929664" read-error=<nil>
+    pr103_large_oci_measurement_test.go:146: before-helper cgroup memory.peak="8627200000" read-error=<nil>
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"tool-authentication","event":"start","elapsedMillis":0}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"tool-authentication","event":"complete","elapsedMillis":74}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-copy","event":"start","elapsedMillis":74}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-copy","event":"complete","elapsedMillis":2030}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-copy","event":"start","elapsedMillis":2030}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-copy","event":"complete","elapsedMillis":5326}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-revalidation","event":"start","elapsedMillis":5326}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-revalidation","event":"complete","elapsedMillis":5457}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"filesystem-extraction","event":"start","elapsedMillis":5458}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"filesystem-extraction","event":"complete","elapsedMillis":18505}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-revalidation","event":"start","elapsedMillis":18506}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-revalidation","event":"complete","elapsedMillis":20525}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"scanner-transport","event":"start","elapsedMillis":20525,"ordinal":1}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"scanner-transport","event":"complete","elapsedMillis":23077,"ordinal":1}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"root-scan","event":"start","elapsedMillis":24051}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"root-scan","event":"complete","elapsedMillis":28834,"ordinal":1}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-revalidation","event":"start","elapsedMillis":28878}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"subject-revalidation","event":"complete","elapsedMillis":33709}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"report-completion","event":"start","elapsedMillis":33761}
+    pr103_large_oci_measurement_test.go:154: NKD_INSPECTION {"phase":"report-completion","event":"complete","elapsedMillis":33824}
+    pr103_large_oci_measurement_test.go:156: helper terminal elapsed=33.824104435s internal-deadline=600s error=<nil> report-bytes=869
+    pr103_large_oci_measurement_test.go:159: cgroup cpu.max="200000 100000" read-error=<nil>
+    pr103_large_oci_measurement_test.go:159: cgroup cpu.stat="usage_usec 40696351\nuser_usec 19489381\nsystem_usec 21206970\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 429\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0" read-error=<nil>
+    pr103_large_oci_measurement_test.go:159: cgroup memory.max="10737418240" read-error=<nil>
+    pr103_large_oci_measurement_test.go:159: cgroup memory.current="49971200" read-error=<nil>
+    pr103_large_oci_measurement_test.go:159: cgroup memory.peak="10737418240" read-error=<nil>
+    pr103_large_oci_measurement_test.go:159: cgroup memory.events="low 0\nhigh 0\nmax 1714\noom 0\noom_kill 0\noom_group_kill 0" read-error=<nil>
+    pr103_large_oci_measurement_test.go:159: cgroup pids.max="256" read-error=<nil>
+    pr103_large_oci_measurement_test.go:159: cgroup pids.peak="12" read-error=<nil>
+    pr103_large_oci_measurement_test.go:165: original carrier postcheck=2.381146145s digest=sha256:3731f2babaef118d72d3f091a54a7098554177e3f7e24076e4765f22e81958ab bytes=2147657216
+    pr103_large_oci_measurement_test.go:195: complete report subject=sha256:3731f2babaef118d72d3f091a54a7098554177e3f7e24076e4765f22e81958ab size=2147657216 components=1 files=0 sha256:99be071cf6986785cf3cd99ac011580b6837989c0a1d2a2a0c4f0c8d02f886bf
+--- PASS: TestDirectOCIMaterialLargeTiming (49.31s)
+PASS
