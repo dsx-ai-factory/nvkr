@@ -68,7 +68,7 @@ the QCOW2, decoded RAW stream, or FDE ciphertext.
 | Owner | Required decision or evidence |
 |---|---|
 | NKE build owners | Buildable pinned entrypoints, vendored private inputs, external image/chart list, OS contents and Spire-agent placement |
-| CI/release engineering | Generic GitHub-hosted runner capability for each build, including virtualization, privilege, disk and wall-time requirements; admit before execution |
+| CI/release engineering | Admit the selected hosted execution route before execution, including virtualization, privilege, disk and wall-time capacity; native NVIDIA disk builds use the explicitly admitted operator-trusted runner pools |
 | Registry/identity owners | Registry blob limits and retention, protected publication environment, keyless identities, source access and public-transparency disclosure approval |
 | Qualification owner | Separate signing identity, explicit waivers and independent negative verification transcripts |
 | Release owner | Pin-bot permissions, immutable-tag enforcement, rerun/concurrency behavior and channel policy |

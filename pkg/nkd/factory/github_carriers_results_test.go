@@ -8,10 +8,31 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
+
+func TestGitHubRecoveryErrorDetail(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		cause error
+		want  string
+	}{
+		{"disk full", syscall.ENOSPC, "NKD-E-VERIFY-FAILED: no space left on device"},
+		{"quota", syscall.EDQUOT, "NKD-E-VERIFY-FAILED: disk quota exceeded"},
+		{"permissions", os.ErrPermission, "NKD-E-VERIFY-FAILED: permission denied"},
+		{"untrusted archive detail", fmt.Errorf("MUST-NOT-BE-LOGGED"), "NKD-E-VERIFY-FAILED"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := e.Wrap(e.CodeVerifyFailed, test.cause, "untrusted archive path MUST-NOT-BE-LOGGED")
+			if got := githubRecoveryErrorDetail(err); got != test.want {
+				t.Fatalf("diagnostic %q want %q", got, test.want)
+			}
+		})
+	}
+}
 
 func TestGitHubCarriersRejectProviderDescriptionsBeforeWork(t *testing.T) {
 	plan := githubTestPlan(t)

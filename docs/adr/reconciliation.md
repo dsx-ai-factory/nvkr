@@ -203,16 +203,18 @@ preinstalled plugin before QEMU, then builds one exact selector and holds one de
 Podman/Packer ARM64 NKE disk build and boot smoke is recorded in
 [the 2026-09-23 local evidence](../evidence/2026-09-23-nke-arm64-local-os-build.md). The
 [2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records successful committed-head
-Docker ARM64 and AMD64 builds and boot smoke through the local adapter. Generated hosted VM execution and qualified
-execution remain unexercised. Encrypted direct-Packer execution
+Docker ARM64 and AMD64 builds and boot smoke through the local adapter. The later native ARC exception
+and generated disk builds are recorded below; qualified execution remains unexercised. Encrypted direct-Packer execution
 and every encrypted command form fail before resolver admission until a typed non-public secret channel exists.
 A consumer currently runs as the invoking host UID/GID without subordinate-ID or user-namespace remapping. The
 other container restrictions reduce exposure but do not prevent an escape from acting with that user's host
-access. Hosted and qualified admission therefore remain closed until a stronger provider identity boundary is
-authenticated and exercised.
+access. Ordinary hosted and qualified admission therefore remain closed until a stronger provider identity boundary is
+authenticated and exercised. The separately selected native ARC route instead has an explicit operator-trusted
+pipeline-attested contract; it does not authenticate that stronger boundary.
 A command producer without materials and a direct-Packer producer lower into IR/Plan, but command/Make VM execution
 also remains disconnected until it has a held-output adapter. A material-bearing VM command producer remains unsupported
-because the schema has no typed manifest handoff. Hosted and qualified VM execution remain fail-closed.
+because the schema has no typed manifest handoff. Generic hosted and qualified VM execution remain fail-closed;
+the native ARC direct-Packer exception is separate.
 
 Ordinary `oci-hermetic` producers may consume explicitly selected component outputs through the native v2 material
 manifest. Factory execution binds each exact Plan payload/result pair, requires canonical recorded prepared-source
@@ -225,14 +227,15 @@ execution receipt needed to authenticate that stronger claim. The pipeline re-ve
 digest in the producer result. BuildKit, Nix, direct non-launch execution, and undeclared material edges fail closed.
 One unqualified local Podman execution exercised this material path inside the complete NKE disk build using
 attempt-frozen draft inputs. The newer source-owned NKE composer and committed NKD PR head were subsequently
-exercised together in the successful Docker ARM64 and AMD64 ARC runs. Generated hosted VM and qualified evidence remain absent.
+exercised together in the successful Docker ARM64 and AMD64 ARC runs. Later generated native disk builds are
+recorded below; complete inspected delivery and qualified evidence remain absent.
 
 For the owner summary below, the network contract spans rows 10, 17 and 18: the producer request is a Builder
 input, the exact Environment authorization is part of the public lifecycle identity, and compilation plus the
 direct-Packer runtime enforce the admitted mode. A Linux ARM64 Podman execution produced and boot-tested one
 non-FDE QCOW2 and recorded its digest and size. Docker ARM64 and AMD64 on ARC subsequently passed the same lifecycle
-and source-owned boot smoke. Generated hosted VM execution remains unexercised, and FDE remains
-unsupported.
+and source-owned boot smoke. The native ARC section below records subsequent generated builds and their
+inspection failures. Complete inspected delivery remains unexercised, and FDE remains unsupported.
 
 Packer-only local Runs admit attempt-owned diagnostics; ordinary producers do not acquire that capability.
 Missing, timed-out or oversized build logs record `logs-incomplete.json` without discarding a separately verified

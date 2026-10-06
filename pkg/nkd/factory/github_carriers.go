@@ -3,10 +3,12 @@ package factory
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"sort"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
@@ -123,7 +125,11 @@ func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 			progress.log("Recover: " + artifact.ID + " (" + githubArtifactLabel(plan, artifact) + ")")
 			status := "job-failed"
 			if results[nodeJobs[artifact.Producer]] == "success" {
-				status = recoverGitHubCarrier(ctx, artifact)
+				var restoreErr error
+				status, restoreErr = recoverGitHubCarrier(ctx, artifact)
+				if restoreErr != nil {
+					progress.detail("Recovery failure: " + artifact.ID + " — " + githubRecoveryErrorDetail(restoreErr))
+				}
 			}
 			// Cancellation must not become an ordinary restore failure or allow
 			// a partially visited carrier set to appear complete.
@@ -179,22 +185,43 @@ func githubFinalizerJobs(plan *Plan, nodeJobs map[string]string) ([]string, erro
 	return uniqueSorted(jobs), nil
 }
 
-func recoverGitHubCarrier(ctx context.Context, artifact Artifact) string {
+func recoverGitHubCarrier(ctx context.Context, artifact Artifact) (string, error) {
 	if ctx.Err() != nil {
-		return "restore-failed"
+		return "restore-failed", e.Wrap(e.CodeTimeout, ctx.Err(), "carrier recovery canceled")
 	}
 	archive, _, err := securepath.OpenRegular(carrierPath(artifact.ID))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "missing"
+			return "missing", nil
 		}
-		return "restore-failed"
+		return "restore-failed", e.Wrap(e.CodeVerifyFailed, err, "opening recovery carrier")
 	}
 	defer archive.Close()
 	if err := transportarchive.UnpackOpen(ctx, archive, ".", []string{artifact.Path}); err != nil {
-		return "restore-failed"
+		return "restore-failed", err
 	}
-	return "restored:success"
+	return "restored:success", nil
+}
+
+// Report the owning code and known resource failures without logging untrusted
+// archive entry names or arbitrary error text. Recovery status remains diagnostic;
+// the finalizer still rejects every missing or unsuccessfully restored carrier.
+func githubRecoveryErrorDetail(err error) string {
+	detail := string(e.CodeInternal)
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		detail = string(coded.Code)
+	}
+	switch {
+	case errors.Is(err, syscall.ENOSPC):
+		return detail + ": no space left on device"
+	case errors.Is(err, syscall.EDQUOT):
+		return detail + ": disk quota exceeded"
+	case errors.Is(err, os.ErrPermission):
+		return detail + ": permission denied"
+	default:
+		return detail
+	}
 }
 
 const (

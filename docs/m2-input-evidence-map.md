@@ -119,6 +119,15 @@ measurements do not establish a hosted build with matching provenance or complet
 Signed disk-mode bindings describe evidence scope; public Verification Policy has no disk-evidence-mode
 acceptance selector. Consumer-policy admission requiring inspection remains a separate deferred contract.
 
+The current candidate selects `diskEvidence: build-provenance-v1`, which explicitly defers
+installed-content inspection and material/APT reconciliation. Both native builds and terminal
+byte checks passed in [run 37445475840](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37445475840),
+but both deep inspections exceeded their deadline. The subsequent
+[deferral change](evidence/2026-10-06-m2-inspection-deferral.md) is not successful strict inspection
+or complete signed delivery evidence. The latest four-lane execution plan requests strict
+inspection for both architectures; integrating it requires the inspection lane's validated
+runtime/profile handoff and an explicit Environment mode update, not relabeling this candidate.
+
 Runtime selection uses the narrowly admitted typed `runtime: docker` and
 `buildNetworkPolicy: producer-declared` controls. No `podmanStorageDriver` field,
 ambient storage variable or setup hook is supplied. Storage follows the existing
@@ -178,8 +187,10 @@ Run from the final composed repository root with its pinned Go version. These
 commands use existing owners, not a new pin writer or publication workflow.
 `--check` below does not write; the other catalog maintenance commands do update
 their machine-managed locks and belong only in a reviewed input-maintenance step.
-The four source updates below were executed during the approved merged-source handoff;
-these `--check` commands revalidate their exact selections without writing.
+The four source updates below were executed during the approved merged-source handoff.
+The SPIRE check below describes that complete source selection, not the temporary retry's
+older pin; it will report a difference while that exception remains selected. The checks
+do not write or silently restore the intended source.
 
 ```sh
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
@@ -259,18 +270,21 @@ The selected NKE #1211 merge commit has separately recorded source approval and
 protected-main reachability. That point-in-time observation is not a generic
 protected-ref policy in `catalog pin`: ADR-22 still supports exact commits and release tags,
 and Git byte authentication alone does not make a source-owner approval claim.
-The existing missing execution-class/profile capability gate still disables candidate
-launch; the publication/signing configuration does not grant source approval.
-No historical host-probe or installed-package replay is claimed as current evidence
-here: those observations lack a retained record for this candidate. The checked
-source locks contain no approved published native Packer/inspector image references.
+The current candidate supplies native execution classes, measured inspector profiles and
+published toolchain references through its Environment and catalog overlay. These remove
+the earlier missing-configuration blocker, not the runtime or delivery acceptance gates.
+The [native preparation record](evidence/2026-10-06-native-arc.md) retains assembly,
+measurement and registry read-back under the scoped candidate exception. General source
+locks still record outstanding organizational license/security approvals; publication and
+signing configuration does not grant them or source approval.
 
 ## Required embedded matrix rows
 
 The M2 specification assigns node-agent, node-side Kubernetes, control-plane images and CNI to the disk,
 and requires a recorded placement choice for SPIRE agent. Both native disk selections include the
-source-owned agent, kubeadm distro, Calico, OVN and SPIRE material producers. Their material locks are
-at exact NKE `ff21ba8c07cafff74b68e238a8876af11e5beded`:
+source-owned agent, kubeadm distro, Calico, OVN and SPIRE material producers. Their intended material locks
+are at exact NKE `ff21ba8c07cafff74b68e238a8876af11e5beded`; the temporary SPIRE retry
+described above does not supply its DSX IMDS row:
 
 | Required row | Authoritative source selection | Evidence still required |
 | --- | --- | --- |
