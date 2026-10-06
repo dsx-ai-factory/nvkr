@@ -1,13 +1,18 @@
 package buildgraph
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	"sigs.k8s.io/yaml"
 )
@@ -28,6 +33,133 @@ func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 	}
 	if len(environment.DiskInspectionProfiles) != 0 {
 		t.Fatal("unmeasured native inspector profiles must remain absent from candidate inputs")
+	}
+}
+
+// These isolated test catalogs exercise the unchanged tag-backed declarations
+// and native pins through their owning loader. They are not alternative product
+// inputs: TestMaintainedM2DeploymentImageMembership still requires the entire
+// actual catalog to fail closed with all 34 outputs and 24 image subjects retained.
+func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
+	provider := catalog.Dir("../../../definitions/nke-m2/image-catalog").(catalog.ContextDataProvider)
+	registryBytes, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var declarations struct {
+		APIVersion string                     `json:"apiVersion"`
+		Kind       string                     `json:"kind"`
+		Metadata   json.RawMessage            `json:"metadata"`
+		Sources    map[string]json.RawMessage `json:"sources"`
+		Components map[string]json.RawMessage `json:"components"`
+	}
+	if err := yaml.UnmarshalStrict(registryBytes, &declarations); err != nil {
+		t.Fatal(err)
+	}
+	lockBytes, err := provider.ReadFileContext(t.Context(), catalog.LockFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lock catalog.PinLock
+	if err := yaml.UnmarshalStrict(lockBytes, &lock); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture := func(directory, name string, value any) {
+		t.Helper()
+		// Serialization is only fixture transport, never structured identity.
+		raw, err := yaml.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, name), raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	components := []string{
+		"csi-node-driver-registrar-image", "spiffe-csi-image", "spire-agent-image",
+		"spire-controller-manager-image", "spire-oidc-image", "spire-server-image",
+		"spire-tpm-server-image", "temporal-admin-tools-image", "temporal-server-image", "temporal-ui-image",
+	}
+	rows := 0
+	for _, component := range components {
+		t.Run(component, func(t *testing.T) {
+			raw, exists := declarations.Components[component]
+			if !exists {
+				t.Fatalf("maintained tag declaration %q is absent", component)
+			}
+			var selected struct {
+				Source   string
+				Prebuilt struct{ Image string }
+			}
+			if err := json.Unmarshal(raw, &selected); err != nil {
+				t.Fatal(err)
+			}
+			pin, exists := lock.Artifacts[component]
+			if !exists || len(pin.Digests) != 2 {
+				t.Fatalf("%s must retain both native artifact pins", component)
+			}
+			fixtureRegistry := declarations
+			fixtureRegistry.Components = map[string]json.RawMessage{component: raw}
+			fixtureLock := lock
+			fixtureLock.Artifacts = map[string]catalog.ArtifactPin{component: pin}
+			directory := t.TempDir()
+			writeFixture(directory, catalog.RegistryFile, fixtureRegistry)
+			writeFixture(directory, catalog.LockFile, fixtureLock)
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(directory))
+			if err != nil {
+				t.Fatal(err)
+			}
+			sourcePin, err := cat.SourcePin(selected.Source)
+			if err != nil || !reflect.DeepEqual(sourcePin, lock.Pins[selected.Source]) {
+				t.Fatalf("source pin changed in fixture: pin=%+v error=%v", sourcePin, err)
+			}
+			if cat.Components[component].Prebuilt.Image != selected.Prebuilt.Image ||
+				!reflect.DeepEqual(cat.Components[component].Prebuilt.Digests, pin.Digests) {
+				t.Fatal("loaded fixture changed the authored transport or native pins")
+			}
+			buildDigests := make(map[string]string)
+			for _, arch := range []string{"amd64", "arm64"} {
+				t.Run(arch, func(t *testing.T) {
+					platform := "linux/" + arch
+					resolved, err := Resolve(cat, Selection{
+						Components: []string{component}, Platform: platform, OutputFormat: definition.OutputOCI,
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					graph, err := Compile(resolved)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := graph.Validate(); err != nil {
+						t.Fatal(err)
+					}
+					if graph.Platform != platform || len(graph.Nodes) != 2 {
+						t.Fatalf("want native pull/verify closure, got %+v", graph)
+					}
+					pull, verify := graph.Nodes[0], graph.Nodes[1]
+					if pull.Kind != ir.KindPull || pull.Component != component || pull.Artifact != selected.Prebuilt.Image ||
+						pull.Platform != platform || pull.Digest != pin.Digests[arch] || pull.OutputType != "oci-image" ||
+						pull.Network != ir.NetworkDefault || len(pull.Needs) != 0 {
+						t.Fatalf("wrong native pull identity/transport: %+v", pull)
+					}
+					if verify.Kind != ir.KindVerify || !slices.Equal(verify.Needs, []string{pull.ID}) {
+						t.Fatalf("verify does not cover the exact native pull: %+v", verify)
+					}
+					buildDigests[arch], err = graph.Digest()
+					if err != nil {
+						t.Fatal(err)
+					}
+					rows++
+				})
+			}
+			if buildDigests["amd64"] == buildDigests["arm64"] {
+				t.Fatal("native platform and subject changes must change BuildDigest")
+			}
+		})
+	}
+	if rows != 20 {
+		t.Fatalf("got %d compiled tag-backed native rows, want 20", rows)
 	}
 }
 
