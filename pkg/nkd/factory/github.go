@@ -224,6 +224,14 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		if stage.DiskOutput != "" {
 			writeGitHubShellStep(&body, stage.Name, []string{githubRunnerCommand("run-disk", "output", stage.DiskOutput)})
+			if !diskBuildProvenance(plan) {
+				// Diagnostics are short-lived descriptions, never planned evidence
+				// carriers. Preserve them even when the live inspection fails.
+				diagnostic := githubInspectionDiagnosticStep(actions, stage.DiskOutput)
+				fmt.Fprintf(&body, "      - name: %s\n        uses: %s\n        if: %s\n        continue-on-error: %t\n        with:\n          name: %s\n          path: %s\n          include-hidden-files: %s\n          if-no-files-found: %s\n          retention-days: %s\n",
+					diagnostic.Name, diagnostic.Uses, diagnostic.If, diagnostic.ContinueOnError,
+					yamlSingle(diagnostic.With["name"]), yamlSingle(diagnostic.With["path"]), diagnostic.With["include-hidden-files"], diagnostic.With["if-no-files-found"], diagnostic.With["retention-days"])
+			}
 			for _, member := range stage.Nodes {
 				writeGitHubOutputSteps(&body, plan, member, artifacts, actions)
 			}

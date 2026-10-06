@@ -258,6 +258,15 @@ the memory-backed route explicitly requests both. The non-root consumer drops al
 requests no-new-privileges, while the fixed ownership preparer has only CHOWN. These controls do not
 justify claiming equivalent mount-flag enforcement or a provider-owned storage quota.
 
+Inspection progress is a separate, non-authoritative channel. The pinned helper emits only closed phase/event
+names, elapsed milliseconds and bounded numeric counters; stdout remains the complete report. The host rejects
+unknown diagnostics and enriches accepted records with its original held subject's digest and content kind.
+Records are bounded to 512 bytes, the sanitized retained log to 32 KiB and forwarded records to 512 per helper
+operation. Rate limiting and truncation never hide the last accepted phase. Guest paths, raw tool output,
+arguments and credentials are not retained. `export-startup` covers appliance startup and auto-mount until the
+first exported bytes; it does not separately measure those preceding operations. Timeout diagnostics do not
+issue an inspection receipt or change the primary error. Timing is excluded from content-report and SBOM identity.
+
 The helper checks the actual cgroup-v2 CPU, memory and process-count ceilings before reading the subject.
 The leaf must exactly match the frozen CPU/RAM values and the launcher's 256-process ceiling; unknown,
 unlimited, malformed, changed or tighter visible ancestor limits fail closed. This authenticates kernel

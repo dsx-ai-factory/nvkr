@@ -2,11 +2,13 @@ package factory
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -57,6 +59,21 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		return e.Wrap(e.CodeEngineCapability, err, "hold ARC workspace")
 	}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, workspace.Close(), "close ARC workspace") }()
+	var inspectionLog *diskdiagnostic.Collector
+	if !diskBuildProvenance(plan) {
+		inspectionLog = diskdiagnostic.NewCollector()
+		defer func() {
+			// A diagnostic retention failure must not replace the inspection verdict.
+			raw, truncated := inspectionLog.Snapshot()
+			retentionCtx, stopRetention := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer stopRetention()
+			if err := retainGitHubInspectionLog(retentionCtx, workspace, output, raw, truncated); err != nil {
+				if options.Stderr != nil {
+					_, _ = fmt.Fprintln(options.Stderr, "Unable to retain inspection diagnostics.")
+				}
+			}
+		}()
+	}
 	var root Node
 	for _, node := range stage.Nodes {
 		if node.Kind == NodeBuild {
@@ -102,7 +119,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	var inspector *sbom.DiskInspectionRuntime
 	if !diskBuildProvenance(plan) {
-		inspector, err = OpenDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace)
+		inspector, err = openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 		if err != nil {
 			return err
 		}
@@ -157,7 +174,21 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	for _, expected := range plan.LifecycleOutputs {
 		if expected.Name == output {
-			return CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)
+			operation := "Inspect, reconcile and package " + output
+			if diskBuildProvenance(plan) {
+				operation = "Package disk build provenance " + output
+			}
+			return githubProgress(ctx, options, operation, nil, func(progress *githubStepProgress) error {
+				progress.phase(operation)
+				err := CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)
+				// Logging occurs after the owned inspection stops. Subprocess
+				// draining never invokes a caller-provided writer.
+				if inspectionLog != nil && progress.options.Stdout != nil {
+					raw, _ := inspectionLog.Snapshot()
+					_, _ = progress.options.Stdout.Write(raw)
+				}
+				return err
+			})
 		}
 	}
 	return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")

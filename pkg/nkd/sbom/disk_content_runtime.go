@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -176,6 +177,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		return e.New(e.CodeUnpinnedInput, "disk content helper requires exact bounded subject, platform and filesystem budget")
 	}
 	var tools []*heldfile.File
+	diskdiagnostic.Emit(ctx, "tool-authentication", "start", 0, 0)
 	defer func() {
 		for _, tool := range tools {
 			_ = tool.Close()
@@ -203,11 +205,14 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		return err
 	}
 	defer func() { _ = codec.Close() }()
+	diskdiagnostic.Emit(ctx, "tool-authentication", "complete", 0, 0)
+	diskdiagnostic.Emit(ctx, "subject-copy", "start", 0, 0)
 	subject, err := holdDiskInspectionSubject(ctx, input, subjectDigest, size)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = subject.Close() }()
+	diskdiagnostic.Emit(ctx, "subject-copy", "complete", 0, 0)
 	scanner := Scanner{Path: "/usr/local/bin/syft", Digest: scannerDigest}
 	var components []Component
 	var files []DiskFile
@@ -258,6 +263,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 	}
 	report := diskContentReport{Subject: subject.Digest(), Size: subject.Size(), Kind: kind, Platform: platform, Inspector: inspectorDigest, Codec: codecDigest,
 		Guestfish: guestfishDigest, Scanner: scannerDigest, PackageReader: packageReaderDigest, MaxFilesystemBytes: maxBytes, Components: components, Files: files}
+	diskdiagnostic.Emit(ctx, "report-completion", "start", 0, 0)
 	if err := validateDiskContentReport(report); err != nil {
 		return err
 	}
@@ -279,16 +285,19 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "writing disk content report")
 	}
+	diskdiagnostic.Emit(ctx, "report-completion", "complete", 0, 0)
 	return nil
 }
 
 // The operation, not scanner-authored metadata, selects the observation class.
 // This descriptive scan cannot issue a sandbox result or a factory receipt.
 func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, scanner Scanner) ([]Component, error) {
+	diskdiagnostic.Emit(ctx, "root-scan", "start", 0, 0)
 	inventory, err := inspectHeldDependencyReport(ctx, subject, "oci-image", scanner, true)
 	if err != nil {
 		return nil, err
 	}
+	diskdiagnostic.Emit(ctx, "root-scan", "complete", 0, len(inventory.Components))
 	return withDiskContentClass(inventory.Components, diskClassContainer), nil
 }
 

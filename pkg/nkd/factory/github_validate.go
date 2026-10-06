@@ -230,6 +230,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub job %q permits checkout to persist ambient credentials", jobID)
 			}
 			if step.Uses == actions.Upload && step.With["if-no-files-found"] != "error" {
+				if stage, ok := byNodeForJob(stages, jobID); ok && stage.DiskOutput != "" && !diskBuildProvenance(plan) &&
+					reflect.DeepEqual(step, githubInspectionDiagnosticStep(actions, stage.DiskOutput)) {
+					continue
+				}
 				return e.New(e.CodeEngineCapability, "GitHub job %q permits a missing declared output", jobID)
 			}
 		}

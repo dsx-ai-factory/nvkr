@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -115,6 +116,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	// libguestfs reopens the supplied path. This private read-only copy is made
 	// only inside the admitted container and is rehashed before accepting output.
 	snapshot := filepath.Join(workspace, "subject")
+	diskdiagnostic.Emit(ctx, "subject-copy", "start", 0, 0)
 	file, err := os.OpenFile(snapshot, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o400)
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "staging filesystem subject")
@@ -123,6 +125,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	if err := errors.Join(copyErr, file.Close()); err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "copying filesystem subject")
 	}
+	diskdiagnostic.Emit(ctx, "subject-copy", "complete", 0, 0)
 	exported := filepath.Join(workspace, "root.tar")
 	output, err := os.OpenFile(exported, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o400)
 	if err != nil {
@@ -144,6 +147,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 		// The pinned filesystem owner must identify the supported ISO filesystem
 		// before an exported SquashFS member can count as installer evidence.
 		var filesystem, diagnostic boundedScanBuffer
+		diskdiagnostic.Emit(ctx, "export-startup", "start", 0, 0)
 		probe := append(slices.Clone(args), "vfs-type", "/dev/sda")
 		if err := heldfile.RunContext(ctx, guestfish, probe, heldfile.RunOptions{Stdout: &filesystem, Stderr: &diagnostic,
 			Dir: workspace, Env: diskInspectorEnvironment(workspace), TerminationGrace: time.Second}); err != nil {
@@ -152,16 +156,24 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 		if err := validateInstallerFilesystemType(filesystem.String(), diagnostic.String()); err != nil {
 			return nil, err
 		}
+		diskdiagnostic.Emit(ctx, "export-startup", "complete", 0, 0)
 	}
 	args = append(args, "tar-out", "/", "-")
 	var diagnostic boundedScanBuffer
+	// guestfish 1.52 auto-launches and mounts -i/-m before executing an event
+	// command. Keep its read-only mounting semantics; first exported bytes mark
+	// extraction, not an invented launch_done callback or an appliance probe.
+	diskdiagnostic.Emit(ctx, "export-startup", "start", 0, 0)
+	extraction := &diskExtractionWriter{ctx: ctx, writer: output}
 	if err := runBoundedExport(ctx, guestfish, args, heldfile.RunOptions{Stderr: &diagnostic,
-		Dir: workspace, Env: diskInspectorEnvironment(workspace), TerminationGrace: time.Second}, output, maxBytes); err != nil {
+		Dir: workspace, Env: diskInspectorEnvironment(workspace), TerminationGrace: time.Second}, extraction, maxBytes); err != nil {
 		return nil, err
 	}
+	diskdiagnostic.Emit(ctx, "filesystem-extraction", "complete", 0, 0)
 	if diagnostic.Len() != 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "filesystem export returned diagnostics")
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "start", 0, 0)
 	if err := recheckFilesystemSnapshot(ctx, snapshot, subject); err != nil {
 		return nil, err
 	}
@@ -180,6 +192,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	if held.Digest() != rootDigest {
 		return nil, e.New(e.CodeVerifyFailed, "filesystem export changed while staging scan")
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "complete", 0, 0)
 	inventory, err := inspectMaterialArchive(ctx, held, platform, scanner, packageReaderDigest, maxBytes)
 	if err != nil {
 		return nil, err
@@ -200,6 +213,23 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	}
 	return &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), guestfish: guestfishDigest,
 		scanner: scanner.Digest, exported: held.Digest(), components: inventory.components, files: inventory.files}, nil
+}
+
+// The export owner, not debug-log text, identifies the first filesystem bytes.
+// Before that boundary export-startup includes appliance startup and auto-mount.
+type diskExtractionWriter struct {
+	ctx     context.Context
+	writer  io.Writer
+	started bool
+}
+
+func (writer *diskExtractionWriter) Write(raw []byte) (int, error) {
+	if len(raw) > 0 && !writer.started {
+		writer.started = true
+		diskdiagnostic.Emit(writer.ctx, "export-startup", "complete", 0, 0)
+		diskdiagnostic.Emit(writer.ctx, "filesystem-extraction", "start", 0, 0)
+	}
+	return writer.writer.Write(raw)
 }
 
 // runBoundedExport uses the standard library pipe and CopyN to enforce the

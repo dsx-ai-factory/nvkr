@@ -6,6 +6,15 @@ implementation. Contract tests, recorded external runs, and organizational accep
 
 ## Current boundary
 
+Strict disk-inspection diagnostics now have bounded, sanitized phase/timing records, exact held-subject
+coordinates, timeout summaries and an exclusive short-retention hosted upload. Progress remains outside
+the evidence identity and receipt gate; deferred M2 builds emit no inspection upload. Contract coverage
+includes log flooding, malformed/secret-bearing diagnostics, timeout/child joining, destination substitution
+and both-architecture upload mutation rejection. This does not establish rebuilt-helper deployment, full
+native disk inspection or a corrected production timeout; those remain unexercised.
+The [diagnostics validation record](../evidence/2026-10-06-disk-inspection-diagnostics.md)
+separates local gates, native ARM64 contract tests and undeployed helper changes.
+
 Public lifecycle disk-output support now includes Plan lowering and a process-local exact-QCOW2 observation
 contract. A public `disk-image`
 output explicitly names one QCOW2 root plus its complete transitive material closure. The build-graph resolver
