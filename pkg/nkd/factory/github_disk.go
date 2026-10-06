@@ -120,9 +120,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 			// Only the sealed sink can issue this fixed, bounded route. Early
 			// admission failure must not upload a preexisting workspace path.
 			if retained := diagnostics.RetainedPath(); retained != "" {
-				if output := os.Getenv("GITHUB_OUTPUT"); output != "" {
-					_ = appendGitHubSummary(output, "packer_diagnostics="+retained+"\n")
-				}
+				returnErr = publishGitHubPackerDiagnosticRoute(returnErr, os.Getenv("GITHUB_OUTPUT"), retained)
 			}
 		}
 	}()
@@ -187,4 +185,14 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		}
 	}
 	return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
+}
+
+// The caller obtains retained only from the successfully sealed diagnostic sink.
+// Output publication is descriptive, but a failed write must remain visible
+// alongside the original producer error instead of silently skipping retention.
+func publishGitHubPackerDiagnosticRoute(primary error, output, retained string) error {
+	if primary == nil || output == "" || retained == "" {
+		return primary
+	}
+	return joinFactoryCleanupError(primary, appendGitHubSummary(output, "packer_diagnostics="+retained+"\n"), "publish ARC Packer diagnostic route")
 }
