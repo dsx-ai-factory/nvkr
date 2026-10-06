@@ -1,7 +1,0 @@
-Inspector export:
-#16 exporting manifest sha256:ff2a9dc76c7e6452c5b19416370f30a250b952b92af6296637978ec7abcebbc8 0.0s done
-#16 exporting config sha256:e73ac67cbf917a165a3dcd23a23f27707893d357f4fd6a204c244f898f010cc1 0.0s done
-Packer export and native validation:
-#28 exporting manifest sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013 0.0s done
-#28 exporting config sha256:e19a2a08504cde137d260a5e5db676c95d7dc566d10da8be2b7da6d273d768ac 0.0s done
-validated local toolchain localhost/nkd-packer-toolchain:dev-amd64 (sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013)

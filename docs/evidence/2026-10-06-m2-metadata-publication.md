@@ -146,3 +146,19 @@ This establishes hosted pipeline-attested candidate delivery with live signing a
 It does not establish mixed-attempt retry acceptance, independent full-payload consumer acceptance,
 M3 deep disk inspection, organizational toolchain approval, or a measured storage-capacity bound.
 The temporary older SPIRE-agent source pin and internal candidate publication namespace remain.
+
+
+## Inspection deferral and temporary source selection
+
+[Run 37445475840](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37445475840)
+built both native disks, but both deep inspections exceeded the 600-second deadline. M2 therefore
+explicitly selects `diskEvidence: build-provenance-v1`; deep disk inspection and filesystem
+reconciliation are deferred to M3. Original live disk/material bindings, exact producer subjects,
+signed deferred-inspection scope and completeness checks remain required. Strict inspection remains
+available; successful candidate delivery does not claim inspected dependency inventories.
+
+The SPIRE-agent source remains pinned to `726f76944404e1106626b8333d3576bdf67b575b`,
+omitting the DSX IMDS plugin whose download returned HTTP 403 in
+[run 37443755541](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37443755541).
+Other OS sources retain the capture-capable pin. Package preparation selects the immutable
+toolchain's existing nFPM executable. These candidate concessions remain in the authored inputs.

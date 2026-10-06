@@ -390,7 +390,7 @@ Both native builds and terminal checks completed in run `37445475840`; both deep
 The user moved deep disk/content inspection and dependent reconciliation to M3. Explicit M2
 `diskEvidence: build-provenance-v1` now selects live producer/material evidence, with signed deferred-inspection
 scope, normal packaging/signing/publication, and unchanged subject/provenance/membership/completeness gates.
-The [inspection deferral record](../evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
+The [inspection deferral record](../evidence/2026-10-06-m2-metadata-publication.md#inspection-deferral-and-temporary-source-selection) records the scope and validation.
 The strict inspection path remains available. New-mode full hosted candidate delivery passed in
 run `37533806963`, including both native OS outputs. Independent consumer acceptance remains unexercised.
 The [October 6 preparation record](../evidence/2026-10-06-native-arc.md) retains final-source
