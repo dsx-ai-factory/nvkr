@@ -66,6 +66,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := validateGitHubWorkflowSize(workflow); err != nil {
 		return err
 	}
+	if err := admitGitHubPlatforms(plan); err != nil {
+		return err
+	}
 	actions, err := resolveGitHubActions(plan.Actions)
 	if err != nil {
 		return err
@@ -91,6 +94,16 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits static qualification or plan identity header")
 	}
 
+	if len(plan.Environment.GitHubRunners) > 0 {
+		for id, job := range document.Jobs {
+			want := githubPlatformCheck(plan, job.RunsOn)
+			if want == "" || len(job.Steps) == 0 || job.Steps[0].Name != githubPlatformCheckName || strings.TrimSpace(job.Steps[0].Run) != want || job.Steps[0].Uses != "" || len(job.Steps[0].Env) != 0 {
+				return e.New(e.CodeEngineCapability, "GitHub job %q omits its exact native-platform preflight", id)
+			}
+			job.Steps = job.Steps[1:]
+			document.Jobs[id] = job
+		}
+	}
 	artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
@@ -110,7 +123,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	bootstrap := map[string]string{}
 	for _, node := range plan.Graph.Nodes {
-		node, err := plan.ExecutionFor(node)
+		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return err
 		}
@@ -139,7 +152,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	sourceEnvironments := make(map[string]map[string]string)
 	for _, node := range plan.Graph.Nodes {
-		node, err := plan.ExecutionFor(node)
+		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return err
 		}
@@ -147,7 +160,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	signJobs := make(map[string]bool, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
-		node, err := plan.ExecutionFor(node)
+		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return err
 		}
@@ -277,7 +290,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 	}
 	for _, node := range plan.Graph.Nodes {
-		node, err := plan.ExecutionFor(node)
+		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return err
 		}

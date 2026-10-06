@@ -19,6 +19,17 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	if err := environment.Validate(); err != nil {
 		return err
 	}
+	if len(environment.GitHubRunners) > 0 {
+		platforms := map[string]bool{environment.UtilityPlatform: true}
+		for _, output := range definition.Outputs {
+			platforms[output.Platform] = true
+		}
+		for _, platform := range sortedKeys(platforms) {
+			if _, ok := environment.GitHubRunners[platform]; !ok {
+				return e.New(e.CodeEngineCapability, "githubRunners has no native route for required platform %s", platform)
+			}
+		}
+	}
 	if environment.Signing != nil && environment.Signing.Mode == SigningModeCosign && definition.CosignTool == "" {
 		return e.New(e.CodeTrustPolicyMissing, "cosign signing requires Definition.cosignTool")
 	}

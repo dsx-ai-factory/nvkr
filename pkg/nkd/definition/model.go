@@ -102,6 +102,8 @@ type Environment struct {
 	DiskInspectionProfiles map[string]DiskInspectionProfile `json:"diskInspectionProfiles,omitempty"`
 	UtilityContainer       string                           `json:"utilityContainer"`
 	UtilityPlatform        string                           `json:"utilityPlatform"`
+	// GitHubRunners selects explicit native hosted routes by execution platform.
+	GitHubRunners map[string]string `json:"githubRunners,omitempty"`
 
 	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
 	Publication  *Publication            `json:"publication,omitempty"`
@@ -244,6 +246,9 @@ func (environment Environment) Validate() error {
 	}
 	if strings.ContainsAny(environment.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "environment runner contains control characters")
+	}
+	if err := validateGitHubRunners(environment.GitHubRunners, environment.RunsOn); err != nil {
+		return err
 	}
 	if len(environment.GitHubDispatchBranches) > 32 {
 		return e.New(e.CodeInvalidCatalog, "too many GitHub dispatch branches")

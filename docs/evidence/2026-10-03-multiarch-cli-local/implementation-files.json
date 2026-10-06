@@ -1,0 +1,32 @@
+{
+  "description": "Exact byte hashes of changed implementation and generated inputs after final validation; diagnostic integrity only, not authenticated provenance.",
+  "baseCommit": "d1a4ec9403a936b154b16f4c53e3d3f6daa4c739",
+  "files": {
+    ".github/nkd-run/manifest.json": "sha256:f0675f22fbd6058e6fd5d60cad8c4a93bc05d2c7df5f2ce0fe152fdcbebb26f0",
+    ".github/nkd-run/plan.json": "sha256:2285b4e85f6aae1f794e27499252578a065f4b05e2b7e74289f054111682c3f6",
+    ".github/workflows/nkd-run.yml": "sha256:0734f05a477f66466673002c14b99bbb37252d1472d225b13b47bdd9e8180943",
+    "cmd/nkdctl/factory.go": "sha256:cf6cd65e1fb977e963765b1b9596191d6188e03182d45dbc9c5b208f26b65e53",
+    "definitions/nke-deploy/definition.yaml": "sha256:ea58fbe802835f9e4bacbd8b90feafc3561b0b79dd219237821920bb0ebd1a71",
+    "definitions/nke-deploy/environment-github.yaml": "sha256:41729fb786dbdfc224f5e4eb0fdec2baeffe7ceee81053da0d1497f2a67ab43a",
+    "definitions/nke-v1/catalog/registry.yaml": "sha256:91bfa25aedd955e8ea8dced5cd67f5288e2951d84fe5291f34c6f67219ceeb12",
+    "pkg/nkd/definition/clone.go": "sha256:67f796513cd2e230cbfa5a8c6bfe7e92af752ce45ecebcee89dbb76ca2af9045",
+    "pkg/nkd/definition/github_runners.go": "sha256:98063c1645ce06554390b8e207cfadfa1ceebbdc3528ae7a90db853a67284a0b",
+    "pkg/nkd/definition/github_runners_test.go": "sha256:d9d136bd608288d032be5db4e7609350ec3d4d16c0078ba2b02b2f829f332f3c",
+    "pkg/nkd/definition/model.go": "sha256:e880948d06c0a8a5ff6dba226ab99af89e1a9fb6433eb772a8585535651d1e48",
+    "pkg/nkd/factory/buildonly_test.go": "sha256:b5f1314adbad43bba5551265311f69a90b15d412af7605f66f24890cb5afab7c",
+    "pkg/nkd/factory/compile_outputs.go": "sha256:809c1cb1931718b77e2f450d1a9107e010d23cb379b46b92341f0123bfbfb4b5",
+    "pkg/nkd/factory/execute.go": "sha256:9f8b2e3190f93878265162e2740437b89fa016fc99968a710dae61121021faea",
+    "pkg/nkd/factory/execution_requirements_test.go": "sha256:e34da6bdde93d0678de176f7adc31c058faacb684e39f083df459c0beed6093b",
+    "pkg/nkd/factory/github.go": "sha256:964f9e3016dccb182b57e5dad57f57fc567d3f0056ad04b03478168dc18013f0",
+    "pkg/nkd/factory/github_platform.go": "sha256:8b4442c6685c8b1bd336c78a871e08dd0a794bcf7a7e55ed41cf55167d05c1c0",
+    "pkg/nkd/factory/github_platform_test.go": "sha256:5dfddae8f99215207e1e6301677430d650d25dca254b412937f7dc4330717abc",
+    "pkg/nkd/factory/github_source_access_test.go": "sha256:31a0f5ebebc23ff5871ac49df8c907525e7ccaee12dc26fe146c7271113dae0d",
+    "pkg/nkd/factory/github_stages.go": "sha256:319b2c81033596083c723700dc9c32191968e5a9855fa9e536f40d65dc7ed916",
+    "pkg/nkd/factory/github_validate.go": "sha256:2b626a20d7e3c4e4c2d9219eab0a89a09c9e61a8429c8fbea4652e1d200b095b",
+    "pkg/nkd/factory/local.go": "sha256:bf7e9f3b9a59d095be7950744621a06c0dca7d6ea1f69b0296c227a98cad74e6",
+    "pkg/nkd/factory/node_platform.go": "sha256:946dab80229d990702800ea8ea7f095cd450ea3b734fdd2aa393caa15c6031dc",
+    "pkg/nkd/factory/node_platform_test.go": "sha256:aa951bfc10a716e41cebcf36ef415f66960b88f8b69715475f3b09eefeebc5c1",
+    "pkg/nkd/pipeline/container_platform.go": "sha256:835b806d6792f54bd0dd745657561e5eeb7d3de11b31aacd01a0d7bd0b391e80",
+    "pkg/nkd/pipeline/container_platform_test.go": "sha256:60050921b3255a9b3a8fed7edca5033af6eb9751291dea24c45748ecd9ab5f96"
+  }
+}

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"time"
 
@@ -59,16 +60,8 @@ func LoadPlanContext(ctx context.Context, path string) (*Plan, error) {
 // Producer instructions remain owned by the embedded build IR; all callers use
 // the same dispatch for acquisition, builds, observation, packaging and publication.
 func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr io.Writer) error {
-	if ctx == nil {
-		return e.New(e.CodeUsage, "factory node execution requires a context")
-	}
-	if err := ctx.Err(); err != nil {
-		return e.Wrap(e.CodeTimeout, err, "factory node execution canceled")
-	}
-	if plan == nil {
-		return e.New(e.CodeUsage, "factory node execution requires a plan")
-	}
-	if err := plan.Validate(); err != nil {
+	node, err := admitExecutionNode(ctx, plan, nodeID)
+	if err != nil {
 		return err
 	}
 	if err := rejectUnsupportedRuntimeStorage(plan, "factory execute-node"); err != nil {
@@ -77,10 +70,16 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 	if err := admitGitHubRequirements(plan, "factory execute-node"); err != nil {
 		return err
 	}
-	nodes, artifacts := planIndex(plan)
-	node, ok := nodes[nodeID]
-	if !ok {
-		return e.New(e.CodeInvalidCatalog, "factory plan has no node %q", nodeID)
+	_, artifacts := planIndex(plan)
+	if len(plan.Environment.GitHubRunners) > 0 {
+		if err := admitGitHubNodePlatform(plan, node, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
+			return err
+		}
+		if node.IRNode != "" {
+			if err := checkNodeContainerPlatform(ctx, plan, node, pipeline.CheckContainerPlatform); err != nil {
+				return err
+			}
+		}
 	}
 	if githubDiskOutput(plan, node) != "" {
 		return e.New(e.CodeEngineCapability, "ARC disk operations require the original grouped executor")

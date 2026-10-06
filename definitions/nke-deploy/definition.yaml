@@ -7,8 +7,8 @@ catalog:
 cosignTool: cosign
 kind: Definition
 metadata:
-  description: Build CWE and its controller chart; acquire the four external charts
-    selected by NKE v0.21.0.
+  description: Build CWE, its controller chart and Linux AMD64/ARM64 CLI binaries;
+    acquire the four external charts selected by NKE v0.21.0.
   name: nke-deploy
 outputs:
 - components:
@@ -24,6 +24,20 @@ outputs:
   format: oci
   name: cwe
   platform: linux/amd64
+- catalog:
+    base: ../nke-v1/catalog
+  components:
+  - nkectl
+  format: executable
+  name: nkectl-linux-amd64
+  platform: linux/amd64
+- catalog:
+    base: ../nke-v1/catalog
+  components:
+  - nkectl
+  format: executable
+  name: nkectl-linux-arm64
+  platform: linux/arm64
 - components:
   - postgresql-chart
   format: helm-oci

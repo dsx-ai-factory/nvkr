@@ -1,0 +1,4 @@
+=== RUN   TestContainerPlatformRealRuntime
+--- PASS: TestContainerPlatformRealRuntime (2.78s)
+PASS
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline	3.071s

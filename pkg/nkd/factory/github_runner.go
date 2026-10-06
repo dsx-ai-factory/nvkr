@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
 // RunGitHubNode executes exactly one admitted Plan operation. Host-side reporting
@@ -32,7 +34,7 @@ func runGitHubNode(ctx context.Context, plan *Plan, nodeID string, options GitHu
 	if !ok {
 		return e.New(e.CodeInvalidCatalog, "GitHub Plan has no node %q", nodeID)
 	}
-	node, err := plan.ExecutionFor(node)
+	node, err := plan.GitHubExecutionFor(node)
 	if err != nil {
 		return err
 	}
@@ -55,6 +57,16 @@ func runGitHubNode(ctx context.Context, plan *Plan, nodeID string, options GitHu
 }
 
 func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHubStepOptions) error {
+	if len(plan.Environment.GitHubRunners) > 0 {
+		if err := admitGitHubNodePlatform(plan, node, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
+			return err
+		}
+		if node.IRNode == "" && node.Container != "" {
+			if err := checkNodeContainerPlatform(ctx, plan, node, pipeline.CheckContainerPlatform); err != nil {
+				return err
+			}
+		}
+	}
 	if node.Kind == NodeFetch {
 		return executeGitHubSourceFetch(ctx, plan, node.ID, options.Stdout, options.Stderr)
 	}

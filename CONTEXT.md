@@ -16,7 +16,8 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
 Separately selected execution settings, publication namespace, credential references, and signing identity policy.
-Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
+Native hosted platform routes are explicit execution settings; they do not change logical Build identity
+or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies; the workflow adapter consumes their locked commits.
 _Avoid_: Delivery profile, component catalog, build identity
 

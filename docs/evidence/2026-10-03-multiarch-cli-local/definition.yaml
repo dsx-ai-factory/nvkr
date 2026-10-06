@@ -1,0 +1,16 @@
+apiVersion: nkd.dev/definition/v4
+kind: Definition
+metadata:
+  name: nkectl-dual-evidence
+catalog:
+  base: /Users/nhensley/.codex/worktrees/nkd-multiarch-cli/nke-recipes/definitions/nke-v1/catalog
+sbomTool: syft
+outputs:
+- name: nkectl-linux-amd64
+  platform: linux/amd64
+  components: [nkectl]
+  format: executable
+- name: nkectl-linux-arm64
+  platform: linux/arm64
+  components: [nkectl]
+  format: executable

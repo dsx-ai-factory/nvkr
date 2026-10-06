@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -54,6 +55,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err := admitGitHubRequirements(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}
+	if err := admitGitHubPlatforms(plan); err != nil {
+		return nil, err
+	}
 	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {
 		return nil, e.New(e.CodeEngineCapability, "GitHub generation requires repository-relative definition and delivery source paths")
 	}
@@ -80,7 +84,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	}
 	bootstrapJobs := map[string]string{}
 	for _, node := range plan.Graph.Nodes {
-		node, err := plan.ExecutionFor(node)
+		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return nil, err
 		}
@@ -106,9 +110,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
 		}
 		fmt.Fprintf(&body, "    steps:\n")
+		writeGitHubPlatformCheck(&body, plan, runner)
 		actions.writeCheckoutStep(&body)
 		actions.writeSetupGoStep(&body)
-		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: CGO_ENABLED=0 go build -trimpath -ldflags %s -o nkd-exec ./cmd/nkdctl\n", shellQuote(linkerFlags))
+		helperEnvironment := "CGO_ENABLED=0"
+		if len(plan.Environment.GitHubRunners) > 0 {
+			platform, _ := authored.GitHubRunnerPlatform(runner) // admitted before rendering
+			helperEnvironment += " GOOS=linux GOARCH=" + strings.TrimPrefix(platform, "linux/")
+		}
+		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: %s go build -trimpath -ldflags %s -o nkd-exec ./cmd/nkdctl\n", helperEnvironment, shellQuote(linkerFlags))
 		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", generationCommand(plan, EngineGitHub))
 		actions.writeUploadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runner), "nkd-exec")
 	}
@@ -200,6 +210,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			}
 		}
 		fmt.Fprintf(&body, "    steps:\n")
+		writeGitHubPlatformCheck(&body, plan, node.RunsOn)
 		actions.writeCheckoutStep(&body)
 		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(node.RunsOn), ".")
 		// upload-artifact/download-artifact do not preserve the execute bit, so the helper
@@ -264,10 +275,13 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if err != nil {
 			return nil, err
 		}
-		runners := sortedKeys(bootstrapJobs)
+		runner := sortedKeys(bootstrapJobs)[0]
+		if len(plan.Environment.GitHubRunners) > 0 {
+			runner = plan.Environment.GitHubRunners[plan.Environment.UtilityPlatform]
+		}
 		fmt.Fprintln(&body, "  nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
-		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runners[0])))
+		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runner)))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))
@@ -281,8 +295,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			}
 		}
 		fmt.Fprintln(&body, "    steps:")
+		writeGitHubPlatformCheck(&body, plan, runner)
 		actions.writeCheckoutStep(&body)
-		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runners[0]), ".")
+		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runner), ".")
 		writePrepareHelperStep(&body)
 		if err := writeGitHubFinalizerRestoreSteps(&body, plan, nodeJobs); err != nil {
 			return nil, err
