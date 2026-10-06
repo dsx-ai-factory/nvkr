@@ -109,12 +109,15 @@ execute a producer reference from the complete Plan through `factory execute-nod
 
 ### 3. Helper-owned isolation and narrowly admitted native ARC disks
 
-Jobs use generic hosted runners except the explicit native ARC disk policy below. The verified `nkd-exec` helper launches each pinned toolchain container
+Jobs use generic hosted runners except the explicit native ARC disk policy below. The same-Run, source-bootstrapped `nkd-exec` helper launches each pinned toolchain container
 through the shared `pipeline.Local.ExecNode` launcher used by local and hosted Run operations. Adapters render job topology, dependencies
 and declared transport; they do not reproduce isolation as provider-specific build syntax. Fetch/pull nodes
 materialize pinned inputs first; hermetic build and verification nodes enforce network denial, read-only inputs,
 private output and a fixed credential-free environment. Shared code prevents semantic drift; it does not alone
 prove byte identity across hosts.
+The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions artifact delivery;
+it does not independently checksum the downloaded helper before restoring its execute bit. This delivery
+contract is not the qualified exact-helper-byte verification required below.
 
 Landlock/seccomp application and process replacement run on one dedicated locked OS thread. Restrictions are
 thread-local before exec; a Go scheduler handoff must not change the thread that enters the build command.
@@ -231,8 +234,8 @@ belong to Environment/profile configuration; component toolchains remain produce
 
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
-- The exact runner bytes that execute from-source nodes are always measured and verified against the
-  builder-profile runner pin.
+- Qualified execution requires the exact runner bytes that execute from-source nodes to be measured and
+  verified against the builder-profile runner pin.
 - A self-hosting execution builds the runner **from pinned source** — its own pinned producer definition, because the tool is not a
   trusted pre-built binary — under a pinned bootstrap toolchain, producing a digest-pinned runner. Its stage-two
   observation records `bootstrapped`, measures that actual bootstrap toolchain, and verifies both identities.

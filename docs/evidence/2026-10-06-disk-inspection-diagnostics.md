@@ -185,3 +185,28 @@ The [verbatim command/terminal record](2026-10-06-disk-inspection-volume.log) ha
 `678a28d10235113ede88b9884de7c4b60fbc2d9c9730114deec872c329bc1337` (trailing blank separator normalized).
 This is contract validation, not native AMD64 execution, a new Mac aggregate-gate pass, rebuilt-helper
 deployment, full NKE disk inspection or hosted acceptance. Historical limitations above remain separately scoped.
+
+## Updated execution-parent integration
+
+The signed local conflict union combines diagnostic head `34774c5e112d1467c7137789284f93aa6c15e9ff`
+with execution parent `8ff3e010a0109cbd7c64d34bca4dcb3b70e7cd03`. It preserves the parent's
+qualified-root rejection of provenance-only disks, Packer diagnostic-route error aggregation and derived
+deadlines, alongside strict-only inspection collection, retention and exact upload admission. The parent's
+Plan inspection modules and documentation remain intact. Two independent source reviews found no blocking
+union defect; no test assertion, timeout, dependency or inventory gate was changed by conflict resolution.
+
+The frozen tracked Go/module/version content manifest is
+`4e365fa45b87fd4c2808e2b62297063670add1ebb8f39fcac92219b14bc21131`, unchanged before and after validation.
+The corresponding Go diff is `18640ffdcd0e545a449ed5e5434734588767a3783206972642607a7f5acef273`
+against the execution parent and `d9feedceb53eeafe3b59bdd97b7255e55d50b941a0cb47074ef2cc99431b698e`
+against the diagnostic parent. Complete native Linux ARM64 race/atomic-coverage tests passed: factory
+238.962 seconds, lifecycle 36.887 seconds, pipeline 22.610 seconds, Plan inspection 36.114 seconds and
+SBOM 74.521 seconds. The existing complete-tool image, read-only source/modules and private ignored-output
+harness were reused without pulls, network, skipped tests or extended deadlines. Host format, vet, lint,
+shellcheck, vulnerability, build and generated-workflow drift gates passed; the Plan digest stayed
+`sha256:850cea27b78f621ccb48242b41a8210c4df6efaee139d4102bfc325270e6cb05`. Actionlint also passed.
+
+The [executed commands and actual terminal outputs](2026-10-06-disk-inspection-updated-parent-union.log)
+have SHA-256 `db67f567e181598616ed7b5cf77b5e09e5e591be6ac1ee01d40595a9c72bb3e5`.
+This remains controlled contract validation, not native AMD64 execution, a full NKE disk inspection,
+rebuilt-helper deployment, hosted acceptance or a successful macOS aggregate gate.

@@ -1,0 +1,110 @@
+PR #99 updated-parent integration, 2026-10-06
+
+Local merge parents:
+34774c5e112d1467c7137789284f93aa6c15e9ff
+8ff3e010a0109cbd7c64d34bca4dcb3b70e7cd03
+
+Tracked Go/module/version content manifest command:
+git ls-files '*.go' go.mod go.sum .go-version | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256
+Before and after:
+4e365fa45b87fd4c2808e2b62297063670add1ebb8f39fcac92219b14bc21131
+
+Staged Go/module/version diff SHA-256 relative to execution parent:
+18640ffdcd0e545a449ed5e5434734588767a3783206972642607a7f5acef273
+Relative to diagnostic parent:
+d9feedceb53eeafe3b59bdd97b7255e55d50b941a0cb47074ef2cc99431b698e
+
+Host command, session 93963:
+set -e
+make fmt-check vet lint shellcheck vulncheck build workflows-check
+git diff --check
+git diff --cached --check
+
+Recorded host output:
+formatting ok
+go vet ./...
+golangci-lint run
+0 issues.
+shellcheck -S warning scripts/*.sh toolchains/**/*.sh
+GOBIN="/Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-timeout/bin" go -C toolchains/govulncheck install tool
+"/Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-timeout/bin/govulncheck" ./...
+No vulnerabilities found.
+go build -ldflags '-X main.version=34774c5-dirty -X main.commit=34774c5' -o bin/nkdctl ./cmd/nkdctl
+CGO_ENABLED=0 go build -trimpath \
+		-ldflags '-X main.version=dev -X main.commit=unknown' \
+		-o bin/nkd-exec ./cmd/nkdctl
+bin/nkd-exec run generate --engine github \
+		--definition definitions/nke-m2/definition.yaml \
+		--environment definitions/nke-m2/environment-github.yaml \
+		--root . --check
+generated run is current: sha256:850cea27b78f621ccb48242b41a8210c4df6efaee139d4102bfc325270e6cb05
+
+Terminal exit code: 0
+
+Independent generated-workflow check:
+actionlint .github/workflows/nkd-run.yml
+No output; terminal exit code: 0
+
+Native command, session 66788:
+sh /private/tmp/pr99-native-full-command.sh
+
+Executed harness:
+#!/bin/sh
+set -eu
+cd /Users/ikislenko/Workspace/github/nke-recipes/.git/checkouts/codex/disk-inspection-timeout
+diagnostic_source="$(pwd -P)"
+diagnostic_modules="$(go env GOMODCACHE)"
+diagnostic_outputs="$(mktemp -d /private/tmp/pr99-native-ignored-output.XXXXXX)"
+podman run --rm --init --pull=never --network none --user 502:20 --entrypoint /bin/sh --volume "${diagnostic_source}:/src:ro" --volume "${diagnostic_modules}:/go/pkg/mod:ro" --volume "${diagnostic_outputs}:/src/.nkd:rw" --workdir /src --env GOTOOLCHAIN=local --env GIT_CEILING_DIRECTORIES=/src 1f87906be577585bff2bc2bf05662972bd9ddd2ddae29975f05e0501090d3abb -c 'diagnostic_root=$(mktemp -d /var/tmp/pr99-full.XXXXXX) || exit; export TMPDIR="$diagnostic_root" GOCACHE="$diagnostic_root/cache"; uname -sm; id; go version; jq --version; stat -f -c "scratch-type=%T blocksize=%S availableblocks=%a" "$diagnostic_root"; go test -race -covermode=atomic -coverprofile="$diagnostic_root/coverage.out" ./... -count=1'
+
+Recorded native output:
+Linux aarch64
+uid=502(core) gid=20(dialout) groups=20(dialout)
+go version go1.27.1 linux/arm64
+jq-1.7
+scratch-type=overlayfs blocksize=4096 availableblocks=62784601
+ok  	github.com/NVIDIA/nke-recipes/client/v1	1.841s	coverage: 69.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/cmd/nkd-disk-inspect	1.018s	coverage: 83.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/cmd/nkdctl	79.210s	coverage: 65.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/architecture	1.064s	coverage: [no statements]
+ok  	github.com/NVIDIA/nke-recipes/internal/diskdiagnostic	6.745s	coverage: 92.4% of statements
+	github.com/NVIDIA/nke-recipes/internal/documentpath		coverage: 0.0% of statements
+	github.com/NVIDIA/nke-recipes/internal/helmarchive		coverage: 0.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/ownedcmd	1.586s	coverage: 78.5% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/releaseasset	1.041s	coverage: 94.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/securepath	1.036s	coverage: 17.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/sourcegit	1.042s	coverage: 81.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/transportarchive	1.186s	coverage: 72.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/internal/versionpolicy	1.025s	coverage: 83.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/assemble	1.725s	coverage: 78.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/attest	1.335s	coverage: 69.3% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph	3.015s	coverage: 93.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/canonical	1.078s	coverage: 77.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/catalog	32.071s	coverage: 85.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/catalogmaintenance	35.148s	coverage: 88.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/definition	1.432s	coverage: 63.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/delivery	140.951s	coverage: 77.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/errors	1.014s	coverage: 84.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/execution	2.066s	coverage: 84.9% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/factory	238.962s	coverage: 79.9% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile	7.561s	coverage: 73.8% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/packertransport	1.352s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext	1.009s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/ir	1.152s	coverage: 88.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle	36.887s	coverage: 81.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/material	2.447s	coverage: 96.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline	22.610s	coverage: 75.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/planview	36.114s	coverage: 94.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/profile	2.030s	coverage: 79.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/provenance	1.044s	coverage: 82.6% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/release	1.043s	coverage: 70.7% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/releaseview	1.026s	coverage: 94.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sbom	74.521s	coverage: 74.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/sign	57.885s	coverage: 73.1% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/status	3.593s	coverage: 75.4% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/target	1.028s	coverage: 100.0% of statements
+ok  	github.com/NVIDIA/nke-recipes/pkg/nkd/trust	1.118s	coverage: 83.2% of statements
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-disk-inspect	1.057s	coverage: [no statements]
+ok  	github.com/NVIDIA/nke-recipes/toolchains/nkd-packer	2.211s	coverage: [no statements]
+
+Terminal exit code: 0

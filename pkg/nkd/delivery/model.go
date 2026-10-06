@@ -12,6 +12,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 const (
@@ -144,6 +145,11 @@ func (root PublicationRoot) Validate() error {
 		} {
 			if !isDigest(value) {
 				return e.New(e.CodeGateUnmet, "qualified publication root has no exact %s", field)
+			}
+		}
+		for _, object := range root.Objects {
+			if object.Output != nil && object.Output.Disk != nil && object.Output.Disk.EvidenceMode == sbom.DiskBuildProvenance {
+				return e.New(e.CodeGateUnmet, "qualified publication root cannot accept producer-provenance-only disk output %q", object.Name)
 			}
 		}
 	default:
