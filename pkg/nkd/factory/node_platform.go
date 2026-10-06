@@ -8,11 +8,12 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 )
 
-// CheckNodePlatform revalidates the complete Plan and selected operation, then
-// admits its actual native helper, daemon and pinned container before launch.
-// Generated utility containers invoke this on the host because the container
-// intentionally has no daemon access. This is point-in-time capability admission,
-// not a qualified runtime receipt or a substitute for ExecuteNode validation.
+// CheckNodePlatform is a standalone diagnostic facade that revalidates the Plan
+// and selected operation and checks its native helper, daemon and pinned container.
+// Generated CI uses executeGitHubNode, which calls checkNodeContainerPlatform on
+// the host before launching a utility container without daemon access. These are
+// point-in-time capability checks, not qualified runtime receipts or substitutes
+// for ExecuteNode validation.
 func CheckNodePlatform(ctx context.Context, plan *Plan, nodeID string) error {
 	return checkNodePlatform(ctx, plan, nodeID, runtime.GOOS+"/"+runtime.GOARCH, pipeline.CheckContainerPlatform)
 }
