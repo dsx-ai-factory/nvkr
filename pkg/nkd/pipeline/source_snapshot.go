@@ -838,18 +838,31 @@ func writeSourceReceiptContext(ctx context.Context, path string, receipt sourceR
 	if len(directories) != 0 {
 		parent = directories[0]
 	}
+	var tmp *os.File
+	var tmpName string
 	if parent == nil {
-		parent, err = holdSourceFetchDirectory(ctx, filepath.Dir(path))
-		if err != nil {
-			return err
+		// Ordinary Local fetching retains its developer-selected workspace path.
+		// Only the separately admitted hosted route supplies a held receipt parent.
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return e.Wrap(e.CodeFetchFailed, err, "creating source receipt directory")
 		}
-		defer func() { _ = parent.Close() }()
+		tmp, err = os.CreateTemp(filepath.Dir(path), ".source-receipt-")
+		if err == nil {
+			tmpName = tmp.Name()
+		}
+	} else {
+		tmp, tmpName, err = securepath.CreateTemporarySibling(parent)
 	}
-	tmp, tmpName, err := securepath.CreateTemporarySibling(parent)
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "creating source receipt")
 	}
-	defer func() { _ = unix.Unlinkat(int(parent.Fd()), tmpName, 0) }()
+	defer func() {
+		if parent == nil {
+			_ = os.Remove(tmpName)
+		} else {
+			_ = unix.Unlinkat(int(parent.Fd()), tmpName, 0)
+		}
+	}()
 	if err := tmp.Chmod(0o644); err != nil {
 		tmp.Close()
 		return err
@@ -867,6 +880,12 @@ func writeSourceReceiptContext(ctx context.Context, path string, receipt sourceR
 	}
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "publishing source receipt %s", path)
+	}
+	if parent == nil {
+		if err := os.Rename(tmpName, path); err != nil {
+			return e.Wrap(e.CodeFetchFailed, err, "publishing source receipt")
+		}
+		return nil
 	}
 	if err := unix.Renameat(int(parent.Fd()), tmpName, int(parent.Fd()), filepath.Base(path)); err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "publishing source receipt")

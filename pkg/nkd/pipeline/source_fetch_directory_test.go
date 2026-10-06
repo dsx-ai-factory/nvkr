@@ -177,3 +177,45 @@ func TestSourceFetchRealLocalGitCreatesAndReusesReceipt(t *testing.T) {
 		t.Fatalf("real fetch receipt mismatch: %+v exists=%t error=%v", receipt, exists, err)
 	}
 }
+
+func TestSourceFetchOrdinaryLocalWorkspaceCompatibility(t *testing.T) {
+	for _, layout := range []string{"absolute linked parent", "relative linked parent", "relative parent"} {
+		t.Run(layout, func(t *testing.T) {
+			node, repository, _ := pristineClosureFixture(t)
+			node.Repo = repository
+			base := t.TempDir()
+			cwd := filepath.Join(base, "cwd")
+			if err := os.Mkdir(cwd, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			t.Chdir(cwd)
+			root := filepath.Join(base, "linked", "src")
+			if layout == "relative parent" {
+				root = filepath.Join("..", "shared", "src")
+			} else {
+				link := filepath.Join(base, "linked")
+				if layout == "relative linked parent" {
+					link = filepath.Join(cwd, "linked")
+					root = filepath.Join("linked", "src")
+				}
+				if err := os.Symlink(t.TempDir(), link); err != nil {
+					t.Fatal(err)
+				}
+			}
+			opts := withDefaults(RunOptions{Ctx: t.Context(), SourceRoot: root, Stdout: io.Discard, Stderr: io.Discard})
+			for range 2 {
+				if err := (Local{}).fetch(node, opts); err != nil {
+					t.Fatal(err)
+				}
+			}
+			path, err := sourceReceiptPath(opts.SourceRoot, node.Dest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			receipt, exists, err := readSourceReceiptContext(t.Context(), path)
+			if err != nil || !exists || receipt.Commit != node.Commit || receipt.TreeHash != node.TreeHash {
+				t.Fatalf("ordinary receipt mismatch: %+v, exists=%t, error=%v", receipt, exists, err)
+			}
+		})
+	}
+}

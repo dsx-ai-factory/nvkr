@@ -3,6 +3,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -178,32 +179,60 @@ func TestSourceFetchGitHubDispatchUsesScopedFetchOwner(t *testing.T) {
 	t.Chdir(t.TempDir())
 	for _, pair := range os.Environ() {
 		key, value, _ := strings.Cut(pair, "=")
-		if strings.HasPrefix(key, "GIT_") {
+		if strings.HasPrefix(key, "GIT_") || strings.HasPrefix(key, "NKD_PIN_SOURCE_TOKEN_") || strings.HasPrefix(key, "ACTIONS_ID_TOKEN_") {
 			t.Setenv(key, value)
 			if err := os.Unsetenv(key); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
-	for _, key := range []string{"NKD_CREDENTIAL", "NKD_REGISTRY_USER", "GITHUB_TOKEN", "GH_TOKEN"} {
+	for _, key := range []string{"NKD_CREDENTIAL", "NKD_REGISTRY_USER", "GITHUB_TOKEN", "GH_TOKEN", "DOCKER_CONFIG", "REGISTRY_AUTH_FILE", "ACTIONS_RUNTIME_TOKEN"} {
 		t.Setenv(key, "")
 		if err := os.Unsetenv(key); err != nil {
 			t.Fatal(err)
 		}
+	}
+	for _, key := range []string{"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy"} {
+		t.Setenv(key, "")
 	}
 	for _, pair := range sourceFetchTestEnvironment(plan, node) {
 		key, value, _ := strings.Cut(pair, "=")
 		t.Setenv(key, value)
 	}
 	commands := t.TempDir()
-	if err := os.WriteFile(filepath.Join(commands, "git"), []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil {
+	marker := filepath.Join(commands, "held-git")
+	script := fmt.Sprintf(`#!/bin/sh
+set -eu
+test "$1" = -C
+test "$2" = /proc/self/fd/3/.
+test -d "$2"
+test "$3" = init
+test "${GIT_CONFIG_GLOBAL}" = /dev/null
+test "${GIT_CONFIG_NOSYSTEM}" = 1
+test "${NKD_SOURCE_TOKEN}" = test-only-synthetic-token
+test "${HOME+x}" != x
+test "${SSH_AUTH_SOCK+x}" != x
+test "${HTTPS_PROXY+x}" != x
+printf held > %q
+exit 1
+`, marker)
+	if err := os.WriteFile(filepath.Join(commands, "git"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", commands+string(os.PathListSeparator)+os.Getenv("PATH"))
+	paths := []string{commands}
+	for _, path := range filepath.SplitList(os.Getenv("PATH")) {
+		if filepath.IsAbs(path) {
+			paths = append(paths, path)
+		}
+	}
+	t.Setenv("PATH", strings.Join(paths, string(os.PathListSeparator)))
 	err := RunGitHubNode(t.Context(), plan, node.ID, GitHubStepOptions{})
 	if runtime.GOOS == "linux" {
 		if factoryErrorCode(err) != e.CodeFetchFailed || !strings.Contains(err.Error(), "git init -q in") {
 			t.Fatalf("actual hosted dispatch did not reach controlled Git: %v", err)
+		}
+		if bytes, err := os.ReadFile(marker); err != nil || string(bytes) != "held" {
+			t.Fatalf("actual hosted dispatch did not use the held directory and selected child environment: %q, %v", bytes, err)
 		}
 	} else if factoryErrorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "inherited directory") {
 		t.Fatalf("actual hosted dispatch bypassed held-source platform admission: %v", err)
