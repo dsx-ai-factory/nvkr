@@ -11,7 +11,7 @@ import (
 )
 
 // These transport subjects are the source-owned operator selections at NKE
-// b30117c25b2dcdf6c16021dae88a2eafdafcae61, kubeadm-distro's AMD64 v1.36.3 lock.
+// ff21ba8c07cafff74b68e238a8876af11e5beded, kubeadm-distro's AMD64 v1.36.3 lock.
 // This freezes membership and logical pins, not publication or measured runtime.
 func TestMaintainedOperatorInputMembership(t *testing.T) {
 	const inputRoot = "../../../definitions/nke-m2"

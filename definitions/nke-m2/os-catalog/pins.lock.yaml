@@ -12,25 +12,25 @@ artifacts:
 kind: PinLock
 pins:
   nke-cni-calico-source:
-    commit: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    sourceDateEpoch: 1791144257
-    tag: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    treeHash: fe97cd65a5d90b3287caadd06ec929f7f1f8ec86
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
   nke-kubeadm-distro-source:
-    commit: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    sourceDateEpoch: 1791144257
-    tag: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    treeHash: fe97cd65a5d90b3287caadd06ec929f7f1f8ec86
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
   nke-os:
-    commit: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    sourceDateEpoch: 1791144257
-    tag: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    treeHash: fe97cd65a5d90b3287caadd06ec929f7f1f8ec86
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
   nke-spire-agent-source:
-    commit: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    sourceDateEpoch: 1791144257
-    tag: b30117c25b2dcdf6c16021dae88a2eafdafcae61
-    treeHash: fe97cd65a5d90b3287caadd06ec929f7f1f8ec86
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
   ovn-kubernetes:
     commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
     sourceDateEpoch: 1788540677

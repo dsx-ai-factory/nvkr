@@ -60,20 +60,22 @@ They are independent source selections; this document does not assert that one N
 
 ## Exact disk source and capture projection
 
-NKE `b30117c25b2dcdf6c16021dae88a2eafdafcae61` has tree
-`fe97cd65a5d90b3287caadd06ec929f7f1f8ec86` and committer epoch `1791144257`.
-Local Git object inspection establishes that it descends from material-adapter commit
-`289abbfa70f53e65788788e39c802b559b040953`. Source review/merge acceptance is separate.
-Four NKE source entries were regenerated using `catalog pin --commit` against the verified local Git clone,
-with a transport-only `insteadOf` mapping. No NKE checkout, source tag or source file was modified.
+NKE `ff21ba8c07cafff74b68e238a8876af11e5beded` has tree
+`b915345debd33ccd63dfbf8146415bf20e94c4ea` and committer epoch `1791257393`.
+NKE #1211 was approved at `7204e852dd3fc31022e9d91a8e1a829c62630008` and merged
+at `2026-10-06T03:29:54Z`. GitHub read-back identified the selected merge commit as the
+exact protected `main` head. The [dated handoff](evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
+separates that approval/reachability observation from Git byte authentication.
+Four NKE source entries were regenerated using separate `catalog pin --commit` calls
+against the canonical repository. No NKE checkout, source tag or source file was modified.
 
 | Input | Authoritative source at that exact NKE commit | Compiled projection |
 | --- | --- | --- |
 | Guest capture opt-in | `os-image/packer/variables.pkr.hcl`, `capture_apt_acquisitions` | Public literal `"true"` for both native disk roots |
-| Retained capture carrier | `os-image/packer/nke-node-non-fde.pkr.hcl`, download provisioner | `packer.acquisitionArchive: non-fde-apt-acquisitions.tar`, relative to authenticated output directory |
+| Retained capture carrier | `os-image/packer/nke-node-non-fde.pkr.hcl`, download provisioner | `packer.acquisitionArchive: non-fde/apt-acquisitions.tar`, relative to authenticated output directory |
 | Material manifest | Same HCL variables and producer consumers | Schema `nke.dev/os-image-materials/v1`; `image-inputs: archive`, `installer-iso: disk-image` |
-| Image-input composition | `os-image/packer/scripts/compose-image-inputs.py` | Explicit agent, Calico, kubeadm distro, OVN and SPIRE material bindings; read-only source and staged materials |
-| Agent version | `agent/Makefile` and exact-tree `git describe --tags --match agent/*` | Source-derived `v0.2.1-68-gb30117c2` |
+| Image-input composition | `os-image/packer/scripts/compose-image-inputs.py` | Explicit agent, Calico, kubeadm distro, OVN and SPIRE material bindings; required native `--architecture`; read-only source and staged materials |
+| Agent version | `agent/Makefile` and exact-tree `git describe --tags --match 'agent/v*'` | Source-derived `v0.2.1-81-gff21ba8` |
 | Kubernetes embedded payload | `os-image/packages/kubeadm-distro/lock/{amd64,arm64}/v1.36.3.lock` and peer-version locks | Source-owned Debian payload composition and exact per-architecture image/acquisition pins |
 | SPIRE payload | `os-image/packages/spire-agent/lock/1.14.1+tpm1.9.0.lock` and bundle script | SPIRE, TPM plugin/helper and DSX IMDS attestor; source pin authenticates the updated lock |
 
@@ -148,9 +150,10 @@ The current published-image fields in both toolchain source locks are null, with
 license/security gates `not-recorded`. The Packer lock's `validatedNKE.commit` remains historical
 `726f76944404e1106626b8333d3576bdf67b575b`, not the selected capture-capable source. Before claiming
 production readiness, native capture-enabled bakes must retain the selected
-`non-fde-apt-acquisitions.tar`, and original live Run owners must reconcile each exact final disk
-and complete material closure. The dated snapshot records NKE #1211 as open at `b30117c`;
-the deployment selection `33fb71b` is on NKE main through merged #1096. Pinning establishes
+`non-fde/apt-acquisitions.tar`, and original live Run owners must reconcile each exact final disk
+and complete material closure. The historical snapshot records the old unmerged candidate;
+the later merged-source handoff records current approval and protected-main reachability.
+The deployment selection `33fb71b` remains independent of this capture-source repin. Pinning establishes
 bytes, not source-owner release acceptance. Final-parent graph
 tests, the full repository/security gates, full signed publication and independent consumer
 verification remain required separately. No unavailable handoff value is filled by this record.
@@ -161,24 +164,25 @@ Run from the final composed repository root with its pinned Go version. These
 commands use existing owners, not a new pin writer or publication workflow.
 `--check` below does not write; the other catalog maintenance commands do update
 their machine-managed locks and belong only in a reviewed input-maintenance step.
-No such update was executed during this read-only source refresh.
+The four source updates below were executed during the approved merged-source handoff;
+these `--check` commands revalidate their exact selections without writing.
 
 ```sh
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
   --dir definitions/nke-m2/os-catalog \
-  --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
+  --commit ff21ba8c07cafff74b68e238a8876af11e5beded --check \
   nke-os
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
   --dir definitions/nke-m2/os-catalog \
-  --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
+  --commit ff21ba8c07cafff74b68e238a8876af11e5beded --check \
   nke-cni-calico-source
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
   --dir definitions/nke-m2/os-catalog \
-  --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
+  --commit ff21ba8c07cafff74b68e238a8876af11e5beded --check \
   nke-kubeadm-distro-source
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
   --dir definitions/nke-m2/os-catalog \
-  --commit b30117c25b2dcdf6c16021dae88a2eafdafcae61 --check \
+  --commit ff21ba8c07cafff74b68e238a8876af11e5beded --check \
   nke-spire-agent-source
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
   --dir definitions/nke-m2/catalog --tag v4.1.4 helm
@@ -237,9 +241,10 @@ This repository does not contain `nkd-inspector-closure-diagnostic.yml`. No comm
 native workflow run is established by that command. The controlled accessor test does
 not exercise a full SDK scan or produce measured native image pins.
 
-The selected NKE #1211 source pin is an explicit review candidate, not
-main-reachable approval or protected-ref evidence. Its dated GitHub state is
-recorded separately and must be refreshed before accepting source approval.
+The selected NKE #1211 merge commit has separately recorded source approval and
+protected-main reachability. That point-in-time observation is not a generic
+protected-ref policy in `catalog pin`: ADR-22 still supports exact commits and release tags,
+and Git byte authentication alone does not make a source-owner approval claim.
 The existing missing execution-class/profile capability gate still disables candidate
 launch; the publication/signing configuration does not grant source approval.
 No historical host-probe or installed-package replay is claimed as current evidence
@@ -251,7 +256,7 @@ source locks contain no approved published native Packer/inspector image referen
 The M2 specification assigns node-agent, node-side Kubernetes, control-plane images and CNI to the disk,
 and requires a recorded placement choice for SPIRE agent. Both native disk selections include the
 source-owned agent, kubeadm distro, Calico, OVN and SPIRE material producers. Their material locks are
-at exact NKE `b30117c25b2dcdf6c16021dae88a2eafdafcae61`:
+at exact NKE `ff21ba8c07cafff74b68e238a8876af11e5beded`:
 
 | Required row | Authoritative source selection | Evidence still required |
 | --- | --- | --- |

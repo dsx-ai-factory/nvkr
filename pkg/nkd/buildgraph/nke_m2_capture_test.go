@@ -13,6 +13,7 @@ import (
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 	const inputRoot = "../../../definitions/nke-m2"
+	const approvedSource = "ff21ba8c07cafff74b68e238a8876af11e5beded"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +36,13 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				t.Fatal(err)
 			}
 			agent := cat.Components["nke-agent"]
-			if len(agent.Commit) != 40 || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.2.1-68-g"+agent.Commit[:8]) {
+			for _, name := range []string{"nke-agent", "nke-cni-calico", "nke-kubeadm-distro", "nke-spire-agent"} {
+				component := cat.Components[name]
+				if component.Commit != approvedSource || component.TreeHash != "b915345debd33ccd63dfbf8146415bf20e94c4ea" || component.SourceDate != 1791257393 {
+					t.Fatalf("%s does not retain the approved source commit/tree/epoch", name)
+				}
+			}
+			if agent.Commit != approvedSource || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.2.1-81-gff21ba8") {
 				t.Fatal("handwritten agent version no longer matches its exact source pin; revalidate owning source version before repinning")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
@@ -51,15 +58,23 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				t.Fatal(err)
 			}
 			found := false
+			compositionFound := false
 			for _, node := range graph.Nodes {
+				if node.Kind == ir.KindBuild && node.Component == "nke-image-inputs" {
+					compositionFound = true
+					arch := strings.TrimPrefix(output.Platform, "linux/")
+					if node.SourceCommit != approvedSource || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
+						t.Fatal("image composition must use the approved source's required native architecture argument")
+					}
+				}
 				if node.Kind != ir.KindBuild || node.Component != root {
 					continue
 				}
 				found = true
-				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != "b30117c25b2dcdf6c16021dae88a2eafdafcae61" {
+				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != approvedSource {
 					t.Fatalf("native source/toolchain binding changed: %+v", node)
 				}
-				if node.Packer == nil || node.Packer.AcquisitionArchive != "non-fde-apt-acquisitions.tar" {
+				if node.Packer == nil || node.Packer.AcquisitionArchive != "non-fde/apt-acquisitions.tar" {
 					t.Fatal("capture carrier did not reach compiled graph")
 				}
 				capture := false
@@ -101,6 +116,9 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			}
 			if !found {
 				t.Fatal("disk producer missing from graph")
+			}
+			if !compositionFound {
+				t.Fatal("image-input composition producer missing from graph")
 			}
 		})
 	}

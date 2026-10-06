@@ -104,6 +104,113 @@ retained diagnostics; they must not establish current acquisition or coverage.
 No native Packer/inspector publication, capture-enabled original live disk join,
 complete disk SBOM, signing or consumer verification was exercised here.
 
+## Merged capture-source handoff
+
+On October 6, the canonical GitHub read-back superseded the historical open-source
+snapshot above. NKE #1211 was `MERGED`, with review decision `APPROVED`, approved
+head `7204e852dd3fc31022e9d91a8e1a829c62630008`, merge time
+`2026-10-06T03:29:54Z` and merge commit
+`ff21ba8c07cafff74b68e238a8876af11e5beded`. The `main` branch response reported
+`protected: true` and that exact commit. The compare response for that commit and
+`main` was `identical`, ahead/behind zero. These are point-in-time source-owner
+approval and reachability observations, not a generic protected-ref policy.
+
+```sh
+gh pr view 1211 --repo dsx-ai-factory/nke \
+  --json state,mergedAt,mergeCommit,headRefOid,reviewDecision
+gh api repos/dsx-ai-factory/nke/branches/main \
+  --jq '{name,protected,sha:.commit.sha}'
+gh api repos/dsx-ai-factory/nke/compare/ff21ba8c07cafff74b68e238a8876af11e5beded...main \
+  --jq '{status,ahead_by,behind_by,mergeBase:.merge_base_commit.sha}'
+for source in nke-os nke-cni-calico-source nke-kubeadm-distro-source nke-spire-agent-source; do
+  go run ./cmd/nkdctl catalog pin --dir definitions/nke-m2/os-catalog \
+    --commit ff21ba8c07cafff74b68e238a8876af11e5beded "$source"
+done
+```
+
+Each owner invocation wrote one source pin. The generated diff changes only those
+four source records, from the old candidate to exact commit `ff21ba8c`, tree
+`b915345debd33ccd63dfbf8146415bf20e94c4ea` and source epoch `1791257393`.
+No source or artifact digest was hand-edited. All 24 native image subjects and
+34 output declarations remain unchanged.
+
+A clean private bare acquisition of the canonical repository provided exact Git
+object inspection without modifying the existing NKE checkout:
+
+```sh
+git clone --bare --filter=blob:none --single-branch --branch main \
+  https://github.com/dsx-ai-factory/nke.git /private/tmp/m2-approved-nke-source.De8zbh
+git -C /private/tmp/m2-approved-nke-source.De8zbh show -s --format='%H %T %ct' \
+  ff21ba8c07cafff74b68e238a8876af11e5beded
+git -C /private/tmp/m2-approved-nke-source.De8zbh describe --match 'agent/v*' --tags --always \
+  ff21ba8c07cafff74b68e238a8876af11e5beded
+git ls-remote --tags https://github.com/dsx-ai-factory/nke.git 'refs/tags/agent/v*'
+```
+
+The source's `agent/Makefile` uses that exact `agent/v*` pattern and removes the
+`agent/` prefix. The result was `v0.2.1-81-gff21ba8`; the closest release tag's
+object was `162ecb366577e42c9c820a46de59184869c3a4c0`, peeled to
+`33fb71b2f4224b470ebc628a9165fc4b92870406`, matching canonical remote tag output.
+The authored agent build argument now freezes that value.
+
+Exact merged-source inspection also required two declarative corrections:
+`compose-image-inputs.py` requires `--architecture`, and the non-FDE HCL downloads
+to `<output_directory>/non-fde/apt-acquisitions.tar`. Both native catalog roots
+and the graph regression now use those contracts. The Helm and kubectl URLs and
+transport hashes in the merged AMD64 v1.36.3 distro lock still match the unchanged
+operator selections. This handoff is not a capture-enabled bake, runtime/profile
+approval, published toolchain identity or complete M2 release proof.
+
+The source-repin working tree atop `9854e5126eaf7337f1c66e6586189fa44e651fcc`
+passed the following actual pinned-source graph integration with the race detector:
+
+```sh
+env GIT_CONFIG_COUNT=1 \
+  GIT_CONFIG_KEY_0=url./Users/ikislenko/Workspace/github/nke/.insteadOf \
+  GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nke \
+  NKD_TEST_M2_ALL_OUTPUT_GRAPHS=1 \
+  go test -race ./pkg/nkd/buildgraph \
+    -run 'TestMaintained(M2All34OutputGraphs|M2NativeCaptureGraph|M2DeploymentImageMembership|Operator)' -count=1
+```
+
+All 34 output graphs, both native disk graph selections, the 24 native image
+selections and operator regressions passed in 7.980s on macOS. An initial attempt
+to serve chart Git inputs from the new blobless bare clone failed six chart rows
+because that partial clone could not lazy-fetch missing blobs while serving a
+local Git upload-pack. The existing complete read-only NKE object store above
+supplied those independently selected chart objects without modifying its
+checkout. The new merged capture source had already been authenticated by its
+four canonical pin-owner calls. These are static graph/race contracts, not native
+bakes or a successful full M2 Run.
+
+Four subsequent `catalog pin --commit ff21ba8c... --check <source>` invocations
+each reported the exact commit already pinned and `no changes`. Current-source
+generation was then checked separately:
+
+```sh
+go run ./cmd/nkdctl run generate --engine github \
+  --definition definitions/nke-m2/definition.yaml \
+  --environment definitions/nke-m2/environment-github.yaml \
+  --root /private/tmp/m2-merged-source-admission.Xhykeq
+```
+
+It reported `CodeEngineCapability`, CLI exit 29 (`go run` itself exits 1), because
+no execution class satisfies platform, resources, capabilities and timeout.
+The fresh output directory remained empty. Source approval/reachability and
+catalog loading are no longer the earliest refusal; production admission remains
+disabled without the missing native execution/profile/toolchain handoff.
+
+The merged-source follow-up passed every repository completion-gate component:
+format, vet, lint (zero issues), ShellCheck, full race/coverage suite (71.1%),
+pinned vulnerability scan (`No vulnerabilities found`), build, workflow drift
+and `git diff --check`. An initial `make check` stopped at the shared linter lock;
+the identical components were then completed as `make fmt-check lint` and
+`make shellcheck test vulncheck`, with vet already successful. No failure was
+reclassified as a pass. `make build workflows-check` passed and retained the
+existing generation digest `sha256:7edadcb49c6ac7348c695e112f57df187c4de25efbb213cff26f20d4cb1b78a9`.
+This local gate does not establish the base-main-only automatic Merge Gate for a
+stacked PR. Remote exact-head CI and production evidence remain separate.
+
 ## Later generic parent binding scope
 
 The historical candidate-refusal command above retains its exact original source and result.

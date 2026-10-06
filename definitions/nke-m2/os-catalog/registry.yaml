@@ -98,7 +98,7 @@ components:
       - -ec
       - |
         GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
-          VERSION=v0.2.1-68-gb30117c2 \
+          VERSION=v0.2.1-81-gff21ba8 \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nke-agent.deb
     writeDir: agent/bin
@@ -239,6 +239,7 @@ components:
       - -ec
       - |
         exec python3 /src/os-image/packer/scripts/compose-image-inputs.py \
+          --architecture {{.Arch}} \
           --materials-dir /nkd/inputs/materials \
           --source-files-dir /src/os-image/files \
           --output /src/nkd-output/image-inputs.tar \
@@ -304,7 +305,7 @@ components:
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
       buildLogDirectoryVariable: build_log_directory
-      acquisitionArchive: non-fde-apt-acquisitions.tar
+      acquisitionArchive: non-fde/apt-acquisitions.tar
       variables:
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
@@ -351,7 +352,7 @@ components:
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
       buildLogDirectoryVariable: build_log_directory
-      acquisitionArchive: non-fde-apt-acquisitions.tar
+      acquisitionArchive: non-fde/apt-acquisitions.tar
       variables:
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd

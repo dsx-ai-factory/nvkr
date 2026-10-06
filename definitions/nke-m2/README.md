@@ -24,10 +24,11 @@ output graphs. Run it with `NKD_TEST_M2_ALL_OUTPUT_GRAPHS=1` and authorized exac
 access or the documented local Git `insteadOf` mapping. Ordinary tests do not receive
 private-source credentials. This is not production launch evidence:
 the Environment still has no measured execution classes or approved native inspector
-profiles, and the selected NKE capture source remains a candidate pending source approval.
+profiles. The selected capture source is the approved, merged NKE #1211 source described below;
+source acceptance does not supply runtime or publication admission.
 
 The operator catalog selects Helm 4.1.4 and kubectl 1.36.3 from the pinned NKE kubeadm-distribution lock:
-`dsx-ai-factory/nke@b30117c25b2dcdf6c16021dae88a2eafdafcae61`,
+`dsx-ai-factory/nke@ff21ba8c07cafff74b68e238a8876af11e5beded`,
 `os-image/packages/kubeadm-distro/lock/amd64/v1.36.3.lock`.
 The declared transport digests match that source-owned lock; no retained download diagnostic is claimed.
 Helm's archive and selected executable
@@ -35,13 +36,14 @@ have distinct pins; the delivered file is `helm`, not its tar archive. Kubectl i
 The local lock is generated with the existing catalog pin/bump command, not hand-authored.
 
 The four NKE OS/material sources are machine-pinned to that exact commit using `catalog pin --commit`.
-The [October 5 source snapshot](../../docs/evidence/2026-10-05-m2-input-acquisition.md#read-only-source-review-snapshot)
-records NKE #1211 as open and unmerged at that head; the pin is a review candidate, not
-source-owner release approval. Exact commit acquisition does not establish reachability
-from a protected/default branch. Publication must not be treated as approved until that
-source-review gate and the independently missing execution/profile gates are resolved.
+The [merged-source handoff](../../docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
+records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
+at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
+`agent/v*` tag pattern. Exact commit acquisition itself is not protected-ref or source-review
+proof; that acceptance is separately recorded. Runtime, publication and consumer gates remain unresolved.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
-`non-fde-apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
+`non-fde/apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
+The source's composition command receives the required explicit native `--architecture` argument.
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
 under `nke.dev/os-image-materials/v1`; every selected material and disk target retains its own architecture.
 
@@ -63,6 +65,6 @@ verification before these inputs can be called an accepted M2 release.
 
 The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current
-source-review gates, and the missing production inputs. The inspector's source
+toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands; no source lock currently
 supplies either approved published native toolchain closure.
