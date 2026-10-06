@@ -25,6 +25,7 @@
 | Understand retained modules and cleanup decisions | [Repository cleanup](repository-cleanup.md) |
 | Understand code organization findings and their implementation | [Codebase organization audit](codebase-organization-audit.md) |
 | Find the failed operation and understand generated transfer steps | [CI steps and log guide](ci-step-and-log-readability.md) |
+| Understand slow repository checks and measured improvements | [CI test performance](ci-test-performance.md) |
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
 | Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
 | Understand the internal staged disk-material tracing contract and its gaps | [Local disk material tracing](nke-os-material-trace.md) |

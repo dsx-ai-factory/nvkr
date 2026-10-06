@@ -488,9 +488,20 @@ func writeNumber(buf *bytes.Buffer, n json.Number) error {
 // the control characters below 0x20; every other code point (including <, >, &,
 // and all non-ASCII) is emitted as literal UTF-8.
 func writeString(buf *bytes.Buffer, s string) {
+	// Marshal's JSON decoder has already supplied valid UTF-8. Only ASCII
+	// controls, quote and backslash need escaping; copy every other byte in
+	// spans, avoiding a buffer write (and coverage update) for every rune.
+	const escaped = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f" +
+		"\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\"\\"
 	buf.WriteByte('"')
-	for _, r := range s {
-		switch r {
+	for {
+		i := strings.IndexAny(s, escaped)
+		if i < 0 {
+			buf.WriteString(s)
+			break
+		}
+		buf.WriteString(s[:i])
+		switch s[i] {
 		case '"':
 			buf.WriteString(`\"`)
 		case '\\':
@@ -506,12 +517,9 @@ func writeString(buf *bytes.Buffer, s string) {
 		case '\t':
 			buf.WriteString(`\t`)
 		default:
-			if r < 0x20 {
-				fmt.Fprintf(buf, `\u%04x`, r)
-			} else {
-				buf.WriteRune(r)
-			}
+			fmt.Fprintf(buf, `\u%04x`, s[i])
 		}
+		s = s[i+1:]
 	}
 	buf.WriteByte('"')
 }
