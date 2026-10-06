@@ -7,6 +7,7 @@ import sys
 
 
 def summarize(lines):
+    """Render terminal test events as Markdown; reject malformed or missing results."""
     packages, tests = [], []
     for line in lines:
         # Make's echoed commands and the final coverage total are not JSON.

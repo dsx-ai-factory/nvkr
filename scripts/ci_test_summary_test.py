@@ -11,7 +11,10 @@ spec.loader.exec_module(summary)
 
 
 class SummaryTest(unittest.TestCase):
+    """Check timing order, safe rendering, and incomplete-log diagnostics."""
+
     def test_results(self):
+        """Summarize pass/fail/skip events with sorted durations and escaped names."""
         for action in ("pass", "fail", "skip"):
             with self.subTest(action=action):
                 events = [
@@ -26,6 +29,7 @@ class SummaryTest(unittest.TestCase):
                 self.assertIn(f"failed packages: {int(action == 'fail')}", text)
 
     def test_missing_or_malformed_results(self):
+        """Reject logs that cannot establish completed package results."""
         for lines in ([], ["make: build failed\n"], ['{"Action":']):
             with self.subTest(lines=lines):
                 with self.assertRaises(ValueError):
