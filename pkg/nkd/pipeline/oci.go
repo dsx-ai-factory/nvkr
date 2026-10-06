@@ -13,9 +13,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -38,6 +40,66 @@ type OCITransport interface {
 }
 
 type registryOCITransport struct{}
+
+// This private built-in path consumes the pin owner's original image. Legacy
+// injected adapters remain compatible for native-only pulls, but cannot claim
+// parent/native authority by implementing a descriptive optional interface.
+func (registryOCITransport) acquireNative(ctx context.Context, parentRef, nativeRef, platform, destination string) (string, int64, error) {
+	parent, _, err := parseDigestReference(parentRef)
+	if err != nil {
+		return "", 0, err
+	}
+	native, want, err := parseDigestReference(nativeRef)
+	if err != nil {
+		return "", 0, err
+	}
+	if parent.Context().Name() != native.Context().Name() {
+		return "", 0, e.New(e.CodeVerifyFailed, "native acquisition cannot cross parent repositories")
+	}
+	var size int64
+	err = catalog.WithNativeImage(ctx, parentRef, want, platform, func(ctx context.Context, selection *catalog.NativeImageSelection) error {
+		return selection.Consume(ctx, func(ctx context.Context, image v1.Image) error {
+			if _, err := os.Lstat(destination); err == nil {
+				var verifyErr error
+				size, verifyErr = verifyOCILayoutAndSize(ctx, destination, want)
+				return verifyErr
+			} else if !os.IsNotExist(err) {
+				return e.Wrap(e.CodeFetchFailed, err, "inspecting native OCI destination")
+			}
+			parentPath := filepath.Dir(destination)
+			if err := os.MkdirAll(parentPath, 0o755); err != nil {
+				return e.Wrap(e.CodeFetchFailed, err, "creating native OCI transport parent")
+			}
+			stage, err := os.MkdirTemp(parentPath, "."+filepath.Base(destination)+"-")
+			if err != nil {
+				return e.Wrap(e.CodeFetchFailed, err, "creating private native OCI stage")
+			}
+			defer os.RemoveAll(stage)
+			root, err := layout.Write(stage, empty.Index)
+			if err == nil {
+				err = root.AppendImage(image)
+			}
+			if err != nil {
+				return classifyOCIReadError(ctx, err, "materializing authenticated native image")
+			}
+			size, err = verifyOCILayoutAndSize(ctx, stage, want)
+			if err != nil {
+				return err
+			}
+			if err := ctx.Err(); err != nil {
+				return e.Wrap(e.CodeTimeout, err, "native OCI acquisition canceled before commit")
+			}
+			if err := os.Rename(stage, destination); err != nil {
+				return e.Wrap(e.CodeFetchFailed, err, "committing native OCI transport")
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	return want, size, nil
+}
 
 func (registryOCITransport) Acquire(ctx context.Context, digestRef, destination string) (string, int64, error) {
 	ref, want, err := parseDigestReference(digestRef)

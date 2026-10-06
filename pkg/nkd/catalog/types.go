@@ -127,11 +127,14 @@ type Pin struct {
 // registry declares the acquisition URL/image template; the lock pins WHAT it must
 // hash to — the same sources+lock split the from-source lane uses (ADR-22 §1).
 type ArtifactPin struct {
-	Chart       *HelmChart        `json:"chart,omitempty"`
-	DerivedFrom string            `json:"derivedFrom,omitempty"`
-	URL         string            `json:"url,omitempty"` // resolved chart package transport; digest remains the byte identity
-	Tag         string            `json:"tag"`
-	Digests     map[string]string `json:"digests"` // arch -> sha256:<64-hex>
+	// ImageParentDigest is the exact index or single-manifest root authenticated
+	// by pinning. Acquisition must authenticate its membership again.
+	ImageParentDigest string            `json:"imageParentDigest,omitempty"`
+	Chart             *HelmChart        `json:"chart,omitempty"`
+	DerivedFrom       string            `json:"derivedFrom,omitempty"`
+	URL               string            `json:"url,omitempty"` // resolved chart package transport; digest remains the byte identity
+	Tag               string            `json:"tag"`
+	Digests           map[string]string `json:"digests"` // arch -> sha256:<64-hex>
 }
 
 // PinLock is the machine-generated lockfile: source name -> resolved pin, plus
@@ -186,12 +189,13 @@ type Prebuilt struct {
 	// existing source ToolPin owns archive and executable identity together.
 	ReleaseExecutable bool `json:"releaseExecutable,omitempty"`
 	// Executable is loader-resolved only; registries must not author it.
-	Executable *ToolPin          `json:"executable,omitempty"`
-	OCIArchive string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
-	Chart      *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
-	URL        string            `json:"url,omitempty"`
-	Image      string            `json:"image,omitempty"`
-	Digests    map[string]string `json:"digests,omitempty"` // arch -> sha256:<64-hex>
+	Executable        *ToolPin          `json:"executable,omitempty"`
+	OCIArchive        string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
+	Chart             *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
+	URL               string            `json:"url,omitempty"`
+	Image             string            `json:"image,omitempty"`
+	ImageParentDigest string            `json:"imageParentDigest,omitempty"` // resolved lock field; never authored
+	Digests           map[string]string `json:"digests,omitempty"`           // arch -> sha256:<64-hex>
 	// Evidence is the upstream's external supply-chain reference (ADR-13 §2). A prebuilt
 	// component MUST declare it explicitly — either a verified reference (whose bytes
 	// hash to the declared digest, else resolution fails closed) or an explicit

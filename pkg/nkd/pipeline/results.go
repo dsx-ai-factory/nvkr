@@ -48,7 +48,11 @@ func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath st
 			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q differs from its pinned acquisition", node.ID)
 		}
 		if node.OutputType == "oci-image" {
-			if result.Ref != node.Artifact+"@"+node.Digest {
+			wantRef, err := ir.NativeImageReference(node)
+			if err != nil {
+				return ArtifactResult{}, err
+			}
+			if result.Ref != wantRef {
 				return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q differs from its pinned image reference", node.ID)
 			}
 			size, err := verifyOCILayoutAndSize(ctx, payloadPath, node.Digest)
@@ -295,7 +299,10 @@ func bindResultToNode(a *ArtifactResult, n ir.Node, opts RunOptions) error {
 			return e.New(e.CodeVerifyFailed, "pull result %q does not match its pinned digest/acquisition engine", n.ID)
 		}
 		if n.OutputType == "oci-image" {
-			wantRef := n.Artifact + "@" + n.Digest
+			wantRef, err := ir.NativeImageReference(n)
+			if err != nil {
+				return err
+			}
 			if a.Ref != wantRef {
 				return e.New(e.CodeVerifyFailed, "pull result %q ref %q does not match %q", n.ID, a.Ref, wantRef)
 			}

@@ -424,6 +424,14 @@ func resolvedDependencies(plan *Plan) []provenance.Dependency {
 				dependency = provenance.ToolchainDependency(node.Toolchain)
 			case node.Kind == ir.KindPull && node.Artifact != "" && node.Digest != "":
 				digest := node.Digest
+				if node.OutputType == "oci-image" && node.ImageParentDigest != "" {
+					digest = node.ImageParentDigest
+					// The parent URI names index/root bytes. The native delivered
+					// subject remains a separate immutable dependency.
+					if nativeRef, err := ir.NativeImageReference(node); err == nil {
+						byURI[nativeRef] = provenance.Dependency{URI: nativeRef, Digest: map[string]string{"sha256": strings.TrimPrefix(node.Digest, "sha256:")}}
+					}
+				}
 				if node.ExecutableArchive != nil {
 					digest = node.ExecutableArchive.Digest
 					// The URL identifies the acquired archive bytes, not the

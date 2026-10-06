@@ -117,9 +117,10 @@ type ExecutableArchive struct {
 // Node is one vertex of the build DAG. Field presence depends on Kind; unused
 // fields are omitted from serialization so the digest stays tight.
 type Node struct {
-	ID    string   `json:"id"`
-	Kind  string   `json:"kind"`
-	Needs []string `json:"needs,omitempty"` // upstream node IDs (sorted)
+	ImageParentDigest string   `json:"imageParentDigest,omitempty"`
+	ID                string   `json:"id"`
+	Kind              string   `json:"kind"`
+	Needs             []string `json:"needs,omitempty"` // upstream node IDs (sorted)
 	// Requirements is the deterministic runner request for this step. Build nodes are
 	// the currently admitted kind; other kinds fail closed until their compiler
 	// projection exists. It travels with executable bytes but is excluded from

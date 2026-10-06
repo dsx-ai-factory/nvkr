@@ -114,13 +114,37 @@ later unknown source fails, but no partial update commits. Artifact selections a
 are admitted before upstream calls. No-op updates preserve existing lock bytes. Source check mode returns
 `CodeDiff` when changes are available without writing; artifact pinning does not acquire a new check mode.
 
-Acquired `prebuilt.image` declarations name a tag-qualified acquisition reference; the generated artifact lock
-records the selected native manifest subjects. Digest-qualified authored image references are rejected with
-`CodeUnverifiedRef` by raw/resolved catalog admission and artifact maintenance before upstream work. The current
-lock protocol does not authenticate membership between an authored index digest and its native children, and
-does not independently pin a single-manifest authored digest. That capability remains deferred; neither stripping
-the authored digest nor accepting a stale child pin establishes membership. Existing templates are rendered by
-their owning catalog boundary before maintenance validates the resulting reference.
+Acquired `prebuilt.image` declarations may retain an exact parent index or single-manifest digest,
+or use a tag. Image maintenance authenticates the actual parent, unique baseline native descriptors and
+native manifest/config bytes with the existing pinned OCI library. The artifact lock retains optional
+`imageParentDigest` plus the independently selected native `digests`. The parent is lock-owned, not a
+second authored pin field. A digest-qualified declaration must equal that retained parent; the legacy
+single-native lane may omit it only when the authored digest equals every selected native subject.
+Missing or substituted parent descriptions fail `CodeUnverifiedRef` before executable work. Templates
+remain owned by their existing render boundary. Lock fields describe constraints, never a receipt.
+
+The frozen full IR retains the exact parent acquisition reference and parent/native/platform binding.
+`ImageParentDigest` is also a logical content-selection constraint: changing the immutable index closure
+that the selected source requires changes Build identity even when its native child is unchanged.
+Repository, tag spelling and registry credentials remain transport-only. This optional field extends
+IR v4; empty legacy nodes preserve their prior canonical logical bytes, while old strict readers reject
+the unknown field rather than silently executing a weaker contract.
+
+The built-in acquisition owner authenticates the exact parent again before output work and consumes its
+original selected native image through an original-owner, callback-scoped single-use handle. It rejects
+wrong parent/child/platform, duplicate or ambiguous native membership, constrained variants, nested
+indexes and substituted manifest/config bytes. Callback exit cancels before joining consumption;
+copied, expired and replayed handles fail. Unsupported injected OCI transports fail capability admission
+before creating output. Tag-only legacy transports remain compatible; new tag pins with a retained
+parent acquire that exact immutable parent, not a possibly moved tag. Native manifests are preserved,
+including Docker schema-2 media, and complete native closures are verified before atomic publication.
+
+Metadata responses remain bounded to 8 MiB and acquisition to five minutes. Only authenticated native
+layer descriptors widen a compressed blob response; HTTPS redirect continuations retain that exact bound.
+The existing OCI library additionally limits and hashes each layer stream against its descriptor.
+No second fetch by a caller-supplied child, standalone unbounded layer client, or ambient credential
+store substitutes for the parent's selected image. This is pipeline-attested acquisition-origin evidence,
+not an upstream signature, build reproduction, source approval or production delivery claim.
 
 - `catalog pin --dir <catalog> --tag vX.Y.Z <source>` — resolve that tag to
   `{tag, commit, treeHash, sourceDateEpoch}` and update the lock.
@@ -145,17 +169,11 @@ their owning catalog boundary before maintenance validates the resulting referen
   entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
   prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
 
-Image pin maintenance selects an upstream index or native image through the
-existing OCI library and records exact native digests. Authored digest-qualified
-image references are currently rejected with `CodeUnverifiedRef` at catalog and
-maintenance admission, including native references equal to a selected pin.
-The lock does not retain an index-membership receipt; no distinct index digest
-may be discarded or silently replaced by a child. An authenticated authored
-index/native protocol remains deferred. Fixed source-reviewed tag references
-are ordinary acquired producers, not automatically extracted chart pin-set members.
-The native pinning profile requires an explicit body `mediaType` matching the
-served image/index media type, even where upstream OCI permits its omission;
-missing or mismatched markers fail closed rather than being inferred.
+Image pin maintenance records authenticated parent and exact native subjects. Fixed source-reviewed
+tag references remain ordinary acquired producers, not automatically extracted chart pin-set members.
+The native profile requires explicit body `mediaType` matching served image/index media; omitted or
+mismatched markers fail closed. Republishing a tag does not authorize changing an already frozen parent
+or native subject. Moving a pin still requires explicit owning maintenance and review.
 
 Maintenance callers may additionally supply explicit `SameRelease` groups of selected independent sources.
 Each group must share the exact repository, tag prefix and constraint before upstream resolution; the complete

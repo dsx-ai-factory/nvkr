@@ -10,6 +10,7 @@ artifacts:
     digests:
       amd64: sha256:9ca5fe8db49a439acdfda55fcbd6ff1c44bc84facf5e775b7e170434d61ce18c
       arm64: sha256:b3dec5235745879ca095c08c230e5a53825f7cd795bcee6e6ac88eed91267d28
+    imageParentDigest: sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71
     tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
   spiffe-csi-image:
     digests:
@@ -25,6 +26,7 @@ artifacts:
     digests:
       amd64: sha256:d49c2b6585ac8e6341adfe8cb214a656914ab5390fb7804a7ed9e90a5b785fba
       arm64: sha256:8d29611142077489b9863426dfccf935c5ee9a27a3548d726c16de32692e71e3
+    imageParentDigest: sha256:90041f375e30f41aa7e0390075d8a69dc61900771d52fa98d63ee5d03d866a58
     tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
   spire-controller-manager-image:
     digests:

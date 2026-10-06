@@ -219,7 +219,7 @@ func (reader releaseExecutableRoundTripReader) Read(p []byte) (int, error) { ret
 func TestReleaseExecutableDefaultClientPreCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, _, err := downloadReleaseExecutable(ctx, ir.Node{ExecutableArchive: &ir.ExecutableArchive{}}, t.TempDir(), "tool")
+	_, _, err := downloadReleaseExecutableWithTransport(ctx, ir.Node{ExecutableArchive: &ir.ExecutableArchive{}}, t.TempDir(), "tool", nil)
 	if code(err) != e.CodeTimeout {
 		t.Fatalf("default production client cancellation: %v", err)
 	}

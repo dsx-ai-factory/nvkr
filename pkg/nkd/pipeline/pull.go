@@ -18,6 +18,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"github.com/google/go-containerregistry/pkg/name"
 	"golang.org/x/sys/unix"
 )
 
@@ -45,18 +46,46 @@ func (l Local) pull(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 // temporary layout, verifies the complete descriptor/blob closure, and publishes the
 // directory atomically. Terminal verification walks the layout again with no network.
 func (l Local) pullImage(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
-	ref := n.Artifact + "@" + n.Digest
+	parsed, err := name.ParseReference(n.Artifact)
+	if err != nil {
+		return nil, e.Wrap(e.CodeUnverifiedRef, err, "parse acquired OCI image")
+	}
+	ref, err := ir.NativeImageReference(n)
+	if err != nil {
+		return nil, err
+	}
+	parent := n.ImageParentDigest
+	if authored, ok := parsed.(name.Digest); ok && parent == "" {
+		parent = authored.DigestStr()
+	}
+	var native registryOCITransport
+	if parent != "" {
+		var supported bool
+		native, supported = opts.OCI.(registryOCITransport)
+		if !supported {
+			return nil, e.New(e.CodeEngineCapability, "selected OCI transport cannot authenticate parent/native membership")
+		}
+	}
 	dir := prebuiltDir(opts, n)
 	layoutPath := filepath.Join(dir, sanitizeName(n.Component)+".oci")
 	if opts.DryRun {
 		fmt.Fprintf(opts.Stdout, "[pull:%s] acquire complete OCI closure %s -> %s (verify %s)\n", n.Component, ref, layoutPath, n.Digest)
 		return nil, nil
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, e.Wrap(e.CodeFetchFailed, err, "creating OCI transport dir for %s", n.Component)
+	// The bound owner authenticates parent/child before creating any output.
+	if parent == "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, e.Wrap(e.CodeFetchFailed, err, "creating OCI transport dir for %s", n.Component)
+		}
 	}
 	fmt.Fprintf(opts.Stdout, "\n=== pull %s (image %s) ===\n", n.Component, ref)
-	got, size, err := opts.OCI.Acquire(opts.ctx(), ref, layoutPath)
+	var got string
+	var size int64
+	if parent != "" {
+		got, size, err = native.acquireNative(opts.ctx(), parsed.Context().Digest(parent).Name(), ref, n.Platform, layoutPath)
+	} else {
+		got, size, err = opts.OCI.Acquire(opts.ctx(), ref, layoutPath)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -131,13 +160,9 @@ func (l Local) pullBinary(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	return res, nil
 }
 
-// downloadReleaseExecutable verifies the archive before selecting any member,
-// then verifies the executable separately before atomic output publication.
-// The carrier remains private and is never passed to a shell or extracted to disk.
-func downloadReleaseExecutable(ctx context.Context, node ir.Node, root, relative string) (string, int64, error) {
-	return downloadReleaseExecutableWithTransport(ctx, node, root, relative, nil)
-}
-
+// downloadReleaseExecutableWithTransport verifies the archive before selecting
+// a member, then verifies the executable before atomic output publication. The
+// carrier remains private and is never passed to a shell or extracted to disk.
 func downloadReleaseExecutableWithTransport(ctx context.Context, node ir.Node, root, relative string, transport http.RoundTripper) (string, int64, error) {
 	client := &http.Client{Transport: transport, Timeout: 10 * time.Minute, CheckRedirect: func(request *http.Request, via []*http.Request) error {
 		if request.URL.Scheme != "https" || request.URL.User != nil || len(via) >= 10 {

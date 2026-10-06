@@ -23,6 +23,9 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 	sort.Strings(componentNames)
 	for _, name := range componentNames {
 		c := reg.Components[name]
+		if c.Prebuilt != nil && c.Prebuilt.ImageParentDigest != "" {
+			return e.New(e.CodeInvalidCatalog, "component %q must retain image parents only in %s", name, LockFile)
+		}
 		if c.Prebuilt != nil && c.Prebuilt.Image != "" {
 			if err := validateAcquiredImageReference(name, c.Prebuilt.Image); err != nil {
 				return err
@@ -440,6 +443,9 @@ func validatePrebuilt(name string, c Component) error {
 	}
 	hasURL, hasImg := p.URL != "", p.Image != ""
 	hasArchive := p.OCIArchive != ""
+	if !hasImg && p.ImageParentDigest != "" {
+		return e.New(e.CodeInvalidCatalog, "parent image pin %q requires image acquisition", name)
+	}
 	forms := 0
 	for _, present := range []bool{hasURL, hasImg, hasArchive} {
 		if present {
@@ -482,7 +488,7 @@ func validatePrebuilt(name string, c Component) error {
 	ref := p.URL
 	if hasImg {
 		ref = p.Image
-		if err := validateAcquiredImageReference(name, ref); err != nil {
+		if err := validateImageBinding(name, ref, p.ImageParentDigest, p.Digests); err != nil {
 			return err
 		}
 	}

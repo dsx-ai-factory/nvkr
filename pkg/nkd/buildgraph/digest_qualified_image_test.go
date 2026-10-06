@@ -9,15 +9,15 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-func TestResolvePrebuiltImageRejectsAuthoredDigests(t *testing.T) {
+func TestResolvePrebuiltImageBinding(t *testing.T) {
 	for _, architecture := range []struct{ arch, pin, other string }{{"amd64", digAmd, digArm}, {"arm64", digArm, digAmd}} {
 		for _, test := range []struct {
 			name, ref, want string
 			code            e.Code
 		}{
-			{"same digest", "registry.example/tool@" + architecture.pin, "", e.CodeUnverifiedRef},
-			{"same tag-and-digest", "registry.example/tool:latest@" + architecture.pin, "", e.CodeUnverifiedRef},
-			{"same explicit-scheme", "oci://registry.example/tool@" + architecture.pin, "", e.CodeUnverifiedRef},
+			{"same digest", "registry.example/tool@" + architecture.pin, "registry.example/tool@" + architecture.pin, ""},
+			{"same tag-and-digest", "registry.example/tool:latest@" + architecture.pin, "registry.example/tool@" + architecture.pin, ""},
+			{"same explicit-scheme", "oci://registry.example/tool@" + architecture.pin, "registry.example/tool@" + architecture.pin, ""},
 			{"tag", "registry.example/tool:1.2.3", "registry.example/tool:1.2.3", ""},
 			{"different digest", "registry.example/tool@" + architecture.other, "", e.CodeUnverifiedRef},
 			{"different tag-and-digest", "registry.example/tool:latest@" + architecture.other, "", e.CodeUnverifiedRef},

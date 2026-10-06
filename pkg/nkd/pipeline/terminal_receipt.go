@@ -170,8 +170,14 @@ func validateTerminalDeclaration(node ir.Node, artifact ArtifactResult, opts Run
 			artifact.EngineClass != ir.EnginePrebuiltAcquire || artifact.SHA256 != node.Digest {
 			return e.New(e.CodeVerifyFailed, "prebuilt artifact %q is not the exact graph-selected acquisition", node.Component)
 		}
-		if node.OutputType == "oci-image" && artifact.Ref != node.Artifact+"@"+node.Digest {
-			return e.New(e.CodeVerifyFailed, "prebuilt artifact %q does not retain its digest-pinned reference", node.Component)
+		if node.OutputType == "oci-image" {
+			wantRef, err := ir.NativeImageReference(node)
+			if err != nil {
+				return err
+			}
+			if artifact.Ref != wantRef {
+				return e.New(e.CodeVerifyFailed, "prebuilt artifact %q does not retain its digest-pinned reference", node.Component)
+			}
 		}
 	default:
 		return e.New(e.CodeInternal, "node %q is not an artifact producer", node.ID)

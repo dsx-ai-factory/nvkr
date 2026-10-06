@@ -17,6 +17,10 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
+func resolveImageDigestsWith(ctx context.Context, ref string, arches []string, read pinImageReader) (map[string]string, error) {
+	return resolveImageBindingWith(ctx, ref, arches, read, nil)
+}
+
 func imagePinFixture(t *testing.T, arch string, media types.MediaType) v1.Image {
 	t.Helper()
 	image, err := mutate.ConfigFile(empty.Image, &v1.ConfigFile{OS: "linux", Architecture: arch})
@@ -172,7 +176,7 @@ func TestImagePinTransportBoundsMetadataBeforeParsing(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			transport := pinImageTransport{imagePinRoundTripper(func(*http.Request) (*http.Response, error) {
+			transport := pinImageTransport{RoundTripper: imagePinRoundTripper(func(*http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: http.StatusOK, ContentLength: tc.length, Body: io.NopCloser(strings.NewReader(tc.body))}, nil
 			})}
 			response, err := transport.RoundTrip(request)

@@ -18,14 +18,15 @@ live diagnostic or production runtime approval.
 
 The source-owned PostgreSQL index `sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71`
 and SPIRE Bash index `sha256:90041f375e30f41aa7e0390075d8a69dc61900771d52fa98d63ee5d03d866a58`
-differ from all four selected native child pins. The inherited catalog admission
-owner rejects authored digest-qualified references with `CodeUnverifiedRef` before
-resolution and before pin acquisition. The entire image catalog therefore cannot
-load; its other twenty native selections cannot compile through this catalog either.
-`TestMaintainedM2DeploymentImageMembership` checks this earliest refusal and separately
-checks the literal authored membership, not a partially accepted catalog. All 34 authored outputs
-remain selected. This additional launch blocker cannot be solved by silently stripping
-the source-owned index or changing its pin to a child without the owning contract.
+differ from all four selected native child pins. The generic binding owner now retains
+both exact parent digests in the machine-managed lock and freezes parent/native/platform
+constraints in full IR and logical content identity. Acquisition authenticates actual
+parent-to-child membership and consumes the original selected native image before output.
+Missing or substituted descriptions still fail `CodeUnverifiedRef`; no source index is
+discarded or replaced by a child. `TestMaintainedM2DeploymentImageMembership` exercises
+public catalog loading and Resolve/Compile for all 24 native selections. The separate
+34-output Git integration requires explicit opt-in and actual pinned-source access.
+These contracts do not supply missing production execution classes or inspector profiles.
 
 ## Candidate output selections and requirement ownership
 
@@ -293,11 +294,12 @@ The image lock was generated atomically with `catalog pin-artifacts --all --arch
 No artifact digest was hand-authored. The informational source/artifact `tag` is the source-selection
 commit, not a claimed upstream image version. Registry refs below and native artifact digests own acquisition.
 The Bash declaration uses its exact source-owned index digest with the informational `latest` tag omitted.
-The catalog refuses the PostgreSQL/Bash authored index declarations before resolving
-any image member. The current protocol does not authorize digest-qualified authored
-image references, including native references, and pin maintenance refuses them before
-network work. No index digest is silently discarded. The command above is therefore
-blocked by `CodeUnverifiedRef` for this maintained catalog, not a runnable refresh.
+The parent-binding maintenance follow-up used the existing owner in one transaction:
+`catalog pin-artifacts --dir definitions/nke-m2/image-catalog postgresql-image spire-bash-image`.
+It added exactly two authenticated `imageParentDigest` fields and left every existing
+native digest and source pin unchanged. A second identical invocation reported no changes.
+The dated diagnostic records this command and no-op lock hash. The catalog now admits
+the complete image selection; runtime production admission remains independently gated.
 
 The following digest table transcribes the maintained lock. Its historical media annotations have no
 retained external diagnostic and are descriptive, not verified live acquisition evidence. `Docker v2` means
@@ -337,9 +339,10 @@ signing or independent consumer verification.
 
 No complete Helm, kubectl or Bash acquisition diagnostic with exact source, commands and terminal
 read-back is retained in this repository for this candidate. Historical private timings and read-backs
-are intentionally not presented as recorded evidence. Bash graph execution remains refused by the
-authored-index guard; a pre-guard acquisition is not reproducible through the current guarded graph.
-Contract fixtures and the lock data do not fill this operational evidence gap.
+are intentionally not presented as recorded evidence. The generic parent-binding source
+change and controlled TLS fixtures establish engineering contracts, not an upstream Bash
+layer acquisition or production release. Contract fixtures and the lock data do not fill
+this operational evidence gap.
 
 ## Downstream-only and checkpoint ownership questions
 

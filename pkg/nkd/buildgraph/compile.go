@@ -94,36 +94,36 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				ref = ir.OCIBlobScheme + nc.Prebuilt.OCIArchive
 			} else if ref == "" {
 				ref = strings.TrimPrefix(nc.Prebuilt.Image, "oci://")
-				// A digest-qualified reference must name the selected native
-				// subject. A distinct authored index requires a retained index-to-
-				// native membership contract, which this lowering does not issue.
 				parsed, err := name.ParseReference(ref)
 				if err != nil {
 					return nil, e.Wrap(e.CodeInvalidCatalog, err, "parse acquired image transport %q", nc.Name)
 				}
-				if authored, digested := parsed.(name.Digest); digested {
-					if authored.DigestStr() != nc.Prebuilt.Digests[arch] {
-						return nil, e.New(e.CodeUnverifiedRef,
-							"component %q authored image digest differs from its selected native pin; index membership is not established", nc.Name)
+				if authored, ok := parsed.(name.Digest); ok {
+					ref = parsed.Name() // retain the exact parent, normalize only owner syntax
+					parent := nc.Prebuilt.ImageParentDigest
+					if parent == "" {
+						parent = nc.Prebuilt.Digests[arch]
 					}
-					// Acquisition appends this same pin once to the repository.
-					ref = parsed.Context().Name()
+					if authored.DigestStr() != parent {
+						return nil, e.New(e.CodeUnverifiedRef, "component %q changes authored image parent", nc.Name)
+					}
 				}
 			}
 			pid := "pull-" + nc.Name
 			verifyNeeds = append(verifyNeeds, pid)
 			g.Nodes = append(g.Nodes, ir.Node{
-				ID:           pid,
-				Kind:         ir.KindPull,
-				Component:    nc.Name,
-				Artifact:     renderArch(ref, arch),
-				Digest:       nc.Prebuilt.Digests[arch],
-				Platform:     "linux/" + arch,
-				Network:      ir.NetworkDefault,
-				Env:          pullEnv(nc),
-				OutputType:   nc.OutputType,
-				ArtifactPath: prebuiltArtifactName(nc),
-				Version:      catalog.NormalizeVersion(nc.Tag),
+				ID:                pid,
+				Kind:              ir.KindPull,
+				Component:         nc.Name,
+				Artifact:          renderArch(ref, arch),
+				Digest:            nc.Prebuilt.Digests[arch],
+				ImageParentDigest: nc.Prebuilt.ImageParentDigest,
+				Platform:          "linux/" + arch,
+				Network:           ir.NetworkDefault,
+				Env:               pullEnv(nc),
+				OutputType:        nc.OutputType,
+				ArtifactPath:      prebuiltArtifactName(nc),
+				Version:           catalog.NormalizeVersion(nc.Tag),
 			})
 			if tool := nc.Prebuilt.Executable; tool != nil && tool.Format == "tar-gzip" {
 				g.Nodes[len(g.Nodes)-1].ExecutableArchive = &ir.ExecutableArchive{

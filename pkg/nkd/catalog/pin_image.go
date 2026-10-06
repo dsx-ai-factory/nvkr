@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -20,23 +22,12 @@ import (
 const maxPinImageMetadataBytes = 8 << 20
 
 type pinImageSource struct {
-	index v1.ImageIndex
-	image v1.Image
+	index     v1.ImageIndex
+	image     v1.Image
+	transport *pinImageTransport
 }
 
 type pinImageReader func(context.Context, name.Reference) (pinImageSource, error)
-
-// The runtime argument remains source-compatible with the maintenance API. Image
-// pins use registry-native bytes, not a daemon's manifest JSON projection.
-func resolveImageDigests(ctx context.Context, runtime string, ref string, arches []string) (map[string]string, error) {
-	if err := validateAcquiredImageReference("image pin", ref); err != nil {
-		return nil, err
-	}
-	if err := validatePinRuntime(runtime); err != nil {
-		return nil, err
-	}
-	return resolveImageDigestsWith(ctx, ref, arches, readPinImage)
-}
 
 func readPinImage(ctx context.Context, ref name.Reference) (pinImageSource, error) {
 	return readPinImageWithTransport(ctx, ref, remote.DefaultTransport)
@@ -45,24 +36,25 @@ func readPinImage(ctx context.Context, ref name.Reference) (pinImageSource, erro
 // The private seam lets registry contract tests retain the production HTTPS and
 // metadata bounds without changing a process-global transport or ambient auth.
 func readPinImageWithTransport(ctx context.Context, ref name.Reference, transport http.RoundTripper) (pinImageSource, error) {
+	bounded := &pinImageTransport{RoundTripper: transport}
 	d, err := remote.Get(ref, remote.WithContext(ctx), remote.WithAuth(authn.Anonymous),
-		remote.WithTransport(pinImageTransport{transport}), remote.WithUserAgent("nkdctl/image-pin"))
+		remote.WithTransport(bounded), remote.WithUserAgent("nkdctl/image-pin"))
 	if err != nil {
 		return pinImageSource{}, err
 	}
 	switch d.MediaType {
 	case types.OCIImageIndex, types.DockerManifestList:
 		index, err := d.ImageIndex()
-		return pinImageSource{index: index}, err
+		return pinImageSource{index: index, transport: bounded}, err
 	case types.OCIManifestSchema1, types.DockerManifestSchema2:
 		image, err := d.Image()
-		return pinImageSource{image: image}, err
+		return pinImageSource{image: image, transport: bounded}, err
 	default:
 		return pinImageSource{}, fmt.Errorf("unsupported image manifest media type %q", d.MediaType)
 	}
 }
 
-func resolveImageDigestsWith(ctx context.Context, ref string, arches []string, read pinImageReader) (map[string]string, error) {
+func resolveImageBindingWith(ctx context.Context, ref string, arches []string, read pinImageReader, observed *pinImageSelection) (map[string]string, error) {
 	if ctx == nil || read == nil || len(arches) == 0 {
 		return nil, e.New(e.CodeUsage, "image pin resolution requires a context, reader and architectures")
 	}
@@ -73,7 +65,7 @@ func resolveImageDigestsWith(ctx context.Context, ref string, arches []string, r
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	pins, err := selectPinImageDigests(ctx, ref, arches, read)
+	pins, err := selectPinImageDigestsAndParent(ctx, ref, arches, read, observed)
 	if ctx.Err() != nil {
 		return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "image pin resolution canceled")
 	}
@@ -83,7 +75,13 @@ func resolveImageDigestsWith(ctx context.Context, ref string, arches []string, r
 	return pins, nil
 }
 
-func selectPinImageDigests(ctx context.Context, ref string, arches []string, read pinImageReader) (map[string]string, error) {
+type pinImageSelection struct {
+	parent    v1.Hash
+	images    map[string]v1.Image
+	transport *pinImageTransport
+}
+
+func selectPinImageDigestsAndParent(ctx context.Context, ref string, arches []string, read pinImageReader, observed *pinImageSelection) (map[string]string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -96,6 +94,7 @@ func selectPinImageDigests(ctx context.Context, ref string, arches []string, rea
 		return nil, err
 	}
 	var parent v1.Hash
+	images := make(map[string]v1.Image, len(arches))
 	pins := make(map[string]string, len(arches))
 	if source.index != nil && source.image == nil {
 		raw, err := source.index.RawManifest()
@@ -157,6 +156,7 @@ func selectPinImageDigests(ctx context.Context, ref string, arches []string, rea
 				}
 			}
 			pins[arch] = digest.String()
+			images[arch] = image
 		}
 	} else if source.image != nil && source.index == nil {
 		for _, arch := range arches {
@@ -165,6 +165,7 @@ func selectPinImageDigests(ctx context.Context, ref string, arches []string, rea
 				return nil, err
 			}
 			parent = digest
+			images[arch] = source.image
 			pins[arch] = digest.String()
 		}
 	} else {
@@ -172,6 +173,9 @@ func selectPinImageDigests(ctx context.Context, ref string, arches []string, rea
 	}
 	if requested, ok := parsed.(name.Digest); ok && requested.DigestStr() != parent.String() {
 		return nil, fmt.Errorf("image bytes differ from requested digest")
+	}
+	if observed != nil {
+		*observed = pinImageSelection{parent: parent, images: images, transport: source.transport}
 	}
 	return pins, nil
 }
@@ -241,20 +245,92 @@ func pinNativePlatform(platform *v1.Platform, arch string) bool {
 		platform.OSVersion == "" && len(platform.OSFeatures) == 0 && len(platform.Features) == 0
 }
 
-type pinImageTransport struct{ http.RoundTripper }
+// Metadata is bounded before decoding. Only descriptors in the authenticated
+// selected native manifest can widen a blob response, and GCR additionally wraps
+// that compressed stream with its descriptor-size/hash verifier.
+type pinImageTransport struct {
+	http.RoundTripper
+	mu        sync.Mutex
+	blobs     map[string]int64
+	redirects map[string]int64
+}
 
-func (transport pinImageTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+func (transport *pinImageTransport) admitImageLayers(image v1.Image) error {
+	raw, err := image.RawManifest()
+	if err != nil {
+		return err
+	}
+	manifest, err := v1.ParseManifest(bytes.NewReader(raw))
+	if err != nil {
+		return err
+	}
+	bounds := make(map[string]int64, len(manifest.Layers))
+	for _, layer := range manifest.Layers {
+		// Foreign URLs are not part of this registry-owned acquisition profile.
+		if layer.Size < 0 || !canonical.IsDigest(layer.Digest.String()) || len(layer.URLs) != 0 ||
+			!(layer.MediaType == types.OCILayer || layer.MediaType == types.OCIUncompressedLayer ||
+				layer.MediaType == types.OCILayerZStd || layer.MediaType == types.DockerLayer || layer.MediaType == types.DockerUncompressedLayer) {
+			return fmt.Errorf("unsupported selected image layer descriptor")
+		}
+		if previous, exists := bounds[layer.Digest.String()]; exists && previous != layer.Size {
+			return fmt.Errorf("conflicting selected layer size")
+		}
+		bounds[layer.Digest.String()] = layer.Size
+	}
+	transport.mu.Lock()
+	defer transport.mu.Unlock()
+	transport.blobs = bounds
+	transport.redirects = make(map[string]int64)
+	return nil
+}
+
+func (transport *pinImageTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	if err := validateHelmHTTPS(request.URL.String()); err != nil {
 		return nil, err
 	}
+	limit := int64(maxPinImageMetadataBytes)
+	transport.mu.Lock()
+	selected := false
+	if bound, ok := transport.redirects[request.URL.String()]; ok {
+		limit, selected = bound, true
+	} else if at := strings.LastIndex(request.URL.Path, "/blobs/"); at >= 0 {
+		if bound, ok := transport.blobs[request.URL.Path[at+len("/blobs/"):]]; ok {
+			limit, selected = bound, true
+		}
+	}
+	transport.mu.Unlock()
 	response, err := transport.RoundTripper.RoundTrip(request)
 	if err != nil {
 		return nil, err
 	}
-	if response.ContentLength > maxPinImageMetadataBytes {
-		_ = response.Body.Close()
-		return nil, fmt.Errorf("image pin metadata response exceeds size bound")
+	// Redirect responses are metadata. The destination only receives the blob
+	// allowance when it is a validated HTTPS continuation of this exact request.
+	if selected && response.StatusCode >= 300 && response.StatusCode < 400 {
+		if location, err := request.URL.Parse(response.Header.Get("Location")); err == nil && response.Header.Get("Location") != "" {
+			if err := validateHelmHTTPS(location.String()); err != nil {
+				_ = response.Body.Close()
+				return nil, err
+			}
+			transport.mu.Lock()
+			previous, exists := transport.redirects[location.String()]
+			if exists && previous != limit {
+				transport.mu.Unlock()
+				_ = response.Body.Close()
+				return nil, fmt.Errorf("ambiguous selected blob redirect")
+			}
+			transport.redirects[location.String()] = limit
+			transport.mu.Unlock()
+		}
+		limit = maxPinImageMetadataBytes
 	}
-	response.Body = &helmBoundedBody{ReadCloser: response.Body, remaining: maxPinImageMetadataBytes, label: "image pin metadata"}
+	label := "image pin metadata"
+	if selected && limit != maxPinImageMetadataBytes {
+		label = "authenticated image layer"
+	}
+	if response.ContentLength > limit {
+		_ = response.Body.Close()
+		return nil, fmt.Errorf("%s response exceeds size bound", label)
+	}
+	response.Body = &helmBoundedBody{ReadCloser: response.Body, remaining: limit, label: label}
 	return response, nil
 }

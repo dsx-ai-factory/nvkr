@@ -17,9 +17,9 @@ func TestPinRuntimeRejectsNondefaultBeforeInputWork(t *testing.T) {
 			assertCatalogContractCode(t, err, e.CodeUsage)
 			_, err = UpdateArtifactPins(t.Context(), ArtifactPinRequest{Directory: "must-not-be-read", Runtime: runtime})
 			assertCatalogContractCode(t, err, e.CodeUsage)
-			pins, err := resolveImageDigests(t.Context(), runtime, "must-not-be-contacted.invalid/tool:v1", []string{"amd64"})
+			pin, err := resolvePrebuiltTarget(t.Context(), PrebuiltTarget{Image: "must-not-be-contacted.invalid/tool:v1", Platforms: []string{"linux/amd64"}}, runtime)
 			assertCatalogContractCode(t, err, e.CodeUsage)
-			if pins != nil {
+			if len(pin.Digests) != 0 || pin.ImageParentDigest != "" {
 				t.Fatal("invalid runtime returned pins")
 			}
 		})

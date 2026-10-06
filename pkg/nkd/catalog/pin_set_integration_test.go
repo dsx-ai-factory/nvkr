@@ -411,6 +411,13 @@ func TestPinSetImageRuntimeSelection(t *testing.T) {
 				if got := fixture.lock(t).Artifacts["image"].Digests["amd64"]; got != digest {
 					t.Fatalf("image digest = %s; want %s", got, digest)
 				}
+				loaded, err := LoadContext(t.Context(), Dir(fixture.dir))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := loaded.Components["image"].Prebuilt; got.Image != "example.invalid/tool:"+version || got.Digests["amd64"] != digest {
+					t.Fatalf("loaded member version/native subject changed: %+v", got)
+				}
 			})
 		}
 	}

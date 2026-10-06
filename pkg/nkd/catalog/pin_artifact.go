@@ -112,8 +112,14 @@ func resolvePrebuiltTarget(ctx context.Context, selected PrebuiltTarget, runtime
 		if err := validateAcquiredImageReference(selected.Name, selected.Image); err != nil {
 			return pin, err
 		}
-		digests, err := resolveImageDigests(ctx, runtime, selected.Image, arches)
-		pin.Digests = digests
+		if err := validatePinRuntime(runtime); err != nil {
+			return pin, err
+		}
+		var selection pinImageSelection
+		digests, err := resolveImageBindingWith(ctx, selected.Image, arches, readPinImage, &selection)
+		if err == nil {
+			pin.Digests, pin.ImageParentDigest = digests, selection.parent.String()
+		}
 		return pin, err
 	}
 	for _, arch := range arches {
@@ -133,7 +139,7 @@ func artifactPinEqual(a, b ArtifactPin) bool {
 	if !reflect.DeepEqual(a.Chart, b.Chart) {
 		return false
 	}
-	if a.DerivedFrom != b.DerivedFrom || a.URL != b.URL || a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
+	if a.ImageParentDigest != b.ImageParentDigest || a.DerivedFrom != b.DerivedFrom || a.URL != b.URL || a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
 		return false
 	}
 	for k, v := range b.Digests {

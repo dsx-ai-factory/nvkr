@@ -16,9 +16,10 @@ import (
 // immutable manifest digest while constructing this value; the registry/name prefix
 // is not representable here.
 type LogicalNode struct {
-	ID    string   `json:"id"`
-	Kind  string   `json:"kind"`
-	Needs []string `json:"needs,omitempty"`
+	ImageParentDigest string   `json:"imageParentDigest,omitempty"`
+	ID                string   `json:"id"`
+	Kind              string   `json:"kind"`
+	Needs             []string `json:"needs,omitempty"`
 
 	Commit            string             `json:"commit,omitempty"`
 	TreeHash          string             `json:"treeHash,omitempty"`
@@ -88,6 +89,7 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"VendorImage":       includeContentReferenceInBuildIdentity,
 	"Artifact":          excludeTransportFromBuildIdentity,
 	"Digest":            includeLogicalValueInBuildIdentity,
+	"ImageParentDigest": includeLogicalValueInBuildIdentity,
 	"ExecutableArchive": includeLogicalValueInBuildIdentity,
 	"Component":         includeLogicalValueInBuildIdentity,
 	"BuilderType":       includeLogicalValueInBuildIdentity,
@@ -198,7 +200,7 @@ func (g Graph) logicalGraph() LogicalGraph {
 			ID: node.ID, Kind: node.Kind, Needs: append([]string(nil), node.Needs...),
 			Commit: node.Commit, TreeHash: node.TreeHash, Dest: node.Dest,
 			VendorCmd:   append([]string(nil), node.VendorCmd...),
-			VendorImage: imageDigestID(node.VendorImage), Digest: node.Digest,
+			VendorImage: imageDigestID(node.VendorImage), Digest: node.Digest, ImageParentDigest: node.ImageParentDigest,
 			ExecutableArchive: cloneExecutableArchive(node.ExecutableArchive),
 			Component:         node.Component, BuilderType: node.BuilderType,
 			FlakeOutput: node.FlakeOutput, FlakeLockDigest: node.FlakeLockDigest,

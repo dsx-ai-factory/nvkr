@@ -175,7 +175,7 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 	if raw.Prebuilt.Chart != nil {
 		url = lock.Artifacts[name].URL
 	}
-	c.Prebuilt = &Prebuilt{URL: url, Image: img, Digests: digests, Evidence: raw.Prebuilt.Evidence}
+	c.Prebuilt = &Prebuilt{URL: url, Image: img, ImageParentDigest: lock.Artifacts[name].ImageParentDigest, Digests: digests, Evidence: raw.Prebuilt.Evidence}
 	if raw.Prebuilt.Chart != nil && strings.HasPrefix(raw.Prebuilt.Chart.Repository, "oci://") {
 		for _, digest := range digests {
 			c.Prebuilt.OCIArchive = strings.TrimRight(strings.TrimPrefix(raw.Prebuilt.Chart.Repository, "oci://"), "/") + "/" + raw.Prebuilt.Chart.Name + "@" + digest

@@ -2,16 +2,15 @@ package buildgraph
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 	"sigs.k8s.io/yaml"
@@ -39,7 +38,7 @@ func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 // These isolated test catalogs exercise the unchanged tag-backed declarations
 // and native pins through their owning loader. They are not alternative product
 // inputs: TestMaintainedM2DeploymentImageMembership still requires the entire
-// actual catalog to fail closed with all 34 outputs and 24 image subjects retained.
+// actual catalog to retain all 34 outputs and compile all 24 image subjects.
 func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
 	provider := catalog.Dir("../../../definitions/nke-m2/image-catalog").(catalog.ContextDataProvider)
 	registryBytes, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
@@ -180,9 +179,8 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 		"temporal-server-image":           "temporalio/server:1.30.3",
 		"temporal-ui-image":               "temporalio/ui:2.48.1",
 	}
-	// Literal maintained lock bindings, not executable admission or registry
-	// proof. Explicit architecture pairs catch accidental native pin swaps even
-	// while the entire catalog is refused at its owning index-reference gate.
+	// Literal maintained native bindings plus public static Resolve/Compile checks.
+	// These do not prove live registry acquisition or production admission.
 	native := map[string][2]string{
 		"csi-node-driver-registrar-image": {"sha256:1ca23bdbb1504e41233d527e826d02dac98571c45a6cd74c5fb28be485d680fa", "sha256:0898bf569379e23a39b9dbd640934c4b9e2563b2c023cbad3e8f686167fd8b99"},
 		"postgresql-image":                {"sha256:9ca5fe8db49a439acdfda55fcbd6ff1c44bc84facf5e775b7e170434d61ce18c", "sha256:b3dec5235745879ca095c08c230e5a53825f7cd795bcee6e6ac88eed91267d28"},
@@ -206,12 +204,11 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	}
 	provider := catalog.Dir(filepath.Join(root, "image-catalog")).(catalog.ContextDataProvider)
 	cat, err := catalog.LoadContext(t.Context(), provider)
-	var coded *e.Error
-	if cat != nil || !errors.As(err, &coded) || coded.Code != e.CodeUnverifiedRef {
-		t.Fatalf("authored indexes must fail at catalog admission: catalog=%+v error=%v", cat, err)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// This is a literal selection check, not an alternate resolved catalog. The
-	// owner above rejects the entire catalog before any component can execute.
+	// Public catalog admission preserves the exact authored parent. Runtime
+	// acquisition still authenticates its relationship before output work.
 	raw, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
 	if err != nil {
 		t.Fatal(err)
@@ -274,10 +271,25 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 		if got := lock.Artifacts[component].Digests[arch]; got != native[component][index] {
 			t.Fatalf("native lock binding for %s/%s=%s, want %s", component, arch, got, native[component][index])
 		}
+		resolved, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
+		if err != nil {
+			t.Fatal(err)
+		}
+		graph, err := Compile(resolved)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pull := graph.Nodes[0]
+		if pull.Digest != native[component][index] || pull.Platform != output.Platform || pull.Artifact != want {
+			t.Fatalf("changed maintained image binding: %+v", pull)
+		}
+		if at := strings.LastIndex(want, "@"); at >= 0 && pull.ImageParentDigest != want[at+1:] {
+			t.Fatal("authored parent did not enter frozen IR")
+		}
 		selections++
 	}
 	if selections != 24 {
-		t.Fatalf("got %d literal image selections; all 24 must remain selected and admission-refused", selections)
+		t.Fatalf("got %d literal image selections; all 24 must remain selected and statically compiled", selections)
 	}
 	for component := range expected {
 		if !seen[component]["linux/amd64"] || !seen[component]["linux/arm64"] {

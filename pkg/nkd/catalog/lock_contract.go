@@ -99,6 +99,9 @@ func validatePinLockShape(lock *PinLock) error {
 	sort.Strings(artifactNames)
 	for _, name := range artifactNames {
 		pin := lock.Artifacts[name]
+		if pin.ImageParentDigest != "" && !canonical.IsDigest(pin.ImageParentDigest) {
+			return e.New(e.CodeUnverifiedRef, "lock artifact %q has an invalid image parent", name)
+		}
 		if strings.TrimSpace(name) == "" {
 			return e.New(e.CodeInvalidCatalog, "lock has an empty artifact pin name")
 		}
@@ -190,6 +193,23 @@ func validateLockAgainstRegistry(reg *registryDoc, lock *PinLock, requireArtifac
 				return e.New(e.CodeUnpinnedSource, "lock is incomplete: prebuilt component %q has no artifact pin", name)
 			}
 			continue
+		}
+		if raw.Prebuilt.Image != "" {
+			_, version, err := memberVersionPin(name, raw, reg.Sources, lock)
+			if err != nil {
+				return err
+			}
+			image, err := renderRef("prebuilt.image", raw.Prebuilt.Image, version)
+			if err != nil {
+				return err
+			}
+			if requireArtifacts {
+				if err := validateImageBinding(name, image, ap.ImageParentDigest, ap.Digests); err != nil {
+					return err
+				}
+			}
+		} else if ap.ImageParentDigest != "" {
+			return e.New(e.CodeInvalidCatalog, "artifact %q has an image parent without image acquisition", name)
 		}
 		if raw.Prebuilt.Chart != nil {
 			var chartDigest string
