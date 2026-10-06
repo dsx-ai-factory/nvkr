@@ -20,6 +20,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/profile"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
 
 // LocalContainerSandboxMode is the exact isolation contract exercised by Local's
@@ -150,7 +151,7 @@ func (execution *verifiedExecution) cleanupRuntime() {
 // LocalExecutionObserver measures the local container adapter. It hashes the exact
 // running executable and resolved runtime binary, asks the runtime for its actual
 // implementation/version document, materializes each digest-pinned image, inspects
-// its RepoDigests, and probes Nix inside the selected image when required.
+// its repository digest and native platform, and probes Nix inside the selected image when required.
 //
 // It never receives the expected builder profile; comparisons happen later in the
 // profile module. Missing runtime evidence therefore fails rather than being filled
@@ -403,38 +404,56 @@ func observeContainerImageWith(ctx context.Context, node ir.Node, output func(..
 		}
 		return observedID, nil
 	}
+	platform := localToolchainPlatform(node)
+	if err := target.ValidatePlatform(platform); err != nil {
+		return "", e.Wrap(e.CodeInvalidCatalog, err, "node %q toolchain platform", node.ID)
+	}
 	// An authenticated preparation step may have materialized a private image
 	// and destroyed its registry credential. Resolve the exact repository digest
 	// locally before attempting a network pull. A present but mismatched record
 	// fails closed; only a failed lookup may fall back to materialization.
-	if raw, err := output("image", "inspect", "--format", "{{json .RepoDigests}}", node.Toolchain); err == nil {
+	if raw, err := output("image", "inspect", "--format", "{{json .}}", node.Toolchain); err == nil {
 		return inspectPreparedContainerImage(node, raw)
 	}
-	pullArgs := []string{"pull"}
-	if node.Platform != "" {
-		pullArgs = append(pullArgs, "--platform", node.Platform)
-	}
-	pullArgs = append(pullArgs, node.Toolchain)
+	pullArgs := []string{"pull", "--platform", platform, node.Toolchain}
 	if _, err := output(pullArgs...); err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "materializing pinned toolchain for node %q", node.ID)
 	}
-	raw, err := output("image", "inspect", "--format", "{{json .RepoDigests}}", node.Toolchain)
+	raw, err := output("image", "inspect", "--format", "{{json .}}", node.Toolchain)
 	if err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "inspecting toolchain identity for node %q", node.ID)
 	}
 	return inspectPreparedContainerImage(node, raw)
 }
 
+// A VM toolchain runs on its selected host, not the guest/output platform.
+func localToolchainPlatform(node ir.Node) string {
+	if node.BuilderType == ir.BuilderVMImage {
+		return node.ToolchainPlatform
+	}
+	return node.Platform
+}
+
 func inspectPreparedContainerImage(node ir.Node, raw []byte) (string, error) {
-	var refs []string
-	if err := json.Unmarshal(bytes.TrimSpace(raw), &refs); err != nil {
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "decoding toolchain identity for node %q", node.ID)
+	}
+	var inspection packerImageInspection
+	if err := json.Unmarshal(bytes.TrimSpace(raw), &inspection); err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "decoding toolchain identity for node %q", node.ID)
+	}
+	platform := localToolchainPlatform(node)
+	wantOS, wantArch, ok := strings.Cut(platform, "/")
+	if !ok || inspection.OS != wantOS || inspection.Architecture != wantArch {
+		return "", e.New(e.CodePreflightFailed,
+			"runtime selected toolchain platform %s/%s for node %q, want %q",
+			inspection.OS, inspection.Architecture, node.ID, platform)
 	}
 	want, err := imageManifestDigest(node.Toolchain)
 	if err != nil {
 		return "", e.Wrap(e.CodeInvalidCatalog, err, "node %q toolchain", node.ID)
 	}
-	for _, ref := range refs {
+	for _, ref := range inspection.RepoDigests {
 		if _, digest, ok := strings.Cut(ref, "@"); ok && digest == want {
 			return digest, nil
 		}
