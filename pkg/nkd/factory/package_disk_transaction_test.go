@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
@@ -140,6 +141,128 @@ func TestReconciledDiskPackageTransaction(t *testing.T) {
 			for _, entry := range entries {
 				if strings.HasPrefix(entry.Name(), ".nkd-download-") {
 					t.Fatalf("transaction leaked private stage %s", entry.Name())
+				}
+			}
+		})
+	}
+}
+
+func TestDiskPackageRollbackPreservesForeignRoots(t *testing.T) {
+	for _, scenario := range []string{"success", "swapped root", "missing root", "closed parent", "occupied stage"} {
+		t.Run(scenario, func(t *testing.T) {
+			workspace := t.TempDir()
+			published := filepath.Join(workspace, "published")
+			private := filepath.Join(workspace, "private")
+			for _, path := range []string{published, private} {
+				if err := os.Mkdir(path, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(published, "sentinel"), []byte("original"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			parent, _, err := securepath.OpenDirectory(workspace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = parent.Close() }()
+			stage, _, err := securepath.OpenDirectory(private)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = stage.Close() }()
+			original, err := os.Stat(published)
+			if err != nil {
+				t.Fatal(err)
+			}
+			retained := published
+			foreign := ""
+			switch scenario {
+			case "swapped root", "missing root":
+				retained = filepath.Join(workspace, "retained")
+				if err := os.Rename(published, retained); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "swapped root" {
+					foreign = published
+				}
+			case "closed parent":
+				if err := parent.Close(); err != nil {
+					t.Fatal(err)
+				}
+			case "occupied stage":
+				foreign = filepath.Join(private, "package")
+			}
+			if foreign != "" {
+				if err := os.Mkdir(foreign, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(foreign, "sentinel"), []byte("foreign"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = rollbackDiskPackageRoot(parent, "published", original, stage, "package")
+			if scenario == "success" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				retained = filepath.Join(private, "package")
+				if _, err := os.Lstat(published); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("rollback left public root: %v", err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodeImmutableViolation)
+			}
+			for path, expected := range map[string]string{retained: "original", foreign: "foreign"} {
+				if path == "" {
+					continue
+				}
+				actual, err := os.ReadFile(filepath.Join(path, "sentinel"))
+				if err != nil || string(actual) != expected {
+					t.Fatalf("rollback changed %s: %q, %v", path, actual, err)
+				}
+			}
+		})
+	}
+}
+
+func TestDiskPackageCleanupRejectsChangedStage(t *testing.T) {
+	for _, scenario := range []string{"missing stage", "swapped stage"} {
+		t.Run(scenario, func(t *testing.T) {
+			workspace := t.TempDir()
+			retained := filepath.Join(t.TempDir(), "retained-stage")
+			var stage string
+			build := func(_ context.Context, path string) (delivery.Result, error) {
+				stage = filepath.Dir(path)
+				if err := os.Rename(stage, retained); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "swapped stage" {
+					if err := os.Mkdir(stage, 0o700); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(filepath.Join(stage, "sentinel"), []byte("foreign"), 0o600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return delivery.Result{}, e.New(e.CodeVerifyFailed, "controlled construction failure")
+			}
+			result, err := publishReconciledDiskPackage(t.Context(), workspace, filepath.Join(workspace, "package"),
+				reconciledEvidenceFiles{directory: filepath.Join(workspace, "evidence")},
+				func() error { t.Fatal("cleanup callback reached after construction failure"); return nil }, build)
+			assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+			if !strings.Contains(err.Error(), "private disk package stage changed") || !reflect.DeepEqual(result, delivery.Result{}) {
+				t.Fatalf("stage cleanup lost failure or exposed result: %+v, %v", result, err)
+			}
+			if scenario == "swapped stage" {
+				actual, err := os.ReadFile(filepath.Join(stage, "sentinel"))
+				if err != nil || string(actual) != "foreign" {
+					t.Fatalf("cleanup touched foreign stage: %q, %v", actual, err)
+				}
+			}
+			for _, name := range []string{"package", "evidence"} {
+				if _, err := os.Lstat(filepath.Join(workspace, name)); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("failed construction published %s: %v", name, err)
 				}
 			}
 		})

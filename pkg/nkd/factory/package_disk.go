@@ -177,19 +177,7 @@ func publishReconciledDiskPackage(ctx context.Context, workspace, output string,
 				if !target.published {
 					continue
 				}
-				current, info, err := securepath.OpenChild(target.parent, target.name, true)
-				if err == nil {
-					err = current.Close()
-				}
-				if err != nil || !os.SameFile(target.info, info) {
-					rollbackErr = errors.Join(rollbackErr, e.New(e.CodeImmutableViolation, "published disk package root changed before rollback"))
-					continue
-				}
-				if err := transportarchive.PublishAtNoReplace(int(target.parent.Fd()), target.name, int(stage.Fd()), target.staged); err != nil {
-					rollbackErr = errors.Join(rollbackErr, err)
-					continue
-				}
-				rollbackErr = errors.Join(rollbackErr, target.parent.Sync())
+				rollbackErr = errors.Join(rollbackErr, rollbackDiskPackageRoot(target.parent, target.name, target.info, stage, target.staged))
 			}
 			if rollbackErr != nil {
 				returnErr = joinFactoryCleanupError(returnErr, rollbackErr, "rolling back disk package transaction")
@@ -245,6 +233,22 @@ func publishReconciledDiskPackage(ctx context.Context, workspace, output string,
 	committed = true
 	result.LayoutPath = output
 	return result, nil
+}
+
+// Rollback moves only the directory this transaction published. A missing or
+// replaced directory is not ours to move, and the private stage is never replaced.
+func rollbackDiskPackageRoot(parent *os.File, name string, expected os.FileInfo, stage *os.File, staged string) error {
+	current, info, err := securepath.OpenChild(parent, name, true)
+	if err == nil {
+		err = current.Close()
+	}
+	if err != nil || !os.SameFile(expected, info) {
+		return e.New(e.CodeImmutableViolation, "published disk package root changed before rollback")
+	}
+	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), name, int(stage.Fd()), staged); err != nil {
+		return e.Wrap(e.CodeImmutableViolation, err, "restoring published disk package root without replacement")
+	}
+	return parent.Sync()
 }
 
 func reconciledDiskPackageBinding(plan *Plan, expected LifecycleOutputPlan, output Artifact) (string, definition.DiskInspectionProfile, error) {
