@@ -93,14 +93,21 @@ and evidence boundaries authenticate their own closures and share one exact-outp
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
-The explicit M2 `build-provenance-v1` mode instead consumes the original live held disk and authenticated
+The explicit narrower candidate `build-provenance-v1` mode instead consumes the original live held disk and authenticated
 transitive material trace. Both paths rehash the exported QCOW2, use the same atomic package/evidence
 transaction, preserve every producer evidence slot and bind raw payload separately from OCI identity.
-The M2 disk binding carries its evidence mode in signed release metadata; consumer verification requires
-matching source-bound documents and refuses inspection claims in that mode. Neither path accepts a
+The disk binding carries its descriptive evidence mode in signed release metadata. Document validators require
+matching source-bound documents and reject invented inspection claims. This is not independent consumer-policy
+admission of a disk mode: public Verification Policy has no disk-evidence-mode acceptance selector, and that
+admission remains deferred. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
-the live inspection-and-packaging operation; full generated production execution remains unexercised. The ordinary
+the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
+the original producer/material owners instead. It does not complete the proposed strict M2 target pending
+named-decider ratification. Both builds completed but strict inspection timed out in run `37445475840`.
+The narrower candidate completed both disk jobs in run `37486058412`, but aggregate release transport failed
+with insufficient hosted-runner storage before publication. [Recorded transport evidence](../evidence/2026-10-06-m2-release-carrier-transport.md)
+does not establish a complete production Run or consumer acceptance. The ordinary
 local scheduler still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate

@@ -1,15 +1,17 @@
 package factory
 
 import (
+	"slices"
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-// A stage is a scheduling choice, not a new graph or authority record. Only
-// consecutive compatible offline utility nodes share a runner. Contracting a
-// consecutive interval of a topological ordering cannot introduce a cycle.
+// A stage is a scheduling choice, not a new graph or authority record. Compatible
+// offline utilities group consecutively; a disk's operations share its live owner
+// even when interleaved with another output. Validate the contracted job graph
+// because grouping nonconsecutive nodes can otherwise introduce a cycle.
 type githubStage struct {
 	DiskOutput string
 	ID         string
@@ -107,12 +109,35 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 		if stage.DiskOutput != "" {
 			stage.ID = githubJobID("disk/" + stage.DiskOutput)
 			stage.Name = "Build, inspect and package " + stage.DiskOutput
+			if diskBuildProvenance(plan) {
+				stage.Name = "Build and package producer evidence for " + stage.DiskOutput
+			}
 		}
 		for _, node := range stage.Nodes {
 			jobs[node.ID] = stage.ID
 		}
 	}
+	if err := validateGitHubStageDAG(plan, stages, jobs); err != nil {
+		return nil, nil, err
+	}
 	return stages, jobs, nil
+}
+
+func validateGitHubStageDAG(plan *Plan, stages []githubStage, jobs map[string]string) error {
+	_, artifacts := planIndex(plan)
+	// Reuse the artifact scheduler's topological walk over the projected stage
+	// edges; this description does not replace or weaken complete Plan admission.
+	graph := ArtifactGraph{Artifacts: append([]Artifact(nil), plan.Graph.Artifacts...)}
+	for i := range graph.Artifacts {
+		graph.Artifacts[i].Producer = jobs[graph.Artifacts[i].Producer]
+	}
+	for _, stage := range stages {
+		graph.Nodes = append(graph.Nodes, Node{ID: stage.ID, Inputs: stage.inputs(artifacts, jobs)})
+	}
+	if len(topologicalFactoryNodes(graph)) != len(stages) {
+		return e.New(e.CodeEngineCapability, "GitHub grouped stages introduce a dependency cycle")
+	}
+	return nil
 }
 
 func githubUtilityNode(node Node) bool {
@@ -137,6 +162,27 @@ func (stage githubStage) inputs(artifacts map[string]Artifact, nodeJobs map[stri
 		}
 	}
 	return uniqueSorted(inputs)
+}
+
+// carrierInputs projects logical dependencies onto transported bytes. A compiled
+// disk's raw subject remains a graph input, but its bytes travel in the exact
+// publication wrapper, which publication observation rehashes against the raw
+// producer result. Never omit a raw subject unless both are also selected.
+func (stage githubStage) carrierInputs(plan *Plan, artifacts map[string]Artifact, nodeJobs map[string]string) ([]string, error) {
+	inputs := stage.inputs(artifacts, nodeJobs)
+	carriers := make([]string, 0, len(inputs))
+	for _, id := range inputs {
+		if output, raw := diskPublicationRequirement(plan, artifacts[id]); raw {
+			if !slices.Contains(inputs, diskPublicationWrapperID(output)) ||
+				!slices.Contains(inputs, diskPublicationProducerResultID(output, artifacts[id])) {
+				return nil, e.New(e.CodeEngineCapability,
+					"GitHub stage %q consumes raw disk %q without its publication wrapper and producer record", stage.ID, id)
+			}
+			continue
+		}
+		carriers = append(carriers, id)
+	}
+	return carriers, nil
 }
 
 func (stage githubStage) needs(artifacts map[string]Artifact, nodeJobs map[string]string, bootstrap string) []string {

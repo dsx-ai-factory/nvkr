@@ -13,7 +13,10 @@ import (
 // mandatory and fails closed before executing a consumer. No wildcard selects
 // unrelated artifacts or merges their untrusted payloads directly into a workspace.
 func writeGitHubStageInputSteps(out *bytes.Buffer, plan *Plan, stage githubStage, artifacts map[string]Artifact, nodeJobs map[string]string, actions githubActionRefs) error {
-	inputs := stage.inputs(artifacts, nodeJobs)
+	inputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
+	if err != nil {
+		return err
+	}
 	if len(inputs) == 0 {
 		return nil
 	}

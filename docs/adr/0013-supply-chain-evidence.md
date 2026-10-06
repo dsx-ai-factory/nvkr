@@ -131,16 +131,21 @@ metadata; they do not claim dependency inspection. The separate full-disk profil
 and does not require a second catalog scanner selection; when both select the same native platform their
 pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
 
-The pipeline-attested M2 route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
+The narrower pipeline-attested producer-provenance candidate explicitly selects `Environment.diskEvidence: build-provenance-v1`.
 It retains the original held disk, exact producer results and authenticated transitive material handoffs,
 and publishes source-bound per-component CycloneDX producer documents under the existing signed evidence
 closure. These documents have no inspected dependency inventory and explicitly bind `nkd:diskEvidence`
-to `build-provenance-v1` and `nkd:diskInspection` to `deferred-m3`. The signed release disk binding carries
+to `build-provenance-v1` and `nkd:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
-mandatory. This is ordinary pipeline-attested M2 delivery, not diagnostic or qualified evidence.
-Deep disk/content inspection and material-to-filesystem reconciliation are M3 qualification requirements.
-Unknown modes fail closed; an omitted mode retains the strict contract. Consumers verify the declared mode
-against each document and reject invented inspection claims. Mode changes affect Environment/Plan and signed
+mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
+It does not complete the October 6 proposed strict M2 engineering target, pending named-decider ratification,
+which requires full disk/content inspection and material-to-filesystem reconciliation on both native architectures.
+Historical signed documents may retain the earlier `deferred-m3` scope token; do not rewrite those bytes or
+interpret that token as inspection evidence. M3 qualification separately checks the delivered evidence.
+Unknown modes fail closed; an omitted mode retains the strict contract. Document validators check the declared mode
+and reject invented inspection claims. The signed mode remains descriptive: public Verification Policy has no
+disk-evidence-mode acceptance selector. Independent consumer-policy admission requiring inspected disks remains
+deferred; a matching mode alone cannot establish that acceptance. Mode changes affect Environment/Plan and signed
 release metadata, not raw payload identity. Only the explicit native ARC publication route admits this mode.
 
 The strict `disk-image` inspection route requires a full CycloneDX inventory whose subject is the
@@ -148,7 +153,7 @@ exact delivered QCOW2 payload digest. It combines an authenticated trace of ever
 read-only inspection of the final disk, then reconciles both views. The material collector, disk codec/inspector,
 and package scanner are pinned tools and explicit Plan inputs. Missing tools or trace members, unreadable
 filesystems, unsupported encryption, scanner failure, or disagreement fails closed at admission or inspection.
-A catalog declaration alone supplies neither inventory nor publication authority; the explicit M2 route above
+A catalog declaration alone supplies neither inventory nor publication authority; the narrower producer-provenance route above
 requires authenticated live producer evidence instead of an inspected inventory.
 The authoring schema alone grants no disk evidence. The full-content operation selects an explicit
 Environment-native `diskInspectionProfiles` entry frozen in the Plan: the complete OCI image, inspector,

@@ -91,6 +91,13 @@ func renderText(selected view) string {
 			platform = " " + output.OS + "/" + output.Arch
 		}
 		fmt.Fprintf(&out, "\n%s (%s%s)\n  Derived artifact reference: %s\n  Build: %s\n", terminal(output.Name), terminal(output.Kind), terminal(platform), terminal(output.Reference), terminal(output.BuildDigest))
+		if output.Disk != nil {
+			mode := output.Disk.EvidenceMode
+			if mode == "" {
+				mode = "inspected"
+			}
+			fmt.Fprintf(&out, "  Declared disk evidence: %s (metadata; consumer policy not applied)\n", terminal(mode))
+		}
 		for _, subject := range output.BuildSubjects {
 			fmt.Fprintf(&out, "  Component: %s @ %s\n", terminal(subject.Component), terminal(subject.Digest))
 		}
@@ -117,6 +124,13 @@ func renderMermaid(selected view) string {
 		label := output.Name + " | " + output.Kind
 		if output.OS != "" || output.Arch != "" {
 			label += " | " + output.OS + "/" + output.Arch
+		}
+		if output.Disk != nil {
+			mode := output.Disk.EvidenceMode
+			if mode == "" {
+				mode = "inspected"
+			}
+			label += " | declared disk evidence: " + mode
 		}
 		fmt.Fprintf(&out, "  %s[\"%s\"]\n  root --> %s\n", id, mermaid(label), id)
 		for j, subject := range output.BuildSubjects {

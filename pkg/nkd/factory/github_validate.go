@@ -91,6 +91,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err != nil {
 		return err
 	}
+	if err := validateGitHubCarrierUploads(plan, document, stages, artifacts, nodeJobs, actions); err != nil {
+		return err
+	}
 	byNode := make(map[string]githubStage, len(plan.Graph.Nodes))
 	for _, stage := range stages {
 		for _, node := range stage.Nodes {
@@ -352,7 +355,11 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
 		}
-		for _, input := range stage.inputs(artifacts, nodeJobs) {
+		carrierInputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
+		if err != nil {
+			return err
+		}
+		for _, input := range carrierInputs {
 			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("restore-inputs", "stage", stage.ID)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not restore exact input %q", jobID, input)
 			}
@@ -440,6 +447,61 @@ func stepUses(steps []githubStep, action string) bool {
 		}
 	}
 	return false
+}
+
+// Validate transport against the admitted graph, not by parsing provider pattern
+// syntax. Every restored carrier has exactly one uploader in its producer job.
+// Raw disk subjects are deliberately absent: their selected wrapper and producer
+// record are mandatory carrier inputs at the shared projection boundary.
+func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, stages []githubStage,
+	artifacts map[string]Artifact, nodeJobs map[string]string, actions githubActionRefs) error {
+	uploads := map[string][]string{}
+	for jobID, job := range document.Jobs {
+		for _, step := range job.Steps {
+			if step.Uses == actions.Upload {
+				uploads[step.With["name"]] = append(uploads[step.With["name"]], jobID)
+			}
+		}
+	}
+	require := func(id string) error {
+		jobs := uploads[githubArtifactName(id)]
+		if len(jobs) != 1 || jobs[0] != nodeJobs[artifacts[id].Producer] {
+			return e.New(e.CodeEngineCapability, "GitHub restored carrier %q requires exactly one uploader in its producer job", id)
+		}
+		return nil
+	}
+	for _, stage := range stages {
+		inputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
+		if err != nil {
+			return err
+		}
+		for _, id := range inputs {
+			if err := require(id); err != nil {
+				return err
+			}
+		}
+	}
+	if len(plan.LifecycleOutputs) > 0 {
+		for _, artifact := range plan.Graph.Artifacts {
+			if _, raw := diskPublicationRequirement(plan, artifact); raw {
+				continue
+			}
+			if err := require(artifact.ID); err != nil {
+				return err
+			}
+		}
+	}
+	for jobID, job := range document.Jobs {
+		for _, step := range job.Steps {
+			if step.Uses != actions.Download || step.With["name"] == "" {
+				continue
+			}
+			if len(uploads[step.With["name"]]) != 1 {
+				return e.New(e.CodeEngineCapability, "GitHub job %q downloads %q without exactly one uploader", jobID, step.With["name"])
+			}
+		}
+	}
+	return nil
 }
 
 func joinRuns(steps []githubStep) string {

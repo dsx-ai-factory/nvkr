@@ -63,6 +63,36 @@ func TestRenderEscapesUntrustedLabels(t *testing.T) {
 	}
 }
 
+func TestRenderShowsDiskEvidenceWithoutPolicyAuthority(t *testing.T) {
+	for _, mode := range []string{"", "build-provenance-v1"} {
+		for _, format := range []string{"text", "json", "mermaid"} {
+			t.Run(mode+"/"+format, func(t *testing.T) {
+				description := delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{{Output: delivery.Output{Name: "disk", Kind: "disk-image", Disk: &delivery.DiskOutput{EvidenceMode: mode}}}}}
+				raw, err := Render(description, Options{Format: format})
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := mode
+				if mode == "" {
+					want = "inspected"
+				}
+				if format != "json" && !strings.Contains(string(raw), want) {
+					t.Fatalf("disk evidence mode hidden: %s", raw)
+				}
+				if !strings.Contains(string(raw), "signatures and policy not verified") {
+					t.Fatalf("view overclaims authority: %s", raw)
+				}
+				if format == "json" {
+					var decoded view
+					if err := json.Unmarshal(raw, &decoded); err != nil || decoded.Outputs[0].Disk.EvidenceMode != mode {
+						t.Fatalf("JSON loses original evidence mode: %s / %v", raw, err)
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestRenderJSONEscapesUnicodeControlsWithoutChangingValues(t *testing.T) {
 	for _, test := range []struct {
 		name, value, escaped string

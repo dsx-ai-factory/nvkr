@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -57,6 +58,50 @@ func TestPrivateImageCredentialLifetime(t *testing.T) {
 	}
 }
 
+func TestPrivateImagePullCommandDoesNotInheritCredentials(t *testing.T) {
+	for _, key := range []string{sourceTokenEnv, githubImageToken, "NKD_CREDENTIAL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "DOCKER_HOST", "DOCKER_CONFIG"} {
+		t.Setenv(key, "must-not-inherit")
+	}
+	t.Setenv("PATH", "/usr/bin:/bin")
+	image := "ghcr.io/example/tool@sha256:" + strings.Repeat("a", 64)
+	command := githubImagePullCommand(t.Context(), "/private-auth", "linux/arm64", image)
+	if !slices.Equal(command.Args, []string{"docker", "--config", "/private-auth", "pull", "--platform", "linux/arm64", image}) ||
+		!slices.Equal(command.Env, []string{"PATH=/usr/bin:/bin", "DOCKER_HOST=unix:///var/run/docker.sock"}) {
+		t.Fatalf("pull escaped its fixed argument/environment boundary: %v / %v", command.Args, command.Env)
+	}
+}
+
+func TestPrivateImagePullRejectsCredentialAndCancellationBeforeWork(t *testing.T) {
+	for _, test := range []struct {
+		name, user, token string
+		cancel            bool
+		want              e.Code
+	}{
+		{"missing user", "", "token", false, e.CodeFetchFailed},
+		{"missing token", "reader", "", false, e.CodeFetchFailed},
+		{"colon user", "reader:admin", "token", false, e.CodeFetchFailed},
+		{"newline user", "reader\n", "token", false, e.CodeFetchFailed},
+		{"carriage return user", "reader\r", "token", false, e.CodeFetchFailed},
+		{"newline token", "reader", "token\n", false, e.CodeFetchFailed},
+		{"carriage return token", "reader", "token\r", false, e.CodeFetchFailed},
+		{"canceled", "reader", "token", true, e.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if test.cancel {
+				cancel()
+			}
+			err := pullGitHubImages(ctx, []string{"image"}, "linux/amd64", test.user, test.token,
+				func(context.Context, string, string, string) error {
+					t.Fatal("denied preparation reached runtime")
+					return nil
+				})
+			assertFactoryErrorCode(t, err, test.want)
+		})
+	}
+}
+
 func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
 	if err != nil {
@@ -104,6 +149,37 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 			}
 			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[GitHubWorkflowPath])
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+		})
+	}
+}
+
+func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
+	plan := arcTestPlan(t, "linux/amd64")
+	plan.Environment.Publication.RepositoryPrefix = "ghcr.io/example/nkd"
+	plan.Environment.DiskInspectionProfiles = nil
+	plan.Environment.DiskEvidence = "build-provenance-v1"
+	stage := githubStage{ID: "disk-stage", DiskOutput: "image", Nodes: []Node{{Container: plan.Environment.Publication.RepositoryPrefix + "/toolchains/packer@sha256:" + strings.Repeat("a", 64)}}}
+	prepare := githubStep{Run: githubRunnerCommand("prepare-images", "stage", stage.ID), Env: githubImageEnvironment()}
+	run := githubStep{Run: githubRunnerCommand("run-disk", "output", stage.DiskOutput)}
+	for _, test := range []struct {
+		name   string
+		steps  []githubStep
+		reason string
+	}{
+		{"before prepare", []githubStep{run, prepare}, "must precede"},
+		{"duplicate prepare", []githubStep{prepare, prepare, run}, "exactly once"},
+		{"missing prepare", nil, "preparation is missing"},
+		{"missing disk executor", []githubStep{prepare}, "grouped live executor"},
+		{"conditional disk executor", []githubStep{prepare, {Run: run.Run, If: "false"}}, "grouped live executor"},
+		{"ignored disk failure", []githubStep{prepare, {Run: run.Run, ContinueOnError: true}}, "grouped live executor"},
+		{"disk executor credential", []githubStep{prepare, {Run: run.Run, Env: map[string]string{sourceTokenEnv: "token"}}}, "grouped live executor"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateGitHubStageExecution(plan, stage, test.steps)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if !strings.Contains(err.Error(), test.reason) {
+				t.Fatalf("wrong boundary rejected: %v", err)
+			}
 		})
 	}
 }

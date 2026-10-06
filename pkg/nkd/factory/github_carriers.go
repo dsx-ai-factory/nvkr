@@ -31,7 +31,10 @@ func RestoreGitHubInputs(ctx context.Context, plan *Plan, stageID string, option
 	if selected == nil {
 		return e.New(e.CodeInvalidCatalog, "GitHub plan has no stage %q", stageID)
 	}
-	inputs := selected.inputs(artifacts, nodeJobs)
+	inputs, err := selected.carrierInputs(plan, artifacts, nodeJobs)
+	if err != nil {
+		return err
+	}
 	details := make([]string, 0, len(inputs))
 	for _, id := range inputs {
 		details = append(details, githubArtifactDetail(plan, "Input", id))

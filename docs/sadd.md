@@ -258,10 +258,12 @@ cannot alter the authenticated material bytes, component, architecture, digest o
 NKE OS producer owns its embedded contents. IR/Plan lowering binds the exact source and material producers and
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
-verdict. Production VM execution and held-result population remain capability-gated; direct producer selection
-does not introduce independently built OS layers. M2 disk delivery uses exact live producer and material
-evidence with explicit deferred-inspection scope. ADR-13's strict mode and M3 qualification require a full
-inventory reconciling traced materials with read-only inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
+verdict. Production VM execution and held-result population use the separately admitted native ARC route;
+direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
+live producer/material evidence and reports inspection as not performed. It does not complete the proposed
+strict M2 target pending named-decider ratification. ADR-13's strict mode requires a full inventory reconciling
+traced materials with read-only inspection of each native AMD64 and ARM64 disk; M3 qualification separately
+checks that evidence. That composition claim does not establish NKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
@@ -454,7 +456,7 @@ of Environment publication namespaces. Helm digest overrides remain possible; de
 
 `curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
 An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate
-deferred inspection and material-reconciliation contract; runtime correctness remains with NKE. Any deferred
+strict inspection and material-reconciliation contract in ADR-13; runtime correctness remains with NKE. Any deferred
 registration transport must consume accepted artifact references without adding a topology model.
 
 ### External Interface and Specification {#external-interface-and-specification}
@@ -861,8 +863,10 @@ For Docker's separate daemon namespace, a fixed device projection additionally c
 admitted character-device numbers before Packer runs. Committed-head Docker/Packer/NKE ARM64 and AMD64 bakes and
 source-owned boot smoke passed through the local adapter on ARC, as recorded in
 [the 2026-10-01 evidence](evidence/2026-10-01-nke-arc-os-builds.md). This diagnostic execution does not establish
-generated hosted VM admission or qualification. The native ARC grouped executor is separately contract-tested; a complete generated M2 production run remains
-unexercised. Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
+qualification. The generated native ARC route also completed both builds in run `37445475840`, but strict
+inspection timed out. Producer-provenance disk jobs passed in run `37486058412`; aggregate transport then failed
+before publication, as the [dated evidence](evidence/2026-10-06-m2-release-carrier-transport.md) records.
+A complete generated M2 production Run remains unproven. Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
 the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
 deferred.
 Produced-artifact size remains an artifact and transport budget.
@@ -887,8 +891,8 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance remains amd64-only;
-additional architectures require their own source and runner acceptance.
+rollback helpers are removed and those workflows remain deferred (ADR-16). The proposed M2 engineering target
+requires independent native AMD64 and ARM64 source, runner and inspection acceptance, pending named-decider ratification.
 
 ### Quality-attribute scenarios
 
