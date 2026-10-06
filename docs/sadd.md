@@ -194,8 +194,10 @@ flowchart TB
 ```
 
 The graph describes logical dependencies; it does not require one job per logical node in every lane. Ordinary
-factory nodes exchange declared artifacts through provider transport. The proposed wrapped-build job keeps its
-large output in one job through publication and verification, avoiding repeated inter-job transfer (ADR-10).
+factory nodes exchange declared artifacts through provider transport. The native ARC disk group keeps the
+original producer and held disk open through disk-evidence packaging. Declared carriers then transport the
+package and evidence to separate generic hosted publication, signing and verification jobs, each with its own
+credential boundary (ADR-18/20). Fused large-output wrapped publication and verification remain deferred (ADR-10).
 
 | Boundary | Data and responsibility | Trust or persistence rule |
 |---|---|---|
@@ -799,9 +801,11 @@ Compilation is dominated by catalog size and graph cardinality. Execution is dom
 package construction and artifact transport. Reads and subprocesses must be bounded, but a bounded reader alone
 does not establish that a large-image workflow fits a hosted runner.
 
-For a wrapped job, capacity planning must include materialized sources, toolchains, build scratch, produced image,
-package representation and verification temporaries that coexist. Fusion removes repeated job transfer, not these
-storage requirements. No numeric capacity or duration target is invented here.
+For the live disk group, capacity planning must include materialized sources, toolchains, build scratch, produced
+image, package representation and, in strict mode, inspection temporaries that coexist. Keeping packaging with
+the producer preserves live ownership; it does not remove these storage requirements. Separate hosted jobs must
+also budget retained carriers, authenticated restoration snapshots, extracted inputs and publication or
+verification temporaries. No numeric capacity or duration target is invented here.
 
 Runner requirements are modeled with a generic per-step request, not as builder-specific metadata. Minimum CPU,
 memory and ephemeral storage, eligible host platforms, typed host capabilities, and an executor wall-time budget
