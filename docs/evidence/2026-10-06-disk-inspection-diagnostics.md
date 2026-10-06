@@ -192,8 +192,8 @@ The signed local conflict union combines diagnostic head `34774c5e112d1467c71377
 with execution parent `8ff3e010a0109cbd7c64d34bca4dcb3b70e7cd03`. It preserves the parent's
 qualified-root rejection of provenance-only disks, Packer diagnostic-route error aggregation and derived
 deadlines, alongside strict-only inspection collection, retention and exact upload admission. The parent's
-Plan inspection modules and documentation remain intact. Two independent source reviews found no blocking
-union defect; no test assertion, timeout, dependency or inventory gate was changed by conflict resolution.
+Plan inspection modules and documentation remain intact. No test assertion, timeout, dependency or inventory
+gate was changed by conflict resolution; the source and both parent-relative Go diffs are identified below.
 
 The frozen tracked Go/module/version content manifest is
 `4e365fa45b87fd4c2808e2b62297063670add1ebb8f39fcac92219b14bc21131`, unchanged before and after validation.
