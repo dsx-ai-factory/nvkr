@@ -1,0 +1,5 @@
+# ADR-18 admits exactly these native disk pools.
+self-hosted-runner:
+  labels:
+    - arc-amd64-kvm
+    - arc-arm64-kvm

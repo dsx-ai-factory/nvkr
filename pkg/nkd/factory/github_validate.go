@@ -154,10 +154,20 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if _, present := job.Env[sourceTokenEnv]; present {
 			return e.New(e.CodeEngineCapability, "GitHub source credential must be scoped to its fetch step")
 		}
+		if _, present := job.Env[githubImageToken]; present {
+			return e.New(e.CodeEngineCapability, "private image credential cannot be job-scoped")
+		}
 		wantSourceEnv := sourceEnvironments[jobID]
 		foundSource := false
 		for _, step := range job.Steps {
 			if len(step.Env) == 0 {
+				continue
+			}
+			if stage, ok := byNodeForJob(stages, jobID); ok && len(githubStagePrivateImages(plan, stage)) > 0 &&
+				strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID) {
+				if !reflect.DeepEqual(step.Env, githubImageEnvironment()) || step.If != "" || step.ContinueOnError || step.Uses != "" {
+					return e.New(e.CodeEngineCapability, "private image preparation requires only its exact read credential")
+				}
 				continue
 			}
 			if jobID == "nkd-lifecycle-run" && step.ID == "recover-artifacts" {
@@ -230,7 +240,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if len(catalogEnv) > 0 {
 			wantCondition = "${{ " + githubDispatchCondition(plan) + " }}"
 		}
-		if !ok || job.RunsOn != runner || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
+		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
@@ -260,6 +270,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		jobID := stage.ID
 		job, ok := document.Jobs[jobID]
 		wantEnvironment := ""
+		if stage.DiskOutput != "" {
+			wantEnvironment = githubARCEnvironment
+		}
 		if githubProtectedPublication(plan, node) {
 			wantEnvironment = githubReleaseEnvironment
 		}
@@ -288,6 +301,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		if err := validateGitHubStageExecution(plan, stage, job.Steps); err != nil {
 			return err
+		}
+		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read", "packages": "read"}) {
+			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read and packages:read")
 		}
 		wantCondition := stage.condition(plan)
 		if job.If != wantCondition {
@@ -453,6 +469,29 @@ func (document githubWorkflowDocument) String() string {
 // order even when scheduling shares a runner. Another node's command cannot
 // satisfy this node's isolation or identity checks.
 func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubStep) error {
+	if len(githubStagePrivateImages(plan, stage)) > 0 {
+		prepared := false
+		for _, step := range steps {
+			if strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID) {
+				if prepared || !reflect.DeepEqual(step.Env, githubImageEnvironment()) {
+					return e.New(e.CodeEngineCapability, "private toolchain preparation must occur exactly once with scoped credentials")
+				}
+				prepared = true
+			}
+			if (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) && !prepared {
+				return e.New(e.CodeEngineCapability, "private toolchain preparation must precede producer execution")
+			}
+		}
+		if !prepared {
+			return e.New(e.CodeEngineCapability, "private toolchain preparation is missing")
+		}
+	}
+	if stage.DiskOutput != "" {
+		if !hasExactGitHubRun(steps, githubRunnerCommand("run-disk", "output", stage.DiskOutput)) {
+			return e.New(e.CodeEngineCapability, "disk stage requires its grouped live executor")
+		}
+		return nil
+	}
 	next := 0
 	for _, step := range steps {
 		if step.ID == "" {

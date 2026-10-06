@@ -26,7 +26,7 @@ Missing or substituted descriptions still fail `CodeUnverifiedRef`; no source in
 discarded or replaced by a child. `TestMaintainedM2DeploymentImageMembership` exercises
 public catalog loading and Resolve/Compile for all 24 native selections. The separate
 34-output Git integration requires explicit opt-in and actual pinned-source access.
-These contracts do not supply missing production execution classes or inspector profiles.
+These contracts do not supply measured inspector profiles or runtime acceptance.
 
 ## Candidate output selections and requirement ownership
 
@@ -90,24 +90,24 @@ capture-enabled installer bake or a live evidence join.
 
 | Required field or closure | Current authoritative configuration | Missing evidence |
 | --- | --- | --- |
-| Disk toolchain host architecture | Separate AMD64/ARM64 source toolchain maps and native allowed-host platforms | Existing catalog digests are local identities; approved published per-native OCI manifests remain absent |
+| Disk toolchain host architecture | Separate AMD64/ARM64 source toolchain maps and native allowed-host platforms | The candidate overlay substitutes published native manifests under the recorded user exception; organizational reviews remain outstanding |
 | Packer and preparation tools | `toolchains/nkd-packer/toolchain.lock.json` and Dockerfile | `images` remains null; BUSL redistribution and vulnerability review approvals remain `not-recorded` |
-| Full inspector tools | `toolchains/nkd-disk-inspect/Dockerfile` and source lock | Updated helper closure, native execution, exact image identity and executable measurements required |
-| Syft inspector scanner | Source lock selects v1.51.1 and schemaVersion `16.1.10` | Native image execution and a retained external acquisition record remain separate |
-| Inspector architecture | Profile key must equal native `linux/amd64` or `linux/arm64` execution host | Both measured native full profiles and capacity grants remain required |
+| Full inspector tools | `toolchains/nkd-disk-inspect/Dockerfile` and source lock; [final-source native ARM64 and AMD64 preparation](evidence/2026-10-06-native-arc.md) recorded | Native registry manifests and measured profiles are wired; full M2 inspection remains unexercised |
+| Syft inspector scanner | Source lock selects v1.51.1 and schemaVersion `16.1.10`; native AMD64 version and executable measurements retained in the preparation record | Native tool execution does not establish full-disk content reconciliation or publication clearance |
+| Inspector architecture | Profile key must equal native `linux/amd64` or `linux/arm64` execution host | Both measured native profiles are authored; actual runner/daemon capacity must still pass admission |
 | Scratch and memory | B's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
 | Registry namespace | M2 candidate Environment explicitly authors `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` | Separate from production `cwe`/`nkectl` routes; live blob limits, retention and package access not verified here |
 | Registry credential | Existing `github:GITHUB_TOKEN` reference | Runtime values are not inspected or serialized; production credential admission/read-back required |
 | Signing identity | Existing main `nkd-run.yml` identity regex and Actions issuer | Existing policy copied byte-for-byte; protected publication environment and current keyless run remain unverified |
 | Private source transport | Exact `https://github.com/dsx-ai-factory/nke` CLI/controller and `https://github.com/dsx-ai-factory/nke.git` OS keys, sharing the existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
-| Generated runner route | ADR-18 generic-hosted-only rule | Native KVM capability for both routes remains unresolved; historical ARC diagnostics cannot establish generated production admission |
+| Generated runner route | ADR-18 explicit `native-kvm-v1` exception, native AMD64/ARM64 classes in the M2 Environment | Protected `nkd-arc` environment, ephemeral pool isolation and full grouped execution remain unverified; historical ARC diagnostics do not establish production acceptance |
 
 `definitions/nke-m2/environment-github.yaml` records the separate candidate publication prefix, existing signing policy and
-producer-declared build network permission. It omits unavailable native execution classes and inspector
-profiles. This is intentionally incomplete for production admission; no placeholder digest or invented runner
-class is supplied. Every missing field must be resolved before generation/production launch.
+producer-declared build network permission. It selects both native ARC classes and measured inspection profiles. The same 34-output Definition
+now generates M2 with the candidate-only native toolchain overlay. Generation is not runtime admission
+or release acceptance; package Actions read access and full native execution remain separate checks.
 
-Runtime selection uses only the supported typed `runtime: podman` and
+Runtime selection uses the narrowly admitted typed `runtime: docker` and
 `buildNetworkPolicy: producer-declared` controls. No `podmanStorageDriver` field,
 ambient storage variable or setup hook is supplied. Storage follows the existing
 runtime owner's admission/observation semantics; the historical explicit-VFS probe
@@ -123,7 +123,8 @@ producer set. The nine source-map consumers selected by each disk are `nke-agent
 `nke-cni-ovn`, `nke-image-inputs`, `nke-kubeadm-distro`, that architecture's disk root and patched
 installer producer, `nke-spire-agent`, and `ovn-kubernetes-chart`. Preserve `ovn-kube-ubuntu`'s
 separate pinned BuildKit image; its explicit component override is not a Packer-map consumer.
-No replacement is authored until its exact measured destination and required approvals exist.
+The authored candidate overlay binds all these fields to measured native images published under the
+explicit user exception recorded in the October 6 evidence; it does not invent completed reviews.
 
 Each native Environment `executionClasses` entry needs `name`, `runsOn`, `hostPlatform`,
 `resources`, `maxTimeoutSeconds` and `capabilities: [kvm]`. Provider/runtime isolation admission
@@ -138,7 +139,7 @@ because the schema can describe one.
 
 Each `diskInspectionProfiles[linux/amd64|linux/arm64]` entry needs its canonical digest-qualified
 native `image`, actual executable SHA-256 measurements for `inspectorDigest`, `codecDigest`,
-`guestfishDigest`, `scannerDigest` and `packageReaderDigest`, measured `resources` headroom,
+`guestfishDigest`, `scannerDigest` and `packageReaderDigest`, declared `resources` with runtime-measured headroom,
 positive `timeoutSeconds` no greater than 600, positive `maxFilesystemBytes` no greater than
 16 GiB, and production `scratchStorage: private-volume`. The full image authenticates the
 helper/appliance/runtime closure; package versions and helper-only binary hashes do not replace
@@ -146,8 +147,9 @@ that image pin. Resource and document bounds must admit the actual complete reta
 materials, not only an installed-package list. Selection follows the frozen root's native host
 binding; guest-platform package metadata remains distinct even for cross-guest TCG consumers.
 
-The current published-image fields in both toolchain source locks are null, with their owning
-license/security gates `not-recorded`. The Packer lock's `validatedNKE.commit` remains historical
+The general published-image fields in both toolchain source locks remain null, with their owning
+license/security gates `not-recorded`. M2 uses the separate candidate overlay and Environment pins
+authorized by the recorded user exception. Exact native registry manifest/config read-back is retained. The Packer lock's `validatedNKE.commit` remains historical
 `726f76944404e1106626b8333d3576bdf67b575b`, not the selected capture-capable source. Before claiming
 production readiness, native capture-enabled bakes must retain the selected
 `non-fde/apt-acquisitions.tar`, and original live Run owners must reconcile each exact final disk

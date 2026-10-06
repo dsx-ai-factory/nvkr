@@ -11,9 +11,10 @@ import (
 // consecutive compatible offline utility nodes share a runner. Contracting a
 // consecutive interval of a topological ordering cannot introduce a cycle.
 type githubStage struct {
-	ID    string
-	Name  string
-	Nodes []Node
+	DiskOutput string
+	ID         string
+	Name       string
+	Nodes      []Node
 }
 
 // githubStageTimeoutMinutes projects the producer-owned per-node timeout into
@@ -21,6 +22,10 @@ type githubStage struct {
 // bounded 60-minute adapter default. Grouped nodes execute serially, so their
 // declared budgets are added rather than taking only the largest value.
 func githubStageTimeoutMinutes(stage githubStage) (int, error) {
+	limit := uint64(githubMaximumJobTimeoutMinutes)
+	if stage.DiskOutput != "" {
+		limit = 1440
+	}
 	var total uint64
 	declared := false
 	undeclared := 0
@@ -34,10 +39,10 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 		if node.Requirements.TimeoutSeconds%60 != 0 {
 			minutes++
 		}
-		if minutes > githubMaximumJobTimeoutMinutes || total > githubMaximumJobTimeoutMinutes-minutes {
+		if minutes > limit || total > limit-minutes {
 			return 0, e.New(e.CodeEngineCapability,
 				"GitHub stage %q timeout exceeds the %d-minute job limit",
-				stage.ID, githubMaximumJobTimeoutMinutes)
+				stage.ID, limit)
 		}
 		total += minutes
 	}
@@ -48,10 +53,10 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	// serial node budgets. Give each undeclared node the bounded adapter default
 	// rather than silently counting it as zero.
 	for range undeclared {
-		if total > githubMaximumJobTimeoutMinutes-githubDefaultStageTimeoutMinutes {
+		if total > limit-githubDefaultStageTimeoutMinutes {
 			return 0, e.New(e.CodeEngineCapability,
 				"GitHub stage %q timeout exceeds the %d-minute job limit",
-				stage.ID, githubMaximumJobTimeoutMinutes)
+				stage.ID, limit)
 		}
 		total += githubDefaultStageTimeoutMinutes
 	}
@@ -60,15 +65,26 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 
 func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 	var stages []githubStage
+	diskStages := make(map[string]int)
 	for _, node := range topologicalFactoryNodes(plan.Graph) {
 		node, err := plan.ExecutionFor(node)
 		if err != nil {
 			return nil, nil, err
 		}
+		if output := githubDiskOutput(plan, node); output != "" {
+			index, exists := diskStages[output]
+			if !exists {
+				index = len(stages)
+				diskStages[output] = index
+				stages = append(stages, githubStage{DiskOutput: output})
+			}
+			stages[index].Nodes = append(stages[index].Nodes, node)
+			continue
+		}
 		if len(stages) > 0 {
 			last := &stages[len(stages)-1]
 			first := last.Nodes[0]
-			if len(last.Nodes) < 16 && githubUtilityNode(first) && githubUtilityNode(node) &&
+			if last.DiskOutput == "" && len(last.Nodes) < 16 && githubUtilityNode(first) && githubUtilityNode(node) &&
 				first.RunsOn == node.RunsOn && first.Container == node.Container && first.Platform == node.Platform {
 				last.Nodes = append(last.Nodes, node)
 				continue
@@ -87,6 +103,10 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 				ids = append(ids, node.ID)
 			}
 			stage.ID = githubJobID("process/" + strings.Join(ids, "+"))
+		}
+		if stage.DiskOutput != "" {
+			stage.ID = githubJobID("disk/" + stage.DiskOutput)
+			stage.Name = "Build, inspect and package " + stage.DiskOutput
 		}
 		for _, node := range stage.Nodes {
 			jobs[node.ID] = stage.ID
@@ -128,6 +148,9 @@ func (stage githubStage) needs(artifacts map[string]Artifact, nodeJobs map[strin
 }
 
 func (stage githubStage) condition(plan *Plan) string {
+	if stage.DiskOutput != "" {
+		return "${{ " + githubDispatchCondition(plan) + " }}"
+	}
 	for _, node := range stage.Nodes {
 		if node.Kind == NodeVerify {
 			return "${{ always() && " + githubDispatchCondition(plan) + " }}"

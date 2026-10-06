@@ -17,6 +17,7 @@ const (
 	GitHubWorkflowPath               = ".github/workflows/nkd-run.yml"
 	FactoryPlanPath                  = ".github/nkd-run/plan.json"
 	githubReleaseEnvironment         = "nkd-release"
+	githubARCEnvironment             = "nkd-arc"
 	githubExecutionCondition         = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
 	githubSupportJobTimeoutMinutes   = 15
 	githubDefaultStageTimeoutMinutes = 60
@@ -46,7 +47,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "GitHub generation"); err != nil {
+	if err := admitGitHubRequirements(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}
 	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {
@@ -95,7 +96,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		jobID := bootstrapJobs[runner]
 		fmt.Fprintf(&body, "  %s:\n", jobID)
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle("Prepare NKD runner ("+runner+")"))
-		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runner))
+		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runner)))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		if len(githubCatalogSourceEnvironment(plan)) > 0 {
 			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
@@ -136,10 +137,17 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(needs, ", "))
 		fmt.Fprintf(&body, "    if: %s\n", stage.condition(plan))
+		if stage.DiskOutput != "" {
+			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubARCEnvironment))
+		}
 		if githubProtectedPublication(plan, node) {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
 		}
 		env := map[string]string{}
+		privateImages := len(githubStagePrivateImages(plan, stage)) > 0
+		if privateImages {
+			fmt.Fprintln(&body, "    permissions:\n      contents: read\n      packages: read")
+		}
 		for k, v := range plan.Environment.Runtime.Variables {
 			env[k] = v
 		}
@@ -207,6 +215,20 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
 		}
+		if privateImages {
+			fmt.Fprintln(&body, "      - name: Prepare private native toolchains\n        env:")
+			for _, key := range sortedKeys(githubImageEnvironment()) {
+				fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(githubImageEnvironment()[key]))
+			}
+			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand("prepare-images", "stage", stage.ID))
+		}
+		if stage.DiskOutput != "" {
+			writeGitHubShellStep(&body, stage.Name, []string{githubRunnerCommand("run-disk", "output", stage.DiskOutput)})
+			for _, member := range stage.Nodes {
+				writeGitHubOutputSteps(&body, plan, member, artifacts, actions)
+			}
+			continue
+		}
 		for _, node := range stage.Nodes {
 			fmt.Fprintf(&body, "      - name: %s\n", yamlSingle(githubNodeLabel(plan, node)))
 			fmt.Fprintf(&body, "        id: %s\n", githubJobID(node.ID))
@@ -232,7 +254,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		runners := sortedKeys(bootstrapJobs)
 		fmt.Fprintln(&body, "  nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
-		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runners[0]))
+		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runners[0])))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))

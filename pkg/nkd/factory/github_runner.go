@@ -192,7 +192,7 @@ func admitGitHubPlan(ctx context.Context, plan *Plan) error {
 	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub execution"); err != nil {
 		return err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "GitHub execution"); err != nil {
+	if err := admitGitHubRequirements(plan, "GitHub execution"); err != nil {
 		return err
 	}
 	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {

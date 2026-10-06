@@ -107,9 +107,9 @@ one IR node (`fetch → build → collect`). Every job uses the same execution c
 The IR is pinned data. Qualified graph diagnostics execute the exact admitted node bundle; maintained Runs
 execute a producer reference from the complete Plan through `factory execute-node`.
 
-### 3. Helper-owned isolation on generic hosted runners
+### 3. Helper-owned isolation and narrowly admitted native ARC disks
 
-Every job uses a generic hosted runner. The verified `nkd-exec` helper launches each pinned toolchain container
+Jobs use generic hosted runners except the explicit native ARC disk policy below. The verified `nkd-exec` helper launches each pinned toolchain container
 through the shared `pipeline.Local.ExecNode` launcher used by local and hosted Run operations. Adapters render job topology, dependencies
 and declared transport; they do not reproduce isolation as provider-specific build syntax. Fetch/pull nodes
 materialize pinned inputs first; hermetic build and verification nodes enforce network denial, read-only inputs,
@@ -125,7 +125,50 @@ Environment selects the runtime and its pins. Rootless podman is the intended de
 operator-selected alternative. Admit the configured runtime before work; do not silently choose another sandbox
 or weaker isolation. Rootless operation still depends on supported user namespaces, UID mapping, storage,
 cgroups and the provider's nesting policy. A mounted privileged Docker socket remains an explicit trust cost.
-Missing prerequisites fail capability admission. No bespoke/self-hosted runner labels are emitted.
+Missing prerequisites fail capability admission. Arbitrary self-hosted labels are not admitted by the native disk route.
+
+The pipeline-attested `githubARC: native-kvm-v1` Environment policy admits only native Linux AMD64 and ARM64
+unencrypted direct-Packer QCOW2 outputs with required KVM. Their execution classes select exactly
+`arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
+claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
+The operator must provision ephemeral single-job runners and restrict pool access to the reviewed workflow on the default branch and any exact
+branches explicitly admitted by `githubDispatchBranches`. The generated disk jobs use the `nkd-arc` protected Environment. Provider configuration and fresh
+native interoperability are external acceptance requirements; emitting a label or naming an Environment does
+not establish those facts.
+
+The route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
+`nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
+It permits no arbitrary setup, injected environment, job container or services.
+Docker is the initial admitted runtime. Bootstrap, source fetch, publication, signing and finalization remain
+on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
+and packaging operations into one bounded helper invocation against the complete Plan. The original producer
+session and held disk survive through reconciliation and receipt-gated packaging. The raw disk has no independent
+carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
+remain required. Only fixed source-fetch steps receive private-source credentials; ARC disk jobs receive no
+source token, registry-write credential or OIDC signing token.
+
+Internal native toolchains beneath the candidate publication prefix's `toolchains/`
+repositories use a separate preparation step with `contents: read` and `packages: read`.
+Only that step receives the ephemeral workflow token. The helper admits the complete Plan,
+native platform and disk host requirements before pulling; it uses a private temporary Docker
+configuration and deletes it on success or failure before source or producer execution.
+Held runtime observation accepts an already-local exact repository digest, rejects a present
+but mismatched record, and pulls only after a failed local lookup. Image/platform/tool-byte
+admission remains required. No registry credential is forwarded into producer containers.
+The package owner must grant the workflow repository Actions read access separately.
+
+Before toolchain preparation or producer work the helper binds the native host and observes cgroup-capped
+CPU/memory, held-workspace capacity and KVM through the existing single-use VM admission. It repeats admission
+inside the producer deadline, uses the same guarded Docker device projection, and closes/joins all held owners.
+Published native Packer and full-inspector image references and all measured inspector executable pins are required.
+The whole ARC group has a bounded sum of serial operation budgets, capped at 24 hours; generic hosted jobs
+retain their six-hour cap. Current availability is not a capacity reservation. The local runtime observations
+remain unqualified descriptions; the complete hosted finalizer, signing and consumer checks own the production claim.
+
+Native preparation is a separate read-only-permission workflow that builds both images and records exact local
+image/tool measurements on matching native hosts. Measurements do not supply publication approval or registry
+pins. Toolchain publication gates and full generated M2 operational acceptance remain unresolved until separately
+recorded; the generation contract must not fill those inputs with placeholders.
 
 Held Linux Podman execution uses a package-owned, initially empty `XDG_CONFIG_HOME`, removed by the same
 runtime owner on close. It does not inherit caller Podman configuration or ambient storage-driver overrides;
@@ -224,7 +267,7 @@ material bytes, digest, component, architecture or deterministic staging path. T
 class, uses its host architecture to select the pinned VM
 toolchain, and projects the raw disk producer artifact into the named lifecycle output without ordinary binary
 packaging. A material-bearing command producer remains unsupported because it has no typed manifest handoff.
-The local unencrypted direct-Packer adapter is connected; command, encrypted, hosted and qualified VM adapters
+The local unencrypted direct-Packer adapter is connected; command, encrypted and qualified VM adapters
 still fail before source, subprocess, or output work. Runner requirements are not VM-image-specific
 metadata. The generic `execution.Requirements` shape carries minimum CPU, memory and ephemeral-storage capacity,
 an optional sorted OR-set of eligible runner-host platforms, typed capability policies, and an exact
@@ -266,8 +309,8 @@ architecture. Plan admission recomputes the deterministic selection from the exa
 rejects a substituted class, route, request, or binding. The class inventory affects Environment and Plan identities; the selected binding affects full-IR bytes and Plan identity. Neither
 enters logical build identity.
 
-Execution-class declarations are planning input, not runtime proof. Every current local or hosted execution
-adapter still rejects a selected build with nonempty execution requirements before execution or emitted output.
+Execution-class declarations are planning input, not runtime proof. Ordinary adapters reject requirements;
+local direct-Packer execution and the explicit native ARC disk route perform the VM admission described here.
 A runtime adapter must authenticate the realized host platform, capacity, capability exposure, and enforced
 deadline before work; a provider's outer job timeout must permit the authored executor budget.
 
@@ -338,8 +381,9 @@ The local unqualified adapter does not configure a subordinate container UID or 
 An escape from its Packer/QEMU consumer would therefore act as the invoking host user against resources already
 available to that user, despite the container's network, filesystem, capability and privilege restrictions. This
 is an explicit limitation of the unqualified local lane, not an accepted hosted or qualified isolation boundary.
-A hosted or qualified adapter must authenticate and enforce a subordinate identity, user namespace or stronger
-provider sandbox and record real interoperability evidence before it may admit this producer.
+Qualified adapters require an authenticated subordinate identity, user namespace or stronger provider sandbox.
+The pipeline-attested native ARC exception instead explicitly trusts the operator-managed ephemeral runner and
+daemon under §3; interoperability evidence remains required before claiming operational acceptance.
 
 Fresh Docker volumes and `docker cp` content are root-owned. One fixed input-extraction container runs as root
 with only `CAP_CHOWN` and `CAP_DAC_OVERRIDE`, mounts only the attempt's input and work volumes, and has no network
@@ -363,9 +407,8 @@ that may belong to another live attempt.
 This is current-availability authority for the current local direct-Packer VM adapter, not a resource reservation, authenticated
 provider allocation, cross-process receipt, or qualification evidence. Holding the validated KVM descriptor
 proves availability through the callback lifetime; it does not prove Packer or QEMU consumed that exact
-descriptor. Driver dispatch must enforce the selected device mode and use the supplied deadline context. A hosted
-or qualified adapter must independently authenticate its effective provider or cgroup allocation and outer
-deadline before it can admit work.
+descriptor. Driver dispatch must enforce the selected device mode and use the supplied deadline context. The native ARC exception measures cgroup-capped availability and enforces the authored deadline without
+claiming authenticated provider allocation. Qualified adapters still require independent allocation evidence.
 
 For the local Docker adapter, the daemon may occupy a different PID/mount namespace from NKD. A client-side
 `/proc/<pid>/fd/<fd>` therefore is not a portable daemon device path. The adapter retains and API-validates the
@@ -386,7 +429,7 @@ lowering. A CI adapter may transport typed inputs and outputs, but it may not re
 command.
 
 VM topology beyond the required-KVM same-architecture invariant, arbitrary devices, nested virtualization, NUMA,
-accelerators, requirements on non-build nodes, hosted adapter integration, qualified runtime authentication, and
+accelerators, requirements on non-build nodes, general hosted VM adapters, qualified runtime authentication, and
 provider-specific lowering remain deferred. The narrowly scoped input-extraction stage above is the only local
 direct-Packer root exception; it grants no general privileged producer lane. Produced-artifact size remains an
 artifact and transport budget. An adapter may not reconstruct producer commands, invoke an upstream workflow, or

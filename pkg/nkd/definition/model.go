@@ -84,6 +84,9 @@ type APTOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
+	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
+	// configuration, not provider isolation or runtime-capacity evidence.
+	GitHubARC string `json:"githubARC,omitempty"`
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
 	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`
 	APIVersion             string                           `json:"apiVersion"`
@@ -237,6 +240,9 @@ func (environment Environment) Validate() error {
 	}
 	if len(environment.GitHubDispatchBranches) > 32 {
 		return e.New(e.CodeInvalidCatalog, "too many GitHub dispatch branches")
+	}
+	if environment.GitHubARC != "" && environment.GitHubARC != "native-kvm-v1" {
+		return e.New(e.CodeEngineCapability, "unsupported GitHub ARC policy %q", environment.GitHubARC)
 	}
 	previousBranch := ""
 	for _, branch := range environment.GitHubDispatchBranches {

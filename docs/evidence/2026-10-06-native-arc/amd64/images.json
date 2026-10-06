@@ -1,0 +1,9 @@
+{
+  "scope": "unqualified-diagnostic",
+  "platform": "linux/amd64",
+  "baseSourceCommit": "61ec66fa4ffaf75fee291450f7572d244f2e624f",
+  "sourceHasUncommittedChanges": true,
+  "inspectorImageID": "sha256:ff2a9dc76c7e6452c5b19416370f30a250b952b92af6296637978ec7abcebbc8",
+  "packerImageID": "sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013",
+  "publicationApproved": false
+}

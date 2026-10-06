@@ -841,13 +841,18 @@ The material manifest is derived from authenticated producer observations; an au
 projection can change only its schema and per-binding kind vocabulary. Bounded in-process cleanup owns ordinary
 completion and cancellation; authenticated
 cross-process orphan recovery after a hard process or host failure remains deferred. Command/Make, encrypted-disk,
-hosted and qualified VM adapters remain closed.
+general hosted and qualified VM adapters remain closed. ADR-18 defines the explicit native ARC disk exception, including exact Environment-authored manual
+dispatch branches matched by deployment policies and signing identity.
 
 The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
 Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,
 default-none network mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
-hosted or qualified identity boundary. Those lanes require an authenticated subordinate identity, user namespace
-or stronger provider sandbox plus recorded interoperability evidence.
+hosted or qualified identity boundary. The qualified lane requires an authenticated subordinate identity, user namespace
+or stronger provider sandbox plus recorded interoperability evidence. The explicit pipeline-attested ARC policy
+trusts the operator-managed ephemeral runner/daemon, with observed native capacity and bounded execution.
+Internal candidate toolchains use a separate packages:read preparation step. Its temporary registry
+credentials are deleted before source/producer execution; the held runtime independently revalidates
+the exact locally prepared image. Package Actions access is configured separately from workflow scopes.
 
 The local capability and driver result are unqualified current-availability evidence, not authenticated provider
 allocation, reservation, pipeline attestation or qualification evidence. Holding a validated KVM descriptor proves
@@ -857,8 +862,8 @@ For Docker's separate daemon namespace, a fixed device projection additionally c
 admitted character-device numbers before Packer runs. Committed-head Docker/Packer/NKE ARM64 and AMD64 bakes and
 source-owned boot smoke passed through the local adapter on ARC, as recorded in
 [the 2026-10-01 evidence](evidence/2026-10-01-nke-arc-os-builds.md). This diagnostic execution does not establish
-generated hosted VM admission or qualification. Hosted admission, provider proof, and VM
-topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
+generated hosted VM admission or qualification. The native ARC grouped executor is separately contract-tested; a complete generated M2 production run remains
+unexercised. Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
 the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
 deferred.
 Produced-artifact size remains an artifact and transport budget.

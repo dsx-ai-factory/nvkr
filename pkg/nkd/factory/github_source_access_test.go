@@ -197,7 +197,13 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			}
 		}
 	}
-	if found["validate-catalog"] != 1 || found["finalize-catalog"] != 1 {
+	bootstraps := 0
+	for id := range document.Jobs {
+		if strings.HasPrefix(id, "build-runner-") {
+			bootstraps++
+		}
+	}
+	if found["validate-catalog"] != bootstraps || found["finalize-catalog"] != 1 {
 		t.Fatalf("catalog revalidation credentials missing: %v", found)
 	}
 	for _, tc := range []struct{ name, old, replacement string }{

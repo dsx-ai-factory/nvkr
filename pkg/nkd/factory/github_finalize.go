@@ -30,7 +30,13 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 			return e.New(e.CodeInvalidCatalog, "GitHub finalizer artifact %q has no producer job", artifact.ID)
 		}
 	}
-	pattern, err := githubCarrierPattern(plan.Graph.Artifacts)
+	var carriers []Artifact
+	for _, artifact := range plan.Graph.Artifacts {
+		if _, raw := diskPublicationRequirement(plan, artifact); !raw {
+			carriers = append(carriers, artifact)
+		}
+	}
+	pattern, err := githubCarrierPattern(carriers)
 	if err != nil {
 		return err
 	}
