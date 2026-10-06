@@ -126,8 +126,10 @@ Replacing the former Recipe binding changes document identity; old evidence is n
 A Definition may select a catalog-pinned Syft executable through `sbomTool`. Both maintained NKE
 Environments require it. The graph then requires each observed payload and the acquired scanner as explicit
 SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismatched bytes, scanner errors and
-empty inventories fail closed. Without `sbomTool`, the existing declaration-only documents provide source
-metadata; they do not claim dependency inspection.
+empty inventories fail closed. Without `sbomTool`, ordinary declaration-only documents provide source
+metadata; they do not claim dependency inspection. The separate full-disk profile pins its own scanner
+and does not require a second catalog scanner selection; when both select the same native platform their
+pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
 
 A `disk-image` admitted for execution or publication requires a full CycloneDX inventory whose subject is the
 exact delivered QCOW2 payload digest. It combines an authenticated trace of every fetched or built material with
@@ -135,8 +137,120 @@ read-only inspection of the final disk, then reconciles both views. The material
 and package scanner are pinned tools and explicit Plan inputs. Missing tools or trace members, unreadable
 filesystems, unsupported encryption, scanner failure, or disagreement fails closed at admission or inspection.
 A catalog declaration may validate without those tools, but it is not a disk SBOM and cannot compile or publish.
-Disk Plan lowering, material tracing, inspection, reconciliation, and evidence publication are not implemented
-by the authoring schema.
+The authoring schema alone grants no disk evidence. The full-content operation selects an explicit
+Environment-native `diskInspectionProfiles` entry frozen in the Plan: the complete OCI image, inspector,
+codec, guestfish, Syft and dpkg-deb executable pins, CPU/RAM ceilings (at least 2 GiB for the appliance), scratch capacity minima,
+filesystem expansion bound and wall-time limit. Changing this observation profile changes Environment/Plan identity rather
+than the logical producer Build. The pinned tools own disk/filesystem, package and OCI grammars;
+NKD projects their observations and does not execute guest programs or package installation scripts.
+
+The original held Packer artifact retains its declared acquisition carrier before producer cleanup.
+The runtime owns capacity admission, snapshot creation, bounded offline content scanning, snapshot
+closure and permit release as one registered operation. Factory retains the original Run permit
+through inspection of the disk, base installer, staged material closure and captured guest APT archives.
+Queueing and profile/trace admission remain bounded to ten minutes. The selected authenticated profile's
+wall-time limit multiplied by the exact content-operation count (root, other trace members and the one
+complete acquisition carrier) sets the scan/recheck deadline from the original operation start. An earlier
+caller deadline or Run closure still cancels the entire join; recursive scans do not add allowances.
+Reconciliation rejects absent input classes and installed package identities absent from those inspected
+inputs. The exact captured package bytes are separately read by pinned dpkg-deb before source-reported
+metadata is accepted. Owner-issued content classes distinguish filesystem package databases, container
+inventories and held Debian archives: a container database cannot justify an installed host Debian package.
+The native Syft adapter retains real/access-path coordinates through admission. Its recursive database
+cataloger can find unpacked or containerd snapshot roots; those nested package databases return
+`CodeEngineCapability` with a distinct diagnostic until a separate held root/container observation exists.
+This gate applies to filesystem, archive and container scans through the shared native report decoder. No path-based container
+identity is invented, no package is silently dropped, and this refusal does not establish functional
+nested-storage reconciliation. Scanner locations remain descriptions, not installed-origin authority.
+Correspondence is checked before public document deduplication; those internal classes do not assert
+installed origin or package ownership. Loose-file hashing observes bytes, not their derivation.
+Unknown package versions remain unknown in descriptive inventory. Final material correspondence requires
+an exact observed version: equal names with unknown versions do not prove identical package content.
+Per-material mixed scanner/package-reader/file-walk documents use the descriptive `disk-content/v1`
+inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operation uses
+`disk-reconciled/v1` with an `operating-system` subject. File dependency inventories are admitted only
+for these per-artifact disk methods, not ordinary Helm/Syft dependency documents. Source declarations
+cannot relabel the inspected disk subject. This is descriptive vocabulary validation: neither a subject
+type nor a method string restores a runtime receipt or grants publication authority.
+
+The implemented QCOW2 reader exports libguestfs's inspected, mounted filesystem tree, not an independently
+enumerated inventory of every filesystem extent. Unmounted or unrecognized content is not proven covered.
+The installer reader supports ISO9660 and its recognized SquashFS payload; a generic raw material is not
+thereby known to be a base installer. The exact authenticated root consumer's declared `installer-iso`
+edge selects that purpose; raw output type alone does not. Transitive and other raw ISO inputs retain
+staged `installer-content` inspection and per-component documents, without satisfying the mandatory
+base or supplying base-filesystem package correspondence. Both operations use the existing ISO/SquashFS
+reader: other raw formats remain unsupported at its format boundary rather than disappearing from the
+trace. Nested image discovery recognizes bounded gzip or plain tar
+contents, not image format from a filename. The pinned Docker decoder requires an unambiguous Docker
+manifest; OCI layouts reuse the existing safe transport extractor and complete offline closure verifier.
+Every accepted image is inspected, while foreign platforms, unsupported descriptors, missing or extra
+blobs and mixed OCI/Docker markers fail closed without partial inventory. Modern mixed Docker-save
+archives, OCI member names prefixed with `./`, and OCI indexes carrying foreign/unknown-platform
+attestation manifests are unsupported; an attestation descriptor is not silently discarded as image evidence.
+The maintained NKE preparation at `b30117c25b2dcdf6c16021dae88a2eafdafcae61` uses pinned crane
+Docker-archive pulls followed by GNU-tar/gzip repacking, not modern Docker-save mixed layouts. This
+source inspection does not establish that retained prepared archive bytes were fully scanned. One operation shares its
+filesystem-byte expansion allowance across sibling archives and Debian exports, with 16,384 recursive
+members, a shared 256-image allowance and bounded nesting. Each selected Docker manifest entry charges
+that image allowance before digest deduplication; each unique OCI image digest charges it within its layout.
+Decoded root image markers select that inspection before member/expansion charging; ordinary gzip/tar,
+including empty or corrupt filename candidates without such a marker, retains only its outer file hash.
+The marker probe streams under the operation deadline, without charging the image expansion/member
+allowance or imposing a separate probe byte limit. Repeated OCI image digests are scanned once per layout,
+not across material carriers, but every descriptor/platform is checked; the pinned layout
+accessor still reparses its bounded index for each unique image/child lookup. Ordinary tar contents retain their outer file hash;
+other compressed formats have no nested-image discovery. These adapters are contract-tested with
+controlled archives; complete native Syft discovery remains unexercised. The root file inventory
+retains actual exported paths and the exact outer archive hash;
+files inside cached Debian archives, Docker archives or SquashFS payloads are not presented as
+invented installed paths. Their discovered components carry descriptive `nkd:containedIn` values
+binding the immediate held carrier path and digest. Repeated public package identities retain a
+sorted canonical string list of those carriers; no recursive ancestry, installed origin or package
+ownership is inferred. A contained payload's file inventory is not an independent root-file inventory.
+Every uncontained non-file component carries `nkd:observedAtSubjectRoot`, including when its public
+package ref also has contained observations; it is not an installed-origin claim. `nkd:materialSubjects` matches only
+top-level regular-file hashes in each material observation. Nested Debian/SquashFS/image file digests
+do not currently participate in that file correspondence, and absence of the property is not non-correspondence proof.
+
+The process-local reconciliation receipt binds the original Run, named output, complete Plan, Build,
+QCOW2 digest/size and admitted inspection closure. Export revalidates those owners before copying the
+exact disk and returning its deterministic CycloneDX document. Descriptive documents, decoded receipts,
+equal-byte sibling Runs and shallow copies after owner closure cannot restore authority. The full-content
+helper, semantic reconciliation and private scratch paths are implemented. Contract tests cover modeled
+reconciliation observations, selected admission/decoder failures, private issuer-core success for both
+consumer architectures and export-owner revalidation. The issuer tests keep complete Plan, original Run,
+payload selection and material-trace checks concrete, while modeling stopped scan/profile observations;
+the public wrapper still requires the actual Packer capability and opaque inspection operations. Those
+tests do not establish full helper discovery. A separate [native ARM64 controlled ELF-protocol test](../evidence/2026-10-06-controlled-public-disk-evidence-issuer.md)
+exercises public producer/inspection owners, receipt issuance, exact export, six negative issuer rows
+and the concrete memory-profile guard; it is not actual Docker/Packer/guestfish/Syft discovery.
+Native AMD64 public positive issuance, complete native NKE content runs, original live NKE joins,
+publication and production acceptance remain unexercised.
+Complete inventory documents are bounded to 32 MiB, composition helper reports to 16 MiB,
+and signed SBOM transports to 64 MiB. These document/bundle policies apply to every SBOM subject,
+not only disks; malformed or oversized SBOM evidence returns `CodeVerifyFailed` (exit 22) before
+cosign work. Provenance independently retains its 4 MiB predicate bound and `CodeProvenanceMissing`
+(exit 45). Sigstore upload/service acceptance at the larger inventory sizes is not established by local tests.
+Diagnostics and generic OCI records retain their independent
+8 MiB limits. A controlled 50,000-file projection measures approximately 9.15 MB of report and
+20.20 MB of CycloneDX; this is not Ubuntu discovery or native execution proof. The 200,000-file
+structural ceiling does not guarantee every such inventory fits the byte limits; oversized complete
+evidence still fails without truncation. Full-content admission charges four overlapping report
+copies for the increase over the diagnostic allowance. The conservative
+simultaneous export/RAM budget is an admission condition, not evidence of runner capacity or reservation.
+Disk-backed scratch authenticates an empty attempt-owned daemon volume, its local driver/options and
+observed free space before streaming. It does not observe `nosuid` or `nodev` mount flags on that volume;
+the memory-backed route explicitly requests both. The non-root consumer drops all capabilities and
+requests no-new-privileges, while the fixed ownership preparer has only CHOWN. These controls do not
+justify claiming equivalent mount-flag enforcement or a provider-owned storage quota.
+
+The helper checks the actual cgroup-v2 CPU, memory and process-count ceilings before reading the subject.
+The leaf must exactly match the frozen CPU/RAM values and the launcher's 256-process ceiling; unknown,
+unlimited, malformed, changed or tighter visible ancestor limits fail closed. This authenticates kernel
+limits visible through the current cgroup mount, not a reservation, hidden ancestor capacity, provider
+allocation or a hosted identity boundary. The generic APIs do not by themselves connect a production disk
+compiler, packaging consumer or publisher.
 
 The diagnostic guest package capture schema `nkd.dev/package-acquisitions/v1` has scope
 `apt-pre-install-pkgs` and target `amd64` or `arm64`. Its canonical JSON manifest is the first USTAR member,
@@ -146,9 +260,10 @@ locations per package, each at most 4,096 bytes. The owning held-archive verifie
 correspondence without extraction; package display metadata and locations remain source-reported descriptions.
 Header metadata and member padding are opaque digest-bound bytes, not canonical package evidence. Capture
 settings belong to the selected producer configuration. The [capture contract](../nke-os-acquisition-contract.md)
-describes the unpinned NKE candidate; live collection, source/Run/QCOW2 binding, origin authentication and
-complete disk reconciliation remain deferred. Neither this diagnostic observation nor its zero-value
-description authorizes production or substitutes for the full exact-QCOW2 inventory required above.
+describes the unpinned NKE candidate. The generic collector binds a selected carrier to its original
+Run/QCOW2; native capture coverage and repository-origin authentication remain unverified. Neither this
+diagnostic observation nor its zero-value description authorizes production or substitutes for the full
+exact-QCOW2 inventory required above.
 
 The optional local installed-package diagnostic uses a caller-selected, already-local
 exact image on its native Linux architecture. Its fixed launcher is unprivileged

@@ -1,0 +1,38 @@
+apiVersion: nkd.dev/definition/v4
+kind: Definition
+metadata:
+  name: authoring-lab
+  description: Seven output authoring fixture with explicit source and package relationships.
+catalog:
+  base: ./catalog
+outputs:
+- name: cli-amd64
+  components: [cli]
+  platform: linux/amd64
+  format: executable
+- name: cli-arm64
+  components: [cli]
+  platform: linux/arm64
+  format: executable
+- name: controller
+  components: [controller]
+  platform: linux/amd64
+  format: oci
+- name: controller-chart
+  components: [controller-chart]
+  platform: linux/amd64
+  format: helm-oci
+  helm:
+    images: {controller: controller}
+- name: diagnostics
+  components: [doctor]
+  platform: linux/amd64
+  format: executable
+- name: support-chart
+  components: [support-chart]
+  platform: linux/amd64
+  format: helm-oci
+- name: tools
+  components: [doctor, status]
+  platform: linux/amd64
+  format: executable

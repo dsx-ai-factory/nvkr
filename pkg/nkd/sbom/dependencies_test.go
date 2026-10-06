@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -73,6 +74,74 @@ func TestDependencyInventoryRejectsFalseClaims(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := WithDependencies(dependencySubject(t), tc.components, "syft-cyclonedx/v1", tc.pin)
 			assertDependencyCode(t, err, tc.code)
+		})
+	}
+}
+
+func TestDependencyMethodsKeepDiskInventorySemanticsScoped(t *testing.T) {
+	for _, subjectType := range []string{"application", "container", "operating-system"} {
+		for _, method := range []string{"helm-manifests/v1", "syft-cyclonedx/v1", "disk-content/v1", "disk-reconciled/v1"} {
+			for _, componentType := range []string{"library", "file"} {
+				t.Run(subjectType+"/"+method+"/"+componentType, func(t *testing.T) {
+					base := dependencySubject(t)
+					base.Metadata.Component.Type = subjectType
+					component := Component{Type: componentType, Name: "observed", Version: "1"}
+					if componentType == "file" {
+						component.Hashes = []Hash{{Alg: "SHA-256", Content: strings.Repeat("c", 64)}}
+					}
+					want := e.Code("")
+					if method == "disk-reconciled/v1" && subjectType != "operating-system" || componentType == "file" && method != "disk-reconciled/v1" && method != "disk-content/v1" {
+						want = e.CodeVerifyFailed
+					}
+					bom, err := WithDependencies(base, []Component{component}, method, "sha256:"+strings.Repeat("b", 64))
+					if want != "" {
+						assertDependencyCode(t, err, want)
+						if bom != nil {
+							t.Fatal("rejected inventory returned a document")
+						}
+						return
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := bom.Validate(); err != nil {
+						t.Fatal(err)
+					}
+					// Serialized/caller-modified descriptions must encounter the
+					// same gate, not just the document-construction helper.
+					if method == "disk-reconciled/v1" {
+						bom.Metadata.Component.Type = "application"
+						assertDependencyCode(t, bom.Validate(), e.CodeVerifyFailed)
+					} else if componentType == "file" {
+						for index := range bom.Metadata.Props {
+							if bom.Metadata.Props[index].Name == "nkd:dependencyInspection" {
+								bom.Metadata.Props[index].Value = "syft-cyclonedx/v1"
+							}
+						}
+						assertDependencyCode(t, bom.Validate(), e.CodeVerifyFailed)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDiskMethodsRequirePerArtifactSubjectOnSerializedAggregate(t *testing.T) {
+	for _, method := range []string{"disk-content/v1", "disk-reconciled/v1"} {
+		t.Run(method, func(t *testing.T) {
+			resolved, digest := resolveCP(t)
+			bom := fromBuild(resolved, digest, nil, false)
+			if err := bom.Validate(); err != nil {
+				t.Fatalf("aggregate fixture is invalid before assigning a method: %v", err)
+			}
+			bom.Metadata.Props = append(bom.Metadata.Props, Property{Name: "nkd:dependencyInspection", Value: method},
+				Property{Name: "nkd:dependencyScannerDigest", Value: "sha256:" + strings.Repeat("b", 64)})
+			slices.SortFunc(bom.Metadata.Props, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+			err := bom.Validate()
+			assertDependencyCode(t, err, e.CodeVerifyFailed)
+			if !strings.Contains(err.Error(), "disk inventory requires an exact per-artifact subject") {
+				t.Fatalf("wrong semantic guard: %v", err)
+			}
 		})
 	}
 }

@@ -147,6 +147,19 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 	c.Tag = pin.Tag
 	c.Commit = pin.Commit
 	c.SourceDate = pin.SourceDateEpoch
+	if raw.Prebuilt.ReleaseExecutable {
+		if err := checkToolPin(src.Tool, pin); err != nil {
+			return c, err
+		}
+		if pin.Tool == nil {
+			return c, e.New(e.CodeUnpinnedSource, "release executable %q has no source tool pin", name)
+		}
+		tool := *pin.Tool
+		c.Prebuilt = &Prebuilt{URL: tool.URL, Executable: &tool,
+			Digests:  map[string]string{strings.TrimPrefix(tool.Platform, "linux/"): tool.ExecutableDigest},
+			Evidence: raw.Prebuilt.Evidence}
+		return c, nil
+	}
 	url, err := renderRef("prebuilt.url", raw.Prebuilt.URL, pin)
 	if err != nil {
 		return c, e.Wrap(e.CodeInvalidCatalog, err, "prebuilt component %q", name)
@@ -162,7 +175,7 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 	if raw.Prebuilt.Chart != nil {
 		url = lock.Artifacts[name].URL
 	}
-	c.Prebuilt = &Prebuilt{URL: url, Image: img, Digests: digests, Evidence: raw.Prebuilt.Evidence}
+	c.Prebuilt = &Prebuilt{URL: url, Image: img, ImageParentDigest: lock.Artifacts[name].ImageParentDigest, Digests: digests, Evidence: raw.Prebuilt.Evidence}
 	if raw.Prebuilt.Chart != nil && strings.HasPrefix(raw.Prebuilt.Chart.Repository, "oci://") {
 		for _, digest := range digests {
 			c.Prebuilt.OCIArchive = strings.TrimRight(strings.TrimPrefix(raw.Prebuilt.Chart.Repository, "oci://"), "/") + "/" + raw.Prebuilt.Chart.Name + "@" + digest

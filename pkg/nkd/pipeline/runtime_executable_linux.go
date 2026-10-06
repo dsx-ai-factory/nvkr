@@ -102,8 +102,22 @@ func snapshotRuntimeExecutableContext(ctx context.Context, runtimePath string) (
 		}
 		return nil, e.Wrap(e.CodeEngineCapability, err, "holding container runtime %s", runtimePath)
 	}
-	return &heldRuntimeExecutable{
+	held := &heldRuntimeExecutable{
 		capability: capability, name: name, endpoint: qualifiedRuntimeEndpoint,
 		environment: append([]string(nil), environment...),
-	}, nil
+	}
+	if name == "podman" {
+		configurationRoot, err := os.MkdirTemp("", "nkd-podman-config-")
+		if err != nil {
+			_ = held.close()
+			return nil, e.Wrap(e.CodeEngineCapability, err, "creating private empty Podman configuration")
+		}
+		held.configurationRoot = configurationRoot
+		for index, item := range held.environment {
+			if item == "XDG_CONFIG_HOME=/nonexistent" {
+				held.environment[index] = "XDG_CONFIG_HOME=" + configurationRoot
+			}
+		}
+	}
+	return held, nil
 }

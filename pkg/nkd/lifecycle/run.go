@@ -67,7 +67,7 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 		}
 		artifactID := compiledOutput.ArtifactID
 		memberArtifactID := compiledOutput.ArtifactID
-		if output.Format == OutputExecutable || output.Format == OutputOCI {
+		if output.Format == OutputExecutable || output.Format == OutputOCI || output.Format == OutputDiskImage {
 			if environment.Publication != nil {
 				artifactID = "package/" + publicationPackageName
 			}

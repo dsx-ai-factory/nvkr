@@ -68,6 +68,7 @@ type PackerConfig struct {
 	SSHPublicKeyVariable      string               `json:"sshPublicKeyVariable,omitempty"`
 	BuildLogDirectoryVariable string               `json:"buildLogDirectoryVariable,omitempty"`
 	HTTPDirectoryVariable     string               `json:"httpDirectoryVariable,omitempty"`
+	AcquisitionArchive        string               `json:"acquisitionArchive,omitempty"`
 	Variables                 []PackerVariable     `json:"variables,omitempty"`
 }
 
@@ -106,12 +107,20 @@ type PatchRef struct {
 	Content string `json:"content"`
 }
 
+// ExecutableArchive binds the release transport separately from the selected
+// executable's Node.Digest. Neither digest can substitute for the other.
+type ExecutableArchive struct {
+	Digest string `json:"digest"`
+	Member string `json:"member"`
+}
+
 // Node is one vertex of the build DAG. Field presence depends on Kind; unused
 // fields are omitted from serialization so the digest stays tight.
 type Node struct {
-	ID    string   `json:"id"`
-	Kind  string   `json:"kind"`
-	Needs []string `json:"needs,omitempty"` // upstream node IDs (sorted)
+	ImageParentDigest string   `json:"imageParentDigest,omitempty"`
+	ID                string   `json:"id"`
+	Kind              string   `json:"kind"`
+	Needs             []string `json:"needs,omitempty"` // upstream node IDs (sorted)
 	// Requirements is the deterministic runner request for this step. Build nodes are
 	// the currently admitted kind; other kinds fail closed until their compiler
 	// projection exists. It travels with executable bytes but is excluded from
@@ -136,8 +145,9 @@ type Node struct {
 	// sha256 of the acquired artifact and is part of buildDigest (a repin is a build identity
 	// change, exactly as a source-commit bump is). Fail-closed: acquisition verifies the
 	// bytes against Digest and refuses a mismatch — no from-source guarantee is claimed.
-	Artifact string `json:"artifact,omitempty"` // HTTPS file URL, OCI image name, or oci-blob://repository@digest; transport only
-	Digest   string `json:"digest,omitempty"`   // pinned expected content digest, sha256:<64-hex>
+	Artifact          string             `json:"artifact,omitempty"` // HTTPS file URL, OCI image name, or oci-blob://repository@digest; transport only
+	Digest            string             `json:"digest,omitempty"`   // pinned expected content digest, sha256:<64-hex>
+	ExecutableArchive *ExecutableArchive `json:"executableArchive,omitempty"`
 
 	// build
 	Component string `json:"component,omitempty"`

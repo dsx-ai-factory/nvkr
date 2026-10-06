@@ -81,13 +81,31 @@ OCI closure; an APT tree inside it is not an enabled direct APT-server publisher
 store publishers remain deferred and fail capability admission. Credential values never enter serialized inputs.
 Transport settings stay replaceable by environment owners.
 
-The disk target is a future OCI evidence and control root over an exact QCOW2 payload. An optional S3 object and
-CDN URL are projections of those same payload bytes, not alternate Build identities. The signed root must bind
-the payload digest, exact object route, and authenticated upload/read-back result before a consumer may accept
-the projection. Object-store credentials remain Environment references and cannot enter the disk, evidence, or
-route metadata. The first disk authoring contract adds no object-store schema, OCI disk wrapper, signing route,
-publisher, or consumer adapter; all remain capability-gated. An FDE payload containing an unlock credential
-cannot pass the existing no-secret publication rule.
+The pipeline-attested disk transport uses a distinct OCI manifest over the unchanged QCOW2 payload. Its one
+`application/vnd.qemu.qcow2` layer binds the exact payload digest and size. The checked config declares the
+guest platform; the layer media type and manifest annotations declare the QCOW2 format and encryption.
+Production consumption requires the explicit unencrypted declaration to match the release binding;
+the diagnostic reader keeps a missing encryption declaration unknown. Manifest identity and payload identity are separate.
+An importing descriptor walk retains its verified disk owner through the same phase's payload copy instead
+of reopening and hashing that inode again for selection. A standalone producer wrapper is selected and
+verified in one payload pass. Every copy/export still rehashes its held bytes; separate hosted publication
+and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
+The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
+select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
+Production packaging consumes the original live Run's exact-subject reconciliation receipt, not a restored
+path or decoded receipt. The compiler describes the wrapper's output-repository and evidence edges.
+Receipt-gated packaging and consumer APIs are implemented, but neither the ordinary local scheduler nor
+generated hosted VM executor consumes the complete live inspection-and-packaging operation yet.
+Local admission rejects that unsupported publication graph before runtime, source or workspace work;
+compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
+composition or authorize release. A real generated
+disk publication on either native architecture remains unexercised.
+
+An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
+The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
+before a consumer may accept that projection. Object-store schema, credentials, publication and consumption
+remain deferred. FDE publication and qualified disk reproduction remain capability-gated. An FDE payload
+containing an unlock credential cannot pass the existing no-secret publication rule.
 
 ### 3. The emitted publish phase
 
@@ -168,8 +186,8 @@ NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI r
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
 one release index from named outputs; normal authors do not wire payload → root → route.
 
-The signed metadata references each deliverable manifest once in its own sibling repository: CLI binary bundle,
-unchanged native CWE image, and Helm artifact. The OCI index directly references only its metadata manifest. Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
+The signed metadata references each deliverable manifest once in its own sibling repository: binary bundle,
+unchanged native container image, Helm artifact or exact-QCOW2 wrapper. The OCI index directly references only its metadata manifest. Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
 standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NKD-specific
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
@@ -188,7 +206,7 @@ still joins independently frozen output requirements to observed payloads before
 not reconstruct compiler records or derive both expectations and observations from release metadata.
 
 Consumer integrity checking opens an opaque delivery publication with an explicit lifetime. It snapshots the
-index and blobs into bounded anonymous immutable files, verifies every reachable descriptor and evidence slot,
+index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
 and checks format-specific payload membership against that exact closure. Private extraction workspaces are
 removed before the capability is returned. Later source-path replacement cannot change the checked output
 projection, and defensive copies cannot mutate the held view; closing releases the file capabilities and rejects
@@ -196,11 +214,24 @@ further projections. Signature and policy verification remain in the lifecycle c
 integrity and membership only, never signer authority by itself. Path-based diagnostic operations retain their
 independent revalidation at each call.
 
+Large QCOW2 payloads use streamed anonymous filesystem snapshots rather than payload-sized RAM files.
+The consumer snapshot root uses the process `TMPDIR` (the platform temporary directory when unset),
+including when registry acquisition has a separate workspace. Before payload copies, the consumer admits
+aggregate unique QCOW2 bytes against writable free space and rejects detected tmpfs/ramfs storage with
+`CodeEngineCapability`; the error identifies the scratch location and asks for a disk-backed `TMPDIR`.
+This is point-in-time capacity, not a reservation or proof of physical backing. Linux overlayfs reports
+capacity for its writable layer but does not identify that layer's backing mount, so a non-memory-backed
+statfs result cannot certify physical disk storage. General VM ephemeral scratch may be memory-backed;
+its separate execution admission uses the same allocation facts without this consumer snapshot policy.
+Payload export checks the exact held digest and size again, and the original publication owner controls the
+snapshot lifetime. These transport capabilities cannot restore the live reconciliation receipt used by
+production packaging.
+
 Registry and local release navigation use that same held owner. Its detached description joins exact sibling
 output and evidence references, all output memberships, Build/component subjects and evidence stage/subject
 bindings. Locators are explicitly labeled as derived from the supplied root reference; the detached view does
 not establish registry availability. Registry acquisition fetches and checks each sibling manifest, while local
-layout inspection does not probe the supplied registry namespace. Executable and image platform labels come
+layout inspection does not probe the supplied registry namespace. Executable, image and disk platform labels come
 from the inspected payload config; a contradictory executable metadata label is rejected. Text, readable JSON and Mermaid explicitly describe integrity-only
 inspection and report qualification as a declaration. JSON escapes nonprinting Unicode without changing
 decoded string values, and empty build-subject collections are arrays. Output filtering occurs only after full
@@ -221,6 +252,11 @@ output uses. Per-build indexes stay internal. Missing, substituted, duplicate or
 construction and consumption. A protected pre-publication stage creates and verifies the bundles before
 assembling the final release metadata; production publication and authenticated consumption reject raw
 preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
+
+For disk-root and material inventories, document byte integrity is checked before provenance properties are
+read. Missing provenance is reported as `CodeProvenanceMissing` before the semantic identity and exact-subject
+gate; if both defects exist, that first error does not imply the subject is valid. A provenance-complete document
+with a substituted semantic identity or subject fails with `CodeVerifyFailed`. Both gates remain mandatory.
 
 Signatures, SLSA provenance and SBOMs use the same standard Sigstore v0.3 bundle format as OCI referrers
 (ADR-04); their predicate types remain distinct. One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
@@ -338,8 +374,13 @@ component, checked against its producer bytes before publication; consumer proje
 and its platform. The [combined hosted Run](../evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
 source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
 finalization. This historical layout had three duplicated publications. Independent consumers authenticated all three; downloaded payload checks
-exercise the native image, recovered CLI and rendered chart binding. Acquired-image layout conversion remains
-unavailable. Source Helm archive selection and exact producer observation also have focused contract tests.
+exercise the native image, recovered CLI and rendered chart binding. Acquired native OCI and Docker-schema-2
+images have contract tests for exact producer-result edges, platform, full blob closure, byte-preserving import,
+offline scanner transport and unchanged upstream manifest subjects. Only the local layout index is normalized
+as transport scaffolding; upstream manifest, config and layer bytes are unchanged. A native Docker manifest is
+not relabeled as an OCI manifest. These tests do not prove hosted acquisition, scanner execution, mirroring,
+signing or independent registry consumption of the new acquired-image outputs. Source Helm archive selection
+and exact producer observation also have focused contract tests.
 This adapter does not mint qualified execution or release authority.
 
 Current contract evidence in `pkg/nkd/factory/*_test.go` and `pkg/nkd/delivery/*_test.go` covers target exclusion
@@ -351,6 +392,15 @@ earlier inputs, not authenticated release publication or production-registry acc
 
 The single-entry layout and stage-bound evidence require a new authorized hosted publication run; the earlier
 NVIDIA run does not establish their external behavior.
+
+Synthetic disk transport tests cover both declared native platforms, distinct raw-payload and wrapper identities,
+component evidence membership, held consumer projection and loopback-registry byte-preserving transport.
+Guard tests reject missing or unrelated receipt owners and profiles, and local admission tests reject the
+unwired publication graph without execution. The successful original-live-Run receipt-to-package-to-hosted-finalization
+path has not been exercised by those tests. Synthetic QCOW2 fixtures and controlled inspection seams do not
+prove a complete NKE filesystem scan, the original live build-to-inspection join, native execution, keyless
+signing or production publication. Both native-generated NKE builds and independent signed disk consumption
+remain required operational evidence.
 
 Qualified end-to-end acceptance requires publishing one cleared mixed-artifact ReleaseSet to operator-selected targets,
 discovering every referrer by immutable digest, authenticating the downstream clearance, and proving that

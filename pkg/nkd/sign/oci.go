@@ -248,14 +248,20 @@ func argv(binary string, args []string) []string {
 }
 
 func requireOCIPredicate(predicate []byte) error {
+	return requireOCIPredicateWithLimit(predicate, maxOCIPredicateBytes, e.CodeProvenanceMissing, "provenance predicate")
+}
+
+// Provenance and CycloneDX have separate bounded document contracts. Share JSON
+// admission without imposing the provenance limit on a complete inventory.
+func requireOCIPredicateWithLimit(predicate []byte, limit int64, code e.Code, label string) error {
 	if len(predicate) == 0 {
-		return e.New(e.CodeProvenanceMissing, "refusing to attest an empty provenance predicate")
+		return e.New(code, "refusing to attest an empty %s", label)
 	}
-	if int64(len(predicate)) > maxOCIPredicateBytes {
-		return e.New(e.CodeProvenanceMissing, "provenance predicate exceeds the attestation size limit")
+	if int64(len(predicate)) > limit {
+		return e.New(code, "%s exceeds the attestation size limit", label)
 	}
 	if err := canonical.ValidateJSONDocument(predicate); err != nil {
-		return e.Wrap(e.CodeProvenanceMissing, err, "provenance predicate is not a single well-formed JSON document")
+		return e.Wrap(code, err, "%s is not a single well-formed JSON document", label)
 	}
 	return nil
 }

@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -63,11 +67,47 @@ type verifiedExecution struct {
 // owns a sealed anonymous file descriptor and every qualified runtime subprocess is
 // execve'd through an inherited descriptor referring to that exact inode.
 type heldRuntimeExecutable struct {
-	capability  *heldfile.File
-	name        string
-	endpoint    string
-	environment []string
-	identity    string
+	capability        *heldfile.File
+	name              string
+	endpoint          string
+	environment       []string
+	identity          string
+	storageDriver     definition.PodmanStorageDriver
+	configurationRoot string
+	closeOnce         sync.Once
+	closeErr          error
+}
+
+// hostedIDMap is the runtime's observed native identity-mapping description.
+// Binding it authenticates the description, not a hosted sandbox policy.
+type hostedIDMap struct {
+	ContainerID uint64 `json:"container_id"`
+	HostID      uint64 `json:"host_id"`
+	Size        uint64 `json:"size"`
+}
+
+// close joins owner cleanup after its commands have completed. The directory
+// is an owner-created temporary empty configuration, never a caller path.
+func (runtime *heldRuntimeExecutable) close() error {
+	if runtime == nil {
+		return nil
+	}
+	runtime.closeOnce.Do(func() {
+		if runtime.capability != nil {
+			runtime.closeErr = runtime.capability.Close()
+		}
+		if runtime.configurationRoot != "" {
+			runtime.closeErr = errors.Join(runtime.closeErr, os.RemoveAll(runtime.configurationRoot))
+		}
+	})
+	return runtime.closeErr
+}
+
+func (runtime *heldRuntimeExecutable) commandArgs(args []string) []string {
+	if runtime.storageDriver == "" {
+		return append([]string(nil), args...)
+	}
+	return append([]string{"--storage-driver=" + string(runtime.storageDriver)}, args...)
 }
 
 func (runtime *heldRuntimeExecutable) run(ctx context.Context, stdout, stderr io.Writer, args ...string) error {
@@ -78,7 +118,7 @@ func (runtime *heldRuntimeExecutable) runIO(ctx context.Context, stdin io.Reader
 	if runtime == nil || runtime.capability == nil || runtime.capability.OSFile() == nil {
 		return e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
 	}
-	return heldfile.RunContext(ctx, runtime.capability, args, heldfile.RunOptions{
+	return heldfile.RunContext(ctx, runtime.capability, runtime.commandArgs(args), heldfile.RunOptions{
 		Stdin: stdin, Stdout: stdout, Stderr: stderr,
 		Env: append([]string(nil), runtime.environment...),
 	})
@@ -93,7 +133,7 @@ func (runtime *heldRuntimeExecutable) runCleanup(ctx context.Context, terminatio
 	if runtime == nil || runtime.capability == nil || runtime.capability.OSFile() == nil {
 		return e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
 	}
-	return heldfile.RunContext(ctx, runtime.capability, args, heldfile.RunOptions{
+	return heldfile.RunContext(ctx, runtime.capability, runtime.commandArgs(args), heldfile.RunOptions{
 		Stdout: stdout, Stderr: stderr,
 		Env:              append([]string(nil), runtime.environment...),
 		TerminationGrace: terminationGrace,
@@ -212,7 +252,7 @@ func observeHeldRuntimeIdentity(ctx context.Context, runtime *heldRuntimeExecuta
 		if err != nil {
 			return "", e.Wrap(e.CodeEngineCapability, err, "observing Podman runtime identity")
 		}
-		serverID, err = podmanServerIdentity(serverRaw)
+		serverID, err = podmanServerIdentityWithDriver(serverRaw, runtime.storageDriver)
 		if err != nil {
 			return "", err
 		}
@@ -233,6 +273,10 @@ func observeHeldRuntimeIdentity(ctx context.Context, runtime *heldRuntimeExecuta
 // to the stable host, storage, security, and engine fields it does expose while
 // deliberately excluding changing capacity and uptime observations.
 func podmanServerIdentity(raw []byte) (string, error) {
+	return podmanServerIdentityWithDriver(raw, "")
+}
+
+func podmanServerIdentityWithDriver(raw []byte, expected definition.PodmanStorageDriver) (string, error) {
 	if err := canonical.ValidateJSONDocument(bytes.TrimSpace(raw)); err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "decoding Podman runtime identity")
 	}
@@ -251,6 +295,14 @@ func podmanServerIdentity(raw []byte) (string, error) {
 				SeccompEnabled bool `json:"seccompEnabled"`
 				SELinuxEnabled bool `json:"selinuxEnabled"`
 			} `json:"security"`
+			IDMappings struct {
+				UIDMap []hostedIDMap `json:"uidmap"`
+				GIDMap []hostedIDMap `json:"gidmap"`
+			} `json:"idMappings"`
+			ServiceIsRemote bool `json:"serviceIsRemote"`
+			OCIRuntime      struct {
+				Name string `json:"name"`
+			} `json:"ociRuntime"`
 		} `json:"host"`
 		Store struct {
 			GraphDriverName string `json:"graphDriverName"`
@@ -271,6 +323,9 @@ func podmanServerIdentity(raw []byte) (string, error) {
 		info.Store.GraphDriverName == "" || info.Store.GraphRoot == "" ||
 		info.Version.Version == "" || info.Version.OsArch == "" {
 		return "", e.New(e.CodeEngineCapability, "Podman returned an incomplete runtime identity")
+	}
+	if expected != "" && info.Store.GraphDriverName != string(expected) {
+		return "", e.New(e.CodeEngineCapability, "Podman storage driver %q differs from frozen selection %q", info.Store.GraphDriverName, expected)
 	}
 	identity, err := canonical.Marshal(info)
 	if err != nil {
@@ -326,16 +381,21 @@ func observeContainerImageWith(ctx context.Context, node ir.Node, output func(..
 			return "", e.New(e.CodeInvalidCatalog,
 				"node %q toolchain image ID is not a canonical digest", node.ID)
 		}
-		raw, err := output("image", "inspect", "--format", "{{json .Id}}", node.Toolchain)
+		raw, err := output("image", "inspect", "--format", "{{json .}}", node.Toolchain)
 		if err != nil {
 			return "", e.Wrap(e.CodeEngineCapability, err,
 				"inspecting local toolchain image ID for node %q", node.ID)
 		}
-		var observedID string
-		if err := json.Unmarshal(bytes.TrimSpace(raw), &observedID); err != nil {
+		if err := canonical.ValidateJSONDocument(raw); err != nil {
 			return "", e.Wrap(e.CodeEngineCapability, err,
 				"decoding local toolchain image ID for node %q", node.ID)
 		}
+		var inspection packerImageInspection
+		if err := json.Unmarshal(bytes.TrimSpace(raw), &inspection); err != nil {
+			return "", e.Wrap(e.CodeEngineCapability, err,
+				"decoding local toolchain image ID for node %q", node.ID)
+		}
+		observedID := normalizeLocalImageID(inspection.ID)
 		if observedID != node.Toolchain {
 			return "", e.New(e.CodePreflightFailed,
 				"runtime selected local toolchain image ID %q for node %q, want %q",
@@ -443,7 +503,7 @@ func qualifySelectedExecution(ctx context.Context, request *QualifiedExecution, 
 		if err != nil {
 			return nil, runtimeBinary, err
 		}
-		runtimeCleanup = func() { _ = runtimeSnapshot.capability.Close() }
+		runtimeCleanup = func() { _ = runtimeSnapshot.close() }
 	}
 	var (
 		runnerSnapshot *heldfile.File

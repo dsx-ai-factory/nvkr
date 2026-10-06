@@ -35,9 +35,24 @@ func inspectFactoryImage(ctx context.Context, plan *Plan, artifact Artifact) (de
 	return delivery.InspectContainerImage(ctx, artifact.Path, platform)
 }
 
-func executeImagePackage(ctx context.Context, plan *Plan, node Node, output Artifact, inputs []Artifact, stdout io.Writer) error {
+func executeImagePackage(ctx context.Context, plan *Plan, node Node, output Artifact, inputs []Artifact, artifacts map[string]Artifact, stdout io.Writer) error {
 	if len(inputs) != 1 || inputs[0].Kind != "oci-image" {
 		return e.New(e.CodeInvalidCatalog, "container image package %q requires one OCI export", node.ID)
+	}
+	if planNode(plan, inputs[0].Producer).Kind == NodeAcquire {
+		recordID := "result/" + inputs[0].BuildTarget + "/" + inputs[0].Component
+		if !containsString(node.Inputs, recordID) {
+			return e.New(e.CodeReleaseIncomplete, "acquired image package omits its exact producer result")
+		}
+		observed, err := authenticateAcquiredImagePayload(ctx, plan, inputs[0], artifacts)
+		if err != nil {
+			return err
+		}
+		image, err := delivery.ImportAcquiredContainerImage(ctx, inputs[0].Path, observed.SHA256, "linux/"+packageArch(plan, inputs), output.Path)
+		if err == nil {
+			fmt.Fprintf(stdout, "Packaged acquired container image %q without rewriting manifest %s\n", output.Name, image.ManifestDigest)
+		}
+		return err
 	}
 	digest, err := digestFactoryPath(ctx, inputs[0].Path)
 	if err != nil {

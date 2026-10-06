@@ -45,8 +45,12 @@ and production details. Definition schema validation, catalog resolution, and co
 are supported. The Plan points the lifecycle output at the root producer's exact disk artifact and carries typed
 command/Packer, disk, public-variable, material-edge, execution-class, and host-toolchain inputs. It does not
 wrap the QCOW2 as a binary bundle. Local unencrypted direct-Packer execution and held-QCOW2 observation are
-supported as described below. Hosted and qualified execution, generated VM jobs, FDE, full-disk evidence, and
-disk publication remain unsupported and fail with `engine-capability` before source, subprocess, or output work.
+supported as described below. The compiler can describe disk publication and its evidence graph, and dry-run
+can inspect that Plan. The ordinary local scheduler rejects disk publication with `engine-capability` before
+runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
+Hosted and qualified execution, generated VM jobs and FDE remain capability-gated before output work.
+The complete live full-disk evidence and publication path is implemented as guarded APIs, not an exercised
+production workflow.
 
 Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
@@ -81,7 +85,10 @@ verification and receipt-derived byte-CAS persistence before interpreting withdr
 and returned decision remain diagnostic; this operation adds no trusted-time or release authority.
 `catalog.UpdateSourcePins` and `UpdateArtifactPins` own selection, resolution, change detection and the existing
 lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
-not own the persisted status schema or reconstruct pin-update transactions.
+not own the persisted status schema or reconstruct pin-update transactions. `catalogmaintenance` composes
+that pin owner with normal lifecycle compilation/generation for review-only candidates and renders the
+explicitly configured maintenance workflow. `catalog refresh` and `catalog update-ci` remain thin adapters;
+these maintenance descriptions cannot grant execution or release authority.
 
 `planview` owns immutable descriptive snapshots after factory validates the complete Plan. It renders readable
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while

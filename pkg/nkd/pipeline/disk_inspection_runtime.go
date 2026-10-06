@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -29,14 +30,23 @@ import (
 // caller-owned and must remain open until Close.
 // This development capability does not grant publication or qualification.
 type DiskInspectionSelection struct {
-	RuntimeExecutable string
-	Image             string
-	Platform          string
-	InspectorDigest   string
-	CodecDigest       string
-	Resources         execution.ResourceRequest
-	TimeoutSeconds    uint64
-	Workspace         *os.File
+	PodmanStorageDriver definition.PodmanStorageDriver
+	RuntimeExecutable   string
+	Image               string
+	Platform            string
+	InspectorDigest     string
+	CodecDigest         string
+	GuestfishDigest     string
+	ScannerDigest       string
+	PackageReaderDigest string
+	MaxFilesystemBytes  uint64
+	ScratchStorage      string
+	compositionKind     string
+	consumerPlatform    string
+	scratchVolume       string
+	Resources           execution.ResourceRequest
+	TimeoutSeconds      uint64
+	Workspace           *os.File
 }
 
 // DiskInspectionContainer retains the exact runtime executable, daemon identity
@@ -57,11 +67,17 @@ type DiskInspectionContainer struct {
 }
 
 const (
+	diskInspectionPIDsLimit    uint64 = 256
 	diskInspectionApplianceMiB uint64 = 2048
 	// MaxDiagnosticDiskBytes bounds the held diagnostic subject and its copies.
 	MaxDiagnosticDiskBytes = 8 << 30
 	// MaxDiskInspectionReportBytes bounds helper reports and runtime diagnostics.
 	MaxDiskInspectionReportBytes = 8 << 20
+	// Composition reports carry complete file inventories. Diagnostics and
+	// installed-package-only reports retain their independent smaller bound.
+	MaxDiskContentReportBytes = 16 << 20
+	// Buffer, returned report, observation copy and decoder input may overlap.
+	diskContentReportMemoryMiB = 4 * (MaxDiskContentReportBytes - MaxDiskInspectionReportBytes) >> 20
 	// MaxDiskInspectionTimeout bounds the complete operation, including revalidation.
 	MaxDiskInspectionTimeout = 10 * time.Minute
 )
@@ -102,6 +118,10 @@ func (reservation *diskInspectionReservation) Close() error {
 // InspectHeld consumes only a subject of the admitted size, without reacquiring
 // capacity. The caller must keep the reservation until that subject is closed.
 func (reservation *diskInspectionReservation) InspectHeld(ctx context.Context, subject *heldfile.File) (*DiskInspectionObservation, error) {
+	return reservation.inspectContent(ctx, subject, "", "")
+}
+
+func (reservation *diskInspectionReservation) inspectContent(ctx context.Context, subject *heldfile.File, kind, platform string) (*DiskInspectionObservation, error) {
 	if err := requireRunContext(ctx, "reserved disk inspection"); err != nil {
 		return nil, err
 	}
@@ -121,7 +141,7 @@ func (reservation *diskInspectionReservation) InspectHeld(ctx context.Context, s
 	if subject == nil || subject.Size() != state.size {
 		return nil, e.New(e.CodeVerifyFailed, "inspection subject differs from its admitted size")
 	}
-	return state.container.inspectHeld(ctx, subject)
+	return state.container.inspectHeldMode(ctx, subject, kind, platform)
 }
 
 // OpenDiskInspectionContainer admits the selected native Linux runtime without
@@ -147,20 +167,24 @@ func OpenDiskInspectionContainer(ctx context.Context, selection DiskInspectionSe
 	if err != nil {
 		return nil, err
 	}
+	held.storageDriver = selection.PodmanStorageDriver
 	held.identity, err = observeHeldRuntimeIdentity(ctx, held)
 	if err != nil {
-		_ = held.capability.Close()
+		_ = held.close()
 		return nil, runtimeCommandError(ctx, err, "", e.CodeEngineCapability, "admitting disk inspection runtime identity")
 	}
 	container := &DiskInspectionContainer{runtime: held, selection: selection}
 	if err := container.observeBinding(ctx); err != nil {
-		_ = held.capability.Close()
+		_ = held.close()
 		return nil, err
 	}
 	return container, nil
 }
 
 func validateDiskInspectionSelection(selection DiskInspectionSelection) error {
+	if err := selection.PodmanStorageDriver.Validate(filepath.Base(selection.RuntimeExecutable)); err != nil {
+		return err
+	}
 	if filepath.Base(selection.RuntimeExecutable) != "docker" && filepath.Base(selection.RuntimeExecutable) != "podman" {
 		return e.New(e.CodeEngineCapability, "disk inspection requires an explicit Docker or Podman runtime")
 	}
@@ -175,8 +199,19 @@ func validateDiskInspectionSelection(selection DiskInspectionSelection) error {
 	if !canonical.IsDigest(selection.InspectorDigest) || !canonical.IsDigest(selection.CodecDigest) {
 		return e.New(e.CodeUnpinnedInput, "disk inspection requires exact inspector and codec pins")
 	}
+	if selection.Resources.CPUMillis > uint64(math.MaxInt64)/100 {
+		return e.New(e.CodeEngineCapability, "disk inspection CPU request exceeds the exact runtime quota range")
+	}
 	if selection.Workspace == nil || selection.Resources.CPUMillis < 10 || selection.Resources.MemoryMiB < diskInspectionApplianceMiB || selection.TimeoutSeconds == 0 || selection.TimeoutSeconds > uint64(MaxDiskInspectionTimeout/time.Second) {
 		return e.New(e.CodeEngineCapability, "disk inspection requires a held workspace, at least 10 CPU millis, at least 2 GiB memory and a timeout of at most ten minutes")
+	}
+	if selection.GuestfishDigest != "" || selection.ScannerDigest != "" || selection.PackageReaderDigest != "" || selection.MaxFilesystemBytes != 0 {
+		if !canonical.IsDigest(selection.GuestfishDigest) || !canonical.IsDigest(selection.ScannerDigest) || !canonical.IsDigest(selection.PackageReaderDigest) || selection.MaxFilesystemBytes == 0 || selection.MaxFilesystemBytes > 16<<30 {
+			return e.New(e.CodeUnpinnedInput, "composition inspection requires complete exporter, scanner, package reader and filesystem budget pins")
+		}
+		if selection.ScratchStorage != "memory" && selection.ScratchStorage != "private-volume" {
+			return e.New(e.CodeEngineCapability, "composition inspection requires explicit scratch storage")
+		}
 	}
 	return nil
 }
@@ -251,7 +286,7 @@ func (container *DiskInspectionContainer) Close() error {
 	if container.runtime == nil {
 		return nil
 	}
-	err := container.runtime.capability.Close()
+	err := container.runtime.close()
 	container.runtime = nil
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "closing disk inspection runtime")
@@ -391,9 +426,11 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 // command has completed and the held subject/runtime have been revalidated.
 // Description methods do not mint another observation.
 type DiskInspectionObservation struct {
-	report                           []byte
-	subject, image, inspector, codec string
-	size                             int64
+	report                                                   []byte
+	subject, image, inspector, codec                         string
+	size                                                     int64
+	contentKind, guestfish, scanner, packageReader, platform string
+	maxFilesystemBytes                                       uint64
 }
 
 func (observation *DiskInspectionObservation) Report() []byte {
@@ -436,7 +473,7 @@ func (container *DiskInspectionContainer) InspectHeld(ctx context.Context, subje
 	return reservation.InspectHeld(ctx, subject)
 }
 
-func (container *DiskInspectionContainer) inspectHeld(ctx context.Context, subject *heldfile.File) (*DiskInspectionObservation, error) {
+func (container *DiskInspectionContainer) inspectHeldMode(ctx context.Context, subject *heldfile.File, kind, platform string) (*DiskInspectionObservation, error) {
 	ctx, finish, err := container.beginOperation(ctx)
 	if err != nil {
 		return nil, err
@@ -457,7 +494,14 @@ func (container *DiskInspectionContainer) inspectHeld(ctx context.Context, subje
 	if err := container.admitResources(ctx, subject.Size()); err != nil {
 		return nil, err
 	}
-	report, err := runDiskInspectionContainer(ctx, heldPackerContainerRuntime{runtime: container.runtime}, container.selection, container.imageID, subject)
+	selection := container.selection
+	if kind != "" {
+		if !diskContentKind(kind) || selection.GuestfishDigest == "" || selection.ScannerDigest == "" || selection.PackageReaderDigest == "" || selection.MaxFilesystemBytes == 0 {
+			return nil, e.New(e.CodeEngineCapability, "disk composition inspection requires a complete admitted runtime profile")
+		}
+		selection.compositionKind, selection.consumerPlatform = kind, platform
+	}
+	report, err := runDiskInspectionContainer(ctx, heldPackerContainerRuntime{runtime: container.runtime}, selection, container.imageID, subject)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +511,8 @@ func (container *DiskInspectionContainer) inspectHeld(ctx context.Context, subje
 	if err := container.observeBinding(ctx); err != nil {
 		return nil, err
 	}
-	return &DiskInspectionObservation{report: report, subject: subject.Digest(), size: subject.Size(), image: container.imageID, inspector: container.selection.InspectorDigest, codec: container.selection.CodecDigest}, nil
+	return &DiskInspectionObservation{report: report, subject: subject.Digest(), size: subject.Size(), image: container.imageID, inspector: container.selection.InspectorDigest, codec: container.selection.CodecDigest,
+		contentKind: kind, guestfish: selection.GuestfishDigest, scanner: selection.ScannerDigest, packageReader: selection.PackageReaderDigest, platform: selection.consumerPlatform, maxFilesystemBytes: selection.MaxFilesystemBytes}, nil
 }
 
 // runDiskInspectionContainer owns subprocess streaming and cleanup, but issues
@@ -485,6 +530,19 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 		return nil, e.Wrap(e.CodeInternal, err, "allocating disk inspection attempt identity")
 	}
 	name := "nkd-inspect-" + attempt
+	if selection.compositionKind != "" && selection.ScratchStorage == "private-volume" {
+		scratch, err := openDiskInspectionScratch(ctx, runtime, selection, imageID, attempt)
+		if err != nil {
+			return nil, err
+		}
+		selection.scratchVolume = scratch.state.volume
+		defer func() {
+			if err := scratch.Close(ctx); err != nil {
+				raw = nil
+				returnErr = errors.Join(returnErr, err)
+			}
+		}()
+	}
 	creationUncertain := true
 	defer func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), cleanupTimeout)
@@ -496,6 +554,9 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 		}
 	}()
 	var created, createDiagnostic, diagnostic, report diskInspectionBuffer
+	if selection.compositionKind != "" {
+		report.limit = MaxDiskContentReportBytes
+	}
 	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(createDiagnostic.Bytes()), e.CodeEngineCapability, "creating disk inspection container")
 	}
@@ -591,35 +652,86 @@ func (container *DiskInspectionContainer) hostFacts(ctx context.Context) (execut
 
 func validateDiskInspectionResources(selection DiskInspectionSelection, facts execution.ObservedHostFacts, size int64, beforeSnapshot bool) error {
 	request := selection.Resources
+	workspaceMiB := request.EphemeralStorageMiB
 	snapshotMiB := uint64((size + (1 << 20) - 1) >> 20)
 	needMemory := 2*snapshotMiB + diskInspectionApplianceMiB
+	if selection.MaxFilesystemBytes != 0 {
+		needMemory += diskContentReportMemoryMiB
+		filesystemMiB := (selection.MaxFilesystemBytes + (1 << 20) - 1) / (1 << 20)
+		if selection.ScratchStorage == "private-volume" {
+			// Linux heldfile snapshots are sealed memfds, accounted in RAM
+			// below. No subject or helper scratch is written to Workspace:
+			// the attempt-private daemon volume is admitted separately before
+			// streaming. Do not demand that same scratch on two filesystems.
+			workspaceMiB = 0
+			needMemory += 6144 + 2*min(filesystemMiB, 1024)
+			needScratch := 12*filesystemMiB + 2*snapshotMiB + diskInspectionApplianceMiB
+			if request.EphemeralStorageMiB < needScratch {
+				return e.New(e.CodeEngineCapability, "inspection scratch capacity: required=%dMiB declared=%dMiB (filesystem=%dMiB subject=%dMiB appliance=%dMiB)", needScratch, request.EphemeralStorageMiB, filesystemMiB, snapshotMiB, diskInspectionApplianceMiB)
+			}
+		} else {
+			needMemory += 12*filesystemMiB + 2048
+		}
+	}
 	hostMemory := request.MemoryMiB
 	if beforeSnapshot {
 		if hostMemory > math.MaxUint64-snapshotMiB {
-			return e.New(e.CodeEngineCapability, "inspection memory request exceeds its supported budget")
+			return e.New(e.CodeEngineCapability, "inspection host memory requirement overflows: declared=%dMiB snapshot=%dMiB", request.MemoryMiB, snapshotMiB)
 		}
 		// Compare the full declared grant plus external snapshot with the
 		// caller-side observation, not merely their independent maxima. This
 		// conservative check does not authenticate the daemon's cgroup budget.
 		hostMemory += snapshotMiB
 	}
-	if request.MemoryMiB < needMemory || facts.Platform != execution.HostPlatform(selection.Platform) || facts.Resources.CPUMillis < request.CPUMillis || facts.Resources.MemoryMiB < hostMemory || facts.Resources.EphemeralStorageMiB < request.EphemeralStorageMiB {
-		return e.New(e.CodeEngineCapability, "inspection host lacks declared CPU, memory or workspace capacity (RAM must cover two disk copies plus appliance)")
+	if request.MemoryMiB < needMemory {
+		return e.New(e.CodeEngineCapability, "inspection memory capacity: required=%dMiB declared=%dMiB (subject=%dMiB)", needMemory, request.MemoryMiB, snapshotMiB)
+	}
+	if facts.Platform != execution.HostPlatform(selection.Platform) {
+		return e.New(e.CodeEngineCapability, "inspection host platform: required=%s observed=%s", selection.Platform, facts.Platform)
+	}
+	if facts.Resources.CPUMillis < request.CPUMillis {
+		return e.New(e.CodeEngineCapability, "inspection host CPU capacity: required=%dm observed=%dm", request.CPUMillis, facts.Resources.CPUMillis)
+	}
+	if facts.Resources.MemoryMiB < hostMemory {
+		return e.New(e.CodeEngineCapability, "inspection host memory capacity: required=%dMiB observed=%dMiB", hostMemory, facts.Resources.MemoryMiB)
+	}
+	if facts.Resources.EphemeralStorageMiB < workspaceMiB {
+		return e.New(e.CodeEngineCapability, "inspection workspace capacity: required=%dMiB observed=%dMiB", workspaceMiB, facts.Resources.EphemeralStorageMiB)
 	}
 	return nil
 }
 
 func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containerName, attempt string, subject *heldfile.File) []string {
-	return []string{"create", "--name", containerName, "--pull=never", "--platform", selection.Platform,
+	args := []string{"create", "--name", containerName, "--pull=never", "--platform", selection.Platform,
 		"--label=nkd.dev/inspection-attempt=" + attempt,
-		"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-		"--user=65534:65534", "--hostname=nkd-inspector", "--no-healthcheck", "--init", "--interactive", "--log-driver=none",
-		"--cpus=" + strconv.FormatFloat(float64(selection.Resources.CPUMillis)/1000, 'f', 3, 64),
+		"--network=none", "--log-driver=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
+		"--user=65534:65534", "--hostname=nkd-inspector", "--no-healthcheck", "--init", "--interactive",
+		diskInspectionCPUPeriodArg, diskInspectionCPUQuotaArg(selection.Resources.CPUMillis),
 		"--memory=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m", "--memory-swap=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m",
-		"--pids-limit=256", "--tmpfs", "/tmp:rw,nosuid,nodev,size=" + strconv.FormatUint(selection.Resources.MemoryMiB, 10) + "m,mode=1777",
+		"--pids-limit=" + strconv.FormatUint(diskInspectionPIDsLimit, 10),
+	}
+	if selection.scratchVolume != "" {
+		args = append(args, "--volume", selection.scratchVolume+":/tmp:nocopy")
+	} else {
+		args = append(args, "--tmpfs", "/tmp:rw,nosuid,nodev,size="+strconv.FormatUint(selection.Resources.MemoryMiB, 10)+"m,mode=1777")
+	}
+	args = append(args,
 		"--env", "PATH=/usr/bin:/bin", "--env", "HOME=/tmp", "--env", "LC_ALL=C", "--env", "TZ=UTC",
 		"--entrypoint=/usr/local/bin/nkd-disk-inspect", image,
-		selection.InspectorDigest, selection.CodecDigest, subject.Digest(), strconv.FormatInt(subject.Size(), 10)}
+		selection.InspectorDigest, selection.CodecDigest, subject.Digest(), strconv.FormatInt(subject.Size(), 10))
+	if selection.compositionKind != "" {
+		args = append(args, "composition", selection.compositionKind, selection.GuestfishDigest, selection.ScannerDigest, selection.PackageReaderDigest, strconv.FormatUint(selection.MaxFilesystemBytes, 10), selection.consumerPlatform)
+	}
+	args = append(args, strconv.FormatUint(selection.Resources.CPUMillis, 10), strconv.FormatUint(selection.Resources.MemoryMiB, 10), strconv.FormatUint(diskInspectionPIDsLimit, 10))
+	return args
+}
+
+const diskInspectionCPUPeriodArg = "--cpu-period=100000"
+
+// Selection admission bounds cpuMillis before either launcher uses it. Integer
+// period/quota avoids runtime float conversion truncating an exact grant.
+func diskInspectionCPUQuotaArg(cpuMillis uint64) string {
+	return "--cpu-quota=" + strconv.FormatUint(cpuMillis*100, 10)
 }
 
 // removeDiskInspectionContainer removes only this attempt's immutable container
@@ -687,7 +799,10 @@ func lockDiskInspection(ctx context.Context, mu *sync.Mutex) error {
 
 // Do not embed bytes.Buffer: promoted ReadFrom and WriteString would let
 // io.Copy and io.WriteString bypass the bounded Write operation below.
-type diskInspectionBuffer struct{ data bytes.Buffer }
+type diskInspectionBuffer struct {
+	data  bytes.Buffer
+	limit int
+}
 
 func (buffer *diskInspectionBuffer) Len() int       { return buffer.data.Len() }
 func (buffer *diskInspectionBuffer) Bytes() []byte  { return buffer.data.Bytes() }
@@ -695,7 +810,11 @@ func (buffer *diskInspectionBuffer) String() string { return buffer.data.String(
 func (buffer *diskInspectionBuffer) Reset()         { buffer.data.Reset() }
 
 func (buffer *diskInspectionBuffer) Write(raw []byte) (int, error) {
-	if buffer.Len()+len(raw) > MaxDiskInspectionReportBytes {
+	limit := buffer.limit
+	if limit == 0 {
+		limit = MaxDiskInspectionReportBytes
+	}
+	if len(raw) > limit-buffer.Len() {
 		return 0, e.New(e.CodeEnvelopeDecode, "disk inspection output exceeds its bound")
 	}
 	return buffer.data.Write(raw)

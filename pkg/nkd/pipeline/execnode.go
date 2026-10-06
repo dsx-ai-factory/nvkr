@@ -22,6 +22,12 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := n.Validate(); err != nil {
 		return nil, err
 	}
+	if opts.SourceWorkspace != nil && (n.Kind != ir.KindFetch || !opts.Launch || opts.Qualification != nil) {
+		return nil, e.New(e.CodeEngineCapability, "held source workspace requires launched, unqualified source fetching")
+	}
+	if opts.SourceGitEnvironment != nil && opts.SourceWorkspace == nil {
+		return nil, e.New(e.CodeEngineCapability, "source Git environment requires its held source workspace")
+	}
 	if err := rejectUnsupportedExecutionRequirements([]ir.Node{n}, "exec-node"); err != nil {
 		return nil, err
 	}

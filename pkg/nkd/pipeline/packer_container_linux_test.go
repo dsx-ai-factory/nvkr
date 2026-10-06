@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
+	"golang.org/x/sys/unix"
 )
 
 func testPackerDiagnosticSink(t *testing.T, root *os.File) *PackerDiagnosticSink {
@@ -1053,6 +1055,111 @@ func TestRunPackerContainerMissingDiagnosticsBeforeRuntime(t *testing.T) {
 	artifact, err := runPackerContainer(testContext(t), request)
 	if artifact != nil || code(err) != e.CodeEngineCapability || len(runtime.calls) != 0 {
 		t.Fatalf("artifact=%v, error=%v, runtime calls=%v", artifact, err, runtime.calls)
+	}
+}
+
+// The complete existing Packer owner runs against its controlled runtime
+// protocol. This is not a native Docker bake or authenticated Debian scan.
+func TestRunPackerContainerAcquisitionCollection(t *testing.T) {
+	for _, architecture := range []string{"amd64", "arm64"} {
+		for _, failed := range []bool{false, true} {
+			t.Run(architecture+"/failure="+strconv.FormatBool(failed), func(t *testing.T) {
+				request, runtime, built := newPackerContainerTestRun(t, "Packer v1.14.2\n", "The configuration is valid.\n", "", nil)
+				request.node.Platform = "linux/" + architecture
+				request.node.Packer.AcquisitionArchive = "capture.tar"
+				fallback := runtime.run
+				collectedDiskFD, copied := -1, false
+				captureBytes := testPackerAcquisitionBytes(t, architecture)
+				runtime.run = func(stdin io.Reader, stdout, stderr io.Writer, args []string) error {
+					if len(args) == 3 && args[0] == "cp" && strings.HasSuffix(args[1], ":"+packerContainerOutputPath+"/capture.tar") {
+						copied = true
+						// Observe the real already-held output descriptor; never
+						// construct an artifact or substitute a caller-owned disk.
+						entries, err := os.ReadDir("/proc/self/fd")
+						if err != nil {
+							return err
+						}
+						for _, entry := range entries {
+							target, err := os.Readlink("/proc/self/fd/" + entry.Name())
+							if err == nil && strings.HasPrefix(target, request.workspace.Name()+"/") && strings.HasSuffix(target, "/artifact/node.qcow2 (deleted)") {
+								collectedDiskFD, err = strconv.Atoi(entry.Name())
+								if err != nil {
+									return err
+								}
+							}
+						}
+						if failed {
+							return errors.New("controlled acquisition copy failure")
+						}
+						_, err = stdout.Write(testPackerArtifactCarrier(t, "capture.tar", captureBytes))
+						return err
+					}
+					return fallback(stdin, stdout, stderr, args)
+				}
+				artifact, err := runPackerContainer(testContext(t), request)
+				if !*built || !copied || collectedDiskFD < 0 {
+					t.Fatalf("owner did not hold the built disk through capture: built=%t copied=%t descriptor=%d error=%v", *built, copied, collectedDiskFD, err)
+				}
+				if failed {
+					if artifact != nil || code(err) != e.CodeVerifyFailed {
+						t.Fatalf("failed capture returned artifact=%v error=%v", artifact, err)
+					}
+					var stat unix.Stat_t
+					if err := unix.Fstat(collectedDiskFD, &stat); !errors.Is(err, unix.EBADF) {
+						t.Fatalf("capture failure left original output descriptor open: %v", err)
+					}
+				} else {
+					if err != nil || artifact == nil {
+						t.Fatalf("complete capture failed: %v", err)
+					}
+					t.Cleanup(func() { _ = artifact.Close() })
+					observation, err := artifact.ObserveAcquisitionsContext(t.Context())
+					if err != nil || observation.Description().Architecture != architecture {
+						t.Fatalf("original output lost capture binding: %v", err)
+					}
+					if err := artifact.Close(); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := artifact.ObserveAcquisitionsContext(t.Context()); code(err) != e.CodeGateUnmet {
+						t.Fatalf("closed output kept acquisition authority: %v", err)
+					}
+				}
+				removed := 0
+				for _, call := range runtime.cleanups {
+					if len(call) > 1 && call[0] == "volume" && call[1] == "rm" {
+						removed++
+					}
+				}
+				if removed != 2 {
+					t.Fatalf("capture outcome leaked private runtime volumes: %v", runtime.cleanups)
+				}
+			})
+		}
+	}
+}
+
+func TestRunPackerContainerAcquisitionAdmissionBeforeWork(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		memory, storage uint64
+		carrier         string
+		want            e.Code
+	}{
+		{"metadata consumes memory", 64, 1024, "capture.tar", e.CodeEngineCapability},
+		{"no scratch after minimal disk", 1024, 1, "capture.tar", e.CodeEngineCapability},
+		{"carrier is disk", 1024, 1024, "node.qcow2", e.CodeInvalidCatalog},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, runtime, built := newPackerContainerTestRun(t, "Packer v1.14.2\n", "The configuration is valid.\n", "", nil)
+			request.node.Packer.AcquisitionArchive = test.carrier
+			request.node.Requirements.Resources.MemoryMiB = test.memory
+			request.node.Requirements.Resources.EphemeralStorageMiB = test.storage
+			artifact, err := runPackerContainer(testContext(t), request)
+			if artifact != nil || code(err) != test.want || *built || len(runtime.calls) != 0 {
+				t.Fatalf("capture admission artifact=%v error=%v built=%t calls=%v; want%s before work", artifact, err, *built, runtime.calls, test.want)
+			}
+			assertNoPackerDiagnosticStages(t, request.workspace.Name())
+		})
 	}
 }
 

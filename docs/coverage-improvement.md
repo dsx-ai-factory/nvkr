@@ -116,9 +116,10 @@ Added tests cover:
 - Published container inspection rejoins the exact native manifest, index, platform and entrypoint. Missing
   selections, wrong object types, unsupported or mismatched platform bindings and corrupted nested content
   return no image identity. These tests use real local OCI layouts without registry publication or execution.
-- Image pinning selects requested Linux manifests from Docker's manifest-list response, excluding other
-  operating systems. Missing architectures, malformed responses, process failures and cancellation expose
-  no partial pin map. The scripted Docker protocol fixture does not exercise a registry.
+- Image-artifact pinning authenticates requested Linux manifests and parent membership through the pinned
+  OCI library. Controlled TLS registry fixtures cover both native media families and architectures,
+  complete built-in acquisition, observed results, cached closure tampering and absent membership.
+  These fixtures do not establish live upstream acquisition, signing or production delivery.
 - Checkpoint shape validation rejects invalid targets, predecessors, declaration sets and lifetimes before
   producing signing bytes or identity. Authenticated receipt access keeps blob integrity separate from chain
   identity, returns detached signer lists and binds the next high-water mark to the accepted target and authority.

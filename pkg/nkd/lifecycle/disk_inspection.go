@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
@@ -38,7 +39,7 @@ func validateInstalledInventorySubjects(run *Run) error {
 			continue
 		}
 		inventory, found := byOutput[output.Name]
-		if !found || output.Disk == nil || inventory.Subject.Digest != output.Digest ||
+		if !found || output.Disk == nil || !canonical.IsDigest(output.Disk.PayloadDigest) || inventory.Subject.Digest != output.Disk.PayloadDigest ||
 			inventory.Subject.Size != output.Disk.Size || inventory.Subject.PlanDigest != run.PlanDigest ||
 			inventory.Subject.BuildDigest != output.BuildDigest || inventory.Subject.Format != output.Disk.Format ||
 			inventory.Subject.Encryption != output.Disk.Encryption {

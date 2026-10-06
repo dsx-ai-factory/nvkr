@@ -134,6 +134,25 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		return Result{}, e.New(e.CodeUsage, "publication root requires 1..%d objects", maxDeliveryObjects)
 	}
 	objects := append([]ObjectInput(nil), requested...)
+	// Admit the disk profile before staging or copying a multi-GiB payload.
+	// This validates descriptions only; factory still owns receipt admission.
+	for _, input := range objects {
+		if input.Kind != "disk-image" {
+			continue
+		}
+		if root.Release == nil || !input.Layout || input.Output == nil || input.Output.Format != "disk-image" || input.Output.Disk == nil ||
+			input.ArtifactType != MediaDiskImage || !isDigest(input.Output.Disk.PayloadDigest) ||
+			input.Output.Disk.Encryption != "none" || input.Output.Disk.Size > maxDeliveryFileBytes || input.Output.TransportPath != "" {
+			return Result{}, e.New(e.CodeVerifyFailed, "disk release input requires exact bounded unencrypted wrapper and payload binding")
+		}
+		if err := (Output{Name: input.Name, Kind: "disk-image", Digest: input.SemanticDigest, BuildDigest: input.Output.BuildDigest,
+			Components: input.Output.Components, Disk: input.Output.Disk}).Validate(); err != nil {
+			return Result{}, err
+		}
+		if _, err := diskPlatform(input.OS + "/" + input.Arch); err != nil {
+			return Result{}, err
+		}
+	}
 	sort.Slice(objects, func(i, j int) bool {
 		if (objects[i].Evidence == nil) != (objects[j].Evidence == nil) {
 			return objects[i].Evidence == nil
@@ -165,7 +184,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 			if ownerErr != nil {
 				return Result{}, ownerErr
 			}
-			input.subject = &Descriptor{MediaType: MediaOCIManifest, Digest: owner.DescriptorDigest, Size: owner.Size}
+			input.subject = &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}
 		}
 		var descriptor Descriptor
 		var blobDigest string
@@ -469,6 +488,9 @@ func readIndex(ctx context.Context, root string) (ociIndex, []byte, error) {
 	defer func() { _ = held.Close() }()
 	raw, err := held.ReadAllContext(ctx, 8<<20)
 	if err != nil {
+		return ociIndex{}, nil, err
+	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return ociIndex{}, nil, err
 	}
 	var index ociIndex

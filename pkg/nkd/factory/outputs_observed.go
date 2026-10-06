@@ -196,6 +196,17 @@ func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, art
 	}
 	var outputs []delivery.Output
 	for _, expected := range plan.LifecycleOutputs {
+		if expected.Kind == PackageDiskImage {
+			if !declared["package/"+expected.Name] || !declared[expected.ArtifactID] {
+				return nil, e.New(e.CodeReleaseIncomplete, "publication omits exact disk wrapper and raw subject")
+			}
+			output, err := ObserveDiskPublicationPayload(ctx, plan, expected, artifacts)
+			if err != nil {
+				return nil, err
+			}
+			outputs = append(outputs, output)
+			continue
+		}
 		artifact, ok := artifacts[expected.ArtifactID]
 		if !ok || artifact.Kind != lifecyclePackageKind(expected.Kind) {
 			return nil, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no typed payload", expected.Name)

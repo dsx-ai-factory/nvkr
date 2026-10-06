@@ -16,6 +16,7 @@ import (
 type VMImagePackerNetworkAdmission struct {
 	environmentDigest string
 	nodes             map[string][]byte
+	storageDriver     definition.PodmanStorageDriver
 }
 
 // AuthorizeVMImagePackerNetwork validates the authored Environment and binds
@@ -44,6 +45,7 @@ func AuthorizeVMImagePackerNetwork(
 	}
 	receipt := &VMImagePackerNetworkAdmission{
 		environmentDigest: environmentDigest,
+		storageDriver:     environment.Runtime.PodmanStorageDriver,
 		nodes:             make(map[string][]byte),
 	}
 	for _, selection := range selections {

@@ -73,13 +73,15 @@ type LocalRunResult struct {
 	Workspace     string            `json:"workspace"`
 	Nodes         []LocalNodeResult `json:"nodes"`
 
-	diskMu               sync.Mutex
-	diskPermit           chan struct{}
-	diskClosed           bool
-	diskClosing          bool
-	diskInspectionCancel context.CancelFunc
-	diskCompletions      []diskProducerCompletion
-	materialConsumptions map[string]producerConsumption
+	diskMu                 sync.Mutex
+	diskPermit             chan struct{}
+	diskClosed             bool
+	diskClosing            bool
+	diskInspectionCancel   context.CancelFunc
+	diskPublicationPending map[string]bool
+	diskPublicationWait    sync.WaitGroup
+	diskCompletions        []diskProducerCompletion
+	materialConsumptions   map[string]producerConsumption
 }
 
 // QualificationLane returns the evidence lane recorded by this local execution.
@@ -134,6 +136,9 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	}
 	if options.DryRun {
 		return nil
+	}
+	if err := admitLocalDiskPublication(plan); err != nil {
+		return err
 	}
 	vmBuild := hasLocalVMBuild(plan)
 	if vmBuild && runtime.GOOS != "linux" {
@@ -194,6 +199,11 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	}
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return nil, err
+	}
+	if !options.DryRun {
+		if err := admitLocalDiskPublication(plan); err != nil {
+			return nil, err
+		}
 	}
 	if !options.DryRun && hasLocalVMBuild(plan) {
 		if err := validateVMDriverPlan(plan); err != nil {
@@ -381,6 +391,19 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	return result, nil
 }
 
+// Compilation can describe disk publication before the grouped live executor
+// is available. Reject its package operation before runtime, source or workspace
+// work; raw disk execution and static Plan inspection remain supported.
+func admitLocalDiskPublication(plan *Plan) error {
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind == NodePackage && node.PackageKind == PackageDiskImage {
+			return e.New(e.CodeEngineCapability,
+				"local disk publication requires the live grouped inspection and packaging executor")
+		}
+	}
+	return nil
+}
+
 func admittedLocalDiskProducer(plan *Plan, options *LocalRunOptions) diskProducerCallback {
 	return func(
 		ctx context.Context,
@@ -546,6 +569,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 		return e.New(e.CodeUsage, "local execution requires a plan")
 	}
 	if err := plan.Validate(); err != nil {
+		return err
+	}
+	if err := rejectUnsupportedRuntimeStorage(plan, "local factory execution"); err != nil {
 		return err
 	}
 	if err := rejectUnsupportedLocalPlanRequirements(plan, "local factory execution"); err != nil {

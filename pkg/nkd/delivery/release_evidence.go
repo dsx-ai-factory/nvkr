@@ -20,6 +20,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 	}
 	expected := map[string]EvidenceBinding{}
 	builds := map[string]string{}
+	diskRoots := map[string]string{}
 	for _, o := range publication.Objects {
 		output := o.Output
 		if output == nil {
@@ -37,6 +38,12 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		}
 		if len(subjects) != len(output.Components) {
 			return e.New(e.CodeVerifyFailed, "output build subject membership is incomplete")
+		}
+		if output.Format == "disk-image" {
+			if output.Disk == nil || subjects[output.Disk.Component] != output.Disk.PayloadDigest {
+				return e.New(e.CodeVerifyFailed, "disk root build subject differs from exact QCOW2 payload")
+			}
+			diskRoots[o.Name] = output.Disk.Component
 		}
 		if output.Format == "executable" {
 			manifest, err := flatManifest(ctx, root, o)
@@ -70,11 +77,16 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			case "oci":
 				binding.SubjectKind = "oci-manifest"
 				binding.SubjectDigest = o.DescriptorDigest
-				binding.InspectionInputDigest = subject
+				// A built export is a distinct producer subject. An acquired
+				// native manifest is already the delivered subject, so it has
+				// no separate input binding (the shared SBOM subject rule).
+				if subject != binding.SubjectDigest {
+					binding.InspectionInputDigest = subject
+				}
 			case outputFormatHelm:
 				binding.Stage = "source-build"
 				binding.SubjectKind = "source-archive"
-			case "executable", "apt-repository":
+			case "executable", "apt-repository", "disk-image":
 			default:
 				return e.New(e.CodeVerifyFailed, "release has an unsupported output format")
 			}
@@ -119,13 +131,17 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		if err != nil {
 			return err
 		}
-		if manifest.Subject == nil || manifest.Subject.Digest != owner.DescriptorDigest || manifest.Subject.Size != owner.Size || manifest.Subject.MediaType != MediaOCIManifest {
+		if manifest.Subject == nil || manifest.Subject.Digest != owner.DescriptorDigest || manifest.Subject.Size != owner.Size || manifest.Subject.MediaType != publishedManifestMediaType(owner) {
 			return e.New(e.CodeVerifyFailed, "SBOM attachment is not bound to its associated deliverable")
 		}
 		if len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != object.ArtifactType {
 			return e.New(e.CodeVerifyFailed, "SBOM manifest has an invalid payload")
 		}
-		raw, err := readBlob(ctx, root, manifest.Layers[0], 8<<20)
+		limit := int64(sbom.MaxDocumentBytes)
+		if object.ArtifactType == sbom.BundleMediaType {
+			limit = sbom.MaxBundleBytes
+		}
+		raw, err := readBlob(ctx, root, manifest.Layers[0], limit)
 		if err != nil {
 			return err
 		}
@@ -142,17 +158,48 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &bom); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "decoding release SBOM")
 		}
-		digest, err := bom.Digest()
-		if err != nil || digest != object.SemanticDigest || object.Name != "sbom-"+strings.TrimPrefix(digest, "sha256:") || len(bom.Metadata.Component.Hashes) != 1 || "sha256:"+bom.Metadata.Component.Hashes[0].Content != binding.SubjectDigest || bom.Metadata.Component.Name != binding.Component {
-			return e.New(e.CodeVerifyFailed, "SBOM document differs from its exact release subject")
-		}
 		props := map[string]string{}
 		for _, p := range bom.Metadata.Props {
 			props[p.Name] = p.Value
 		}
+		// Missing disk-root and material provenance share the release's owning
+		// gate, including the scanner pin required by generic BOM validation.
+		// After authenticating document bytes, report missing provenance before
+		// semantic/subject mismatch when both defects exist. The error identifies
+		// the first failed gate, not the absence of any other integrity defect.
+		// This grants no authority: the exact semantic/subject checks still follow.
+		for _, outputName := range binding.Outputs {
+			diskRoot := diskRoots[outputName]
+			if diskRoot == "" {
+				continue
+			}
+			keys := []string{"nkd:dependencyScannerDigest"}
+			if diskRoot == binding.Component {
+				if len(bom.Components) == 0 || props["nkd:dependencyInspection"] != "disk-reconciled/v1" {
+					return e.New(e.CodeProvenanceMissing, "disk root requires a full reconciled inventory")
+				}
+				keys = append(keys, "nkd:diskInspectionRuntimeDigest", "nkd:diskInspectorDigest", "nkd:diskCodecDigest")
+			} else if len(bom.Components) == 0 || props["nkd:dependencyInspection"] != "disk-content/v1" {
+				return e.New(e.CodeProvenanceMissing, "disk material requires its exact inspected content inventory")
+			}
+			for _, key := range keys {
+				if !isDigest(props[key]) {
+					return e.New(e.CodeProvenanceMissing, "disk inventory lacks an exact %s", key)
+				}
+			}
+		}
+		digest, err := bom.Digest()
+		if err != nil || digest != object.SemanticDigest || object.Name != "sbom-"+strings.TrimPrefix(digest, "sha256:") || len(bom.Metadata.Component.Hashes) != 1 || "sha256:"+bom.Metadata.Component.Hashes[0].Content != binding.SubjectDigest || bom.Metadata.Component.Name != binding.Component {
+			return e.New(e.CodeVerifyFailed, "SBOM document differs from its exact release subject")
+		}
 		for _, outputName := range binding.Outputs {
 			if props["nkd:buildDigest"] != builds[outputName] {
 				return e.New(e.CodeVerifyFailed, "SBOM build is unbound")
+			}
+			diskRoot := diskRoots[outputName]
+			method := props["nkd:dependencyInspection"]
+			if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1") {
+				return e.New(e.CodeVerifyFailed, "disk inspection method is not valid for a non-disk output")
 			}
 		}
 		if props["nkd:evidenceStage"] != binding.Stage || props["nkd:inspectionInputDigest"] != binding.InspectionInputDigest {

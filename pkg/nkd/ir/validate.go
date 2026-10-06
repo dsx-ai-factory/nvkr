@@ -499,6 +499,9 @@ func validateVMImageNode(n Node) error {
 	if err := validateIRPackerConfig(n.ID, n.Packer); err != nil {
 		return err
 	}
+	if n.Packer.AcquisitionArchive != "" && n.Packer.AcquisitionArchive == n.ArtifactPath {
+		return e.New(e.CodeInvalidCatalog, "VM build node %q acquisition carrier is its disk payload", n.ID)
+	}
 	if err := validateMaterialBindings(n.ID, n.Materials); err != nil {
 		return err
 	}
@@ -541,6 +544,10 @@ func validateIRPackerConfig(nodeID string, config *PackerConfig) error {
 		!safeRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q has an unsafe Packer project path", nodeID)
+	}
+	if config.AcquisitionArchive != "" && (!safetext.Valid(config.AcquisitionArchive, 4096, false) ||
+		!safeRelativePath(config.AcquisitionArchive) || config.AcquisitionArchive == "." || strings.ContainsAny(config.AcquisitionArchive, "{}")) {
+		return e.New(e.CodeInvalidCatalog, "VM build node %q has an unsafe acquisition archive path", nodeID)
 	}
 	if !safetext.Valid(config.BuildName, 256, false) || strings.ContainsAny(config.BuildName, ",*?[]\\") {
 		return e.New(e.CodeInvalidCatalog,
@@ -676,7 +683,7 @@ func validateMaterialDependencies(node Node, byID map[string]Node, fetchID strin
 func validatePullNode(n Node) error {
 	if err := rejectUnexpectedNodeFields(n, allowFields(
 		"component", "artifact", "digest", "platform", "network", "env",
-		"outputType", "artifactPath", "version")); err != nil {
+		"outputType", "artifactPath", "version", "executableArchive", "imageParentDigest")); err != nil {
 		return err
 	}
 	if !canonicalNodeID.MatchString(n.Component) || n.ID != "pull-"+n.Component {
@@ -703,6 +710,15 @@ func validatePullNode(n Node) error {
 	}
 	if err := validatePullArtifact(n); err != nil {
 		return err
+	}
+	if n.ImageParentDigest != "" && n.OutputType != "oci-image" {
+		return e.New(e.CodeInvalidCatalog, "image parent is valid only for OCI image pulls")
+	}
+	if n.ExecutableArchive != nil {
+		if n.OutputType != "host-package" || !strings.HasPrefix(n.Artifact, "https://") ||
+			!safeRelativePath(n.ExecutableArchive.Member) || !canonical.IsDigest(n.ExecutableArchive.Digest) {
+			return e.New(e.CodeInvalidCatalog, "release executable %q requires a pinned HTTPS archive and exact regular member", n.ID)
+		}
 	}
 	switch n.OutputType {
 	case "oci-image":

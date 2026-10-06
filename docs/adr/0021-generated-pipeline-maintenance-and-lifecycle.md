@@ -72,11 +72,31 @@ generator-owned directory and do not change stored canonical bytes, Plan identit
 
 A pin or catalog change moves the IR, which moves the emitted pipeline. The two travel together:
 
-- `catalog bump [--pins|--artifacts|--all] --check` previews the lockfile diff without writing (ADR-22).
+- `catalog bump [--all] --check` previews the lockfile diff without writing (ADR-22).
 - `run generate` after `catalog bump` regenerates the pipeline in the **same
   change** as the lock edit. The drift gate (§2) makes a lock change **unmergeable without the matching pipeline
   regen**, so "forgot to regenerate" is structurally impossible to merge.
-- A scheduled job runs bump → regeneration → build → verification → PR. Qualified changes require reproduction; v1 production uses its explicit evidence contract. Merge to the default branch is the v1 release decision (ADR-16), without a reproduction claim. Scheduled automation and release-manifest issuance remain deferred. Regeneration is a reviewable diff.
+- `catalogmaintenance` owns an explicitly configured review-candidate refresh: check the existing bundle,
+  atomically bump selected independent roots and their declared pin sets, regenerate, and repeat the drift
+  check. No-op preserves bytes. `--check` previews only the complete pin transaction, without writes or a
+  claim that candidate production was exercised. Locks and generated files retain separate transactions;
+  failure after pin commit leaves a disposable checkout for diagnosis, never a publishable candidate.
+  Recovery context preserves the generating owner's coded cause, including retryable cancellation and
+  non-retryable generated-file drift during either generation pass.
+- `catalog update-ci` renders a separate GitHub workflow with optional reviewed scheduling, default-branch
+  admission, exact base checkout, bounded non-canceling concurrency and read-only repository permissions.
+  Credentials are passed only to the fixed private-source checkout, not resolution or producer execution.
+  Its Git prefix override rejects distinct repository URL collisions before workflow output or pin mutation;
+  admission covers selected maintenance source closures, every revalidated catalog pin set and compiled
+  fetches. Repeated roles and ordinary `.git`/trailing-slash aliases for the same repository remain supported.
+  Changed candidates pass the repository gate and deterministic regeneration; `local-run` additionally
+  requires execution and independent observation of every required output. Unsupported capabilities fail
+  without reducing the Definition. Static mode emits only a review patch. Automatic review-branch/PR
+  publication remains capability-gated, and no scheduled external acceptance is claimed.
+- Local candidate verification is diagnostic, not qualified reproduction or hosted release acceptance.
+  Qualified changes require reproduction; v1 production uses its explicit evidence contract. Merge to the
+  default branch is the v1 release decision (ADR-16), without a reproduction claim. Release-manifest issuance
+  remains deferred. Regeneration is a reviewable diff.
 
 
 GitHub actions are catalog sources with `kind: github-action`. The registry owns the GitHub repository

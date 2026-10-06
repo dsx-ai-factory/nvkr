@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,13 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
 func TestCatalogSourcePinProjection(t *testing.T) {
@@ -140,7 +148,12 @@ func TestCatalogSourcePinCommandOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := readLock()
-	out, err := invoke("bump", "--dir", data, "--all", "--check")
+	out, err := invoke("pin", "--dir", data, "--commit", git("rev-parse", "HEAD"), "--check", "source")
+	assertLifecycleCommandCode(t, err, e.CodeDiff)
+	if !bytes.Equal(before, readLock()) || !strings.Contains(string(out), git("rev-parse", "HEAD")) {
+		t.Fatal("commit flag did not reach exact revision check or changed lock")
+	}
+	out, err = invoke("bump", "--dir", data, "--all", "--check")
 	assertLifecycleCommandCode(t, err, e.CodeDiff)
 	if !bytes.Equal(before, readLock()) || !strings.Contains(string(out), "v1.1.0") {
 		t.Fatal("dry run changed lock or failed to report newer tag")
@@ -200,7 +213,62 @@ func TestCatalogArtifactPinCommandRejectsArchitectureSubset(t *testing.T) {
 	}
 }
 
-func TestCatalogDerivedImageRuntimeAndNoOpOutput(t *testing.T) {
+func TestCatalogPinCommandsRejectNondefaultLegacyRuntime(t *testing.T) {
+	for _, args := range [][]string{
+		{"pin", "--runtime", "podman", "source"},
+		{"bump", "--runtime", "podman", "--all"},
+		{"pin-artifacts", "--runtime", "podman", "--all"},
+		{"pin-artifacts", "--docker", "podman", "--all"},
+	} {
+		t.Run(strings.Join(args, "-"), func(t *testing.T) {
+			command := append([]string{"nkdctl", "catalog", args[0], "--dir", "must-not-be-read"}, args[1:]...)
+			_, err := runCLIWithCapturedStdout(t, newApp(), command...)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+		})
+	}
+}
+
+func TestCatalogDerivedImageRegistryAndNoOpOutput(t *testing.T) {
+	// Keep the real CLI-to-owner fixture's transport configuration in an isolated
+	// process, never in the parent test process shared by other command tests.
+	if os.Getenv("NKD_TEST_ISOLATED_IMAGE_PIN") != "1" {
+		command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestCatalogDerivedImageRegistryAndNoOpOutput$")
+		command.Env = append(os.Environ(), "NKD_TEST_ISOLATED_IMAGE_PIN=1")
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("isolated command fixture: %v\n%s", err, output)
+		}
+		return
+	}
+	// Exercise the real registry codec/transport without an external service or
+	// daemon. Only this sequential command fixture trusts its private TLS server.
+	server := httptest.NewTLSServer(registry.New())
+	defer server.Close()
+	serverURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Host != "example.invalid" && request.URL.Host != serverURL.Host {
+			t.Fatalf("unexpected fixture registry %q", request.URL.Host)
+		}
+		clone := request.Clone(request.Context())
+		clone.URL.Host = serverURL.Host
+		return server.Client().Transport.RoundTrip(clone)
+	})
+	previousTransport := remote.DefaultTransport
+	remote.DefaultTransport = transport
+	t.Cleanup(func() { remote.DefaultTransport = previousTransport })
+	image, err := mutate.ConfigFile(empty.Image, &v1.ConfigFile{OS: "linux", Architecture: "amd64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	imageReference, err := name.NewTag("example.invalid/tool:1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := remote.Write(imageReference, image, remote.WithContext(t.Context()), remote.WithAuth(authn.Anonymous), remote.WithTransport(transport)); err != nil {
+		t.Fatal(err)
+	}
 	repo, data := t.TempDir(), t.TempDir()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
@@ -238,11 +306,7 @@ components:
 	if err := os.WriteFile(filepath.Join(data, catalog.RegistryFile), []byte(registry), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	runtime := filepath.Join(t.TempDir(), "podman")
-	script := "#!/bin/sh\n[ \"$#\" = 3 ] && [ \"$1\" = manifest ] && [ \"$2\" = inspect ] && [ \"$3\" = example.invalid/tool:1.2.3 ] || exit 91\nprintf '%s' '{\"manifests\":[{\"digest\":\"sha256:" + strings.Repeat("a", 64) + "\",\"platform\":{\"os\":\"linux\",\"architecture\":\"amd64\"}}]}'\n"
-	if err := os.WriteFile(runtime, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	runtime := "docker"
 	for _, tc := range []struct {
 		command string
 		check   bool

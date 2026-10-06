@@ -199,6 +199,17 @@ func (owner *LocalRunResult) validateDiskInstalledInventory(ctx context.Context,
 		return err
 	}
 	defer release()
+	return owner.validateDiskInstalledInventoryWhileHeld(ctx, plan, expected, runtime, receipt, bindings)
+}
+
+// The caller holds the disk permit through the complete evidence join.
+func (owner *LocalRunResult) validateDiskInstalledInventoryWhileHeld(ctx context.Context, plan *Plan,
+	expected LifecycleOutputPlan, runtime *sbom.DiskInspectionRuntime, receipt *DiskInstalledInventoryReceipt,
+	bindings diskInventoryBindings,
+) error {
+	if receipt == nil || receipt.owner != owner || receipt.runtime != runtime || receipt.trace == nil || bindings == nil {
+		return e.New(e.CodeVerifyFailed, "disk inventory belongs to a different Run or inspector")
+	}
 	trace, err := owner.observeDiskMaterialsWhileHeld(ctx, plan, expected)
 	if err != nil {
 		return err
@@ -225,22 +236,42 @@ func (owner *LocalRunResult) validateDiskInstalledInventory(ctx context.Context,
 // snapshotting, scanning and rechecks. The runtime's timeout is an additional
 // upper bound, not a guaranteed scan allowance beyond the remaining deadline.
 func (owner *LocalRunResult) beginDiskInspection(ctx context.Context) (context.Context, func(), error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	release, err := owner.acquireDiskPermit(ctx)
+	ctx, started, release, err := owner.beginDiskInspectionOperation(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	ctx, cancel := context.WithDeadline(ctx, started.Add(10*time.Minute))
+	return ctx, func() { cancel(); release() }, nil
+}
+
+// The permit and Close cancellation belong to this one operation. Callers add
+// their bounded work deadline as a child of this context, never of the original
+// caller context: replacing an admission deadline must not detach Run closure.
+func (owner *LocalRunResult) beginDiskInspectionOperation(ctx context.Context) (context.Context, time.Time, func(), error) {
+	return owner.beginDiskInspectionOperationAt(ctx, time.Now())
+}
+
+// Only the private test seam supplies a clock value. Production records its
+// actual start before queueing, and queue time consumes the same work budget.
+func (owner *LocalRunResult) beginDiskInspectionOperationAt(ctx context.Context, started time.Time) (context.Context, time.Time, func(), error) {
+	ctx, cancel := context.WithCancel(ctx)
+	queue, queueCancel := context.WithDeadline(ctx, started.Add(10*time.Minute))
+	release, err := owner.acquireDiskPermit(queue)
+	queueCancel()
 	if err != nil {
 		cancel()
-		return nil, nil, err
+		return nil, time.Time{}, nil, err
 	}
 	owner.diskMu.Lock()
 	if owner.diskClosed || owner.diskClosing {
 		owner.diskMu.Unlock()
 		cancel()
 		release()
-		return nil, nil, e.New(e.CodeGateUnmet, "disk inspection requires the original open Run")
+		return nil, time.Time{}, nil, e.New(e.CodeGateUnmet, "disk inspection requires the original open Run")
 	}
 	owner.diskInspectionCancel = cancel
 	owner.diskMu.Unlock()
-	return ctx, func() {
+	return ctx, started, func() {
 		owner.diskMu.Lock()
 		owner.diskInspectionCancel = nil
 		owner.diskMu.Unlock()

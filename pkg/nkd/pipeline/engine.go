@@ -7,6 +7,8 @@ package pipeline
 import (
 	"context"
 	"io"
+	"net/http"
+	"os"
 	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -28,11 +30,20 @@ type RunOptions struct {
 	// bounded force-removal attempt for every possibly-live container. It is required
 	// by the public Run, VerifyResults, and ExecNode entry points; nil fails admission.
 	Ctx        context.Context
-	reap       *reaper  // cleanup registry (set by Run; force-removes started containers on cancel)
-	SourceRoot string   // where fetch nodes check out sources (default .nkd/work/src)
-	Only       []string // if set, build only these component names
-	Jobs       int      // max concurrent local work slots across fetch/source/build nodes
-	DryRun     bool     // print the docker invocations instead of executing
+	reap       *reaper // cleanup registry (set by Run; force-removes started containers on cancel)
+	SourceRoot string  // where fetch nodes check out sources (default .nkd/work/src)
+	// SourceWorkspace grants descriptor-relative access for a source-only fetch.
+	// HoldSourceWorkspace issues the handle; Close cancels and joins its fetches.
+	// It confers no build authority and exposes no directory descriptor.
+	// SourceRoot must be relative to this directory. Held Git execution is Linux-only.
+	SourceWorkspace *SourceWorkspace
+	// SourceGitEnvironment describes the factory-admitted source-only child
+	// environment. It is used only with SourceWorkspace; nil selects the fixed
+	// public-source baseline, never the ambient process environment.
+	SourceGitEnvironment []string
+	Only                 []string // if set, build only these component names
+	Jobs                 int      // max concurrent local work slots across fetch/source/build nodes
+	DryRun               bool     // print the docker invocations instead of executing
 	// Launch selects ADR-18 §8 for a single exec-node: instead of running the
 	// build DIRECTLY (assuming the engine placed the job inside the toolchain container),
 	// the helper ORCHESTRATES the pinned toolchain container itself — the same code path as
@@ -49,6 +60,15 @@ type RunOptions struct {
 	// sources is a run-owned single-flight cache for exact prepared source inputs.
 	// It is intentionally private: authority and lifetime cannot cross a Run call.
 	sources *preparedSourceCache
+	// fetchDirectory is the current fetch owner's held checkout, not a caller path.
+	fetchDirectory        *os.File
+	fetchGitDirectory     *os.File
+	fetchRepository       string
+	fetchReceiptDirectory *os.File
+	fetchWorkspace        *os.File
+	// Private transport seam for acquisition contract tests; production retains
+	// the default HTTPS transport and the owning redirect policy.
+	releaseExecutableTransport http.RoundTripper
 	// BuildMaterials is a process-local capability over the exact manifest and
 	// producer bytes selected by the factory Plan. It is required for a build node
 	// with material bindings and rejected by every other node.

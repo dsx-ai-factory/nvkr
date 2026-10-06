@@ -1,0 +1,38 @@
+# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
+apiVersion: nkd.dev/lock/v1
+artifacts:
+  ubuntu-installer-iso:
+    digests:
+      arm64: sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168
+    tag: 26.04.1
+  ubuntu-installer-iso-amd64:
+    digests:
+      amd64: sha256:cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927
+    tag: 26.04.1
+kind: PinLock
+pins:
+  nke-cni-calico-source:
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
+  nke-kubeadm-distro-source:
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
+  nke-os:
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
+  nke-spire-agent-source:
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
+  ovn-kubernetes:
+    commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
+    sourceDateEpoch: 1788540677
+    tag: v1.4.0
+    treeHash: ce0cb49cd14f2fc260457e61a5a222c027a07f79

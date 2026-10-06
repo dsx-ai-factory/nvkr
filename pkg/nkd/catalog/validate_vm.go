@@ -56,6 +56,10 @@ const (
 )
 
 func validatePackerConfig(name string, config *PackerConfig) error {
+	if config.AcquisitionArchive != "" && (!validPackerTransportValue(config.AcquisitionArchive, maxPackerArtifactPathBytes) ||
+		!validSourceRelativePath(config.AcquisitionArchive) || config.AcquisitionArchive == "." || strings.ContainsAny(config.AcquisitionArchive, "{}")) {
+		return e.New(e.CodeInvalidCatalog, "component %q: packer.acquisitionArchive must be an exact clean output-relative path", name)
+	}
 	if !validPackerTransportValue(config.ProjectPath, maxPackerProjectPathBytes) ||
 		!validSourceRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
 		return e.New(e.CodeInvalidCatalog,

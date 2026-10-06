@@ -355,6 +355,9 @@ func (b *BOM) Validate() error {
 	if err != nil {
 		return err
 	}
+	if err := validateInventorySemantics(b, artifact); err != nil {
+		return err
+	}
 	serialSeed := buildDigest
 	if artifact != "" {
 		serialSeed += "/" + artifact
@@ -431,8 +434,11 @@ func metadataBindings(properties []Property) (string, string, error) {
 }
 
 func validateSBOMComponent(field string, component Component) error {
-	if (component.Type != "application" && component.Type != "library" && component.Type != "container" && component.Type != "operating-system") || !canonicalText(component.Name) {
-		return e.New(e.CodeInvalidCatalog, "%s is not a canonical application component", field)
+	if (component.Type != "application" && component.Type != "library" && component.Type != "container" && component.Type != "operating-system" && component.Type != "file") || !canonicalText(component.Name) {
+		return e.New(e.CodeInvalidCatalog, "%s is not a canonical supported component", field)
+	}
+	if component.Type == "file" && len(component.Hashes) != 1 {
+		return e.New(e.CodeUnverifiedRef, "%s file has no exact content hash", field)
 	}
 	if component.Version != "" && !canonicalText(component.Version) {
 		return e.New(e.CodeInvalidCatalog, "%s has a non-canonical version", field)
@@ -488,7 +494,14 @@ func (b *BOM) Marshal() ([]byte, error) {
 	if err := b.Validate(); err != nil {
 		return nil, err
 	}
-	return canonical.Marshal(b) // canonical on-disk form (ADR-01 §4)
+	raw, err := canonical.Marshal(b) // canonical on-disk form (ADR-01 §4)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > MaxDocumentBytes {
+		return nil, e.New(e.CodeVerifyFailed, "complete SBOM exceeds its bounded document policy")
+	}
+	return raw, nil
 }
 
 // Digest is the SBOM's domain-separated content digest (ADR-01 codec), the value the

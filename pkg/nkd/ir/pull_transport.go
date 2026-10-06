@@ -31,6 +31,27 @@ func ParseOCIBlobArtifact(artifact, digest string) (name.Digest, error) {
 	return ref, nil
 }
 
+// NativeImageReference projects the immutable delivered native subject. A bound
+// parent stays in the full node and never becomes the delivered image digest.
+// Legacy tag-only transports preserve their prior reference spelling.
+func NativeImageReference(node Node) (string, error) {
+	if node.OutputType != "oci-image" || !canonical.IsDigest(node.Digest) {
+		return "", e.New(e.CodeUnverifiedRef, "native image reference requires an OCI image and exact child")
+	}
+	if err := validatePullArtifact(node); err != nil {
+		return "", err
+	}
+	parsed, err := name.ParseReference(node.Artifact)
+	if err != nil {
+		return "", e.Wrap(e.CodeUnverifiedRef, err, "native image reference")
+	}
+	_, authored := parsed.(name.Digest)
+	if node.ImageParentDigest != "" || authored {
+		return parsed.Context().Digest(node.Digest).Name(), nil
+	}
+	return node.Artifact + "@" + node.Digest, nil
+}
+
 func validatePullArtifact(node Node) error {
 	if strings.HasPrefix(node.Artifact, OCIBlobScheme) {
 		if node.OutputType != "raw" {
@@ -42,6 +63,25 @@ func validatePullArtifact(node Node) error {
 	if node.OutputType == "oci-image" {
 		if strings.Contains(node.Artifact, "://") {
 			return e.New(e.CodeInvalidCatalog, "OCI image pull %q requires an image name, not an archive or URL transport", node.ID)
+		}
+		parsed, err := name.ParseReference(node.Artifact)
+		if err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "OCI pull reference %q", node.ID)
+		}
+		if node.ImageParentDigest != "" && !canonical.IsDigest(node.ImageParentDigest) {
+			return e.New(e.CodeUnverifiedRef, "OCI pull %q has invalid parent digest", node.ID)
+		}
+		if authored, ok := parsed.(name.Digest); ok {
+			if !canonical.IsDigest(authored.DigestStr()) {
+				return e.New(e.CodeUnverifiedRef, "OCI pull %q has invalid authored digest", node.ID)
+			}
+			want := node.ImageParentDigest
+			if want == "" {
+				want = node.Digest
+			}
+			if authored.DigestStr() != want {
+				return e.New(e.CodeUnverifiedRef, "OCI pull %q changes its authored digest", node.ID)
+			}
 		}
 		return nil
 	}

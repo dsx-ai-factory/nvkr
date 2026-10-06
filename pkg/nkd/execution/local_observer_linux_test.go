@@ -337,6 +337,8 @@ func TestAvailableScratchMiBFailClosed(t *testing.T) {
 		{name: "negative block size", fd: 7, stat: unix.Statfs_t{Bsize: -1}, wantCode: nkderr.CodeEngineCapability},
 		{name: "overflow", fd: 7, stat: unix.Statfs_t{Bsize: 2, Bavail: math.MaxUint64}, wantCode: nkderr.CodeEngineCapability},
 		{name: "capacity", fd: 7, stat: unix.Statfs_t{Bsize: 4096, Bavail: 512}, want: 2},
+		{name: "fragment capacity", fd: 7, stat: unix.Statfs_t{Frsize: 1024, Bsize: 4096, Bavail: 1024}, want: 1},
+		{name: "memory-backed ephemeral capacity", fd: 7, stat: unix.Statfs_t{Type: unix.TMPFS_MAGIC, Bsize: 4096, Bavail: 512}, want: 2},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var statfs localStatfs

@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 	"sync/atomic"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
@@ -314,17 +314,17 @@ func availableScratchMiBWith(fd int, statfs localStatfs) (uint64, error) {
 	if err := statfs(fd, &stat); err != nil {
 		return 0, e.Wrap(e.CodeEngineCapability, err, "reading local scratch capacity")
 	}
-	if uint64(stat.Flags)&uint64(unix.ST_RDONLY) != 0 {
+	facts := securepath.FilesystemSpaceFromStat(stat)
+	if facts.ReadOnly() {
 		return 0, e.New(e.CodeEngineCapability, "local scratch filesystem is read-only")
 	}
-	if stat.Bsize <= 0 {
-		return 0, e.New(e.CodeEngineCapability, "local scratch filesystem reports an invalid block size")
+	available, err := facts.AvailableBytes()
+	if err != nil {
+		return 0, e.Wrap(e.CodeEngineCapability, err, "reading local scratch capacity")
 	}
-	blockSize := uint64(stat.Bsize)
-	if stat.Bavail > math.MaxUint64/blockSize {
-		return 0, e.New(e.CodeEngineCapability, "local scratch capacity exceeds the supported range")
-	}
-	return stat.Bavail * blockSize / bytesPerMiB, nil
+	// General VM ephemeral scratch may be memory-backed. Large consumer QCOW2
+	// snapshots have a separate policy that rejects detected memory filesystems.
+	return available / bytesPerMiB, nil
 }
 
 func (observation *linuxLocalObservation) observeKVM() (bool, error) {

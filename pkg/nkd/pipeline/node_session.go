@@ -124,7 +124,7 @@ func (handle *NodeSession) Close() {
 	if session.packerRuntime != nil {
 		<-session.packerRuntime.ready
 		if session.packerRuntime.runtime != nil && session.packerRuntime.runtime.capability != nil {
-			_ = session.packerRuntime.runtime.capability.Close()
+			_ = session.packerRuntime.runtime.close()
 		}
 	}
 	close(session.done)

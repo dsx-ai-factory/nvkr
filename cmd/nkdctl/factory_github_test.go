@@ -51,6 +51,14 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 	}
 }
 
+func TestFactoryDoesNotExposeUnusedSourceFetchCommand(t *testing.T) {
+	for _, command := range cmdFactory().Subcommands {
+		if command.Name == "fetch-source" {
+			t.Fatal("unused source-only command bypasses the GitHub Plan admission boundary")
+		}
+	}
+}
+
 // Exercise main in a fresh process: writing to a reader-closed fd 2 otherwise
 // exits with SIGPIPE before the selected coded status reaches os.Exit.
 func TestCLIFinalDiagnosticPreservesStatusWithClosedPipe(t *testing.T) {

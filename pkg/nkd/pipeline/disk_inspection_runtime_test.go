@@ -323,6 +323,53 @@ func TestDiskInspectionBufferHasNoUnboundedWriteFastPaths(t *testing.T) {
 	}
 }
 
+func TestDiskContentReportBufferHasSeparateBound(t *testing.T) {
+	for _, content := range []bool{false, true} {
+		t.Run(strconv.FormatBool(content), func(t *testing.T) {
+			var buffer diskInspectionBuffer
+			limit := MaxDiskInspectionReportBytes
+			if content {
+				buffer.limit, limit = MaxDiskContentReportBytes, MaxDiskContentReportBytes
+			}
+			if n, err := buffer.Write([]byte(strings.Repeat("x", limit))); err != nil || n != limit {
+				t.Fatalf("exact report bound: bytes=%d error=%v", n, err)
+			}
+			if n, err := buffer.Write([]byte("x")); code(err) != e.CodeEnvelopeDecode || n != 0 || buffer.Len() != limit {
+				t.Fatalf("report bound+1: bytes=%d error=%v retained=%d", n, err, buffer.Len())
+			}
+		})
+	}
+}
+
+// Exercise the actual launcher projection, not merely a standalone buffer. The
+// controlled transport emits bytes; it is not Docker or content-discovery proof.
+func TestDiskInspectionLauncherSelectsContentReportBound(t *testing.T) {
+	for _, composition := range []bool{false, true} {
+		for _, runtimeName := range []string{"docker", "podman"} {
+			t.Run(runtimeName+"/"+strconv.FormatBool(composition), func(t *testing.T) {
+				subject, err := heldfile.FromBytesContext(t.Context(), []byte("held subject"), heldfile.Options{Label: "report-bound-subject", MaxBytes: 128})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer subject.Close()
+				selection := testDiskInspectionSelection(t)
+				if composition {
+					selection.compositionKind, selection.consumerPlatform = "disk-image", "linux/amd64"
+				}
+				runtime := &diskInspectionRunRuntime{name: runtimeName, report: strings.Repeat("x", MaxDiskInspectionReportBytes+1)}
+				raw, err := runDiskInspectionContainer(t.Context(), runtime, selection, "image", subject)
+				if composition {
+					if err != nil || len(raw) != len(runtime.report) || !runtime.copied {
+						t.Fatalf("composition report was truncated or used diagnostic policy: bytes=%d error=%v", len(raw), err)
+					}
+				} else if code(err) != e.CodeEnvelopeDecode || raw != nil {
+					t.Fatalf("diagnostic bound was weakened: bytes=%d error=%v", len(raw), err)
+				}
+			})
+		}
+	}
+}
+
 func TestDiskInspectionBufferProcessHelper(t *testing.T) {
 	mode := os.Getenv("NKD_DISK_INSPECTION_OUTPUT_HELPER")
 	if mode == "" {
@@ -398,6 +445,7 @@ func TestDiskInspectionSelectionFailsClosed(t *testing.T) {
 		{name: "missing codec", edit: func(s *DiskInspectionSelection) { s.CodecDigest = "" }, want: e.CodeUnpinnedInput},
 		{name: "no cpu", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 0 }, want: e.CodeEngineCapability},
 		{name: "below CPU runtime floor", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 9 }, want: e.CodeEngineCapability},
+		{name: "CPU quota overflow", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = uint64(math.MaxInt64)/100 + 1 }, want: e.CodeEngineCapability},
 		{name: "CPU runtime floor", edit: func(s *DiskInspectionSelection) { s.Resources.CPUMillis = 10 }},
 		{name: "no appliance memory", edit: func(s *DiskInspectionSelection) { s.Resources.MemoryMiB = 1024 }, want: e.CodeEngineCapability},
 		{name: "no timeout", edit: func(s *DiskInspectionSelection) { s.TimeoutSeconds = 0 }, want: e.CodeEngineCapability},
@@ -427,6 +475,9 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 			}
 			defer subject.Close()
 			args := diskInspectionCreateArgs(selection, selection.Image, "owned-attempt", "attempt-token", subject)
+			if !slices.Equal(args[len(args)-3:], []string{"1000", "16384", "256"}) {
+				t.Fatalf("frozen helper resource grant not projected: %v", args)
+			}
 			if !slices.Contains(args, "--log-driver=none") {
 				t.Fatal("daemon log persistence was not disabled")
 			}
@@ -444,6 +495,33 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 						t.Fatalf("unexpected authority %q", arg)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestDiskInspectionCPUArgumentPreservesExactMillis(t *testing.T) {
+	subject, err := heldfile.FromBytesContext(t.Context(), []byte("subject"), heldfile.Options{Label: "CPU argv", MaxBytes: 32})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	for _, tt := range []struct {
+		cpu  uint64
+		want string
+	}{
+		{10, "--cpu-quota=1000"},
+		{2001, "--cpu-quota=200100"},
+		{2300, "--cpu-quota=230000"},
+		{4100, "--cpu-quota=410000"},
+		{uint64(math.MaxInt64) / 100, "--cpu-quota=9223372036854775800"},
+	} {
+		t.Run(strconv.FormatUint(tt.cpu, 10), func(t *testing.T) {
+			selection := testDiskInspectionSelection(t)
+			selection.Resources.CPUMillis = tt.cpu
+			args := diskInspectionCreateArgs(selection, selection.Image, "name", "attempt", subject)
+			if !slices.Contains(args, tt.want) || !slices.Contains(args, "--cpu-period=100000") || args[len(args)-3] != strconv.FormatUint(tt.cpu, 10) {
+				t.Fatalf("CPU grant rounded during projection: %v", args)
 			}
 		})
 	}

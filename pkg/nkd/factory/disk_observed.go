@@ -490,6 +490,9 @@ func (result *LocalRunResult) Close() error {
 		result.diskInspectionCancel()
 	}
 	result.diskMu.Unlock()
+	// No new reservation can pass after diskClosing is set. A completion
+	// already committing must record its outcomes before its held Run closes.
+	result.diskPublicationWait.Wait()
 	permit := result.diskOperationPermit()
 	<-permit
 	defer func() { permit <- struct{}{} }()

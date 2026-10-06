@@ -85,14 +85,15 @@ type APTOutput struct {
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
-	GitHubDispatchBranches []string          `json:"githubDispatchBranches,omitempty"`
-	APIVersion             string            `json:"apiVersion"`
-	Kind                   string            `json:"kind"`
-	Metadata               Metadata          `json:"metadata"`
-	RunsOn                 string            `json:"runsOn,omitempty"`
-	ExecutionClasses       []execution.Class `json:"executionClasses,omitempty"`
-	UtilityContainer       string            `json:"utilityContainer"`
-	UtilityPlatform        string            `json:"utilityPlatform"`
+	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`
+	APIVersion             string                           `json:"apiVersion"`
+	Kind                   string                           `json:"kind"`
+	Metadata               Metadata                         `json:"metadata"`
+	RunsOn                 string                           `json:"runsOn,omitempty"`
+	ExecutionClasses       []execution.Class                `json:"executionClasses,omitempty"`
+	DiskInspectionProfiles map[string]DiskInspectionProfile `json:"diskInspectionProfiles,omitempty"`
+	UtilityContainer       string                           `json:"utilityContainer"`
+	UtilityPlatform        string                           `json:"utilityPlatform"`
 
 	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
 	Publication  *Publication            `json:"publication,omitempty"`
@@ -117,9 +118,10 @@ type Publication struct {
 }
 
 type Runtime struct {
-	Runtime      string `json:"runtime,omitempty"`
-	RuntimeImage string `json:"runtimeImage,omitempty"`
-	HelperImage  string `json:"helperImage,omitempty"`
+	PodmanStorageDriver PodmanStorageDriver `json:"podmanStorageDriver,omitempty"`
+	Runtime             string              `json:"runtime,omitempty"`
+	RuntimeImage        string              `json:"runtimeImage,omitempty"`
+	HelperImage         string              `json:"helperImage,omitempty"`
 	// BuilderImage retains the retired GitLab bootstrap schema allocation.
 	// Nonempty values are unsupported by maintained execution targets.
 	BuilderImage      string            `json:"builderImage,omitempty"`
@@ -251,6 +253,17 @@ func (environment Environment) Validate() error {
 	if err := execution.ValidateClasses(environment.ExecutionClasses); err != nil {
 		return err
 	}
+	profilePlatforms := make([]string, 0, len(environment.DiskInspectionProfiles))
+	for platform := range environment.DiskInspectionProfiles {
+		profilePlatforms = append(profilePlatforms, platform)
+	}
+	sort.Strings(profilePlatforms)
+	for _, platform := range profilePlatforms {
+		profile := environment.DiskInspectionProfiles[platform]
+		if err := profile.Validate(platform); err != nil {
+			return err
+		}
+	}
 	for source, access := range environment.SourceAccess {
 		if err := validateHTTPSURL("environment sourceAccess source", source); err != nil {
 			return err
@@ -338,6 +351,9 @@ func (profile Environment) RuntimeBinary() string {
 }
 
 func (profile Runtime) validate() error {
+	if err := profile.PodmanStorageDriver.Validate(profile.Runtime); err != nil {
+		return err
+	}
 	if profile.BuilderImage != "" {
 		return e.New(e.CodeEngineCapability, "runtime builderImage requires the retired GitLab bootstrap adapter")
 	}

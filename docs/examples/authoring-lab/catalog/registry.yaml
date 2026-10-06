@@ -1,0 +1,89 @@
+apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: authoring-lab
+  description: Local authoring fixture; plans do not establish build or release evidence.
+sources:
+  platform:
+    repo: https://authoring.example.invalid/platform
+    tagPrefix: platform/v
+    constraint: 1.0.x
+    pinSet:
+      file: versions.yaml
+      members:
+        app: {source: app, path: 'dependencies[name=app].version'}
+        tools: {source: tools, path: 'dependencies[name=tools].version'}
+  app:
+    repo: https://authoring.example.invalid/platform
+    tagPrefix: app/v
+    pinnedBy: platform
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  tools:
+    repo: https://authoring.example.invalid/platform
+    tagPrefix: tools/v
+    pinnedBy: platform
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+components:
+  cli:
+    source: app
+    fromSource: true
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: bin/labctl
+    writeDir: bin
+    buildCommand: [sh, -ec, 'cp cli.sh bin/labctl; chmod +x bin/labctl']
+  doctor:
+    source: tools
+    fromSource: true
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: bin/doctor
+    writeDir: bin
+    buildCommand: [sh, -ec, 'cp doctor.sh bin/doctor; chmod +x bin/doctor']
+  doctor-alt:
+    source: tools
+    fromSource: true
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: bin/doctor
+    writeDir: bin
+    buildCommand: [sh, -ec, 'cp doctor-alt.sh bin/doctor; chmod +x bin/doctor']
+  status:
+    source: tools
+    fromSource: true
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: bin/status
+    writeDir: bin
+    buildCommand: [sh, -ec, 'cp status.sh bin/status; chmod +x bin/status']
+  controller:
+    source: app
+    fromSource: true
+    platforms: [linux/amd64]
+    outputType: oci-image
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    artifactPath: bin/controller.oci.tar
+    writeDir: bin
+    buildCommand: [sh, -ec, 'buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local dockerfile=/src --opt platform=linux/amd64 --output type=oci,dest=/src/bin/controller.oci.tar,oci-mediatypes=true']
+  controller-chart:
+    source: app
+    fromSource: true
+    platforms: [linux/amd64]
+    outputType: tarball
+    artifactPath: bin/controller.tar
+    writeDir: bin
+    buildCommand: [tar, -cf, bin/controller.tar, chart]
+    helm:
+      chart: .
+      images:
+        controller:
+          values: {digest: image.digest}
+  support-chart:
+    source: tools
+    fromSource: true
+    platforms: [linux/amd64]
+    outputType: tarball
+    artifactPath: bin/support.tar
+    writeDir: bin
+    buildCommand: [tar, -cf, bin/support.tar, support]

@@ -279,10 +279,11 @@ func packerContractFromBuildRequest(request PackerBuildRequest) packerBuildContr
 // output tree. The pathname is removed before runPacker returns, so later path
 // substitution cannot change these bytes.
 type PackerArtifact struct {
-	mu     sync.Mutex
-	file   *os.File
-	digest string
-	size   int64
+	mu           sync.Mutex
+	file         *os.File
+	digest       string
+	size         int64
+	acquisitions *heldfile.File
 }
 
 func (artifact *PackerArtifact) Digest() string {
@@ -348,8 +349,9 @@ func (artifact *PackerArtifact) Close() error {
 	if artifact.file == nil {
 		return nil
 	}
-	err := artifact.file.Close()
+	err := errors.Join(artifact.file.Close(), artifact.acquisitions.Close())
 	artifact.file = nil
+	artifact.acquisitions = nil
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "closing collected Packer artifact")
 	}

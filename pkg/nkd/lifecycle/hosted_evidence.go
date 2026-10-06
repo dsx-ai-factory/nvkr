@@ -76,8 +76,11 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 		}
 		for _, member := range bound {
 			observed, ok := outputs[member.Name]
-			if !ok || observed.Kind != member.Kind || observed.Digest != member.Digest || observed.BuildDigest != member.BuildDigest || !equalStrings(observed.Components, member.Components) {
+			if !ok {
 				return e.New(e.CodeVerifyFailed, "publication substitutes observed output %q", member.Name)
+			}
+			if err := requireHostedOutputMembership(observed, member); err != nil {
+				return err
 			}
 		}
 		identity, regexErr := regexp.Compile(plan.Environment.Signing.Identity)
@@ -88,6 +91,21 @@ func observeHostedPipelineEvidence(ctx context.Context, workspace string, plan *
 			!identity.MatchString(record.ObservedIdentity) || record.ObservedIssuer != plan.Environment.Signing.Issuer {
 			return e.New(e.CodeSignatureInvalid, "publication verification for %q does not prove the planned signer and provenance", route.Name)
 		}
+	}
+	return nil
+}
+
+// Both hosted phases use this exact-subject comparison after their own byte and
+// evidence verification. Transport locators are excluded; no cached description
+// can replace either phase's independently authenticated publication closure.
+func requireHostedOutputMembership(observed, member delivery.Output) error {
+	sameDisk := observed.Disk == nil && member.Disk == nil
+	if observed.Disk != nil && member.Disk != nil {
+		sameDisk = *observed.Disk == *member.Disk
+	}
+	if observed.Name != member.Name || observed.Kind != member.Kind || observed.Digest != member.Digest ||
+		observed.BuildDigest != member.BuildDigest || !equalStrings(observed.Components, member.Components) || !sameDisk {
+		return e.New(e.CodeVerifyFailed, "publication substitutes observed output %q", member.Name)
 	}
 	return nil
 }

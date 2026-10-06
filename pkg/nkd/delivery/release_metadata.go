@@ -5,6 +5,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 // ReleaseMetadata is the release-wide context stored in the sole release index
@@ -25,6 +26,7 @@ type OutputBinding struct {
 	Components    []string       `json:"components"`
 	TransportPath string         `json:"transportPath,omitempty"`
 	BuildSubjects []BuildSubject `json:"buildSubjects,omitempty"`
+	Disk          *DiskOutput    `json:"disk,omitempty"`
 }
 
 type BuildSubject struct {
@@ -82,16 +84,32 @@ func validateReleaseMetadata(root PublicationRoot) error {
 		case "executable":
 			kind, media = "binary-bundle", MediaBinaryBundle
 		case "oci":
-			kind, media = "container-image", MediaOCIManifest
+			kind, media = "container-image", o.ArtifactType
+			if !types.MediaType(media).IsImage() {
+				return e.New(e.CodeVerifyFailed, "container output requires a native OCI or Docker schema-2 image manifest")
+			}
 		case outputFormatHelm:
 			kind, media = outputFormatHelm, "application/vnd.nkd.helm-bundle.v1"
 		case "apt-repository":
 			kind, media = "apt-repository", "application/vnd.nkd.apt-repository.v1"
+		case "disk-image":
+			kind, media = "disk-image", o.ArtifactType
+			if media != MediaDiskImage || o.Output.Disk == nil || !isDigest(o.Output.Disk.PayloadDigest) ||
+				o.Output.Disk.PayloadDigest != o.BlobDigest || o.Output.Disk.Encryption != "none" || o.Output.TransportPath != "" {
+				return e.New(e.CodeVerifyFailed, "published disk requires an exact unencrypted payload binding")
+			}
+			if err := (Output{Name: o.Name, Kind: kind, Digest: o.DescriptorDigest, BuildDigest: o.Output.BuildDigest,
+				Components: o.Output.Components, Disk: o.Output.Disk}).Validate(); err != nil {
+				return err
+			}
 		default:
 			return e.New(e.CodeVerifyFailed, "unsupported release output format")
 		}
 		if o.Kind != kind || o.ArtifactType != media {
 			return e.New(e.CodeVerifyFailed, "release output type differs from format")
+		}
+		if kind != "disk-image" && o.Output.Disk != nil {
+			return e.New(e.CodeVerifyFailed, "non-disk release output carries disk binding")
 		}
 		previous := ""
 		for _, component := range o.Output.Components {

@@ -16,6 +16,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/safetext"
 	"golang.org/x/sys/unix"
@@ -71,6 +72,19 @@ func writePackerIdentityFile(ctx context.Context, name, content string) error {
 }
 
 func validatePackerContainerRequest(request packerContainerRunRequest, kvmEnabled bool) error {
+	if request.node.Packer.AcquisitionArchive != "" {
+		if request.node.Requirements == nil || request.node.Requirements.Resources == nil {
+			return e.New(e.CodeEngineCapability, "acquisition collection requires declared memory and scratch capacity before Packer work")
+		}
+		budget := *request.node.Requirements.Resources
+		// Reject a declaration that cannot fit even a minimal held disk and
+		// bounded carrier before diagnostics, runtime commands or baking. The
+		// actual collected disk and observed free capacity are checked later.
+		minimum := execution.ResourceCapacity{MemoryMiB: budget.MemoryMiB, EphemeralStorageMiB: budget.EphemeralStorageMiB}
+		if _, err := packerAcquisitionCollectionLimit(budget, minimum, 1); err != nil {
+			return err
+		}
+	}
 	if request.diagnostics == nil || request.subject == "" {
 		return e.New(e.CodeEngineCapability,
 			"containerized Packer requires an attempt-owned diagnostic capability bound to its Plan subject")

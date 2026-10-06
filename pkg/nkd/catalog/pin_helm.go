@@ -312,16 +312,26 @@ func (transport helmTransport) RoundTrip(request *http.Request) (*http.Response,
 type helmBoundedBody struct {
 	io.ReadCloser
 	remaining int64
+	label     string
 }
 
 func (body *helmBoundedBody) Read(p []byte) (int, error) {
-	if int64(len(p)) > body.remaining+1 {
+	label := body.label
+	if label == "" {
+		label = "helm OCI"
+	}
+	if body.remaining < 0 {
+		return 0, fmt.Errorf("%s response exceeds size bound", label)
+	}
+	// Only add the overflow-detection byte when remaining is smaller than the
+	// buffer; this preserves every representable descriptor size, including MaxInt64.
+	if body.remaining < int64(len(p)) {
 		p = p[:body.remaining+1]
 	}
 	n, err := body.ReadCloser.Read(p)
 	body.remaining -= int64(n)
 	if body.remaining < 0 {
-		return 0, fmt.Errorf("helm OCI response exceeds size bound")
+		return 0, fmt.Errorf("%s response exceeds size bound", label)
 	}
 	return n, err
 }

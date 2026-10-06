@@ -114,17 +114,88 @@ later unknown source fails, but no partial update commits. Artifact selections a
 are admitted before upstream calls. No-op updates preserve existing lock bytes. Source check mode returns
 `CodeDiff` when changes are available without writing; artifact pinning does not acquire a new check mode.
 
+Acquired `prebuilt.image` declarations may retain an exact parent index or single-manifest digest,
+or use a tag. Image maintenance authenticates the actual parent, unique baseline native descriptors and
+native manifest/config bytes with the existing pinned OCI library. The artifact lock retains optional
+`imageParentDigest` plus the independently selected native `digests`. The parent is lock-owned, not a
+second authored pin field. A digest-qualified declaration must equal that retained parent; the legacy
+single-native lane may omit it only when the authored digest equals every selected native subject.
+Missing or substituted parent descriptions fail `CodeUnverifiedRef` before executable work. Templates
+remain owned by their existing render boundary. Lock fields describe constraints, never a receipt.
+
+The frozen full IR retains the exact parent acquisition reference and parent/native/platform binding.
+`ImageParentDigest` is also a logical content-selection constraint: changing the immutable index closure
+that the selected source requires changes Build identity even when its native child is unchanged.
+Repository, tag spelling and registry credentials remain transport-only. This optional field extends
+IR v4; empty legacy nodes preserve their prior canonical logical bytes, while old strict readers reject
+the unknown field rather than silently executing a weaker contract.
+
+Migrating a legacy tag pin that lacks `imageParentDigest` authenticates and records the current parent.
+That first maintenance operation intentionally changes Build identity, even if every native child
+digest is unchanged. Subsequent maintenance at the same parent and children preserves the exact lock
+bytes and Build identity. Maintained catalogs should complete this migration before establishing a
+release identity. A same-version republish policy compares the parent as well as native subjects.
+The pinned OCI library canonicalizes `repository:tag@digest` as `repository@digest`; the digest, not
+the redundant tag spelling, constrains selection. The original declaration remains descriptive transport.
+
+The built-in acquisition owner authenticates the exact parent again before output work and consumes its
+original selected native image through an original-owner, callback-scoped single-use handle. It rejects
+wrong parent/child/platform, duplicate or ambiguous native membership, constrained variants, nested
+indexes and substituted manifest/config bytes. Callback exit cancels before joining consumption;
+copied, expired and replayed handles fail. Unsupported injected OCI transports fail capability admission
+before creating output. Tag-only legacy transports remain compatible; new tag pins with a retained
+parent acquire that exact immutable parent, not a possibly moved tag. Native manifests are preserved,
+including Docker schema-2 media, and complete native closures are verified before atomic publication.
+
+Metadata responses remain bounded to 8 MiB and acquisition to five minutes, including membership,
+config and complete layer materialization within the callback. Large images that cannot finish within
+this fixed acquisition budget fail closed; extending it requires an owning capability change, not a
+caller bypass. Only authenticated native
+layer descriptors widen a compressed blob response; HTTPS redirect continuations retain that exact bound.
+The existing OCI library additionally limits and hashes each layer stream against its descriptor.
+No second fetch by a caller-supplied child, standalone unbounded layer client, or ambient credential
+store substitutes for the parent's selected image. This is pipeline-attested acquisition-origin evidence,
+not an upstream signature, build reproduction, source approval or production delivery claim.
+
 - `catalog pin --dir <catalog> --tag vX.Y.Z <source>` — resolve that tag to
   `{tag, commit, treeHash, sourceDateEpoch}` and update the lock.
+- `catalog pin --dir <catalog> --commit <full-commit> <source>` pins an exact Git
+  source revision through the same acquisition and atomic lock writer. It cannot
+  be combined with `--tag` or bump. The held Git commit, tree and epoch are checked;
+  the lock's descriptive `tag` is that full commit, not an invented release tag.
+  GitHub actions and release-tool sources retain their exact release-tag contract
+  and reject this option before source acquisition. This permits candidate source
+  integration without making a release or governance approval claim.
+  `bump` rejects selected commit-mode pins (`tag == commit`) before upstream work;
+  moving one requires explicit `pin --commit` or `pin --tag` intent, not a routine
+  automatic conversion to the newest release tag.
 - `catalog bump --dir <catalog> [--all] [source...]` — resolve the newest tag matching each selected source's
   `constraint` (e.g. `1.32.x`). `--all` selects independent roots and visits each explicitly nested set once.
 - `catalog pin-artifacts --dir <catalog> [--all] [component...]` — resolve the complete declared architecture
   set of prebuilt digests through the existing URL or image acquisition path.
+
 - `catalog pin` and `catalog bump` accept `--check`: resolve and print the complete update without writing.
 - **Derived pins (§7).** `pin`/`bump` must **refuse** an independent bump of a member marked `pinnedBy` with a coded
   error naming its umbrella; bumping the umbrella is **one operation** that re-derives and rewrites the umbrella
   entry and **every** member entry in the set together (an aborted partial set is never committed); and `--check`
   prints the **whole set** — the umbrella plus every member it moves — never a member in isolation.
+
+Image pin maintenance records authenticated parent and exact native subjects. Fixed source-reviewed
+tag references remain ordinary acquired producers, not automatically extracted chart pin-set members.
+The native profile requires explicit body `mediaType` matching served image/index media; omitted or
+mismatched markers fail closed. Republishing a tag does not authorize changing an already frozen parent
+or native subject. Moving a pin still requires explicit owning maintenance and review.
+
+Maintenance callers may additionally supply explicit `SameRelease` groups of selected independent sources.
+Each group must share the exact repository, tag prefix and constraint before upstream resolution; the complete
+candidate must share tag, commit, tree and source epoch before the lock commit. Toolchain and vendoring
+settings may differ. Disagreement aborts the entire transaction, including derived pins. This is an
+invocation-scoped consistency assertion, not `pinnedBy` or `derivedFrom` provenance and not a new catalog
+schema. Maintenance also opts into rejecting republished versions before preview or CAS: unchanged
+versions may not acquire different source identities or acquired payload bytes/chart identities. Derived
+provenance may advance to a new umbrella with unchanged member bytes. Interactive pin/bump semantics
+remain explicit and unchanged. No constraint is widened automatically. The maintenance workflow owner is
+defined in ADR-21.
 
 Every write follows ADR-21's same-filesystem stage, fsync, original-digest compare-and-swap, and atomic rename.
 Lock snapshots and writes share the bounded context-aware file boundary. Cancellation before rename aborts and
@@ -205,8 +276,23 @@ dependencies:
 Pinning `platform` resolves `controller/v0.9.3` and pins helper version `2.0.0` through its existing
 artifact-pin path, recording a digest for each declared architecture. Every resulting member pin records
 `derivedFrom: platform@<full-commit>`. The umbrella and all affected pins commit together.
-`catalog pin` and `catalog bump` accept `--runtime` for acquired image manifest inspection
-(default `docker`), including images whose versions come through derived sources.
+Image pinning uses the already pinned OCI library against anonymous HTTPS registries,
+not a runtime CLI's manifest projection. Index selection requires exactly one baseline
+Linux native descriptor for each requested architecture (unvariant AMD64; unvariant or
+baseline `v8` ARM64), authenticates the native manifest/config bytes and platform, and
+preserves OCI or Docker schema-2 native manifest identity. Nested indexes, ambiguous
+matches, constrained OS variants and substituted subjects fail closed. Metadata I/O is
+bounded to 8 MiB per response and five minutes. These pin read-backs do not authenticate
+layers or grant image-delivery, scanner or publication acceptance.
+`catalog pin`, `catalog bump` and `catalog pin-artifacts` retain `--runtime` (and the
+artifact command's `--docker` alias) only for maintenance API compatibility; it no longer
+selects a process or ambient runtime credentials for image pinning.
+Only the empty/default `docker` spelling is admitted; non-default values return
+`CodeUsage` before catalog reads or upstream work rather than silently ignoring
+a requested runtime's credential store.
+This anonymous native client owns acquired `prebuilt.image` artifact pins only.
+Source `toolchainBaseImage` resolution remains a separate existing Docker path;
+it does not inherit these native selection or anonymous registry guarantees.
 
 **Explicit membership.** Each member names exactly one source or acquired artifact, with a reciprocal
 `pinnedBy` declaration. An acquired member has no `source`. Every record in a selector-addressed collection
@@ -356,6 +442,32 @@ These hashes pin acquired bytes; they do not establish an upstream signature or 
 The resolved catalog snapshot includes tool pins. Definition selects tools by purpose, and compilation
 requires each selected catalog tool to match the utility execution platform. Missing pins, invalid formats
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
+
+An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`
+with one matching-platform source tool declaration. The source tool lock owns
+both transport and selected executable pins; a second component artifact lock,
+authored URL/image/chart or resolved executable record is rejected. Raw assets
+retain their bytes. A tar-gzip asset uses the standard-library codecs to select
+one exact bounded regular member after archive verification, then rechecks the
+executable digest. Archive selection is byte-preserving acquisition, not a build
+or an upstream authenticity claim. The selected executable and transport/member
+pins participate in logical Build identity; transport locations do not.
+The shared source-tool selector admits at most 4,096 members and 1 GiB of both
+physical expanded stream bytes and aggregate logical member bytes; sparse holes
+cannot evade the latter. Reads of synthesized member bytes remain cancellation-aware.
+The selector replaces the former 65,536-entry/256 MiB expanded policy with this
+4,096-entry/1 GiB policy shared by catalog pinning and executable acquisition;
+transport and selected-executable bounds remain 256 MiB. A focused contract test
+freezes the selector limits at the shared `internal/releaseasset` owner; catalog
+pinning and executable acquisition consume that owner's immutable policy.
+Production archive acquisition uses the existing
+anonymous immutable held-file owner to authenticate the already-open HTTP stream,
+then selects from that descriptor rather than reopening a pathname. The bounded
+carrier is never created beside the published executable and is closed before
+the selected executable's atomic digest-checked publication. Linux uses a sealed
+memfd; Darwin supports diagnostic anonymous read-only holding, not Linux execution
+authority. These finite byte bounds do not constitute runner capacity reservation.
+Production provenance records archive and selected-member digests independently (ADR-09).
 
 ## GitHub action dependencies
 

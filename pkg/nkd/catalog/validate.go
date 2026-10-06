@@ -23,6 +23,14 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 	sort.Strings(componentNames)
 	for _, name := range componentNames {
 		c := reg.Components[name]
+		if c.Prebuilt != nil && c.Prebuilt.ImageParentDigest != "" {
+			return e.New(e.CodeInvalidCatalog, "component %q must retain image parents only in %s", name, LockFile)
+		}
+		if c.Prebuilt != nil && c.Prebuilt.Image != "" {
+			if err := validateAcquiredImageReference(name, c.Prebuilt.Image); err != nil {
+				return err
+			}
+		}
 		if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
 			return err
 		}
@@ -417,11 +425,27 @@ func validateComponent(name string, c Component) error {
 // digests are checked in sorted order so the first error is deterministic.
 func validatePrebuilt(name string, c Component) error {
 	p := c.Prebuilt
+	if p.ReleaseExecutable {
+		return e.New(e.CodeInvalidCatalog, "unresolved release executable for %q", name)
+	}
+	if p.Executable != nil {
+		if err := validateToolPin(*p.Executable); err != nil {
+			return err
+		}
+		arch := strings.TrimPrefix(p.Executable.Platform, "linux/")
+		if c.OutputType != "host-package" || len(c.Platforms) != 1 || c.Platforms[0] != p.Executable.Platform ||
+			p.URL != p.Executable.URL || len(p.Digests) != 1 || p.Digests[arch] != p.Executable.ExecutableDigest {
+			return e.New(e.CodeInvalidCatalog, "release executable %q disagrees with its exact source tool pin", name)
+		}
+	}
 	if p.Chart != nil {
 		return e.New(e.CodeInvalidCatalog, "unresolved chart acquisition for %q", name)
 	}
 	hasURL, hasImg := p.URL != "", p.Image != ""
 	hasArchive := p.OCIArchive != ""
+	if !hasImg && p.ImageParentDigest != "" {
+		return e.New(e.CodeInvalidCatalog, "parent image pin %q requires image acquisition", name)
+	}
 	forms := 0
 	for _, present := range []bool{hasURL, hasImg, hasArchive} {
 		if present {
@@ -464,6 +488,9 @@ func validatePrebuilt(name string, c Component) error {
 	ref := p.URL
 	if hasImg {
 		ref = p.Image
+		if err := validateImageBinding(name, ref, p.ImageParentDigest, p.Digests); err != nil {
+			return err
+		}
 	}
 	if err := checkArchTokens("component", name, "prebuilt ref", ref); err != nil {
 		return err

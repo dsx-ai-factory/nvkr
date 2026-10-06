@@ -3,11 +3,13 @@ package delivery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 const MediaEmptyConfig = "application/vnd.oci.empty.v1+json"
@@ -43,7 +45,7 @@ func PayloadDescriptor(ctx context.Context, root string) (Descriptor, error) {
 		if descriptor.ArtifactType == MediaPublicationRoot {
 			continue
 		}
-		if selected.Digest != "" || descriptor.MediaType != MediaOCIManifest {
+		if selected.Digest != "" || !types.MediaType(descriptor.MediaType).IsImage() {
 			return Descriptor{}, e.New(e.CodeVerifyFailed, "payload layout must contain one deliverable manifest")
 		}
 		selected = descriptor
@@ -77,7 +79,8 @@ func (writer layoutWriter) importFlatLayout(ctx context.Context, input ObjectInp
 	if err != nil {
 		return Descriptor{}, "", err
 	}
-	if (manifest.Config.MediaType == MediaEmptyConfig || manifest.Config.MediaType == MediaHelmConfig) && len(manifest.Layers) == 1 {
+	if len(manifest.Layers) == 1 && (manifest.Config.MediaType == MediaEmptyConfig || manifest.Config.MediaType == MediaHelmConfig ||
+		(manifest.Config.MediaType == MediaImageConfig && manifest.Layers[0].MediaType == MediaQCOW2)) {
 		blob = manifest.Layers[0].Digest
 	}
 	return selected, blob, nil
@@ -128,12 +131,24 @@ func ReadArtifact(ctx context.Context, root string) (Descriptor, []byte, error) 
 	return descriptor, raw, err
 }
 
-func (writer layoutWriter) copyClosure(ctx context.Context, source string, descriptor Descriptor) error {
+func (writer layoutWriter) copyClosure(ctx context.Context, source string, descriptor Descriptor) (err error) {
 	visited := map[string]bool{}
-	if err := verifyDescriptor(ctx, source, descriptor, visited); err != nil {
+	disks := map[string]*DiskArtifact{}
+	defer func() {
+		for _, disk := range disks {
+			err = errors.Join(err, disk.Close())
+		}
+	}()
+	if err := verifyDescriptorHoldingDisks(ctx, source, descriptor, visited, nil, disks); err != nil {
 		return err
 	}
 	for digest := range visited {
+		if disk := disks[digest]; disk != nil {
+			if err := writer.copyDiskPayload(ctx, disk); err != nil {
+				return err
+			}
+			continue
+		}
 		held, err := heldfile.OpenContext(ctx, filepath.Join(source, "blobs", "sha256", strings.TrimPrefix(digest, "sha256:")), heldfile.Options{Label: "release payload", MaxBytes: maxDeliveryFileBytes})
 		if err != nil {
 			return err

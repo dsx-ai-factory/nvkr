@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"net/http"
 	"reflect"
@@ -13,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/target"
 )
@@ -41,7 +39,7 @@ func prebuiltTargetsFrom(reg *registryDoc, lock *PinLock) ([]PrebuiltTarget, err
 	var out []PrebuiltTarget
 	for _, name := range names {
 		raw := reg.Components[name]
-		if raw.Prebuilt == nil {
+		if raw.Prebuilt == nil || raw.Prebuilt.ReleaseExecutable {
 			continue
 		}
 		_, pin, err := memberVersionPin(name, raw, reg.Sources, lock)
@@ -70,6 +68,11 @@ func prebuiltTargetFor(name string, raw rawComponent, pin Pin) (PrebuiltTarget, 
 	image, err := renderRef("prebuilt.image", raw.Prebuilt.Image, pin)
 	if err != nil {
 		return PrebuiltTarget{}, e.Wrap(e.CodeInvalidCatalog, err, "prebuilt component %q", name)
+	}
+	if image != "" {
+		if err := validateAcquiredImageReference(name, image); err != nil {
+			return PrebuiltTarget{}, err
+		}
 	}
 	return PrebuiltTarget{
 		Name:      name,
@@ -106,8 +109,17 @@ func resolvePrebuiltTarget(ctx context.Context, selected PrebuiltTarget, runtime
 		return pin, nil
 	}
 	if selected.Image != "" {
-		digests, err := resolveImageDigests(ctx, runtime, selected.Image, arches)
-		pin.Digests = digests
+		if err := validateAcquiredImageReference(selected.Name, selected.Image); err != nil {
+			return pin, err
+		}
+		if err := validatePinRuntime(runtime); err != nil {
+			return pin, err
+		}
+		var selection pinImageSelection
+		digests, err := resolveImageBindingWith(ctx, selected.Image, arches, readPinImage, &selection)
+		if err == nil {
+			pin.Digests, pin.ImageParentDigest = digests, selection.parent.String()
+		}
 		return pin, err
 	}
 	for _, arch := range arches {
@@ -127,7 +139,7 @@ func artifactPinEqual(a, b ArtifactPin) bool {
 	if !reflect.DeepEqual(a.Chart, b.Chart) {
 		return false
 	}
-	if a.DerivedFrom != b.DerivedFrom || a.URL != b.URL || a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
+	if a.ImageParentDigest != b.ImageParentDigest || a.DerivedFrom != b.DerivedFrom || a.URL != b.URL || a.Tag != b.Tag || len(a.Digests) != len(b.Digests) {
 		return false
 	}
 	for k, v := range b.Digests {
@@ -150,49 +162,6 @@ func resolveBinaryDigest(ctx context.Context, url string) (string, error) {
 		return "", e.Wrap(e.CodeTimeout, ctx.Err(), "resolving binary digest canceled")
 	}
 	return httpSHA256(ctx, url, 2<<30)
-}
-
-// resolveImageDigests reads a multi-arch image's per-arch manifest digests via
-// `docker manifest inspect`, returning arch -> sha256:<digest> for each requested arch
-// (fail closed if an arch is absent from the manifest list).
-func resolveImageDigests(ctx context.Context, docker, ref string, arches []string) (map[string]string, error) {
-	if ctx == nil {
-		return nil, e.New(e.CodeUsage, "image digest resolution requires a context")
-	}
-	out, err := ownedcmd.Output(ctx, docker, "manifest", "inspect", ref)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "docker manifest inspection canceled")
-		}
-		return nil, e.Wrap(e.CodeFetchFailed, err, "docker manifest inspect %s", ref)
-	}
-	var idx struct {
-		Manifests []struct {
-			Digest   string `json:"digest"`
-			Platform struct {
-				Architecture string `json:"architecture"`
-				OS           string `json:"os"`
-			} `json:"platform"`
-		} `json:"manifests"`
-	}
-	if err := json.Unmarshal(out, &idx); err != nil {
-		return nil, e.Wrap(e.CodeFetchFailed, err, "parsing manifest list of %s", ref)
-	}
-	byArch := map[string]string{}
-	for _, m := range idx.Manifests {
-		if m.Platform.OS == "linux" {
-			byArch[m.Platform.Architecture] = m.Digest
-		}
-	}
-	res := map[string]string{}
-	for _, a := range arches {
-		d, ok := byArch[a]
-		if !ok {
-			return nil, e.New(e.CodeFetchFailed, "image %s has no linux/%s manifest", ref, a)
-		}
-		res[a] = d
-	}
-	return res, nil
 }
 
 // httpGetBody fetches a URL and returns its body, erroring on a non-200 status.

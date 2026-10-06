@@ -41,6 +41,11 @@ func validateHostedRestores(ctx context.Context, workspace string, plan *Plan) e
 		if err := ctx.Err(); err != nil {
 			return e.Wrap(e.CodeTimeout, err, "validating hosted restore outcomes")
 		}
+		if _, projected := diskPublicationRequirement(plan, artifact); projected {
+			// The raw disk remains a historical subject, but its one restored
+			// carrier is the wrapper. Outcomes below rehash that exact raw layer.
+			continue
+		}
 		path := HostedRestoreOutcomePath(workspace, artifact.ID)
 		raw, err := readSmallFactoryFile(ctx, path, "hosted restore outcome")
 		if err != nil {
@@ -132,7 +137,26 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 				if err != nil {
 					return err
 				}
-				actual, err := digestFactoryPath(ctx, inputPath)
+				var actual string
+				if expected, projected := diskPublicationRequirement(plan, planned); projected {
+					localized := make(map[string]Artifact, len(artifacts))
+					for id, artifact := range artifacts {
+						localArtifact := artifact
+						localArtifact.Path, err = local(artifact.Path)
+						if err != nil {
+							return err
+						}
+						localized[id] = localArtifact
+					}
+					var observed delivery.Output
+					observed, err = ObserveDiskPublicationPayload(ctx, plan, expected, localized)
+					if err != nil {
+						return err
+					}
+					actual = observed.Disk.PayloadDigest
+				} else {
+					actual, err = digestFactoryPath(ctx, inputPath)
+				}
 				if err != nil || actual != input.Digest {
 					return e.New(e.CodeVerifyFailed, "hosted terminal observation input %q differs from restored bytes", input.ArtifactID)
 				}
@@ -179,12 +203,12 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			if len(plan.LifecycleOutputs) > 0 {
 				localized := make(map[string]Artifact, len(artifacts))
 				for id, artifact := range artifacts {
-					copy := artifact
-					copy.Path, err = local(artifact.Path)
+					localArtifact := artifact
+					localArtifact.Path, err = local(artifact.Path)
 					if err != nil {
 						return err
 					}
-					localized[id] = copy
+					localized[id] = localArtifact
 				}
 				expected, err = releaseEvidenceObjects(ctx, plan, packageNode, localized)
 				if err != nil {

@@ -68,7 +68,7 @@ func parseCgroupV2Path(raw string) (string, error) {
 	}
 	if !matched {
 		return "", e.New(e.CodeEngineCapability,
-			"local VM admission requires cgroup v2")
+			"local execution observation requires cgroup v2")
 	}
 	return found, nil
 }

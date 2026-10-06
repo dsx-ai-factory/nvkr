@@ -381,7 +381,7 @@ func TestVMPlanDataflowCarriesMaterialBytesAndProducerResult(t *testing.T) {
 	target := authored.DefinitionOutput{Name: "node-image", Format: authored.OutputDiskImage,
 		Components: []string{"agent", "image"}}
 	if err := addBuildDataflow(target, "runner", graph, map[string]bool{"agent": true, "image": true},
-		fixtureUtilityContainer, "linux/amd64", nodes, artifacts); err != nil {
+		fixtureUtilityContainer, "linux/amd64", false, nodes, artifacts); err != nil {
 		t.Fatal(err)
 	}
 	root := nodes["node-image/build-image"]

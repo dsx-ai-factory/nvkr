@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"regexp"
+	"slices"
 	"sort"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -29,13 +30,16 @@ type Output struct {
 // decoded RAW reproduction identity, compatibility, inspection, SBOM, or
 // publication authority.
 type DiskOutput struct {
-	Producer   string `json:"producer"`
-	Component  string `json:"component"`
-	Format     string `json:"format"`
-	Encryption string `json:"encryption"`
-	Size       int64  `json:"size"`
-	PlanDigest string `json:"planDigest"`
-	Outcome    string `json:"outcome"`
+	// PayloadDigest always identifies raw QCOW2 bytes. Output.Digest separately
+	// identifies the observed deliverable: raw locally, its manifest when wrapped.
+	PayloadDigest string `json:"payloadDigest"`
+	Producer      string `json:"producer"`
+	Component     string `json:"component"`
+	Format        string `json:"format"`
+	Encryption    string `json:"encryption"`
+	Size          int64  `json:"size"`
+	PlanDigest    string `json:"planDigest"`
+	Outcome       string `json:"outcome"`
 }
 
 var outputNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
@@ -64,19 +68,11 @@ func (output Output) Validate() error {
 		output.Disk.Format != "qcow2" ||
 		(output.Disk.Encryption != "none" && output.Disk.Encryption != "luks2") ||
 		output.Disk.Size <= 0 || !canonical.IsDigest(output.Disk.PlanDigest) ||
-		output.Disk.Outcome != "succeeded" || !containsOutputComponent(output.Components, output.Disk.Component) {
+		!canonical.IsDigest(output.Disk.PayloadDigest) ||
+		output.Disk.Outcome != "succeeded" || !slices.Contains(output.Components, output.Disk.Component) {
 		return e.New(e.CodeVerifyFailed, "disk artifact %q lacks an exact successful QCOW2 producer binding", output.Name)
 	}
 	return nil
-}
-
-func containsOutputComponent(components []string, component string) bool {
-	for _, candidate := range components {
-		if candidate == component {
-			return true
-		}
-	}
-	return false
 }
 
 // ContentDigest is the sole owner of release-content canonical bytes. It sorts

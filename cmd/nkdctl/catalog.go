@@ -101,13 +101,14 @@ func cmdCatalog() *cli.Command {
 			},
 			{
 				Name:      "pin",
-				Usage:     "resolve a source tag and any declared tool asset to exact pins, then write the lock",
+				Usage:     "resolve a source release or exact Git commit to pins, then write the lock",
 				ArgsUsage: "<source>",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "tag", Usage: "tag to pin (default: newest matching the source constraint)"},
+					&cli.StringFlag{Name: "commit", Usage: "full Git source commit to pin without a release-tag claim; incompatible with --tag"},
 					&cli.BoolFlag{Name: "check", Usage: "resolve and show the complete pin update without writing"},
 					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
-					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "container runtime for acquired image member manifest inspection"},
+					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
 				Action: func(c *cli.Context) error { return pinSources(c, false) },
@@ -120,7 +121,7 @@ func cmdCatalog() *cli.Command {
 					&cli.BoolFlag{Name: "all", Usage: "bump every source"},
 					&cli.BoolFlag{Name: "check", Usage: "dry-run: print the lockfile diff, write nothing (ADR-22 §4)"},
 					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
-					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "container runtime for acquired image member manifest inspection"},
+					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
 				Action: func(c *cli.Context) error { return pinSources(c, true) },
@@ -133,23 +134,13 @@ func cmdCatalog() *cli.Command {
 					&cli.BoolFlag{Name: "all", Usage: "pin every prebuilt component"},
 					&cli.StringSliceFlag{Name: "arch", Usage: "optional exact declared architecture set to pin"},
 					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
-					&cli.StringFlag{Name: "runtime", Aliases: []string{"docker"}, Value: "docker", Usage: "container runtime for image manifest inspection"},
+					&cli.StringFlag{Name: "runtime", Aliases: []string{"docker"}, Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for artifact digest resolution"},
 				},
 				Action: pinArtifacts,
 			},
-			{
-				Name:  "update-ci",
-				Usage: "emit a scheduled GitHub Actions workflow that bumps pins, verifies, and opens a PR",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "dir", Required: true, Usage: "catalog directory the workflow updates"},
-					&cli.StringFlag{Name: "cron", Value: "0 6 * * 1", Usage: "schedule (default: weekly Mon 06:00 UTC)"},
-				},
-				Action: func(c *cli.Context) error {
-					return e.New(e.CodeEngineCapability,
-						"catalog update-ci is unavailable until a provider adapter can regenerate, authenticate, reproduce, verify, and open a PR with every exact input transported")
-				},
-			},
+			cmdCatalogRefresh(),
+			cmdCatalogUpdateCI(),
 		},
 	}
 }
@@ -159,7 +150,7 @@ func pinSources(c *cli.Context, bump bool) error {
 	ctx, cancel := context.WithTimeout(c.Context, c.Duration("timeout"))
 	defer cancel()
 	update, err := catalog.UpdateSourcePins(ctx, catalog.SourcePinRequest{
-		Directory: c.String("dir"), Sources: c.Args().Slice(), Tag: c.String("tag"),
+		Directory: c.String("dir"), Sources: c.Args().Slice(), Tag: c.String("tag"), Commit: c.String("commit"),
 		Bump: bump, All: c.Bool("all"), Check: c.Bool("check"), Runtime: c.String("runtime"),
 	})
 	for _, change := range update.Pins {

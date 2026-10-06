@@ -242,6 +242,7 @@ func TestObserveDiskOutputRecordsHeldFactoryObservation(t *testing.T) {
 	}
 	if bound.Status != RunComplete || len(bound.Observed) != 1 || bound.Observed[0].Disk == nil ||
 		bound.Observed[0].Digest != observation.Digest || bound.Observed[0].Disk.PlanDigest != run.PlanDigest ||
+		bound.Observed[0].Disk.PayloadDigest != observation.Digest ||
 		bound.Observed[0].Disk.Size != observation.Size {
 		t.Fatalf("recorded held disk observation = %+v", bound)
 	}

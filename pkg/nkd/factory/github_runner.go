@@ -52,6 +52,9 @@ func runGitHubNode(ctx context.Context, plan *Plan, nodeID string, options GitHu
 }
 
 func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHubStepOptions) error {
+	if node.Kind == NodeFetch {
+		return executeGitHubSourceFetch(ctx, plan, node.ID, options.Stdout, options.Stderr)
+	}
 	if node.IRNode != "" || node.Container == "" {
 		return ExecuteNode(ctx, plan, node.ID, options.Stdout, options.Stderr)
 	}
@@ -184,6 +187,9 @@ func admitGitHubPlan(ctx context.Context, plan *Plan) error {
 		return e.New(e.CodeUsage, "GitHub execution requires a Plan")
 	}
 	if err := plan.Validate(); err != nil {
+		return err
+	}
+	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub execution"); err != nil {
 		return err
 	}
 	if err := rejectUnsupportedPlanRequirements(plan, "GitHub execution"); err != nil {

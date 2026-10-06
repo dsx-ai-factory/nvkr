@@ -216,6 +216,10 @@ func cloneComponent(component catalog.Component) catalog.Component {
 	if component.Prebuilt != nil {
 		copy := *component.Prebuilt
 		copy.Digests = maps.Clone(copy.Digests)
+		if copy.Executable != nil {
+			executable := *copy.Executable
+			copy.Executable = &executable
+		}
 		if copy.Evidence != nil {
 			evidence := *copy.Evidence
 			copy.Evidence = &evidence

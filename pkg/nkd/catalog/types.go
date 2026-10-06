@@ -56,6 +56,10 @@ type PackerConfig struct {
 	SSHPublicKeyVariable      string               `json:"sshPublicKeyVariable,omitempty"`
 	BuildLogDirectoryVariable string               `json:"buildLogDirectoryVariable,omitempty"`
 	HTTPDirectoryVariable     string               `json:"httpDirectoryVariable,omitempty"`
+	// AcquisitionArchive is an optional, exact output-directory-relative carrier
+	// of guest package capture bytes. It does not assert complete acquisition
+	// coverage or authenticate the package metadata reported inside the carrier.
+	AcquisitionArchive string `json:"acquisitionArchive,omitempty"`
 	// Variables are public, literal string values passed to source-owned Packer
 	// variables. They are build inputs, not a secret channel; future lowering must
 	// expose them in the invocation record and let the pinned Packer executable
@@ -123,11 +127,14 @@ type Pin struct {
 // registry declares the acquisition URL/image template; the lock pins WHAT it must
 // hash to — the same sources+lock split the from-source lane uses (ADR-22 §1).
 type ArtifactPin struct {
-	Chart       *HelmChart        `json:"chart,omitempty"`
-	DerivedFrom string            `json:"derivedFrom,omitempty"`
-	URL         string            `json:"url,omitempty"` // resolved chart package transport; digest remains the byte identity
-	Tag         string            `json:"tag"`
-	Digests     map[string]string `json:"digests"` // arch -> sha256:<64-hex>
+	// ImageParentDigest is the exact index or single-manifest root authenticated
+	// by pinning. Acquisition must authenticate its membership again.
+	ImageParentDigest string            `json:"imageParentDigest,omitempty"`
+	Chart             *HelmChart        `json:"chart,omitempty"`
+	DerivedFrom       string            `json:"derivedFrom,omitempty"`
+	URL               string            `json:"url,omitempty"` // resolved chart package transport; digest remains the byte identity
+	Tag               string            `json:"tag"`
+	Digests           map[string]string `json:"digests"` // arch -> sha256:<64-hex>
 }
 
 // PinLock is the machine-generated lockfile: source name -> resolved pin, plus
@@ -177,11 +184,18 @@ type FlakePin struct {
 // authoritative source, avoiding duplicate semantic entries. A component is prebuilt XOR
 // from-source XOR an exclusion — declaring both fromSource and prebuilt fails closed.
 type Prebuilt struct {
-	OCIArchive string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
-	Chart      *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
-	URL        string            `json:"url,omitempty"`
-	Image      string            `json:"image,omitempty"`
-	Digests    map[string]string `json:"digests,omitempty"` // arch -> sha256:<64-hex>
+	// ReleaseExecutable selects the referenced source's pinned release executable.
+	// Authored URLs and component artifact pins are absent in this form: the
+	// existing source ToolPin owns archive and executable identity together.
+	ReleaseExecutable bool `json:"releaseExecutable,omitempty"`
+	// Executable is loader-resolved only; registries must not author it.
+	Executable        *ToolPin          `json:"executable,omitempty"`
+	OCIArchive        string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
+	Chart             *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
+	URL               string            `json:"url,omitempty"`
+	Image             string            `json:"image,omitempty"`
+	ImageParentDigest string            `json:"imageParentDigest,omitempty"` // resolved lock field; never authored
+	Digests           map[string]string `json:"digests,omitempty"`           // arch -> sha256:<64-hex>
 	// Evidence is the upstream's external supply-chain reference (ADR-13 §2). A prebuilt
 	// component MUST declare it explicitly — either a verified reference (whose bytes
 	// hash to the declared digest, else resolution fails closed) or an explicit

@@ -10,11 +10,20 @@
   },
   "packages": {
     "guestfs-tools": "1.52.0-2ubuntu5",
+    "guestfish": "1:1.52.0-5ubuntu3",
     "libguestfs0t64": "1:1.52.0-5ubuntu3",
     "linux-image-virtual": "6.8.0-139.139",
     "qemu-system-x86": "1:8.2.2+ds-0ubuntu1.18",
     "qemu-system-arm": "1:8.2.2+ds-0ubuntu1.18",
     "qemu-utils": "1:8.2.2+ds-0ubuntu1.18"
+  },
+  "scanner": {
+    "version": "1.51.1",
+    "schemaVersion": "16.1.10",
+    "archives": {
+      "amd64": "sha256:8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+      "arm64": "sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f"
+    }
   },
   "images": {"amd64": null, "arm64": null},
   "publicationGates": {"licenseApproval": "not-recorded", "vulnerabilityApproval": "not-recorded"}

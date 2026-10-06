@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -20,20 +22,28 @@ import (
 // output descriptions leave this owner; Close releases all held bytes.
 // It establishes membership and integrity, not signer or release authorization.
 type Publication struct {
-	mu         sync.RWMutex
-	closed     bool
-	files      []*heldfile.File
-	inspection Inspection
-	outputs    []Output
-	platforms  map[string]publicationPlatform
+	mu           sync.RWMutex
+	closed       bool
+	files        []*heldfile.File
+	diskFiles    []*os.File
+	diskPayloads map[string]*os.File
+	inspection   Inspection
+	outputs      []Output
+	platforms    map[string]publicationPlatform
 }
 
 type publicationPlatform struct{ OS, Arch string }
 
-// OpenPublication captures bounded immutable files, validates the exact root and
+// OpenPublication captures bounded held-byte snapshots, validates the exact root and
 // every reachable descriptor/evidence binding, then checks output payload members.
 // The caller's root digest is an expectation; only the checked bytes establish it.
 func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publication, error) {
+	return openPublication(ctx, root, expectedRoot, admitPublicationDiskScratch)
+}
+
+func openPublication(ctx context.Context, root, expectedRoot string,
+	admitDiskScratch func(context.Context, *os.File, uint64) error,
+) (*Publication, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return nil, err
 	}
@@ -45,7 +55,7 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating publication inspection workspace")
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
-	publication := &Publication{}
+	publication := &Publication{diskPayloads: map[string]*os.File{}}
 	failed := true
 	defer func() {
 		if failed {
@@ -75,6 +85,33 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 	if err := capture("index.json", expectedRoot, 8<<20); err != nil {
 		return nil, err
 	}
+	disks, err := publicationDiskPayloads(ctx, root, expectedRoot)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		for _, disk := range disks {
+			_ = disk.Close()
+		}
+	}()
+	if len(disks) != 0 {
+		var required uint64
+		for _, disk := range disks {
+			size := uint64(disk.Inspection().Size)
+			if size > ^uint64(0)-required {
+				return nil, e.New(e.CodeEngineCapability, "publication disk snapshot capacity overflows")
+			}
+			required += size
+		}
+		directory, _, err := securepath.OpenDirectory(stage)
+		if err != nil {
+			return nil, e.Wrap(e.CodeEngineCapability, err, "holding publication scratch filesystem")
+		}
+		admitErr := admitDiskScratch(ctx, directory, required)
+		if err := errors.Join(admitErr, directory.Close()); err != nil {
+			return nil, classifyContext(ctx, e.Wrap(e.CodeEngineCapability, err, "admitting publication disk snapshots"))
+		}
+	}
 	entries, err := os.ReadDir(filepath.Join(root, "blobs", "sha256"))
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening publication blob inventory")
@@ -84,11 +121,26 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 		if !isDigest(digest) || !entry.Type().IsRegular() {
 			return nil, e.New(e.CodeVerifyFailed, "publication contains an invalid blob inventory member")
 		}
+		if disk := disks[digest]; disk != nil {
+			if err := (layoutWriter{root: layout}).copyDiskPayload(ctx, disk); err != nil {
+				return nil, err
+			}
+			// Hold the private disk-backed snapshot, not another complete memfd.
+			// Deferred workspace cleanup unlinks it before the owner is returned.
+			file, err := os.Open(filepath.Join(layout, "blobs", "sha256", entry.Name()))
+			if err != nil {
+				return nil, e.Wrap(e.CodeVerifyFailed, err, "holding private disk snapshot")
+			}
+			publication.diskFiles = append(publication.diskFiles, file)
+			publication.diskPayloads[digest] = file
+			continue
+		}
 		if err := capture(filepath.Join("blobs", "sha256", entry.Name()), digest, maxDeliveryFileBytes); err != nil {
 			return nil, err
 		}
 	}
-	inspection, err := Inspect(ctx, layout)
+	diskObservations := map[string]DiskArtifactInspection{}
+	inspection, err := inspectPublicationWithDisks(ctx, layout, nil, diskObservations)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +148,7 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 		return nil, e.New(e.CodeVerifyFailed, "publication has no exact release metadata")
 	}
 	platforms := make(map[string]publicationPlatform)
-	outputs, err := inspectOutputs(ctx, layout, inspection, stage, platforms)
+	outputs, err := inspectOutputs(ctx, layout, inspection, stage, platforms, diskObservations)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +163,28 @@ func OpenPublication(ctx context.Context, root, expectedRoot string) (*Publicati
 	publication.platforms = platforms
 	failed = false
 	return publication, nil
+}
+
+func admitPublicationDiskScratch(ctx context.Context, directory *os.File, required uint64) error {
+	return admitPublicationDiskScratchWith(ctx, directory, required, securepath.AvailableDiskBackedBytes)
+}
+
+// Only capacity observation is replaceable in tests; refusal and exact-fit
+// admission always execute the production policy.
+func admitPublicationDiskScratchWith(ctx context.Context, directory *os.File, required uint64,
+	observe func(context.Context, *os.File) (uint64, error),
+) error {
+	if ctx == nil || directory == nil || observe == nil {
+		return e.New(e.CodeEngineCapability, "publication disk snapshot admission requires context, held scratch and capacity observer")
+	}
+	available, err := observe(ctx, directory)
+	if err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "publication disk snapshot scratch %q (under TMPDIR %q) requires writable non-memory-backed capacity; select a disk-backed TMPDIR", directory.Name(), os.TempDir())
+	}
+	if available < required {
+		return e.New(e.CodeEngineCapability, "publication disk snapshot scratch %q (under TMPDIR %q) has %d available bytes, requires %d for unique QCOW2 snapshots", directory.Name(), os.TempDir(), available, required)
+	}
+	return nil
 }
 
 // PullPublication owns registry materialization and its cleanup, then returns the
@@ -150,6 +224,11 @@ func (publication *Publication) Close() error {
 		result = errors.Join(result, held.Close())
 	}
 	publication.files = nil
+	for _, file := range publication.diskFiles {
+		result = errors.Join(result, file.Close())
+	}
+	publication.diskFiles = nil
+	publication.diskPayloads = nil
 	if result != nil {
 		return e.Wrap(e.CodeVerifyFailed, result, "closing publication snapshots")
 	}
@@ -197,14 +276,52 @@ func (publication *Publication) RequireAttestedEvidence() error {
 	return RequireAttestedEvidence(publication.inspection)
 }
 
-func inspectOutputs(ctx context.Context, layout string, inspection Inspection, stage string, platforms map[string]publicationPlatform) ([]Output, error) {
+// WriteDiskPayload streams one exact disk member from the private anonymous
+// snapshot. The owner establishes byte integrity and membership only; signature,
+// policy and release authorization remain independent consumer checks. A failed
+// write can leave partial bytes; callers must discard their private destination.
+// This streaming API is contract-tested; no production export caller uses it yet.
+func (publication *Publication) WriteDiskPayload(ctx context.Context, outputName string, destination io.Writer) (int64, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return 0, err
+	}
+	if publication == nil {
+		return 0, e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	if destination == nil {
+		return 0, e.New(e.CodeUsage, "disk payload destination is required")
+	}
+	publication.mu.RLock()
+	defer publication.mu.RUnlock()
+	if publication.closed {
+		return 0, e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	for _, output := range publication.outputs {
+		if output.Name != outputName {
+			continue
+		}
+		if output.Kind != "disk-image" || output.Disk == nil || !isDigest(output.Disk.PayloadDigest) {
+			return 0, e.New(e.CodeVerifyFailed, "requested output is not an exact disk member")
+		}
+		file := publication.diskPayloads[output.Disk.PayloadDigest]
+		if file == nil {
+			return 0, e.New(e.CodeVerifyFailed, "disk member has no held payload snapshot")
+		}
+		return streamDiskPayload(ctx, file, destination, output.Disk.PayloadDigest, output.Disk.Size)
+	}
+	return 0, e.New(e.CodeVerifyFailed, "publication has no requested disk output")
+}
+
+func inspectOutputs(ctx context.Context, layout string, inspection Inspection, stage string, platforms map[string]publicationPlatform,
+	disks map[string]DiskArtifactInspection,
+) ([]Output, error) {
 	var outputs []Output
 	for _, object := range inspection.Root.Objects {
 		binding := object.Output
 		if binding == nil {
 			continue
 		} // Inspect already requires exact evidence membership for every other object.
-		output := Output{Name: object.Name, Kind: binding.Format, Digest: object.DescriptorDigest, BuildDigest: binding.BuildDigest, Components: append([]string(nil), binding.Components...)}
+		output := Output{Name: object.Name, Kind: binding.Format, Digest: object.DescriptorDigest, BuildDigest: binding.BuildDigest, Components: append([]string(nil), binding.Components...), Disk: cloneDiskOutput(binding.Disk)}
 		if binding.Format == "apt-repository" {
 			output.Digest = object.SemanticDigest
 		}
@@ -213,6 +330,14 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 		}
 		members := append([]string(nil), output.Components...)
 		switch output.Kind {
+		case "disk-image":
+			observed, found := disks[object.DescriptorDigest]
+			if !found || observed.ManifestDigest != object.DescriptorDigest || observed.ArtifactType != object.ArtifactType ||
+				observed.Platform != object.OS+"/"+object.Arch || output.Disk == nil || observed.PayloadDigest != output.Disk.PayloadDigest ||
+				observed.Size != output.Disk.Size || observed.Encryption != "none" {
+				return nil, e.New(e.CodeVerifyFailed, "disk output differs from its wrapper binding")
+			}
+			platforms[output.Name] = publicationPlatform{OS: "linux", Arch: strings.TrimPrefix(observed.Platform, "linux/")}
 		case "oci":
 			if len(members) != 1 || binding.TransportPath != "" {
 				return nil, e.New(e.CodeVerifyFailed, "OCI output has invalid members or transport binding")

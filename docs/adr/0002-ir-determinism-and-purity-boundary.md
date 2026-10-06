@@ -32,7 +32,8 @@ Every field lives in exactly one tier:
 
 - **T1 — inside the Build Digest** (the hashed, compiled graph): resolved logical sources (stable catalog
   source key + commit + tree/content digest + source-date), per-component builder pins (`oci-hermetic` toolchain
-  digest; `nix` container-image digest + flake lock), prebuilt content digests, the **builder type**, the pinned
+  digest; `nix` container-image digest + flake lock), prebuilt content digests and authenticated image-parent
+  content-selection constraints (ADR-22), the **builder type**, the pinned
   normalization / build-flag environment allowlist, and concrete target platform. A network URL, registry host,
   mirror path, credential reference, or other transport locator is never a T1 field.
 - **T2 — deterministic metadata, *not* in the Build Digest**: the Build Digest itself, the expected

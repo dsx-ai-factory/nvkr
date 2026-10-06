@@ -7,26 +7,36 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // derivePublication creates package operations and one publication route from named
 // outputs. These are executable dataflow, never another authored document model.
 func derivePublication(definition authored.Definition, environment authored.Environment, builds []BuildPlan) ([]packageSpec, map[string]Target, []Route, error) {
-	if environment.Publication != nil {
-		for _, output := range definition.Outputs {
-			if output.Format == authored.OutputDiskImage {
-				return nil, nil, nil, e.New(e.CodeEngineCapability,
-					"disk-image output %q has no admitted publication adapter", output.Name)
-			}
-		}
-	}
 	packages := make([]packageSpec, 0, len(definition.Outputs))
 	closureInputs := make([]string, 0, len(definition.Outputs))
 	for _, output := range definition.Outputs {
 		if output.Format == authored.OutputDiskImage {
-			// The produced QCOW2 is the lifecycle payload. It is not repackaged as
-			// an ordinary binary bundle; disk observation/publication remain gated.
+			// Local raw-output diagnostics retain their existing lifecycle subject.
+			// Publication adds a distinct wrapper rather than changing that subject.
+			if environment.Publication != nil {
+				var root string
+				for _, build := range builds {
+					if build.Name == output.Name {
+						var err error
+						root, err = lifecycleArtifactID(output, build.ResolvedComponents)
+						if err != nil {
+							return nil, nil, nil, err
+						}
+					}
+				}
+				if root == "" {
+					return nil, nil, nil, e.New(e.CodePipelineDrift, "disk output %q has no resolved raw subject", output.Name)
+				}
+				packages = append(packages, packageSpec{Name: output.Name, Kind: PackageDiskImage, Inputs: []string{root}})
+				closureInputs = append(closureInputs, "package/"+output.Name)
+			}
 			continue
 		}
 		selectors := make([]string, 0, len(output.Components))
@@ -85,7 +95,7 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 	for _, inputID := range inputs {
 		input := artifacts[inputID]
 		switch input.Kind {
-		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageImage:
+		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageImage, PackageDiskImage:
 		default:
 			continue
 		}
@@ -270,9 +280,16 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 	if spec.Kind == PackageImage && len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "container image package %q requires exactly one OCI export", spec.Name)
 	}
+	if spec.Kind == PackageDiskImage && len(inputs) != 1 {
+		return e.New(e.CodeInvalidCatalog, "disk package %q requires exactly one raw disk subject", spec.Name)
+	}
 	for _, id := range inputs {
 		artifact := artifacts[id]
 		switch spec.Kind {
+		case PackageDiskImage:
+			if artifact.Kind != PackageDiskImage || artifact.BuildTarget != spec.Name || artifact.Component == "" {
+				return e.New(e.CodeInvalidCatalog, "disk package %q requires its exact raw producer subject", spec.Name)
+			}
 		case PackageImage:
 			if artifact.Kind != "oci-image" || artifact.BuildTarget == "" {
 				return e.New(e.CodeInvalidCatalog, "container image package %q requires a build OCI image export", spec.Name)
@@ -300,7 +317,7 @@ func validateRouteCompatibility(route Route, target Target, artifact Artifact) e
 			"delivery route %q requires an object-store publication adapter that is not implemented", route.Name)
 	case TargetOCI:
 		switch artifact.Kind {
-		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageImage, "oci-image":
+		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageImage, PackageDiskImage, "oci-image":
 		default:
 			return e.New(e.CodeInvalidCatalog, "delivery route %q sends unsupported %q to OCI target", route.Name, artifact.Kind)
 		}
@@ -312,6 +329,8 @@ func packageMediaType(kind string) string {
 	switch kind {
 	case PackageImage:
 		return "application/vnd.oci.image.manifest.v1+json"
+	case PackageDiskImage:
+		return delivery.MediaDiskImage
 	case PackageBinaryBundle:
 		return "application/vnd.nkd.binary-bundle.v1"
 	case PackageAPT:

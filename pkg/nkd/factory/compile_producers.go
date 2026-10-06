@@ -12,7 +12,7 @@ import (
 )
 
 func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph *ir.Graph, selected map[string]bool,
-	utilityContainer, utilityPlatform string, nodes map[string]Node, artifacts map[string]Artifact) error {
+	utilityContainer, utilityPlatform string, diskPublication bool, nodes map[string]Node, artifacts map[string]Artifact) error {
 	target := targetSpec.Name
 	byID := map[string]ir.Node{}
 	selectedFetch := map[string]bool{}
@@ -114,12 +114,11 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 	artifacts[observationID] = Artifact{ID: observationID, Name: target + "-terminal-observation",
 		Kind: string(TierTerminalObservation), Producer: verifyID, BuildTarget: target,
 		Path: filepath.ToSlash(filepath.Join(".nkd", "factory", target, "terminal-observation.json"))}
-	if targetSpec.Format == authored.OutputDiskImage {
+	if targetSpec.Format == authored.OutputDiskImage && !diskPublication {
 		// The ordinary per-component SBOM operation does not prove the disk
-		// inventory and material reconciliation required by ADR-13. Keep disk
-		// evidence absent until that typed observation contract is implemented.
-		// Plan validation mirrors this temporary exemption through
-		// hasCompiledDiskTarget; change both boundaries together.
+		// inventory and material reconciliation required by ADR-13. Diagnostic-only
+		// plans retain their raw disk without claiming a complete
+		// SBOM. Production plans require the separate live reconciliation operation.
 		return nil
 	}
 

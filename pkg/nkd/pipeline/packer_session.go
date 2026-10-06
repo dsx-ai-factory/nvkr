@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -20,10 +21,11 @@ import (
 )
 
 type nodeSessionPackerRuntime struct {
-	ready   chan struct{}
-	path    string
-	runtime *heldRuntimeExecutable
-	err     error
+	ready         chan struct{}
+	path          string
+	storageDriver definition.PodmanStorageDriver
+	runtime       *heldRuntimeExecutable
+	err           error
 }
 
 // VMImagePackerExecutor is a process-local, session-owned admission for one
@@ -139,7 +141,11 @@ func (handle *NodeSession) AdmitVMImagePacker(
 	if err != nil {
 		return nil, err
 	}
-	admitted, err := session.admitPackerRuntime(callCtx, runtimePath)
+	storageDriver := definition.PodmanStorageDriver("")
+	if networkAdmission != nil {
+		storageDriver = networkAdmission.storageDriver
+	}
+	admitted, err := session.admitPackerRuntimeStorage(callCtx, runtimePath, storageDriver)
 	if err != nil {
 		return nil, err
 	}
@@ -158,25 +164,33 @@ func (handle *NodeSession) AdmitVMImagePacker(
 }
 
 func (session *nodeSessionState) admitPackerRuntime(ctx context.Context, runtimePath string) (*heldRuntimeExecutable, error) {
+	return session.admitPackerRuntimeStorage(ctx, runtimePath, "")
+}
+
+func (session *nodeSessionState) admitPackerRuntimeStorage(ctx context.Context, runtimePath string, storageDriver definition.PodmanStorageDriver) (*heldRuntimeExecutable, error) {
+	if err := storageDriver.Validate(filepath.Base(runtimePath)); err != nil {
+		return nil, err
+	}
 	session.mu.Lock()
 	entry := session.packerRuntime
 	if entry == nil {
-		entry = &nodeSessionPackerRuntime{ready: make(chan struct{}), path: runtimePath}
+		entry = &nodeSessionPackerRuntime{ready: make(chan struct{}), path: runtimePath, storageDriver: storageDriver}
 		session.packerRuntime = entry
 		session.mu.Unlock()
 
 		held, err := snapshotRuntimeExecutableContext(ctx, runtimePath) //nolint:staticcheck // Linux authority path.
 		if err == nil {                                                 //nolint:staticcheck // Linux authority path; the non-Linux snapshot always fails.
+			held.storageDriver = storageDriver
 			held.identity, err = observeHeldRuntimeIdentity(ctx, held)
 		}
 		if err != nil && held != nil && held.capability != nil {
-			_ = held.capability.Close()
+			_ = held.close()
 			held = nil
 		}
 		entry.runtime, entry.err = held, err
 		close(entry.ready)
 	} else {
-		if entry.path != runtimePath {
+		if entry.path != runtimePath || entry.storageDriver != storageDriver {
 			session.mu.Unlock()
 			return nil, e.New(e.CodeEngineCapability,
 				"node execution session is already bound to a different container runtime")

@@ -35,6 +35,7 @@ func (input Definition) Clone() Definition {
 func (input Environment) Clone() Environment {
 	input.GitHubDispatchBranches = append([]string(nil), input.GitHubDispatchBranches...)
 	input.ExecutionClasses = execution.CloneClasses(input.ExecutionClasses)
+	input.DiskInspectionProfiles = maps.Clone(input.DiskInspectionProfiles)
 	if input.SourceAccess != nil {
 		original := input.SourceAccess
 		input.SourceAccess = make(map[string]SourceAccess, len(original))

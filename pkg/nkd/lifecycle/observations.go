@@ -161,7 +161,7 @@ func observeHeldDiskOutput(ctx context.Context, slot requiredOutput, plan *facto
 func artifactFromDiskObservation(slot requiredOutput, observation factory.DiskPayloadObservation) Artifact {
 	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest,
 		BuildDigest: observation.BuildDigest, Components: append([]string(nil), observation.Components...),
-		Disk: &delivery.DiskOutput{Producer: observation.Producer, Component: observation.Component,
+		Disk: &delivery.DiskOutput{PayloadDigest: observation.Digest, Producer: observation.Producer, Component: observation.Component,
 			Format: observation.Format, Encryption: observation.Encryption, Size: observation.Size,
 			PlanDigest: observation.PlanDigest, Outcome: observation.Outcome}}
 }

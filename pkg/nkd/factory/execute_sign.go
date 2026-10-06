@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -422,8 +423,29 @@ func resolvedDependencies(plan *Plan) []provenance.Dependency {
 			case node.Kind == ir.KindBuild && node.Toolchain != "":
 				dependency = provenance.ToolchainDependency(node.Toolchain)
 			case node.Kind == ir.KindPull && node.Artifact != "" && node.Digest != "":
+				digest := node.Digest
+				if node.OutputType == "oci-image" && node.ImageParentDigest != "" {
+					digest = node.ImageParentDigest
+					// The parent URI names index/root bytes. The native delivered
+					// subject remains a separate immutable dependency.
+					if nativeRef, err := ir.NativeImageReference(node); err == nil {
+						byURI[nativeRef] = provenance.Dependency{URI: nativeRef, Digest: map[string]string{"sha256": strings.TrimPrefix(node.Digest, "sha256:")}}
+					}
+				}
+				if node.ExecutableArchive != nil {
+					digest = node.ExecutableArchive.Digest
+					// The URL identifies the acquired archive bytes, not the
+					// executable selected from it. Retain both exact subjects.
+					memberURI := "nkd:prebuilt/" + url.PathEscape(node.Component) + "?" + url.Values{
+						"archive": {node.Artifact}, "member": {node.ExecutableArchive.Member},
+					}.Encode()
+					if _, seen := byURI[memberURI]; !seen {
+						byURI[memberURI] = provenance.Dependency{URI: memberURI,
+							Digest: map[string]string{"sha256": strings.TrimPrefix(node.Digest, "sha256:")}}
+					}
+				}
 				dependency = provenance.Dependency{URI: node.Artifact,
-					Digest: map[string]string{"sha256": strings.TrimPrefix(node.Digest, "sha256:")}}
+					Digest: map[string]string{"sha256": strings.TrimPrefix(digest, "sha256:")}}
 			default:
 				continue
 			}

@@ -90,6 +90,12 @@ The exact generated files and commit manifest that carry an execution plan to a 
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
+**Catalog maintenance candidate**:
+A review-only lock and regenerated execution-bundle change under explicit source-selection constraints.
+Static checks and optional complete local diagnostic execution precede candidate handoff; neither is release
+acceptance. Scheduling and source-role alignment are operational policy, not additional lifecycle objects.
+_Avoid_: Release, qualified reproduction, automatic promotion
+
 **Binary bundle**:
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
@@ -229,6 +235,9 @@ _Avoid_: Node-SKU staging manifest, producer receipt, absolute staging path
 A source-reported record of package archives retained during a guest installation event, distinct from a
 catalog component acquisition or build-material input. Checking its held archive proves declared member-byte
 correspondence, not acquisition origin, installed content, a complete closure or live-Run authority.
+The optional producer `acquisitionArchive` selects one output-directory-relative carrier. Collection holds
+that carrier under the original Packer artifact owner before cleanup; an independently supplied path cannot
+attach capture authority to a disk. The selection is a producer input, not a new public lifecycle object.
 _Avoid_: Full disk SBOM, authenticated download trace, build-material manifest
 
 **VM-image builder**:

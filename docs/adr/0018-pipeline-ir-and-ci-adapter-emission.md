@@ -127,6 +127,19 @@ or weaker isolation. Rootless operation still depends on supported user namespac
 cgroups and the provider's nesting policy. A mounted privileged Docker socket remains an explicit trust cost.
 Missing prerequisites fail capability admission. No bespoke/self-hosted runner labels are emitted.
 
+Held Linux Podman execution uses a package-owned, initially empty `XDG_CONFIG_HOME`, removed by the same
+runtime owner on close. It does not inherit caller Podman configuration or ambient storage-driver overrides;
+this is configuration isolation, not a new user-namespace or provider boundary. An explicit typed
+`podmanStorageDriver` is supported by the held inspector and Environment-bound direct-Packer admission,
+where command arguments and observed driver must agree. Complete-Plan local, GitHub and execute-node
+adapters reject nonempty overrides before work because other runner, utility and producer routes do not
+yet project that setting. Empty preserves the runtime's existing store selection.
+
+The observed Podman identity includes UID/GID mappings, remote-service status and OCI runtime name in
+addition to the existing host, storage, security and version fields. Adding these fields changes the
+`nkd.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
+or prove compatibility with previously recorded qualification profiles.
+
 The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
 a hosted VM adapter. Each push to `main` selects that exact commit for full AMD64 and ARM64 builds, boot smoke,
 and short-retention QCOW2 uploads. Manual dispatch from the default-branch workflow remains available for
@@ -420,11 +433,53 @@ v1 invokes pinned source entrypoints instead.
 Maintained local and hosted Runs share the factory producer operation and `pipeline.Local.ExecNode` launcher.
 A producer reference resolves the exact embedded IR instruction; utility operations retain their pinned execution
 containers. Local execution schedules the whole Run graph once in bounded ready batches, retains source receipts
-through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted jobs enter through
-`factory.ExecuteNode`, which dispatches producers to that same operation. Neither path converts a whole producer
+through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted build and utility jobs enter through
+`factory.ExecuteNode`; hosted source fetch delegates through a private factory source owner to the same producer primitive. Neither path converts a whole producer
 report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
 The generated Plan is the single executable input document; separate per-build graph files are retired.
+
+The hosted source owner admits the complete Plan and exact selected Git helper/environment, then requests a
+pipeline-issued source-workspace capability. Linux admission precedes opening the workspace; zero or closed
+handles cannot launch work. Close cancels and joins registered fetch calls before releasing the directory.
+Git receives retained checkout/metadata descriptors with explicit Git directory/work-tree selection, disabled
+repository hooks/filesystem monitors and no submodule recursion, never an upward-discovered repository. A shared
+closed child-environment owner admits the selected absolute Git search path and only the existing exact public
+baseline or repository-specific credential-helper configuration. Only network fetch receives that helper/token;
+init, checkout and status receive the public baseline. An empty descriptor-owned child HOME/XDG configuration
+prevents ambient home or netrc lookup without changing the host process environment. The new held route admits
+HTTPS and absolute local/file repositories; selected private credentials require the configured HTTPS mirror.
+Git's package-owned protocol override refuses repository-configured external transports, and held fetch fixes
+the upload-pack program, disables recursive fetching and requests the exact selected repository rather than a
+retained origin. Before operational Git work, Git's own bounded local-configuration query rejects filter,
+include/includeIf, local URL rewriting and delegated worktree/promisor/callback configuration. The query has no
+source token, reads no included configuration, and cancellation remains a timeout. Directory identity rechecks
+do not claim immutable configuration bytes against a concurrent hostile host writer. Unsupported held Git/SSH transports fail capability
+admission before work; the general catalog and ordinary Local route retain their existing Git/SSH behavior.
+Original checkout and receipt directories are rechecked
+through the held workspace before receipt reuse or commit. This capability grants filesystem access only, not
+producer observation, installed-content, publication or qualification authority. Ordinary Local fetch remains
+the existing developer route without these additional guarantees.
+
+Dependency vendoring authenticates the selected runtime/daemon and exact native pinned image before source work.
+A bounded, Git-metadata-free archive enters a fresh private volume; the pinned entrypoint, exact vendor arguments
+and declared fetch network remain. Neither source credentials nor host bind mounts enter that container. Its
+bounded return is decoded by the existing archive owner, rejects Git metadata at every depth and unsafe members
+before copy-back, and must preserve the original source binding. Container/transport cleanup and the admitted
+runtime's closure finish before source receipt issuance; cleanup failures remain coded errors. Docker and Podman
+use their respective existing private-volume no-copy syntax. Local rootless Podman networking uses a source-only
+trusted-system helper admission: the runtime selects pasta
+or slirp4netns, and no-follow descriptor checks require `/`, `/usr`, `/usr/bin` and that executable to be root-owned,
+executable and not group/world writable before selecting that helper directory. Shared closed PATH/config
+defaults and qualified runtime admission remain unchanged. This is host-system trust for the unqualified source
+lane, not a digest-pinned helper closure or protection against the host administrator. Fetch-stage deadlines, declared networking and
+observed return-carrier headroom are separate from container capacity enforcement: fetch IR currently declares
+no CPU, memory or PIDs budget, so the vendor container has no such caps or tmpfs byte-size cap. This capacity
+enhancement remains deferred, not a provider reservation or a claim made by the timeout. Local fixtures
+model the daemon; cross-compilation is not native descriptor execution, and real pinned Docker/Helm execution
+requires separate runtime evidence. An opt-in native smoke test requires an explicitly selected installed runtime
+and already-local exact native image ID; absence of those inputs skips it, not proves the backend works.
+No generated disk executor or stronger evidence lane is implied.
 
 Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selection returns
 `CodeEngineCapability` before reading authored inputs or producing output. No fallback renderer exists.

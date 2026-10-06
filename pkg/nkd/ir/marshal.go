@@ -16,40 +16,42 @@ import (
 // immutable manifest digest while constructing this value; the registry/name prefix
 // is not representable here.
 type LogicalNode struct {
-	ID    string   `json:"id"`
-	Kind  string   `json:"kind"`
-	Needs []string `json:"needs,omitempty"`
+	ImageParentDigest string   `json:"imageParentDigest,omitempty"`
+	ID                string   `json:"id"`
+	Kind              string   `json:"kind"`
+	Needs             []string `json:"needs,omitempty"`
 
-	Commit            string            `json:"commit,omitempty"`
-	TreeHash          string            `json:"treeHash,omitempty"`
-	Dest              string            `json:"dest,omitempty"`
-	VendorCmd         []string          `json:"vendorCmd,omitempty"`
-	VendorImage       string            `json:"vendorImage,omitempty"`
-	Digest            string            `json:"digest,omitempty"`
-	Component         string            `json:"component,omitempty"`
-	BuilderType       string            `json:"builderType,omitempty"`
-	FlakeOutput       string            `json:"flakeOutput,omitempty"`
-	FlakeLockDigest   string            `json:"flakeLockDigest,omitempty"`
-	Toolchain         string            `json:"toolchain,omitempty"`
-	ToolchainPlatform string            `json:"toolchainPlatform,omitempty"`
-	Platform          string            `json:"platform,omitempty"`
-	Network           string            `json:"network,omitempty"`
-	Env               []EnvVar          `json:"env,omitempty"`
-	Patches           []PatchRef        `json:"patches,omitempty"`
-	Command           []string          `json:"command,omitempty"`
-	Workdir           string            `json:"workdir,omitempty"`
-	SourceDest        string            `json:"sourceDest,omitempty"`
-	SourceCommit      string            `json:"sourceCommit,omitempty"`
-	SourceTreeHash    string            `json:"sourceTreeHash,omitempty"`
-	VendorSpecDigest  string            `json:"vendorSpecDigest,omitempty"`
-	SourceReadOnly    bool              `json:"sourceReadOnly,omitempty"`
-	WriteDir          string            `json:"writeDir,omitempty"`
-	Disk              *DiskSpec         `json:"disk,omitempty"`
-	Packer            *PackerConfig     `json:"packer,omitempty"`
-	Materials         []MaterialBinding `json:"materials,omitempty"`
-	OutputType        string            `json:"outputType,omitempty"`
-	ArtifactPath      string            `json:"artifactPath,omitempty"`
-	Version           string            `json:"version,omitempty"`
+	Commit            string             `json:"commit,omitempty"`
+	TreeHash          string             `json:"treeHash,omitempty"`
+	Dest              string             `json:"dest,omitempty"`
+	VendorCmd         []string           `json:"vendorCmd,omitempty"`
+	VendorImage       string             `json:"vendorImage,omitempty"`
+	Digest            string             `json:"digest,omitempty"`
+	ExecutableArchive *ExecutableArchive `json:"executableArchive,omitempty"`
+	Component         string             `json:"component,omitempty"`
+	BuilderType       string             `json:"builderType,omitempty"`
+	FlakeOutput       string             `json:"flakeOutput,omitempty"`
+	FlakeLockDigest   string             `json:"flakeLockDigest,omitempty"`
+	Toolchain         string             `json:"toolchain,omitempty"`
+	ToolchainPlatform string             `json:"toolchainPlatform,omitempty"`
+	Platform          string             `json:"platform,omitempty"`
+	Network           string             `json:"network,omitempty"`
+	Env               []EnvVar           `json:"env,omitempty"`
+	Patches           []PatchRef         `json:"patches,omitempty"`
+	Command           []string           `json:"command,omitempty"`
+	Workdir           string             `json:"workdir,omitempty"`
+	SourceDest        string             `json:"sourceDest,omitempty"`
+	SourceCommit      string             `json:"sourceCommit,omitempty"`
+	SourceTreeHash    string             `json:"sourceTreeHash,omitempty"`
+	VendorSpecDigest  string             `json:"vendorSpecDigest,omitempty"`
+	SourceReadOnly    bool               `json:"sourceReadOnly,omitempty"`
+	WriteDir          string             `json:"writeDir,omitempty"`
+	Disk              *DiskSpec          `json:"disk,omitempty"`
+	Packer            *PackerConfig      `json:"packer,omitempty"`
+	Materials         []MaterialBinding  `json:"materials,omitempty"`
+	OutputType        string             `json:"outputType,omitempty"`
+	ArtifactPath      string             `json:"artifactPath,omitempty"`
+	Version           string             `json:"version,omitempty"`
 }
 
 // LogicalGraph is the only shape accepted by build identity computation. The
@@ -87,6 +89,8 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"VendorImage":       includeContentReferenceInBuildIdentity,
 	"Artifact":          excludeTransportFromBuildIdentity,
 	"Digest":            includeLogicalValueInBuildIdentity,
+	"ImageParentDigest": includeLogicalValueInBuildIdentity,
+	"ExecutableArchive": includeLogicalValueInBuildIdentity,
 	"Component":         includeLogicalValueInBuildIdentity,
 	"BuilderType":       includeLogicalValueInBuildIdentity,
 	"FlakeRef":          excludeTransportFromBuildIdentity,
@@ -155,6 +159,7 @@ func (g Graph) normalizedCopy() Graph {
 		}
 		c.Nodes[i].Packer = clonePackerConfig(g.Nodes[i].Packer)
 		c.Nodes[i].Materials = append([]MaterialBinding(nil), g.Nodes[i].Materials...)
+		c.Nodes[i].ExecutableArchive = cloneExecutableArchive(g.Nodes[i].ExecutableArchive)
 	}
 	c.Normalize()
 	return c
@@ -195,8 +200,9 @@ func (g Graph) logicalGraph() LogicalGraph {
 			ID: node.ID, Kind: node.Kind, Needs: append([]string(nil), node.Needs...),
 			Commit: node.Commit, TreeHash: node.TreeHash, Dest: node.Dest,
 			VendorCmd:   append([]string(nil), node.VendorCmd...),
-			VendorImage: imageDigestID(node.VendorImage), Digest: node.Digest,
-			Component: node.Component, BuilderType: node.BuilderType,
+			VendorImage: imageDigestID(node.VendorImage), Digest: node.Digest, ImageParentDigest: node.ImageParentDigest,
+			ExecutableArchive: cloneExecutableArchive(node.ExecutableArchive),
+			Component:         node.Component, BuilderType: node.BuilderType,
 			FlakeOutput: node.FlakeOutput, FlakeLockDigest: node.FlakeLockDigest,
 			Toolchain: imageDigestID(node.Toolchain), ToolchainPlatform: node.ToolchainPlatform,
 			Platform: node.Platform,
@@ -212,6 +218,14 @@ func (g Graph) logicalGraph() LogicalGraph {
 		})
 	}
 	return logical
+}
+
+func cloneExecutableArchive(archive *ExecutableArchive) *ExecutableArchive {
+	if archive == nil {
+		return nil
+	}
+	clone := *archive
+	return &clone
 }
 
 func cloneDiskSpec(spec *DiskSpec) *DiskSpec {

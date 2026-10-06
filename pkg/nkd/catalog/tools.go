@@ -1,9 +1,7 @@
 package catalog
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -14,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/releaseasset"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
@@ -35,6 +34,12 @@ type ToolPin struct {
 	ExecutablePath   string `json:"executablePath"`
 	ArchiveDigest    string `json:"archiveDigest"`
 	ExecutableDigest string `json:"executableDigest"`
+}
+
+const maxToolArchiveBytes = releaseasset.MaxToolTransportBytes
+
+func toolArchiveLimits() releaseasset.Limits {
+	return releaseasset.ToolLimits()
 }
 
 func validateToolSource(tool ToolSource) error {
@@ -129,7 +134,7 @@ func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, clie
 	if response.StatusCode != http.StatusOK {
 		return ToolPin{}, e.New(e.CodeFetchFailed, "tool download returned HTTP %d", response.StatusCode)
 	}
-	const limit = 256 << 20
+	const limit = maxToolArchiveBytes
 	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {
 		if ctx.Err() != nil {
@@ -143,52 +148,11 @@ func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, clie
 	archiveDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
 	executableDigest := archiveDigest
 	if source.Format == "tar-gzip" {
-		reader, err := gzip.NewReader(bytes.NewReader(raw))
+		member, err := releaseasset.SelectTarGzip(ctx, bytes.NewReader(raw), source.ExecutablePath, toolArchiveLimits())
 		if err != nil {
-			return ToolPin{}, e.Wrap(e.CodeVerifyFailed, err, "opening tool archive")
+			return ToolPin{}, err
 		}
-		defer func() { _ = reader.Close() }()
-		expanded := &io.LimitedReader{R: reader, N: limit + 1}
-		tr := tar.NewReader(expanded)
-		found := false
-		seen := map[string]bool{}
-		for count := 0; ; count++ {
-			if err := pinContextError(ctx); err != nil {
-				return ToolPin{}, err
-			}
-			h, err := tr.Next()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return ToolPin{}, e.Wrap(e.CodeVerifyFailed, err, "reading tool archive")
-			}
-			name := strings.TrimSuffix(h.Name, "/")
-			if count >= 65536 || !safeToolPath(name) || seen[name] {
-				return ToolPin{}, e.New(e.CodeVerifyFailed, "unsafe or duplicate tool archive member")
-			}
-			seen[name] = true
-			if h.Typeflag == tar.TypeDir {
-				continue
-			}
-			if h.Typeflag != tar.TypeReg {
-				return ToolPin{}, e.New(e.CodeVerifyFailed, "nonregular tool archive member")
-			}
-			if h.Name == source.ExecutablePath {
-				if h.Size <= 0 {
-					return ToolPin{}, e.New(e.CodeVerifyFailed, "tool executable is empty")
-				}
-				hash := sha256.New()
-				if _, err := io.Copy(hash, tr); err != nil {
-					return ToolPin{}, e.Wrap(e.CodeVerifyFailed, err, "hashing tool executable")
-				}
-				executableDigest = fmt.Sprintf("sha256:%x", hash.Sum(nil))
-				found = true
-			}
-		}
-		if !found || expanded.N <= 0 {
-			return ToolPin{}, e.New(e.CodeVerifyFailed, "missing executable or oversized tool archive")
-		}
+		executableDigest = fmt.Sprintf("sha256:%x", sha256.Sum256(member))
 	}
 	return ToolPin{Format: source.Format, URL: location, Platform: source.Platform, ExecutablePath: source.ExecutablePath, ArchiveDigest: archiveDigest, ExecutableDigest: executableDigest}, nil
 }

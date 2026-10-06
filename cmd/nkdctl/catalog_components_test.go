@@ -109,7 +109,7 @@ func TestCatalogUpdateCIFailsBeforeOutputOrCatalogIO(t *testing.T) {
 	os.Stdout = writer
 	t.Cleanup(func() { os.Stdout = oldStdout })
 	app := &cli.App{Commands: []*cli.Command{cmdCatalog()}}
-	runErr := app.Run([]string{"nkdctl", "catalog", "update-ci", "--dir", "must-not-be-read"})
+	runErr := app.Run([]string{"nkdctl", "catalog", "update-ci", "--config", "must-not-be-read", "--engine", "gitlab"})
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
