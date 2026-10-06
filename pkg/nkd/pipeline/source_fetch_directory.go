@@ -101,7 +101,8 @@ func sourceFetchGitOut(opts RunOptions, dir string, args ...string) (string, err
 		if err != nil {
 			return "", err
 		}
-		command = append(command, "--git-dir="+gitPath, "--work-tree="+path, "-c", "core.hooksPath=/dev/null")
+		command = append(command, "--git-dir="+gitPath, "--work-tree="+path,
+			"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false")
 		files = append(files, opts.fetchGitDirectory)
 	}
 	cmd := execCmd(opts, "git", append(command, args...)...)

@@ -273,6 +273,40 @@ func TestSourceFetchHeldGitDisablesRepositoryHookCredentialAccess(t *testing.T) 
 	}
 }
 
+func TestSourceFetchHeldGitDisablesRepositoryFilesystemMonitorCredentialAccess(t *testing.T) {
+	_, dir, _ := pristineClosureFixture(t)
+	checkout, _, err := securepath.OpenDirectory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer checkout.Close()
+	metadata, _, err := securepath.OpenChild(checkout, ".git", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer metadata.Close()
+	marker := filepath.Join(t.TempDir(), "repository-monitor-executed")
+	monitor := filepath.Join(t.TempDir(), "fsmonitor")
+	script := fmt.Sprintf("#!/bin/sh\nif test -n \"${NKD_SOURCE_TOKEN:-}\"; then printf exposed > %q; else printf executed > %q; fi\nprintf 'controlled-clock\\000'\n", marker, marker)
+	if err := os.WriteFile(monitor, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.CommandContext(t.Context(), "git", "-C", dir, "config", "core.fsmonitor", monitor)
+	if raw, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("configuring controlled repository monitor: %v %s", err, raw)
+	}
+	options := RunOptions{Ctx: t.Context(), fetchDirectory: checkout, fetchGitDirectory: metadata,
+		SourceGitEnvironment: []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GIT_CONFIG_GLOBAL=/dev/null",
+			"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=credential.helper", "GIT_CONFIG_VALUE_0=",
+			"NKD_SOURCE_TOKEN=test-only-synthetic-source-token"}}
+	if _, err := sourceFetchGitOut(options, dir, "status", "--porcelain", "--untracked-files=all", "--ignored"); err != nil {
+		t.Fatalf("actual held Git status failed: %v", err)
+	}
+	if raw, err := os.ReadFile(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("repository monitor ran in selected credential environment: marker=%q, error=%v", raw, err)
+	}
+}
+
 func TestSourceFetchProductionOwnerRejectsMidFetchParentSubstitution(t *testing.T) {
 	git, err := exec.LookPath("git")
 	if err != nil {
