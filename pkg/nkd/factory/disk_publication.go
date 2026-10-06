@@ -118,7 +118,7 @@ func ObserveDiskPublicationPayload(ctx context.Context, plan *Plan, expected Lif
 		BuildDigest: expected.BuildDigest, Components: append([]string(nil), expected.Components...),
 		Disk: &delivery.DiskOutput{PayloadDigest: inspection.PayloadDigest, Producer: strings.TrimPrefix(raw.Producer, expected.Name+"/"),
 			Component: raw.Component, Format: "qcow2", Encryption: "none", Size: inspection.Size,
-			PlanDigest: planDigest, Outcome: "succeeded"}}
+			PlanDigest: planDigest, Outcome: "succeeded", EvidenceMode: plan.Environment.DiskEvidence}}
 	if err := output.Validate(); err != nil {
 		return delivery.Output{}, err
 	}

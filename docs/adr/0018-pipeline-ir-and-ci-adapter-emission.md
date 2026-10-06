@@ -142,7 +142,7 @@ It permits no arbitrary setup, injected environment, job container or services.
 Docker is the initial admitted runtime. Bootstrap, source fetch, publication, signing and finalization remain
 on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
 and packaging operations into one bounded helper invocation against the complete Plan. The original producer
-session and held disk survive through reconciliation and receipt-gated packaging. The raw disk has no independent
+session and held disk survive through packaging; strict mode additionally requires reconciliation. The raw disk has no independent
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
 remain required. Only fixed source-fetch steps receive private-source credentials; ARC disk jobs receive no
 source token, registry-write credential or OIDC signing token.
@@ -160,7 +160,9 @@ The package owner must grant the workflow repository Actions read access separat
 Before toolchain preparation or producer work the helper binds the native host and observes cgroup-capped
 CPU/memory, held-workspace capacity and KVM through the existing single-use VM admission. It repeats admission
 inside the producer deadline, uses the same guarded Docker device projection, and closes/joins all held owners.
-Published native Packer and full-inspector image references and all measured inspector executable pins are required.
+Published native Packer pins remain required. The strict disk-evidence mode additionally requires the full
+inspector image and measured executable pins. Explicit M2 `diskEvidence: build-provenance-v1` omits inspector
+preparation and execution; it authenticates live producer/material evidence under ADR-13/20 instead.
 The whole ARC group has a bounded sum of serial operation budgets, capped at 24 hours; generic hosted jobs
 retain their six-hour cap. Current availability is not a capacity reservation. The local runtime observations
 remain unqualified descriptions; the complete hosted finalizer, signing and consumer checks own the production claim.

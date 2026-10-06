@@ -71,9 +71,11 @@ it declares no storage-driver field or ambient runtime-variable workaround. Stor
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
-A complete generated Run must admit execution, inspect and reconcile both
-disks, generate exact-subject evidence, publish/sign all required outputs, and pass independent consumer
-verification before these inputs can be called an accepted M2 release.
+M2 selects `diskEvidence: build-provenance-v1`: deep disk/content inspection and dependent reconciliation
+are deferred to M3. The existing profiles are retained for the strict mode but are not pulled or executed
+in this mode. A complete M2 Run must authenticate both held disks and their material producers, generate
+exact-subject source evidence with explicit deferred-inspection scope, publish/sign all required outputs
+as one release, and pass consumer verification. It reports normal M2 success when those gates pass.
 
 The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current

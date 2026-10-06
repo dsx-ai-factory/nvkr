@@ -39,7 +39,7 @@ func diskMaterialTraceFixtureForPlatformAndEncryption(t *testing.T, sibling, net
 	return diskMaterialTraceFixtureWithCapture(t, sibling, networked, platform, encryption, "")
 }
 
-func diskMaterialTraceFixtureWithCapture(t *testing.T, sibling, networked bool, platform, encryption, capture string) (*Plan, *LocalRunResult) {
+func diskMaterialTraceFixtureWithCapture(t *testing.T, sibling, networked bool, platform, encryption, capture string, buildProvenance ...bool) (*Plan, *LocalRunResult) {
 	t.Helper()
 	fixture := newVMPackerMaterialFixtureForPlatform(t, nil, map[string]string{"a-agent": "agent", "z-runtime": "runtime"}, platform)
 	base := fixture.plan.CatalogSnapshot
@@ -68,6 +68,14 @@ func diskMaterialTraceFixtureWithCapture(t *testing.T, sibling, networked bool, 
 		image.BuildNetwork = ir.NetworkDefault
 		base.Components["image"] = image
 		environment.Runtime.BuildNetworkPolicy = authored.BuildNetworkProducerDeclared
+	}
+	if len(buildProvenance) != 0 && buildProvenance[0] {
+		environment.GitHubARC = "native-kvm-v1"
+		environment.DiskEvidence = "build-provenance-v1"
+		environment.Publication = &authored.Publication{RepositoryPrefix: "example.test/nkd", Anonymous: true}
+		environment.Signing = cosignSigningProfile()
+		fixture.plan.Definition.CosignTool = "cosign"
+		base.Tools = map[string]catalog.ToolPin{"cosign": {Format: ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", Platform: environment.UtilityPlatform, ExecutablePath: "cosign", ArchiveDigest: testCosignArchiveDigest, ExecutableDigest: testCosignExecutableDigest}}
 	}
 	stack, err := catalog.ApplyStack(base)
 	if err != nil {

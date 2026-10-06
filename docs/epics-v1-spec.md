@@ -193,8 +193,8 @@ these named outputs to the exact delivered artifacts.
   only after the build phase has exited and the run record is written.
 - **The OS image artifact.** One disk-image artifact per OS image build, amd64, with provenance naming the NKE
   commit and tree hash. Pushed as a single-layer artifact if the registry's blob limit permits (verified at the
-  Sep 10 checkpoint), otherwise chunked, with the whole-image digest in the run record and provenance. What is
-  inside the image must be inventoried against its exact delivered bytes. NKE owns the correctness and runtime
+  Sep 10 checkpoint), otherwise chunked, with the whole-image digest in the run record and provenance. M2 binds the exact delivered bytes to the successful producer and traced materials;
+  full installed-content inventory and reconciliation are deferred to M3. NKE owns the correctness and runtime
   validation of embedded software; NKD attests production and composition under the admitted evidence contract.
   Matching dependency or inventory evidence never promotes this wrapped disk to a reproduction claim.
 - **Embedded-component declaration.** The OS image producer declares the components it embeds and NKD neither
@@ -202,9 +202,9 @@ these named outputs to the exact delivered artifacts.
   if so decided), each with name, version and known source pin. The declaration flows into the provenance's
   resolved dependencies and the aggregate SBOM as dependency edges from the image to its members, and M3
   cross-checks it against NKE's own version manifest at the pinned commit. The declared list alone cannot supply
-  the full-disk inventory: traced materials must reconcile with read-only final-disk inspection. Missing members,
-  unreadable or unsupported disks, inspection failure or disagreement prevent delivery admission. These adapters
-  remain deferred, and their eventual inventory does not establish runtime correctness.
+  the full-disk inventory. M3 adds read-only final-disk inspection and material reconciliation;
+  unreadable filesystems, inspection failure or disagreement fail that qualification gate. M2 requires
+  complete exact producer membership and reports the deferred inspection scope without claiming it passed.
 - **Image and blob publication.** Pushing container-image layouts by digest with the pinned digest preserved,
   and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
   digest and skips content that is already present, so re-runs are cheap and mirrors are idempotent.
@@ -236,7 +236,7 @@ incomplete; a build failure cannot create an implicit deferral.
 
 **Acceptance criteria**
 1. The OS image is published as one signed, attested amd64 disk-image artifact built from the pinned NKE commit; its provenance names that commit and tree hash with build type `wrapped-build`; consumer verification succeeds. (Under the fallback: the prebuilt QCOW2 is mirrored by digest, signed, consumer-verified, its `acquired` provenance names the upstream reference and digest, and the row is recorded as `acquired`.)
-2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, spire-agent if acquired, third-party images, NKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. The OS image's provenance lists its declared embedded components, and every embedded row in the milestone matrix appears in that declaration. Its software inventory binds the exact delivered disk and reconciles traced materials with read-only inspection; disagreement fails delivery.
+2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NKE container images, Helm, spire-agent if acquired, third-party images, NKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. The OS image's provenance lists its declared embedded components, and every embedded row in the milestone matrix appears in that declaration. Its producer evidence binds the exact delivered disk and all selected material subjects. Deep inspection and installed-content reconciliation are explicitly deferred to M3; missing producer evidence or a digest mismatch still fails delivery.
 3. CWE controller and NKE container images are either built (`wrapped-build`, provenance naming the NKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
 4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
 5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
@@ -297,10 +297,11 @@ establish cluster conformance or independently verify the OS image's runtime beh
   nothing is attested.
 - **Verify-only dispatch.** A manual dispatch that runs verification and the gate against an already-published
   manifest, building and publishing nothing. Used for red-run rehearsal here and by M4's manual release.
+- **Disk inventory.** Inspect the exact delivered disk and reconcile installed content with traced producer materials; emit signed evidence and fail closed on missing inventory or disagreement.
 - **Carry-over.** Any approved artifact deferral from M2 is resolved or explicitly retained with its qualification waiver under M2's criterion 4.
 
 **Does not deliver.** Independent functional or runtime validation of OS image contents (owned by the NKE OS image build team);
-new inventory-generation requirements beyond M2's disk-composition contract; vulnerability scanning; booting the image; cluster conformance; deployment topology and cluster-scoped qualification.
+vulnerability scanning; booting the image; cluster conformance; deployment topology and cluster-scoped qualification.
 
 **Acceptance criteria**
 1. The gate is green on the default-branch run for every selected producer and every published artifact.

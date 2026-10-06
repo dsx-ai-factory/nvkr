@@ -1,9 +1,10 @@
 apiVersion: nkd.dev/environment/v1
 kind: Environment
 metadata:
-  description: M2 candidate publication namespace; native disk execution classes and measured inspection profiles must pass admission before use.
+  description: M2 candidate publication namespace; native disk execution with build provenance; deep inspection and reconciliation deferred to M3.
   name: nke-m2-github
 githubARC: native-kvm-v1
+diskEvidence: build-provenance-v1
 githubDispatchBranches:
   - codex/m2-arc-validation
 executionClasses:

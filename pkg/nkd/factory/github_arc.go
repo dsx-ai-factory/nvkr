@@ -77,15 +77,17 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 			if !strings.Contains(instruction.Toolchain, "@sha256:") {
 				return e.New(e.CodeUnpinnedInput, "ARC disk toolchain requires a published native OCI digest")
 			}
-			_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
-			if err != nil {
-				return err
-			}
-			if err := requireProductionDiskScratch(profile); err != nil {
-				return err
-			}
-			if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
-				return err
+			if !diskBuildProvenance(plan) {
+				_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
+				if err != nil {
+					return err
+				}
+				if err := requireProductionDiskScratch(profile); err != nil {
+					return err
+				}
+				if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
+					return err
+				}
 			}
 			disks++
 		}

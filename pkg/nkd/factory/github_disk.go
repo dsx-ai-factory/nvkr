@@ -12,6 +12,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 // RunGitHubDisk keeps all material consumptions, the held QCOW2, inspection and
@@ -80,7 +81,11 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	profile := plan.Environment.DiskInspectionProfiles[root.Platform]
 	// Preparation follows host capability admission and precedes held image
 	// admission. Consumers use the exact pinned reference, never a mutable tag.
-	for _, image := range uniqueSorted([]string{instruction.Toolchain, profile.Image}) {
+	images := []string{instruction.Toolchain}
+	if !diskBuildProvenance(plan) {
+		images = append(images, profile.Image)
+	}
+	for _, image := range uniqueSorted(images) {
 		if githubPrivateToolchain(plan, image) {
 			// The isolated preparation step pulled this exact reference. Held
 			// runtime admission below must still authenticate the local image.
@@ -95,11 +100,14 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 			return e.Wrap(e.CodeFetchFailed, err, "prepare exact ARC toolchain")
 		}
 	}
-	inspector, err := OpenDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace)
-	if err != nil {
-		return err
+	var inspector *sbom.DiskInspectionRuntime
+	if !diskBuildProvenance(plan) {
+		inspector, err = OpenDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace)
+		if err != nil {
+			return err
+		}
+		defer func() { returnErr = joinFactoryCleanupError(returnErr, inspector.Close(), "close ARC inspector") }()
 	}
-	defer func() { returnErr = joinFactoryCleanupError(returnErr, inspector.Close(), "close ARC inspector") }()
 	diagnostics, err := pipeline.NewPackerDiagnosticSink(ctx, workspace)
 	if err != nil {
 		return err
