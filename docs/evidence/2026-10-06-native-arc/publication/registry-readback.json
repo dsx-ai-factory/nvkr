@@ -1,0 +1,34 @@
+[
+  {
+    "platform": "linux/amd64",
+    "role": "packer",
+    "ref": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013",
+    "configDigest": "sha256:e19a2a08504cde137d260a5e5db676c95d7dc566d10da8be2b7da6d273d768ac",
+    "visibility": "internal",
+    "scope": "user-authorized-candidate-exception"
+  },
+  {
+    "platform": "linux/amd64",
+    "role": "inspector",
+    "ref": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/inspector@sha256:ff2a9dc76c7e6452c5b19416370f30a250b952b92af6296637978ec7abcebbc8",
+    "configDigest": "sha256:e73ac67cbf917a165a3dcd23a23f27707893d357f4fd6a204c244f898f010cc1",
+    "visibility": "internal",
+    "scope": "user-authorized-candidate-exception"
+  },
+  {
+    "platform": "linux/arm64",
+    "role": "packer",
+    "ref": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db",
+    "configDigest": "sha256:e0b40339a5482da0a45eb82c81a313b324ba98fe97d5e2de0b3156289cf8c181",
+    "visibility": "internal",
+    "scope": "user-authorized-candidate-exception"
+  },
+  {
+    "platform": "linux/arm64",
+    "role": "inspector",
+    "ref": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/inspector@sha256:3aed46be99e43aa273533808f3604e384e8c7f80c33ba7716bb382316ebf343e",
+    "configDigest": "sha256:6a7a0a5dfc1502127e0f7bce264712517e7eefbbb376e8bb702872efb2cbefc6",
+    "visibility": "internal",
+    "scope": "user-authorized-candidate-exception"
+  }
+]

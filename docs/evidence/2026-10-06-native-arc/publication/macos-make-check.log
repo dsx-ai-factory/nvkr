@@ -1,0 +1,21 @@
+formatting ok
+go vet ./...
+golangci-lint run
+pkg/nkd/pipeline/disk_inspection_runtime.go:166:2: SA4023(related information): the lhs of the comparison is the 2nd return value of this function call (staticcheck)
+	held, err := snapshotRuntimeExecutableContext(ctx, runtimePath)
+	^
+pkg/nkd/pipeline/disk_inspection_runtime.go:167:5: SA4023: this comparison is always true (staticcheck)
+	if err != nil {
+	   ^
+pkg/nkd/pipeline/source_vendor.go:57:2: SA4023(related information): the lhs of the comparison is the 2nd return value of this function call (staticcheck)
+	held, err := snapshotRuntimeExecutableContext(ctx, path)
+	^
+pkg/nkd/pipeline/source_vendor.go:58:5: SA4023: this comparison is always true (staticcheck)
+	if err != nil {
+	   ^
+pkg/nkd/pipeline/source_vendor.go:69:56: SA4023: this comparison is always true (staticcheck)
+		if err := admitSourceVendorPodmanHelpers(ctx, held); err != nil {
+		                                                     ^
+5 issues:
+* staticcheck: 5
+make: *** [lint] Error 1

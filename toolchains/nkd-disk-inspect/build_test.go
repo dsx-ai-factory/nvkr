@@ -80,10 +80,10 @@ func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
 		}
 	}
 	for _, text := range []string{"FROM " + lock.BaseImage, "FROM " + lock.DownloadImage,
-		"COPY bin/nkd-disk-inspect-${TARGETARCH} /usr/local/bin/nkd-disk-inspect",
 		"COPY --from=scanner /tmp/syft /usr/local/bin/syft",
 		"https://github.com/anchore/syft/releases/download/v" + lock.Scanner.Version + "/syft_" + lock.Scanner.Version + "_linux_${TARGETARCH}.tar.gz",
 		"sha256sum -c -;",
+		"COPY --chmod=0755 bin/nkd-disk-inspect-${TARGETARCH} /usr/local/bin/nkd-disk-inspect",
 		"--max-time 300 --max-filesize 134217728",
 		"sha256sum /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish /usr/bin/dpkg-deb /usr/local/bin/syft",
 		"USER 65534:65534",

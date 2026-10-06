@@ -209,7 +209,7 @@ _Avoid_: Execution admission, runtime proof, execution class, provider attestati
 An opaque, single-use, same-process capability binding the exact current Plan bytes and one selected VM build,
 its execution request and binding, cgroup-capped Linux host observations, and retained workspace/KVM handles.
 Capacity is re-observed inside the authored callback deadline immediately before work. It is current-availability
-authority for the local VM adapter only, not provider allocation, resource reservation, qualification evidence,
+authority reused by the local VM adapter and the explicitly operator-trusted native ARC disk route, not provider allocation, resource reservation, qualification evidence,
 or proof that a subprocess consumed the held KVM descriptor.
 _Avoid_: Serialized receipt, hosted-runner attestation, resource reservation, KVM-consumption evidence
 

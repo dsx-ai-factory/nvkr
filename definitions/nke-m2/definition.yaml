@@ -43,6 +43,7 @@ outputs:
     platform: linux/amd64
     catalog:
       base: ./os-catalog
+      overlays: [./native-toolchains.yaml]
     format: disk-image
     components:
       - nke-agent
@@ -60,6 +61,7 @@ outputs:
     platform: linux/arm64
     catalog:
       base: ./os-catalog
+      overlays: [./native-toolchains.yaml]
     format: disk-image
     components:
       - nke-agent

@@ -21,17 +21,17 @@ func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if environment.Runtime.Runtime != "podman" || environment.Runtime.BuildNetworkPolicy != "producer-declared" {
+	if environment.Runtime.Runtime != "docker" || environment.Runtime.BuildNetworkPolicy != "producer-declared" {
 		t.Fatalf("candidate runtime controls changed: %+v", environment.Runtime)
 	}
 	if len(environment.Runtime.Variables) != 0 || len(environment.Runtime.Setup) != 0 {
 		t.Fatal("candidate supplies an ambient storage/isolation workaround")
 	}
-	if len(environment.ExecutionClasses) != 0 {
-		t.Fatal("unmeasured execution classes must remain absent from candidate inputs")
+	if environment.GitHubARC != "native-kvm-v1" || len(environment.ExecutionClasses) != 2 {
+		t.Fatal("explicit native ARC routes must be selected")
 	}
-	if len(environment.DiskInspectionProfiles) != 0 {
-		t.Fatal("unmeasured native inspector profiles must remain absent from candidate inputs")
+	if len(environment.DiskInspectionProfiles) != 2 {
+		t.Fatal("both measured native inspector profiles must be selected")
 	}
 }
 

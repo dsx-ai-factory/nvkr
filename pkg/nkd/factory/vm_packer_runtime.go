@@ -45,6 +45,9 @@ func (localVMPackerResolver) Admit(
 	subjects := make(map[string]struct{})
 	sourceRoots := make(map[string]string)
 	for _, selected := range topologicalFactoryNodes(plan.Graph) {
+		if config.NodeID != "" && selected.ID != config.NodeID {
+			continue
+		}
 		if selected.Kind != NodeBuild || selected.IRNode == "" {
 			continue
 		}

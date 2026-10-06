@@ -34,6 +34,14 @@ func (plan Plan) producerInstruction(node Node) (BuildPlan, ir.Node, error) {
 // value is an ephemeral execution view; it is never written back into the Plan.
 // Utility operations already own their instruction and are returned unchanged.
 func (plan Plan) ExecutionFor(node Node) (Node, error) {
+	resolved, err := plan.executionForProducer(node)
+	if err != nil {
+		return Node{}, err
+	}
+	return projectARCNode(&plan, resolved), nil
+}
+
+func (plan Plan) executionForProducer(node Node) (Node, error) {
 	if node.IRNode == "" {
 		return node, nil
 	}

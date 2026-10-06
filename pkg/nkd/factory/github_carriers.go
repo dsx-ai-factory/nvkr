@@ -110,6 +110,9 @@ func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 		"Transport outcomes are diagnostic; the finalizer authenticates completeness.",
 	}, func(progress *githubStepProgress) error {
 		for _, artifact := range carriers {
+			if _, raw := diskPublicationRequirement(plan, artifact); raw {
+				continue
+			}
 			if err := githubCarrierContext(ctx); err != nil {
 				return err
 			}

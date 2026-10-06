@@ -71,13 +71,16 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 	if err := rejectUnsupportedRuntimeStorage(plan, "factory execute-node"); err != nil {
 		return err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "factory execute-node"); err != nil {
+	if err := admitGitHubRequirements(plan, "factory execute-node"); err != nil {
 		return err
 	}
 	nodes, artifacts := planIndex(plan)
 	node, ok := nodes[nodeID]
 	if !ok {
 		return e.New(e.CodeInvalidCatalog, "factory plan has no node %q", nodeID)
+	}
+	if githubDiskOutput(plan, node) != "" {
+		return e.New(e.CodeEngineCapability, "ARC disk operations require the original grouped executor")
 	}
 	if stdout == nil {
 		stdout = io.Discard

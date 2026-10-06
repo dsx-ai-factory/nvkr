@@ -346,6 +346,27 @@ Qualified interfaces require package-issued opaque receipts. Caller structs, pat
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the
 owning signed protocol, never serialization of an in-process capability.
 
+## Native ARC disk route
+
+ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted policy for the two native KVM pools.
+The grouped helper retains original material and disk owners through reconciliation and packaging; generation
+contracts cover both architectures, individual-node bypass rejection and unsupported policy rejection. Source
+fetch, bootstrap and release credentials remain outside ARC jobs. Native preparation/measurement is provided
+separately. M2 now generates all 34 outputs with two native disk jobs from the same Definition,
+an exact catalog overlay and measured native inspection profiles. Four toolchain images were
+published to internal GHCR packages under the user's scoped candidate exception, with exact
+manifest/config read-back. This is not completed organizational license/security review.
+Private pulls use a separate packages:read step whose temporary credentials are removed before
+execution; cached exact image identities are revalidated by the held runtime.
+No complete generated M2 execution, provider capacity verification or independent consumer
+acceptance is recorded by this change.
+The [October 6 preparation record](../evidence/2026-10-06-native-arc.md) retains final-source
+ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
+and unprivileged libguestfs appliance filesystem probes. The M2 Environment reuses the exact
+`githubDispatchBranches` mechanism for `codex/m2-arc-validation`, with a matching signer identity.
+Both `nkd-arc` and `nkd-release` deployment policies admit that exact branch; the source secret name exists. Package Actions read access, native pool capacity
+and generated M2 execution remain external acceptance requirements.
+
 ## Maintained M2 input candidate
 
 The combined M2 Definition selects 34 named outputs: the existing ten CLI/controller/chart/operator/disk

@@ -115,8 +115,8 @@ workflows-check: ## Verify the committed Run generation matches the catalog (ADR
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nkd-exec ./cmd/nkdctl
 	bin/nkd-exec run generate --engine github \
-		--definition definitions/nke-deploy/definition.yaml \
-		--environment definitions/nke-deploy/environment-github.yaml \
+		--definition definitions/nke-m2/definition.yaml \
+		--environment definitions/nke-m2/environment-github.yaml \
 		--root . --check
 
 .PHONY: check

@@ -403,6 +403,13 @@ func observeContainerImageWith(ctx context.Context, node ir.Node, output func(..
 		}
 		return observedID, nil
 	}
+	// An authenticated preparation step may have materialized a private image
+	// and destroyed its registry credential. Resolve the exact repository digest
+	// locally before attempting a network pull. A present but mismatched record
+	// fails closed; only a failed lookup may fall back to materialization.
+	if raw, err := output("image", "inspect", "--format", "{{json .RepoDigests}}", node.Toolchain); err == nil {
+		return inspectPreparedContainerImage(node, raw)
+	}
 	pullArgs := []string{"pull"}
 	if node.Platform != "" {
 		pullArgs = append(pullArgs, "--platform", node.Platform)
@@ -415,6 +422,10 @@ func observeContainerImageWith(ctx context.Context, node ir.Node, output func(..
 	if err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "inspecting toolchain identity for node %q", node.ID)
 	}
+	return inspectPreparedContainerImage(node, raw)
+}
+
+func inspectPreparedContainerImage(node ir.Node, raw []byte) (string, error) {
 	var refs []string
 	if err := json.Unmarshal(bytes.TrimSpace(raw), &refs); err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "decoding toolchain identity for node %q", node.ID)

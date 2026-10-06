@@ -23,8 +23,9 @@ cover all 24 image rows; the explicit pinned-source Git integration covers all 3
 output graphs. Run it with `NKD_TEST_M2_ALL_OUTPUT_GRAPHS=1` and authorized exact-source
 access or the documented local Git `insteadOf` mapping. Ordinary tests do not receive
 private-source credentials. This is not production launch evidence:
-the Environment still has no measured execution classes or approved native inspector
-profiles. The selected capture source is the approved, merged NKE #1211 source described below;
+the Environment selects explicit native ARC routes and measured inspector profiles. Native toolchain
+closures are published internally under the user's scoped candidate exception, not completed
+organizational license/security review. The selected capture source is the approved, merged NKE #1211 source described below;
 source acceptance does not supply runtime or publication admission.
 
 The operator catalog selects Helm 4.1.4 and kubectl 1.36.3 from the pinned NKE kubeadm-distribution lock:
@@ -49,16 +50,23 @@ under `nke.dev/os-image-materials/v1`; every selected material and disk target r
 
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
-the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The reused signer
-identity is existing configuration, not a new source or publication approval. Native disk
-execution classes and measured native inspection profiles are absent, so admission must fail before a Run.
-OS toolchain digests remain the inherited local runtime identities, not approved published OCI pins.
-The inspector and Packer source locks retain their outstanding publication approval gates.
-The candidate Environment selects Podman through the existing typed runtime controls;
+the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The signer identity admits the existing main ref and the explicitly authorized
+`codex/m2-arc-validation` ref; this is not organizational source or publication approval. Native disk
+execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
+capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
+Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
+The two inspector profiles use measured executable hashes and published native image manifests.
+Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
+224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
+include the held subject snapshot. These are admission budgets, not measured full-M2 usage.
+The inspector and Packer source locks retain their outstanding organizational approval gates;
+the [candidate exception and publication evidence](../../docs/evidence/2026-10-06-native-arc.md)
+records the narrower authorization and exact registry read-back.
+The candidate Environment selects Docker through the existing typed runtime controls;
 it declares no storage-driver field or ambient runtime-variable workaround. Storage behavior
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
-Default-owner semantics do not supply absent execution-class or full-inspector profile authority.
+Runner labels do not supply runtime-capacity or full-inspector profile authority.
 A complete generated Run must admit execution, inspect and reconcile both
 disks, generate exact-subject evidence, publish/sign all required outputs, and pass independent consumer
 verification before these inputs can be called an accepted M2 release.
@@ -66,5 +74,8 @@ verification before these inputs can be called an accepted M2 release.
 The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
-README gives separate AMD64 and ARM64 assembly commands; no source lock currently
-supplies either approved published native toolchain closure.
+README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
+read-only image preparation with the ephemeral GitHub token; grant this repository Read under
+each internal toolchain package's Manage Actions access settings. The `nkd-arc` deployment
+environment and signing policy admit `main` and the exact manual-validation branch
+`codex/m2-arc-validation`; the same branch must be admitted by `nkd-release`. The generated bundle has not been exercised as a full M2 Run.

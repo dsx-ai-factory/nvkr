@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -8,6 +9,46 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
+
+func TestPreparedPrivateImageRequiresExactLocalDigest(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	ref := "ghcr.io/example/tool@" + digest
+	for _, test := range []struct {
+		name, document string
+		missing        bool
+		want           e.Code
+	}{
+		{"present", `["` + ref + `"]`, false, ""},
+		{"missing then pulled", `["` + ref + `"]`, true, ""},
+		{"substituted", `["ghcr.io/example/tool@sha256:` + strings.Repeat("b", 64) + `"]`, false, e.CodePreflightFailed},
+		{"malformed", `{`, false, e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls, pulls := 0, 0
+			got, err := observeContainerImageWith(t.Context(), ir.Node{ID: "private", Toolchain: ref, Platform: "linux/amd64"}, func(args ...string) ([]byte, error) {
+				calls++
+				if calls == 1 && test.missing {
+					return nil, errors.New("image absent")
+				}
+				if args[0] == "pull" {
+					pulls++
+					return nil, nil
+				}
+				return []byte(test.document), nil
+			})
+			if pulls != map[bool]int{false: 0, true: 1}[test.missing] {
+				t.Fatal("present private image unexpectedly needed registry credentials")
+			}
+			if test.want != "" {
+				if code(err) != test.want || got != "" {
+					t.Fatalf("unexpected identity admission: %q / %v", got, err)
+				}
+			} else if err != nil || got != digest {
+				t.Fatalf("exact prepared digest was rejected: %q / %v", got, err)
+			}
+		})
+	}
+}
 
 func TestLocalImageIdentityUsesPortableExactIDProjection(t *testing.T) {
 	want := "sha256:" + strings.Repeat("b", 64)

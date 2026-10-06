@@ -94,8 +94,9 @@ The wrapper platform describes the guest artifact; inspection tooling, scanner p
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Production packaging consumes the original live Run's exact-subject reconciliation receipt, not a restored
 path or decoded receipt. The compiler describes the wrapper's output-repository and evidence edges.
-Receipt-gated packaging and consumer APIs are implemented, but neither the ordinary local scheduler nor
-generated hosted VM executor consumes the complete live inspection-and-packaging operation yet.
+Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
+the live inspection-and-packaging operation; full generated production execution remains unexercised. The ordinary
+local scheduler still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
 composition or authorize release. A real generated

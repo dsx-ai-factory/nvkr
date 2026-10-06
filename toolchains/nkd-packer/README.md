@@ -39,15 +39,41 @@ capability-dropped container profile. A non-native image may be assembled with
 followed by the same validation and a real bake on a native host before
 publication.
 
+The [October 6 native preparation record](../../docs/evidence/2026-10-06-native-arc.md#native-amd64-assembly-and-validation)
+records a successful AMD64 Docker assembly and this script's native validation.
+It includes the retained image archive and exact identities; it grants no
+publication or redistribution approval.
+
 Use `--check` for the network-free source-lock validation. Building uses the
-fixed Ubuntu snapshot and verifies every downloaded release archive before
+fixed Ubuntu snapshot and verifies every release archive before
 extracting them. The command does not push, sign, or write a transport digest.
+
+For Docker builds behind a TLS proxy, `NKD_BUILD_CA_BUNDLE` supplies a trusted
+public CA bundle as an ephemeral, read-only BuildKit secret. Its mode permits
+APT's unprivileged downloader to read it; it is never copied into the image.
+`NKD_BUILD_ARCHIVES` selects a local directory through the `nkd_archives`
+[named build context](https://docs.docker.com/reference/cli/docker/buildx/build/#build-context).
+Place the official Packer, QEMU plugin, Go, crane and nfpm release archives there
+under their upstream filenames for the selected architecture. Local mode copies
+them through read-only build mounts and applies the same archive and executable
+checksum checks. Missing or corrupt inputs fail; local mode never falls back to
+downloading release archives. The pinned base images and signed Ubuntu snapshot
+still require network access. Both optional inputs require Docker Buildx.
+
+```sh
+CONTAINER_RUNTIME=docker NKD_BUILD_ARCHIVES=/absolute/path/to/archives \
+  NKD_BUILD_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+  toolchains/nkd-packer/build.sh --arch amd64
+```
+
 Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` and the Docker exporter's
 `rewrite-timestamp=true` option for deterministic image creation and layer-file
 timestamps. Docker explicitly streams the image archive to `docker image load`,
 separating timestamp rewriting from image-store unpacking; failure in either
-stage stops validation. Podman retains its existing build path and independent
-ARM64 local image pin. The fixed epoch does not itself prove identical image
+stage stops validation. The existing Podman ARM64 local pin describes the earlier
+measured image. These Dockerfile changes need a new native Podman measurement
+before that pin can be replaced; a different rebuilt ID still fails closed.
+The fixed epoch does not itself prove identical image
 bytes. Repeat a native Docker build on fresh runners and compare the resulting
 image IDs before adding a Docker pin.
 `localPodmanImages` and `localDockerImages` keep the two runtime identities
@@ -90,6 +116,10 @@ reviews are recorded by the owning process. Keeping the image digests null in
 the lock records that the source is not ready for maintained catalog use; the
 required review remains an organizational publication gate, not a technical
 control implemented by this source lock.
+
+The [October 6 candidate record](../../docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
+records the user's explicit exception for four measured native images used only by M2.
+That exception permits the candidate overlay; it does not mark these general review gates approved.
 
 This source and a successful container build prove only the toolchain layout.
 They do not prove an NKE QCOW2 bake, bootability, publication, pipeline

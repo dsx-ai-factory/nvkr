@@ -50,7 +50,7 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 				t.Fatal(err)
 			}
 			// This real selected graph is a compiler diagnostic, not admission of
-			// the candidate's absent execution classes or inspection profiles.
+			// the candidate's unmeasured full inspection profiles.
 			plan := &Plan{Definition: authored, Environment: environment, Builds: []BuildPlan{{Name: output.Name, CatalogSnapshot: cat, Graph: graph}}}
 			privateFetches := 0
 			for _, source := range graph.Nodes {

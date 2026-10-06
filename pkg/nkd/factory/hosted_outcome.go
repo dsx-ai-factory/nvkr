@@ -30,7 +30,7 @@ func ValidateHostedRestores(ctx context.Context, workspace string, plan *Plan) e
 	if err := plan.Validate(); err != nil {
 		return err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "hosted restore validation"); err != nil {
+	if err := admitGitHubRequirements(plan, "hosted restore validation"); err != nil {
 		return err
 	}
 	return validateHostedRestores(ctx, workspace, plan)
@@ -76,7 +76,7 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 	if err := plan.Validate(); err != nil {
 		return err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "hosted outcome validation"); err != nil {
+	if err := admitGitHubRequirements(plan, "hosted outcome validation"); err != nil {
 		return err
 	}
 	return validateHostedOutcomes(ctx, workspace, plan)
