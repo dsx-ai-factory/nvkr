@@ -55,7 +55,9 @@ The [executed commands](2026-10-06-disk-content-parent-integration.commands.txt)
 include the native build, both native run scopes, host non-test gates and
 manifest command. Command-file SHA-256:
 `2b30806c14790ea8cb95f01dbf0711c08658137262a11d164184ff8ae52ef981`.
-All runs used already-local images without pulls or installations. Native
+Native container runs used already-local images without pulls or package
+installations. The host vulnerability gate performed its repository-native
+pinned Go-tool installation, as recorded in the host log. Native
 execution used no network, read-only source/modules, nonroot users and owned
 scratch; HOME and production/test deadlines were not overridden.
 
