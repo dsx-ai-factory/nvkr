@@ -5,6 +5,7 @@ package definition
 
 import (
 	"maps"
+	"slices"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 )
@@ -16,7 +17,7 @@ func (input Definition) Clone() Definition {
 	for i := range input.Outputs {
 		out := &input.Outputs[i]
 		out.Components = append([]string(nil), out.Components...)
-		out.Platforms = append([]string(nil), out.Platforms...)
+		out.Platforms = slices.Clone(out.Platforms)
 		if out.Catalog != nil {
 			value := *out.Catalog
 			value.Overlays = append([]string(nil), value.Overlays...)

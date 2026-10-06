@@ -92,7 +92,7 @@ func publishImageAliases(ctx context.Context, root string, aliases []imageAlias,
 	}
 	workspace, err := os.MkdirTemp("", "nkd-image-alias-readback-*")
 	if err != nil {
-		return e.Wrap(e.CodeImmutableViolation, err, "creating image discovery readback workspace")
+		return e.Wrap(e.CodeInternal, err, "creating image discovery readback workspace")
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
 	// Re-read the entire exact release, including every sibling payload and SBOM,

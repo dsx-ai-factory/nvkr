@@ -53,12 +53,20 @@ a fixed version tag, or a development tag. It returns the digest-pinned referenc
 Explicit low-level tagged publication remains a discovery operation; automatic version/channel aliases and
 promotion policy are not implemented by this lifecycle configuration.
 
-A Helm chart deliverable is the one bounded exception: after its manifest is durably published at its digest,
+A Helm chart deliverable has a bounded discovery exception: after its manifest is durably published at its digest,
 the publisher additionally advances two chart-scoped tags — the chart's own `<version>` (matching what real
 `helm push` itself would tag) and a `<version>-<digest>` tag that is a deterministic, collision-free function of
 the chart's exact published content. Both remain non-authoritative discovery hints under the same tag rule
 stated above and in §6; no consumer, evidence binding, or release acceptance path treats either tag as
-identity. This is scoped to `helm-oci` outputs only — no other output kind advances any tag.
+identity. These two automatic aliases are scoped to `helm-oci` outputs.
+
+A second explicit exception is `publication.imageTags`, mapping an exact aggregate OCI output name to one
+literal non-authoritative tag in that output's sibling repository. Admission rejects unknown, native-only or
+non-image outputs before registry I/O. After digest publication, the publisher reads back and verifies the
+entire release closure, including every sibling payload and required SBOM, before the first image alias update.
+It then verifies each alias against the exact index bytes, media type and digest. Existing exact aliases are
+checked without rewriting them. Failure can leave an alias advanced; no rollback, compare-and-swap or
+multi-tag transaction is promised. Tags never replace immutable references, signed membership or acceptance.
 
 Definition owns selected components, byte-changing packaging intent, and catalog tool selectors (`sbomTool`,
 `cosignTool`). Catalog source declarations own release URL templates, executable
@@ -182,12 +190,15 @@ Full publication inspection verifies structural and content closure but does not
 root. Qualified consumption requires an implemented clearance verifier and the operator's trust policy;
 no current diagnostic operation grants that authority.
 
-### Runnable image indexes — delivery stage, lifecycle integration disabled
+### Runnable image indexes — pipeline-attested lifecycle integration
 
 The delivery module can assemble and open a standard runnable OCI image index over an explicit, nonempty,
-unique set drawn from `linux/amd64` and `linux/arm64`. This is an independently testable integrity capability;
-it does not add aggregate Definition outputs or enable index production, signing, release publication or
-consumption. ADR-12's current single-platform output admission remains in force.
+unique set drawn from `linux/amd64` and `linux/arm64`. Definition v5 admits an OCI output with that explicit
+`platforms` set instead of `platform`, selecting one producer independently on every required platform.
+Compilation freezes all native Build Digests, results and platform-scoped evidence before index assembly.
+The aggregate has its own typed logical Build Digest; it does not change native producer identity. Lifecycle
+production, index-subject signing/attestation, publication and consumption are implemented and contract-tested
+for the pipeline-attested lane. This does not establish a dual-native hosted release or qualified acceptance.
 
 Each assembly input names one platform, one single-manifest OCI layout and its exact native manifest digest.
 The complete request is admitted before filesystem access. Delivery captures bounded regular files through
@@ -203,17 +214,21 @@ Assembly emits canonical index bytes with one descriptor per platform in sorted 
 child manifest digests are exact OCI blob identities, not logical Build Digests. Child manifest/config/layer
 bytes remain unchanged; identical blobs shared by children are stored once. A held `ImageIndex` exposes
 only defensive descriptions and an atomic no-replace layout writer; caller paths and descriptions cannot
-substitute another child after validation. Closing joins active operations and releases the held files.
+substitute another child after validation. Closing joins active operations and releases the held files; shallow handle copies share synchronization and revocation.
 The writer requires an existing parent directory, writes and syncs a private sibling through directory
 descriptors, and atomically commits without replacing an existing destination, then syncs the parent.
 Cancellation before commit removes the private stage. A directory-sync failure after commit is reported as
 failure even though a complete layout may exist; callers must inspect that result before retrying.
 
-The next integration stage must freeze every required platform/producer use and its exact evidence before
-assembly; bind aggregate identity, signed metadata and consumer membership to every child; and make Helm
-bindings and release navigation describe the index and its complete platform set. No public index producer,
-post-build manifest command, mutable alias or `platform: multi` is admitted by this stage. The implementation
-and remaining contracts are described in [multi-architecture CWE delivery](../multiarch-cwe-delivery.md).
+Release v4 and PublicationRoot v4 bind aggregate identity and exact platform/child Build, payload and evidence
+membership. Every child retains required native-image SBOM coverage; equal Build Digests do not substitute
+for another named output/platform use. Consumer validation checks the complete membership before exposing
+it, and release navigation describes the index and each child without claiming signature authority. Helm
+bindings require their chart platform to belong to the index's declared and observed coverage and embed the
+complete index digest. No post-build manifest rewrite or `platform: multi` is admitted. Explicit discovery
+aliases follow the post-readback rule in section 2. M2 ARC/per-output metadata-only publication composition
+and a dual-native hosted build/sign/publication remain separate, unexercised integration work. See
+[multi-architecture CWE delivery](../multiarch-cwe-delivery.md).
 
 ### 5. Credentials by reference, never embedded
 
@@ -372,7 +387,7 @@ its name discovered from the archive itself rather than assumed, the same shape 
 own declared name exactly as `helm package` would produce it. Lifecycle observation checks the exact archive
 against its producer result and independently reproduces the publication payload. Optional Definition Helm
 settings contain only a named relationship map: `helm.images: {controller: cwe}` binds a chart slot to an OCI
-output on the same platform. The selected source producer owns `helm.chart` (`.` for the archive root or a
+output on the same platform, or an aggregate output containing that platform. The selected source producer owns `helm.chart` (`.` for the archive root or a
 direct child directory) and each slot's `values.digest` path in `values.yaml`. Compilation joins the relationships with that output's resolved catalog,
 including catalog overrides. Every catalog slot must be bound exactly once; missing mappings, unbound slots
 and unknown slots fail. Mappings participate in catalog identity and are frozen in the plan, whose validation
@@ -389,7 +404,7 @@ writes the full OCI digest. Unknown formats fail catalog/Plan admission; the for
 identity and frozen package dataflow, not inferred from a value path or template. No template
 rewriting or new digest algorithm is introduced.
 
-Packaging inspects each native image package, writes its manifest digest to the mapped values and refreshes
+Packaging inspects each native image or aggregate index package, writes its manifest or index digest to the mapped values and refreshes
 wrapper-level checksums when the chart is nested. With `chart: "."`, no bookkeeping is written
 inside the chart; any upstream `checksums.txt` remains chart content. Templates, repository and tag defaults remain unchanged. Source links and ambiguous value
 selections fail. Values serialization preserves semantic values, not exact formatting; document-level

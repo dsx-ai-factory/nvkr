@@ -22,6 +22,7 @@ func writeImageIndexLayout(ctx context.Context, out string, closure *imageIndexC
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
+	out = filepath.Clean(out)
 	name := filepath.Base(out)
 	if name == "." || name == ".." || name == string(filepath.Separator) {
 		return e.New(e.CodeUsage, "image index destination must name a new directory")

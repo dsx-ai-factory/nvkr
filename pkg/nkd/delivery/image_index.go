@@ -44,6 +44,11 @@ type ImageIndexDescription struct {
 // This capability proves integrity only; producers and release consumers must
 // independently authenticate each child's build, output and evidence membership.
 type ImageIndex struct {
+	*imageIndexState
+}
+
+// Every shallow handle copy shares revocation and synchronization.
+type imageIndexState struct {
 	mu          sync.Mutex
 	operation   chan struct{}
 	closed      bool
@@ -171,15 +176,18 @@ func OpenImageIndex(ctx context.Context, root, expectedIndexDigest string, requi
 }
 
 func newImageIndex(closure *imageIndexClosure, children []ImageIndexChild) *ImageIndex {
-	return &ImageIndex{operation: make(chan struct{}, 1), closure: closure, description: ImageIndexDescription{
+	return &ImageIndex{imageIndexState: &imageIndexState{operation: make(chan struct{}, 1), closure: closure, description: ImageIndexDescription{
 		Digest: closure.index.Digest(), Size: closure.index.Size(), Children: children,
-	}}
+	}}}
 }
 
 // Description returns only defensive metadata from the verified held closure.
 func (index *ImageIndex) Description() (ImageIndexDescription, error) {
 	if index == nil {
 		return ImageIndexDescription{}, e.New(e.CodeUsage, "image index capability is nil")
+	}
+	if index.imageIndexState == nil {
+		return ImageIndexDescription{}, e.New(e.CodeVerifyFailed, "image index capability was not issued by delivery")
 	}
 	index.mu.Lock()
 	defer index.mu.Unlock()
@@ -207,7 +215,7 @@ func (index *ImageIndex) WriteLayout(ctx context.Context, out string) error {
 	if index == nil || strings.TrimSpace(out) == "" {
 		return e.New(e.CodeUsage, "image index writing requires a capability and output path")
 	}
-	if index.operation == nil {
+	if index.imageIndexState == nil || index.operation == nil {
 		return e.New(e.CodeVerifyFailed, "image index capability was not issued by delivery")
 	}
 	select {
@@ -240,7 +248,7 @@ func (index *ImageIndex) usable() error {
 
 // Close joins active operations and releases the held closure. It is idempotent.
 func (index *ImageIndex) Close() error {
-	if index == nil {
+	if index == nil || index.imageIndexState == nil {
 		return nil
 	}
 	if index.operation != nil {

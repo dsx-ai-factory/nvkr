@@ -559,13 +559,13 @@ func TestImageIndexCanceledWriterDoesNotWaitForActiveCopy(t *testing.T) {
 	parent := t.TempDir()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	started := make(chan struct{})
+	waiting := make(chan struct{})
+	queued := &imageWaitContext{Context: ctx, waiting: waiting}
 	returned := make(chan error, 1)
 	go func() {
-		close(started)
-		returned <- index.WriteLayout(ctx, filepath.Join(parent, "index"))
+		returned <- index.WriteLayout(queued, filepath.Join(parent, "index"))
 	}()
-	<-started
+	<-waiting
 	cancel()
 	select {
 	case err := <-returned:
@@ -576,4 +576,16 @@ func TestImageIndexCanceledWriterDoesNotWaitForActiveCopy(t *testing.T) {
 	if entries := mustReadImageDirectory(t, parent); len(entries) != 0 {
 		t.Fatal("canceled waiter created output")
 	}
+}
+
+// Done is evaluated by WriteLayout only after its initial admission, at the operation gate.
+type imageWaitContext struct {
+	context.Context
+	waiting chan struct{}
+	once    sync.Once
+}
+
+func (ctx *imageWaitContext) Done() <-chan struct{} {
+	ctx.once.Do(func() { close(ctx.waiting) })
+	return ctx.Context.Done()
 }
