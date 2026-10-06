@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"sigs.k8s.io/yaml"
@@ -47,6 +48,7 @@ type githubStep struct {
 	ContinueOnError bool              `json:"continue-on-error,omitempty"`
 	If              string            `json:"if,omitempty"`
 	With            map[string]string `json:"with,omitempty"`
+	TimeoutMinutes  int               `json:"timeout-minutes,omitempty"`
 }
 
 // ValidateGitHubBundle performs local schema and semantic analysis only. It does not
@@ -549,8 +551,35 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		}
 	}
 	if stage.DiskOutput != "" {
-		if !hasExactGitHubRun(steps, githubRunnerCommand("run-disk", "output", stage.DiskOutput)) {
-			return e.New(e.CodeEngineCapability, "disk stage requires its grouped live executor")
+		executors, diagnostics := 0, 0
+		actions, err := resolveGitHubActions(plan.Actions)
+		if err != nil {
+			return err
+		}
+		var expected bytes.Buffer
+		writeGitHubPackerDiagnosticStep(&expected, stage, actions)
+		var diagnostic struct {
+			Steps []githubStep `json:"steps"`
+		}
+		if err := yaml.UnmarshalStrict([]byte("steps:\n"+expected.String()), &diagnostic); err != nil {
+			return e.Wrap(e.CodeInternal, err, "decode fixed Packer diagnostic transport")
+		}
+		for i, step := range steps {
+			if step.ID == "run-disk" {
+				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes {
+					return e.New(e.CodeEngineCapability, "disk stage requires its bounded unconditional live executor")
+				}
+				executors++
+			}
+			if step.Name == "Upload failed Packer diagnostics" {
+				if diagnostics != 0 || i == 0 || steps[i-1].ID != "run-disk" || !reflect.DeepEqual(step, diagnostic.Steps[0]) {
+					return e.New(e.CodeEngineCapability, "disk diagnostics require the exact failure-only sealed route transport")
+				}
+				diagnostics++
+			}
+		}
+		if executors != 1 || diagnostics != 1 {
+			return e.New(e.CodeEngineCapability, "disk stage requires one live executor and one failure diagnostic transport")
 		}
 		return nil
 	}

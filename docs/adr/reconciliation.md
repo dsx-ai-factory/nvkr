@@ -240,6 +240,12 @@ successful QCOW2. Unsafe archive entries and immutable-path violations still fai
 log directories are sealed before Run recording; partial extraction is rolled back. These failure contracts are
 unit-tested; the existing ARC success evidence does not exercise each diagnostic failure mode.
 
+The native ARC disk adapter contract now derives execution/job budgets from real producers, the selected VM
+class and the strict inspection join, leaving separate cleanup headroom. Failure-only diagnostic transport
+selects only one successfully sealed sink-issued route with bounded retention; early admission failures cannot
+select workspace content. Both-native generation and tampering tests cover this projection, not a fresh
+ephemeral-runner timeout or diagnostic-upload exercise.
+
 The generated helper's shared-cache rejection is contract-tested. The trusted selector disables
 shared Actions cache restoration and checks each selected Definition's Plan-derived source closure
 with main's reader; future schemas must land in main first. Run `37043068395` exercised these selector controls,

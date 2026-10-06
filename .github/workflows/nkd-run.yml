@@ -716,7 +716,7 @@ jobs:
   nkd-disk-nke-node-image-amd64:
     name: 'Build and package producer evidence for nke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1140
+    timeout-minutes: 1045
     needs: [build-runner-arc-amd64-kvm, nkd-nke-node-image-amd64-fetch-source-30-f0f0f1e48d9e, nkd-nke-node-image-amd64-fetch-source-3f-1d671fc59ece, nkd-nke-node-image-amd64-fetch-source-59-9a6e0c5686fc, nkd-nke-node-image-amd64-fetch-source-68-feb1288193d6, nkd-nke-node-image-amd64-fetch-source-a9-97b7ca05e592, nkd-nke-node-image-amd64-fetch-source-f9-f4e1a567d407]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nkd-arc'
@@ -750,8 +750,19 @@ jobs:
           NKD_TOOLCHAIN_READ_USER: '${{ github.actor }}'
         run: ./nkd-exec factory github prepare-images --plan .github/nkd-run/plan.json --stage nkd-disk-nke-node-image-amd64
       - name: 'Build and package producer evidence for nke-node-image-amd64'
-        run: |
-          ./nkd-exec factory github run-disk --plan .github/nkd-run/plan.json --output nke-node-image-amd64
+        id: run-disk
+        timeout-minutes: 1025
+        run: ./nkd-exec factory github run-disk --plan .github/nkd-run/plan.json --output nke-node-image-amd64
+      - name: Upload failed Packer diagnostics
+        if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
+        timeout-minutes: 5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: 'nkd-packer-diagnostics-nke-node-image-amd64'
+          path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
+          if-no-files-found: error
+          include-hidden-files: 'true'
+          retention-days: '1'
       - name: 'Prepare output carriers: Build nke-cni-calico (nke-node-image-amd64)'
         run: |
           ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node nke-node-image-amd64/build-nke-cni-calico
@@ -1237,7 +1248,7 @@ jobs:
   nkd-disk-nke-node-image-arm64:
     name: 'Build and package producer evidence for nke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1140
+    timeout-minutes: 1045
     needs: [build-runner-arc-arm64-kvm, nkd-nke-node-image-arm64-fetch-source-68-ec77913cc55d, nkd-nke-node-image-arm64-fetch-source-7d-6080999efb52, nkd-nke-node-image-arm64-fetch-source-7d-96615eb80dbe, nkd-nke-node-image-arm64-fetch-source-a9-759f7b8c2561, nkd-nke-node-image-arm64-fetch-source-c5-eb40a4b80bf4, nkd-nke-node-image-arm64-fetch-source-cc-3b90dd492df7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nkd-arc'
@@ -1271,8 +1282,19 @@ jobs:
           NKD_TOOLCHAIN_READ_USER: '${{ github.actor }}'
         run: ./nkd-exec factory github prepare-images --plan .github/nkd-run/plan.json --stage nkd-disk-nke-node-image-arm64
       - name: 'Build and package producer evidence for nke-node-image-arm64'
-        run: |
-          ./nkd-exec factory github run-disk --plan .github/nkd-run/plan.json --output nke-node-image-arm64
+        id: run-disk
+        timeout-minutes: 1025
+        run: ./nkd-exec factory github run-disk --plan .github/nkd-run/plan.json --output nke-node-image-arm64
+      - name: Upload failed Packer diagnostics
+        if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
+        timeout-minutes: 5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: 'nkd-packer-diagnostics-nke-node-image-arm64'
+          path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
+          if-no-files-found: error
+          include-hidden-files: 'true'
+          retention-days: '1'
       - name: 'Prepare output carriers: Build ovn-kube-ubuntu (nke-node-image-arm64)'
         run: |
           ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node nke-node-image-arm64/build-ovn-kube-ubuntu

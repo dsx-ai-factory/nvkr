@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
@@ -223,7 +224,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand("prepare-images", "stage", stage.ID))
 		}
 		if stage.DiskOutput != "" {
-			writeGitHubShellStep(&body, stage.Name, []string{githubRunnerCommand("run-disk", "output", stage.DiskOutput)})
+			fmt.Fprintf(&body, "      - name: %s\n        id: run-disk\n        timeout-minutes: %d\n        run: %s\n", yamlSingle(stage.Name), int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes, githubRunnerCommand("run-disk", "output", stage.DiskOutput))
+			writeGitHubPackerDiagnosticStep(&body, stage, actions)
 			for _, member := range stage.Nodes {
 				writeGitHubOutputSteps(&body, plan, member, artifacts, actions)
 			}
@@ -278,6 +280,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 	}
 	return bundle, nil
+}
+
+func writeGitHubPackerDiagnosticStep(out *bytes.Buffer, stage githubStage, actions githubActionRefs) {
+	fmt.Fprintf(out, "      - name: Upload failed Packer diagnostics\n        if: %s\n        timeout-minutes: %d\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n          include-hidden-files: 'true'\n          retention-days: '1'\n", yamlSingle("${{ failure() && steps.run-disk.outputs.packer_diagnostics != '' }}"), githubDiskDiagnosticUploadMinutes, actions.Upload, yamlSingle("nkd-packer-diagnostics-"+stage.DiskOutput), yamlSingle("${{ steps.run-disk.outputs.packer_diagnostics }}"))
 }
 
 // signFamilyNode reports whether a node kind belongs to the signing family: the
