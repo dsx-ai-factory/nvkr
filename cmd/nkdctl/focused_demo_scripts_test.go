@@ -76,6 +76,57 @@ func TestReleaseConsumerRejectsUnsafeInputsBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestReleaseConsumerForwardsExactInputs(t *testing.T) {
+	script := demoScript(t, "demo-release-consumer.sh")
+	temp := t.TempDir()
+	captured := filepath.Join(temp, "args")
+	recorder := filepath.Join(temp, "nkdctl")
+	if err := os.WriteFile(recorder, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	work := filepath.Join(".nkd", "release-input-"+filepath.Base(temp))
+	workPath := filepath.Join(filepath.Dir(filepath.Dir(script)), work)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(workPath); err != nil {
+			t.Errorf("remove test workspace: %v", err)
+		}
+	})
+
+	digest := "sha256:" + strings.Repeat("a", 64)
+	definition := "selected-definition.yaml"
+	environment := "selected-environment.yaml"
+	plan := "selected-plan.json"
+	cmd := exec.Command("bash", script,
+		"--reference", "registry.test/release@"+digest,
+		"--identity", "identity",
+		"--issuer", "issuer",
+		"--cosign", "/bin/true",
+		"--cosign-digest", digest,
+		"--definition", definition,
+		"--environment", environment,
+		"--plan", plan,
+		"--work", work,
+	)
+	cmd.Env = append(os.Environ(), "NKDCTL_BIN="+recorder, "CAPTURE_ARGS="+captured)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("consumer failed: %v\n%s", err, output)
+	}
+
+	raw, err := os.ReadFile(captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Join([]string{
+		"--definition", definition,
+		"--environment", environment,
+		"--plan", plan,
+	}, "\n") + "\n"
+	if !strings.Contains(string(raw), want) {
+		t.Fatalf("consumer did not forward the selected exact inputs:\n%s", raw)
+	}
+}
+
 func TestDemoWorkspaceCanBeRerunOnlyByItsOwner(t *testing.T) {
 	common, err := filepath.Abs(filepath.Join("..", "..", "scripts", "_demo-common.sh"))
 	if err != nil {
