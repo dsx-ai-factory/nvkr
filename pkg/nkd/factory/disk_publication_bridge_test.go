@@ -120,6 +120,11 @@ func TestDiskPublicationSelectsFrozenExecutionHostProfile(t *testing.T) {
 			if err := validateReconciledDiskDocument(plan, expected.Name, component, pin, bom); err != nil {
 				t.Fatalf("native host evidence rejected: %v", err)
 			}
+			for _, kind := range []string{"application", "library", "container", "file"} {
+				changed := *bom
+				changed.Metadata.Component.Type = kind
+				assertFactoryErrorCode(t, validateReconciledDiskDocument(plan, expected.Name, component, pin, &changed), e.CodeVerifyFailed)
+			}
 			for _, field := range []string{"version", "purl"} {
 				changed := *bom
 				switch field {

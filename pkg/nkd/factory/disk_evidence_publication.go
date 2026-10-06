@@ -104,6 +104,9 @@ func validateReconciledDiskDocument(plan *Plan, output, component, subject strin
 		if err != nil {
 			return err
 		}
+		// Independently pin the expected root type instead of copying the
+		// document's type into both sides of the source-subject comparison.
+		source.Metadata.Component.Type = "operating-system"
 	}
 	actual := bom.Metadata.Component
 	actual.BOMRef = source.Metadata.Component.BOMRef
