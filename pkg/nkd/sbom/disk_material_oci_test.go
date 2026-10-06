@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -120,10 +121,16 @@ func TestNestedOCIUsesCompleteClosureAndAllPlatforms(t *testing.T) {
 				architectures []string
 				change        func(string)
 				code          e.Code
+				message       string
 			}{
-				{"two images reach scanner", []string{architecture, architecture}, nil, e.CodeUnverifiedRef},
-				{"other platform not dropped", []string{architecture, "unsupported"}, nil, e.CodeVerifyFailed},
-				{"empty layout fails before scanner", nil, nil, e.CodeVerifyFailed},
+				{"two images reach scanner", []string{architecture, architecture}, nil, e.CodeUnverifiedRef, ""},
+				{"other platform not dropped", []string{architecture, "unsupported"}, nil, e.CodeVerifyFailed, ""},
+				{"empty layout malformed blob directory", nil, nil, e.CodeVerifyFailed, "unexpected directory set"},
+				{"well-formed empty layout has no image", nil, func(root string) {
+					if err := os.MkdirAll(filepath.Join(root, "blobs", "sha256"), 0o755); err != nil {
+						t.Fatal(err)
+					}
+				}, e.CodeEngineCapability, "no inspectable image"},
 				{"multiple roots without index media type", []string{architecture, architecture}, func(root string) {
 					raw, err := os.ReadFile(filepath.Join(root, "index.json"))
 					if err != nil {
@@ -141,23 +148,55 @@ func TestNestedOCIUsesCompleteClosureAndAllPlatforms(t *testing.T) {
 					if err := os.WriteFile(filepath.Join(root, "index.json"), raw, 0o644); err != nil {
 						t.Fatal(err)
 					}
-				}, e.CodeVerifyFailed},
+				}, e.CodeVerifyFailed, ""},
 				{"unreferenced blob rejected", []string{architecture}, func(root string) {
 					raw := []byte("unreferenced")
 					if err := os.WriteFile(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(rawDigest(raw), "sha256:")), raw, 0o644); err != nil {
 						t.Fatal(err)
 					}
-				}, e.CodeVerifyFailed},
+				}, e.CodeVerifyFailed, ""},
 			} {
 				t.Run(architecture+"/"+strconv.FormatBool(compressed)+"/"+test.name, func(t *testing.T) {
 					inspection, err := inspectCompressedImages(t.Context(), nestedOCIFixture(t, test.architectures, compressed, test.change), "linux/"+architecture, Scanner{Path: "/missing/selected-syft", Digest: "sha256:" + strings.Repeat("f", 64)}, 1<<20, 0)
 					assertDependencyCode(t, err, test.code)
+					if test.message != "" && !strings.Contains(err.Error(), test.message) {
+						t.Fatalf("wrong rejection boundary: %v", err)
+					}
 					if inspection != nil {
 						t.Fatal("rejected OCI returned partial inventory")
 					}
 				})
 			}
 		}
+	}
+}
+
+func TestNestedOCIValidationErrorPreservesTimeout(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		canceled bool
+		inner    error
+		code     e.Code
+	}{
+		{"canceled context", true, errors.New("controlled transport failure"), e.CodeTimeout},
+		{"inner coded timeout", false, e.New(e.CodeTimeout, "controlled inner timeout"), e.CodeTimeout},
+		{"ordinary validation error", false, errors.New("controlled transport failure"), e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if test.canceled {
+				cancel()
+			}
+			err := nestedOCIValidationError(ctx, test.inner, "controlled OCI validation")
+			assertDependencyCode(t, err, test.code)
+			if test.canceled && !errors.Is(err, context.Canceled) {
+				t.Fatalf("lost actual cancellation cause: %v", err)
+			}
+			if !test.canceled && test.code == e.CodeTimeout && err != test.inner {
+				t.Fatalf("coded inner timeout was rewritten: %v", err)
+			}
+		})
 	}
 }
 

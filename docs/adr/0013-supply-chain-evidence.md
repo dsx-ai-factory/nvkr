@@ -192,10 +192,13 @@ The maintained NKE preparation at `b30117c25b2dcdf6c16021dae88a2eafdafcae61` use
 Docker-archive pulls followed by GNU-tar/gzip repacking, not modern Docker-save mixed layouts. This
 source inspection does not establish that retained prepared archive bytes were fully scanned. One operation shares its
 filesystem-byte expansion allowance across sibling archives and Debian exports, with 16,384 recursive
-members, 256 unique OCI images (Docker manifest entries remain bounded separately) and bounded nesting.
+members, a shared 256-image allowance and bounded nesting. Each selected Docker manifest entry charges
+that image allowance before digest deduplication; each unique OCI image digest charges it within its layout.
 Decoded root image markers select that inspection before member/expansion charging; ordinary gzip/tar,
 including empty or corrupt filename candidates without such a marker, retains only its outer file hash.
-Repeated OCI image digests are scanned once, but every descriptor/platform is checked; the pinned layout
+The marker probe streams under the operation deadline, without charging the image expansion/member
+allowance or imposing a separate probe byte limit. Repeated OCI image digests are scanned once per layout,
+not across material carriers, but every descriptor/platform is checked; the pinned layout
 accessor still reparses its bounded index for each unique image/child lookup. Ordinary tar contents retain their outer file hash;
 other compressed formats have no nested-image discovery. These adapters are contract-tested with
 controlled archives; complete native Syft discovery remains unexercised. The root file inventory
@@ -205,8 +208,8 @@ invented installed paths. Their discovered components carry descriptive `nkd:con
 binding the immediate held carrier path and digest. Repeated public package identities retain a
 sorted canonical string list of those carriers; no recursive ancestry, installed origin or package
 ownership is inferred. A contained payload's file inventory is not an independent root-file inventory.
-When public package refs combine contained and uncontained observations, `nkd:observedAtSubjectRoot`
-retains the latter explicitly; it is not an installed-origin claim. `nkd:materialSubjects` matches only
+Every uncontained non-file component carries `nkd:observedAtSubjectRoot`, including when its public
+package ref also has contained observations; it is not an installed-origin claim. `nkd:materialSubjects` matches only
 top-level regular-file hashes in each material observation. Nested Debian/SquashFS/image file digests
 do not currently participate in that file correspondence, and absence of the property is not non-correspondence proof.
 

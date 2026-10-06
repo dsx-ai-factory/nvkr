@@ -101,12 +101,18 @@ func TestDiskEvidenceQueueAndAdmissionConsumeOriginalClock(t *testing.T) {
 		want    e.Code
 	}{
 		{"queue past ten minute bound", 11 * time.Minute, true, e.CodeTimeout},
-		{"admission past ten minute bound", 11 * time.Minute, false, e.CodeTimeout},
+		{"admission past ten minute bound", 10*time.Minute - time.Second, false, e.CodeTimeout},
 		{"queue time consumes selected scan allowance", 9 * time.Minute, false, e.CodeEnvelopeDecode},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan, owner := diskMaterialTraceFixtureWithCapture(t, false, false, "linux/amd64", "none", "acquisitions.tar")
+			caller := t.Context()
 			if test.queued {
+				// If the queue deadline regresses, the caller watchdog releases
+				// the blocked operation promptly and the assertion below fails.
+				var cancel context.CancelFunc
+				caller, cancel = context.WithTimeout(caller, time.Second)
+				defer cancel()
 				release, err := owner.acquireDiskPermit(t.Context())
 				if err != nil {
 					t.Fatal(err)
@@ -115,14 +121,15 @@ func TestDiskEvidenceQueueAndAdmissionConsumeOriginalClock(t *testing.T) {
 			}
 			started := time.Now().Add(-test.elapsed)
 			bindingsCalled, scanned := false, false
-			receipt, err := owner.reconcileDiskEvidenceStarted(t.Context(), plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{},
+			receipt, err := owner.reconcileDiskEvidenceStarted(caller, plan, plan.LifecycleOutputs[0], &sbom.DiskInspectionRuntime{},
 				func(ctx context.Context) (definition.DiskInspectionProfile, error) {
 					bindingsCalled = true
 					deadline, ok := ctx.Deadline()
 					if !ok || !deadline.Equal(started.Add(10*time.Minute)) {
 						t.Fatalf("admission escaped original ten minute bound: %v", deadline)
 					}
-					if ctx.Err() != nil {
+					if test.want == e.CodeTimeout {
+						<-ctx.Done()
 						return definition.DiskInspectionProfile{}, e.Wrap(e.CodeTimeout, ctx.Err(), "controlled expired admission")
 					}
 					return definition.DiskInspectionProfile{TimeoutSeconds: 600}, nil
@@ -135,9 +142,21 @@ func TestDiskEvidenceQueueAndAdmissionConsumeOriginalClock(t *testing.T) {
 					}
 					return diskEvidenceScan{}, e.New(e.CodeEnvelopeDecode, "controlled stopped scan")
 				}, started)
+			if test.queued && caller.Err() != nil {
+				t.Fatalf("queue exceeded short watchdog instead of its original deadline: %v", err)
+			}
 			assertFactoryErrorCode(t, err, test.want)
-			if receipt != nil || test.queued && bindingsCalled || scanned != (test.want == e.CodeEnvelopeDecode) {
+			if receipt != nil || bindingsCalled == test.queued || scanned != (test.want == e.CodeEnvelopeDecode) {
 				t.Fatalf("expired operation performed work: bindings=%v scanned=%v", bindingsCalled, scanned)
+			}
+			if test.want == e.CodeTimeout {
+				message := "controlled expired admission"
+				if test.queued {
+					message = "waiting to observe disk lifecycle payload"
+				}
+				if !strings.Contains(err.Error(), message) {
+					t.Fatalf("wrong timeout owner: %v", err)
+				}
 			}
 		})
 	}

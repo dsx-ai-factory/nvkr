@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -172,6 +173,146 @@ func TestImageArchiveProbeCancellationDuringOrdinaryExpansion(t *testing.T) {
 	assertDependencyCode(t, err, e.CodeTimeout)
 	if indicated {
 		t.Fatal("canceled format probe selected an image")
+	}
+}
+
+// Only one underlying read is released after cancellation. The next read waits
+// for cleanup, rather than manufacturing EOF or independently observing ctx.
+// This tests cancellation between reads, not interruption of an arbitrary Read.
+type gatedArchiveProbeReader struct {
+	started   chan struct{}
+	resume    chan struct{}
+	readAgain chan struct{}
+	stop      chan struct{}
+	reads     int
+}
+
+func (reader *gatedArchiveProbeReader) Read(raw []byte) (int, error) {
+	reader.reads++
+	if reader.reads == 1 {
+		close(reader.started)
+		<-reader.resume
+		// Leave both the large tar payload and gzip extra field incomplete.
+		n := min(len(raw), 512)
+		clear(raw[:n])
+		return n, nil
+	}
+	close(reader.readAgain)
+	<-reader.stop
+	return 0, io.EOF
+}
+
+func archiveProbeHeaderPrefix(t *testing.T, name string, compressed bool) []byte {
+	t.Helper()
+	var raw bytes.Buffer
+	archive := tar.NewWriter(&raw)
+	if err := archive.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Size: 1 << 40}); err != nil {
+		t.Fatal(err)
+	}
+	// Deliberately omit payload and EOF: the probe must select a root marker
+	// from the standard-library header without materializing its huge payload.
+	if !compressed {
+		return raw.Bytes()
+	}
+	var encoded bytes.Buffer
+	writer := gzip.NewWriter(&encoded)
+	if _, err := writer.Write(raw.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	prefix := bytes.Clone(encoded.Bytes())
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return prefix
+}
+
+func TestImageArchiveProbeCancellationBeforeEOF(t *testing.T) {
+	var encoded bytes.Buffer
+	writer := gzip.NewWriter(&encoded)
+	writer.Extra = make([]byte, 65535)
+	if _, err := writer.Write([]byte("ordinary")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name   string
+		prefix []byte
+	}{
+		{"ordinary tar payload", archiveProbeHeaderPrefix(t, "ordinary", false)},
+		// Keep the gzip fixed header and extra-field length; its extra field
+		// is supplied incrementally by the gated source, before tar decoding.
+		{"gzip extra header", bytes.Clone(encoded.Bytes()[:12])},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			reader := &gatedArchiveProbeReader{
+				started: make(chan struct{}), resume: make(chan struct{}),
+				readAgain: make(chan struct{}), stop: make(chan struct{}),
+			}
+			resume := sync.OnceFunc(func() { close(reader.resume) })
+			stop := sync.OnceFunc(func() { close(reader.stop) })
+			finished := make(chan struct{})
+			result := make(chan error, 1)
+			t.Cleanup(func() {
+				cancel()
+				resume()
+				stop()
+				select {
+				case <-finished:
+				case <-time.After(5 * time.Second):
+					t.Error("format probe did not join after releasing its source")
+				}
+			})
+			go func() {
+				defer close(finished)
+				indicated, err := probeImageArchive(ctx, io.MultiReader(bytes.NewReader(test.prefix), reader))
+				if indicated {
+					result <- e.New(e.CodeVerifyFailed, "canceled ordinary stream selected an image")
+					return
+				}
+				result <- err
+			}()
+			select {
+			case <-reader.started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("probe did not reach the gated source")
+			}
+			cancel()
+			resume()
+			select {
+			case err := <-result:
+				assertDependencyCode(t, err, e.CodeTimeout)
+			case <-reader.readAgain:
+				t.Fatal("canceled probe demanded more bytes instead of returning before EOF")
+			case <-time.After(5 * time.Second):
+				t.Fatal("canceled probe did not return")
+			}
+		})
+	}
+}
+
+type unreadArchiveProbePayload struct{ reads int }
+
+func (reader *unreadArchiveProbePayload) Read([]byte) (int, error) {
+	reader.reads++
+	return 0, io.ErrUnexpectedEOF
+}
+
+func TestImageArchiveProbeSelectsHeaderWithoutMaterializingPayload(t *testing.T) {
+	for _, compressed := range []bool{false, true} {
+		t.Run(strconv.FormatBool(compressed), func(t *testing.T) {
+			payload := &unreadArchiveProbePayload{}
+			prefix := archiveProbeHeaderPrefix(t, "manifest.json", compressed)
+			indicated, err := probeImageArchive(t.Context(), io.MultiReader(bytes.NewReader(prefix), payload))
+			if err != nil || !indicated || payload.reads != 0 {
+				t.Fatalf("probe materialized a 1-TiB advertised payload: image=%v error=%v payload reads=%d", indicated, err, payload.reads)
+			}
+		})
 	}
 }
 
