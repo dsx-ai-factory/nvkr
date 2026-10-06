@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -37,7 +38,7 @@ func executeGitHubSourceFetch(ctx context.Context, plan *Plan, nodeID string, st
 }
 
 func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environment []string, stdout, stderr io.Writer,
-	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) error {
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) (returnErr error) {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "source fetch requires a context")
 	}
@@ -76,6 +77,11 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	if err != nil {
 		return err
 	}
+	workspace, err := pipeline.HoldSourceWorkspace(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { returnErr = errors.Join(returnErr, workspace.Close()) }()
 	for _, output := range node.Outputs {
 		if err := admitSourceFetchPath(ctx, artifacts[output].Path, artifacts[output].Kind == "source-closure"); err != nil {
 			return err
@@ -87,11 +93,6 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	if stderr == nil {
 		stderr = io.Discard
 	}
-	workspace, _, err := securepath.OpenDirectory(".")
-	if err != nil {
-		return e.Wrap(e.CodeFetchFailed, err, "holding source fetch workspace")
-	}
-	defer func() { _ = workspace.Close() }()
 	return executeProducer(ctx, plan, node, plan.Environment.RuntimeBinary(), 1, stdout, stderr,
 		func(instruction ir.Node, options pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
 			options.SourceWorkspace = workspace

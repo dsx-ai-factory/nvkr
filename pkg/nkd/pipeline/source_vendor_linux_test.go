@@ -84,9 +84,10 @@ func TestSourceVendorHeldTransportAndReceipt(t *testing.T) {
 			r.result = vendorResultFixture(t, kind)
 			vendor := &sourceVendor{runtime: r, image: "sha256:" + strings.Repeat("b", 64), platform: platform,
 				network: ir.NetworkDefault, command: append([]string(nil), node.VendorCmd...)}
-			if kind == "source mutation" {
+			switch kind {
+			case "source mutation":
 				r.beforeStart = func() error { return os.WriteFile(filepath.Join(dir, "input"), []byte("concurrent mutation"), 0o644) }
-			} else if kind == "cancellation" {
+			case "cancellation":
 				r.beforeStart = func() error { cancel(); return ctx.Err() }
 			}
 			gitBefore, err := os.ReadFile(filepath.Join(dir, ".git", "HEAD"))
@@ -204,7 +205,7 @@ func TestSourceFetchGitDirectoryReplacementUsesOriginalDescriptor(t *testing.T) 
 	}
 	_, repository, _ := pristineClosureFixture(t)
 	t.Chdir(repository)
-	workspace, _, err := securepath.OpenDirectory(".")
+	workspace, err := HoldSourceWorkspace(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,5 +270,51 @@ func TestSourceFetchHeldGitDisablesRepositoryHookCredentialAccess(t *testing.T) 
 	}
 	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("repository hook ran in selected credential environment: %v", err)
+	}
+}
+
+func TestSourceFetchProductionOwnerRejectsMidFetchParentSubstitution(t *testing.T) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, repository, _ := pristineClosureFixture(t)
+	node.Repo = repository
+	t.Chdir(t.TempDir())
+	workspace, err := HoldSourceWorkspace(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer workspace.Close()
+	outside, commands := t.TempDir(), t.TempDir()
+	original, foreign := filepath.Join(outside, "original"), filepath.Join(outside, "foreign")
+	if err := os.Mkdir(foreign, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(commands, "swapped")
+	// Only the first command swaps the public parent, then every command uses
+	// actual Git with the production owner's retained checkout and metadata FDs.
+	script := fmt.Sprintf("#!/bin/sh\nset -eu\nif test ! -e %q; then\n/bin/mv .nkd %q\n/bin/ln -s %q .nkd\nprintf done > %q\nfi\nexec %q \"$@\"\n", marker, original, foreign, marker, git)
+	if err := os.WriteFile(filepath.Join(commands, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", commands+string(os.PathListSeparator)+os.Getenv("PATH"))
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	opts := withDefaults(RunOptions{Ctx: ctx, SourceRoot: ".nkd/src", SourceWorkspace: workspace,
+		Stdout: io.Discard, Stderr: io.Discard})
+	if err := (Local{}).fetch(node, opts); code(err) != e.CodeFetchFailed {
+		t.Fatalf("substituted production output parent succeeded: %v", err)
+	}
+	entries, err := os.ReadDir(foreign)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("real Git wrote through substituted parent: %v, %v", entries, err)
+	}
+	if _, err := os.Stat(filepath.Join(original, "src", node.Dest, "input")); err != nil {
+		t.Fatalf("real Git did not finish against the original held checkout: %v", err)
+	}
+	receipt, _ := sourceReceiptPath(filepath.Join(original, "src"), node.Dest)
+	if _, err := os.Stat(receipt); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("changed source parent issued a receipt: %v", err)
 	}
 }

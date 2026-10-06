@@ -32,9 +32,10 @@ type RunOptions struct {
 	reap       *reaper // cleanup registry (set by Run; force-removes started containers on cancel)
 	SourceRoot string  // where fetch nodes check out sources (default .nkd/work/src)
 	// SourceWorkspace grants descriptor-relative access for a source-only fetch.
-	// The caller retains ownership through ExecNode; no build authority is issued.
+	// HoldSourceWorkspace issues the handle; Close cancels and joins its fetches.
+	// It confers no build authority and exposes no directory descriptor.
 	// SourceRoot must be relative to this directory. Held Git execution is Linux-only.
-	SourceWorkspace *os.File
+	SourceWorkspace *SourceWorkspace
 	// SourceGitEnvironment describes the factory-admitted source-only child
 	// environment. It is used only with SourceWorkspace; nil selects the fixed
 	// public-source baseline, never the ambient process environment.
@@ -62,6 +63,7 @@ type RunOptions struct {
 	fetchDirectory        *os.File
 	fetchGitDirectory     *os.File
 	fetchReceiptDirectory *os.File
+	fetchWorkspace        *os.File
 	// BuildMaterials is a process-local capability over the exact manifest and
 	// producer bytes selected by the factory Plan. It is required for a build node
 	// with material bindings and rejected by every other node.

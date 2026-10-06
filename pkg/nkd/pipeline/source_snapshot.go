@@ -178,6 +178,9 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	if err != nil {
 		return err
 	}
+	if err := recheckSourceFetchDirectories(n, opts); err != nil {
+		return err
+	}
 	receipt, exists, err := readSourceReceiptContext(opts.ctx(), receiptPath, opts.fetchReceiptDirectory)
 	if err != nil {
 		return err
@@ -193,7 +196,7 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 		if got != receipt.ClosureDigest {
 			return e.New(e.CodeFetchFailed, "source closure drift for %q: got %s want %s", n.Dest, got, receipt.ClosureDigest)
 		}
-		return nil
+		return recheckSourceFetchDirectories(n, opts)
 	}
 
 	// A missing receipt is accepted only for a pristine checkout. Include ignored
@@ -220,6 +223,9 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	closure, err := sourceTreeDigestContext(opts.ctx(), dir)
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "hashing fetched source %s", n.Dest)
+	}
+	if err := recheckSourceFetchDirectories(n, opts); err != nil {
+		return err
 	}
 	return writeSourceReceiptContext(opts.ctx(), receiptPath, sourceReceipt{
 		Schema: sourceReceiptSchema, Commit: n.Commit, TreeHash: n.TreeHash,

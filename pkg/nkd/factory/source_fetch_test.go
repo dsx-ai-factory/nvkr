@@ -30,6 +30,9 @@ func sourceFetchTestEnvironment(plan *Plan, node Node) []string {
 }
 
 func TestSourceFetchDelegatesDependencyVendoringToHeldSourceOwner(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("issued held source workspace requires Linux")
+	}
 	original := githubTestPlan(t)
 	base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
 	if err != nil {
@@ -88,7 +91,11 @@ func TestSourceFetchRejectsSymlinkDestinationBeforeWork(t *testing.T) {
 	called := false
 	err := executeSourceFetch(t.Context(), plan, node.ID, sourceFetchTestEnvironment(plan, node), nil, nil,
 		func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) { called = true; return nil, nil })
-	if called || factoryErrorCode(err) != e.CodeFetchFailed {
+	want := e.CodeFetchFailed
+	if runtime.GOOS != "linux" {
+		want = e.CodeEngineCapability
+	}
+	if called || factoryErrorCode(err) != want {
 		t.Fatalf("unsafe destination delegated=%t error=%v", called, err)
 	}
 	entries, err := os.ReadDir(outside)
@@ -171,7 +178,7 @@ func TestSourceFetchRejectsPathSubstitutionAtRealFetchOwner(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		want = e.CodeEngineCapability
 	}
-	if !called || factoryErrorCode(err) != want {
+	if called != (runtime.GOOS == "linux") || factoryErrorCode(err) != want {
 		t.Fatalf("real fetch boundary called=%t error=%v", called, err)
 	}
 	entries, err := os.ReadDir(outside)
@@ -251,6 +258,9 @@ exit 1
 }
 
 func TestSourceFetchDelegatesOnlyExactSelectedInstruction(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("issued held source workspace requires Linux")
+	}
 	plan, node, source := authenticatedSourcePlan(t)
 	t.Chdir(t.TempDir())
 	_, artifacts := planIndex(plan)
@@ -295,29 +305,24 @@ func TestSourceFetchChildEnvironmentContainsOnlySelectedSourceConfiguration(t *t
 			}
 			environment := append(sourceFetchTestEnvironment(plan, node), "HOME=/ambient-secret-home", "XDG_CONFIG_HOME=/ambient-config", "SSH_AUTH_SOCK=/ambient-agent", "UNSELECTED_SECRET=synthetic-secret", "GITHUB_RUN_ID=123")
 			t.Chdir(t.TempDir())
-			called := false
-			err := executeSourceFetch(t.Context(), plan, node.ID, environment, nil, nil,
-				func(_ ir.Node, options pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
-					called = true
-					allowed := githubSourceEnvironment(plan, node)
-					if !private {
-						allowed = map[string]string{"GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "credential.helper", "GIT_CONFIG_VALUE_0": ""}
-					}
-					allowed["PATH"], allowed["LC_ALL"] = os.Getenv("PATH"), "C"
-					if private {
-						allowed[sourceTokenEnv] = "test-only-synthetic-token"
-					}
-					var want []string
-					for _, key := range sortedKeys(allowed) {
-						want = append(want, key+"="+allowed[key])
-					}
-					if !slices.Equal(options.SourceGitEnvironment, want) {
-						t.Fatal("source child environment differs from exact selected allowlist")
-					}
-					return nil, nil
-				})
-			if err != nil || !called {
-				t.Fatalf("selected source delegation called=%t error=%v", called, err)
+			got, err := admitSourceFetchEnvironment(plan, node, environment)
+			if err != nil {
+				t.Fatal(err)
+			}
+			allowed := githubSourceEnvironment(plan, node)
+			if !private {
+				allowed = map[string]string{"GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "credential.helper", "GIT_CONFIG_VALUE_0": ""}
+			}
+			allowed["PATH"], allowed["LC_ALL"] = os.Getenv("PATH"), "C"
+			if private {
+				allowed[sourceTokenEnv] = "test-only-synthetic-token"
+			}
+			var want []string
+			for _, key := range sortedKeys(allowed) {
+				want = append(want, key+"="+allowed[key])
+			}
+			if !slices.Equal(got, want) {
+				t.Fatal("source child environment differs from exact selected allowlist")
 			}
 		})
 	}
@@ -381,8 +386,11 @@ func TestSourceFetchDoesNotOpenRequirementBearingGitHubPlan(t *testing.T) {
 			}
 			return nil, nil
 		})
-	if err != nil || !called {
+	if runtime.GOOS == "linux" && (err != nil || !called) {
 		t.Fatalf("selected source-only delegation called=%t error=%v", called, err)
+	}
+	if runtime.GOOS != "linux" && (called || factoryErrorCode(err) != e.CodeEngineCapability) {
+		t.Fatalf("unsupported hosted workspace delegated=%t error=%v", called, err)
 	}
 	var logs bytes.Buffer
 	err = executeGitHubSourceFetch(t.Context(), plan, node.ID, &logs, &logs)
@@ -514,6 +522,9 @@ func TestSourceFetchPreCanceledContextAndArtifactResultFailClosed(t *testing.T) 
 	err := executeSourceFetch(ctx, plan, node.ID, env, nil, nil, func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) { called = true; return nil, nil })
 	if called || factoryErrorCode(err) != e.CodeTimeout {
 		t.Fatalf("canceled delegated=%t error=%v", called, err)
+	}
+	if runtime.GOOS != "linux" {
+		return // Positive executor delegation requires an issued Linux workspace.
 	}
 	err = executeSourceFetch(t.Context(), plan, node.ID, env, nil, nil, func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
 		return &pipeline.ArtifactResult{}, nil

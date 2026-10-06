@@ -10,6 +10,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // Source checkout and Git writes stay beneath opened directory capabilities.
@@ -133,6 +134,64 @@ func recheckSourceFetchGitDirectory(opts RunOptions) error {
 	held, err := opts.fetchGitDirectory.Stat()
 	if err != nil || !os.SameFile(info, held) {
 		return e.Wrap(e.CodeFetchFailed, err, "source Git directory changed after admission")
+	}
+	return nil
+}
+
+// Authenticate the selected logical outputs against the original directories,
+// without creating components or following replacement ancestor links.
+func recheckSourceFetchDirectories(node ir.Node, opts RunOptions) error {
+	if opts.fetchWorkspace == nil {
+		return nil // Ordinary Local and package-private IO fixtures own other paths.
+	}
+	receipt, err := sourceReceiptPath(opts.SourceRoot, node.Dest)
+	if err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "locating held source receipt")
+	}
+	for _, selected := range []struct {
+		path string
+		file *os.File
+	}{
+		{filepath.Join(opts.SourceRoot, node.Dest), opts.fetchDirectory},
+		{filepath.Dir(receipt), opts.fetchReceiptDirectory},
+	} {
+		if err := recheckSourceFetchDirectory(opts.ctx(), opts.fetchWorkspace, selected.path, selected.file); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func recheckSourceFetchDirectory(ctx context.Context, workspace *os.File, relative string, held *os.File) error {
+	if held == nil || !securepath.WorkspaceRelative(relative) || filepath.Clean(relative) != relative {
+		return e.New(e.CodeFetchFailed, "source fetch output lost its held directory binding")
+	}
+	current, owned := workspace, false
+	defer func() {
+		if owned {
+			_ = current.Close()
+		}
+	}()
+	for _, component := range strings.Split(filepath.ToSlash(relative), "/") {
+		if err := ctx.Err(); err != nil {
+			return e.Wrap(e.CodeTimeout, err, "source directory recheck canceled")
+		}
+		child, _, err := securepath.OpenChild(current, component, true)
+		if err != nil {
+			return e.Wrap(e.CodeFetchFailed, err, "source fetch directory changed during execution")
+		}
+		if owned {
+			_ = current.Close()
+		}
+		current, owned = child, true
+	}
+	actual, err := current.Stat()
+	if err != nil {
+		return e.Wrap(e.CodeFetchFailed, err, "rechecking source fetch directory")
+	}
+	original, err := held.Stat()
+	if err != nil || !os.SameFile(actual, original) {
+		return e.Wrap(e.CodeFetchFailed, err, "source fetch directory no longer matches its original owner")
 	}
 	return nil
 }

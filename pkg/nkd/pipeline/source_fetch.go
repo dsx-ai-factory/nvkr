@@ -20,9 +20,12 @@ import (
 func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
 	var vendor *sourceVendor
 	if opts.SourceWorkspace != nil {
-		if _, err := sourceFetchDescriptorPath(3); err != nil {
+		ctx, workspace, release, err := opts.SourceWorkspace.borrow(opts.ctx())
+		if err != nil {
 			return err
 		}
+		defer release()
+		opts.Ctx, opts.fetchWorkspace = ctx, workspace
 		if len(n.VendorCmd) != 0 && !opts.DryRun {
 			var err error
 			vendor, err = admitSourceVendor(opts.ctx(), n, opts.Runtime)
@@ -47,7 +50,7 @@ func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
 		return nil
 	}
 	if opts.SourceWorkspace != nil {
-		checkout, err := holdSourceFetchWorkspaceDirectory(opts.ctx(), opts.SourceWorkspace, filepath.Join(opts.SourceRoot, n.Dest))
+		checkout, err := holdSourceFetchWorkspaceDirectory(opts.ctx(), opts.fetchWorkspace, filepath.Join(opts.SourceRoot, n.Dest))
 		if err != nil {
 			return err
 		}
@@ -57,7 +60,7 @@ func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
 		if err != nil {
 			return err
 		}
-		receipts, err := holdSourceFetchWorkspaceDirectory(opts.ctx(), opts.SourceWorkspace, filepath.Dir(receiptPath))
+		receipts, err := holdSourceFetchWorkspaceDirectory(opts.ctx(), opts.fetchWorkspace, filepath.Dir(receiptPath))
 		if err != nil {
 			return err
 		}
@@ -131,7 +134,7 @@ func (l Local) completeFetch(n ir.Node, dir string, opts RunOptions, vendor *sou
 		return l.vendor(n, dir, opts)
 	}
 	return ensureSourceClosure(n, dir, opts, func() error {
-		return vendor.run(opts.ctx(), opts.SourceWorkspace, opts.fetchDirectory, opts.Stdout, opts.Stderr)
+		return vendor.run(opts.ctx(), opts.fetchWorkspace, opts.fetchDirectory, opts.Stdout, opts.Stderr)
 	})
 }
 

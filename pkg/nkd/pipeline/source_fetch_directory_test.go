@@ -109,17 +109,9 @@ func TestSourceFetchHeldWorkspacePlatformAdmissionBeforeWork(t *testing.T) {
 	if runtime.GOOS == "linux" {
 		t.Skip("unsupported-platform admission is exercised on other hosts")
 	}
-	_, repository, _ := pristineClosureFixture(t)
 	t.Chdir(t.TempDir())
-	workspace, _, err := securepath.OpenDirectory(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer workspace.Close()
-	err = (Local{}).fetch(ir.Node{Dest: "source", Repo: repository}, RunOptions{
-		Ctx: t.Context(), SourceRoot: "src", SourceWorkspace: workspace,
-	})
-	if code(err) != e.CodeEngineCapability {
+	workspace, err := HoldSourceWorkspace(t.Context())
+	if workspace != nil || code(err) != e.CodeEngineCapability {
 		t.Fatalf("unsupported held Git route: %v", err)
 	}
 	entries, err := os.ReadDir(".")
@@ -135,7 +127,7 @@ func TestSourceFetchHeldWorkspaceRealLocalGit(t *testing.T) {
 	node, repository, _ := pristineClosureFixture(t)
 	node.Repo = repository
 	t.Chdir(t.TempDir())
-	workspace, _, err := securepath.OpenDirectory(".")
+	workspace, err := HoldSourceWorkspace(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +177,7 @@ func TestSourceFetchHeldCheckoutDoesNotReuseEnclosingRepository(t *testing.T) {
 	node, repository, _ := pristineClosureFixture(t)
 	node.Repo = repository
 	t.Chdir(repository)
-	workspace, _, err := securepath.OpenDirectory(".")
+	workspace, err := HoldSourceWorkspace(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,11 +222,8 @@ func TestSourceFetchHeldWorkspaceMisuseFailsBeforeWork(t *testing.T) {
 	for _, misuse := range []string{"build", "not launched", "qualified", "whole graph", "environment without workspace"} {
 		t.Run(misuse, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			workspace, _, err := securepath.OpenDirectory(".")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer workspace.Close()
+			workspace := &SourceWorkspace{}
+			var err error
 			node := testFetchNode("fetch-source", "https://example.test/source", testSourceCommit, testSourceTree,
 				"source", "registry.example/toolchain@sha256:"+repeatHex("c"), "")
 			opts := RunOptions{Ctx: t.Context(), SourceRoot: "src", SourceWorkspace: workspace, Launch: true}
@@ -279,7 +268,7 @@ func TestSourceFetchHeldReceiptDirectoryRejectsSubstitutionBeforeGit(t *testing.
 	if err := os.Symlink(outside, "source-receipts"); err != nil {
 		t.Fatal(err)
 	}
-	workspace, _, err := securepath.OpenDirectory(".")
+	workspace, err := HoldSourceWorkspace(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

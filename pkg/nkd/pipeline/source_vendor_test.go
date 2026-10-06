@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
@@ -169,8 +169,11 @@ func TestSourceVendorRejectsIncompleteAdmission(t *testing.T) {
 }
 
 func TestSourceVendorConcreteFetchRejectsUnavailableRuntimeBeforeSourceWork(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("concrete held source runtime admission requires Linux")
+	}
 	t.Chdir(t.TempDir())
-	workspace, _, err := securepath.OpenDirectory(".")
+	workspace, err := HoldSourceWorkspace(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

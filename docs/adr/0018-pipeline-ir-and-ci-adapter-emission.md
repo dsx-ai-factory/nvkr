@@ -433,11 +433,28 @@ v1 invokes pinned source entrypoints instead.
 Maintained local and hosted Runs share the factory producer operation and `pipeline.Local.ExecNode` launcher.
 A producer reference resolves the exact embedded IR instruction; utility operations retain their pinned execution
 containers. Local execution schedules the whole Run graph once in bounded ready batches, retains source receipts
-through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted jobs enter through
-`factory.ExecuteNode`, which dispatches producers to that same operation. Neither path converts a whole producer
+through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted build and utility jobs enter through
+`factory.ExecuteNode`; hosted source fetch delegates through a private factory source owner to the same producer primitive. Neither path converts a whole producer
 report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
 The generated Plan is the single executable input document; separate per-build graph files are retired.
+
+The hosted source owner admits the complete Plan and exact selected Git helper/environment, then requests a
+pipeline-issued source-workspace capability. Linux admission precedes opening the workspace; zero or closed
+handles cannot launch work. Close cancels and joins registered fetch calls before releasing the directory.
+Git receives retained checkout/metadata descriptors with explicit Git directory/work-tree selection and disabled
+repository hooks, never an upward-discovered repository. Original checkout and receipt directories are rechecked
+through the held workspace before receipt reuse or commit. This capability grants filesystem access only, not
+producer observation, installed-content, publication or qualification authority. Ordinary Local fetch remains
+the existing developer route without these additional guarantees.
+
+Dependency vendoring authenticates the selected runtime/daemon and exact native pinned image before source work.
+A bounded, Git-metadata-free archive enters a fresh private volume; the pinned entrypoint, exact vendor arguments
+and declared fetch network remain. Neither source credentials nor host bind mounts enter that container. Its
+bounded return is decoded by the existing archive owner, rejects Git metadata and unsafe members before copy-back,
+and must preserve the original source binding. Cleanup finishes before source receipt issuance. Local fixtures
+model the daemon; cross-compilation is not native descriptor execution, and real pinned Docker/Helm execution
+requires separate runtime evidence. No generated disk executor or stronger evidence lane is implied.
 
 Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selection returns
 `CodeEngineCapability` before reading authored inputs or producing output. No fallback renderer exists.
