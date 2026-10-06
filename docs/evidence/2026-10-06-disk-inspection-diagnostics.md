@@ -129,3 +129,33 @@ outputs and disk-backed temporary state; no network, new pull, deadline extensio
 acceptance relaxation was used. Together with the passed host non-test gates, build/drift and standalone
 vulnerability scan, this validates the review-fix snapshot. It does not claim the macOS aggregate gate passed,
 native AMD64 execution or full guestfish/disk acceptance.
+
+## Exact parent integration validation
+
+The conflict union integrates parent `9ba0ad047658fcc0d0a67b0a2d0b48c5a56843e6` into
+diagnostic head `4ea09f3be40623105d04a6d0d7d2109cd4b4c352` by local merge, preserving both histories.
+The generated disk step remains bounded and is immediately followed by the parent's exact sealed Packer
+failure upload. Strict-only inspection retention follows separately; required carriers remain mandatory.
+Both complete diagnostic test sets are preserved, and the required-carrier mutation selects a carrier rather
+than the newly earlier Packer diagnostic upload. Two independent source reviews found no blocking union defect.
+
+The frozen tracked Go/module/version content manifest has SHA-256
+`4149431f295e918a37b0a6396e8b0ddefa9666e49d646fa00963dd3b6ea109e3`.
+The staged Go/module/version diff has SHA-256
+`b46928ed64ad551b261a779c0f8df095eebb6ceb5d118446dd214bb94d67d922` relative to the diagnostic parent,
+and `36b5c6241933e8bc37ce265068f6a2c456d2cc8af04b33a22d06a81eaeba2194` relative to the execution parent.
+
+The complete native Linux ARM64 race/atomic-coverage `./... -count=1` gate passed without changed
+assertions or deadlines: factory 226.379 seconds, lifecycle 39.492 seconds, pipeline 22.606 seconds and
+sbom 74.689 seconds. It reused the verified local `1f87906be577585bff2bc2bf05662972bd9ddd2ddae29975f05e0501090d3abb`
+image, read-only source/modules and task-owned ignored outputs, without pulls or network.
+Host format, vet, lint, shellcheck, vulnerability, build and generated-workflow drift gates also passed;
+the current generated Plan is `sha256:850cea27b78f621ccb48242b41a8210c4df6efaee139d4102bfc325270e6cb05`.
+The focused host diagnostic/retention/deadline suite passed in 1.569 seconds.
+
+Commands and actual terminal outputs are retained in the
+[parent-union record](2026-10-06-disk-inspection-parent-union.log), SHA-256
+`e0ffbeab789f5b50e5151599a0fb91a6cda1ae551c97acaef689ca6c6250fef7`.
+This is controlled contract validation, not native AMD64 execution, a real full disk inspection or hosted
+acceptance. The historical macOS aggregate failure above remains unresolved as an aggregate cause;
+this union uses the complete native Linux equivalent test stage plus the host non-test gates.

@@ -45,6 +45,7 @@ func TestGitHubStageTimeoutMinutes(t *testing.T) {
 			want: 61,
 		},
 		{name: "reject over GitHub limit", stage: githubStage{ID: "too-long", Nodes: []Node{{ID: "build", Requirements: requirements(21601)}}}, wantErr: e.CodeEngineCapability},
+		{name: "disk requires derived budget", stage: githubStage{ID: "disk", DiskOutput: "image", Nodes: []Node{{Requirements: requirements(86400)}}}, wantErr: e.CodeEngineCapability},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -61,6 +62,24 @@ func TestGitHubStageTimeoutMinutes(t *testing.T) {
 			}
 			if got != test.want {
 				t.Fatalf("got %d minutes, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestGitHubContractedStagesRejectIntroducedCycle(t *testing.T) {
+	for _, cycle := range []bool{false, true} {
+		t.Run(map[bool]string{false: "acyclic", true: "contracted cycle"}[cycle], func(t *testing.T) {
+			plan := &Plan{Graph: ArtifactGraph{Artifacts: []Artifact{{ID: "a", Producer: "a1"}, {ID: "b", Producer: "b"}}}}
+			stages := []githubStage{{ID: "disk", Nodes: []Node{{ID: "a1"}, {ID: "a2"}}}, {ID: "utility", Nodes: []Node{{ID: "b", Inputs: []string{"a"}}}}}
+			if cycle {
+				stages[0].Nodes[1].Inputs = []string{"b"}
+			}
+			err := validateGitHubStageDAG(plan, stages, map[string]string{"a1": "disk", "a2": "disk", "b": "utility"})
+			if cycle {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			} else if err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

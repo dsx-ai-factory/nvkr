@@ -1,7 +1,7 @@
 # M2 maintained input evidence map
 
-The source candidate is under review as PR #95, stacked on source-fetch PR #94,
-publication PR #92 and evidence PR #91. Those open, under-review dependencies supply
+The source candidate originated in PR #95, with source-fetch PR #94,
+publication PR #92 and evidence PR #91. GitHub read-back on October 6 confirmed all four were merged. They supply
 the capture schema and scoped trusted source-fetch interfaces;
 the native capture regression runs against those inherited interfaces. Exact-head local
 validation is recorded in the pull request separately from production acceptance.
@@ -36,9 +36,9 @@ is the exact pinned NKE deployment values, not unmodified chart defaults. This d
 runtime/publication completion or resolve the separately owned external-NKE-image checkpoint.
 `docs/epics-v1-spec.md`, Epic M2 Goal/Acquisition/acceptance criteria 2–3, and
 `docs/milestones.md:36–55` require external NKE and third-party image rows in addition to these packages.
-The formal v1 scope is AMD64. The additional ARM64 disk and runtime-image rows are
-out-of-spec sprint candidates, not a ratified change to M2 acceptance. Their inclusion
-preserves the requested candidate matrix; each disk still has independent execution
+The October 6 proposed strict M2 engineering target requires both native AMD64 and ARM64 disks, pending
+named-decider ratification, not recorded organizational scope approval. The selected runtime-image rows
+preserve the requested candidate matrix; each disk still has independent execution
 and evidence obligations. Deployment-value membership is human-transcribed from the
 pinned tree, not derived or machine-verified by the literal membership regression.
 
@@ -68,6 +68,11 @@ exact protected `main` head. The [dated handoff](evidence/2026-10-05-m2-input-ac
 separates that approval/reachability observation from Git byte authentication.
 Four NKE source entries were regenerated using separate `catalog pin --commit` calls
 against the canonical repository. No NKE checkout, source tag or source file was modified.
+The subsequent temporary test exception pins only `nke-spire-agent-source` to
+`726f76944404e1106626b8333d3576bdf67b575b`, omitting the DSX IMDS plugin after both hosted downloads returned
+HTTP 403. The OS, Calico and kubeadm sources retain `ff21ba8c07cafff74b68e238a8876af11e5beded`.
+The exception's production acceptance owner, expiry and restoration/content-approval decision remain unrecorded.
+The intended SPIRE row below describes the newer source, not the older selected exception's delivered contents.
 
 | Input | Authoritative source at that exact NKE commit | Compiled projection |
 | --- | --- | --- |
@@ -83,7 +88,7 @@ The source capture contract rejects disappeared repository metadata and any matc
 Its installer-media behavior is explicitly unexercised in `os-image/docs/apt-acquisition-capture.md`.
 `TestMaintainedM2NativeCaptureGraph` asserts both native target/toolchain architectures,
 the capture opt-in, carrier path, exact source-owned material kinds and native producer bindings
-against the inherited B/C/A schema. This graph test does not establish a successful
+against the admitted acquisition, material and execution contracts. This graph test does not establish a successful
 capture-enabled installer bake or a live evidence join.
 
 ## Runtime, inspector, registry and signer map
@@ -92,20 +97,27 @@ capture-enabled installer bake or a live evidence join.
 | --- | --- | --- |
 | Disk toolchain host architecture | Separate AMD64/ARM64 source toolchain maps and native allowed-host platforms | The candidate overlay substitutes published native manifests under the recorded user exception; organizational reviews remain outstanding |
 | Packer and preparation tools | `toolchains/nkd-packer/toolchain.lock.json` and Dockerfile | `images` remains null; BUSL redistribution and vulnerability review approvals remain `not-recorded` |
-| Full inspector tools | `toolchains/nkd-disk-inspect/Dockerfile` and source lock; [final-source native ARM64 and AMD64 preparation](evidence/2026-10-06-native-arc.md) recorded | Native registry manifests and measured profiles are wired; full M2 inspection remains unexercised |
+| Full inspector tools | `toolchains/nkd-disk-inspect/Dockerfile` and source lock; [final-source native ARM64 and AMD64 preparation](evidence/2026-10-06-native-arc.md) recorded | Native pins are wired; strict inspection timed out in run 37445475840. Current producer-provenance mode does not invoke inspection |
 | Syft inspector scanner | Source lock selects v1.51.1 and schemaVersion `16.1.10`; native AMD64 version and executable measurements retained in the preparation record | Native tool execution does not establish full-disk content reconciliation or publication clearance |
 | Inspector architecture | Profile key must equal native `linux/amd64` or `linux/arm64` execution host | Both measured native profiles are authored; actual runner/daemon capacity must still pass admission |
-| Scratch and memory | B's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
+| Scratch and memory | ADR-13's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
 | Registry namespace | M2 candidate Environment explicitly authors `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` | Separate from production `cwe`/`nkectl` routes; live blob limits, retention and package access not verified here |
 | Registry credential | Existing `github:GITHUB_TOKEN` reference | Runtime values are not inspected or serialized; production credential admission/read-back required |
-| Signing identity | M2 `nkd-run.yml` identity regex admits `main` and `codex/m2-arc-validation`; Actions issuer | M2 adds the exact manual-validation branch to the main-only policy; protected publication environment and current keyless run remain unverified |
+| Signing identity | Maintained M2 `nkd-run.yml` identity regex admits only `main`; Actions issuer | Earlier validation-branch authority is historical; external deployment-policy alignment and a current keyless run remain unverified |
 | Private source transport | Exact `https://github.com/dsx-ai-factory/nke` CLI/controller and `https://github.com/dsx-ai-factory/nke.git` OS keys, sharing the existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
-| Generated runner route | ADR-18 explicit `native-kvm-v1` exception, native AMD64/ARM64 classes in the M2 Environment | Protected `nkd-arc` environment, ephemeral pool isolation and full grouped execution remain unverified; historical ARC diagnostics do not establish production acceptance |
+| Generated runner route | ADR-18 explicit `native-kvm-v1` exception, native AMD64/ARM64 classes in the M2 Environment | Environment protection, ephemeral pool isolation and successful strict receipt-gated execution remain unverified; producer-provenance disk jobs do not establish complete production acceptance |
 
 `definitions/nke-m2/environment-github.yaml` records the separate candidate publication prefix, explicitly scoped signing policy and
 producer-declared build network permission. It selects both native ARC classes and measured inspection profiles. The same 34-output Definition
 now generates M2 with the candidate-only native toolchain overlay. Generation is not runtime admission
 or release acceptance; package Actions read access and full native execution remain separate checks.
+The current `diskEvidence: build-provenance-v1` selection is narrower than the proposed strict inspected M2
+target pending ratification. Both producer-provenance disk jobs passed, but aggregate carrier transport failed
+before publication in [run 37486058412](evidence/2026-10-06-m2-release-carrier-transport.md).
+No complete delivery or independent consumer acceptance is established. Toolchain preparation/publication
+measurements do not establish a hosted build with matching provenance or completed license/security clearance.
+Signed disk-mode bindings describe evidence scope; public Verification Policy has no disk-evidence-mode
+acceptance selector. Consumer-policy admission requiring inspection remains a separate deferred contract.
 
 Runtime selection uses the narrowly admitted typed `runtime: docker` and
 `buildNetworkPolicy: producer-declared` controls. No `podmanStorageDriver` field,

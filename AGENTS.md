@@ -101,11 +101,8 @@ make tidy           # go mod tidy + gofmt
 # single package / single test
 go test ./pkg/nkd/factory/... -run TestName -count=1
 
-# generated-bundle drift check (byte-exact regeneration from public inputs)
-go run ./cmd/nkdctl run generate \
-  --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root . --check
+# generated-bundle drift check (current Makefile target: maintained M2 candidate inputs)
+make workflows-check
 
 # M1 local demo (needs Docker and a local NKE clone; see docs/demo-m1.md)
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
@@ -193,7 +190,8 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 ## Key files
 
 Use `docs/README.md` for the documentation map and `scripts/README.md` for runnable demos. `definitions/nke-v1/`
-contains current NKE product inputs. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
+contains the retained three-output NKE inputs; `definitions/nke-m2/` supplies the current checked-in candidate
+selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
 ## Completion gate

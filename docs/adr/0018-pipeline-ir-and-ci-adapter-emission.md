@@ -161,10 +161,20 @@ Before toolchain preparation or producer work the helper binds the native host a
 CPU/memory, held-workspace capacity and KVM through the existing single-use VM admission. It repeats admission
 inside the producer deadline, uses the same guarded Docker device projection, and closes/joins all held owners.
 Published native Packer pins remain required. The strict disk-evidence mode additionally requires the full
-inspector image and measured executable pins. Explicit M2 `diskEvidence: build-provenance-v1` omits inspector
+inspector image and measured executable pins. Explicit candidate `diskEvidence: build-provenance-v1` omits inspector
 preparation and execution; it authenticates live producer/material evidence under ADR-13/20 instead.
-The whole ARC group has a bounded sum of serial operation budgets, capped at 24 hours; generic hosted jobs
-retain their six-hour cap. Current availability is not a capacity reservation. The local runtime observations
+That narrower candidate does not complete the proposed strict M2 target pending named-decider ratification.
+The ARC group sums only executed material-producer budgets, applying the selected VM class ceiling to its
+root producer. Synthetic SBOM/package nodes do not each add an adapter-default hour. One adapter-default hour
+covers terminal observation and live packaging; strict inspection additionally reuses the selected profile's
+per-member plus acquisition join budget. The job reserves fifteen minutes for provider setup/transport and
+five minutes each for cleanup and failure-diagnostic upload beyond the helper deadline. Each producer is
+independently bounded; earlier caller deadlines still win. The complete job remains capped at twenty-four hours; generic hosted jobs retain their
+six-hour cap. These configured allowances do not measure remaining provider-job time or prove runner capacity.
+On failure the sealed Packer sink can emit one exact diagnostic-route description. The generated job uploads
+only that bounded route, with one-day retention and a five-minute upload limit; early admission or failed
+sealing emits no route. Diagnostic transport grants no artifact, receipt or release authority.
+Current availability is not a capacity reservation. The local runtime observations
 remain unqualified descriptions; the complete hosted finalizer, signing and consumer checks own the production claim.
 
 Native preparation is a separate read-only-permission workflow that builds both images and records exact local
@@ -386,6 +396,11 @@ is an explicit limitation of the unqualified local lane, not an accepted hosted 
 Qualified adapters require an authenticated subordinate identity, user namespace or stronger provider sandbox.
 The pipeline-attested native ARC exception instead explicitly trusts the operator-managed ephemeral runner and
 daemon under §3; interoperability evidence remains required before claiming operational acceptance.
+For network-enabled ARC builds, the pool operator must also document and enforce isolation from cloud/cluster
+metadata, workload and credential services, permitting only the outbound acquisition traffic required by the
+producer. Container bridge networking does not establish these restrictions. Network-isolation configuration
+and a fresh native negative-reachability demonstration are external acceptance evidence, not implied by the
+Environment declaration; that evidence is not recorded here.
 
 Fresh Docker volumes and `docker cp` content are root-owned. One fixed input-extraction container runs as root
 with only `CAP_CHOWN` and `CAP_DAC_OVERRIDE`, mounts only the attempt's input and work volumes, and has no network

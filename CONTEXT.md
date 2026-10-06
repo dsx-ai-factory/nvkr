@@ -127,6 +127,12 @@ pipeline-attested lane. Exact delivery identity, material equality, SBOM agreeme
 not substitute for an independent exact-byte reproduction of the aggregate claim subject.
 _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
+**Disk inspection scope**:
+The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
+documents report `nkd:diskInspection: not-performed`; this supplies neither an installed inventory nor milestone
+acceptance. Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
+_Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
+
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
 _Avoid_: List of successful outputs, component catalog
