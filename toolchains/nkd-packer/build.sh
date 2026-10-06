@@ -208,8 +208,12 @@ if [[ "${runtime##*/}" == docker ]]; then
     --build-arg SOURCE_DATE_EPOCH=0)
 fi
 
+# Bash 3.2 treats an empty array expansion as unset under nounset. Optional
+# archive/CA inputs must add no arguments, without weakening failure handling.
+if [[ "${#build_inputs[@]}" -gt 0 ]]; then
+  build_command+=("${build_inputs[@]}")
+fi
 build_command+=(
-  "${build_inputs[@]}"
   --platform "linux/${arch}" \
   --build-arg "TARGETARCH=${arch}" \
   --build-arg "BASE_IMAGE=${base_image}" \
