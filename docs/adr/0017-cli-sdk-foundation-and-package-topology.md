@@ -48,7 +48,9 @@ wrap the QCOW2 as a binary bundle. Local unencrypted direct-Packer execution and
 supported as described below. The compiler can describe disk publication and its evidence graph, and dry-run
 can inspect that Plan. The ordinary local scheduler rejects disk publication with `engine-capability` before
 runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
-Hosted and qualified execution, generated VM jobs and FDE remain capability-gated before output work.
+General hosted VM execution, qualified execution and FDE remain capability-gated before output work.
+ADR-18 separately admits the pipeline-attested native ARC disk route and its generated grouped jobs;
+that operator-trusted exception does not establish qualified execution or complete release acceptance.
 The complete live full-disk evidence and publication path is implemented as guarded APIs, not an exercised
 production workflow.
 
@@ -103,7 +105,9 @@ JSON cannot restore executable authority. Consumer verification takes one pinned
 policy (ADR-04), returning inspectable views plus a closeable capability. The reference selects the sole
 ADR-20 release index: delivery owns its metadata/descriptor/evidence join, checked named outputs, exact sibling
 artifact references, and release content projection. Lifecycle applies consumer policy and assembles the Release
-view. Transport locators are excluded from
+view. The signed disk-evidence mode is descriptive: public Verification Policy has no disk-mode acceptance
+selector. ADR-13/20 retain that independent consumer-policy limitation; mode rendering does not require inspected disks.
+Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
 
