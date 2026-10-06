@@ -551,7 +551,7 @@ func publicationDiskPayloads(ctx context.Context, root, expectedRoot string) (ma
 					return nil, err
 				}
 				var children runnableIndex
-				if err := canonical.UnmarshalExact(raw, &children); err != nil {
+				if err := decodeImageJSON(raw, &children); err != nil {
 					return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding image index storage selection")
 				}
 				if children.SchemaVersion != 2 || children.MediaType != MediaOCIIndex || len(children.Manifests) == 0 || len(children.Manifests)+len(objects) > maxDeliveryObjects {

@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -187,5 +188,51 @@ func TestPublicationRejectsPreviousMembershipSchema(t *testing.T) {
 			previous.SchemaVersion = version
 			assertRegistryCode(t, previous.Validate(), e.CodeVerifyFailed)
 		})
+	}
+}
+
+// OCI index bytes are identity-bearing but need not use NKD's canonical codec.
+// Storage preflight must preserve the format admitted by the image-index owner.
+func TestImageIndexPublicationPreservesNoncanonicalOCIIndex(t *testing.T) {
+	request := imageIndexPublicationRequestFixture(t)
+	var outputs []Output
+	for i := range request.Objects {
+		input := &request.Objects[i]
+		if input.Output == nil {
+			continue
+		}
+		path := filepath.Join(input.Path, "index.json")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var formatted bytes.Buffer
+		if err := json.Indent(&formatted, raw, "", "  "); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, formatted.Bytes(), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		input.BlobDigest = digestBytes(formatted.Bytes())
+		input.SemanticDigest = input.BlobDigest
+		outputs = append(outputs, Output{Name: input.Name, Kind: input.Output.Format, Digest: input.BlobDigest,
+			BuildDigest: input.Output.BuildDigest, Components: input.Output.Components, ImageIndex: input.Output.ImageIndex})
+	}
+	var err error
+	request.Release.ContentSubject, err = ContentDigest(outputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "publication")
+	result, err := BuildPublicationRoot(t.Context(), root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := OpenPublication(t.Context(), root, result.RootDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
