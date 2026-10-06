@@ -11,18 +11,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/material"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
 // This opt-in regression executes the selected digest-pinned scanner on a small
-// real Docker archive. It proves both scanner command paths accept the selected
-// cataloger, not libguestfs execution or complete NKE image coverage.
+// real Docker archive. It proves both scanner command paths and the plain/gzip
+// nested-image owner accept the selected cataloger, not libguestfs execution or
+// complete NKE image coverage.
 func TestDiskContentPinnedScannerReal(t *testing.T) {
 	path := os.Getenv("NKD_SBOM_SCANNER")
 	if path == "" {
@@ -98,6 +102,112 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 				}
 			}
 			t.Fatalf("real scanner omitted exact fixture package: %+v", inventory.Components)
+		})
+	}
+	for _, test := range []struct {
+		name       string
+		compressed bool
+	}{{"plain", false}, {"gzip", true}} {
+		t.Run("nested/"+test.name, func(t *testing.T) {
+			subject := transport
+			if test.compressed {
+				raw, err := io.ReadAll(io.NewSectionReader(transport, 0, transport.Size()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				subject = compressedMaterialBytes(t, raw)
+			}
+			inspection, err := inspectCompressedImages(t.Context(), subject, "linux/"+runtime.GOARCH, scanner, 1<<20, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if inspection == nil || inspection.subject != subject.Digest() || inspection.size != subject.Size() || inspection.scanner != scanner.Digest || len(inspection.files) != 0 {
+				t.Fatalf("nested scan lost its exact carrier/tool binding or invented root files: %+v", inspection)
+			}
+			for _, component := range inspection.Components() {
+				key, err := diskComponentKey(component, "linux/"+runtime.GOARCH)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if key == (diskPackageKey{name: "nkd-scanner-fixture", version: "2:1.0-1ubuntu4", format: "deb", architecture: "all"}) {
+					class, err := diskComponentClass(component)
+					if err != nil || class != diskClassContainer {
+						t.Fatalf("nested container package changed observation class: %q, %v", class, err)
+					}
+					t.Logf("scanner=%s carrier=%s bytes=%d exact nested package=%s version=%s", scanner.Digest, subject.Digest(), subject.Size(), component.Name, component.Version)
+					return
+				}
+			}
+			t.Fatal("real nested image scanner omitted exact fixture package")
+		})
+	}
+	// Unlike nested archive discovery, the top-level material operation must not
+	// trust Syft's selected image as proof of complete native OCI membership.
+	for _, architecture := range []string{runtime.GOARCH, map[string]string{"amd64": "arm64", "arm64": "amd64"}[runtime.GOARCH]} {
+		t.Run("oci-helper/"+architecture, func(t *testing.T) {
+			for _, variable := range []string{"NKD_SBOM_INSPECTOR_DIGEST", "NKD_SBOM_CODEC_DIGEST", "NKD_SBOM_GUESTFISH_DIGEST", "NKD_SBOM_PACKAGE_READER_DIGEST"} {
+				if os.Getenv(variable) == "" {
+					t.Skip("full helper platform regression requires every selected native tool pin")
+				}
+			}
+			config := configuration.DeepCopy()
+			config.Architecture = architecture
+			selected, err := mutate.ConfigFile(image, config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			lp, err := layout.Write(root, empty.Index)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := lp.AppendImage(selected); err != nil {
+				t.Fatal(err)
+			}
+			carrier := filepath.Join(root, "image.tar")
+			if err := transportarchive.Pack(t.Context(), carrier, root, []string{"oci-layout", "index.json", "blobs"}); err != nil {
+				t.Fatal(err)
+			}
+			subject, err := heldfile.OpenContext(t.Context(), carrier, heldfile.Options{Label: "real-native-oci-material", MaxBytes: 1 << 20})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer subject.Close()
+			var report bytes.Buffer
+			err = RunDiskContentHelper(t.Context(), os.Getenv("NKD_SBOM_INSPECTOR_DIGEST"), os.Getenv("NKD_SBOM_CODEC_DIGEST"), subject.Digest(), subject.Size(),
+				"oci-image", os.Getenv("NKD_SBOM_GUESTFISH_DIGEST"), scanner.Digest, os.Getenv("NKD_SBOM_PACKAGE_READER_DIGEST"), 1<<20, "linux/"+runtime.GOARCH,
+				io.NewSectionReader(subject, 0, subject.Size()), &report)
+			if architecture != runtime.GOARCH {
+				assertDependencyCode(t, err, e.CodeVerifyFailed)
+				if report.Len() != 0 {
+					t.Fatal("foreign OCI configuration returned a partial content report")
+				}
+				return
+			}
+			if err != nil || report.Len() == 0 {
+				t.Fatalf("native OCI helper failed: %v", err)
+			}
+			var observed diskContentReport
+			if err := canonical.UnmarshalExact(report.Bytes(), &observed); err != nil {
+				t.Fatal(err)
+			}
+			if observed.Subject != subject.Digest() || observed.Size != subject.Size() || observed.Platform != "linux/"+runtime.GOARCH || observed.Kind != "oci-image" || observed.Scanner != scanner.Digest {
+				t.Fatal("OCI helper lost exact carrier, platform, operation or scanner binding")
+			}
+			for _, component := range observed.Components {
+				key, err := diskComponentKey(component, observed.Platform)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if key == (diskPackageKey{name: "nkd-scanner-fixture", version: "2:1.0-1ubuntu4", format: "deb", architecture: "all"}) {
+					class, err := diskComponentClass(component)
+					if err != nil || class != diskClassContainer {
+						t.Fatalf("OCI helper package class=%q error=%v", class, err)
+					}
+					return
+				}
+			}
+			t.Fatal("OCI helper omitted exact fixture package")
 		})
 	}
 }

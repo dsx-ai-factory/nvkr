@@ -2,6 +2,7 @@ package sbom
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -60,12 +61,13 @@ func TestContainerScannerAlsoRefusesUnownedNestedDatabase(t *testing.T) {
 	if err := os.WriteFile(filename, script, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	subject, err := heldfile.FromBytesContext(t.Context(), []byte("controlled scanner input"), heldfile.Options{Label: "nested-container-report", MaxBytes: 1 << 20})
+	archive := nestedOCIFixture(t, []string{runtime.GOARCH}, false, nil)
+	subject, err := heldfile.FromReaderContext(t.Context(), io.NewSectionReader(archive, 0, archive.Size()), heldfile.Options{Label: "nested-container-report", MaxBytes: 1 << 20})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer subject.Close()
-	components, err := inspectContainerMaterial(t.Context(), subject, Scanner{Path: filename, Digest: rawDigest(script)})
+	components, err := inspectContainerMaterial(t.Context(), subject, "linux/"+runtime.GOARCH, Scanner{Path: filename, Digest: rawDigest(script)}, 1<<20)
 	assertDependencyCode(t, err, e.CodeEngineCapability)
 	if components != nil || !strings.Contains(err.Error(), "unsupported nested package database") {
 		t.Fatalf("container scanner assigned unheld child packages: %+v %v", components, err)

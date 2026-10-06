@@ -3,6 +3,7 @@ package sbom
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -48,7 +49,7 @@ func TestContainerScanProgress(t *testing.T) {
 		name, body string
 		want       e.Code
 	}{
-		{"scanner admission failure", "", e.CodeVerifyFailed},
+		{"scanner admission failure", "", e.CodeUnverifiedRef},
 		{"success", "printf '%s' '" + inventory + "'", ""},
 		{"scanner failure", "exit 23", e.CodeProvenanceMissing},
 		{"timeout", "sleep 30", e.CodeTimeout},
@@ -64,7 +65,8 @@ func TestContainerScanProgress(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			subject, err := heldfile.FromBytesContext(t.Context(), []byte("controlled OCI subject"), heldfile.Options{Label: "container-progress", MaxBytes: 128})
+			archive := nestedOCIFixture(t, []string{runtime.GOARCH}, false, nil)
+			subject, err := heldfile.FromReaderContext(t.Context(), io.NewSectionReader(archive, 0, archive.Size()), heldfile.Options{Label: "container-progress", MaxBytes: 1 << 20})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -76,7 +78,7 @@ func TestContainerScanProgress(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer cancel()
 			}
-			components, err := inspectContainerMaterial(ctx, subject, Scanner{Path: filename, Digest: rawDigest(script)})
+			components, err := inspectContainerMaterial(ctx, subject, "linux/"+runtime.GOARCH, Scanner{Path: filename, Digest: rawDigest(script)}, 1<<20)
 			if test.want != "" {
 				assertDependencyCode(t, err, test.want)
 				if len(components) != 0 {

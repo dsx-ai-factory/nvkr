@@ -254,7 +254,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		}
 		components, files = inspection.Components(), inspection.Files()
 	case "oci-image":
-		components, err = inspectContainerMaterial(ctx, subject, scanner)
+		components, err = inspectContainerMaterial(ctx, subject, platform, scanner, int64(maxBytes))
 		if err != nil {
 			return err
 		}
@@ -291,14 +291,41 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 
 // The operation, not scanner-authored metadata, selects the observation class.
 // This descriptive scan cannot issue a sandbox result or a factory receipt.
-func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, scanner Scanner) ([]Component, error) {
+func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, platform string, scanner Scanner, maxBytes int64) ([]Component, error) {
 	diskdiagnostic.Emit(ctx, "root-scan", "start", 0, 0)
-	inventory, err := inspectHeldDependencyReport(ctx, subject, "oci-image", scanner, true)
+	if err := validateSBOMContext(ctx); err != nil {
+		return nil, err
+	}
+	if subject == nil || subject.Size() <= 0 || subject.Size() > maxBytes || maxBytes <= 0 || maxBytes > 16<<30 ||
+		(platform != "linux/amd64" && platform != "linux/arm64") {
+		return nil, e.New(e.CodeEngineCapability, "OCI material requires a bounded held subject and consumer platform")
+	}
+	// Syft may select an image from a multi-image layout. That selection is not
+	// complete membership or platform proof. Reuse the nested OCI owner before
+	// any scan; it authenticates every blob/descriptor, scans every native image
+	// and revalidates the complete closure and original held carrier afterward.
+	archive, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
+		_, err := subject.WriteToContext(ctx, destination)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	diskdiagnostic.Emit(ctx, "root-scan", "complete", 0, len(inventory.Components))
-	return withDiskContentClass(inventory.Components, diskClassContainer), nil
+	defer func() { _ = archive.Close() }()
+	docker, oci, err := compressedImageMarkers(ctx, archive)
+	if err != nil {
+		return nil, err
+	}
+	if docker || !oci {
+		return nil, e.New(e.CodeVerifyFailed, "OCI material requires an unmixed OCI layout")
+	}
+	inventory, err := inspectNestedOCILayout(ctx, subject, archive, platform, scanner, maxBytes, &materialInspectionBudget{remaining: maxBytes})
+	if err != nil {
+		return nil, err
+	}
+	components := inventory.Components()
+	diskdiagnostic.Emit(ctx, "root-scan", "complete", 0, len(components))
+	return components, nil
 }
 
 func checkCapturedPackageMetadata(capture *material.AcquisitionObservation, packages map[string]diskPackageKey, platform string) error {

@@ -539,14 +539,15 @@ func TestMaterialScanOperationsIssueTheirOwnClasses(t *testing.T) {
 						components = inspection.Components()
 					}
 				case "direct-container":
-					// The controlled scanner owns the native JSON projection;
-					// these subject bytes prove routing, not valid OCI discovery.
-					subject, createErr := heldfile.FromBytesContext(t.Context(), []byte("controlled OCI subject"), heldfile.Options{Label: "class-operation-test", MaxBytes: 1 << 20})
+					// The real OCI owner validates this closure; the controlled
+					// scanner models package discovery, not native Syft evidence.
+					archive := nestedOCIFixture(t, []string{architecture}, false, nil)
+					subject, createErr := heldfile.FromReaderContext(t.Context(), io.NewSectionReader(archive, 0, archive.Size()), heldfile.Options{Label: "class-operation-test", MaxBytes: 1 << 20})
 					if createErr != nil {
 						t.Fatal(createErr)
 					}
 					defer subject.Close()
-					components, err = inspectContainerMaterial(t.Context(), subject, scanner)
+					components, err = inspectContainerMaterial(t.Context(), subject, "linux/"+architecture, scanner, 1<<20)
 				}
 				if err != nil || len(components) != 1 {
 					t.Fatalf("actual scan components=%+v error=%v", components, err)
