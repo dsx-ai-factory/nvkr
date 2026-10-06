@@ -90,7 +90,11 @@ that pin owner with normal lifecycle compilation/generation for review-only cand
 explicitly configured maintenance workflow. `catalog refresh` and `catalog update-ci` remain thin adapters;
 these maintenance descriptions cannot grant execution or release authority.
 
-Normal commands are `definition validate|inspect`, `run plan|local|generate`, and `release verify|inspect|browse`, with
+`planview` owns immutable descriptive snapshots after factory validates the complete Plan. It renders readable
+Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
+separating per-output Build Digest changes from execution and transport changes. It issues no authority.
+
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the

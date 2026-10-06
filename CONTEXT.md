@@ -81,6 +81,8 @@ _Avoid_: Host platform, query criterion
 The complete generated closure of admitted Definition and Environment values, independently required outputs,
 packaging, routes and executable dependencies for a Run. Producer operations reference the single executable
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
+Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
+its canonical stored bytes or grant execution or evidence authority.
 _Avoid_: Authored definition, execution observation
 
 **Generated execution bundle**:
