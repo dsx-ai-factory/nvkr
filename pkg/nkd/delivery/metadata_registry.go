@@ -207,7 +207,7 @@ func PushMetadata(ctx context.Context, source, repository string, options Regist
 		return "", e.Wrap(e.CodeVerifyFailed, err, "open metadata index")
 	}
 	if err := remote.WriteIndex(ref, index, registryOptions(ctx, options)...); err != nil {
-		return "", e.Wrap(e.CodeUnavailable, err, "publish metadata root")
+		return "", classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publish metadata root"))
 	}
 	return ref.Name(), nil
 }

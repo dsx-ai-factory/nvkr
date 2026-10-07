@@ -95,3 +95,68 @@ func TestPullMetadataActiveInterruption(t *testing.T) {
 		}
 	}
 }
+
+func TestPushMetadataActiveInterruption(t *testing.T) {
+	for _, mode := range []string{"cancel", "deadline", "failure"} {
+		t.Run(mode, func(t *testing.T) {
+			request, _ := diskPublicationRequest(t, "amd64")
+			full := filepath.Join(t.TempDir(), "full")
+			result, err := BuildPublicationRoot(t.Context(), full, request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var armed, reached atomic.Bool
+			var cancel context.CancelFunc
+			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !armed.Load() || r.Method != http.MethodPut || r.URL.Path != "/v2/candidate/releases/manifests/"+result.RootDigest {
+					handler.ServeHTTP(w, r)
+					return
+				}
+				_, _ = io.Copy(io.Discard, r.Body)
+				reached.Store(true)
+				if mode == "failure" {
+					http.Error(w, "ordinary registry failure", http.StatusServiceUnavailable)
+					return
+				}
+				if mode == "cancel" {
+					cancel()
+				}
+				<-r.Context().Done()
+			}))
+			defer server.Close()
+			prefix := strings.TrimPrefix(server.URL, "http://") + "/candidate"
+			options := RegistryOptions{PlainHTTP: true, Anonymous: true}
+			if _, err := Push(t.Context(), full, prefix+"/releases-node-image", options); err != nil {
+				t.Fatal(err)
+			}
+			metadata := filepath.Join(t.TempDir(), "metadata")
+			if _, err := ExportMetadata(t.Context(), full, metadata); err != nil {
+				t.Fatal(err)
+			}
+			ctx := t.Context()
+			if mode == "deadline" {
+				ctx, cancel = context.WithTimeout(ctx, time.Second)
+			} else {
+				ctx, cancel = context.WithCancel(ctx)
+			}
+			defer cancel()
+			armed.Store(true)
+			ref, err := PushMetadata(ctx, metadata, prefix+"/releases", options)
+			if !reached.Load() {
+				t.Fatal("request never reached final metadata index upload")
+			}
+			if ref != "" {
+				t.Fatalf("failed upload returned a publication reference: %s", ref)
+			}
+			if mode == "failure" {
+				assertRegistryCode(t, err, e.CodeUnavailable)
+			} else {
+				assertRegistryCode(t, err, e.CodeTimeout)
+				if !errors.Is(err, ctx.Err()) {
+					t.Fatalf("lost interruption cause: %v", err)
+				}
+			}
+		})
+	}
+}
