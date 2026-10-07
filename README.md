@@ -33,6 +33,9 @@ and producing workflow, and SBOMs recording the components observed during inspe
 the published artifacts and release root. These signatures let a verifier authenticate the signer and
 detect changes to the signed statements; the digest binds each claim to its intended artifact.
 
+Signing an artifact or its attestations does **not claim ownership** of the software or its included
+components. It identifies the signer making the recorded production or publication claim.
+
 The consumer still chooses whom to trust. A Verification Policy supplies the accepted workflow identity
 and **issuer**, the service that issued that identity; verification also requires a pinned verifier.
 NKD checks the required signatures and production attestations against that policy, then checks the
