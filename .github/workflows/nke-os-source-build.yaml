@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/nke-os-source-build.yaml
       - definitions/nke-os-source/**
+      - definitions/nke-ovn-source/**
       - pkg/nkd/buildgraph/**
       - pkg/nkd/catalog/**
       - pkg/nkd/pipeline/**
@@ -62,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           go test ./pkg/nkd/buildgraph \
-            -run '^TestNKEOS(PublicSource(Graphs|MissingToolchainFailsClosed)|BinaryBundle)$' \
+            -run '^TestNKE.*(Graphs|MissingToolchainFailsClosed|BinaryBundle|RenderedImages)$' \
             -count=1
       - name: Build pinned public sources offline and rehash outputs
         run: |

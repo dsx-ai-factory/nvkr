@@ -2,6 +2,12 @@
 
 Experimental source-producer catalog for NKE v0.21.0 OS inputs. It uses NKD's existing catalog, source preparation, graph compiler and local executor. It is not selected by the maintained OS/M2 Definitions and is not yet a replacement for their package graph.
 
+The separately selectable [DSX OVN source-build option](../nke-ovn-source/README.md)
+adds the fork's source-owned OCI image and offline chart/image Debian packaging.
+It is kept separate because its Git repository is internal; the public-source
+diagnostic does not receive source credentials. Calico and maintained inputs are
+unchanged.
+
 ## Implemented producers
 
 Every producer supports native Linux AMD64 and ARM64. The catalog has 13 independently locked Git sources and 14 outputs:

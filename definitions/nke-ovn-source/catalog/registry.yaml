@@ -1,0 +1,145 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nke-ovn-fork-source
+  description: Candidate OVN-only CNI packages from the internal DSX GitHub fork. Requires authenticated host-side source acquisition; not selected by maintained OS/M2 inputs.
+sources:
+  ovn-kubernetes:
+    repo: https://github.com/dsx-ai-factory/ovn-kubernetes
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+components:
+  ovn-kube-ubuntu:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: ovn-kubernetes
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
+    outputType: oci-image
+    buildCommand:
+      - buildctl-daemonless.sh
+      - build
+      - --frontend
+      - dockerfile.v0
+      - --local
+      - context=/src
+      - --local
+      - dockerfile=/src/dist/images
+      - --opt
+      - filename=Dockerfile.ubuntu
+      - --opt
+      - platform=linux/{{.Arch}}
+      - --opt
+      - build-arg:OVN_KUBERNETES_DIR=.
+      - --opt
+      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:74560d1d7488711be460297046d5b8423dc21e81f2a0953b36ef6c8ec37a15cb
+      - --opt
+      - build-arg:KUBECTL_MINOR=1.36
+      - --opt
+      - build-arg:UBUNTU_BASE_IMAGE=docker.io/library/ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
+      - --output
+      - type=oci,dest=/src/nkd-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nke/ovn-kubernetes:git-26cc199de8e814a7fe6d899a770fc04df0bbc2f9
+    writeDir: nkd-output
+    artifactPath: nkd-output/ovn-kube-ubuntu.oci.tar
+  nke-cni-ovn:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: ovn-kubernetes
+    outputType: tarball
+    materials:
+      ovn-image: ovn-kube-ubuntu
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        echo 'SOURCE ACCESS EXCEPTION: DSX OVN fork is internal; source credentials are host-side only.' >&2
+        echo 'WRAPPED IMAGE: source-owned Ubuntu Dockerfile acquires OVS/OVN and kubectl through APT; not hermetic or NV FIPS/STIG.' >&2
+        readonly stream=1.5.18
+        readonly revision=1+git.26cc199de8e8
+        readonly out=/src/nkd-output
+        readonly charts="$out/charts"
+        readonly images="$out/images"
+        readonly image_dir="$images/usr/lib/nke/cni-ovn/$stream"
+        readonly image_name="ovn-images_${stream}_linux_{{.Arch}}.tgz"
+        test -f /src/charts/ovn-kubernetes/Chart.yaml
+        grep -qx "version: $stream" /src/charts/ovn-kubernetes/Chart.yaml
+        mkdir -p "$charts/DEBIAN" "$charts/etc/dgx/ovn-kubernetes" "$images/DEBIAN" "$image_dir" "$out/debs"
+        cp -a /src/charts/ovn-kubernetes/. "$charts/etc/dgx/ovn-kubernetes/"
+        # Fork-specific keys: the old upstream global.image override does not apply.
+        cat >"$charts/etc/dgx/ovn-kubernetes/values-nke.yaml" <<'EOF'
+        global:
+          skipCallToK8s: true
+          enableNgnExtension: false
+          imagePullSecretName: ""
+          useImageDigest: false
+        ovnkube-control-plane:
+          ovnkubeControlPlane:
+            image: &built_image
+              repository: localhost/nke/ovn-kubernetes
+              tag: git-26cc199de8e814a7fe6d899a770fc04df0bbc2f9
+              sha256: ""
+        ovnkube-single-node-zone:
+          ovnkubeSingleNodeZone:
+            image: *built_image
+          ovnkubeSingleNodeZoneNbdb:
+            image: *built_image
+          ovnkubeSingleNodeZoneSbdb:
+            image: *built_image
+          ovnkubeSingleNodeZoneNorthd:
+            image: *built_image
+          ovnkubeSingleNodeZoneOvnHost:
+            image: *built_image
+        EOF
+        for kind in charts images; do
+          root="$out/$kind"
+          cat >"$root/DEBIAN/control" <<EOF
+        Package: nke-cni-ovn-$kind-$stream
+        Version: $revision
+        Architecture: {{.Arch}}
+        Maintainer: NVIDIA NKE
+        Provides: nke-cni-ovn-$kind
+        Conflicts: nke-cni-ovn-$kind
+        Description: NKE OVN $kind from pinned DSX source
+        EOF
+        done
+        printf 'Depends: containerd | nke-kubeadm-distro\n' >>"$images/DEBIAN/control"
+        gzip -n -9 -c /nkd/inputs/materials/ovn-image >"$image_dir/$image_name"
+        (cd "$image_dir" && sha256sum "$image_name" >"$image_name.sha256")
+        # Preserve the offline containerd import contract and fail configuration
+        # on checksum, readiness or import errors.
+        cat >"$images/DEBIAN/postinst" <<'EOF'
+        #!/bin/bash
+        # SPDX-License-Identifier: Apache-2.0
+        set -euo pipefail
+        [ "${1:-}" = configure ] || exit 0
+        readonly image_dir=/usr/lib/nke/cni-ovn/1.5.18
+        readonly image_name=ovn-images_1.5.18_linux_{{.Arch}}.tgz
+        readonly ctr="${NKE_CTR_BIN:-/usr/local/bin/ctr}"
+        readonly log=/var/log/nke-cni-ovn-postinst.log
+        cd "$image_dir"
+        sha256sum --strict -c "$image_name.sha256"
+        ready=false
+        for ((n=0; n<50; n++)); do
+          if timeout --kill-after=1s 2s "$ctr" version >/dev/null 2>&1; then
+            ready=true; break
+          fi
+          sleep 0.2
+        done
+        "$ready" || { echo 'OVN import: containerd readiness timed out' >&2; exit 1; }
+        gzip -dc "$image_name" | timeout --kill-after=5s 300s "$ctr" -n k8s.io images import - >>"$log" 2>&1
+        EOF
+        chmod 0755 "$images/DEBIAN/postinst"
+        for kind in charts images; do
+          root="$out/$kind"
+          find "$root" -print0 | xargs -0 touch -h -d "@$SOURCE_DATE_EPOCH"
+          dpkg-deb --root-owner-group --uniform-compression -Zxz -z6 --build "$root" \
+            "$out/debs/nke-cni-ovn-${kind}-${stream}_${revision}_{{.Arch}}.deb"
+        done
+        tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C "$out/debs" -cf "$out/nke-cni-ovn.tar" .
+    writeDir: nkd-output
+    artifactPath: nkd-output/nke-cni-ovn.tar
