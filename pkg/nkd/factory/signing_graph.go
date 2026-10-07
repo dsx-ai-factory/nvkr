@@ -34,6 +34,9 @@ func addSigningDataflow(plan *Plan, runsOn string, route Route,
 	}
 	signInputs := []string{packageInput, referenceID}
 	verifyInputs := []string{referenceID, "signature/" + route.Name}
+	if PerOutputPublication(plan) {
+		verifyInputs = append(verifyInputs, "predicate/"+route.Name)
+	}
 	if signing.Mode == SigningModeCosign {
 		// The pinned cosign executable is DATA this node consumes; declaring it as an
 		// input is what makes a generated pipeline transport it to the signing job

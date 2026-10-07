@@ -218,6 +218,29 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	if observed.Digest != inspection.Digest || len(observed.Components) != 1 || observed.Components[0] != "charts" {
 		t.Fatalf("observation: %#v", observed)
 	}
+	if binding {
+		plan.Environment.Publication = &definition.Publication{Mode: "per-output-v1"}
+		plan.LifecycleOutputs = []LifecycleOutputPlan{expected}
+		nodes, _ := planIndex(plan)
+		publication := Node{ID: "package/publication-charts", Kind: NodePackage, PackageKind: PackageOCI, Inputs: []string{"package/charts"}}
+		publication.Inputs = uniqueSorted(append(publication.Inputs, packageProducerResults(publication.Inputs, nodes, artifacts)...))
+		plan.Graph.Nodes = append(plan.Graph.Nodes, publication)
+		if _, err := lifecyclePublicationOutputs(ctx, plan, publication, artifacts); err != nil {
+			t.Fatalf("output-local chart reproduction lost its bound image: %v", err)
+		}
+		var inputs []Artifact
+		for _, id := range publication.Inputs {
+			inputs = append(inputs, artifacts[id])
+		}
+		objects, cleanup, err := collectPublicationObjects(ctx, plan, Artifact{Producer: publication.ID}, inputs, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cleanup()
+		if len(objects) != 1 || objects[0].Name != "charts" {
+			t.Fatalf("published reproduction dependencies as sibling outputs: %+v", objects)
+		}
+	}
 	record.SHA256 = "sha256:" + strings.Repeat("b", 64)
 	writeRecord()
 	_, err = ObserveLifecyclePayload(ctx, plan, expected, artifacts)

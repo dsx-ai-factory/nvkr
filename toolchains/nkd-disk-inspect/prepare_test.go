@@ -8,6 +8,20 @@ import (
 	"testing"
 )
 
+func TestNativePreparationUsesForegroundInspectorLog(t *testing.T) {
+	script, err := os.ReadFile("../../scripts/prepare-native-toolchains.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	if strings.Contains(text, "2> >(") {
+		t.Fatal("inspector log writes must not escape the joined build/load pipeline")
+	}
+	if !strings.Contains(text, `2>"${output}/inspector-build.log" | timeout`) {
+		t.Fatal("inspector build must retain its foreground failure log")
+	}
+}
+
 func TestNativePreparationRejectsUnsupportedHostBeforeBuild(t *testing.T) {
 	script, err := filepath.Abs("../../scripts/prepare-native-toolchains.sh")
 	if err != nil {

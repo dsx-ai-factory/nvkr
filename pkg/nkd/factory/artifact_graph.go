@@ -55,7 +55,7 @@ func (graph ArtifactGraph) Validate() error {
 				}
 			}
 			switch node.Kind {
-			case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence:
+			case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence, NodeAssembleRelease:
 				if node.Network != ir.NetworkDefault {
 					return e.New(e.CodeInvalidCatalog, "artifact graph networked node %q does not declare default network", node.ID)
 				}

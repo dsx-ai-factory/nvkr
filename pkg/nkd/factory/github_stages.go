@@ -172,7 +172,8 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 		if len(stages) > 0 {
 			last := &stages[len(stages)-1]
 			first := last.Nodes[0]
-			if last.DiskOutput == "" && len(last.Nodes) < 16 && githubUtilityNode(first) && githubUtilityNode(node) &&
+			if !(PerOutputPublication(plan) && (first.PackageKind == PackageOCI || node.PackageKind == PackageOCI)) &&
+				last.DiskOutput == "" && len(last.Nodes) < 16 && githubUtilityNode(first) && githubUtilityNode(node) &&
 				first.RunsOn == node.RunsOn && first.Container == node.Container && first.Platform == node.Platform {
 				last.Nodes = append(last.Nodes, node)
 				continue

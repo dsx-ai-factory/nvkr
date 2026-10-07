@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -75,8 +76,14 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 			cleanup()
 		}
 	}()
+	selected := map[string]bool{}
+	if PerOutputPublication(plan) {
+		for _, expected := range selectedPublicationOutputs(plan, planNode(plan, output.Producer)) {
+			selected[expected.Name] = true
+		}
+	}
 	for _, input := range inputs {
-		if input.BuildTarget != "" {
+		if input.BuildTarget != "" || (PerOutputPublication(plan) && !selected[input.Name]) {
 			continue
 		}
 		object := delivery.ObjectInput{Name: input.Name, Kind: input.Kind, Path: input.Path,
@@ -179,6 +186,17 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 			return nil, err
 		}
 		metadata = &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest, ContentSubject: contentSubject}
+		if PerOutputPublication(plan) {
+			digest, err := plan.IdentityDigest()
+			if err != nil {
+				return nil, err
+			}
+			run, err := factoryRunContext(digest, time.Now().UTC(), time.Now().UTC())
+			if err != nil {
+				return nil, err
+			}
+			metadata.PlanDigest, metadata.InvocationID = digest, run.InvocationID()
+		}
 		outputByName := make(map[string]delivery.Output, len(outputs))
 		transportPaths := make(map[string]string, len(outputs))
 		for _, output := range outputs {

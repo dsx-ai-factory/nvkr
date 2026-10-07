@@ -114,10 +114,12 @@ or release acceptance; package Actions read access and full native execution rem
 The current `diskEvidence: build-provenance-v1` selection is narrower than the proposed strict inspected M2
 target pending ratification. Both producer-provenance disk jobs passed, but aggregate carrier transport failed
 before publication in [run 37486058412](evidence/2026-10-06-m2-release-carrier-transport.md).
-No complete delivery or independent consumer acceptance is established. Toolchain preparation/publication
+Historical validation-branch run `37533806963` at commit `625980e` subsequently passed candidate delivery;
+it does not validate this merged head or establish independent full-payload consumer acceptance. Toolchain preparation/publication
 measurements do not establish a hosted build with matching provenance or completed license/security clearance.
-Signed disk-mode bindings describe evidence scope; public Verification Policy has no disk-evidence-mode
-acceptance selector. Consumer-policy admission requiring inspection remains a separate deferred contract.
+Signed disk-mode bindings describe evidence scope. `VerificationPolicy.minimumDiskEvidence` defaults to
+strict inspected evidence; producer-only evidence requires explicit `build-provenance-v1` consumer opt-in.
+The minimum is policy-digest-bound and cannot be lowered by producer metadata.
 
 Runtime selection uses the narrowly admitted typed `runtime: docker` and
 `buildNetworkPolicy: producer-declared` controls. No `podmanStorageDriver` field,

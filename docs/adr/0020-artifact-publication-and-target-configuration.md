@@ -107,12 +107,14 @@ the original producer/material owners instead. It does not complete the proposed
 named-decider ratification. Both builds completed but strict inspection timed out in run `37445475840`.
 The narrower candidate completed both disk jobs in run `37486058412`, but aggregate release transport failed
 with insufficient hosted-runner storage before publication. [Recorded transport evidence](../evidence/2026-10-06-m2-release-carrier-transport.md)
-does not establish a complete production Run or consumer acceptance. The ordinary
-local scheduler still rejects disk publication.
+records that earlier failed attempt. The subsequent validation-branch run `37533806963` at commit
+`625980e` passed candidate publication, signing, verification and finalization. It predates these consumer-policy
+and timeout changes and does not validate this merged head. Current main-only execution, independent full-payload
+consumer read-back and live mixed-attempt retry validation remain unexercised. The ordinary local scheduler
+still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
-composition or authorize release. A real generated
-disk publication on either native architecture remains unexercised.
+composition or authorize release.
 
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
@@ -205,6 +207,47 @@ standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras p
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
+The explicit GitHub-only `publication.mode: per-output-v1` uses one output-local publication route per
+required output, retaining the full compiled Plan. Each route observes its exact payload and producer records,
+attests its required SBOMs, publishes the output and evidence, then signs and verifies its own metadata root
+at `<prefix>/releases-<output>`. These roots are internal publication handoffs, not additional product outputs.
+Their signed metadata binds the exact Plan digest and workflow invocation, including run attempt.
+Partial retries may reuse an authenticated output-local root from an earlier attempt of the same GitHub
+run. The server, repository, run ID and workflow builder must match exactly; canonical positive attempt
+numbers must satisfy preparation ≤ signing ≤ the consuming attempt. Different runs, future attempts,
+changed Plans or missing evidence fail closed. Signing may retry against an earlier prepared root without
+rewriting its metadata or original predicate. This exception is limited to pipeline-attested metadata
+assembly/finalization; it does not relax qualified execution or live disk ownership.
+Output-local chart reproduction transports its bound image packages and their producer/evidence
+closure. Those packages are validation dependencies; only the selected chart enters that route's
+published output membership.
+
+Release assembly authenticates every output-local root and its exact production predicate under the configured
+workflow identity/issuer, verifies its SBOM bundles, and joins its named output to the independently frozen
+requirements. It merges shared evidence only when document, subject and stage bindings agree, choosing the
+first sorted output's existing bundle and repository. It publishes a single aggregate root at `<prefix>/releases`.
+The aggregate identifies its current assembly invocation. Each output's `publication` binding preserves
+the digest-pinned output-local root reference and its original preparation and signing invocation IDs.
+These descriptions acquire authority only through the authenticated release; assembly derives them from
+the verified output receipt. A finalizer retry may authenticate an unchanged aggregate from an earlier
+attempt of the same run under the same ordering and Plan checks.
+Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
+and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
+verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.
+Each output route still verifies its full payload closure. The independent Release consumer still retrieves
+and verifies full payloads through its existing held owner.
+
+In this mode finalization requires every provider job to succeed, then reauthenticates the aggregate root,
+exact Plan/invocation-bound production predicate, output signatures/provenance and SBOM bundles. Persisted
+success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
+it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
+read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
+GitHub per-output publication admits only anonymous access or the job-scoped `github:GITHUB_TOKEN`;
+custom static publication credentials are rejected because job permissions cannot narrow their authority.
+Legacy publication without this mode retains its full-closure assembly/finalization path. Local execution and
+dry-run signing do not admit the new mode. Interrupted runs can leave independently published outputs; no
+cross-run reuse, rollback, retention protocol or atomic multi-repository transaction is added.
+
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
 output names, sibling repository locators, descriptor identities, output-to-Build-Digest/component mappings, content subject and
 required evidence membership. There is no separately published lifecycle-binding object. Output identity is
@@ -264,7 +307,8 @@ after each output's exact producer/evidence handoff is validated. Equal Build Di
 output uses. Per-build indexes stay internal. Missing, substituted, duplicate or unbound evidence fails
 construction and consumption. A protected pre-publication stage creates and verifies the bundles before
 assembling the final release metadata; production publication and authenticated consumption reject raw
-preparation evidence. Finalization regenerates the canonical documents from handoffs and rejects disagreement.
+preparation evidence. Legacy finalization regenerates canonical documents from raw handoffs. Per-output finalization authenticates
+the same exact document bindings through the current Run's signed metadata and independently verifies their bundles.
 
 For disk-root and material inventories, document byte integrity is checked before provenance properties are
 read. Missing provenance is reported as `CodeProvenanceMissing` before the semantic identity and exact-subject
@@ -280,7 +324,8 @@ membership and SBOM coverage through the root. Standalone verification does not 
 record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace, fetch every pinned manifest
 and verify its full payload/evidence closure before exposing accepted views. Metadata cannot redirect credentials
 to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their
-repositories, then publishes the release index last; hosted verification pulls the full distributed closure. Plain `release inspect` is descriptive and exposes deliverables, not
+repositories, then publishes the release index last; output-local and legacy hosted verification pull the full distributed closure.
+Per-output aggregate verification fetches only control documents and evidence. Plain `release inspect` is descriptive and exposes deliverables, not
 SBOMs as extra products. No tag-based cosign signature substitutes for qualified clearance. The full graph and
 wrapper rationale are in [publication architecture](../publication-architecture.md).
 

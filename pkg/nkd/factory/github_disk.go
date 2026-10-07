@@ -92,13 +92,12 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 			// runtime admission below must still authenticate the local image.
 			continue
 		}
-		pullCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
-		command := exec.CommandContext(pullCtx, plan.Environment.RuntimeBinary(), "pull", "--platform", root.Platform, image)
-		command.Stdout, command.Stderr = options.Stdout, options.Stderr
-		err := ownedcmd.Run(pullCtx, command)
-		stop()
-		if err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "prepare exact ARC toolchain")
+		if err := pullGitHubPublicImage(ctx, func(pullCtx context.Context) error {
+			command := exec.CommandContext(pullCtx, plan.Environment.RuntimeBinary(), "pull", "--platform", root.Platform, image)
+			command.Stdout, command.Stderr = options.Stdout, options.Stderr
+			return ownedcmd.Run(pullCtx, command)
+		}); err != nil {
+			return err
 		}
 	}
 	var inspector *sbom.DiskInspectionRuntime
@@ -181,7 +180,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	for _, expected := range plan.LifecycleOutputs {
 		if expected.Name == output {
-			return CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)
+			return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, options)
 		}
 	}
 	return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
@@ -195,4 +194,34 @@ func publishGitHubPackerDiagnosticRoute(primary error, output, retained string) 
 		return primary
 	}
 	return joinFactoryCleanupError(primary, appendGitHubSummary(output, "packer_diagnostics="+retained+"\n"), "publish ARC Packer diagnostic route")
+}
+
+// Classify the active pull before releasing its deadline, so cleanup cancellation
+// cannot turn an ordinary registry failure into a retryable timeout.
+func pullGitHubPublicImage(ctx context.Context, run func(context.Context) error) error {
+	ctx, stop := context.WithTimeout(ctx, 15*time.Minute)
+	defer stop()
+	if err := run(ctx); err != nil {
+		return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "prepare exact ARC toolchain"))
+	}
+	return nil
+}
+
+func completeGitHubDiskPublication(ctx context.Context, plan *Plan, expected LifecycleOutputPlan,
+	owner *LocalRunResult, inspector *sbom.DiskInspectionRuntime, options GitHubStepOptions,
+) error {
+	if err := CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector); err != nil {
+		return err
+	}
+	if !PerOutputPublication(plan) {
+		return nil
+	}
+	node := planNode(plan, "package/"+outputPublicationPackage(expected.Name))
+	if githubDiskOutput(plan, node) != expected.Name {
+		return e.New(e.CodePipelineDrift, "ARC output has no admitted offline publication preparation")
+	}
+	_, artifacts := planIndex(plan)
+	return githubProgress(ctx, options, githubNodeLabel(plan, node), githubNodeDetails(plan, node), func(_ *githubStepProgress) error {
+		return executePackage(ctx, plan, node, artifacts, options.Stdout)
+	})
 }

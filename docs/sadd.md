@@ -617,6 +617,13 @@ as a subject-bound CycloneDX attestation bundle. Attestations are created and ve
 the final release index, so its signature covers each exact bundle and document digest. Helm source-archive and final bound-package
 inventories are separate claims; Run completion is not signed. See the [registry graph](publication-architecture.md). Build-only and dry-run outputs gain no signature.
 
+For the M2 GitHub Environment, each output is published, signed and fully verified separately. Release
+assembly and finalization authenticate only bounded metadata and signed evidence from that same Plan and
+workflow run attempt. This avoids gathering all payloads on one runner while preserving one signed release
+entry point and exact output completeness. Failed provider jobs, mismatched attempt bindings or rejected
+signatures prevent completion. Independent consumption still verifies the complete payload closure
+(ADR-18/20); this does not add qualified reproduction or cross-run publication reuse.
+
 Independent artifact consumption uses a signature and subject-bound production attestation on each deliverable
 manifest in its own repository. The release signature remains the authority for membership and SBOM coverage;
 standalone artifact verification does not establish those release-wide claims (ADR-04/20). The pinned cosign 3.1.3

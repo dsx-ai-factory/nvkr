@@ -60,6 +60,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		return err
 	}
 
+	if err := validateGitHubWorkflowSize(workflow); err != nil {
+		return err
+	}
 	actions, err := resolveGitHubActions(plan.Actions)
 	if err != nil {
 		return err

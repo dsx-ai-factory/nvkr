@@ -65,15 +65,22 @@ CWE uses upstream Dockerfile network dependencies; this is not a hermetic or qua
 
 ## GitHub
 
-The [GitHub Environment](../definitions/nke-deploy/environment-github.yaml) publishes under
-`ghcr.io/dsx-ai-factory/nke-recipes` and selects keyless signing. Configure:
+The hosted six-output deploy workflow instructions are retired. The committed `nkd-run.yml`
+and `make workflows-check` both use the [M2 Definition and Environment](../definitions/nke-m2/README.md),
+which include the controller and chart outputs alongside the other M2 artifacts.
+Use that guide for source access, native runner, registry and signing requirements.
 
-- `NKE_SOURCE_TOKEN`: read-only Contents access to `dsx-ai-factory/nke`.
-- The `nkd-release` deployment environment: admit only `main`.
-- GHCR package write access for this repository's `GITHUB_TOKEN`.
+Do not generate this deploy Definition into the repository root: it would replace the shared
+workflow, Plan and manifest with a different bundle and fail the M2 drift check.
+To regenerate the maintained M2 bundle with Git access configured:
 
-The Environment admits default-branch execution only, and its signing identity accepts `main`.
-The repository deployment policy must enforce the same restriction.
+```sh
+go run ./cmd/nkdctl run generate \
+  --definition definitions/nke-m2/definition.yaml \
+  --environment definitions/nke-m2/environment-github.yaml \
+  --engine github --root .
+make workflows-check
+```
 
 Dispatch selects the inputs already committed at the workflow ref, not a Definition argument.
 The following command currently selects the M2 candidate on a ref containing the current bundle, requiring

@@ -59,6 +59,7 @@ diskInspectionProfiles:
     maxFilesystemBytes: 17179869184
     scratchStorage: private-volume
 publication:
+  mode: per-output-v1
   credentialRef: github:GITHUB_TOKEN
   repositoryPrefix: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate
 runtime:

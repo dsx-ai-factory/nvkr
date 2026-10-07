@@ -85,8 +85,8 @@ esac
 			}
 			if tc.localInputs {
 				for _, flag := range []string{"--build-context nkd_archives=" + dir, "--build-arg NKD_ARCHIVE_MODE=local", "--secret id=nkd_ca_bundle,src=" + fake} {
-					if !strings.Contains(string(calls), flag) {
-						t.Fatalf("missing input binding %q: %s", flag, calls)
+					if count := strings.Count(string(calls), flag); count != 1 {
+						t.Fatalf("input binding %q appears %d times, want exactly once: %s", flag, count, calls)
 					}
 				}
 			}

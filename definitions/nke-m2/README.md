@@ -48,7 +48,8 @@ The [merged-source handoff](../../docs/evidence/2026-10-05-m2-input-acquisition.
 records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
 `agent/v*` tag pattern. Exact commit acquisition itself is not protected-ref or source-review
-proof; that acceptance is separately recorded. Runtime, publication and consumer gates remain unresolved.
+proof; that acceptance is separately recorded. The hosted candidate publication result is recorded below;
+independent consumer acceptance remains unresolved.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde/apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
 The source's composition command receives the required explicit native `--architecture` argument.
@@ -89,15 +90,34 @@ full scan, acquisition/material reconciliation and receipt-gated packaging. Afte
 and measured pins are updated, omitting `diskEvidence` selects that strict contract. A complete producer-provenance
 candidate still requires publication, signatures and consumer verification for every selected output, but cannot
 be reported as completion of the proposed strict target. The [failed delivery attempt](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md)
-records the remaining aggregate transport/capacity gap.
-The signed disk mode is descriptive. Public Verification Policy currently has no disk-evidence-mode acceptance
-selector; validating matching documents is not independent policy admission requiring inspected disks.
+records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
+Per-output storage peaks still require measured admission.
+The signed disk mode is descriptive. `VerificationPolicy.minimumDiskEvidence` defaults to `strict` and rejects
+producer-only evidence. A consumer must explicitly opt in to `build-provenance-v1`; the selected minimum is
+policy-digest-bound. The historical validation run below predates this consumer-policy fix and does not validate
+this merged head or prove independent full-payload consumer acceptance.
 
 The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
 read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. The maintained authored policy selects only
-`main`; external `nkd-arc` and `nkd-release` deployment settings must be aligned and independently read back.
-That external policy change is not established by a YAML edit. A complete generated M2 Run remains unproven.
+each internal toolchain package's Manage Actions access settings. The generated workflow has no feature-branch execution exception. Its signing policy admits only
+`main`, which must also be admitted by the `nkd-arc` and `nkd-release` deployment environments.
+The equivalent validation-branch bundle completed all jobs in
+[run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963);
+that run used an exact branch exception absent from these maintained inputs.
+
+The Environment selects `publication.mode: per-output-v1`. Each output is packaged, published, signed and
+verified independently. Release assembly combines authenticated references and evidence from the same Plan
+and workflow run, admitting current or earlier attempts with original preparation/signing identities.
+Aggregate verification and finalization do not download output payloads. Finalization
+still checks every job and every required output. The public release remains one signed entry point under
+`m2-candidate/releases`, with independently consumable output repositories. Per-output jobs still need room
+for their own payloads and copies; this change does not establish a measured runner-storage budget. The
+metadata transport and failure gates are locally contract-tested, and full candidate publication/finalization
+passed the [hosted validation run](https://github.com/dsx-ai-factory/nke-recipes/pull/106).
+Mixed-attempt retry reuse and independent full-payload consumer acceptance remain unexercised.
+
+The generator checks the complete workflow against a 500,000-byte ceiling before writing. YAML anchors and
+inline step maps compact repeated configuration without changing the expanded job graph or credentials.

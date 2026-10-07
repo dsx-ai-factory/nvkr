@@ -142,13 +142,17 @@ not establish those facts.
 The route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
 `nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
-Docker is the initial admitted runtime. Bootstrap, source fetch, publication, signing and finalization remain
+Docker is the initial admitted runtime. Bootstrap, source fetch, registry publication, signing and finalization remain
 on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
 and packaging operations into one bounded helper invocation against the complete Plan. The original producer
 session and held disk survive through packaging; strict mode additionally requires reconciliation. The raw disk has no independent
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
 remain required. Only fixed source-fetch steps receive private-source credentials; ARC disk jobs receive no
-source token, registry-write credential or OIDC signing token.
+source token, registry-write credential or OIDC signing token. With `publication.mode: per-output-v1`, the
+same ARC group also prepares that disk's offline publication layout using its existing material files. The
+exact derived OCI package node is admitted only with network disabled; SBOM attestation and all credentialed
+publication operations remain on hosted runners. Those runners restore the prepared layout rather than the
+disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and `packages: read`.
@@ -615,11 +619,13 @@ command argument is added.
 
 Each stage downloads one exact set of external input carriers, then restores each required carrier in one
 helper step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
-part of the requested set. Each operation prepares its outputs in one step and retains an independent upload
+part of the requested set. After a successful restore, the helper deletes that exact regular carrier file to
+avoid retaining both the archive and its unpacked contents. Failed and unrequested carriers remain untouched.
+Each operation prepares its outputs in one step and retains an independent upload
 for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
 artifacts. Logical commands, transport authentication and isolation remain unchanged.
 
-The finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits
+The legacy finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits
 every carrier and records its producer and restore outcome separately; it continues after missing carriers,
 failed producer jobs and returned restore failures. A diagnostic summary names every outcome. A successful batch
 download or recovery step proves no completeness: the finalizer consumes those unchanged per-carrier records
@@ -627,8 +633,24 @@ and authenticates the complete output and evidence closure. The helper accepts b
 through a step environment value, with an exact stage/bootstrap job set, known statuses, duplicate rejection
 and bounded parsing before filesystem work. Unknown, missing or malformed job results fail closed. Individual
 carrier failure does not stop later recovery; cancellation or failed outcome persistence does.
+With `publication.mode: per-output-v1`, the compiler emits independent output publication routes and a
+metadata-only aggregate operation (ADR-20 §6). Output publication packages cannot be grouped with other
+utility nodes, so grouping cannot recreate an all-output payload download. Offline packaging receives only
+the public GitHub workflow/run identity variables, never registry, source or OIDC credentials. Each output's
+verification exports a bounded metadata carrier. The finalizer downloads only the aggregate metadata,
+published reference, signing record, predicate, verification record and pinned cosign tool. Provider-result
+admission still covers every stage and bootstrap job; any failed, skipped or missing required job prevents
+completion. Assembly and finalization have registry-read permission and no OIDC minting or package-write
+permission. All credentials and signing remain outside ARC producer jobs.
+
 Every generated run script remains checked against GitHub's 21,000-character ceiling, conservatively measured
-as UTF-8 bytes, including explicit operator setup and bootstrap commands.
+as UTF-8 bytes, including explicit operator setup and bootstrap commands. The generator also rejects a
+workflow file over 500,000 UTF-8 bytes before returning a bundle or writing generated files; validation and
+bundle persistence enforce the same bound. Per-output workflows compact repeated values with YAML anchors
+and inline step maps, then compare the fully expanded JSON to the uncompressed workflow before acceptance.
+Compaction changes presentation only, not jobs, scripts or permissions. The limit follows GitHub's
+[500 KB workflow-file ceiling](https://docs.github.com/en/actions/reference/limits#workflow-file-size);
+files that remain oversized fail closed instead of generating an unstartable workflow.
 Provider outage or failed local outcome storage can
 still prevent finalization.
 

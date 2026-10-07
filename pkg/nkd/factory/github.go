@@ -260,6 +260,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))
+		if PerOutputPublication(plan) {
+			target := plan.Targets["release"]
+			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
+			fmt.Fprintln(&body, "    permissions:\n      contents: read\n      packages: read")
+			if target.CredentialRef != "" {
+				secret := strings.TrimPrefix(target.CredentialRef, "github:")
+				fmt.Fprintf(&body, "    env:\n      NKD_REGISTRY_USER: '${{ github.actor }}'\n      NKD_CREDENTIAL: '${{ secrets.%s }}'\n", secret)
+			}
+		}
 		fmt.Fprintln(&body, "    steps:")
 		actions.writeCheckoutStep(&body)
 		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runners[0]), ".")
@@ -272,6 +281,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "      - name: Upload final Run record\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nkd-lifecycle-run\n          path: .nkd/run.json\n          if-no-files-found: error\n", actions.Upload)
 	}
 	workflow := body.Bytes()
+	if PerOutputPublication(plan) {
+		workflow, err = compactGitHubWorkflow(workflow)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := validateGitHubWorkflowSize(workflow); err != nil {
+		return nil, err
+	}
 	files[GitHubWorkflowPath] = append([]byte(nil), workflow...)
 	bundle := newGeneratedBundle(EngineGitHub, githubLayout, files, planDigest)
 	if validate {
@@ -290,7 +308,7 @@ func writeGitHubPackerDiagnosticStep(out *bytes.Buffer, stage githubStage, actio
 // jobs that use a signing profile. Artifact signing and SBOM attestation request an OIDC identity token;
 // publication verification uses registry read access without minting credentials.
 func signFamilyNode(kind string) bool {
-	return kind == NodeSign || kind == NodeVerifyPublication || kind == NodeAttestEvidence
+	return kind == NodeSign || kind == NodeVerifyPublication || kind == NodeAttestEvidence || kind == NodeAssembleRelease
 }
 
 // githubSigningPermissions is the exact token scope set of one signing-family job.
@@ -300,7 +318,7 @@ func signFamilyNode(kind string) bool {
 // (sign) or registry read to fetch it back (verify).
 func githubSigningPermissions(kind, mode string) map[string]string {
 	permissions := map[string]string{"contents": "read"}
-	if kind == NodeVerifyPublication {
+	if kind == NodeVerifyPublication || kind == NodeAssembleRelease {
 		permissions["packages"] = "read"
 	}
 	if mode != SigningModeCosign {

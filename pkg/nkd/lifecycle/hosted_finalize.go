@@ -48,6 +48,25 @@ func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	if restoreErr := factory.ValidateHostedRestores(ctx, workspace, plan); restoreErr != nil {
 		return recordRunFailure(ctx, outputPath, run, restoreErr, "recording hosted failed Run")
 	}
+	if factory.PerOutputPublication(plan) {
+		observed, err := factory.AuthenticateHostedReferenceRelease(ctx, workspace, plan)
+		if err != nil {
+			return recordRunFailure(ctx, outputPath, run, err, "authenticating hosted reference release")
+		}
+		run.Lane = LanePipeline
+		bound, err := bindObserved(run, observed)
+		if err != nil {
+			return recordRunFailure(ctx, outputPath, run, err, "binding hosted reference release")
+		}
+		bound, err = bindReleaseContent(plan, bound)
+		if err != nil {
+			return recordRunFailure(ctx, outputPath, run, err, "binding reference release content")
+		}
+		if err := writeRunRecord(ctx, outputPath, bound); err != nil {
+			return nil, err
+		}
+		return bound, nil
+	}
 	observed, err := observeHostedOutputs(ctx, workspace, run.Expected, artifacts, plan)
 	if err != nil {
 		return recordRunFailure(ctx, outputPath, run, err, "recording hosted failed Run")

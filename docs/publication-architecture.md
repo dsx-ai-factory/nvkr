@@ -89,6 +89,17 @@ The maintained CLI/CWE/Helm outputs each own their evidence, with two distinct i
 5. Authenticate the root, retrieve the complete distributed closure, verify all deliverable signatures and
    provenance, and independently verify every SBOM bundle before writing successful hosted verification.
 
+For `publication.mode: per-output-v1`, steps 1–5 run independently for each named output. Each route also
+publishes an internal signed metadata root at `<prefix>/releases-<output>`, bound to the full Plan and current
+workflow run attempt. Aggregate assembly verifies these roots, exact production predicates and SBOM bundles,
+checks the frozen output set, and publishes only the combined release metadata at `<prefix>/releases`.
+Aggregate verification and finalization fetch manifests/configs and evidence, never payload layers. The
+finalizer restores six carriers (metadata, reference, signing record, predicate, verification record and cosign),
+and still requires every provider job to succeed. Metadata readers reject extra blobs and enforce a 512 MiB
+control/evidence limit per root. Each output's full payload validation remains in its own publication route;
+independent consumers retain full payload validation. This mode is GitHub-only and requires production cosign
+signing. Assembly and finalization receive registry-read access without OIDC or package-write permission.
+
 The SBOM-attestation job uses the same protected workflow identity and issuer as artifact signing. It needs
 OIDC access but no registry credentials. Artifact publication/signing retain their existing scoped registry
 access. These effects are not an atomic remote transaction: failure can leave payloads or partial evidence;

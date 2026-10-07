@@ -155,6 +155,38 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	}
 }
 
+func TestPrivateImageActiveInterruption(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		t.Run(map[bool]string{false: "cancellation", true: "deadline"}[deadline], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			if deadline {
+				ctx, cancel = context.WithTimeout(t.Context(), time.Second)
+			}
+			defer cancel()
+			var directory string
+			err := pullGitHubImages(ctx, []string{"ghcr.io/example/tool@sha256:" + strings.Repeat("a", 64)}, "linux/amd64", "reader", "synthetic-token",
+				func(active context.Context, config, _, _ string) error {
+					directory = config
+					if !deadline {
+						cancel()
+					}
+					<-active.Done()
+					return active.Err()
+				})
+			assertFactoryErrorCode(t, err, e.CodeTimeout)
+			if !errors.Is(err, ctx.Err()) {
+				t.Fatalf("lost context cause: %v", err)
+			}
+			if directory == "" {
+				t.Fatal("pull did not start")
+			}
+			if _, err := os.Stat(directory); !os.IsNotExist(err) {
+				t.Fatal("credential directory survived interruption")
+			}
+		})
+	}
+}
+
 func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 	plan := arcTestPlan(t, "linux/amd64")
 	plan.Environment.Publication.RepositoryPrefix = "ghcr.io/example/nkd"

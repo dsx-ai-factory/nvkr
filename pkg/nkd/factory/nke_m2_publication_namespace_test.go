@@ -34,6 +34,8 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 		{"refs/heads/main", true},
 		{"refs/heads/codex/m2-arc-validation", false},
 		{"refs/heads/codex/m2-arc-validation-other", false},
+		{"refs/heads/feat/m2-native-arc", false},
+		{"refs/heads/main-other", false},
 		{"refs/heads/other", false},
 		{"refs/tags/codex/m2-arc-validation", false},
 		{"refs/pull/1/merge", false},

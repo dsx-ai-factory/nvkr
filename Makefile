@@ -3,6 +3,8 @@
 
 BIN         := bin/nkdctl
 PKG         := ./...
+# Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
+GO_TEST_FLAGS ?=
 # Module source dirs only (never the vendored trees checked out under .nkd/).
 GOSRC       := client cmd internal pkg
 GOFILES     := $(shell find $(GOSRC) -type f -name '*.go' -print)
@@ -84,8 +86,13 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 
 .PHONY: test
 test: ## Unit tests with race + coverage (pure logic; no docker required).
-	go test -race -covermode=atomic -coverprofile=coverage.out $(PKG)
+	# Full factory race/coverage contracts exceed Go's default 10m package budget on hosted runners.
+	go test -timeout 20m -race -covermode=atomic -coverprofile=coverage.out $(GO_TEST_FLAGS) $(PKG)
 	@go tool cover -func=coverage.out | tail -1
+
+.PHONY: test-ci-tools
+test-ci-tools: ## Check CI timing report parsing and failure diagnostics.
+	python3 -B -m unittest discover -s scripts -p ci_test_summary_test.py
 
 .PHONY: cover
 cover: test ## Open the HTML coverage report in a browser.
@@ -120,7 +127,7 @@ workflows-check: ## Verify the committed Run generation matches the catalog (ADR
 		--root . --check
 
 .PHONY: check
-check: go-version-check fmt-check vet lint shellcheck test vulncheck ## Full local gate — run before pushing.
+check: go-version-check fmt-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
 
 # --- housekeeping -----------------------------------------------------------
 
