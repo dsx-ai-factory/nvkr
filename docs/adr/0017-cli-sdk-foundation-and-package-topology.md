@@ -26,8 +26,10 @@ belongs to the downstream deployment owner and is not part of the Definition or 
 sets, clearance, publication roots, and qualification records are generated/authenticated internals available
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
-Definition declares named outputs directly. Each output selects exact catalog components and a concrete target
-platform, together with its artifact format. An output may explicitly
+Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
+platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
+set; the compiler derives one native producer target per member and one required image-index output
+binding every member's exact manifest, Build identity and evidence. An output may explicitly
 select another catalog. The compiler derives its complete pinned build graph, routine package envelopes,
 required slots, and routes. Byte-changing transformations remain explicit. Missing or duplicate selections,
 unsupported platforms and unsupported formats fail with coded errors before work.
@@ -56,7 +58,7 @@ without a successful real NKE join; main-only execution, independent full-payloa
 M3 inventory/qualification and organizational acceptance remain separate gaps in
 [reconciliation](reconciliation.md).
 
-Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
+Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy

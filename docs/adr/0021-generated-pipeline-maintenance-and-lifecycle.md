@@ -29,8 +29,11 @@ This ADR fixes maintenance.
 `run generate` is the normal owner of committed workflows, complete plans and manifests. Every
 owned file regenerates byte-for-byte from exact Definition, Environment, catalog pins, generator version and
 engine. Drift checks repeat the recorded Definition and Environment inputs without substituting a different
-catalog, path or engine. Definition v4 outputs select exact producers and a concrete platform directly;
-the Plan embeds producer graphs keyed by output name. Separate per-build graph files are retired through
+catalog, path or engine. Definition v5 outputs select exact producers directly, with either a native `platform`
+or an OCI aggregate `platforms` set. The v5 Plan/artifact graph embeds one producer graph per native build target: a native
+output has one target keyed by output name, while an aggregate derives a target for each required platform
+and one image-index packaging node that joins every member's exact result and evidence. Run/Release v4
+records retain the required aggregate output and its native membership. Separate per-build graph files are retired through
 the previous manifest; hosted operations execute the exact complete Plan. The former recipe selection and catalog criteria
 workflow are removed. Cluster-composition files and nodes are also removed; regeneration retires former
 owned members through the same prior-manifest checks described below. Changed graph/plan and lifecycle records use their new schema majors; old records

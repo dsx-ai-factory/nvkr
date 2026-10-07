@@ -489,18 +489,25 @@ func mustReadImageDirectory(t *testing.T, path string) []os.DirEntry {
 	return entries
 }
 
-// Trigger cancellation at a stable I/O boundary instead of relying on wall-clock
-// timing or a very large fixture. The embedded context owns Done and cancellation.
+// Cancel only after observing the private stage, independent of the number of
+// pre-stage context checks. The embedded context owns Done and cancellation.
 type imageCancelContext struct {
 	context.Context
 	cancel context.CancelFunc
-	checks atomic.Int32
-	after  int32
+	parent string
+	staged atomic.Bool
 }
 
 func (ctx *imageCancelContext) Err() error {
-	if ctx.checks.Add(1) >= ctx.after {
-		ctx.cancel()
+	entries, err := os.ReadDir(ctx.parent)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), ".nkd-image-index-") {
+				ctx.staged.Store(true)
+				ctx.cancel()
+				break
+			}
+		}
 	}
 	return ctx.Context.Err()
 }
@@ -511,8 +518,11 @@ func TestImageIndexCancellationCleansPrivateStage(t *testing.T) {
 	parent := t.TempDir()
 	base, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx := &imageCancelContext{Context: base, cancel: cancel, after: 4}
+	ctx := &imageCancelContext{Context: base, cancel: cancel, parent: parent}
 	assertRegistryCode(t, index.WriteLayout(ctx, filepath.Join(parent, "index")), e.CodeTimeout)
+	if !ctx.staged.Load() {
+		t.Fatal("cancellation did not observe a private stage")
+	}
 	if entries := mustReadImageDirectory(t, parent); len(entries) != 0 {
 		t.Fatalf("canceled copy leaked stage: %v", entries)
 	}

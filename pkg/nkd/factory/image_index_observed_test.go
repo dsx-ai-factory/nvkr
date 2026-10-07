@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -237,5 +238,53 @@ func TestImageIndexPackagingCancellationHasNoOutput(t *testing.T) {
 	assertFactoryErrorCode(t, executePackage(ctx, p, n, a, io.Discard), e.CodeTimeout)
 	if _, err := os.Lstat(a[n.Outputs[0]].Path); !os.IsNotExist(err) {
 		t.Fatalf("partial output: %v", err)
+	}
+}
+
+// Exercise the consumer joins independently of generic packageInputs admission.
+func TestImageIndexConsumerRejectsMissingOrSubstitutedEvidence(t *testing.T) {
+	for _, route := range []string{"prepare", "observe"} {
+		for _, tc := range []struct {
+			name    string
+			child   int
+			missing bool
+			code    e.Code
+		}{
+			{"missing inventory", 1, true, e.CodeProvenanceMissing},
+			{"first result substitution", 0, false, e.CodeReleaseIncomplete},
+			{"second result substitution", 1, false, e.CodeVerifyFailed},
+		} {
+			t.Run(route+"/"+tc.name, func(t *testing.T) {
+				p, n, a := indexObservationFixture(t)
+				// Materialize a valid aggregate before corrupting only the consumer handoff.
+				if err := executePackage(t.Context(), p, n, a, io.Discard); err != nil {
+					t.Fatal(err)
+				}
+				child := n.ImageIndex.Children[tc.child]
+				if tc.missing {
+					delete(a, child.SBOMArtifactID)
+				} else {
+					result := a[child.ResultArtifactID]
+					result.BuildTarget = n.ImageIndex.Children[1-tc.child].BuildTarget
+					a[child.ResultArtifactID] = result
+				}
+				if route == "prepare" {
+					index, binding, err := prepareImageIndex(t.Context(), p, n.ImageIndex, a)
+					if index != nil {
+						defer index.Close()
+					}
+					assertFactoryErrorCode(t, err, tc.code)
+					if index != nil || binding != nil {
+						t.Fatal("failed consumer returned held index or binding")
+					}
+				} else {
+					observed, err := ObserveLifecyclePayload(t.Context(), p, p.LifecycleOutputs[0], a)
+					assertFactoryErrorCode(t, err, tc.code)
+					if !reflect.DeepEqual(observed, LifecyclePayloadObservation{}) {
+						t.Fatalf("failed consumer returned observation: %+v", observed)
+					}
+				}
+			})
+		}
 	}
 }
