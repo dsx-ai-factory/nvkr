@@ -1,0 +1,224 @@
+{
+  "sourceRun": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963",
+  "sourceCommit": "625980e30b1a9f5ef27a9b46534de65eefff385a",
+  "retrieval": "Authenticated GitHub CLI read-only API/artifact reads; no independent registry or consumer verification",
+  "files": [
+    {
+      "path": "release-control.json",
+      "sha256": "75ec2768aa4174d2d7f2fc6daad43040f0a8a05d0d1c96e3c325f4ebe889577d",
+      "size": 88076,
+      "artifact": "nkd-metadata-release",
+      "artifactId": 11449811663,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11449811663",
+      "tarMember": ".nkd/factory/metadata/release/blobs/sha256/75ec2768aa4174d2d7f2fc6daad43040f0a8a05d0d1c96e3c325f4ebe889577d",
+      "carrierTarSha256": "659558eddce3946cfb83b0e8bc5ceb66d126a603b552ba3d8fdbf02e7d5c541c",
+      "archiveDigest": "sha256:c92c0425e2da876f9bc502cda4f5f9291c6c3e56b858a70dc616eb63b4c3f6d5"
+    },
+    {
+      "path": "release-index.json",
+      "sha256": "292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "size": 675,
+      "artifact": "nkd-metadata-release",
+      "artifactId": 11449811663,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11449811663",
+      "tarMember": ".nkd/factory/metadata/release/index.json",
+      "carrierTarSha256": "659558eddce3946cfb83b0e8bc5ceb66d126a603b552ba3d8fdbf02e7d5c541c",
+      "archiveDigest": "sha256:c92c0425e2da876f9bc502cda4f5f9291c6c3e56b858a70dc616eb63b4c3f6d5"
+    },
+    {
+      "path": "amd64-verification.json",
+      "sha256": "dcce6ea0e6259d3431693e927c6868cd71b9c798e99aeb1dc25711f123dfd886",
+      "size": 2545,
+      "artifact": "nkd-verification-output-nke-node-image-amd64",
+      "artifactId": 11449455030,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11449455030",
+      "tarMember": ".nkd/factory/verifications/output-nke-node-image-amd64.json",
+      "carrierTarSha256": "64b52808fdea78ff810841126d93216ba440f07e5ecc95211940e12e24b30853",
+      "archiveDigest": "sha256:fec98f72c13db171d45125a324fe9e7b62b893a77efeff5c85dba8cf21556c7b"
+    },
+    {
+      "path": "release-verification.json",
+      "sha256": "4ead60d5b443171c02e35804c0261187288cdf6d0d2064b922bcb65426852de5",
+      "size": 2482,
+      "artifact": "nkd-verification-release",
+      "artifactId": 11448904167,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11448904167",
+      "tarMember": ".nkd/factory/verifications/release.json",
+      "carrierTarSha256": "9f9249b6d7892a68d489abcef9048820c7e10a78eb06c188989e836348a3afdf",
+      "archiveDigest": "sha256:4f08fb122558fba2510b8b00d1857aecf7e2194263aa40fac27da91292982b00"
+    },
+    {
+      "path": "release-predicate.json",
+      "sha256": "e7545f7207f52072e503fca4d851a1b3b9ab88eaf9cfc51f1608c2f564cb8b55",
+      "size": 11404,
+      "artifact": "nkd-predicate-release",
+      "artifactId": 11449292574,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11449292574",
+      "tarMember": ".nkd/factory/predicates/release.json",
+      "carrierTarSha256": "17f9f33a4f14afbe72da85e9a58e62db4de1c0c7fcbb70385d581ebb0e9ba1b3",
+      "archiveDigest": "sha256:a247a1ab4ea0931caddad580260011fbfe3930c5461cece8ec8dd27dfd95cc6d"
+    },
+    {
+      "path": "release-signature.json",
+      "sha256": "1b18afb58d1aa5ed28b4af4f83e9c7fb79d6f319dde7612d3532fc1d077d9744",
+      "size": 1182,
+      "artifact": "nkd-signature-release",
+      "artifactId": 11448723020,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11448723020",
+      "tarMember": ".nkd/factory/signatures/release.json",
+      "carrierTarSha256": "cfe10c3c33a43e0b73b1b5fe37f676dc36f44867eb5af3ec50ca0132111131ba",
+      "archiveDigest": "sha256:ad67e622490a0b4a8b9750307d623a12785893945f48f5f7fc7ac3df3acf74ab"
+    },
+    {
+      "path": "arm64-verification.json",
+      "sha256": "42b5e13f13eea1d850a1e0623ec85663a829aa7d94c342a1abccd938182241d7",
+      "size": 2545,
+      "artifact": "nkd-verification-output-nke-node-image-arm64",
+      "artifactId": 11448465629,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11448465629",
+      "tarMember": ".nkd/factory/verifications/output-nke-node-image-arm64.json",
+      "carrierTarSha256": "6c611275b22bf5aba9b9d8e132150bb503e8fa3fe44c77544154c17a2da78b4e",
+      "archiveDigest": "sha256:795a91c576f8e3353012bf2354c131aa75fb24e9914f08889c3e58be24f2f071"
+    },
+    {
+      "path": "release-reference.txt",
+      "sha256": "b5ea159898a98ac7e7bc1159d4700baf0f2727aedfcd4bd003d2207734598181",
+      "size": 129,
+      "artifact": "nkd-publication-release",
+      "artifactId": 11448359352,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11448359352",
+      "tarMember": ".nkd/factory/publications/release.txt",
+      "carrierTarSha256": "b98b17851f8a8af73c4d759b12e7c504f09d1d17a831b2efe5c68521a24e5074",
+      "archiveDigest": "sha256:eeab0d9a88ae66d78933110878ed94300c2229e9fe966b2b1a76c9fafd92423b"
+    },
+    {
+      "path": "plan.json",
+      "sha256": "2fa4adaa92568688bda2e247639d7ef89559514a8f89433cf35becc238d1e707",
+      "size": 804955,
+      "sourceURL": "https://github.com/dsx-ai-factory/nke-recipes/blob/625980e30b1a9f5ef27a9b46534de65eefff385a/.github/nkd-run/plan.json"
+    },
+    {
+      "path": "definition.yaml",
+      "sha256": "bdb0d072c60bb890ff7157a607449f8217508145f7d04cc582acef7e2c76a022",
+      "size": 6516,
+      "sourceURL": "https://github.com/dsx-ai-factory/nke-recipes/blob/625980e30b1a9f5ef27a9b46534de65eefff385a/definitions/nke-m2/definition.yaml"
+    },
+    {
+      "path": "run-summary.json",
+      "sha256": "fad6f0c30052308517f176e9339274b1bcf7daefc429f313e2264fa178af223b",
+      "size": 107972,
+      "sourceURL": "https://api.github.com/repos/dsx-ai-factory/nke-recipes/actions/runs/37533806963",
+      "projection": "gh run view metadata plus jobs with step details removed; successful final snapshot; updatedAt 2026-10-06T23:03:19Z"
+    },
+    {
+      "path": "run.json",
+      "sha256": "cc95b6ff6d1f48b0d992dda3cbe4b388aeb6da21ce579f58e937ab724d80702c",
+      "size": 22677,
+      "artifact": "nkd-lifecycle-run",
+      "artifactId": 11449334418,
+      "artifactURL": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/artifacts/11449334418",
+      "member": "run.json",
+      "archiveDigest": "sha256:79c00d300a67732eabbf9f944ca784452dc7bf4ee4b44c3775b5d0d349922986"
+    },
+    {
+      "path": "pr108-browse-full.mmd",
+      "sha256": "a372b92e5e98ce8e6495e8b6ad56dde7b36740558adb015639bc6d3cc4f62cd8",
+      "size": 16391,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse-full.txt",
+      "sha256": "7d499050c58cdd476dc1d0b0c35d806f3ab887eb9e22f6b5f2b4a5995d37f340",
+      "size": 40713,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse-nke-node-image-amd64.json",
+      "sha256": "eaf4133cc19e74d3c368a1afd80e1dbbfa8613367573860ca64d4ce0a7dd026f",
+      "size": 15761,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse-nke-node-image-amd64.mmd",
+      "sha256": "0ab12007b0ca2f325db2daaef4c0234a458f941ea5ffeae78e9074b196cf1a67",
+      "size": 2736,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse-nke-node-image-amd64.txt",
+      "sha256": "524137da30e287294ef775f4dea8b37ee3ef6ff0d800c2166fc27365943a2644",
+      "size": 6512,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse-nke-node-image-arm64.json",
+      "sha256": "1c9ed9c06f42dd50f7892bfa7d112e5fef0f6f6ac8e5da4998b0ead6601a2e26",
+      "size": 15695,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse-nke-node-image-arm64.mmd",
+      "sha256": "bffa1f373b0599cb3a94b8d86aca2f06afca9fce85715d0da9171cab9ef9a177",
+      "size": 2700,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse-nke-node-image-arm64.txt",
+      "sha256": "b04eb216ae222ad294ec13e8d739a09e7974572c1d153430e3d5616def9f009c",
+      "size": 6476,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-browse.json",
+      "sha256": "ab2e7d4fd77f76b581cac8838b6d4d19bc01b8529c0df7418ab19014d6ef17b2",
+      "size": 96092,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    },
+    {
+      "path": "pr108-replay.json",
+      "sha256": "e89760c12a3f908207d1bb508c49fa9d806fe30b028dafd33330b0d3a82e8c96",
+      "size": 4511,
+      "producerCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+      "producerCliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+      "operation": "read-only replay summary",
+      "sourceReference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "sourceMetadataArtifactId": 11449811663
+    }
+  ]
+}

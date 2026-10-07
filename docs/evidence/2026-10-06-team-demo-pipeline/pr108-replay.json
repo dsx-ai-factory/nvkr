@@ -1,0 +1,131 @@
+{
+  "sourceCommit": "00c71385580e798eb3d7f74b88fc694225cfe175",
+  "sourcePR": "https://github.com/dsx-ai-factory/nke-recipes/pull/108",
+  "replayedOnUTC": "2026-10-07",
+  "replayedOnPacific": "2026-10-06",
+  "cliVersion": "nkdctl version 00c71385 (00c71385)",
+  "cliSha256": "5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a",
+  "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+  "inspection": "metadata inspection; payloads, signatures and policy not verified",
+  "metadataCarrier": {
+    "artifact": "nkd-metadata-release",
+    "artifactId": 11449811663,
+    "regularFiles": 193,
+    "bytes": 2213704,
+    "blobNamesHashChecked": 191,
+    "uniqueDeclaredOutputPayloadLayers": 111,
+    "outputPayloadLayersPresent": 0
+  },
+  "liveRegistry": {
+    "exitCode": 0,
+    "elapsedSeconds": 184.875,
+    "stdoutBytes": 96092,
+    "stderrBytes": 0,
+    "privateWorkspaceCleaned": true,
+    "byteIdenticalToLocal": true,
+    "outputSha256": "ab2e7d4fd77f76b581cac8838b6d4d19bc01b8529c0df7418ab19014d6ef17b2"
+  },
+  "localViews": {
+    "views": [
+      {
+        "file": "pr108-browse-full.txt",
+        "format": "text",
+        "output": "full",
+        "exitCode": 0,
+        "elapsedSeconds": 18.914,
+        "sha256": "7d499050c58cdd476dc1d0b0c35d806f3ab887eb9e22f6b5f2b4a5995d37f340",
+        "size": 40713
+      },
+      {
+        "file": "pr108-browse-full.mmd",
+        "format": "mermaid",
+        "output": "full",
+        "exitCode": 0,
+        "elapsedSeconds": 15.009,
+        "sha256": "a372b92e5e98ce8e6495e8b6ad56dde7b36740558adb015639bc6d3cc4f62cd8",
+        "size": 16391
+      },
+      {
+        "file": "pr108-browse-nke-node-image-amd64.txt",
+        "format": "text",
+        "output": "nke-node-image-amd64",
+        "exitCode": 0,
+        "elapsedSeconds": 16.007,
+        "sha256": "524137da30e287294ef775f4dea8b37ee3ef6ff0d800c2166fc27365943a2644",
+        "size": 6512
+      },
+      {
+        "file": "pr108-browse-nke-node-image-amd64.json",
+        "format": "json",
+        "output": "nke-node-image-amd64",
+        "exitCode": 0,
+        "elapsedSeconds": 11.257,
+        "sha256": "eaf4133cc19e74d3c368a1afd80e1dbbfa8613367573860ca64d4ce0a7dd026f",
+        "size": 15761
+      },
+      {
+        "file": "pr108-browse-nke-node-image-amd64.mmd",
+        "format": "mermaid",
+        "output": "nke-node-image-amd64",
+        "exitCode": 0,
+        "elapsedSeconds": 10.409,
+        "sha256": "0ab12007b0ca2f325db2daaef4c0234a458f941ea5ffeae78e9074b196cf1a67",
+        "size": 2736
+      },
+      {
+        "file": "pr108-browse-nke-node-image-arm64.txt",
+        "format": "text",
+        "output": "nke-node-image-arm64",
+        "exitCode": 0,
+        "elapsedSeconds": 17.969,
+        "sha256": "b04eb216ae222ad294ec13e8d739a09e7974572c1d153430e3d5616def9f009c",
+        "size": 6476
+      },
+      {
+        "file": "pr108-browse-nke-node-image-arm64.json",
+        "format": "json",
+        "output": "nke-node-image-arm64",
+        "exitCode": 0,
+        "elapsedSeconds": 19.443,
+        "sha256": "1c9ed9c06f42dd50f7892bfa7d112e5fef0f6f6ac8e5da4998b0ead6601a2e26",
+        "size": 15695
+      },
+      {
+        "file": "pr108-browse-nke-node-image-arm64.mmd",
+        "format": "mermaid",
+        "output": "nke-node-image-arm64",
+        "exitCode": 0,
+        "elapsedSeconds": 16.323,
+        "sha256": "bffa1f373b0599cb3a94b8d86aca2f06afca9fce85715d0da9171cab9ef9a177",
+        "size": 2700
+      }
+    ],
+    "unknownOutput": {
+      "exitCode": 2,
+      "stdoutBytes": 0,
+      "codedError": "NKD-E-USAGE"
+    }
+  },
+  "selfGuidedScript": {
+    "script": "docs/demo-team-release.sh",
+    "scriptSha256": "3ea7ff99fde2eef7e47b51ba0d357d0e27aab103ebd61e32b0851d6672c36a69",
+    "arguments": [
+      "--reference",
+      "<recorded exact reference>",
+      "--layout",
+      "<recorded metadata carrier layout>",
+      "--output",
+      "nke-node-image-arm64",
+      "--mermaid",
+      "--non-interactive",
+      "--out",
+      "<new directory>"
+    ],
+    "exitCode": 0,
+    "jsonByteIdentical": true,
+    "focusedOutputs": 1,
+    "totalOutputs": 34,
+    "mermaidHeaderChecked": true
+  },
+  "scope": "Exact external release metadata inspection on PR108; no artifact payload, signature or consumer-policy verification. No additional HTTP transport guard was installed for this replay; the earlier PR validation record separately records its guarded live call."
+}

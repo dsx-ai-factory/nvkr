@@ -1,0 +1,272 @@
+apiVersion: nkd.dev/definition/v4
+kind: Definition
+metadata:
+  name: nke-m2
+  description: Build the maintained CLI, controller, configurable deployment charts and both native non-FDE node images, and acquire operator tooling plus AMD64 and ARM64 non-test runtime images selected by NKE deployment values at 33fb71b2f4224b470ebc628a9165fc4b92870406 in one Run.
+catalog:
+  base: ../nke-v1/catalog
+sbomTool: syft
+cosignTool: cosign
+outputs:
+  - name: controller-chart
+    platform: linux/amd64
+    catalog:
+      base: ../nke-controller/catalog
+    format: helm-oci
+    components:
+      - nke-controller-chart
+    helm:
+      images:
+        controller: cwe
+  - name: csi-node-driver-registrar-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - csi-node-driver-registrar-image
+  - name: csi-node-driver-registrar-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - csi-node-driver-registrar-image
+  - name: cwe
+    platform: linux/amd64
+    catalog:
+      base: ../nke-controller/catalog
+    format: oci
+    components:
+      - nke-controller
+  - name: nke-node-image-amd64
+    platform: linux/amd64
+    catalog:
+      base: ./os-catalog
+      overlays: [./native-toolchains.yaml]
+    format: disk-image
+    components:
+      - nke-agent
+      - nke-cni-calico
+      - nke-cni-ovn
+      - nke-image-inputs
+      - nke-kubeadm-distro
+      - nke-node-image-amd64
+      - nke-patched-installer-iso-amd64
+      - nke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso-amd64
+  - name: nke-node-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./os-catalog
+      overlays: [./native-toolchains.yaml]
+    format: disk-image
+    components:
+      - nke-agent
+      - nke-cni-calico
+      - nke-cni-ovn
+      - nke-image-inputs
+      - nke-kubeadm-distro
+      - nke-node-image
+      - nke-patched-installer-iso
+      - nke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso
+  - name: nkectl
+    platform: linux/amd64
+    format: executable
+    components:
+      - nkectl
+  - name: operator-tools
+    platform: linux/amd64
+    catalog:
+      base: ./catalog
+    format: executable
+    components:
+      - helm
+      - kubectl
+  - name: postgresql
+    platform: linux/amd64
+    catalog:
+      base: ../nke-controller/catalog
+    format: helm-oci
+    components:
+      - postgresql-chart
+  - name: postgresql-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - postgresql-image
+  - name: postgresql-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - postgresql-image
+  - name: spiffe-csi-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spiffe-csi-image
+  - name: spiffe-csi-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spiffe-csi-image
+  - name: spire
+    platform: linux/amd64
+    catalog:
+      base: ../nke-controller/catalog
+    format: helm-oci
+    components:
+      - spire-chart
+  - name: spire-agent-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-agent-image
+  - name: spire-agent-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-agent-image
+  - name: spire-bash-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-bash-image
+  - name: spire-bash-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-bash-image
+  - name: spire-controller-manager-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-controller-manager-image
+  - name: spire-controller-manager-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-controller-manager-image
+  - name: spire-crds
+    platform: linux/amd64
+    catalog:
+      base: ../nke-controller/catalog
+    format: helm-oci
+    components:
+      - spire-crds-chart
+  - name: spire-oidc-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-oidc-image
+  - name: spire-oidc-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-oidc-image
+  - name: spire-server-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-server-image
+  - name: spire-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-server-image
+  - name: spire-tpm-server-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-tpm-server-image
+  - name: spire-tpm-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - spire-tpm-server-image
+  - name: temporal
+    platform: linux/amd64
+    catalog:
+      base: ../nke-controller/catalog
+    format: helm-oci
+    components:
+      - temporal-chart
+  - name: temporal-admin-tools-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - temporal-admin-tools-image
+  - name: temporal-admin-tools-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - temporal-admin-tools-image
+  - name: temporal-server-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - temporal-server-image
+  - name: temporal-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - temporal-server-image
+  - name: temporal-ui-image
+    platform: linux/amd64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - temporal-ui-image
+  - name: temporal-ui-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./image-catalog
+    format: oci
+    components:
+      - temporal-ui-image

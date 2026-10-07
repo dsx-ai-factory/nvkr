@@ -1,0 +1,421 @@
+flowchart TD
+  %% metadata inspection; payloads, signatures and policy not verified.
+  root["Release sha256:292524ba607d #124; metadata inspection"]
+  o0["controller-chart #124; helm-oci"]
+  root --> o0
+  o0_c0["nke-controller-chart #124; sha256:9d484bbaae15"]
+  o0 -->|contains| o0_c0
+  o1["csi-node-driver-registrar-image #124; oci #124; linux/amd64"]
+  root --> o1
+  o1_c0["csi-node-driver-registrar-image #124; sha256:1ca23bdbb150"]
+  o1 -->|contains| o1_c0
+  o2["csi-node-driver-registrar-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o2
+  o2_c0["csi-node-driver-registrar-image #124; sha256:0898bf569379"]
+  o2 -->|contains| o2_c0
+  o3["cwe #124; oci #124; linux/amd64"]
+  root --> o3
+  o3_c0["nke-controller #124; sha256:8e2c9793473f"]
+  o3 -->|contains| o3_c0
+  o4["nke-node-image-amd64 #124; disk-image #124; linux/amd64"]
+  root --> o4
+  o4_c0["nke-agent #124; sha256:4ba6aa929380"]
+  o4 -->|contains| o4_c0
+  o4_c1["nke-cni-calico #124; sha256:4eea36a1a38b"]
+  o4 -->|contains| o4_c1
+  o4_c2["nke-cni-ovn #124; sha256:ab17f6a8cfee"]
+  o4 -->|contains| o4_c2
+  o4_c3["nke-image-inputs #124; sha256:96b980545901"]
+  o4 -->|contains| o4_c3
+  o4_c4["nke-kubeadm-distro #124; sha256:4df3b51d7807"]
+  o4 -->|contains| o4_c4
+  o4_c5["nke-node-image-amd64 #124; sha256:b955979a5b84"]
+  o4 -->|contains| o4_c5
+  o4_c6["nke-patched-installer-iso-amd64 #124; sha256:534d4a9495d1"]
+  o4 -->|contains| o4_c6
+  o4_c7["nke-spire-agent #124; sha256:13d768206967"]
+  o4 -->|contains| o4_c7
+  o4_c8["ovn-kube-ubuntu #124; sha256:736e5fc6a819"]
+  o4 -->|contains| o4_c8
+  o4_c9["ovn-kubernetes-chart #124; sha256:0db7b1033252"]
+  o4 -->|contains| o4_c9
+  o4_c10["ubuntu-installer-iso-amd64 #124; sha256:cc8a95cde20f"]
+  o4 -->|contains| o4_c10
+  o5["nke-node-image-arm64 #124; disk-image #124; linux/arm64"]
+  root --> o5
+  o5_c0["nke-agent #124; sha256:539d1f0c5c81"]
+  o5 -->|contains| o5_c0
+  o5_c1["nke-cni-calico #124; sha256:3c88dfa0c840"]
+  o5 -->|contains| o5_c1
+  o5_c2["nke-cni-ovn #124; sha256:bfebd32bebb2"]
+  o5 -->|contains| o5_c2
+  o5_c3["nke-image-inputs #124; sha256:1bfbcb47c0ce"]
+  o5 -->|contains| o5_c3
+  o5_c4["nke-kubeadm-distro #124; sha256:d57373ac0a73"]
+  o5 -->|contains| o5_c4
+  o5_c5["nke-node-image #124; sha256:a62ed828ab7d"]
+  o5 -->|contains| o5_c5
+  o5_c6["nke-patched-installer-iso #124; sha256:08e42ee44451"]
+  o5 -->|contains| o5_c6
+  o5_c7["nke-spire-agent #124; sha256:89e3651153d9"]
+  o5 -->|contains| o5_c7
+  o5_c8["ovn-kube-ubuntu #124; sha256:5a752af5faaa"]
+  o5 -->|contains| o5_c8
+  o5_c9["ovn-kubernetes-chart #124; sha256:0db7b1033252"]
+  o5 -->|contains| o5_c9
+  o5_c10["ubuntu-installer-iso #124; sha256:af78753c94b9"]
+  o5 -->|contains| o5_c10
+  o6["nkectl #124; executable #124; linux/amd64"]
+  root --> o6
+  o6_c0["nkectl #124; sha256:eeb21f04fb79"]
+  o6 -->|contains| o6_c0
+  o7["operator-tools #124; executable #124; linux/amd64"]
+  root --> o7
+  o7_c0["helm #124; sha256:210d576a6dc0"]
+  o7 -->|contains| o7_c0
+  o7_c1["kubectl #124; sha256:ebbd080e7c2e"]
+  o7 -->|contains| o7_c1
+  o8["postgresql #124; helm-oci"]
+  root --> o8
+  o8_c0["postgresql-chart #124; sha256:c350143d2e21"]
+  o8 -->|contains| o8_c0
+  o9["postgresql-image #124; oci #124; linux/amd64"]
+  root --> o9
+  o9_c0["postgresql-image #124; sha256:9ca5fe8db49a"]
+  o9 -->|contains| o9_c0
+  o10["postgresql-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o10
+  o10_c0["postgresql-image #124; sha256:b3dec5235745"]
+  o10 -->|contains| o10_c0
+  o11["spiffe-csi-image #124; oci #124; linux/amd64"]
+  root --> o11
+  o11_c0["spiffe-csi-image #124; sha256:b98766c90387"]
+  o11 -->|contains| o11_c0
+  o12["spiffe-csi-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o12
+  o12_c0["spiffe-csi-image #124; sha256:6bfd786d4ffd"]
+  o12 -->|contains| o12_c0
+  o13["spire #124; helm-oci"]
+  root --> o13
+  o13_c0["spire-chart #124; sha256:7c32126bb190"]
+  o13 -->|contains| o13_c0
+  o14["spire-agent-image #124; oci #124; linux/amd64"]
+  root --> o14
+  o14_c0["spire-agent-image #124; sha256:0d9c792d7f40"]
+  o14 -->|contains| o14_c0
+  o15["spire-agent-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o15
+  o15_c0["spire-agent-image #124; sha256:0c94e29f29a1"]
+  o15 -->|contains| o15_c0
+  o16["spire-bash-image #124; oci #124; linux/amd64"]
+  root --> o16
+  o16_c0["spire-bash-image #124; sha256:d49c2b6585ac"]
+  o16 -->|contains| o16_c0
+  o17["spire-bash-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o17
+  o17_c0["spire-bash-image #124; sha256:8d2961114207"]
+  o17 -->|contains| o17_c0
+  o18["spire-controller-manager-image #124; oci #124; linux/amd64"]
+  root --> o18
+  o18_c0["spire-controller-manager-image #124; sha256:fb3bfc8f98f2"]
+  o18 -->|contains| o18_c0
+  o19["spire-controller-manager-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o19
+  o19_c0["spire-controller-manager-image #124; sha256:99dae65b7e20"]
+  o19 -->|contains| o19_c0
+  o20["spire-crds #124; helm-oci"]
+  root --> o20
+  o20_c0["spire-crds-chart #124; sha256:ce982e63fc37"]
+  o20 -->|contains| o20_c0
+  o21["spire-oidc-image #124; oci #124; linux/amd64"]
+  root --> o21
+  o21_c0["spire-oidc-image #124; sha256:32f5e7d7b632"]
+  o21 -->|contains| o21_c0
+  o22["spire-oidc-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o22
+  o22_c0["spire-oidc-image #124; sha256:6adc68d480f2"]
+  o22 -->|contains| o22_c0
+  o23["spire-server-image #124; oci #124; linux/amd64"]
+  root --> o23
+  o23_c0["spire-server-image #124; sha256:3aa2dce70fc1"]
+  o23 -->|contains| o23_c0
+  o24["spire-server-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o24
+  o24_c0["spire-server-image #124; sha256:b2fb59ac8ec2"]
+  o24 -->|contains| o24_c0
+  o25["spire-tpm-server-image #124; oci #124; linux/amd64"]
+  root --> o25
+  o25_c0["spire-tpm-server-image #124; sha256:0ba43be0bd5c"]
+  o25 -->|contains| o25_c0
+  o26["spire-tpm-server-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o26
+  o26_c0["spire-tpm-server-image #124; sha256:d5a0bd84d06c"]
+  o26 -->|contains| o26_c0
+  o27["temporal #124; helm-oci"]
+  root --> o27
+  o27_c0["temporal-chart #124; sha256:14a8efe1cc92"]
+  o27 -->|contains| o27_c0
+  o28["temporal-admin-tools-image #124; oci #124; linux/amd64"]
+  root --> o28
+  o28_c0["temporal-admin-tools-image #124; sha256:f24c619953ba"]
+  o28 -->|contains| o28_c0
+  o29["temporal-admin-tools-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o29
+  o29_c0["temporal-admin-tools-image #124; sha256:2f90b7c95151"]
+  o29 -->|contains| o29_c0
+  o30["temporal-server-image #124; oci #124; linux/amd64"]
+  root --> o30
+  o30_c0["temporal-server-image #124; sha256:1a71947754cd"]
+  o30 -->|contains| o30_c0
+  o31["temporal-server-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o31
+  o31_c0["temporal-server-image #124; sha256:77c887f311db"]
+  o31 -->|contains| o31_c0
+  o32["temporal-ui-image #124; oci #124; linux/amd64"]
+  root --> o32
+  o32_c0["temporal-ui-image #124; sha256:6734b3988aa3"]
+  o32 -->|contains| o32_c0
+  o33["temporal-ui-image-arm64 #124; oci #124; linux/arm64"]
+  root --> o33
+  o33_c0["temporal-ui-image #124; sha256:0e7478fad0ee"]
+  o33 -->|contains| o33_c0
+  e0["sbom #124; nke-cni-ovn #124; build-output"]
+  e0_s["file #124; sha256:bfebd32bebb2"]
+  e0 -->|inventories| e0_s
+  e0 -->|supports| o5
+  e1["sbom #124; nke-patched-installer-iso-amd64 #124; build-output"]
+  e1_s["file #124; sha256:534d4a9495d1"]
+  e1 -->|inventories| e1_s
+  e1 -->|supports| o4
+  e2["sbom #124; postgresql-image #124; build-output"]
+  e2_s["oci-manifest #124; sha256:9ca5fe8db49a"]
+  e2 -->|inventories| e2_s
+  e2 -->|supports| o9
+  e3["sbom #124; ubuntu-installer-iso #124; build-output"]
+  e3_s["file #124; sha256:af78753c94b9"]
+  e3 -->|inventories| e3_s
+  e3 -->|supports| o5
+  e4["sbom #124; nke-spire-agent #124; build-output"]
+  e4_s["file #124; sha256:89e3651153d9"]
+  e4 -->|inventories| e4_s
+  e4 -->|supports| o5
+  e5["sbom #124; postgresql-chart #124; source-build"]
+  e5_s["source-archive #124; sha256:c350143d2e21"]
+  e5 -->|inventories| e5_s
+  e5 -->|supports| o8
+  e6["sbom #124; nke-controller #124; build-output"]
+  e6_s["oci-manifest #124; sha256:f42a3946274b"]
+  e6 -->|inventories| e6_s
+  e6 -->|supports| o3
+  e7["sbom #124; postgresql #124; packaging"]
+  e7_s["helm-bundle #124; sha256:879c83735816"]
+  e7 -->|inventories| e7_s
+  e7 -->|supports| o8
+  e8["sbom #124; spire-bash-image #124; build-output"]
+  e8_s["oci-manifest #124; sha256:d49c2b6585ac"]
+  e8 -->|inventories| e8_s
+  e8 -->|supports| o16
+  e9["sbom #124; spire-server-image #124; build-output"]
+  e9_s["oci-manifest #124; sha256:b2fb59ac8ec2"]
+  e9 -->|inventories| e9_s
+  e9 -->|supports| o24
+  e10["sbom #124; nkectl #124; build-output"]
+  e10_s["file #124; sha256:eeb21f04fb79"]
+  e10 -->|inventories| e10_s
+  e10 -->|supports| o6
+  e11["sbom #124; nke-node-image-amd64 #124; build-output"]
+  e11_s["file #124; sha256:b955979a5b84"]
+  e11 -->|inventories| e11_s
+  e11 -->|supports| o4
+  e12["sbom #124; spire-crds-chart #124; source-build"]
+  e12_s["source-archive #124; sha256:ce982e63fc37"]
+  e12 -->|inventories| e12_s
+  e12 -->|supports| o20
+  e13["sbom #124; ovn-kube-ubuntu #124; build-output"]
+  e13_s["file #124; sha256:736e5fc6a819"]
+  e13 -->|inventories| e13_s
+  e13 -->|supports| o4
+  e14["sbom #124; spire-chart #124; source-build"]
+  e14_s["source-archive #124; sha256:7c32126bb190"]
+  e14 -->|inventories| e14_s
+  e14 -->|supports| o13
+  e15["sbom #124; nke-agent #124; build-output"]
+  e15_s["file #124; sha256:539d1f0c5c81"]
+  e15 -->|inventories| e15_s
+  e15 -->|supports| o5
+  e16["sbom #124; spire-bash-image #124; build-output"]
+  e16_s["oci-manifest #124; sha256:8d2961114207"]
+  e16 -->|inventories| e16_s
+  e16 -->|supports| o17
+  e17["sbom #124; nke-image-inputs #124; build-output"]
+  e17_s["file #124; sha256:96b980545901"]
+  e17 -->|inventories| e17_s
+  e17 -->|supports| o4
+  e18["sbom #124; csi-node-driver-registrar-image #124; build-output"]
+  e18_s["oci-manifest #124; sha256:1ca23bdbb150"]
+  e18 -->|inventories| e18_s
+  e18 -->|supports| o1
+  e19["sbom #124; temporal-ui-image #124; build-output"]
+  e19_s["oci-manifest #124; sha256:0e7478fad0ee"]
+  e19 -->|inventories| e19_s
+  e19 -->|supports| o33
+  e20["sbom #124; temporal-admin-tools-image #124; build-output"]
+  e20_s["oci-manifest #124; sha256:2f90b7c95151"]
+  e20 -->|inventories| e20_s
+  e20 -->|supports| o29
+  e21["sbom #124; controller-chart #124; packaging"]
+  e21_s["helm-bundle #124; sha256:a0f3f42bf81f"]
+  e21 -->|inventories| e21_s
+  e21 -->|supports| o0
+  e22["sbom #124; spire-controller-manager-image #124; build-output"]
+  e22_s["oci-manifest #124; sha256:fb3bfc8f98f2"]
+  e22 -->|inventories| e22_s
+  e22 -->|supports| o18
+  e23["sbom #124; spire-oidc-image #124; build-output"]
+  e23_s["oci-manifest #124; sha256:6adc68d480f2"]
+  e23 -->|inventories| e23_s
+  e23 -->|supports| o22
+  e24["sbom #124; spire-controller-manager-image #124; build-output"]
+  e24_s["oci-manifest #124; sha256:99dae65b7e20"]
+  e24 -->|inventories| e24_s
+  e24 -->|supports| o19
+  e25["sbom #124; temporal-server-image #124; build-output"]
+  e25_s["oci-manifest #124; sha256:77c887f311db"]
+  e25 -->|inventories| e25_s
+  e25 -->|supports| o31
+  e26["sbom #124; postgresql-image #124; build-output"]
+  e26_s["oci-manifest #124; sha256:b3dec5235745"]
+  e26 -->|inventories| e26_s
+  e26 -->|supports| o10
+  e27["sbom #124; spire-tpm-server-image #124; build-output"]
+  e27_s["oci-manifest #124; sha256:d5a0bd84d06c"]
+  e27 -->|inventories| e27_s
+  e27 -->|supports| o26
+  e28["sbom #124; spire-crds #124; packaging"]
+  e28_s["helm-bundle #124; sha256:b995224bcedc"]
+  e28 -->|inventories| e28_s
+  e28 -->|supports| o20
+  e29["sbom #124; spire #124; packaging"]
+  e29_s["helm-bundle #124; sha256:8a98b44f8ae6"]
+  e29 -->|inventories| e29_s
+  e29 -->|supports| o13
+  e30["sbom #124; spiffe-csi-image #124; build-output"]
+  e30_s["oci-manifest #124; sha256:b98766c90387"]
+  e30 -->|inventories| e30_s
+  e30 -->|supports| o11
+  e31["sbom #124; nke-cni-calico #124; build-output"]
+  e31_s["file #124; sha256:3c88dfa0c840"]
+  e31 -->|inventories| e31_s
+  e31 -->|supports| o5
+  e32["sbom #124; nke-agent #124; build-output"]
+  e32_s["file #124; sha256:4ba6aa929380"]
+  e32 -->|inventories| e32_s
+  e32 -->|supports| o4
+  e33["sbom #124; spire-server-image #124; build-output"]
+  e33_s["oci-manifest #124; sha256:3aa2dce70fc1"]
+  e33 -->|inventories| e33_s
+  e33 -->|supports| o23
+  e34["sbom #124; temporal-chart #124; source-build"]
+  e34_s["source-archive #124; sha256:14a8efe1cc92"]
+  e34 -->|inventories| e34_s
+  e34 -->|supports| o27
+  e35["sbom #124; spire-agent-image #124; build-output"]
+  e35_s["oci-manifest #124; sha256:0d9c792d7f40"]
+  e35 -->|inventories| e35_s
+  e35 -->|supports| o14
+  e36["sbom #124; spire-agent-image #124; build-output"]
+  e36_s["oci-manifest #124; sha256:0c94e29f29a1"]
+  e36 -->|inventories| e36_s
+  e36 -->|supports| o15
+  e37["sbom #124; nke-cni-calico #124; build-output"]
+  e37_s["file #124; sha256:4eea36a1a38b"]
+  e37 -->|inventories| e37_s
+  e37 -->|supports| o4
+  e38["sbom #124; csi-node-driver-registrar-image #124; build-output"]
+  e38_s["oci-manifest #124; sha256:0898bf569379"]
+  e38 -->|inventories| e38_s
+  e38 -->|supports| o2
+  e39["sbom #124; ovn-kubernetes-chart #124; build-output"]
+  e39_s["file #124; sha256:0db7b1033252"]
+  e39 -->|inventories| e39_s
+  e39 -->|supports| o4
+  e40["sbom #124; nke-kubeadm-distro #124; build-output"]
+  e40_s["file #124; sha256:4df3b51d7807"]
+  e40 -->|inventories| e40_s
+  e40 -->|supports| o4
+  e41["sbom #124; spire-tpm-server-image #124; build-output"]
+  e41_s["oci-manifest #124; sha256:0ba43be0bd5c"]
+  e41 -->|inventories| e41_s
+  e41 -->|supports| o25
+  e42["sbom #124; nke-cni-ovn #124; build-output"]
+  e42_s["file #124; sha256:ab17f6a8cfee"]
+  e42 -->|inventories| e42_s
+  e42 -->|supports| o4
+  e43["sbom #124; nke-node-image #124; build-output"]
+  e43_s["file #124; sha256:a62ed828ab7d"]
+  e43 -->|inventories| e43_s
+  e43 -->|supports| o5
+  e44["sbom #124; nke-kubeadm-distro #124; build-output"]
+  e44_s["file #124; sha256:d57373ac0a73"]
+  e44 -->|inventories| e44_s
+  e44 -->|supports| o5
+  e45["sbom #124; temporal-admin-tools-image #124; build-output"]
+  e45_s["oci-manifest #124; sha256:f24c619953ba"]
+  e45 -->|inventories| e45_s
+  e45 -->|supports| o28
+  e46["sbom #124; nke-controller-chart #124; source-build"]
+  e46_s["source-archive #124; sha256:9d484bbaae15"]
+  e46 -->|inventories| e46_s
+  e46 -->|supports| o0
+  e47["sbom #124; nke-spire-agent #124; build-output"]
+  e47_s["file #124; sha256:13d768206967"]
+  e47 -->|inventories| e47_s
+  e47 -->|supports| o4
+  e48["sbom #124; ubuntu-installer-iso-amd64 #124; build-output"]
+  e48_s["file #124; sha256:cc8a95cde20f"]
+  e48 -->|inventories| e48_s
+  e48 -->|supports| o4
+  e49["sbom #124; ovn-kube-ubuntu #124; build-output"]
+  e49_s["file #124; sha256:5a752af5faaa"]
+  e49 -->|inventories| e49_s
+  e49 -->|supports| o5
+  e50["sbom #124; temporal-ui-image #124; build-output"]
+  e50_s["oci-manifest #124; sha256:6734b3988aa3"]
+  e50 -->|inventories| e50_s
+  e50 -->|supports| o32
+  e51["sbom #124; temporal-server-image #124; build-output"]
+  e51_s["oci-manifest #124; sha256:1a71947754cd"]
+  e51 -->|inventories| e51_s
+  e51 -->|supports| o30
+  e52["sbom #124; nke-patched-installer-iso #124; build-output"]
+  e52_s["file #124; sha256:08e42ee44451"]
+  e52 -->|inventories| e52_s
+  e52 -->|supports| o5
+  e53["sbom #124; kubectl #124; build-output"]
+  e53_s["file #124; sha256:ebbd080e7c2e"]
+  e53 -->|inventories| e53_s
+  e53 -->|supports| o7
+  e54["sbom #124; helm #124; build-output"]
+  e54_s["file #124; sha256:210d576a6dc0"]
+  e54 -->|inventories| e54_s
+  e54 -->|supports| o7
+  e55["sbom #124; spire-oidc-image #124; build-output"]
+  e55_s["oci-manifest #124; sha256:32f5e7d7b632"]
+  e55 -->|inventories| e55_s
+  e55 -->|supports| o21
+  e56["sbom #124; nke-image-inputs #124; build-output"]
+  e56_s["file #124; sha256:1bfbcb47c0ce"]
+  e56 -->|inventories| e56_s
+  e56 -->|supports| o5
+  e57["sbom #124; spiffe-csi-image #124; build-output"]
+  e57_s["oci-manifest #124; sha256:6bfd786d4ffd"]
+  e57 -->|inventories| e57_s
+  e57 -->|supports| o12
+  e58["sbom #124; ovn-kubernetes-chart #124; build-output"]
+  e58_s["file #124; sha256:0db7b1033252"]
+  e58 -->|inventories| e58_s
+  e58 -->|supports| o5
+  e59["sbom #124; temporal #124; packaging"]
+  e59_s["helm-bundle #124; sha256:5175a6f55076"]
+  e59 -->|inventories| e59_s
+  e59 -->|supports| o27

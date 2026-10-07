@@ -1,0 +1,309 @@
+{
+  "inspection": "metadata inspection; payloads, signatures and policy not verified",
+  "selectedOutput": "nke-node-image-arm64",
+  "totalOutputs": 34,
+  "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+  "referenceScope": "derived from supplied root reference; no registry availability claim",
+  "rootDigest": "sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+  "declaredQualification": "diagnostic",
+  "metadata": {
+    "planDigest": "sha256:4a7215ab77d219d2695e2eae15d6546c102d808de8b4f229b52868935e98ba63",
+    "invocationId": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/attempts/1",
+    "definitionDigest": "sha256:fbeb6c2d50e33459b31bf2eff23a7ffe17ee75ad354703789e03f6da90823372",
+    "environmentDigest": "sha256:cd84222798d6cab6922960824d1679e1a29c0c52b1517a46e2338ec5e1b4e854",
+    "contentSubject": "sha256:d195f6970037059e5b2999b23bc769a98c4a23fb653071bdce19dba6a2340144"
+  },
+  "outputs": [
+    {
+      "name": "nke-node-image-arm64",
+      "kind": "disk-image",
+      "digest": "sha256:6a7efe0c2c01685e21fa3723b1b151363c719c0baf68b95df327d3278ea1d254",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:6a7efe0c2c01685e21fa3723b1b151363c719c0baf68b95df327d3278ea1d254",
+      "buildDigest": "sha256:d9ba1cec0862e2a1bea7ea3a6e5b0f6ddd0d96a67b05614b47f4825c1b896ae7",
+      "components": [
+        "nke-agent",
+        "nke-cni-calico",
+        "nke-cni-ovn",
+        "nke-image-inputs",
+        "nke-kubeadm-distro",
+        "nke-node-image",
+        "nke-patched-installer-iso",
+        "nke-spire-agent",
+        "ovn-kube-ubuntu",
+        "ovn-kubernetes-chart",
+        "ubuntu-installer-iso"
+      ],
+      "disk": {
+        "evidenceMode": "build-provenance-v1",
+        "payloadDigest": "sha256:a62ed828ab7dbd62e4e7e8beb6270b131bf2683bd1a72140d66a968883fc3bfa",
+        "producer": "build-nke-node-image",
+        "component": "nke-node-image",
+        "format": "qcow2",
+        "encryption": "none",
+        "size": 3298230784,
+        "planDigest": "sha256:4a7215ab77d219d2695e2eae15d6546c102d808de8b4f229b52868935e98ba63",
+        "outcome": "succeeded"
+      },
+      "artifactType": "application/vnd.nkd.disk-image.v1",
+      "os": "linux",
+      "arch": "arm64",
+      "buildSubjects": [
+        {
+          "component": "nke-agent",
+          "digest": "sha256:539d1f0c5c81ae604625d3ffd615e6ebb766a7e994643aad40aff10e9ada0832"
+        },
+        {
+          "component": "nke-cni-calico",
+          "digest": "sha256:3c88dfa0c84097ba6ecaaf81d4bf021f7b9d7d5dae0413087e94880407ebb8af"
+        },
+        {
+          "component": "nke-cni-ovn",
+          "digest": "sha256:bfebd32bebb2674e15eef978cd6af2eed826bfff0cc3884c545301d7ddd8080e"
+        },
+        {
+          "component": "nke-image-inputs",
+          "digest": "sha256:1bfbcb47c0ce0a177c33497ea7ec5c2787fa51f3296aa4d0a9095cf8932bfdc9"
+        },
+        {
+          "component": "nke-kubeadm-distro",
+          "digest": "sha256:d57373ac0a739e2fba4007ebab3cb0d2f64429372ac7728d7193b705212e0fb6"
+        },
+        {
+          "component": "nke-node-image",
+          "digest": "sha256:a62ed828ab7dbd62e4e7e8beb6270b131bf2683bd1a72140d66a968883fc3bfa"
+        },
+        {
+          "component": "nke-patched-installer-iso",
+          "digest": "sha256:08e42ee44451efd7edbf2734239e2e124e6d72dc6e42cad92ad7d6ce9ea371b6"
+        },
+        {
+          "component": "nke-spire-agent",
+          "digest": "sha256:89e3651153d9690d625712ca838b2dad239a5d7334bf968fe1d8a3cdf2f6b2a2"
+        },
+        {
+          "component": "ovn-kube-ubuntu",
+          "digest": "sha256:5a752af5faaabc5989bbb0b63730989dbfd69b67b4d4cf92271db83285929a4e"
+        },
+        {
+          "component": "ovn-kubernetes-chart",
+          "digest": "sha256:0db7b103325259ddb2b882a3b454f8018339cb717975ee32f52db53d49fef7c9"
+        },
+        {
+          "component": "ubuntu-installer-iso",
+          "digest": "sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168"
+        }
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "name": "sbom-0624cb70022d876bc6e6bdc759332c7139915f67d7c6de704806b40f3135b405",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:1736ee84b83515b9ce2c2bf65465a1413ac3a71cea98e9a196cce2c64a1d5b3f",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:1736ee84b83515b9ce2c2bf65465a1413ac3a71cea98e9a196cce2c64a1d5b3f",
+      "blobDigest": "sha256:d13004ec3f672fb265c9f2b621216b8adafada8775665f9aea3a565dbed930c8",
+      "semanticDigest": "sha256:0624cb70022d876bc6e6bdc759332c7139915f67d7c6de704806b40f3135b405",
+      "binding": {
+        "documentDigest": "sha256:919ff6974ca67347984327d0531ab3876d307789ffd7c99c93f1e87f3df557ba",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-cni-ovn",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:bfebd32bebb2674e15eef978cd6af2eed826bfff0cc3884c545301d7ddd8080e"
+      }
+    },
+    {
+      "name": "sbom-1785eb766e8834bfb8c3b526ec6b1dca35b0be99474052bed349678ae3628565",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:03f3542977d6eb62847321eb6e3e29f9ba88a69e3720d7a08fcb0b90f352d869",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:03f3542977d6eb62847321eb6e3e29f9ba88a69e3720d7a08fcb0b90f352d869",
+      "blobDigest": "sha256:8f36f79fa807858a02f6eeaf1a607ea3f2d39a6faef97a688176ab16461ddcfc",
+      "semanticDigest": "sha256:1785eb766e8834bfb8c3b526ec6b1dca35b0be99474052bed349678ae3628565",
+      "binding": {
+        "documentDigest": "sha256:858f2fd215fcb098a257a047b0e082c7975a0a9467bbf766807dd4df78a0e1b1",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "ubuntu-installer-iso",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168"
+      }
+    },
+    {
+      "name": "sbom-17c27d6850b1621c38e03835dfa11b4634eef7ced52d0b5f9fe5e62a9074ded8",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:789e7791b98e14b247b3b914b00608342b503f3e0baceb655ce2bcc209fa376e",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:789e7791b98e14b247b3b914b00608342b503f3e0baceb655ce2bcc209fa376e",
+      "blobDigest": "sha256:cad8999799b2e3d10856ed875f7b761db14ff6d4ab0219613b372b923af3f629",
+      "semanticDigest": "sha256:17c27d6850b1621c38e03835dfa11b4634eef7ced52d0b5f9fe5e62a9074ded8",
+      "binding": {
+        "documentDigest": "sha256:c92658fd80036ea307d2dd1c531f13e617c8f91fcbd6e68c6af034de65c8dd67",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-spire-agent",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:89e3651153d9690d625712ca838b2dad239a5d7334bf968fe1d8a3cdf2f6b2a2"
+      }
+    },
+    {
+      "name": "sbom-31f028e140bce1182142d251fc803ee136ed1c91aa12a293186bb6213654ee49",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:9776e55b217da1c844ac80f4fe2338052c20c9cf3c96382bf779fa3227b8f9fb",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:9776e55b217da1c844ac80f4fe2338052c20c9cf3c96382bf779fa3227b8f9fb",
+      "blobDigest": "sha256:0b0f06c11a6d5c155d8cc1e7117bb6481a29d5d48215729d18a9613501cb92d9",
+      "semanticDigest": "sha256:31f028e140bce1182142d251fc803ee136ed1c91aa12a293186bb6213654ee49",
+      "binding": {
+        "documentDigest": "sha256:7e30798f017740ac1083e41f0a958b83fb772d4c48f8f1a9b409d0c7ee400dbf",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-agent",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:539d1f0c5c81ae604625d3ffd615e6ebb766a7e994643aad40aff10e9ada0832"
+      }
+    },
+    {
+      "name": "sbom-77cb5622aea3bd5d0e5afecaf8441c9ef6f54afcf608f08de75a9e749e7250aa",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:f9a3cdbb15e5191d9d4b9e25909493141f50ab69b2c31226977678b8c6a483ef",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:f9a3cdbb15e5191d9d4b9e25909493141f50ab69b2c31226977678b8c6a483ef",
+      "blobDigest": "sha256:490ef88e40df66f9d6533b4ad7049ab11b1d8d4942bcc95f33e210bda866c6d1",
+      "semanticDigest": "sha256:77cb5622aea3bd5d0e5afecaf8441c9ef6f54afcf608f08de75a9e749e7250aa",
+      "binding": {
+        "documentDigest": "sha256:33bc22a141932ed7b641dd107f2d0779611483d8ecfee3a488a7ab94a12a3c73",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-cni-calico",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:3c88dfa0c84097ba6ecaaf81d4bf021f7b9d7d5dae0413087e94880407ebb8af"
+      }
+    },
+    {
+      "name": "sbom-9be4559207686d2e726c0a05790e355a843c560bb3b4f26dd93c8e6d20d15b6a",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:5b7de4647770e0d82f21ca2b6926900924758feda351029030a65eefadeea91c",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:5b7de4647770e0d82f21ca2b6926900924758feda351029030a65eefadeea91c",
+      "blobDigest": "sha256:a7601e86fb21de937a7499c6e127f039a392d7cff6b636f46f3ffa174d59222d",
+      "semanticDigest": "sha256:9be4559207686d2e726c0a05790e355a843c560bb3b4f26dd93c8e6d20d15b6a",
+      "binding": {
+        "documentDigest": "sha256:a886a338d6ed3bcc812211422427033f59b8f5c16ef203d6e85bf1bc8ebff13d",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-node-image",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:a62ed828ab7dbd62e4e7e8beb6270b131bf2683bd1a72140d66a968883fc3bfa"
+      }
+    },
+    {
+      "name": "sbom-acf00432b7cc3cac9fccbb235f6937b490eefce6abfe619eaca9d92b27a3947e",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:03e9fa6f50399dae88ba68703141c3d032424d9ba58c38833981f155c020aa5c",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:03e9fa6f50399dae88ba68703141c3d032424d9ba58c38833981f155c020aa5c",
+      "blobDigest": "sha256:590b765a9abba60e9858f196395463b0126511676d2e42074b1c52ac1f5f194d",
+      "semanticDigest": "sha256:acf00432b7cc3cac9fccbb235f6937b490eefce6abfe619eaca9d92b27a3947e",
+      "binding": {
+        "documentDigest": "sha256:7d1f56211b4148bbc5699e4e0408c9fd87e8a755620def6f6c7801cea37d732d",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-kubeadm-distro",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:d57373ac0a739e2fba4007ebab3cb0d2f64429372ac7728d7193b705212e0fb6"
+      }
+    },
+    {
+      "name": "sbom-c4b6fa50ff69862a43c57cd08205fbf493437685963e8df0ef2ddba638cf371d",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:d85d89edfb7dbbb253d1344f7d7f594c372f53f9afed2c61839a0a602785b524",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:d85d89edfb7dbbb253d1344f7d7f594c372f53f9afed2c61839a0a602785b524",
+      "blobDigest": "sha256:9d1d2d6e4afa4857d06e625eda6678dbcc29aa45f86cd30ffa7872a0d9b66c60",
+      "semanticDigest": "sha256:c4b6fa50ff69862a43c57cd08205fbf493437685963e8df0ef2ddba638cf371d",
+      "binding": {
+        "documentDigest": "sha256:a1fb370466a1bfcafa5e112cec9e9c26c50383d861ba23b0945ae33ab768cb3e",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "ovn-kube-ubuntu",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:5a752af5faaabc5989bbb0b63730989dbfd69b67b4d4cf92271db83285929a4e"
+      }
+    },
+    {
+      "name": "sbom-cdadafcd630ec3d359525bba8724a3b16ae87d4691694b3c9df8ed7b2802f718",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:55774ec89a9cc6cad23caa47d55457f117e3935bac550ce0cb0817dfc83482fa",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:55774ec89a9cc6cad23caa47d55457f117e3935bac550ce0cb0817dfc83482fa",
+      "blobDigest": "sha256:676415c77f00ab83354c432cf0d6f9d54ca540b5805d1889b3eb14eafdb0f798",
+      "semanticDigest": "sha256:cdadafcd630ec3d359525bba8724a3b16ae87d4691694b3c9df8ed7b2802f718",
+      "binding": {
+        "documentDigest": "sha256:3325406824a2373472823da74df38439b79068836a27d10c507a521448c1a987",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-patched-installer-iso",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:08e42ee44451efd7edbf2734239e2e124e6d72dc6e42cad92ad7d6ce9ea371b6"
+      }
+    },
+    {
+      "name": "sbom-f18f701eeaf8b160bdc4b0b3ae84b509646cda15d782be1887f6feb2819f2162",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:cbd58a99f0985e16dca02138c133ba00437129ce24ce4ebe6388e0867fca08b7",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:cbd58a99f0985e16dca02138c133ba00437129ce24ce4ebe6388e0867fca08b7",
+      "blobDigest": "sha256:b82004125c59308b195991b20d454b794c401887255f61ffd66dd2c6f8820193",
+      "semanticDigest": "sha256:f18f701eeaf8b160bdc4b0b3ae84b509646cda15d782be1887f6feb2819f2162",
+      "binding": {
+        "documentDigest": "sha256:49f6315aa60f431247b5d0ae4b3d93fb7b0f6853ec6444428f2091d4e29c33f6",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "nke-image-inputs",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:1bfbcb47c0ce0a177c33497ea7ec5c2787fa51f3296aa4d0a9095cf8932bfdc9"
+      }
+    },
+    {
+      "name": "sbom-f518a72d54d12590c72ac6c5fc1ac2260aed0a6e381aa345e75eadc29cd24764",
+      "kind": "sbom",
+      "reference": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:e9b2253e4ec2cfebaab33258d29607ff096c9f3e11e4addbd192dc610b28773b",
+      "artifactType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "manifestDigest": "sha256:e9b2253e4ec2cfebaab33258d29607ff096c9f3e11e4addbd192dc610b28773b",
+      "blobDigest": "sha256:633b680f771deff7a1f5a01a3d0f93e19a42824b23409b404397d35c686acd5b",
+      "semanticDigest": "sha256:f518a72d54d12590c72ac6c5fc1ac2260aed0a6e381aa345e75eadc29cd24764",
+      "binding": {
+        "documentDigest": "sha256:b5f1371984ace19adff1fac4dbc462224fae3138e34c93600bb42c6c846fd652",
+        "outputs": [
+          "nke-node-image-arm64"
+        ],
+        "component": "ovn-kubernetes-chart",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:0db7b103325259ddb2b882a3b454f8018339cb717975ee32f52db53d49fef7c9"
+      }
+    }
+  ]
+}

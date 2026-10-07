@@ -2,6 +2,7 @@
 
 | Need | Read |
 |---|---|
+| Introduce NKD to the team and explore its concepts | [Slide deck](nkd-team-tour.html), [33 concept examples](demo-team-concepts.html), [HTML walkthrough](demo-team-walkthrough.html), [offline graph explorer](demo-team-explorer.html) |
 | Build the NKE v0.21.0 deploy release | [NKE deploy pipeline](nke-deploy-pipeline.md) |
 | Automate reviewable pin updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
 | Manage shared catalogs and understand replacement identity | [Authoring analysis](catalog-definition-authoring.md), [local replacement lab](examples/authoring-lab/README.md) |

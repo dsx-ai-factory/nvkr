@@ -1,0 +1,67 @@
+Release ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e
+Inspection: metadata inspection; payloads, signatures and policy not verified
+Declared qualification: diagnostic
+References: derived from supplied root reference; no registry availability claim
+Content: sha256:d195f6970037059e5b2999b23bc769a98c4a23fb653071bdce19dba6a2340144
+Definition: sha256:fbeb6c2d50e33459b31bf2eff23a7ffe17ee75ad354703789e03f6da90823372
+Environment: sha256:cd84222798d6cab6922960824d1679e1a29c0c52b1517a46e2338ec5e1b4e854
+Outputs: 1 of 34
+
+nke-node-image-arm64 (disk-image linux/arm64)
+  Derived artifact reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:6a7efe0c2c01685e21fa3723b1b151363c719c0baf68b95df327d3278ea1d254
+  Build: sha256:d9ba1cec0862e2a1bea7ea3a6e5b0f6ddd0d96a67b05614b47f4825c1b896ae7
+  Component: nke-agent @ sha256:539d1f0c5c81ae604625d3ffd615e6ebb766a7e994643aad40aff10e9ada0832
+  Component: nke-cni-calico @ sha256:3c88dfa0c84097ba6ecaaf81d4bf021f7b9d7d5dae0413087e94880407ebb8af
+  Component: nke-cni-ovn @ sha256:bfebd32bebb2674e15eef978cd6af2eed826bfff0cc3884c545301d7ddd8080e
+  Component: nke-image-inputs @ sha256:1bfbcb47c0ce0a177c33497ea7ec5c2787fa51f3296aa4d0a9095cf8932bfdc9
+  Component: nke-kubeadm-distro @ sha256:d57373ac0a739e2fba4007ebab3cb0d2f64429372ac7728d7193b705212e0fb6
+  Component: nke-node-image @ sha256:a62ed828ab7dbd62e4e7e8beb6270b131bf2683bd1a72140d66a968883fc3bfa
+  Component: nke-patched-installer-iso @ sha256:08e42ee44451efd7edbf2734239e2e124e6d72dc6e42cad92ad7d6ce9ea371b6
+  Component: nke-spire-agent @ sha256:89e3651153d9690d625712ca838b2dad239a5d7334bf968fe1d8a3cdf2f6b2a2
+  Component: ovn-kube-ubuntu @ sha256:5a752af5faaabc5989bbb0b63730989dbfd69b67b4d4cf92271db83285929a4e
+  Component: ovn-kubernetes-chart @ sha256:0db7b103325259ddb2b882a3b454f8018339cb717975ee32f52db53d49fef7c9
+  Component: ubuntu-installer-iso @ sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168
+  Evidence: sbom-0624cb70022d876bc6e6bdc759332c7139915f67d7c6de704806b40f3135b405 (nke-cni-ovn, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:1736ee84b83515b9ce2c2bf65465a1413ac3a71cea98e9a196cce2c64a1d5b3f
+    Subject: file sha256:bfebd32bebb2674e15eef978cd6af2eed826bfff0cc3884c545301d7ddd8080e
+    Members: nke-node-image-arm64
+  Evidence: sbom-1785eb766e8834bfb8c3b526ec6b1dca35b0be99474052bed349678ae3628565 (ubuntu-installer-iso, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:03f3542977d6eb62847321eb6e3e29f9ba88a69e3720d7a08fcb0b90f352d869
+    Subject: file sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168
+    Members: nke-node-image-arm64
+  Evidence: sbom-17c27d6850b1621c38e03835dfa11b4634eef7ced52d0b5f9fe5e62a9074ded8 (nke-spire-agent, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:789e7791b98e14b247b3b914b00608342b503f3e0baceb655ce2bcc209fa376e
+    Subject: file sha256:89e3651153d9690d625712ca838b2dad239a5d7334bf968fe1d8a3cdf2f6b2a2
+    Members: nke-node-image-arm64
+  Evidence: sbom-31f028e140bce1182142d251fc803ee136ed1c91aa12a293186bb6213654ee49 (nke-agent, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:9776e55b217da1c844ac80f4fe2338052c20c9cf3c96382bf779fa3227b8f9fb
+    Subject: file sha256:539d1f0c5c81ae604625d3ffd615e6ebb766a7e994643aad40aff10e9ada0832
+    Members: nke-node-image-arm64
+  Evidence: sbom-77cb5622aea3bd5d0e5afecaf8441c9ef6f54afcf608f08de75a9e749e7250aa (nke-cni-calico, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:f9a3cdbb15e5191d9d4b9e25909493141f50ab69b2c31226977678b8c6a483ef
+    Subject: file sha256:3c88dfa0c84097ba6ecaaf81d4bf021f7b9d7d5dae0413087e94880407ebb8af
+    Members: nke-node-image-arm64
+  Evidence: sbom-9be4559207686d2e726c0a05790e355a843c560bb3b4f26dd93c8e6d20d15b6a (nke-node-image, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:5b7de4647770e0d82f21ca2b6926900924758feda351029030a65eefadeea91c
+    Subject: file sha256:a62ed828ab7dbd62e4e7e8beb6270b131bf2683bd1a72140d66a968883fc3bfa
+    Members: nke-node-image-arm64
+  Evidence: sbom-acf00432b7cc3cac9fccbb235f6937b490eefce6abfe619eaca9d92b27a3947e (nke-kubeadm-distro, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:03e9fa6f50399dae88ba68703141c3d032424d9ba58c38833981f155c020aa5c
+    Subject: file sha256:d57373ac0a739e2fba4007ebab3cb0d2f64429372ac7728d7193b705212e0fb6
+    Members: nke-node-image-arm64
+  Evidence: sbom-c4b6fa50ff69862a43c57cd08205fbf493437685963e8df0ef2ddba638cf371d (ovn-kube-ubuntu, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:d85d89edfb7dbbb253d1344f7d7f594c372f53f9afed2c61839a0a602785b524
+    Subject: file sha256:5a752af5faaabc5989bbb0b63730989dbfd69b67b4d4cf92271db83285929a4e
+    Members: nke-node-image-arm64
+  Evidence: sbom-cdadafcd630ec3d359525bba8724a3b16ae87d4691694b3c9df8ed7b2802f718 (nke-patched-installer-iso, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:55774ec89a9cc6cad23caa47d55457f117e3935bac550ce0cb0817dfc83482fa
+    Subject: file sha256:08e42ee44451efd7edbf2734239e2e124e6d72dc6e42cad92ad7d6ce9ea371b6
+    Members: nke-node-image-arm64
+  Evidence: sbom-f18f701eeaf8b160bdc4b0b3ae84b509646cda15d782be1887f6feb2819f2162 (nke-image-inputs, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:cbd58a99f0985e16dca02138c133ba00437129ce24ce4ebe6388e0867fca08b7
+    Subject: file sha256:1bfbcb47c0ce0a177c33497ea7ec5c2787fa51f3296aa4d0a9095cf8932bfdc9
+    Members: nke-node-image-arm64
+  Evidence: sbom-f518a72d54d12590c72ac6c5fc1ac2260aed0a6e381aa345e75eadc29cd24764 (ovn-kubernetes-chart, build-output)
+    Derived reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/nke-node-image-arm64@sha256:e9b2253e4ec2cfebaab33258d29607ff096c9f3e11e4addbd192dc610b28773b
+    Subject: file sha256:0db7b103325259ddb2b882a3b454f8018339cb717975ee32f52db53d49fef7c9
+    Members: nke-node-image-arm64

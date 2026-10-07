@@ -1,0 +1,71 @@
+flowchart TD
+  %% metadata inspection; payloads, signatures and policy not verified.
+  root["Release sha256:292524ba607d #124; metadata inspection"]
+  o0["nke-node-image-amd64 #124; disk-image #124; linux/amd64"]
+  root --> o0
+  o0_c0["nke-agent #124; sha256:4ba6aa929380"]
+  o0 -->|contains| o0_c0
+  o0_c1["nke-cni-calico #124; sha256:4eea36a1a38b"]
+  o0 -->|contains| o0_c1
+  o0_c2["nke-cni-ovn #124; sha256:ab17f6a8cfee"]
+  o0 -->|contains| o0_c2
+  o0_c3["nke-image-inputs #124; sha256:96b980545901"]
+  o0 -->|contains| o0_c3
+  o0_c4["nke-kubeadm-distro #124; sha256:4df3b51d7807"]
+  o0 -->|contains| o0_c4
+  o0_c5["nke-node-image-amd64 #124; sha256:b955979a5b84"]
+  o0 -->|contains| o0_c5
+  o0_c6["nke-patched-installer-iso-amd64 #124; sha256:534d4a9495d1"]
+  o0 -->|contains| o0_c6
+  o0_c7["nke-spire-agent #124; sha256:13d768206967"]
+  o0 -->|contains| o0_c7
+  o0_c8["ovn-kube-ubuntu #124; sha256:736e5fc6a819"]
+  o0 -->|contains| o0_c8
+  o0_c9["ovn-kubernetes-chart #124; sha256:0db7b1033252"]
+  o0 -->|contains| o0_c9
+  o0_c10["ubuntu-installer-iso-amd64 #124; sha256:cc8a95cde20f"]
+  o0 -->|contains| o0_c10
+  e0["sbom #124; nke-patched-installer-iso-amd64 #124; build-output"]
+  e0_s["file #124; sha256:534d4a9495d1"]
+  e0 -->|inventories| e0_s
+  e0 -->|supports| o0
+  e1["sbom #124; nke-node-image-amd64 #124; build-output"]
+  e1_s["file #124; sha256:b955979a5b84"]
+  e1 -->|inventories| e1_s
+  e1 -->|supports| o0
+  e2["sbom #124; ovn-kube-ubuntu #124; build-output"]
+  e2_s["file #124; sha256:736e5fc6a819"]
+  e2 -->|inventories| e2_s
+  e2 -->|supports| o0
+  e3["sbom #124; nke-image-inputs #124; build-output"]
+  e3_s["file #124; sha256:96b980545901"]
+  e3 -->|inventories| e3_s
+  e3 -->|supports| o0
+  e4["sbom #124; nke-agent #124; build-output"]
+  e4_s["file #124; sha256:4ba6aa929380"]
+  e4 -->|inventories| e4_s
+  e4 -->|supports| o0
+  e5["sbom #124; nke-cni-calico #124; build-output"]
+  e5_s["file #124; sha256:4eea36a1a38b"]
+  e5 -->|inventories| e5_s
+  e5 -->|supports| o0
+  e6["sbom #124; ovn-kubernetes-chart #124; build-output"]
+  e6_s["file #124; sha256:0db7b1033252"]
+  e6 -->|inventories| e6_s
+  e6 -->|supports| o0
+  e7["sbom #124; nke-kubeadm-distro #124; build-output"]
+  e7_s["file #124; sha256:4df3b51d7807"]
+  e7 -->|inventories| e7_s
+  e7 -->|supports| o0
+  e8["sbom #124; nke-cni-ovn #124; build-output"]
+  e8_s["file #124; sha256:ab17f6a8cfee"]
+  e8 -->|inventories| e8_s
+  e8 -->|supports| o0
+  e9["sbom #124; nke-spire-agent #124; build-output"]
+  e9_s["file #124; sha256:13d768206967"]
+  e9 -->|inventories| e9_s
+  e9 -->|supports| o0
+  e10["sbom #124; ubuntu-installer-iso-amd64 #124; build-output"]
+  e10_s["file #124; sha256:cc8a95cde20f"]
+  e10 -->|inventories| e10_s
+  e10 -->|supports| o0
