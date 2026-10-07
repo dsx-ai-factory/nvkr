@@ -1,9 +1,12 @@
 package factory
 
 import (
+	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -149,6 +152,28 @@ func TestReferencePublicationRejectsUnscopedCredentials(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestReferenceFinalizerPreservesContextError(t *testing.T) {
+	plan := referenceTestPlan(t)
+	for _, mode := range []string{"cancel", "deadline"} {
+		t.Run(mode, func(t *testing.T) {
+			var ctx context.Context
+			var cancel context.CancelFunc
+			if mode == "deadline" {
+				ctx, cancel = context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+			} else {
+				ctx, cancel = context.WithCancel(t.Context())
+				cancel()
+			}
+			defer cancel()
+			err := ValidateHostedRestores(ctx, filepath.Join(t.TempDir(), "factory"), plan)
+			assertFactoryErrorCode(t, err, e.CodeTimeout)
+			if !errors.Is(err, ctx.Err()) {
+				t.Fatalf("lost interruption cause: %v", err)
 			}
 		})
 	}

@@ -40,7 +40,7 @@ func validateHostedRestores(ctx context.Context, workspace string, plan *Plan) e
 	if PerOutputPublication(plan) {
 		raw, err := readSmallFactoryFile(ctx, HostedRestoreOutcomePath(workspace, "all-provider-jobs"), "provider job closure")
 		if err != nil || string(raw) != "restored:success\n" {
-			return e.New(e.CodeProvenanceMissing, "complete provider job closure did not succeed")
+			return classifyContext(ctx, e.New(e.CodeProvenanceMissing, "complete provider job closure did not succeed"))
 		}
 	}
 	for _, artifact := range plan.Graph.Artifacts {
