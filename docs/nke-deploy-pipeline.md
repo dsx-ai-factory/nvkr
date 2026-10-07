@@ -1,7 +1,8 @@
 # NKE v0.21.0 deploy pipeline
 
 [Definition](../definitions/nke-deploy/definition.yaml) → build/acquire → SBOMs → package → one signed Release.
-The committed GitHub workflow now uses this Definition.
+This six-output Definition remains available for local execution. The committed GitHub workflow
+now uses the [combined M2 Definition](../definitions/nke-m2/README.md).
 
 | Output | Input |
 |---|---|
@@ -63,47 +64,35 @@ CWE uses upstream Dockerfile network dependencies; this is not a hermetic or qua
 
 ## GitHub
 
-The [GitHub Environment](../definitions/nke-deploy/environment-github.yaml) publishes under
-`ghcr.io/dsx-ai-factory/nke-recipes` and selects keyless signing. Configure:
+The hosted six-output deploy workflow instructions are retired. The committed `nkd-run.yml`
+and `make workflows-check` both use the [M2 Definition and Environment](../definitions/nke-m2/README.md),
+which include the controller and chart outputs alongside the other M2 artifacts.
+Use that guide for source access, native runner, registry and signing requirements.
 
-- `NKE_SOURCE_TOKEN`: read-only Contents access to `dsx-ai-factory/nke`.
-- The `nkd-release` deployment environment: admit only `main`.
-- GHCR package write access for this repository's `GITHUB_TOKEN`.
+Do not generate this deploy Definition into the repository root: it would replace the shared
+workflow, Plan and manifest with a different bundle and fail the M2 drift check.
+To regenerate the maintained M2 bundle with Git access configured:
 
-The Environment admits default-branch execution only, and its signing identity accepts `main`.
-The repository deployment policy must enforce the same restriction.
+```sh
+go run ./cmd/nkdctl run generate \
+  --definition definitions/nke-m2/definition.yaml \
+  --environment definitions/nke-m2/environment-github.yaml \
+  --engine github --root .
+make workflows-check
+```
 
-Dispatch the full pipeline from `main`:
+Dispatching `nkd-run.yml` from `main` runs M2, not the six-output deploy Definition:
 
 ```sh
 gh workflow run nkd-run.yml --repo dsx-ai-factory/nke-recipes --ref main
 ```
 
-It builds, inventories, packages, publishes, signs, verifies, and finalizes the six required outputs.
-Generated wiring is not evidence of a completed release.
-
-Catalog revalidation needs private Git access in bootstrap and finalization. Credentials are scoped to those
-steps and source fetches, with repository-specific Git helpers. The merge gate acquires a fixed NKE checkout
-before running the generator, with no persisted token. Fork PRs without private-source access fail closed;
-no privileged PR trigger is used.
-
-To regenerate, with Git access configured:
-
-```sh
-go run ./cmd/nkdctl run generate \
-  --definition definitions/nke-deploy/definition.yaml \
-  --environment definitions/nke-deploy/environment-github.yaml \
-  --engine github --root .
-make workflows-check
-```
-
-Installation stays with NKE. Accounted manifests/templates are not delivered as standalone outputs.
-This pipeline does not package an installer/deploy bundle, build NKTP or the provider image, mirror all
-runtime images, or establish NKE release qualification.
+Installation stays with NKE. The local deploy Definition does not package an installer/deploy
+bundle, build NKTP or the provider image, mirror all runtime images, or establish release qualification.
 
 ## Validation
 
-Passed on this branch: `make check notices-check workflows-check build`, uncached `go test ./... -count=1`,
+Historical validation of the six-output deploy Definition, before M2 replaced the committed workflow: `make check notices-check workflows-check build`, uncached `go test ./... -count=1`,
 `actionlint`, relaxed `yamllint`, and `git diff --check`. Dry-runs passed for the six-output deploy Definition and both upstream controller Definitions, with
 zero observed artifacts (`static-unqualified`). Docker was stopped; no complete build or hosted publication
 was exercised. Contract tests cover acquired-chart SBOMs and repository-scoped validation credentials.
