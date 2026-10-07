@@ -56,6 +56,7 @@ jobs:
           test "$(go env GOOS)" = linux
           test "$(go env GOARCH)" = "$EXPECTED_ARCH"
           docker info --format '{{.OSType}}/{{.Architecture}}'
+          sudo --non-interactive true
       - name: Resolve both architecture graphs and negative contracts
         run: |
           set -euo pipefail
@@ -65,8 +66,14 @@ jobs:
       - name: Build pinned public sources offline and rehash outputs
         run: |
           set -euo pipefail
-          go test -v ./pkg/nkd/buildgraph \
-            -run '^TestNKEOSPublicSourcesLive$' -count=1 -timeout 75m \
+          go test -c -o "$RUNNER_TEMP/nke-os-source.test" ./pkg/nkd/buildgraph
+          cd pkg/nkd/buildgraph
+          # This credential-free hosted diagnostic uses the rootful Docker
+          # daemon. Keep the test's disposable checkout/output owner aligned
+          # with that daemon, without weakening Git or source integrity checks.
+          sudo --non-interactive --preserve-env=NKD_OS_SOURCE_RUNTIME \
+            "$RUNNER_TEMP/nke-os-source.test" \
+            -test.run '^TestNKEOSPublicSourcesLive$' -test.v -test.timeout 75m \
             2>&1 | tee "$RUNNER_TEMP/direct-source-build.log"
       - name: Retain diagnostic build log
         if: always()

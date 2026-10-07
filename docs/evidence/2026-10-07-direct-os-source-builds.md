@@ -100,3 +100,9 @@ The first full-gate attempt used macOS Bash 3.2 and failed three existing `toolc
 No AMD64 source execution, Debian installation, TPM attestation, complete NKE OS component closure, embedded image assembly, Packer bake, publication, signing or release acceptance is established by these local runs. They do not qualify compiler licensing/security or assert byte reproduction. The DSX IMDS payload exception and its inaccessible release URLs remain unresolved for a complete image.
 
 The PR adds a separate integration test and native ARM64/AMD64 CI jobs for all declared public-source producers. Their live results must be inspected independently; this document does not predeclare those jobs successful.
+
+## First hosted Docker attempt
+
+[Run 37675257555](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37675257555) tested PR head `aa8e06455016b3bb1431fc2aba23cd43140a517d`. The ARM64 job failed during Helm preparation: Git reported dubious ownership of `/src`, then test cleanup could not remove root-owned vendored files. This is not a failure of the recorded rootless Podman run and is not a successful hosted source build.
+
+The diagnostic workflow was changed to compile the same test binary as the runner user and execute it as root on the ephemeral credential-free Docker runner, matching the rootful daemon's file ownership. No global Git safe-directory exception, source-validation weakening or production executor change was made. A fresh run at the corrected head is required; the first attempt is retained as failure evidence.

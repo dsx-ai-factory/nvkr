@@ -36,14 +36,17 @@ Helm's pinned Git trees contain external symlinks used only by negative-test fix
 
 The ordinary repository gate resolves all 14 producers for both architectures and checks isolated offline build nodes, no acquired producer substitution, and coded rejection of a missing compiler pin.
 
-The opt-in integration test uses real source preparation and containers. On a native Linux host with Docker:
+The opt-in integration test uses real source preparation and containers. On a dedicated native Linux test host with rootful Docker, keep the disposable source/output owner aligned with Docker. The hosted diagnostic compiles as the runner user, then executes this credential-free test as root:
 
 ```sh
-NKD_OS_SOURCE_RUNTIME=docker go test -v ./pkg/nkd/buildgraph \
-  -run '^TestNKEOSPublicSourcesLive$' -count=1 -timeout 75m
+nkd_source_test_dir="$(mktemp -d)"
+go test -c -o "$nkd_source_test_dir/nke-os-source.test" ./pkg/nkd/buildgraph
+cd pkg/nkd/buildgraph
+sudo --non-interactive env NKD_OS_SOURCE_RUNTIME=docker "$nkd_source_test_dir/nke-os-source.test" \
+  -test.run '^TestNKEOSPublicSourcesLive$' -test.v -test.timeout 75m
 ```
 
-For native Linux Podman, use `NKD_OS_SOURCE_RUNTIME=podman`. SELinux enforcing hosts need the disposable test workspace and `TMPDIR` prepared with a shared container label; see the [recorded Podman setup](../../docs/evidence/2026-10-07-direct-os-source-builds.md). No host SELinux policy is disabled.
+For native Linux rootless Podman, `NKD_OS_SOURCE_RUNTIME=podman go test -v ./pkg/nkd/buildgraph -run '^TestNKEOSPublicSourcesLive$' -count=1 -timeout 75m` keeps the caller and container output ownership aligned. SELinux enforcing hosts need the disposable test workspace and `TMPDIR` prepared with a shared container label; see the [recorded Podman setup](../../docs/evidence/2026-10-07-direct-os-source-builds.md). No host SELinux policy is disabled. Rootful Docker execution as an ordinary user is not validated by this diagnostic: it can fail Git's ownership checks and cleanup of root-owned module files. Neither route asserts provider isolation or qualified execution.
 
 An optional comma-separated `NKD_OS_SOURCE_COMPONENTS` selects exact producer names for a smaller diagnostic. Without it, all 14 producers run. The test recomputes output size and SHA-256, checks raw binary ELF architecture, checks exact tar membership, and executes Helm/crictl version probes. It does not exercise TPM hardware or start Kubernetes/containerd services. Its result is explicitly unqualified.
 
