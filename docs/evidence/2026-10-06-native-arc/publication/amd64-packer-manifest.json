@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.manifest.v1+json",
+  "config": {
+    "mediaType": "application/vnd.oci.image.config.v1+json",
+    "digest": "sha256:e19a2a08504cde137d260a5e5db676c95d7dc566d10da8be2b7da6d273d768ac",
+    "size": 9574
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:09923199ca0ebd3ad9fb1dd1d0ab85d2b86aa388b988c8d4c8ee4f660fdb9e9e",
+      "size": 41572999
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:d9b9856437537fc061e98f71ecab9d95d7745fbf7d7b871d2e54ca4c3b02ea5a",
+      "size": 391
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:0031393edaa44d9ffe88684296e8f4c0d143cd73578ef8404313ed1a682f1313",
+      "size": 126874,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:73eff8b87b5a92995ad280a8c9441d4b1f9c608369d6a193ecd3a67b120df65c",
+      "size": 190375010,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:dedd39a5dcde17962930ed887ecebcd89ce687c6b6d3b65994959b10de3b10a0",
+      "size": 31231606,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:88cd107ab40528f2f0453fa2fdb4b41c51fa5f5715e5b0210ecfe3c979dafbf3",
+      "size": 11205736,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:0f2664cc426e86392fdced03f8a8bcf539a7d4148301078f5cf306322a950f91",
+      "size": 71077105,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:2efd7ec0787237004674c4ba32d81e1ad63cb807806029aafb657f5856c567fa",
+      "size": 4837938,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:c8f61bb1c5d1780efbe9d664324d9195f2245d8f1deaedc34ca375d059d7a1e7",
+      "size": 6623510,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:496eccc22f1ed0ac9dde673e16cdd008530718fede3954d37a6ec9809c638e0c",
+      "size": 11425,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:459b62f9a7e479de1657c73af474a93d3d45a5a3a6e9663c6b9ede885db6b193",
+      "size": 169,
+      "annotations": {
+        "buildkit/rewritten-timestamp": "0"
+      }
+    }
+  ]
+}

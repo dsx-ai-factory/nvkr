@@ -27,10 +27,10 @@ pins:
     tag: ff21ba8c07cafff74b68e238a8876af11e5beded
     treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
   nke-spire-agent-source:
-    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
-    sourceDateEpoch: 1791257393
-    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
-    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
+    commit: 726f76944404e1106626b8333d3576bdf67b575b
+    sourceDateEpoch: 1790192178
+    tag: 726f76944404e1106626b8333d3576bdf67b575b
+    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
   ovn-kubernetes:
     commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
     sourceDateEpoch: 1788540677

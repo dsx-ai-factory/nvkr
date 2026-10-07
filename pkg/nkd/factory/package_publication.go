@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -5,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -75,8 +79,14 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 			cleanup()
 		}
 	}()
+	selected := map[string]bool{}
+	if PerOutputPublication(plan) {
+		for _, expected := range selectedPublicationOutputs(plan, planNode(plan, output.Producer)) {
+			selected[expected.Name] = true
+		}
+	}
 	for _, input := range inputs {
-		if input.BuildTarget != "" {
+		if input.BuildTarget != "" || (PerOutputPublication(plan) && !selected[input.Name]) {
 			continue
 		}
 		object := delivery.ObjectInput{Name: input.Name, Kind: input.Kind, Path: input.Path,
@@ -178,7 +188,19 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 		if err != nil {
 			return nil, err
 		}
-		metadata = &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest, ContentSubject: contentSubject}
+		planDigest, err := plan.IdentityDigest()
+		if err != nil {
+			return nil, err
+		}
+		metadata = &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest,
+			PlanDigest: planDigest, ContentSubject: contentSubject}
+		if PerOutputPublication(plan) {
+			run, err := factoryRunContext(planDigest, time.Now().UTC(), time.Now().UTC())
+			if err != nil {
+				return nil, err
+			}
+			metadata.InvocationID = run.InvocationID()
+		}
 		outputByName := make(map[string]delivery.Output, len(outputs))
 		transportPaths := make(map[string]string, len(outputs))
 		for _, output := range outputs {

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package profile models the NKD builder profile — the reconciliation of nkdctl's
 // reproducibility contract toward NKD v1 §8.2.1/§8.2.2/§10.1. NKD v1 favors bounding
 // byte-identity to a *signed builder profile* rather than claiming host-independent

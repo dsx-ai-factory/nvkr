@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # The ADR-18 §3 pinned helper image: rootless podman + the reproducibly-built nkd-exec helper,
 # so a Model-B job can run every node on ONE digest-pinned image (nkd-exec on PATH) with no
 # from-source bootstrap. Assembled by build-nkd-exec.sh; the build context is ./out.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -90,6 +93,13 @@ func TestAcquiredImageReleaseEvidenceRetainsNativeSubject(t *testing.T) {
 				metadata, err := bindPublicationMetadata(t.Context(), plan, release, artifacts, objects)
 				if err != nil {
 					t.Fatal(err)
+				}
+				planDigest, err := plan.IdentityDigest()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if metadata.PlanDigest != planDigest {
+					t.Fatalf("release metadata Plan identity = %q, want %q", metadata.PlanDigest, planDigest)
 				}
 				request := delivery.PublicationRequest{Release: metadata, Objects: objects}
 				path := filepath.Join(t.TempDir(), "diagnostic")

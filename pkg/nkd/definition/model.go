@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package definition owns authored Definition and Environment admission and identity.
 // Start with LoadDefinition and LoadEnvironment for strict, bounded document reads;
 // Validate and Digest apply the same schema and canonical identity to in-memory inputs.
@@ -84,6 +87,11 @@ type APTOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
+	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
+	// configuration, not provider isolation or runtime-capacity evidence.
+	GitHubARC string `json:"githubARC,omitempty"`
+	// DiskEvidence selects the M2 producer-evidence contract; empty requires deep inspection.
+	DiskEvidence string `json:"diskEvidence,omitempty"`
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
 	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`
 	APIVersion             string                           `json:"apiVersion"`
@@ -111,6 +119,8 @@ type SourceAccess struct {
 
 // Publication selects one OCI namespace. Release metadata/evidence use /releases; outputs use named sibling repositories.
 type Publication struct {
+	// Mode selects output-local publication and metadata-only release assembly.
+	Mode             string `json:"mode,omitempty"`
 	RepositoryPrefix string `json:"repositoryPrefix"`
 	CredentialRef    string `json:"credentialRef,omitempty"`
 	Anonymous        bool   `json:"anonymous,omitempty"`
@@ -238,6 +248,12 @@ func (environment Environment) Validate() error {
 	if len(environment.GitHubDispatchBranches) > 32 {
 		return e.New(e.CodeInvalidCatalog, "too many GitHub dispatch branches")
 	}
+	if environment.GitHubARC != "" && environment.GitHubARC != "native-kvm-v1" {
+		return e.New(e.CodeEngineCapability, "unsupported GitHub ARC policy %q", environment.GitHubARC)
+	}
+	if environment.DiskEvidence != "" && (environment.DiskEvidence != "build-provenance-v1" || environment.GitHubARC != "native-kvm-v1" || environment.Publication == nil) {
+		return e.New(e.CodeEngineCapability, "disk evidence mode requires the explicit native ARC publication route")
+	}
 	previousBranch := ""
 	for _, branch := range environment.GitHubDispatchBranches {
 		if !dispatchBranchPattern.MatchString(branch) || branch <= previousBranch || strings.HasPrefix(branch, "refs/") || strings.Contains(branch, "..") || strings.Contains(branch, "//") || strings.HasSuffix(branch, "/") || strings.HasSuffix(branch, ".") {
@@ -277,6 +293,9 @@ func (environment Environment) Validate() error {
 		}
 	}
 	if publication := environment.Publication; publication != nil {
+		if publication.Mode != "" && (publication.Mode != "per-output-v1" || environment.Signing == nil || environment.Signing.Mode != "cosign") {
+			return e.New(e.CodeEngineCapability, "per-output publication requires production cosign signing")
+		}
 		if strings.ContainsAny(publication.CredentialRef, "\r\n\x00") {
 			return e.New(e.CodeInvalidCatalog, "publication credentialRef must not contain control characters")
 		}

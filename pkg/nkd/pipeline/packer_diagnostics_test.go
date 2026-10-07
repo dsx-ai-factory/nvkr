@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package pipeline
 
 import (
@@ -20,6 +23,73 @@ type packerDiagnosticTarEntry struct {
 	typeflag byte
 	payload  []byte
 	link     string
+}
+
+func TestPackerDiagnosticSinkIssuesOnlyOneSealedRoute(t *testing.T) {
+	for _, mode := range []string{"sealed", "open", "failed sealing", "failed target sealing", "multiple routes", "absent"} {
+		t.Run(mode, func(t *testing.T) {
+			root, sink, target, manifest := newPackerDiagnosticFixture(t, "plan/retained")
+			defer sink.Close()
+			defer target.close()
+			if sink.RetainedPath() != "" {
+				t.Fatal("open sink issued a transport route")
+			}
+			switch mode {
+			case "open":
+				return
+			case "failed sealing":
+				if err := sink.packer.Close(); err != nil {
+					t.Fatal(err)
+				}
+			case "failed target sealing":
+				if err := target.root.Close(); err != nil {
+					t.Fatal(err)
+				}
+			case "multiple routes":
+				other, err := sink.start(t.Context(), "plan/other", manifest, fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := other.close(); err != nil {
+					t.Fatal(err)
+				}
+			case "absent":
+				if (*PackerDiagnosticSink)(nil).RetainedPath() != "" {
+					t.Fatal("absent sink issued a path")
+				}
+				return
+			}
+			if err := target.close(); mode == "failed target sealing" {
+				if err == nil {
+					t.Fatal("wanted target sealing failure")
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			err := sink.Close()
+			if mode == "failed sealing" {
+				if err == nil {
+					t.Fatal("wanted sealing failure")
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			route := sink.RetainedPath()
+			if mode != "sealed" {
+				if route != "" {
+					t.Fatal("unsealed/ambiguous sink issued a path")
+				}
+				return
+			}
+			if !strings.HasPrefix(route, "diagnostics/packer/run-") || strings.ContainsAny(route, "\r\n") {
+				t.Fatalf("unsafe issued route %q", route)
+			}
+			info, err := os.Stat(filepath.Join(root, route, packerDiagnosticManifestName))
+			if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o444 {
+				t.Fatalf("issued route lacks sealed manifest: %v", err)
+			}
+		})
+	}
 }
 
 func TestPackerDiagnosticSinkRetainsExactManifestAndRegularLogs(t *testing.T) {
@@ -95,6 +165,12 @@ func TestPackerDiagnosticSinkRejectsManifestDigestMismatchBeforeCreatingOutput(t
 	}
 	if _, statErr := os.Stat(filepath.Join(root, packerDiagnosticDirectory)); !os.IsNotExist(statErr) {
 		t.Fatalf("manifest digest mismatch created diagnostic output: %v", statErr)
+	}
+	if err := sink.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if sink.RetainedPath() != "" {
+		t.Fatal("failed retention issued a transport route")
 	}
 }
 

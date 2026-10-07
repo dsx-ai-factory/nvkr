@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -55,7 +58,7 @@ func (graph ArtifactGraph) Validate() error {
 				}
 			}
 			switch node.Kind {
-			case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence:
+			case NodeFetch, NodeAcquire, NodePublish, NodeSign, NodeVerifyPublication, NodeAttestEvidence, NodeAssembleRelease:
 				if node.Network != ir.NetworkDefault {
 					return e.New(e.CodeInvalidCatalog, "artifact graph networked node %q does not declare default network", node.ID)
 				}

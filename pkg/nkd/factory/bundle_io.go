@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -54,6 +57,11 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	if !ok || pipeline.FileDigest(workflow) != bundle.WorkflowDigest {
 		return GeneratedManifest{}, nil, e.New(e.CodePipelineDrift,
 			"generated %s workflow bytes do not match workflowDigest", bundle.Engine)
+	}
+	if bundle.Engine == EngineGitHub {
+		if err := validateGitHubWorkflowSize(workflow); err != nil {
+			return GeneratedManifest{}, nil, err
+		}
 	}
 	names := sortedFileNames(bundle.Files)
 	members := make([]GeneratedMember, 0, len(names))

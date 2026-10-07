@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
@@ -53,7 +56,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/cni-calico bundle nfpm \
-          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   ovn-kubernetes:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
@@ -72,7 +75,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/kubeadm-distro bundle nfpm \
-          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   nke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
@@ -85,7 +88,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/spire-agent bundle nfpm \
-          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
 components:
   nke-agent:
     platforms: [linux/amd64, linux/arm64]

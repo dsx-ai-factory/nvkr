@@ -1,0 +1,16 @@
+virt-inspector 1.52.0
+qemu-img version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+Copyright (c) 2003-2023 Fabrice Bellard and the QEMU Project developers
+guestfish 1.52.0
+Application:   syft
+Version:       1.51.1
+BuildDate:     2026-08-27T16:55:02Z
+GitCommit:     91a0032987d91b7411b52f6f5c185c5e7f775495
+GitDescription: v1.51.1
+Platform:      linux/amd64
+GoVersion:     go1.26.3
+Compiler:      gc
+SchemaVersion: 16.1.10
+Debian 'dpkg-deb' package archive backend version 1.22.6 (amd64).
+This is free software; see the GNU General Public License version 2 or
+later for copying conditions. There is NO warranty.

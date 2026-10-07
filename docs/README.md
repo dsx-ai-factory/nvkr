@@ -5,12 +5,13 @@
 | Build the NKE v0.21.0 deploy release | [NKE deploy pipeline](nke-deploy-pipeline.md) |
 | Automate reviewable pin updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
 | Manage shared catalogs and understand replacement identity | [Authoring analysis](catalog-definition-authoring.md), [local replacement lab](examples/authoring-lab/README.md) |
-| Inspect the incomplete combined M2 candidate and its input gaps | [M2 candidate inputs](../definitions/nke-m2/README.md), [input mapping and handoff](m2-input-evidence-map.md), [October 5 diagnostic observations](evidence/2026-10-05-m2-input-acquisition.md) |
+| Inspect the incomplete combined M2 candidate and its input gaps | [M2 candidate inputs](../definitions/nke-m2/README.md), [input mapping](m2-input-evidence-map.md), [customer supplier choices](nke-m2-customer-choices.md), [release carrier transport evidence](evidence/2026-10-06-m2-release-carrier-transport.md), [October 5 diagnostic observations](evidence/2026-10-05-m2-input-acquisition.md) |
 | Derive several pins from one upstream version file | [Generic pin-set example](generic-pin-set-example.md) |
 | Use Definition → Run → Release | [Lifecycle guide](lifecycle.md) |
 | Choose and run a demo | [Demo index](../scripts/README.md) |
 | Learn the six public objects | [Domain vocabulary](../CONTEXT.md) |
 | Understand architecture and failure behavior | [SADD](sadd.md) |
+| Review generated Plans, visualize dependencies and explain regeneration changes | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Inspect the single release registry graph and signing scope | [Publication architecture](publication-architecture.md) |
 | Browse a registry release and its artifact/evidence relationships | [Release navigation](release-navigation.md) |
 | Change an engineering contract | Current [ADRs](adr/); public lifecycle in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) |
@@ -25,6 +26,7 @@
 | Understand retained modules and cleanup decisions | [Repository cleanup](repository-cleanup.md) |
 | Understand code organization findings and their implementation | [Codebase organization audit](codebase-organization-audit.md) |
 | Find the failed operation and understand generated transfer steps | [CI steps and log guide](ci-step-and-log-readability.md) |
+| Understand slow repository checks and measured improvements | [CI test performance](ci-test-performance.md) |
 | Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
 | Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
 | Understand the internal staged disk-material tracing contract and its gaps | [Local disk material tracing](nke-os-material-trace.md) |

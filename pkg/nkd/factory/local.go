@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -576,6 +579,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	}
 	if err := rejectUnsupportedLocalPlanRequirements(plan, "local factory execution"); err != nil {
 		return err
+	}
+	if PerOutputPublication(plan) {
+		return e.New(e.CodeEngineCapability, "per-output publication requires GitHub execution")
 	}
 	if len(plan.Environment.GitHubDispatchBranches) > 0 {
 		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubDispatchBranches")

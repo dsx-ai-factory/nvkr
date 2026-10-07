@@ -1,7 +1,7 @@
 # M2 maintained input evidence map
 
-The source candidate is under review as PR #95, stacked on source-fetch PR #94,
-publication PR #92 and evidence PR #91. Those open, under-review dependencies supply
+The source candidate originated in PR #95, with source-fetch PR #94,
+publication PR #92 and evidence PR #91. GitHub read-back on October 6 confirmed all four were merged. They supply
 the capture schema and scoped trusted source-fetch interfaces;
 the native capture regression runs against those inherited interfaces. Exact-head local
 validation is recorded in the pull request separately from production acceptance.
@@ -26,7 +26,7 @@ Missing or substituted descriptions still fail `CodeUnverifiedRef`; no source in
 discarded or replaced by a child. `TestMaintainedM2DeploymentImageMembership` exercises
 public catalog loading and Resolve/Compile for all 24 native selections. The separate
 34-output Git integration requires explicit opt-in and actual pinned-source access.
-These contracts do not supply missing production execution classes or inspector profiles.
+These contracts do not supply measured inspector profiles or runtime acceptance.
 
 ## Candidate output selections and requirement ownership
 
@@ -36,9 +36,10 @@ is the exact pinned NKE deployment values, not unmodified chart defaults. This d
 runtime/publication completion or resolve the separately owned external-NKE-image checkpoint.
 `docs/epics-v1-spec.md`, Epic M2 Goal/Acquisition/acceptance criteria 2–3, and
 `docs/milestones.md:36–55` require external NKE and third-party image rows in addition to these packages.
-The formal v1 scope is AMD64. The additional ARM64 disk and runtime-image rows are
-out-of-spec sprint candidates, not a ratified change to M2 acceptance. Their inclusion
-preserves the requested candidate matrix; each disk still has independent execution
+Ilya Kislenko's October 7, 2026 scope decision retains both native AMD64 and ARM64 disks with producer provenance
+for M2 and strict content inspection/material reconciliation for M3 ([ADR-13 §6](adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+Organizational ratification remains separate. The selected runtime-image rows
+preserve the requested candidate matrix; each disk still has independent execution
 and evidence obligations. Deployment-value membership is human-transcribed from the
 pinned tree, not derived or machine-verified by the literal membership regression.
 
@@ -68,6 +69,11 @@ exact protected `main` head. The [dated handoff](evidence/2026-10-05-m2-input-ac
 separates that approval/reachability observation from Git byte authentication.
 Four NKE source entries were regenerated using separate `catalog pin --commit` calls
 against the canonical repository. No NKE checkout, source tag or source file was modified.
+The subsequent temporary test exception pins only `nke-spire-agent-source` to
+`726f76944404e1106626b8333d3576bdf67b575b`, omitting the DSX IMDS plugin after both hosted downloads returned
+HTTP 403. The OS, Calico and kubeadm sources retain `ff21ba8c07cafff74b68e238a8876af11e5beded`.
+The exception's production acceptance owner, expiry and restoration/content-approval decision remain unrecorded.
+The intended SPIRE row below describes the newer source, not the older selected exception's delivered contents.
 
 | Input | Authoritative source at that exact NKE commit | Compiled projection |
 | --- | --- | --- |
@@ -83,31 +89,42 @@ The source capture contract rejects disappeared repository metadata and any matc
 Its installer-media behavior is explicitly unexercised in `os-image/docs/apt-acquisition-capture.md`.
 `TestMaintainedM2NativeCaptureGraph` asserts both native target/toolchain architectures,
 the capture opt-in, carrier path, exact source-owned material kinds and native producer bindings
-against the inherited B/C/A schema. This graph test does not establish a successful
+against the admitted acquisition, material and execution contracts. This graph test does not establish a successful
 capture-enabled installer bake or a live evidence join.
 
 ## Runtime, inspector, registry and signer map
 
 | Required field or closure | Current authoritative configuration | Missing evidence |
 | --- | --- | --- |
-| Disk toolchain host architecture | Separate AMD64/ARM64 source toolchain maps and native allowed-host platforms | Existing catalog digests are local identities; approved published per-native OCI manifests remain absent |
+| Disk toolchain host architecture | Separate AMD64/ARM64 source toolchain maps and native allowed-host platforms | The candidate overlay substitutes published native manifests under the recorded user exception; organizational reviews remain outstanding |
 | Packer and preparation tools | `toolchains/nkd-packer/toolchain.lock.json` and Dockerfile | `images` remains null; BUSL redistribution and vulnerability review approvals remain `not-recorded` |
-| Full inspector tools | `toolchains/nkd-disk-inspect/Dockerfile` and source lock | Updated helper closure, native execution, exact image identity and executable measurements required |
-| Syft inspector scanner | Source lock selects v1.51.1 and schemaVersion `16.1.10` | Native image execution and a retained external acquisition record remain separate |
-| Inspector architecture | Profile key must equal native `linux/amd64` or `linux/arm64` execution host | Both measured native full profiles and capacity grants remain required |
-| Scratch and memory | B's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
+| Full inspector tools | `toolchains/nkd-disk-inspect/Dockerfile` and source lock; [final-source native ARM64 and AMD64 preparation](evidence/2026-10-06-native-arc.md) recorded | Native pins are wired; strict inspection timed out in run 37445475840. Current producer-provenance mode does not invoke inspection |
+| Syft inspector scanner | Source lock selects v1.51.1 and schemaVersion `16.1.10`; native AMD64 version and executable measurements retained in the preparation record | Native tool execution does not establish full-disk content reconciliation or publication clearance |
+| Inspector architecture | Profile key must equal native `linux/amd64` or `linux/arm64` execution host | Both measured native profiles are authored; actual runner/daemon capacity must still pass admission |
+| Scratch and memory | ADR-13's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
 | Registry namespace | M2 candidate Environment explicitly authors `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` | Separate from production `cwe`/`nkectl` routes; live blob limits, retention and package access not verified here |
 | Registry credential | Existing `github:GITHUB_TOKEN` reference | Runtime values are not inspected or serialized; production credential admission/read-back required |
-| Signing identity | Existing main `nkd-run.yml` identity regex and Actions issuer | Existing policy copied byte-for-byte; protected publication environment and current keyless run remain unverified |
+| Signing identity | M2 `nkd-run.yml` identity regex admits only `main`; Actions issuer. The cancelled `562a609` branch-test exception is removed | A current successful keyless run remains unverified; external deployment-policy alignment is separate |
 | Private source transport | Exact `https://github.com/dsx-ai-factory/nke` CLI/controller and `https://github.com/dsx-ai-factory/nke.git` OS keys, sharing the existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
-| Generated runner route | ADR-18 generic-hosted-only rule | Native KVM capability for both routes remains unresolved; historical ARC diagnostics cannot establish generated production admission |
+| Generated runner route | ADR-18 explicit `native-kvm-v1` exception, native AMD64/ARM64 classes in the M2 Environment | Environment protection, ephemeral pool isolation and successful strict receipt-gated execution remain unverified; producer-provenance disk jobs do not establish complete production acceptance |
 
-`definitions/nke-m2/environment-github.yaml` records the separate candidate publication prefix, existing signing policy and
-producer-declared build network permission. It omits unavailable native execution classes and inspector
-profiles. This is intentionally incomplete for production admission; no placeholder digest or invented runner
-class is supplied. Every missing field must be resolved before generation/production launch.
+`definitions/nke-m2/environment-github.yaml` records the separate candidate publication prefix, explicitly scoped signing policy and
+producer-declared build network permission. It selects both native ARC classes and measured inspection profiles. The same 34-output Definition
+now generates M2 with the candidate-only native toolchain overlay. Generation is not runtime admission
+or release acceptance; package Actions read access and full native execution remain separate checks.
+The current `diskEvidence: build-provenance-v1` selection implements the M2 producer-provenance scope;
+strict inspection and material reconciliation belong to M3. Both producer-provenance disk jobs passed, but aggregate carrier transport failed
+before publication in [run 37486058412](evidence/2026-10-06-m2-release-carrier-transport.md).
+Historical validation-branch run `37533806963` at commit `625980e` subsequently passed candidate delivery;
+it does not validate this updated head, current main execution, strict inspection or independent full-payload
+consumer acceptance. Toolchain preparation/publication
+measurements do not establish a hosted build with matching provenance or completed license/security clearance.
+Signed disk-mode bindings describe evidence scope. `VerificationPolicy.minimumDiskEvidence` defaults to
+`build-provenance-v1` for pipeline-attested verification; explicit `strict` requires inspected evidence.
+Qualified verification defaults to strict and rejects the producer-only minimum.
+The minimum is policy-digest-bound and cannot be lowered by producer metadata.
 
-Runtime selection uses only the supported typed `runtime: podman` and
+Runtime selection uses the narrowly admitted typed `runtime: docker` and
 `buildNetworkPolicy: producer-declared` controls. No `podmanStorageDriver` field,
 ambient storage variable or setup hook is supplied. Storage follows the existing
 runtime owner's admission/observation semantics; the historical explicit-VFS probe
@@ -123,7 +140,8 @@ producer set. The nine source-map consumers selected by each disk are `nke-agent
 `nke-cni-ovn`, `nke-image-inputs`, `nke-kubeadm-distro`, that architecture's disk root and patched
 installer producer, `nke-spire-agent`, and `ovn-kubernetes-chart`. Preserve `ovn-kube-ubuntu`'s
 separate pinned BuildKit image; its explicit component override is not a Packer-map consumer.
-No replacement is authored until its exact measured destination and required approvals exist.
+The authored candidate overlay binds all these fields to measured native images published under the
+explicit user exception recorded in the October 6 evidence; it does not invent completed reviews.
 
 Each native Environment `executionClasses` entry needs `name`, `runsOn`, `hostPlatform`,
 `resources`, `maxTimeoutSeconds` and `capabilities: [kvm]`. Provider/runtime isolation admission
@@ -138,7 +156,7 @@ because the schema can describe one.
 
 Each `diskInspectionProfiles[linux/amd64|linux/arm64]` entry needs its canonical digest-qualified
 native `image`, actual executable SHA-256 measurements for `inspectorDigest`, `codecDigest`,
-`guestfishDigest`, `scannerDigest` and `packageReaderDigest`, measured `resources` headroom,
+`guestfishDigest`, `scannerDigest` and `packageReaderDigest`, declared `resources` with runtime-measured headroom,
 positive `timeoutSeconds` no greater than 600, positive `maxFilesystemBytes` no greater than
 16 GiB, and production `scratchStorage: private-volume`. The full image authenticates the
 helper/appliance/runtime closure; package versions and helper-only binary hashes do not replace
@@ -146,8 +164,9 @@ that image pin. Resource and document bounds must admit the actual complete reta
 materials, not only an installed-package list. Selection follows the frozen root's native host
 binding; guest-platform package metadata remains distinct even for cross-guest TCG consumers.
 
-The current published-image fields in both toolchain source locks are null, with their owning
-license/security gates `not-recorded`. The Packer lock's `validatedNKE.commit` remains historical
+The general published-image fields in both toolchain source locks remain null, with their owning
+license/security gates `not-recorded`. M2 uses the separate candidate overlay and Environment pins
+authorized by the recorded user exception. Exact native registry manifest/config read-back is retained. The Packer lock's `validatedNKE.commit` remains historical
 `726f76944404e1106626b8333d3576bdf67b575b`, not the selected capture-capable source. Before claiming
 production readiness, native capture-enabled bakes must retain the selected
 `non-fde/apt-acquisitions.tar`, and original live Run owners must reconcile each exact final disk
@@ -164,8 +183,10 @@ Run from the final composed repository root with its pinned Go version. These
 commands use existing owners, not a new pin writer or publication workflow.
 `--check` below does not write; the other catalog maintenance commands do update
 their machine-managed locks and belong only in a reviewed input-maintenance step.
-The four source updates below were executed during the approved merged-source handoff;
-these `--check` commands revalidate their exact selections without writing.
+The four source updates below were executed during the approved merged-source handoff.
+The SPIRE check below describes that complete source selection, not the temporary retry's
+older pin; it will report a difference while that exception remains selected. The checks
+do not write or silently restore the intended source.
 
 ```sh
 GOTOOLCHAIN=local go run ./cmd/nkdctl catalog pin \
@@ -245,18 +266,21 @@ The selected NKE #1211 merge commit has separately recorded source approval and
 protected-main reachability. That point-in-time observation is not a generic
 protected-ref policy in `catalog pin`: ADR-22 still supports exact commits and release tags,
 and Git byte authentication alone does not make a source-owner approval claim.
-The existing missing execution-class/profile capability gate still disables candidate
-launch; the publication/signing configuration does not grant source approval.
-No historical host-probe or installed-package replay is claimed as current evidence
-here: those observations lack a retained record for this candidate. The checked
-source locks contain no approved published native Packer/inspector image references.
+The current candidate supplies native execution classes, measured inspector profiles and
+published toolchain references through its Environment and catalog overlay. These remove
+the earlier missing-configuration blocker, not the runtime or delivery acceptance gates.
+The [native preparation record](evidence/2026-10-06-native-arc.md) retains assembly,
+measurement and registry read-back under the scoped candidate exception. General source
+locks still record outstanding organizational license/security approvals; publication and
+signing configuration does not grant them or source approval.
 
 ## Required embedded matrix rows
 
 The M2 specification assigns node-agent, node-side Kubernetes, control-plane images and CNI to the disk,
 and requires a recorded placement choice for SPIRE agent. Both native disk selections include the
-source-owned agent, kubeadm distro, Calico, OVN and SPIRE material producers. Their material locks are
-at exact NKE `ff21ba8c07cafff74b68e238a8876af11e5beded`:
+source-owned agent, kubeadm distro, Calico, OVN and SPIRE material producers. Their intended material locks
+are at exact NKE `ff21ba8c07cafff74b68e238a8876af11e5beded`; the temporary SPIRE retry
+described above does not supply its DSX IMDS row:
 
 | Required row | Authoritative source selection | Evidence still required |
 | --- | --- | --- |

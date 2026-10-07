@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -11,6 +14,8 @@ import (
 func githubNodeLabel(plan *Plan, node Node) string {
 	name := strings.TrimPrefix(node.ID, node.Kind+"/")
 	switch node.Kind {
+	case NodeAssembleRelease:
+		return "Assemble release from verified output references"
 	case NodeFetch:
 		return "Fetch pinned source for " + githubSourceConsumers(plan, node)
 	case NodeBuild:

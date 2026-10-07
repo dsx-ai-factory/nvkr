@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -13,7 +16,7 @@ import (
 func ValidatePublicationReference(reference string) error {
 	ref, err := name.NewDigest(reference, name.StrictValidation)
 	if err != nil || strings.Count(reference, "@") != 1 || ref.Name() != reference || !isDigest(ref.DigestStr()) {
-		return e.New(e.CodeUnverifiedRef, "release inspection requires a canonical repository@sha256:digest reference")
+		return e.New(e.CodeUnverifiedRef, "release access requires a canonical repository@sha256:digest reference")
 	}
 	return nil
 }

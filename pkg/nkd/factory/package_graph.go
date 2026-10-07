@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -87,12 +90,20 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 	targets := map[string]Target{"release": {Kind: TargetOCI, Ref: publication.RepositoryPrefix + "/releases", CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}}
 	routes := []Route{{Name: "release", Input: "package/release", Target: "release"}}
 	packages = append(packages, packageSpec{Name: "release", Kind: PackageOCI, Inputs: closureInputs})
-	return packages, targets, routes, nil
+	return deriveOutputPublication(definition, environment, packages, targets, routes)
 }
 
 func packageProducerResults(inputs []string, nodes map[string]Node, artifacts map[string]Artifact) []string {
 	var results []string
-	for _, inputID := range inputs {
+	pending := append([]string(nil), inputs...)
+	seen := map[string]bool{}
+	for len(pending) > 0 {
+		inputID := pending[0]
+		pending = pending[1:]
+		if seen[inputID] {
+			continue
+		}
+		seen[inputID] = true
 		input := artifacts[inputID]
 		switch input.Kind {
 		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageImage, PackageDiskImage:
@@ -104,6 +115,13 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 			member := artifacts[memberID]
 			if member.Kind == string(TierTerminalObservation) {
 				continue
+			}
+			// A bound chart must reopen its selected image when independently
+			// reproducing the chart. Transport that package and its producer
+			// records; it remains a dependency, not another published output.
+			if producer.HelmImage != nil && member.Kind == PackageImage {
+				results = append(results, memberID)
+				pending = append(pending, memberID)
 			}
 			if member.BuildTarget != "" {
 				results = append(results, memberID)
@@ -338,7 +356,7 @@ func packageMediaType(kind string) string {
 	case PackageHelm:
 		return "application/vnd.nkd.helm-bundle.v1"
 	default:
-		return "application/vnd.nkd.publication-root.v3"
+		return delivery.MediaPublicationRoot
 	}
 }
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -22,6 +25,7 @@ type utilityRunnerLocation struct {
 	helper, plan, planDigest string
 	user                     string
 	home                     bool
+	publicationRunContext    bool
 }
 
 // executeUtilityNode is shared by local orchestration and hosted helper steps.
@@ -39,6 +43,12 @@ func executeUtilityNode(ctx context.Context, node Node, location utilityRunnerLo
 	}
 	name := "nkd-factory-" + sanitizeLocalNodeID(node.ID) + "-" + strconv.Itoa(os.Getpid())
 	args := []string{"run", "--rm", "--name", name, "--network", network, "--platform", node.Platform}
+	if location.publicationRunContext {
+		// Only public runner identity crosses this offline packaging boundary.
+		for _, key := range []string{"GITHUB_ACTIONS", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW_REF", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"} {
+			args = append(args, "-e", key)
+		}
+	}
 	if location.home {
 		args = append(args, "-e", "HOME=/tmp")
 	}

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -23,6 +26,7 @@ type vmDriverResolver interface {
 }
 
 type vmDriverRunConfig struct {
+	NodeID      string // Optional exact node within a complete hosted Plan.
 	Runtime     string
 	Stdout      io.Writer
 	Stderr      io.Writer

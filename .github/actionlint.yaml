@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ADR-18 admits exactly these native disk pools.
+self-hosted-runner:
+  labels:
+    - arc-amd64-kvm
+    - arc-arm64-kvm

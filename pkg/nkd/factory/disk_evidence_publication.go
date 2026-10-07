@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -47,6 +50,9 @@ func diskPublicationInspectionProfile(build BuildPlan, environment definition.En
 // planned inspection pins. It authenticates no receipt; the producer calls it
 // only after live export, and read-back remains subject to normal signing gates.
 func validateReconciledDiskDocument(plan *Plan, output, component, subject string, bom *sbom.BOM) error {
+	if diskBuildProvenance(plan) {
+		return validateDiskBuildDocument(plan, output, component, subject, bom)
+	}
 	if err := bom.Validate(); err != nil {
 		return err
 	}

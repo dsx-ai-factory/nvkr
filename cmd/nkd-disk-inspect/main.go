@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // nkd-disk-inspect is the fixed entrypoint inside the inspection toolchain. All
 // subject authentication, inspection and result binding lives in pkg/nkd/sbom;
 // the execution owner authenticates kernel resource limits before subject reads.

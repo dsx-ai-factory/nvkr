@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -5,6 +8,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
@@ -19,7 +23,7 @@ func CompleteHostedDiskPublication(ctx context.Context, plan *Plan, expected Lif
 	if ctx == nil {
 		return e.New(e.CodeUsage, "hosted disk completion requires a context")
 	}
-	if plan == nil || owner == nil || runtime == nil {
+	if plan == nil || owner == nil || (runtime == nil && !diskBuildProvenance(plan)) {
 		return e.New(e.CodeProvenanceMissing, "hosted disk completion requires its original Plan, live owner and admitted inspector")
 	}
 	if err := ctx.Err(); err != nil {
@@ -47,12 +51,36 @@ func CompleteHostedDiskPublication(ctx context.Context, plan *Plan, expected Lif
 		return err
 	}
 	defer release()
-	receipt, err := owner.ReconcileDiskEvidence(ctx, plan, expected, runtime)
+	// The root bypasses executeProducer to retain its opaque held capability.
+	// Persist its descriptive record from that same live owner for downstream
+	// exact-subject validation; caller-supplied JSON cannot create this result.
+	observation, producerResult, err := owner.inspectDiskLifecycleMetadata(ctx, plan, expected)
 	if err != nil {
 		return err
 	}
-	if _, _, err := owner.PackageReconciledDisk(ctx, plan, expected, runtime, receipt, output); err != nil {
+	record := artifacts["result/"+expected.Name+"/"+observation.Component]
+	if record.Kind != "producer-result" || record.Path == "" {
+		return e.New(e.CodePipelineDrift, "disk publication lacks its exact producer record slot")
+	}
+	raw, err := canonical.Marshal(producerResult)
+	if err != nil {
 		return err
+	}
+	if err := writeFactoryFile(ctx, record.Path, raw, 0o644); err != nil {
+		return err
+	}
+	if diskBuildProvenance(plan) {
+		if err := owner.packageDiskBuildProvenance(ctx, plan, expected, output); err != nil {
+			return err
+		}
+	} else {
+		receipt, err := owner.ReconcileDiskEvidence(ctx, plan, expected, runtime)
+		if err != nil {
+			return err
+		}
+		if _, _, err := owner.PackageReconciledDisk(ctx, plan, expected, runtime, receipt, output); err != nil {
+			return err
+		}
 	}
 	// The package/evidence no-replace commit succeeded. Commit wins over
 	// subsequent cancellation; Close waits for this reservation to finish.

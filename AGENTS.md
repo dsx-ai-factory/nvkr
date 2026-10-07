@@ -79,8 +79,9 @@ retains its original scope; superseded requirements and plans are available only
    errors, never warnings or silent defaults.
 4. **Never overclaim.** Distinguish implemented, contract-tested, and externally exercised. Mocks and unit tests
    do not prove registries, CI, signing services, or runners.
-5. **Generated CI targets generic hosted runners only.** Never emit self-hosted runner labels. Maintained
-   execution targets are local and GitHub; publication and signing are GitHub-only in v1.
+5. **Generated CI defaults to generic hosted runners.** ADR-18 permits only the explicit `native-kvm-v1`
+   ARC disk route on `arc-amd64-kvm` and `arc-arm64-kvm`; no arbitrary self-hosted labels or qualified
+   claims. Maintained execution targets are local and GitHub; publication and signing are GitHub-only in v1.
 6. **Do not commit, push, tag, or open PRs unless explicitly asked.** Leave the working tree for the user to
    review.
 7. **Prefer file tools and `git mv` over destructive shell commands.** Do not use `rm`-style commands when a
@@ -90,10 +91,11 @@ retains its original scope; superseded requirements and plans are available only
 ## Commands
 
 ```sh
-make check          # full local gate: fmt-check → vet → lint → shellcheck → test → vulncheck (run before pushing)
+make check          # full local gate (run before pushing; prerequisites in DEVELOPMENT.md)
 make test           # fast default tests; matches PR checks
 make test-race      # opt-in race + coverage for the default suite
 make test-full      # opt-in extended fixtures, race + coverage
+make test-ci-tools  # CI timing report parser tests (requires python3)
 make lint           # golangci-lint v2 (.golangci.yml)
 make build          # build bin/nkdctl
 make nkd-exec-helper
@@ -102,11 +104,8 @@ make tidy           # go mod tidy + gofmt
 # single package / single test
 go test ./pkg/nkd/factory/... -run TestName -count=1
 
-# generated-bundle drift check (byte-exact regeneration from public inputs)
-go run ./cmd/nkdctl run generate \
-  --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root . --check
+# generated-bundle drift check (current Makefile target: maintained M2 candidate inputs)
+make workflows-check
 
 # M1 local demo (needs Docker and a local NKE clone; see docs/demo-m1.md)
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
@@ -158,7 +157,7 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 | Accept a caller-provided digest, path, or boolean as proof | Authenticate in the owning module and issue an opaque receipt bound to the bytes |
 | Raw `sha256.Sum256` as a structured identity | Use the canonical codec and an existing typed digest family |
 | Log a warning and continue on a validation, pin, or signature problem | Return a coded error; fail closed |
-| Emit a self-hosted runner label or a `git tag` trigger in a generated workflow | Hosted runners only; sign on default-branch push or manual dispatch |
+| Emit an arbitrary self-hosted runner label or a `git tag` trigger in a generated workflow | Generic hosted runners, with only ADR-18's explicitly admitted native ARC disk exception; sign through the admitted default-branch workflow |
 | Hand-edit `.github/workflows/nkd-run.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
 | Claim a feature works because a unit test with a fake passes | Record external evidence under `docs/evidence/` and keep the reconciliation row honest |
 | Write repo paths, commands, or code identifiers into a product spec or epic | Specs use product nouns only; implementation detail belongs in ADRs and code |
@@ -194,7 +193,8 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 ## Key files
 
 Use `docs/README.md` for the documentation map and `scripts/README.md` for runnable demos. `definitions/nke-v1/`
-contains current NKE product inputs. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
+contains the retained three-output NKE inputs; `definitions/nke-m2/` supplies the current checked-in candidate
+selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
 ## Completion gate
@@ -204,22 +204,24 @@ completion:
 
 ```sh
 gofmt -l cmd client internal pkg
+make license-header-check
 go test ./... -count=1
 go vet ./...
 golangci-lint run
 make shellcheck
+make test-ci-tools
 make vulncheck
 git diff --check
 ```
 
-`make check` runs the repository gate, including shellcheck and the Go vulnerability scan. The direct commands
-above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
+`make check` runs the repository gate, including the license header check, shellcheck, Python report-tool tests
+and the Go vulnerability scan. New source files need the two-line SPDX header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
 outside a restricted sandbox. `make vulncheck` needs access to the Go module proxy and vulnerability database;
 run it with network access or report it as unverified. Default tests omit expensive capacity and integration
 matrices. Do not routinely enable `NKD_TEST_EXTENDED`, whole-suite race detection, or coverage. For concurrency
 or process-lifetime changes, run targeted `go test -race` checks on the affected packages; use Linux for
 affected `pkg/nkd/sign` or `pkg/nkd/pipeline` paths. Enable the relevant extended tests when changing their
-capacity limits or integration contracts; see `docs/go-test-performance.md` for the selection. Record external
+capacity limits or integration contracts. Record external
 operational evidence separately from the contract suite.
 
 ## Troubleshooting

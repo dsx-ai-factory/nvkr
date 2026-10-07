@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package factory
@@ -18,6 +21,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -143,6 +147,92 @@ func TestDiskEvidencePublicRuntimeIssuer(t *testing.T) {
 			}
 		})
 	}
+}
+
+// This exercises the strict hosted completion with receipts issued by the real
+// public owners over controlled bytes, not a real Docker/Packer/NKE bake.
+func TestCompleteHostedDiskPublicationStrictPublicRuntime(t *testing.T) {
+	if os.Getenv("NKD_TEST_DISK_EVIDENCE_RUNTIME") != "1" {
+		t.Skip("explicit strict completion contract requires NKD_TEST_DISK_EVIDENCE_RUNTIME=1 and real composition capacity")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
+	defer cancel()
+	fixture := newPublicDiskEvidenceFixture(t, ctx, "hosted publication")
+	if diskBuildProvenance(fixture.plan) || fixture.plan.Qualification != TierPipelineAttested {
+		t.Fatal("fixture does not select strict pipeline-attested completion")
+	}
+	owner, artifact := fixture.produce(t, ctx)
+	inspection, err := OpenDiskEvidenceRuntime(ctx, fixture.plan, fixture.runtime, fixture.workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = inspection.Close() })
+	expected := fixture.plan.LifecycleOutputs[0]
+	_, artifacts := planIndex(fixture.plan)
+	observation, producer, err := owner.inspectDiskLifecycleMetadata(ctx, fixture.plan, expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRecord, err := canonical.Marshal(producer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := artifacts["result/"+expected.Name+"/"+observation.Component]
+	// The held completion, not previously serialized caller bytes, owns the
+	// root record that strict reconciliation and packaging consume.
+	if err := writeFactoryFile(ctx, record.Path, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompleteHostedDiskPublication(ctx, fixture.plan, expected, owner, inspection); err != nil {
+		t.Fatal(err)
+	}
+	gotRecord, err := os.ReadFile(record.Path)
+	if err != nil || !bytes.Equal(gotRecord, wantRecord) {
+		t.Fatalf("strict completion did not persist exact held producer bytes: %s, %v", gotRecord, err)
+	}
+	wrapped := artifacts["package/"+expected.Name]
+	held, err := delivery.OpenSingleDiskArtifact(ctx, wrapped.Path, "linux/"+runtime.GOARCH, 64<<30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = held.Close() }()
+	var payload bytes.Buffer
+	if size, err := held.WriteToContext(ctx, &payload); err != nil || size != artifact.Size() || !bytes.Equal(payload.Bytes(), testQCOW2HeaderPayload()) {
+		t.Fatalf("strict wrapper changed the original QCOW2 bytes: size=%d error=%v", size, err)
+	}
+	observed, err := ObserveDiskPublicationPayload(ctx, fixture.plan, expected, artifacts)
+	if err != nil || observed.Disk == nil || observed.Disk.PayloadDigest != artifact.Digest() || observed.Disk.Size != artifact.Size() || observed.Disk.EvidenceMode != "" {
+		t.Fatalf("strict publication lost exact subject or evidence mode: %+v, %v", observed, err)
+	}
+	for _, component := range expected.Components {
+		raw, err := os.ReadFile(filepath.Join(artifacts["sbom/"+expected.Name].Path, component+".cdx.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var bom sbom.BOM
+		if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte("\n")), &bom); err != nil {
+			t.Fatal(err)
+		}
+		result, err := readProducerResult(ctx, artifacts["result/"+expected.Name+"/"+component].Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := validateReconciledDiskDocument(fixture.plan, expected.Name, component, result.SHA256, &bom); err != nil {
+			t.Fatalf("strict evidence slot %s: %v", component, err)
+		}
+	}
+	for _, id := range []string{wrapped.Producer, artifacts["sbom/"+expected.Name].Producer} {
+		count := 0
+		for _, result := range owner.Nodes {
+			if result.ID == id && result.Status == "ok" {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Fatalf("strict completion recorded %d successful outcomes for %s", count, id)
+		}
+	}
+	assertFactoryErrorCode(t, CompleteHostedDiskPublication(ctx, fixture.plan, expected, owner, inspection), e.CodeImmutableViolation)
 }
 
 // A real admitted inspection owner is required to reach the consumption guard;
@@ -320,6 +410,15 @@ func newPublicDiskEvidenceFixture(t *testing.T, ctx context.Context, mode string
 			Prebuilt: &catalog.Prebuilt{URL: "https://example.test/" + entry.file, Digests: map[string]string{arch: pipeline.FileDigest(raw)}, Evidence: &catalog.ExternalEvidence{None: true}}}
 	}
 	declared.Outputs[0].Components = []string{"agent", "image", "runtime"}
+	if mode == "hosted publication" {
+		environment.Publication = &definition.Publication{RepositoryPrefix: "example.test/nkd", Anonymous: true}
+		environment.Signing = cosignSigningProfile()
+		declared.CosignTool = "cosign"
+		stack.Catalog.Tools = map[string]catalog.ToolPin{"cosign": {
+			Format: ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", Platform: environment.UtilityPlatform,
+			ExecutablePath: "cosign", ArchiveDigest: testCosignArchiveDigest, ExecutableDigest: testCosignExecutableDigest,
+		}}
+	}
 	stack, err = catalog.ApplyStack(stack.Catalog)
 	if err != nil {
 		t.Fatal(err)
@@ -358,6 +457,12 @@ func newPublicDiskEvidenceFixture(t *testing.T, ctx context.Context, mode string
 }
 
 func (fixture publicDiskEvidenceFixture) produce(t *testing.T, ctx context.Context) (*LocalRunResult, *pipeline.PackerArtifact) {
+	t.Helper()
+	owner, artifact, _ := fixture.produceWithDiagnostics(t, ctx)
+	return owner, artifact
+}
+
+func (fixture publicDiskEvidenceFixture) produceWithDiagnostics(t *testing.T, ctx context.Context) (*LocalRunResult, *pipeline.PackerArtifact, *pipeline.PackerDiagnosticSink) {
 	t.Helper()
 	owner := localDiskRunResult(t, fixture.plan)
 	t.Cleanup(func() { _ = owner.Close() })
@@ -433,7 +538,7 @@ func (fixture publicDiskEvidenceFixture) produce(t *testing.T, ctx context.Conte
 	if original == nil {
 		t.Fatal("real public executor did not issue original artifact")
 	}
-	return owner, original
+	return owner, original, diagnostics
 }
 
 const publicDiskEvidenceRuntimeSource = `package main

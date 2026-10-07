@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -39,7 +42,12 @@ func diskMaterialTraceFixtureForPlatformAndEncryption(t *testing.T, sibling, net
 	return diskMaterialTraceFixtureWithCapture(t, sibling, networked, platform, encryption, "")
 }
 
-func diskMaterialTraceFixtureWithCapture(t *testing.T, sibling, networked bool, platform, encryption, capture string) (*Plan, *LocalRunResult) {
+func diskMaterialTraceFixtureWithCapture(t *testing.T, sibling, networked bool, platform, encryption, capture string, buildProvenance ...bool) (*Plan, *LocalRunResult) {
+	t.Helper()
+	return diskMaterialTraceFixtureWithPublicationMode(t, sibling, networked, platform, encryption, capture, len(buildProvenance) != 0 && buildProvenance[0], "")
+}
+
+func diskMaterialTraceFixtureWithPublicationMode(t *testing.T, sibling, networked bool, platform, encryption, capture string, buildProvenance bool, publicationMode string) (*Plan, *LocalRunResult) {
 	t.Helper()
 	fixture := newVMPackerMaterialFixtureForPlatform(t, nil, map[string]string{"a-agent": "agent", "z-runtime": "runtime"}, platform)
 	base := fixture.plan.CatalogSnapshot
@@ -68,6 +76,14 @@ func diskMaterialTraceFixtureWithCapture(t *testing.T, sibling, networked bool, 
 		image.BuildNetwork = ir.NetworkDefault
 		base.Components["image"] = image
 		environment.Runtime.BuildNetworkPolicy = authored.BuildNetworkProducerDeclared
+	}
+	if buildProvenance {
+		environment.GitHubARC = "native-kvm-v1"
+		environment.DiskEvidence = "build-provenance-v1"
+		environment.Publication = &authored.Publication{RepositoryPrefix: "example.test/nkd", Anonymous: true, Mode: publicationMode}
+		environment.Signing = cosignSigningProfile()
+		fixture.plan.Definition.CosignTool = "cosign"
+		base.Tools = map[string]catalog.ToolPin{"cosign": {Format: ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", Platform: environment.UtilityPlatform, ExecutablePath: "cosign", ArchiveDigest: testCosignArchiveDigest, ExecutableDigest: testCosignExecutableDigest}}
 	}
 	stack, err := catalog.ApplyStack(base)
 	if err != nil {

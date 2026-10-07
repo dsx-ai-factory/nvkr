@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package provenance
 
 // production.go emits the PRODUCTION SLSA v1 predicate for one executed factory
@@ -54,9 +57,24 @@ const (
 	SigningModeCosign = "cosign"
 )
 
-// timestampLayout is the exact SLSA metadata timestamp rendering. RFC 3339 in UTC
-// keeps predicates byte-stable across hosts and locales.
+// timestampLayout preserves the existing local invocation identity rendering.
 const timestampLayout = time.RFC3339Nano
+
+// productionTimestamp matches the protobuf JSON representation used by Cosign's
+// SLSA v1 encoder: UTC with 0, 3, 6 or 9 fractional digits. RFC3339Nano alone
+// trims individual zeros, so Cosign can otherwise change the exact predicate.
+func productionTimestamp(value time.Time) string {
+	layout := "2006-01-02T15:04:05.000000000Z"
+	switch nanos := value.Nanosecond(); {
+	case nanos == 0:
+		layout = "2006-01-02T15:04:05Z"
+	case nanos%1000000 == 0:
+		layout = "2006-01-02T15:04:05.000Z"
+	case nanos%1000 == 0:
+		layout = "2006-01-02T15:04:05.000000Z"
+	}
+	return value.UTC().Format(layout)
+}
 
 // RunContext is the authenticated-enough description of one build execution:
 // which builder ran it, under which invocation identity, and between which
@@ -232,8 +250,8 @@ func ProductionPredicate(run RunContext, in ProductionInputs) Predicate {
 		builderID = run.BuilderID()
 		invocationID = run.InvocationID()
 		metadata["invocationId"] = invocationID
-		metadata["startedOn"] = run.StartedOn().UTC().Format(timestampLayout)
-		metadata["finishedOn"] = run.FinishedOn().UTC().Format(timestampLayout)
+		metadata["startedOn"] = productionTimestamp(run.StartedOn())
+		metadata["finishedOn"] = productionTimestamp(run.FinishedOn())
 	}
 	return Predicate{
 		BuildDefinition: BuildDefinition{

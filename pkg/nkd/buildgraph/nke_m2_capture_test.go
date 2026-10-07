@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package buildgraph
 
 import (
@@ -36,11 +39,16 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				t.Fatal(err)
 			}
 			agent := cat.Components["nke-agent"]
-			for _, name := range []string{"nke-agent", "nke-cni-calico", "nke-kubeadm-distro", "nke-spire-agent"} {
+			for _, name := range []string{"nke-agent", "nke-cni-calico", "nke-kubeadm-distro"} {
 				component := cat.Components[name]
 				if component.Commit != approvedSource || component.TreeHash != "b915345debd33ccd63dfbf8146415bf20e94c4ea" || component.SourceDate != 1791257393 {
 					t.Fatalf("%s does not retain the approved source commit/tree/epoch", name)
 				}
+			}
+			// Temporary SPIRE-only rollback avoids the inaccessible DSX IMDS asset.
+			spire := cat.Components["nke-spire-agent"]
+			if spire.Commit != "726f76944404e1106626b8333d3576bdf67b575b" || spire.TreeHash != "3d6ea77f85d5da2648038425f805a598e23464ba" || spire.SourceDate != 1790192178 {
+				t.Fatal("temporary SPIRE source pin changed")
 			}
 			if agent.Commit != approvedSource || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.2.1-81-gff21ba8") {
 				t.Fatal("handwritten agent version no longer matches its exact source pin; revalidate owning source version before repinning")

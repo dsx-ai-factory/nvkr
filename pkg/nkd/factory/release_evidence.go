@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -74,7 +77,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			Evidence: &delivery.EvidenceBinding{Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspected}})
 		return nil
 	}
-	for _, output := range plan.LifecycleOutputs {
+	for _, output := range selectedPublicationOutputs(plan, node) {
 		artifact, ok := artifacts[output.ArtifactID]
 		if !ok || !containsString(node.Inputs, artifact.ID) {
 			return nil, e.New(e.CodeProvenanceMissing, "release omits output %q", output.Name)

@@ -1,0 +1,2 @@
+nkdctl: [NKD-E-ENGINE-CAPABILITY] disk output "nke-node-image-amd64" requires its frozen execution-host inspection profile
+exit status 29

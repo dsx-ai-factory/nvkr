@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -10,10 +13,18 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
+func diskPublicationWrapperID(output LifecycleOutputPlan) string {
+	return "package/" + output.Name
+}
+
+func diskPublicationProducerResultID(output LifecycleOutputPlan, raw Artifact) string {
+	return "result/" + output.Name + "/" + raw.Component
+}
+
 // inspectFactoryDisk checks the exact wrapper profile and bytes. This is a
 // transport observation, not reconstruction of the live evidence receipt.
 func inspectFactoryDisk(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, artifact Artifact) (delivery.DiskArtifactInspection, error) {
-	if expected.Kind != PackageDiskImage || artifact.ID != "package/"+expected.Name || artifact.Kind != PackageDiskImage ||
+	if expected.Kind != PackageDiskImage || artifact.ID != diskPublicationWrapperID(expected) || artifact.Kind != PackageDiskImage ||
 		artifact.Name != expected.Name || artifact.BuildTarget != "" || artifact.MediaType != packageMediaType(PackageDiskImage) {
 		return delivery.DiskArtifactInspection{}, e.New(e.CodeVerifyFailed, "disk publication substitutes its exact planned wrapper")
 	}
@@ -87,8 +98,8 @@ func ObserveDiskPublicationPayload(ctx context.Context, plan *Plan, expected Lif
 		return delivery.Output{}, e.New(e.CodeEngineCapability, "disk publication requires its compiled production wrapper graph")
 	}
 	raw, rawFound := artifacts[expected.ArtifactID]
-	wrapper, wrapperFound := artifacts["package/"+expected.Name]
-	wantedRaw, wantedWrapper := planned[expected.ArtifactID], planned["package/"+expected.Name]
+	wrapper, wrapperFound := artifacts[diskPublicationWrapperID(expected)]
+	wantedRaw, wantedWrapper := planned[expected.ArtifactID], planned[diskPublicationWrapperID(expected)]
 	if !rawFound || !wrapperFound || raw.Kind != PackageDiskImage || raw.BuildTarget != expected.Name || raw.Component == "" ||
 		raw.ID != wantedRaw.ID || raw.Producer != wantedRaw.Producer || raw.Component != wantedRaw.Component ||
 		wrapper.ID != wantedWrapper.ID || wrapper.Producer != wantedWrapper.Producer || wrapper.Name != wantedWrapper.Name ||
@@ -99,7 +110,7 @@ func ObserveDiskPublicationPayload(ctx context.Context, plan *Plan, expected Lif
 	if err != nil {
 		return delivery.Output{}, err
 	}
-	record, found := artifacts["result/"+expected.Name+"/"+raw.Component]
+	record, found := artifacts[diskPublicationProducerResultID(expected, raw)]
 	if !found || record.Kind != "producer-result" || record.Producer != raw.Producer || record.Component != raw.Component || record.BuildTarget != expected.Name {
 		return delivery.Output{}, e.New(e.CodeProvenanceMissing, "disk wrapper lacks its exact raw producer record")
 	}
@@ -118,7 +129,7 @@ func ObserveDiskPublicationPayload(ctx context.Context, plan *Plan, expected Lif
 		BuildDigest: expected.BuildDigest, Components: append([]string(nil), expected.Components...),
 		Disk: &delivery.DiskOutput{PayloadDigest: inspection.PayloadDigest, Producer: strings.TrimPrefix(raw.Producer, expected.Name+"/"),
 			Component: raw.Component, Format: "qcow2", Encryption: "none", Size: inspection.Size,
-			PlanDigest: planDigest, Outcome: "succeeded"}}
+			PlanDigest: planDigest, Outcome: "succeeded", EvidenceMode: plan.Environment.DiskEvidence}}
 	if err := output.Validate(); err != nil {
 		return delivery.Output{}, err
 	}

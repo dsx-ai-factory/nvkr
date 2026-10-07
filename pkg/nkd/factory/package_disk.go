@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -283,6 +286,9 @@ func reconciledDiskPackageBinding(plan *Plan, expected LifecycleOutputPlan, outp
 	for _, build := range plan.Builds {
 		if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest {
 			continue
+		}
+		if diskBuildProvenance(plan) {
+			return build.Platform, definition.DiskInspectionProfile{}, nil
 		}
 		_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
 		if err != nil {

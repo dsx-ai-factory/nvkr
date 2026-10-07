@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -8,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"sigs.k8s.io/yaml"
@@ -47,6 +51,7 @@ type githubStep struct {
 	ContinueOnError bool              `json:"continue-on-error,omitempty"`
 	If              string            `json:"if,omitempty"`
 	With            map[string]string `json:"with,omitempty"`
+	TimeoutMinutes  int               `json:"timeout-minutes,omitempty"`
 }
 
 // ValidateGitHubBundle performs local schema and semantic analysis only. It does not
@@ -58,6 +63,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		return err
 	}
 
+	if err := validateGitHubWorkflowSize(workflow); err != nil {
+		return err
+	}
 	actions, err := resolveGitHubActions(plan.Actions)
 	if err != nil {
 		return err
@@ -89,6 +97,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	stages, nodeJobs, err := githubStages(plan)
 	if err != nil {
+		return err
+	}
+	if err := validateGitHubCarrierUploads(plan, document, stages, artifacts, nodeJobs, actions); err != nil {
 		return err
 	}
 	byNode := make(map[string]githubStage, len(plan.Graph.Nodes))
@@ -154,10 +165,20 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if _, present := job.Env[sourceTokenEnv]; present {
 			return e.New(e.CodeEngineCapability, "GitHub source credential must be scoped to its fetch step")
 		}
+		if _, present := job.Env[githubImageToken]; present {
+			return e.New(e.CodeEngineCapability, "private image credential cannot be job-scoped")
+		}
 		wantSourceEnv := sourceEnvironments[jobID]
 		foundSource := false
 		for _, step := range job.Steps {
 			if len(step.Env) == 0 {
+				continue
+			}
+			if stage, ok := byNodeForJob(stages, jobID); ok && len(githubStagePrivateImages(plan, stage)) > 0 &&
+				strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID) {
+				if !reflect.DeepEqual(step.Env, githubImageEnvironment()) || step.If != "" || step.ContinueOnError || step.Uses != "" {
+					return e.New(e.CodeEngineCapability, "private image preparation requires only its exact read credential")
+				}
 				continue
 			}
 			if jobID == "nkd-lifecycle-run" && step.ID == "recover-artifacts" {
@@ -230,7 +251,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if len(catalogEnv) > 0 {
 			wantCondition = "${{ " + githubDispatchCondition(plan) + " }}"
 		}
-		if !ok || job.RunsOn != runner || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
+		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
@@ -260,6 +281,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		jobID := stage.ID
 		job, ok := document.Jobs[jobID]
 		wantEnvironment := ""
+		if stage.DiskOutput != "" {
+			wantEnvironment = githubARCEnvironment
+		}
 		if githubProtectedPublication(plan, node) {
 			wantEnvironment = githubReleaseEnvironment
 		}
@@ -288,6 +312,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		if err := validateGitHubStageExecution(plan, stage, job.Steps); err != nil {
 			return err
+		}
+		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read", "packages": "read"}) {
+			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read and packages:read")
 		}
 		wantCondition := stage.condition(plan)
 		if job.If != wantCondition {
@@ -336,7 +363,11 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
 		}
-		for _, input := range stage.inputs(artifacts, nodeJobs) {
+		carrierInputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
+		if err != nil {
+			return err
+		}
+		for _, input := range carrierInputs {
 			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("restore-inputs", "stage", stage.ID)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not restore exact input %q", jobID, input)
 			}
@@ -426,6 +457,90 @@ func stepUses(steps []githubStep, action string) bool {
 	return false
 }
 
+// Validate transport against the admitted graph, not by parsing provider pattern
+// syntax. Every restored carrier has exactly one uploader in its producer job.
+// Raw disk subjects are deliberately absent: their selected wrapper and producer
+// record are mandatory carrier inputs at the shared projection boundary.
+func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, stages []githubStage,
+	artifacts map[string]Artifact, nodeJobs map[string]string, actions githubActionRefs) error {
+	uploads := map[string][]string{}
+	patterns := map[string]string{}
+	for jobID, job := range document.Jobs {
+		for _, step := range job.Steps {
+			if step.Uses == actions.Upload {
+				uploads[step.With["name"]] = append(uploads[step.With["name"]], jobID)
+			}
+		}
+	}
+	require := func(id string) error {
+		jobs := uploads[githubArtifactName(id)]
+		if len(jobs) != 1 || jobs[0] != nodeJobs[artifacts[id].Producer] {
+			return e.New(e.CodeEngineCapability, "GitHub restored carrier %q requires exactly one uploader in its producer job", id)
+		}
+		return nil
+	}
+	for _, stage := range stages {
+		inputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
+		if err != nil {
+			return err
+		}
+		for _, id := range inputs {
+			if err := require(id); err != nil {
+				return err
+			}
+		}
+		if len(inputs) > 0 {
+			selected := make([]Artifact, len(inputs))
+			for index, id := range inputs {
+				selected[index] = artifacts[id]
+			}
+			patterns[stage.ID], err = githubCarrierPattern(selected)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if len(plan.LifecycleOutputs) > 0 {
+		var carriers []Artifact
+		for _, artifact := range plan.Graph.Artifacts {
+			if finalizerArtifact(plan, artifact) {
+				carriers = append(carriers, artifact)
+			}
+			if _, raw := diskPublicationRequirement(plan, artifact); raw {
+				continue
+			}
+			if err := require(artifact.ID); err != nil {
+				return err
+			}
+		}
+		var err error
+		patterns["nkd-lifecycle-run"], err = githubCarrierPattern(carriers)
+		if err != nil {
+			return err
+		}
+	}
+	for jobID, job := range document.Jobs {
+		for _, step := range job.Steps {
+			if step.Uses != actions.Download {
+				continue
+			}
+			if pattern := step.With["pattern"]; pattern != "" {
+				if step.With["name"] != "" || pattern != patterns[jobID] {
+					return e.New(e.CodeEngineCapability, "GitHub job %q downloads a carrier pattern outside its admitted graph", jobID)
+				}
+				continue
+			}
+			if step.With["name"] == "" {
+				continue
+			}
+			if len(uploads[step.With["name"]]) != 1 {
+				return e.New(e.CodeEngineCapability, "GitHub job %q downloads %q without exactly one uploader", jobID, step.With["name"])
+			}
+		}
+	}
+	return nil
+}
+
 func joinRuns(steps []githubStep) string {
 	var runs []string
 	for _, step := range steps {
@@ -453,6 +568,56 @@ func (document githubWorkflowDocument) String() string {
 // order even when scheduling shares a runner. Another node's command cannot
 // satisfy this node's isolation or identity checks.
 func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubStep) error {
+	if len(githubStagePrivateImages(plan, stage)) > 0 {
+		prepared := false
+		for _, step := range steps {
+			if strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID) {
+				if prepared || !reflect.DeepEqual(step.Env, githubImageEnvironment()) {
+					return e.New(e.CodeEngineCapability, "private toolchain preparation must occur exactly once with scoped credentials")
+				}
+				prepared = true
+			}
+			if (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) && !prepared {
+				return e.New(e.CodeEngineCapability, "private toolchain preparation must precede producer execution")
+			}
+		}
+		if !prepared {
+			return e.New(e.CodeEngineCapability, "private toolchain preparation is missing")
+		}
+	}
+	if stage.DiskOutput != "" {
+		executors, diagnostics := 0, 0
+		actions, err := resolveGitHubActions(plan.Actions)
+		if err != nil {
+			return err
+		}
+		var expected bytes.Buffer
+		writeGitHubPackerDiagnosticStep(&expected, stage, actions)
+		var diagnostic struct {
+			Steps []githubStep `json:"steps"`
+		}
+		if err := yaml.UnmarshalStrict([]byte("steps:\n"+expected.String()), &diagnostic); err != nil {
+			return e.Wrap(e.CodeInternal, err, "decode fixed Packer diagnostic transport")
+		}
+		for i, step := range steps {
+			if step.ID == "run-disk" {
+				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes {
+					return e.New(e.CodeEngineCapability, "disk stage requires its bounded unconditional live executor")
+				}
+				executors++
+			}
+			if step.Name == "Upload failed Packer diagnostics" {
+				if diagnostics != 0 || i == 0 || steps[i-1].ID != "run-disk" || !reflect.DeepEqual(step, diagnostic.Steps[0]) {
+					return e.New(e.CodeEngineCapability, "disk diagnostics require the exact failure-only sealed route transport")
+				}
+				diagnostics++
+			}
+		}
+		if executors != 1 || diagnostics != 1 {
+			return e.New(e.CodeEngineCapability, "disk stage requires one live executor and one failure diagnostic transport")
+		}
+		return nil
+	}
 	next := 0
 	for _, step := range steps {
 		if step.ID == "" {

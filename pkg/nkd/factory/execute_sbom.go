@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 // execute_sbom.go owns the per-build SBOM node. ADR-13 §1 (re-entered into v1
@@ -181,6 +184,9 @@ func (plan *Plan) validateSBOMGraph() error {
 			continue
 		}
 		if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
+			if diskBuildProvenance(plan) {
+				continue
+			}
 			var selected BuildPlan
 			for _, build := range plan.Builds {
 				if build.Name == node.BuildTarget {

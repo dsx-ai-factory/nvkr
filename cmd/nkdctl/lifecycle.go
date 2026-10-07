@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 import (
@@ -69,30 +72,9 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			fmt.Printf("hosted Run %s: %s (%d observed outputs)\n", run.Attempt, run.Status, len(run.Observed))
 			return nil
 		}},
-		{Name: "plan", Usage: "compile a Definition and Environment into an inspectable run plan", Flags: append(lifecycleInputFlags(), &cli.BoolFlag{Name: "json", Usage: "emit the generated internal plan"}), Action: func(c *cli.Context) error {
-			plan, err := compileLifecycleInput(c)
-			if err != nil {
-				return err
-			}
-			if c.Bool("json") {
-				raw, err := canonical.Marshal(plan)
-				if err != nil {
-					return err
-				}
-				_, err = os.Stdout.Write(append(raw, '\n'))
-				return err
-			}
-			definition, err := lifecycle.LoadDefinition(c.Context, c.String("definition"))
-			if err != nil {
-				return err
-			}
-			digest, err := plan.Digest()
-			if err != nil {
-				return err
-			}
-			fmt.Printf("definition: %s\ndefinitionDigest: %s\nenvironmentDigest: %s\nrun plan: %s\nexpected outputs: %d\nlane: %s\n", plan.Name, plan.DefinitionDigest, plan.EnvironmentDigest, digest, len(definition.Outputs), plan.Qualification)
-			return nil
-		}},
+		cmdRunPlan(),
+		cmdRunGraph(),
+		cmdRunDiff(),
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {

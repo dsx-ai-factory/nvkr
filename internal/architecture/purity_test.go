@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package architecture hosts the ADR-02 §3 STATIC purity guard: an automated check that
 // the identity-producing code paths contain no nondeterministic source — wall-clock
 // reads, randomness, UUID generation, hostname, or host-environment reads — because a

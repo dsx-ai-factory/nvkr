@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -9,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
@@ -17,6 +21,7 @@ const (
 	GitHubWorkflowPath               = ".github/workflows/nkd-run.yml"
 	FactoryPlanPath                  = ".github/nkd-run/plan.json"
 	githubReleaseEnvironment         = "nkd-release"
+	githubARCEnvironment             = "nkd-arc"
 	githubExecutionCondition         = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
 	githubSupportJobTimeoutMinutes   = 15
 	githubDefaultStageTimeoutMinutes = 60
@@ -46,7 +51,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "GitHub generation"); err != nil {
+	if err := admitGitHubRequirements(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}
 	if plan.DefinitionPath == "" || plan.EnvironmentPath == "" {
@@ -95,7 +100,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		jobID := bootstrapJobs[runner]
 		fmt.Fprintf(&body, "  %s:\n", jobID)
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle("Prepare NKD runner ("+runner+")"))
-		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runner))
+		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runner)))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		if len(githubCatalogSourceEnvironment(plan)) > 0 {
 			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
@@ -136,10 +141,17 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(needs, ", "))
 		fmt.Fprintf(&body, "    if: %s\n", stage.condition(plan))
+		if stage.DiskOutput != "" {
+			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubARCEnvironment))
+		}
 		if githubProtectedPublication(plan, node) {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
 		}
 		env := map[string]string{}
+		privateImages := len(githubStagePrivateImages(plan, stage)) > 0
+		if privateImages {
+			fmt.Fprintln(&body, "    permissions:\n      contents: read\n      packages: read")
+		}
 		for k, v := range plan.Environment.Runtime.Variables {
 			env[k] = v
 		}
@@ -207,6 +219,21 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
 		}
+		if privateImages {
+			fmt.Fprintln(&body, "      - name: Prepare private native toolchains\n        env:")
+			for _, key := range sortedKeys(githubImageEnvironment()) {
+				fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(githubImageEnvironment()[key]))
+			}
+			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand("prepare-images", "stage", stage.ID))
+		}
+		if stage.DiskOutput != "" {
+			fmt.Fprintf(&body, "      - name: %s\n        id: run-disk\n        timeout-minutes: %d\n        run: %s\n", yamlSingle(stage.Name), int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes, githubRunnerCommand("run-disk", "output", stage.DiskOutput))
+			writeGitHubPackerDiagnosticStep(&body, stage, actions)
+			for _, member := range stage.Nodes {
+				writeGitHubOutputSteps(&body, plan, member, artifacts, actions)
+			}
+			continue
+		}
 		for _, node := range stage.Nodes {
 			fmt.Fprintf(&body, "      - name: %s\n", yamlSingle(githubNodeLabel(plan, node)))
 			fmt.Fprintf(&body, "        id: %s\n", githubJobID(node.ID))
@@ -232,10 +259,19 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		runners := sortedKeys(bootstrapJobs)
 		fmt.Fprintln(&body, "  nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
-		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runners[0]))
+		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runners[0])))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))
+		if PerOutputPublication(plan) {
+			target := plan.Targets["release"]
+			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
+			fmt.Fprintln(&body, "    permissions:\n      contents: read\n      packages: read")
+			if target.CredentialRef != "" {
+				secret := strings.TrimPrefix(target.CredentialRef, "github:")
+				fmt.Fprintf(&body, "    env:\n      NKD_REGISTRY_USER: '${{ github.actor }}'\n      NKD_CREDENTIAL: '${{ secrets.%s }}'\n", secret)
+			}
+		}
 		fmt.Fprintln(&body, "    steps:")
 		actions.writeCheckoutStep(&body)
 		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runners[0]), ".")
@@ -248,6 +284,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "      - name: Upload final Run record\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nkd-lifecycle-run\n          path: .nkd/run.json\n          if-no-files-found: error\n", actions.Upload)
 	}
 	workflow := body.Bytes()
+	if PerOutputPublication(plan) {
+		workflow, err = compactGitHubWorkflow(workflow)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := validateGitHubWorkflowSize(workflow); err != nil {
+		return nil, err
+	}
 	files[GitHubWorkflowPath] = append([]byte(nil), workflow...)
 	bundle := newGeneratedBundle(EngineGitHub, githubLayout, files, planDigest)
 	if validate {
@@ -258,11 +303,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	return bundle, nil
 }
 
+func writeGitHubPackerDiagnosticStep(out *bytes.Buffer, stage githubStage, actions githubActionRefs) {
+	fmt.Fprintf(out, "      - name: Upload failed Packer diagnostics\n        if: %s\n        timeout-minutes: %d\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n          include-hidden-files: 'true'\n          retention-days: '1'\n", yamlSingle("${{ failure() && steps.run-disk.outputs.packer_diagnostics != '' }}"), githubDiskDiagnosticUploadMinutes, actions.Upload, yamlSingle("nkd-packer-diagnostics-"+stage.DiskOutput), yamlSingle("${{ steps.run-disk.outputs.packer_diagnostics }}"))
+}
+
 // signFamilyNode reports whether a node kind belongs to the signing family: the
 // jobs that use a signing profile. Artifact signing and SBOM attestation request an OIDC identity token;
 // publication verification uses registry read access without minting credentials.
 func signFamilyNode(kind string) bool {
-	return kind == NodeSign || kind == NodeVerifyPublication || kind == NodeAttestEvidence
+	return kind == NodeSign || kind == NodeVerifyPublication || kind == NodeAttestEvidence || kind == NodeAssembleRelease
 }
 
 // githubSigningPermissions is the exact token scope set of one signing-family job.
@@ -272,7 +321,7 @@ func signFamilyNode(kind string) bool {
 // (sign) or registry read to fetch it back (verify).
 func githubSigningPermissions(kind, mode string) map[string]string {
 	permissions := map[string]string{"contents": "read"}
-	if kind == NodeVerifyPublication {
+	if kind == NodeVerifyPublication || kind == NodeAssembleRelease {
 		permissions["packages"] = "read"
 	}
 	if mode != SigningModeCosign {

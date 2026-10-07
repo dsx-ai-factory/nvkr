@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -101,7 +104,7 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, bundle.Engine+" bundle validation"); err != nil {
+	if err := admitGitHubRequirements(plan, bundle.Engine+" bundle validation"); err != nil {
 		return nil, err
 	}
 	expectedPlanDigest, err := plan.Digest()
@@ -138,7 +141,7 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if err != nil || digest != expectedPlanDigest {
 		return nil, e.New(e.CodePipelineDrift, "generated factory plan does not match planDigest")
 	}
-	if err := rejectUnsupportedPlanRequirements(&decodedPlan, bundle.Engine+" bundle validation"); err != nil {
+	if err := admitGitHubRequirements(&decodedPlan, bundle.Engine+" bundle validation"); err != nil {
 		return nil, err
 	}
 

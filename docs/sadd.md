@@ -194,8 +194,10 @@ flowchart TB
 ```
 
 The graph describes logical dependencies; it does not require one job per logical node in every lane. Ordinary
-factory nodes exchange declared artifacts through provider transport. The proposed wrapped-build job keeps its
-large output in one job through publication and verification, avoiding repeated inter-job transfer (ADR-10).
+factory nodes exchange declared artifacts through provider transport. The native ARC disk group keeps the
+original producer and held disk open through disk-evidence packaging. Declared carriers then transport the
+package and evidence to separate generic hosted publication, signing and verification jobs, each with its own
+credential boundary (ADR-18/20). Fused large-output wrapped publication and verification remain deferred (ADR-10).
 
 | Boundary | Data and responsibility | Trust or persistence rule |
 |---|---|---|
@@ -258,10 +260,13 @@ cannot alter the authenticated material bytes, component, architecture, digest o
 NKE OS producer owns its embedded contents. IR/Plan lowering binds the exact source and material producers and
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
-verdict. Production VM execution and held-result population remain capability-gated; direct producer selection
-does not introduce independently built OS layers. Before
-disk delivery is admitted, ADR-13 also requires a full inventory reconciling traced materials with read-only
-inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
+verdict. Production VM execution and held-result population use the separately admitted native ARC route;
+direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
+live producer/material evidence and reports inspection as not performed, satisfying the M2 disk-evidence floor.
+M2 still requires the remaining delivery and consumer gates. ADR-13's strict mode requires a full inventory
+reconciling traced materials with read-only inspection of each native AMD64 and ARM64 disk; these are M3
+qualification requirements under Ilya Kislenko's October 7 scope decision. That composition claim does not
+establish NKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
@@ -317,6 +322,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
+| Plan inspection | `planview` | Validate through factory, retain immutable descriptive snapshots, render linked graphs and compare named Plan fields without granting execution or evidence authority |
 | Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
@@ -454,7 +460,7 @@ of Environment publication namespaces. Helm digest overrides remain possible; de
 
 `curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
 An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate
-deferred inspection and material-reconciliation contract; runtime correctness remains with NKE. Any deferred
+strict inspection and material-reconciliation contract in ADR-13; runtime correctness remains with NKE. Any deferred
 registration transport must consume accepted artifact references without adding a topology model.
 
 ### External Interface and Specification {#external-interface-and-specification}
@@ -611,6 +617,13 @@ verifies upstream signatures nor upgrades evidence. The release metadata referen
 as a subject-bound CycloneDX attestation bundle. Attestations are created and verified before deriving
 the final release index, so its signature covers each exact bundle and document digest. Helm source-archive and final bound-package
 inventories are separate claims; Run completion is not signed. See the [registry graph](publication-architecture.md). Build-only and dry-run outputs gain no signature.
+
+For the M2 GitHub Environment, each output is published, signed and fully verified separately. Release
+assembly and finalization authenticate only bounded metadata and signed evidence from that same Plan and
+workflow run attempt. This avoids gathering all payloads on one runner while preserving one signed release
+entry point and exact output completeness. Failed provider jobs, mismatched attempt bindings or rejected
+signatures prevent completion. Independent consumption still verifies the complete payload closure
+(ADR-18/20); this does not add qualified reproduction or cross-run publication reuse.
 
 Independent artifact consumption uses a signature and subject-bound production attestation on each deliverable
 manifest in its own repository. The release signature remains the authority for membership and SBOM coverage;
@@ -797,9 +810,11 @@ Compilation is dominated by catalog size and graph cardinality. Execution is dom
 package construction and artifact transport. Reads and subprocesses must be bounded, but a bounded reader alone
 does not establish that a large-image workflow fits a hosted runner.
 
-For a wrapped job, capacity planning must include materialized sources, toolchains, build scratch, produced image,
-package representation and verification temporaries that coexist. Fusion removes repeated job transfer, not these
-storage requirements. No numeric capacity or duration target is invented here.
+For the live disk group, capacity planning must include materialized sources, toolchains, build scratch, produced
+image, package representation and, in strict mode, inspection temporaries that coexist. Keeping packaging with
+the producer preserves live ownership; it does not remove these storage requirements. Separate hosted jobs must
+also budget retained carriers, authenticated restoration snapshots, extracted inputs and publication or
+verification temporaries. No numeric capacity or duration target is invented here.
 
 Runner requirements are modeled with a generic per-step request, not as builder-specific metadata. Minimum CPU,
 memory and ephemeral storage, eligible host platforms, typed host capabilities, and an executor wall-time budget
@@ -840,13 +855,18 @@ The material manifest is derived from authenticated producer observations; an au
 projection can change only its schema and per-binding kind vocabulary. Bounded in-process cleanup owns ordinary
 completion and cancellation; authenticated
 cross-process orphan recovery after a hard process or host failure remains deferred. Command/Make, encrypted-disk,
-hosted and qualified VM adapters remain closed.
+general hosted and qualified VM adapters remain closed. ADR-18 defines the explicit native ARC disk exception, including exact Environment-authored manual
+dispatch branches matched by deployment policies and signing identity.
 
 The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
 Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,
 default-none network mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
-hosted or qualified identity boundary. Those lanes require an authenticated subordinate identity, user namespace
-or stronger provider sandbox plus recorded interoperability evidence.
+hosted or qualified identity boundary. The qualified lane requires an authenticated subordinate identity, user namespace
+or stronger provider sandbox plus recorded interoperability evidence. The explicit pipeline-attested ARC policy
+trusts the operator-managed ephemeral runner/daemon, with observed native capacity and bounded execution.
+Internal candidate toolchains use a separate packages:read preparation step. Its temporary registry
+credentials are deleted before source/producer execution; the held runtime independently revalidates
+the exact locally prepared image. Package Actions access is configured separately from workflow scopes.
 
 The local capability and driver result are unqualified current-availability evidence, not authenticated provider
 allocation, reservation, pipeline attestation or qualification evidence. Holding a validated KVM descriptor proves
@@ -856,8 +876,13 @@ For Docker's separate daemon namespace, a fixed device projection additionally c
 admitted character-device numbers before Packer runs. Committed-head Docker/Packer/NKE ARM64 and AMD64 bakes and
 source-owned boot smoke passed through the local adapter on ARC, as recorded in
 [the 2026-10-01 evidence](evidence/2026-10-01-nke-arc-os-builds.md). This diagnostic execution does not establish
-generated hosted VM admission or qualification. Hosted admission, provider proof, and VM
-topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
+qualification. The generated native ARC route also completed both builds in run `37445475840`, but strict
+inspection timed out. Producer-provenance disk jobs passed in run `37486058412`; aggregate transport then failed
+before publication, as the [dated evidence](evidence/2026-10-06-m2-release-carrier-transport.md) records.
+Historical validation run `37533806963` at `625980e` subsequently passed all 34 candidate outputs and
+publication/signing/verification/finalization. This does not validate the updated head, current main execution,
+strict inspection or independent full-payload consumer acceptance; see
+[reconciliation](adr/reconciliation.md#native-arc-disk-route). Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
 the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
 deferred.
 Produced-artifact size remains an artifact and transport budget.
@@ -882,8 +907,9 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance remains amd64-only;
-additional architectures require their own source and runner acceptance.
+rollback helpers are removed and those workflows remain deferred (ADR-16). M2 requires independent native
+AMD64 and ARM64 source, runner and producer-provenance delivery acceptance; M3 adds strict disk inspection
+and material reconciliation (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios
 

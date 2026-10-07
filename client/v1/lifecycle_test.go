@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package client_test
 
 import (
@@ -83,6 +86,18 @@ func TestSDKRejectsUnsupportedGenerationBeforeInputsAndUnconfiguredConsumer(t *t
 	_, err = client.New().VerifyRelease(context.Background(), "registry.example.test/product@sha256:0000000000000000000000000000000000000000000000000000000000000000",
 		client.VerificationPolicy{Lane: "pipeline-attested", Scope: "artifact-publication", IdentityRegexp: "^builder$", Issuer: "issuer"})
 	requireLifecycleCode(t, err, nkderr.CodeEngineCapability)
+}
+
+func TestSDKExposesTypedDiskEvidencePolicy(t *testing.T) {
+	runtimeValue := string(client.DiskEvidenceBuildProvenance)
+	policy := client.VerificationPolicy{Lane: "pipeline-attested", Scope: "artifact-publication",
+		IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: client.DiskEvidenceRequirement(runtimeValue)}
+	if err := policy.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if client.DiskEvidenceStrict != "strict" || client.DiskEvidenceBuildProvenance != "build-provenance-v1" {
+		t.Fatalf("disk evidence policy constants = %q, %q", client.DiskEvidenceStrict, client.DiskEvidenceBuildProvenance)
+	}
 }
 
 func requireLifecycleCode(t *testing.T, err error, expected nkderr.Code) {

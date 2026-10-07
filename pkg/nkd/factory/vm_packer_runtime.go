@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -45,6 +48,9 @@ func (localVMPackerResolver) Admit(
 	subjects := make(map[string]struct{})
 	sourceRoots := make(map[string]string)
 	for _, selected := range topologicalFactoryNodes(plan.Graph) {
+		if config.NodeID != "" && selected.ID != config.NodeID {
+			continue
+		}
 		if selected.Kind != NodeBuild || selected.IRNode == "" {
 			continue
 		}

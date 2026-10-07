@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nkd.dev/catalog-overlay/v3
+kind: CatalogOverlay
+name: nke-m2-native-toolchains
+requiresCatalogDigest: sha256:be089debd30cbfeaf36ca81f77c644a8b914b9c0a7f4edb96e7f03721b0619e4
+# Candidate-only exception: docs/evidence/2026-10-06-native-arc.md.
+toolchainSubstitutions:
+  - arch: amd64
+    from: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+    to: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013
+    components:
+      - nke-agent
+      - nke-cni-calico
+      - nke-cni-ovn
+      - nke-image-inputs
+      - nke-kubeadm-distro
+      - nke-node-image-amd64
+      - nke-patched-installer-iso-amd64
+      - nke-spire-agent
+      - ovn-kubernetes-chart
+  - arch: arm64
+    from: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+    to: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+    components:
+      - nke-agent
+      - nke-cni-calico
+      - nke-cni-ovn
+      - nke-image-inputs
+      - nke-kubeadm-distro
+      - nke-node-image
+      - nke-patched-installer-iso
+      - nke-spire-agent
+      - ovn-kubernetes-chart

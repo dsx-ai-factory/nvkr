@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package provenance
 
 import (
@@ -352,5 +355,41 @@ func TestProductionRejectsRetiredCompilerHandoff(t *testing.T) {
 	delete(predicate.BuildDefinition.ExternalParameters, "definitionDigest")
 	if err := ValidateProduction(predicate); err == nil {
 		t.Fatal("retired compiler handoff parameter admitted under v2")
+	}
+}
+
+func TestProductionPredicatePreservesCosignTimestampEncoding(t *testing.T) {
+	for _, tc := range []struct{ name, instant, encoded string }{
+		{"seconds", "2026-10-06T17:37:51Z", "2026-10-06T17:37:51Z"},
+		{"tenths", "2026-10-06T17:37:51.1Z", "2026-10-06T17:37:51.100Z"},
+		{"hundredths", "2026-10-06T17:37:51.12Z", "2026-10-06T17:37:51.120Z"},
+		{"milliseconds", "2026-10-06T17:37:51.123Z", "2026-10-06T17:37:51.123Z"},
+		{"four digits", "2026-10-06T17:37:51.1234Z", "2026-10-06T17:37:51.123400Z"},
+		{"five digits", "2026-10-06T17:37:51.12345Z", "2026-10-06T17:37:51.123450Z"},
+		{"microseconds", "2026-10-06T17:37:51.123456Z", "2026-10-06T17:37:51.123456Z"},
+		{"seven digits", "2026-10-06T17:37:51.1234567Z", "2026-10-06T17:37:51.123456700Z"},
+		{"captured hosted failure", "2026-10-06T17:37:51.08561615Z", "2026-10-06T17:37:51.085616150Z"},
+		{"nanoseconds", "2026-10-06T17:37:51.123456789Z", "2026-10-06T17:37:51.123456789Z"},
+		{"UTC normalization", "2026-10-06T10:37:51.12-07:00", "2026-10-06T17:37:51.120Z"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			instant, err := time.Parse(time.RFC3339Nano, tc.instant)
+			if err != nil {
+				t.Fatal(err)
+			}
+			run, err := NewLocalRunContext(testPlanDigest, instant, instant)
+			if err != nil {
+				t.Fatal(err)
+			}
+			predicate := ProductionPredicate(run, testProductionInputs())
+			if _, err := MarshalProduction(predicate); err != nil {
+				t.Fatal(err)
+			}
+			for _, field := range []string{"startedOn", "finishedOn"} {
+				if got := predicate.RunDetails.Metadata[field]; got != tc.encoded {
+					t.Fatalf("%s = %s; Cosign signs %s", field, got, tc.encoded)
+				}
+			}
+		})
 	}
 }

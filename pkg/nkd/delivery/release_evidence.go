@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -21,6 +24,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 	expected := map[string]EvidenceBinding{}
 	builds := map[string]string{}
 	diskRoots := map[string]string{}
+	diskModes := map[string]string{}
 	for _, o := range publication.Objects {
 		output := o.Output
 		if output == nil {
@@ -44,6 +48,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 				return e.New(e.CodeVerifyFailed, "disk root build subject differs from exact QCOW2 payload")
 			}
 			diskRoots[o.Name] = output.Disk.Component
+			diskModes[o.Name] = output.Disk.EvidenceMode
 		}
 		if output.Format == "executable" {
 			manifest, err := flatManifest(ctx, root, o)
@@ -171,6 +176,12 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		for _, outputName := range binding.Outputs {
 			diskRoot := diskRoots[outputName]
 			if diskRoot == "" {
+				continue
+			}
+			if diskModes[outputName] == "build-provenance-v1" {
+				if err := sbom.ValidateDiskBuildProvenance(&bom); err != nil {
+					return err
+				}
 				continue
 			}
 			keys := []string{"nkd:dependencyScannerDigest"}

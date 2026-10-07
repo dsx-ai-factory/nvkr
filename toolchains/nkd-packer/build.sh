@@ -126,6 +126,19 @@ if [[ -z "${runtime}" ]]; then
 fi
 [[ -n "${runtime}" ]] || { echo "podman or docker is required" >&2; exit 1; }
 
+build_inputs=()
+if [[ -n "${NKD_BUILD_ARCHIVES:-}" || -n "${NKD_BUILD_CA_BUNDLE:-}" ]]; then
+  [[ "${runtime##*/}" == docker ]] || { echo 'archive/CA inputs require Docker Buildx' >&2; exit 1; }
+fi
+if [[ -n "${NKD_BUILD_ARCHIVES:-}" ]]; then
+  [[ -d "${NKD_BUILD_ARCHIVES}" ]] || { echo 'archive context is not a directory' >&2; exit 1; }
+  build_inputs+=(--build-context "nkd_archives=${NKD_BUILD_ARCHIVES}" --build-arg NKD_ARCHIVE_MODE=local)
+fi
+if [[ -n "${NKD_BUILD_CA_BUNDLE:-}" ]]; then
+  [[ -f "${NKD_BUILD_CA_BUNDLE}" ]] || { echo 'build CA bundle is not a regular file' >&2; exit 1; }
+  build_inputs+=(--secret "id=nkd_ca_bundle,src=${NKD_BUILD_CA_BUNDLE}")
+fi
+
 uid="$(id -u)"
 gid="$(id -g)"
 identity_dir=""
@@ -186,8 +199,8 @@ if [[ "${runtime##*/}" == docker ]]; then
   # Explicit stdout export avoids the Docker driver's automatic image-store
   # unpack, which cannot be combined with timestamp rewriting. Load the
   # archive separately below; pipefail preserves failures from either stage.
-  # Keep the existing Podman path unchanged so its recorded ARM64 image ID
-  # remains an independently checkable local development pin.
+  # Runtime-specific recorded IDs remain independent and are checked below;
+  # changes to the image sources require fresh measurements.
   "${runtime}" buildx version
   "${runtime}" version --format 'Docker server {{.Server.Version}}'
   build_command=("${runtime}" buildx build
@@ -195,6 +208,11 @@ if [[ "${runtime##*/}" == docker ]]; then
     --build-arg SOURCE_DATE_EPOCH=0)
 fi
 
+# Bash 3.2 treats an empty array expansion as unset under nounset. Optional
+# archive/CA inputs must add no arguments, without weakening failure handling.
+if [[ "${#build_inputs[@]}" -gt 0 ]]; then
+  build_command+=("${build_inputs[@]}")
+fi
 build_command+=(
   --platform "linux/${arch}" \
   --build-arg "TARGETARCH=${arch}" \

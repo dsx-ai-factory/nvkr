@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -30,18 +33,24 @@ func ValidateHostedRestores(ctx context.Context, workspace string, plan *Plan) e
 	if err := plan.Validate(); err != nil {
 		return err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "hosted restore validation"); err != nil {
+	if err := admitGitHubRequirements(plan, "hosted restore validation"); err != nil {
 		return err
 	}
 	return validateHostedRestores(ctx, workspace, plan)
 }
 
 func validateHostedRestores(ctx context.Context, workspace string, plan *Plan) error {
+	if PerOutputPublication(plan) {
+		raw, err := readSmallFactoryFile(ctx, HostedRestoreOutcomePath(workspace, "all-provider-jobs"), "provider job closure")
+		if err != nil || string(raw) != "restored:success\n" {
+			return classifyContext(ctx, e.New(e.CodeProvenanceMissing, "complete provider job closure did not succeed"))
+		}
+	}
 	for _, artifact := range plan.Graph.Artifacts {
 		if err := ctx.Err(); err != nil {
 			return e.Wrap(e.CodeTimeout, err, "validating hosted restore outcomes")
 		}
-		if _, projected := diskPublicationRequirement(plan, artifact); projected {
+		if !finalizerArtifact(plan, artifact) {
 			// The raw disk remains a historical subject, but its one restored
 			// carrier is the wrapper. Outcomes below rehash that exact raw layer.
 			continue
@@ -76,7 +85,11 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 	if err := plan.Validate(); err != nil {
 		return err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "hosted outcome validation"); err != nil {
+	if err := admitGitHubRequirements(plan, "hosted outcome validation"); err != nil {
+		return err
+	}
+	if PerOutputPublication(plan) {
+		_, err := AuthenticateHostedReferenceRelease(ctx, workspace, plan)
 		return err
 	}
 	return validateHostedOutcomes(ctx, workspace, plan)

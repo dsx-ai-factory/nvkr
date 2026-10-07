@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -48,6 +51,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		if target.Format == "disk-image" && delivery.Publication != nil {
 			if err := admitDiskPublicationProducer(build); err != nil {
 				return ArtifactGraph{}, err
+			}
+			if diskBuildProvenance(&plan) {
+				continue
 			}
 			host, profile, err := diskPublicationInspectionProfile(build, delivery)
 			if err != nil {
@@ -184,6 +190,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 	}
 
+	if err := bindReferenceReleaseGraph(&plan, nodes, artifacts); err != nil {
+		return ArtifactGraph{}, err
+	}
 	plan.Graph.Nodes = mapNodes(nodes)
 	plan.Graph.Artifacts = mapArtifacts(artifacts)
 	if err := bindEvidenceAttestation(&plan); err != nil {

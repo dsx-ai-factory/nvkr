@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -67,7 +70,8 @@ func releasePublicationRequestFixture(t *testing.T, osName, arch string) Publica
 	if err != nil {
 		t.Fatal(err)
 	}
-	return PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: []ObjectInput{
+	return PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build,
+		PlanDigest: digestBytes([]byte("plan")), ContentSubject: content}, Objects: []ObjectInput{
 		{Name: "tools", Kind: "binary-bundle", Path: bundlePath, Layout: true, ArtifactType: MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest, OS: osName, Arch: arch, Output: &OutputBinding{Repository: "tools", Format: "executable", BuildDigest: build, Components: []string{"cli"}, BuildSubjects: []BuildSubject{{Component: "cli", Digest: digestBytes(payload)}}}},
 		{Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: semantic, Bytes: raw, Evidence: &EvidenceBinding{Outputs: []string{"tools"}, Component: "cli", Stage: "build-output", SubjectKind: "file", SubjectDigest: digestBytes(payload)}},
 	}}
@@ -110,6 +114,31 @@ func TestPublicationOwnsHeldClosureLifetime(t *testing.T) {
 	}
 	_, _, err = publication.Artifacts(reference)
 	assertRegistryCode(t, err, e.CodeGateUnmet)
+}
+
+func TestPublicationRootRequiresAndBindsPlanIdentity(t *testing.T) {
+	for _, planDigest := range []string{"", "sha256:bad"} {
+		t.Run(planDigest, func(t *testing.T) {
+			request := releasePublicationRequestFixture(t, "", "")
+			request.Release.PlanDigest = planDigest
+			_, err := BuildPublicationRoot(t.Context(), filepath.Join(t.TempDir(), "publication"), request)
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+		})
+	}
+	firstRequest := releasePublicationRequestFixture(t, "", "")
+	first, err := BuildPublicationRoot(t.Context(), filepath.Join(t.TempDir(), "first"), firstRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRequest := releasePublicationRequestFixture(t, "", "")
+	secondRequest.Release.PlanDigest = digestBytes([]byte("other plan"))
+	second, err := BuildPublicationRoot(t.Context(), filepath.Join(t.TempDir(), "second"), secondRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.RootDigest == second.RootDigest {
+		t.Fatal("changing the Plan identity did not change the publication root identity")
+	}
 }
 
 func TestPublicationRejectsCorruptionAndUnreachableBytes(t *testing.T) {

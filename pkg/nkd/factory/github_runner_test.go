@@ -1,9 +1,13 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -345,5 +349,29 @@ func TestGitHubUtilityContextUsesStageBoundAndEarlierDeadline(t *testing.T) {
 				t.Fatalf("unexpected stage bound: %s", delta)
 			}
 		})
+	}
+}
+
+func TestPublicationUtilityCarriesOnlyPublicRunIdentity(t *testing.T) {
+	plan, node, calls := githubRunnerRuntimeFixture(t, "exit 0\n")
+	location := utilityRunnerLocation{runtime: plan.Environment.RuntimeBinary(), mountSource: "/fixture", mountTarget: "/workspace", helper: "/workspace/nkd-exec", plan: FactoryPlanPath, publicationRunContext: true}
+	t.Setenv("GITHUB_ACTIONS", "true")
+	t.Setenv("GITHUB_TOKEN", "must-not-cross")
+	if err := executeUtilityNode(t.Context(), node, location, io.Discard, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"GITHUB_ACTIONS", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW_REF", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"} {
+		if !strings.Contains(string(raw), "-e\n"+key+"\n") {
+			t.Fatalf("missing run identity %s", key)
+		}
+	}
+	for _, forbidden := range []string{"GITHUB_TOKEN", "ACTIONS_ID_TOKEN", sourceTokenEnv, "NKD_CREDENTIAL", "must-not-cross"} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("credential crossed utility boundary: %s", forbidden)
+		}
 	}
 }

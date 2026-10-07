@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -180,7 +183,10 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 			return LifecyclePayloadObservation{}, err
 		}
 		expectedDigest, err := reproduceLifecyclePackage(ctx, plan, artifact, artifacts)
-		if err != nil || expectedDigest != descriptor.Digest {
+		if err != nil {
+			return LifecyclePayloadObservation{}, e.Wrap(e.CodeVerifyFailed, err, "independently reproduce lifecycle Helm output %q", expected.Name)
+		}
+		if expectedDigest != descriptor.Digest {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced package (%s != %s)", expected.Name, descriptor.Digest, expectedDigest)
 		}
 		return LifecyclePayloadObservation{Digest: descriptor.Digest, SemanticDigest: descriptor.Digest, Components: components}, nil
@@ -195,7 +201,7 @@ func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, art
 		declared[input] = true
 	}
 	var outputs []delivery.Output
-	for _, expected := range plan.LifecycleOutputs {
+	for _, expected := range selectedPublicationOutputs(plan, node) {
 		if expected.Kind == PackageDiskImage {
 			if !declared["package/"+expected.Name] || !declared[expected.ArtifactID] {
 				return nil, e.New(e.CodeReleaseIncomplete, "publication omits exact disk wrapper and raw subject")
@@ -230,7 +236,7 @@ func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, art
 		outputs = append(outputs, bound)
 	}
 	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
-	if err := ValidateLifecycleOutputs(plan.LifecycleOutputs, outputs); err != nil {
+	if err := ValidateLifecycleOutputs(selectedPublicationOutputs(plan, node), outputs); err != nil {
 		return nil, err
 	}
 	return outputs, nil

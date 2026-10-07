@@ -1,8 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # The base indexes and Ubuntu archive snapshot are exact inputs supplied from
 # toolchain.lock.json by build.sh. The final image intentionally inherits only
 # Ubuntu's PATH environment entry because NKD rejects ambient image settings.
 ARG DOWNLOAD_IMAGE
 ARG BASE_IMAGE
+FROM scratch AS nkd_archives
 FROM ${DOWNLOAD_IMAGE} AS download
 
 ARG TARGETARCH
@@ -20,20 +24,26 @@ ARG CRANE_BINARY_SHA256
 ARG NFPM_VERSION
 ARG NFPM_ARCHIVE_SHA256
 ARG NFPM_BINARY_SHA256
+ARG NKD_ARCHIVE_MODE=download
 
-RUN set -eux; \
+RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 --mount=type=bind,from=nkd_archives,target=/nkd/archives set -eux; \
+    if [ -r /run/secrets/nkd_ca_bundle ]; then export CURL_CA_BUNDLE=/run/secrets/nkd_ca_bundle; fi; \
     packer_archive="packer_${PACKER_VERSION}_linux_${TARGETARCH}.zip"; \
     plugin_archive="packer-plugin-qemu_${QEMU_PLUGIN_VERSION}_linux_${TARGETARCH}.zip"; \
-    curl --fail --location --retry 5 --retry-all-errors \
+    case "${NKD_ARCHIVE_MODE}" in \
+    local) cp "/nkd/archives/${packer_archive}" "/tmp/${packer_archive}"; cp "/nkd/archives/${plugin_archive}" "/tmp/${plugin_archive}" ;; \
+    download) curl --fail --location --max-time 300 --retry 2 \
       "https://releases.hashicorp.com/packer/${PACKER_VERSION}/${packer_archive}" \
       --output "/tmp/${packer_archive}"; \
-    printf '%s  %s\n' "${PACKER_ARCHIVE_SHA256}" "/tmp/${packer_archive}" | sha256sum -c; \
-    curl --fail --location --retry 5 --retry-all-errors \
+    curl --fail --location --max-time 300 --retry 2 \
       "https://releases.hashicorp.com/packer-plugin-qemu/${QEMU_PLUGIN_VERSION}/${plugin_archive}" \
-      --output "/tmp/${plugin_archive}"; \
+      --output "/tmp/${plugin_archive}" ;; \
+    *) echo 'unsupported archive mode' >&2; exit 1 ;; esac; \
+    printf '%s  %s\n' "${PACKER_ARCHIVE_SHA256}" "/tmp/${packer_archive}" | sha256sum -c; \
     printf '%s  %s\n' "${QEMU_PLUGIN_ARCHIVE_SHA256}" "/tmp/${plugin_archive}" | sha256sum -c
 
-RUN set -eux; \
+RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 --mount=type=bind,from=nkd_archives,target=/nkd/archives set -eux; \
+    if [ -r /run/secrets/nkd_ca_bundle ]; then export CURL_CA_BUNDLE=/run/secrets/nkd_ca_bundle; fi; \
     go_archive="go${GO_VERSION}.linux-${TARGETARCH}.tar.gz"; \
     case "${TARGETARCH}" in \
       amd64) release_arch=x86_64 ;; \
@@ -42,16 +52,19 @@ RUN set -eux; \
     esac; \
     crane_archive="go-containerregistry_Linux_${release_arch}.tar.gz"; \
     nfpm_archive="nfpm_${NFPM_VERSION}_Linux_${release_arch}.tar.gz"; \
-    curl --fail --location --retry 5 --retry-all-errors \
+    case "${NKD_ARCHIVE_MODE}" in \
+    local) for archive in "${go_archive}" "${crane_archive}" "${nfpm_archive}"; do cp "/nkd/archives/${archive}" "/tmp/${archive}"; done ;; \
+    download) curl --fail --location --max-time 300 --retry 2 \
       "https://go.dev/dl/${go_archive}" --output "/tmp/${go_archive}"; \
-    printf '%s  %s\n' "${GO_ARCHIVE_SHA256}" "/tmp/${go_archive}" | sha256sum -c; \
-    curl --fail --location --retry 5 --retry-all-errors \
+    curl --fail --location --max-time 300 --retry 2 \
       "https://github.com/google/go-containerregistry/releases/download/v${CRANE_VERSION}/${crane_archive}" \
       --output "/tmp/${crane_archive}"; \
-    printf '%s  %s\n' "${CRANE_ARCHIVE_SHA256}" "/tmp/${crane_archive}" | sha256sum -c; \
-    curl --fail --location --retry 5 --retry-all-errors \
+    curl --fail --location --max-time 300 --retry 2 \
       "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/${nfpm_archive}" \
-      --output "/tmp/${nfpm_archive}"; \
+      --output "/tmp/${nfpm_archive}" ;; \
+    *) echo 'unsupported archive mode' >&2; exit 1 ;; esac; \
+    printf '%s  %s\n' "${GO_ARCHIVE_SHA256}" "/tmp/${go_archive}" | sha256sum -c; \
+    printf '%s  %s\n' "${CRANE_ARCHIVE_SHA256}" "/tmp/${crane_archive}" | sha256sum -c; \
     printf '%s  %s\n' "${NFPM_ARCHIVE_SHA256}" "/tmp/${nfpm_archive}" | sha256sum -c
 
 FROM ${BASE_IMAGE} AS fetch
@@ -80,8 +93,9 @@ COPY --from=download /tmp/go*.linux-*.tar.gz /tmp/
 COPY --from=download /tmp/go-containerregistry_Linux_*.tar.gz /tmp/
 COPY --from=download /tmp/nfpm_*_Linux_*.tar.gz /tmp/
 
-RUN printf '%s\n' 'Acquire::https::CaInfo "/etc/ssl/certs/ca-certificates.crt";' \
+RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 printf '%s\n' 'Acquire::https::CaInfo "/etc/ssl/certs/ca-certificates.crt";' \
       >/etc/apt/apt.conf.d/99bootstrap-ca \
+    && if [ -r /run/secrets/nkd_ca_bundle ]; then printf '%s\n' 'Acquire::https::CaInfo "/run/secrets/nkd_ca_bundle";' >/etc/apt/apt.conf.d/99bootstrap-ca; fi \
     && printf '%s\n' \
       'Types: deb' \
       "URIs: https://snapshot.ubuntu.com/ubuntu/${UBUNTU_SNAPSHOT}" \
@@ -146,13 +160,14 @@ ARG TARGETARCH
 ARG UBUNTU_SNAPSHOT
 ARG QEMU_PLUGIN_VERSION
 COPY --from=download /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-RUN set -eux; \
+RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 set -eux; \
 	case "${TARGETARCH}" in \
 	  amd64|arm64) ;; \
 	  *) echo "unsupported target architecture: ${TARGETARCH}" >&2; exit 1 ;; \
 	esac; \
     printf '%s\n' 'Acquire::https::CaInfo "/etc/ssl/certs/ca-certificates.crt";' \
       >/etc/apt/apt.conf.d/99bootstrap-ca \
+    && if [ -r /run/secrets/nkd_ca_bundle ]; then printf '%s\n' 'Acquire::https::CaInfo "/run/secrets/nkd_ca_bundle";' >/etc/apt/apt.conf.d/99bootstrap-ca; fi \
     && printf '%s\n' \
       'Types: deb' \
       "URIs: https://snapshot.ubuntu.com/ubuntu/${UBUNTU_SNAPSHOT}" \

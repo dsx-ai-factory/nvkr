@@ -4,8 +4,12 @@ This image supplies upstream `virt-inspector`, `guestfish`, libguestfs, a Linux
 appliance kernel, QEMU, `dpkg-deb` and the exact native Syft archive selected by
 the source lock for the full content helper. The build records package inventory
 and the inspector/codec/guestfish/package-reader/scanner executable hashes.
-This source configuration is not a measured, published or qualified NKD toolchain.
+The [native ARC preparation record](../../docs/evidence/2026-10-06-native-arc.md) contains final-source native ARM64 and AMD64 assembly, executable measurements and appliance filesystem probes.
+This source configuration is not a published or qualified NKD toolchain.
 Both native `images` slots and license/security approval gates remain unresolved.
+The [October 6 candidate exception](../../docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
+separately authorizes internal publication and M2 selection of the recorded native images;
+it does not claim completed organizational reviews.
 The Dockerfile
 uses an exact official Ubuntu 24.04 base, the existing Packer toolchain's
 certificate image and signed archive snapshot. The named package versions were resolved from that snapshot
@@ -39,10 +43,20 @@ podman build --platform linux/amd64 --build-arg TARGETARCH=amd64 \
 
 Run each assembly on its matching Linux host after the final helper source is
 composed and tested. Cross-compiling the helper does not exercise it, and merely
-selecting `--platform` does not prove a native host. There is no inspector build
-script or image publisher here. Docker is admitted by the adapter and argument contracts, but this
-inspection route has been exercised only with Podman; no Docker daemon run is
-recorded here. Do not treat a local image tag, package
+selecting `--platform` does not prove a native host. The repository now supplies `scripts/prepare-native-toolchains.sh` and the manual
+`Prepare native NKD toolchains` workflow for native Docker assembly and measurement of both architectures.
+They require a clean checkout and retain exact image archives alongside measurements for later publication.
+For Docker preparation, `NKD_BUILD_ARCHIVES` selects a read-only named build
+context containing the official release filenames, including
+`syft_1.51.1_linux_ARCH.tar.gz`. The Dockerfile checks the pinned archive digest
+before extraction and never falls back to downloading a missing local archive.
+`NKD_BUILD_CA_BUNDLE` supplies trusted public CA certificates through an ephemeral
+secret readable by APT's downloader. Archive bytes are not secret mounts.
+Preparation checks native tool versions, helper argument admission and an isolated
+libguestfs appliance filesystem round trip before retaining the image archive.
+It does not publish images or issue approved profiles. The full NKD inspection
+route has been exercised only with Podman; the AMD64 Docker appliance probe is
+scoped separately. Do not treat a local image tag, package
 version, or executable digest as runtime-closure authority. No registry digest,
 NVIDIA security clearance or license-allowlist approval is asserted here.
 

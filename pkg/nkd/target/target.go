@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package target owns concrete artifact target platforms. Target support does not
 // imply that an execution host has the capabilities needed to produce an artifact.
 package target

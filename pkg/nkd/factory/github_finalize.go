@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -30,7 +33,13 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 			return e.New(e.CodeInvalidCatalog, "GitHub finalizer artifact %q has no producer job", artifact.ID)
 		}
 	}
-	pattern, err := githubCarrierPattern(plan.Graph.Artifacts)
+	var carriers []Artifact
+	for _, artifact := range plan.Graph.Artifacts {
+		if finalizerArtifact(plan, artifact) {
+			carriers = append(carriers, artifact)
+		}
+	}
+	pattern, err := githubCarrierPattern(carriers)
 	if err != nil {
 		return err
 	}

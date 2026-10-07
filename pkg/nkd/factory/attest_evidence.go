@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -25,6 +28,9 @@ func bindEvidenceAttestation(plan *Plan) error {
 		return nil
 	}
 	for _, route := range plan.Routes {
+		if PerOutputPublication(plan) && route.Name == "release" {
+			continue
+		}
 		index := -1
 		for i, a := range plan.Graph.Artifacts {
 			if a.ID == route.Input {
@@ -100,6 +106,9 @@ func (plan Plan) validateEvidenceAttestationGraph() error {
 	}
 	nodes, artifacts := planIndex(&plan)
 	for _, route := range plan.Routes {
+		if PerOutputPublication(&plan) && route.Name == "release" {
+			continue
+		}
 		output, ok := artifacts[route.Input]
 		if !ok {
 			return e.New(e.CodePipelineDrift, "attested route has no output")

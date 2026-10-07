@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -11,14 +14,18 @@ import (
 // ReleaseMetadata is the release-wide context stored in the sole release index
 // metadata document. Output identities and evidence membership live on Objects.
 type ReleaseMetadata struct {
+	InvocationID      string `json:"invocationId,omitempty"`
 	DefinitionDigest  string `json:"definitionDigest"`
 	EnvironmentDigest string `json:"environmentDigest"`
+	PlanDigest        string `json:"planDigest"`
 	ContentSubject    string `json:"contentSubject"`
 }
 
 // OutputBinding adds meaning to the object's one descriptor; it does not repeat
 // the name or artifact digest already owned by the release index object.
 type OutputBinding struct {
+	// Publication retains the authenticated output-local handoff selected by assembly.
+	Publication *PublicationOrigin `json:"publication,omitempty"`
 	// Repository is a sibling repository name relative to the release repository namespace.
 	Repository    string         `json:"repository"`
 	Format        string         `json:"format"`
@@ -27,6 +34,14 @@ type OutputBinding struct {
 	TransportPath string         `json:"transportPath,omitempty"`
 	BuildSubjects []BuildSubject `json:"buildSubjects,omitempty"`
 	Disk          *DiskOutput    `json:"disk,omitempty"`
+}
+
+// PublicationOrigin preserves preparation and signing identities across retries.
+// These fields are descriptions until the containing release is authenticated.
+type PublicationOrigin struct {
+	Ref                  string `json:"ref"`
+	PreparedInvocationID string `json:"preparedInvocationId"`
+	SignedInvocationID   string `json:"signedInvocationId"`
 }
 
 type BuildSubject struct {
@@ -51,7 +66,11 @@ func validateReleaseMetadata(root PublicationRoot) error {
 		return nil
 	}
 	m := root.Release
-	if !canonical.IsDigest(m.DefinitionDigest) || !canonical.IsDigest(m.EnvironmentDigest) || !canonical.IsDigest(m.ContentSubject) {
+	if len(m.InvocationID) > 2048 {
+		return e.New(e.CodeVerifyFailed, "release invocation identity exceeds the maximum length")
+	}
+	if !canonical.IsDigest(m.DefinitionDigest) || !canonical.IsDigest(m.EnvironmentDigest) ||
+		!canonical.IsDigest(m.PlanDigest) || !canonical.IsDigest(m.ContentSubject) {
 		return e.New(e.CodeVerifyFailed, "release metadata has incomplete identities")
 	}
 	outputs := map[string]PublishedObject{}
@@ -68,6 +87,13 @@ func validateReleaseMetadata(root PublicationRoot) error {
 
 		if o.Output == nil {
 			continue
+		}
+		if origin := o.Output.Publication; origin != nil {
+			if ValidatePublicationReference(origin.Ref) != nil || len(origin.Ref) > 2048 || m.InvocationID == "" ||
+				origin.PreparedInvocationID == "" || len(origin.PreparedInvocationID) > 2048 ||
+				origin.SignedInvocationID == "" || len(origin.SignedInvocationID) > 2048 {
+				return e.New(e.CodeVerifyFailed, "release output has an invalid publication origin")
+			}
 		}
 		if o.Evidence != nil || !canonical.IsDigest(o.Output.BuildDigest) {
 			return e.New(e.CodeVerifyFailed, "release object has conflicting output/evidence bindings")
