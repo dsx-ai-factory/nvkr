@@ -17,6 +17,11 @@ type Release = lifecycle.Release
 type VerificationPolicy = lifecycle.VerificationPolicy
 type ReleaseConsumerOptions = lifecycle.ConsumerOptions
 
+const (
+	DiskEvidenceStrict          = lifecycle.DiskEvidenceStrict
+	DiskEvidenceBuildProvenance = lifecycle.DiskEvidenceBuildProvenance
+)
+
 type LocalRunOptions = lifecycle.LocalOptions
 type PreparedRun = lifecycle.PreparedRun
 

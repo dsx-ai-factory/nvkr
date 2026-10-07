@@ -40,6 +40,16 @@ const (
 	ScopeRelease             = "release"
 )
 
+// DiskEvidenceRequirement is the minimum disk evidence a consumer accepts.
+// The build-provenance value admits producer-only evidence; strict is the
+// default and requires inspected disk evidence.
+type DiskEvidenceRequirement string
+
+const (
+	DiskEvidenceStrict          DiskEvidenceRequirement = "strict"
+	DiskEvidenceBuildProvenance DiskEvidenceRequirement = "build-provenance-v1"
+)
+
 var namePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 
 type Metadata = definition.Metadata
@@ -108,17 +118,26 @@ type Release struct {
 // VerificationPolicy identifies the exact lane and trust requirements a
 // consumer accepts. Empty signer policy never authorizes pipeline evidence.
 type VerificationPolicy struct {
-	Lane           string `json:"lane"`
-	Scope          string `json:"scope"`
-	IdentityRegexp string `json:"identityRegexp,omitempty"`
-	Issuer         string `json:"issuer,omitempty"`
+	Lane                string                  `json:"lane"`
+	Scope               string                  `json:"scope"`
+	IdentityRegexp      string                  `json:"identityRegexp,omitempty"`
+	Issuer              string                  `json:"issuer,omitempty"`
+	MinimumDiskEvidence DiskEvidenceRequirement `json:"minimumDiskEvidence,omitempty"`
 }
 
 func (policy VerificationPolicy) Validate() error {
+	switch policy.MinimumDiskEvidence {
+	case "", DiskEvidenceStrict, DiskEvidenceBuildProvenance:
+	default:
+		return e.New(e.CodeTrustPolicyMissing, "minimum disk evidence %q is unsupported", policy.MinimumDiskEvidence)
+	}
 	switch policy.Lane {
 	case LaneQualified:
 		if policy.Scope != ScopeRelease {
 			return e.New(e.CodeTrustPolicyMissing, "qualified verification requires full release scope")
+		}
+		if policy.MinimumDiskEvidence == DiskEvidenceBuildProvenance {
+			return e.New(e.CodeTrustPolicyMissing, "qualified verification cannot accept producer-only disk evidence")
 		}
 		return nil
 	case LanePipeline:
@@ -140,6 +159,9 @@ func (policy VerificationPolicy) Validate() error {
 func (policy VerificationPolicy) Digest() (string, error) {
 	if err := policy.Validate(); err != nil {
 		return "", err
+	}
+	if policy.MinimumDiskEvidence == "" {
+		policy.MinimumDiskEvidence = DiskEvidenceStrict
 	}
 	return canonical.Digest(canonical.KindVerificationPolicy, policy)
 }

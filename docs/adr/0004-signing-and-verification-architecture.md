@@ -162,8 +162,14 @@ A Verification Policy explicitly selects lane and acceptance scope:
 | `pipeline-attested` / `release` | Artifact-publication checks plus ADR-16 qualification identity, verdicts, membership, and ADR-06 revocation checks |
 | `qualified` / `release` | Qualified authority, evidence, freshness, status, and publication contracts in ADR-05/06/16/20 |
 
+For disk outputs, `VerificationPolicy.minimumDiskEvidence` is part of the policy digest. Its omitted default is
+`strict`, which rejects the producer-only `build-provenance-v1` mode. A consumer may explicitly set the minimum
+to `build-provenance-v1` to accept that narrower evidence; a strictly inspected disk also satisfies that weaker
+minimum. Unknown values fail closed, and no producer-signed disk mode can weaken the consumer's policy.
+
 Missing scope is an error. Unsupported scopes fail admission before dependent I/O, without falling back to a
-weaker scope. The returned opaque capability binds the exact reference and policy, including scope; closing it
+weaker scope. The returned opaque capability binds the exact reference and policy, including scope and the
+minimum disk-evidence requirement; closing it
 invalidates shallow copies. Public descriptions and inspection never supply verification authority.
 
 Live keyless acceptance requires the protected hosted workflow, public-transparency disclosure approval before

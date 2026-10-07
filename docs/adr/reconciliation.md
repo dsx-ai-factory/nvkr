@@ -348,6 +348,13 @@ The common positive consumer scope is `pipeline-attested` / `artifact-publicatio
 published bytes and build evidence, not M3/M4 full-release acceptance. A stronger unavailable scope never falls
 back. Static/dry-run evidence cannot satisfy either production or qualified policy.
 
+Consumer Verification Policy now binds `minimumDiskEvidence` into its typed policy digest. The omitted value
+requires strict inspected-disk evidence; the explicit `build-provenance-v1` minimum opts into producer-only
+disk evidence, and qualified policy rejects that weaker minimum. `Consumer.Verify` checks every disk output
+from the authenticated publication closure before returning a capability. Contract tests exercise both native
+architectures and verify failed-policy publication cleanup. This is policy enforcement evidence, not a successful
+production disk-release run.
+
 Qualified interfaces require package-issued opaque receipts. Caller structs, paths, digest strings, parsed
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the
 owning signed protocol, never serialization of an in-process capability.

@@ -97,9 +97,9 @@ The explicit narrower candidate `build-provenance-v1` mode instead consumes the 
 transitive material trace. Both paths rehash the exported QCOW2, use the same atomic package/evidence
 transaction, preserve every producer evidence slot and bind raw payload separately from OCI identity.
 The disk binding carries its descriptive evidence mode in signed release metadata. Document validators require
-matching source-bound documents and reject invented inspection claims. This is not independent consumer-policy
-admission of a disk mode: public Verification Policy has no disk-evidence-mode acceptance selector, and that
-admission remains deferred. Neither path accepts a
+matching source-bound documents and reject invented inspection claims. Consumer acceptance is independently
+bound by `VerificationPolicy.minimumDiskEvidence` in the policy digest: the omitted default is strict and rejects
+producer-only evidence, while explicit `build-provenance-v1` admits that narrower mode. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes

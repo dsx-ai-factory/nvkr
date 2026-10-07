@@ -117,6 +117,12 @@ publication checks its exact bytes, build identity, and production provenance. F
 qualification and revocation requirements. A result for the first scope cannot satisfy the second, and an
 unavailable stronger scope never falls back to weaker verification.
 
+For disk outputs, `VerificationPolicy.minimumDiskEvidence` defaults to `strict` and is included in the policy
+digest. Use `--minimum-disk-evidence build-provenance-v1` only when the consumer deliberately accepts signed
+producer/material evidence without an inspected disk inventory; the default rejects that narrower mode. The
+SDK exposes `DiskEvidenceStrict` and `DiskEvidenceBuildProvenance`. Qualified verification cannot opt into the
+producer-only mode.
+
 The CLI expresses build-evidence acceptance as `--scope artifact-publication`. On Linux, with a pinned cosign
 executable and an existing signed publication in a public registry, the consumer invocation is:
 

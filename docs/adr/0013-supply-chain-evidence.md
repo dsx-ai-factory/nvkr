@@ -142,11 +142,13 @@ It does not complete the October 6 proposed strict M2 engineering target, pendin
 which requires full disk/content inspection and material-to-filesystem reconciliation on both native architectures.
 Historical signed documents may retain the earlier `deferred-m3` scope token; do not rewrite those bytes or
 interpret that token as inspection evidence. M3 qualification separately checks the delivered evidence.
-Unknown modes fail closed; an omitted mode retains the strict contract. Document validators check the declared mode
-and reject invented inspection claims. The signed mode remains descriptive: public Verification Policy has no
-disk-evidence-mode acceptance selector. Independent consumer-policy admission requiring inspected disks remains
-deferred; a matching mode alone cannot establish that acceptance. Mode changes affect Environment/Plan and signed
-release metadata, not raw payload identity. Only the explicit native ARC publication route admits this mode.
+Unknown modes fail closed; an omitted producer mode retains the strict contract. Document validators check the
+declared mode and reject invented inspection claims. Consumer acceptance is separately controlled by
+`VerificationPolicy.minimumDiskEvidence`, included in the policy digest. An omitted value defaults to `strict`
+and rejects `build-provenance-v1`; an explicit `build-provenance-v1` minimum admits producer-only evidence while
+also accepting stricter inspected evidence. Producer metadata cannot lower the consumer's minimum. Mode changes
+affect Environment/Plan and signed release metadata, not raw payload identity. Only the explicit native ARC
+publication route admits this mode.
 
 The strict `disk-image` inspection route requires a full CycloneDX inventory whose subject is the
 exact delivered QCOW2 payload digest. It combines an authenticated trace of every fetched or built material with

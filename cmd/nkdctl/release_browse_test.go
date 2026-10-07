@@ -40,3 +40,20 @@ func TestReleaseBrowseRejectsInvalidReferencesWithoutEffects(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseVerifyExposesAndValidatesDiskEvidencePolicy(t *testing.T) {
+	var out bytes.Buffer
+	app := &cli.App{Commands: []*cli.Command{cmdRelease()}, Writer: &out}
+	err := app.RunContext(t.Context(), []string{"nkdctl", "release", "verify", "--help"})
+	if err != nil || !strings.Contains(out.String(), "minimum-disk-evidence") || !strings.Contains(out.String(), "build-provenance-v1") {
+		t.Fatalf("release verify help omitted disk evidence policy: err=%v output=%q", err, out.String())
+	}
+
+	out.Reset()
+	app = &cli.App{Commands: []*cli.Command{cmdRelease()}, Writer: &out}
+	err = app.RunContext(t.Context(), []string{"nkdctl", "release", "verify", "--reference", "registry.example.test/product@sha256:" + strings.Repeat("a", 64),
+		"--lane", "qualified", "--scope", "release", "--minimum-disk-evidence", "build-provenance-v1"})
+	if cliErrorCode(err) != e.CodeTrustPolicyMissing || out.Len() != 0 {
+		t.Fatalf("qualified producer-only policy was not rejected before adapters: err=%v output=%q", err, out.String())
+	}
+}

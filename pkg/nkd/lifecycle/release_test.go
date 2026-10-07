@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -141,6 +142,7 @@ func TestConsumerRejectsStrongerOrUnconfiguredPolicyBeforeAdapters(t *testing.T)
 	}{
 		{name: "full pipeline release", policy: VerificationPolicy{Lane: LanePipeline, Scope: ScopeRelease, IdentityRegexp: "builder", Issuer: "issuer"}, want: nkderr.CodeEngineCapability},
 		{name: "qualified", policy: VerificationPolicy{Lane: LaneQualified, Scope: ScopeRelease}, want: nkderr.CodeEngineCapability},
+		{name: "qualified producer-only minimum", policy: VerificationPolicy{Lane: LaneQualified, Scope: ScopeRelease, MinimumDiskEvidence: DiskEvidenceBuildProvenance}, want: nkderr.CodeTrustPolicyMissing},
 		{name: "missing explicit scope", policy: VerificationPolicy{Lane: LanePipeline, IdentityRegexp: "builder", Issuer: "issuer"}, want: nkderr.CodeTrustPolicyMissing},
 	}
 	for _, test := range tests {
@@ -455,4 +457,224 @@ func TestConsumerRejectsDifferentCheckedPublicationSubject(t *testing.T) {
 	}
 	_, _, err = held.Artifacts("registry.example.test/product@" + digest)
 	assertCode(t, err, nkderr.CodeGateUnmet)
+}
+
+func TestVerificationPolicyBindsStrictDiskEvidenceByDefault(t *testing.T) {
+	base := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
+		IdentityRegexp: "^builder$", Issuer: "issuer"}
+	implicit, err := base.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	explicit := base
+	explicit.MinimumDiskEvidence = DiskEvidenceStrict
+	explicitDigest, err := explicit.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if explicitDigest != implicit {
+		t.Fatalf("omitted strict default digest %s differs from explicit strict digest %s", implicit, explicitDigest)
+	}
+	producerOnly := base
+	producerOnly.MinimumDiskEvidence = DiskEvidenceBuildProvenance
+	producerOnlyDigest, err := producerOnly.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if producerOnlyDigest == implicit {
+		t.Fatal("producer-provenance opt-in did not change policy identity")
+	}
+}
+
+func TestConsumerDiskEvidenceMinimumFailsClosed(t *testing.T) {
+	strict := VerificationPolicy{MinimumDiskEvidence: DiskEvidenceStrict}
+	producerAllowed := VerificationPolicy{MinimumDiskEvidence: DiskEvidenceBuildProvenance}
+	strictDisk := delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{}}
+	producerDisk := delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: "build-provenance-v1"}}
+	nonDisk := delivery.Output{Name: "tools", Kind: OutputExecutable}
+	tests := []struct {
+		name     string
+		policy   VerificationPolicy
+		artifact delivery.Output
+		want     nkderr.Code
+	}{
+		{name: "default requires inspected disk", artifact: producerDisk, want: nkderr.CodeGateUnmet},
+		{name: "explicit strict requires inspected disk", policy: strict, artifact: producerDisk, want: nkderr.CodeGateUnmet},
+		{name: "strict inventory satisfies strict policy", policy: strict, artifact: strictDisk},
+		{name: "strict inventory satisfies producer minimum", policy: producerAllowed, artifact: strictDisk},
+		{name: "explicit producer minimum admits producer evidence", policy: producerAllowed, artifact: producerDisk},
+		{name: "non-disk output is unaffected", artifact: nonDisk},
+		{name: "missing disk metadata fails closed", artifact: delivery.Output{Name: "disk", Kind: OutputDiskImage}, want: nkderr.CodeVerifyFailed},
+		{name: "unknown evidence mode fails closed", policy: producerAllowed, artifact: delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: "unknown"}}, want: nkderr.CodeVerifyFailed},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := requireDiskEvidence(test.policy, []delivery.Output{test.artifact})
+			if test.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			assertCode(t, err, test.want)
+		})
+	}
+}
+
+func TestConsumerDiskEvidenceMinimumRejectsAnyWeakMember(t *testing.T) {
+	artifacts := []delivery.Output{
+		{Name: "node-amd64", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{}},
+		{Name: "node-arm64", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: string(DiskEvidenceBuildProvenance)}},
+	}
+	assertCode(t, requireDiskEvidence(VerificationPolicy{}, artifacts), nkderr.CodeGateUnmet)
+}
+
+func TestVerificationPolicyRejectsUnknownDiskEvidenceMinimum(t *testing.T) {
+	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
+		IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: "skip-everything"}
+	assertCode(t, policy.Validate(), nkderr.CodeTrustPolicyMissing)
+}
+
+func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			for _, mode := range []struct {
+				name  string
+				value string
+			}{{name: "strict"}, {name: "producer-only", value: string(DiskEvidenceBuildProvenance)}} {
+				t.Run(mode.name, func(t *testing.T) {
+					layout, digest := testDiskPublication(t, arch, mode.value)
+					reference := "registry.example.test/product@" + digest
+					for _, minimum := range []DiskEvidenceRequirement{"", DiskEvidenceBuildProvenance} {
+						name := "default-strict"
+						if minimum == DiskEvidenceBuildProvenance {
+							name = "explicit-producer-minimum"
+						}
+						t.Run(name, func(t *testing.T) {
+							verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
+								Ref: reference, Digest: digest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
+								SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
+							var held *delivery.Publication
+							consumer := &Consumer{verifier: verifier, materialize: func(ctx context.Context, got string) (*delivery.Publication, error) {
+								if got != reference {
+									t.Fatalf("materialized reference = %q, want %q", got, reference)
+								}
+								publication, err := delivery.OpenPublication(ctx, layout, digest)
+								held = publication
+								return publication, err
+							}}
+							policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: minimum}
+							verified, err := consumer.Verify(t.Context(), reference, policy)
+							accepted := mode.value == "" || minimum == DiskEvidenceBuildProvenance
+							if !accepted {
+								assertCode(t, err, nkderr.CodeGateUnmet)
+								if verified != nil || verifier.calls != 1 || held == nil {
+									t.Fatalf("rejected result=%v verifier calls=%d publication=%v", verified, verifier.calls, held)
+								}
+								if _, _, err := held.Artifacts(reference); err == nil {
+									t.Fatal("rejected publication remained open")
+								} else {
+									assertCode(t, err, nkderr.CodeGateUnmet)
+								}
+								return
+							}
+							if err != nil {
+								t.Fatal(err)
+							}
+							if verifier.calls != 1 || held == nil {
+								t.Fatalf("accepted verifier calls=%d publication=%v", verifier.calls, held)
+							}
+							if err := verified.Close(); err != nil {
+								t.Fatal(err)
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func testDiskPublication(t *testing.T, arch, evidenceMode string) (string, string) {
+	t.Helper()
+	ctx := t.Context()
+	payload := []byte("synthetic qcow2 envelope for consumer policy")
+	payloadPath := filepath.Join(t.TempDir(), "node.qcow2")
+	if err := os.WriteFile(payloadPath, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	payloadDigest := pipeline.FileDigest(payload)
+	planDigest := "sha256:" + repeat("a", 64)
+	buildDigest := "sha256:" + repeat("b", 64)
+	layout := filepath.Join(t.TempDir(), "disk")
+	transport, err := delivery.BuildDiskArtifact(ctx, layout, delivery.DiskArtifactRequest{Path: payloadPath,
+		Digest: payloadDigest, Size: int64(len(payload)), Platform: "linux/" + arch, Format: "qcow2",
+		Encryption: "none", ArtifactType: delivery.MediaDiskImage})
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := delivery.OpenSingleDiskArtifact(ctx, layout, "linux/"+arch, int64(len(payload)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diskInspection := held.Inspection()
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	disk := &delivery.DiskOutput{EvidenceMode: evidenceMode, PayloadDigest: payloadDigest,
+		Producer: "packer", Component: "image", Format: "qcow2", Encryption: "none", Size: int64(len(payload)),
+		PlanDigest: planDigest, Outcome: "succeeded"}
+	artifact := Artifact{Name: "node-image", Kind: OutputDiskImage, Digest: diskInspection.ManifestDigest,
+		BuildDigest: buildDigest, Components: []string{"image"}, Disk: disk}
+	input := delivery.ObjectInput{Name: artifact.Name, Kind: OutputDiskImage, Path: layout, Layout: true,
+		ArtifactType: delivery.MediaDiskImage, SemanticDigest: payloadDigest, BlobDigest: transport.RootDigest,
+		OS: "linux", Arch: arch}
+	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{input}, map[string]string{"image": payloadDigest})
+	request.Objects[0].Output.Disk = disk
+	bom, err := sbom.NewSubject(buildDigest, "image", payloadDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evidenceMode == string(DiskEvidenceBuildProvenance) {
+		bom, err = sbom.ForDiskBuildProvenance(bom, payloadDigest)
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		bom.Metadata.Component.Type = "operating-system"
+		bom, err = sbom.ForSubject(bom, payloadDigest, "build-output", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "fixture-package", Version: "1"}}, "disk-reconciled/v1", buildDigest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bom.Metadata.Props = append(bom.Metadata.Props,
+			sbom.Property{Name: "nkd:diskInspectionRuntimeDigest", Value: buildDigest},
+			sbom.Property{Name: "nkd:diskInspectorDigest", Value: buildDigest},
+			sbom.Property{Name: "nkd:diskCodecDigest", Value: buildDigest})
+		sort.Slice(bom.Metadata.Props, func(i, j int) bool { return bom.Metadata.Props[i].Name < bom.Metadata.Props[j].Name })
+	}
+	raw, err := bom.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bomDigest, err := bom.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Objects[1].Name = "sbom-" + strings.TrimPrefix(bomDigest, "sha256:")
+	request.Objects[1].SemanticDigest = bomDigest
+	request.Objects[1].Bytes = raw
+	root := filepath.Join(t.TempDir(), "publication")
+	prepared, err := delivery.BuildPublicationRoot(ctx, root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attested, result := attestFixtureLayout(t, root)
+	if result.RootDigest == prepared.RootDigest {
+		t.Fatal("attested publication unexpectedly retained the unsigned root identity")
+	}
+	return attested, result.RootDigest
 }

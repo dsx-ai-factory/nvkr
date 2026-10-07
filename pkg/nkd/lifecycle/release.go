@@ -148,6 +148,9 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 	if err != nil {
 		return nil, err
 	}
+	if err := requireDiskEvidence(policy, artifacts); err != nil {
+		return nil, err
+	}
 	if err := publication.RequireAttestedEvidence(); err != nil {
 		return nil, err
 	}
@@ -162,6 +165,31 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 	}
 	failed = false
 	return &VerifiedRelease{valid: true, release: description, publication: publication}, nil
+}
+
+func requireDiskEvidence(policy VerificationPolicy, artifacts []delivery.Output) error {
+	minimum := policy.MinimumDiskEvidence
+	if minimum == "" {
+		minimum = DiskEvidenceStrict
+	}
+	for _, artifact := range artifacts {
+		if artifact.Kind != OutputDiskImage {
+			continue
+		}
+		if artifact.Disk == nil {
+			return e.New(e.CodeVerifyFailed, "disk artifact %q has no evidence binding", artifact.Name)
+		}
+		switch artifact.Disk.EvidenceMode {
+		case "": // Strict inspected evidence is stronger than either policy floor.
+		case string(DiskEvidenceBuildProvenance):
+			if minimum != DiskEvidenceBuildProvenance {
+				return e.New(e.CodeGateUnmet, "disk artifact %q has producer-only evidence, below consumer minimum %q", artifact.Name, minimum)
+			}
+		default:
+			return e.New(e.CodeVerifyFailed, "disk artifact %q has unsupported evidence mode %q", artifact.Name, artifact.Disk.EvidenceMode)
+		}
+	}
+	return nil
 }
 
 // InspectReleaseLayout returns exact Artifact descriptions from an already
