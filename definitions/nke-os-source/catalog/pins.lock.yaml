@@ -1,0 +1,72 @@
+# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
+apiVersion: nkd.dev/lock/v1
+kind: PinLock
+pins:
+  cni-plugins-1-6-0:
+    commit: fec2d62676cbe4f2fd587b4840c7fc021bead3f9
+    sourceDateEpoch: 1728980530
+    tag: v1.6.0
+    treeHash: a02de4e95c0214c21097f323b192187967fdd60c
+  containerd-2-1-7:
+    commit: 07ad9c703cb4a2adc322998afbe6e33c4f8790f7
+    sourceDateEpoch: 1776185081
+    tag: v2.1.7
+    treeHash: ace2d4ed8db2d18399551d0ead9e4b2ae5797812
+  containerd-2-2-3:
+    commit: 77c84241c7cbdd9b4eca2591793e3d4f4317c590
+    sourceDateEpoch: 1776187087
+    tag: v2.2.3
+    treeHash: 99a1056330163b25e613a3fd93d34c189ac41700
+  containerd-2-3-0:
+    commit: 2976f38ccbfcda5ef1364d63d60b0a304e4bf94a
+    sourceDateEpoch: 1777573803
+    tag: v2.3.0
+    treeHash: 41a70b5cb8e3959f231004bc1c024c416fa53e70
+  crictl-1-34-0:
+    commit: ca0237b9fec5b675b0bb7bc96b7496e6d54f5ccb
+    sourceDateEpoch: 1755762067
+    tag: v1.34.0
+    treeHash: 5256875f0fb92225af917d88935ebf93e6293487
+  crictl-1-35-0:
+    commit: 46c81013b00ea238cd39499df021441ae51ec65f
+    sourceDateEpoch: 1765355613
+    tag: v1.35.0
+    treeHash: 9ed74e90fce21faf04ad1396a703097b2e734145
+  crictl-1-36-0:
+    commit: 88d8ad9d40f82726fda53c2d271e6172b4c619c9
+    sourceDateEpoch: 1777045248
+    tag: v1.36.0
+    treeHash: 126e06cc25a444069801e34bf1afda455579d2e3
+  helm-3-20-2:
+    commit: 8fb76d6ab555577e98e23b7500009537a471feee
+    sourceDateEpoch: 1775766427
+    tag: v3.20.2
+    treeHash: 81736e975eb6da11c3e8bb338e557b81d8ccf692
+  helm-4-1-4:
+    commit: 05fa37973dc9e42b76e1d2883494c87174b6074f
+    sourceDateEpoch: 1775710686
+    tag: v4.1.4
+    treeHash: 0d1b8951004def309b5788c4aad4a1249bfe70fe
+  kubernetes-1-34-2:
+    commit: 8cc511e399b929453cd98ae65b419c3cc227ec79
+    goVersion: 1.24.9
+    sourceDateEpoch: 1762887637
+    tag: v1.34.2
+    treeHash: 3044d97295d24abc46b5c3f8fce9017295e2719f
+  kubernetes-1-35-3:
+    commit: 6c1cd99aef09161ddb07b8ade6c9564e9b9bfe27
+    goVersion: 1.25.7
+    sourceDateEpoch: 1773858607
+    tag: v1.35.3
+    treeHash: f5ee9385ae67dd75625b730a7f2d2ffbfc40398e
+  kubernetes-1-36-3:
+    commit: 0f29094e5b73085e3802ecc1298ecae13866bfe6
+    goVersion: 1.26.5
+    sourceDateEpoch: 1784743658
+    tag: v1.36.3
+    treeHash: 3194a85fa3325c21657eb21aff2a34ede1478c3f
+  spire-tpm-1-9-0:
+    commit: 6eb314139fdeceb0332de617b4c90c7c63d60bc1
+    sourceDateEpoch: 1745027557
+    tag: v1.9.0
+    treeHash: 232f8514d5a27e0ad539f136702cfe7e558f6cd0
