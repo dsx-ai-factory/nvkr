@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -50,6 +51,9 @@ type DiskInspectionSelection struct {
 	Resources           execution.ResourceRequest
 	TimeoutSeconds      uint64
 	Workspace           *os.File
+	// Diagnostics receives sanitized phase records only. It is not part of
+	// the authenticated observation profile and never grants evidence authority.
+	Diagnostics *diskdiagnostic.Collector
 }
 
 // DiskInspectionContainer retains the exact runtime executable, daemon identity
@@ -556,7 +560,8 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 			returnErr = errors.Join(returnErr, e.Wrap(e.CodeInternal, err, "removing inspection container"))
 		}
 	}()
-	var created, createDiagnostic, diagnostic, report diskInspectionBuffer
+	var created, createDiagnostic, report diskInspectionBuffer
+	diagnostic := diskdiagnostic.NewSubjectReceiver(selection.Diagnostics, selection.compositionKind, subject.Digest())
 	if selection.compositionKind != "" {
 		report.limit = MaxDiskContentReportBytes
 	}
@@ -576,13 +581,16 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	reader, writer := io.Pipe()
 	done := make(chan error, 1)
 	go func() { _, err := subject.WriteToContext(ctx, writer); _ = writer.CloseWithError(err); done <- err }()
-	err = runtime.Run(ctx, reader, &report, &diagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), "start", "--attach", "--interactive", ids[0])...)
+	err = runtime.Run(ctx, reader, &report, diagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), "start", "--attach", "--interactive", ids[0])...)
+	diagnostic.Finish()
 	_ = reader.Close()
 	copyErr := <-done
 	if err := errors.Join(err, copyErr); err != nil {
-		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.Bytes()), diskInspectionHelperCode(err), "inspecting held disk")
+		// Preserve allowlisted phase/timing information even when the context
+		// branch of the shared runtime error mapper omits child stderr.
+		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.FailureBytes()), diskInspectionHelperCode(err), "inspecting held disk: %s", diagnostic.Summary())
 	}
-	if diagnostic.Len() != 0 || report.Len() == 0 {
+	if diagnostic.Unexpected() || report.Len() == 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection returned diagnostics or no report")
 	}
 	return bytes.Clone(report.Bytes()), nil

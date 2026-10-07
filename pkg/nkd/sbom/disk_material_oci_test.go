@@ -196,8 +196,53 @@ func TestNestedOCIValidationErrorPreservesTimeout(t *testing.T) {
 			if test.canceled && !errors.Is(err, context.Canceled) {
 				t.Fatalf("lost actual cancellation cause: %v", err)
 			}
+			if !errors.Is(err, test.inner) {
+				t.Fatalf("lost primary validation cause: %v", err)
+			}
 			if !test.canceled && test.code == e.CodeTimeout && err != test.inner {
 				t.Fatalf("coded inner timeout was rewritten: %v", err)
+			}
+		})
+	}
+}
+
+func TestNestedOCIScanCancellationPreservesTimeout(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		cancel bool
+		code   e.Code
+	}{
+		{"canceled transport verification", true, e.CodeVerifyFailed},
+		{"canceled scanner admission", true, e.CodeUnverifiedRef},
+		{"ordinary transport verification", false, e.CodeVerifyFailed},
+		{"ordinary scanner admission", false, e.CodeUnverifiedRef},
+		{"canceled inner timeout", true, e.CodeTimeout},
+		{"ordinary inner timeout", false, e.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			subject := nestedOCIFixture(t, []string{"arm64"}, false, nil)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			primary := e.New(test.code, "controlled scan callback failure")
+			calls := 0
+			inspection, err := inspectNestedOCILayoutScan(ctx, subject, subject, "linux/arm64", Scanner{}, &materialInspectionBudget{remaining: 1 << 20},
+				func(context.Context, string, v1.Image) (DependencyInventory, error) {
+					calls++
+					if test.cancel {
+						cancel()
+					}
+					return DependencyInventory{}, primary
+				})
+			if calls != 1 || inspection != nil {
+				t.Fatalf("scan boundary not reached or partial inventory returned: calls=%d error=%v", calls, err)
+			}
+			if test.cancel && test.code != e.CodeTimeout {
+				assertDependencyCode(t, err, e.CodeTimeout)
+				if !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "scanning nested OCI image canceled") {
+					t.Fatalf("wrong cancellation boundary: %v", err)
+				}
+			} else if err != primary {
+				t.Fatalf("ordinary scanner failure changed: %v", err)
 			}
 		})
 	}

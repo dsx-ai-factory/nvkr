@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -61,6 +62,11 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		return e.Wrap(e.CodeEngineCapability, err, "hold ARC workspace")
 	}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, workspace.Close(), "close ARC workspace") }()
+	var inspectionLog *diskdiagnostic.Collector
+	if !diskBuildProvenance(plan) {
+		inspectionLog = diskdiagnostic.NewCollector()
+		defer finishGitHubInspectionDiagnostics(ctx, workspace, output, inspectionLog, options)
+	}
 	var root Node
 	for _, node := range stage.Nodes {
 		if node.Kind == NodeBuild {
@@ -105,7 +111,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	var inspector *sbom.DiskInspectionRuntime
 	if !diskBuildProvenance(plan) {
-		inspector, err = OpenDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace)
+		inspector, err = openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 		if err != nil {
 			return err
 		}
@@ -116,7 +122,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		return err
 	}
 	return coordinateGitHubDiskExecution(ctx, diagnostics, func(ctx context.Context) (returnErr error) {
-		return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, inspector, diagnostics, options)
+		return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, inspector, inspectionLog, diagnostics, options)
 	})
 }
 
@@ -140,7 +146,7 @@ func coordinateGitHubDiskExecution(ctx context.Context, diagnostics *pipeline.Pa
 }
 
 func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStage, root Node,
-	admission vmAdmission, inspector *sbom.DiskInspectionRuntime, diagnostics *pipeline.PackerDiagnosticSink,
+	admission vmAdmission, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, diagnostics *pipeline.PackerDiagnosticSink,
 	options GitHubStepOptions,
 ) (returnErr error) {
 	session, err := pipeline.NewNodeSession(ctx)
@@ -178,7 +184,7 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 	}, func(ctx context.Context) error {
 		for _, expected := range plan.LifecycleOutputs {
 			if expected.Name == stage.DiskOutput {
-				return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, options)
+				return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, inspectionLog, options)
 			}
 		}
 		return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
@@ -261,9 +267,15 @@ func pullGitHubPublicImage(ctx context.Context, run func(context.Context) error)
 }
 
 func completeGitHubDiskPublication(ctx context.Context, plan *Plan, expected LifecycleOutputPlan,
-	owner *LocalRunResult, inspector *sbom.DiskInspectionRuntime, options GitHubStepOptions,
+	owner *LocalRunResult, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, options GitHubStepOptions,
 ) error {
-	if err := CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector); err != nil {
+	operation := "Inspect, reconcile and package " + expected.Name
+	if diskBuildProvenance(plan) {
+		operation = "Package disk build provenance " + expected.Name
+	}
+	if err := reportGitHubDiskCompletion(ctx, options, operation, inspectionLog, func(ctx context.Context) error {
+		return CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)
+	}); err != nil {
 		return err
 	}
 	if !PerOutputPublication(plan) {

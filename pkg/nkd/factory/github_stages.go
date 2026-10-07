@@ -125,7 +125,11 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 	}
 	// The helper returns before the provider boundary, leaving time for owner
 	// cleanup and failure diagnostics. Earlier caller deadlines still win.
-	overhead := uint64((githubDiskProviderOverheadMinutes + githubDiskCleanupHeadroomMinutes + githubDiskDiagnosticUploadMinutes) * 60)
+	uploadMinutes := githubDiskDiagnosticUploadMinutes // failed Packer diagnostics
+	if !diskBuildProvenance(plan) {
+		uploadMinutes += githubDiskDiagnosticUploadMinutes // always-run inspection diagnostics
+	}
+	overhead := uint64((githubDiskProviderOverheadMinutes + githubDiskCleanupHeadroomMinutes + uploadMinutes) * 60)
 	if total > maximum-overhead {
 		return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q has no provider/cleanup headroom", stage.ID)
 	}

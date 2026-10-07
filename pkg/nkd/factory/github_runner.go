@@ -133,10 +133,16 @@ type githubStepExitError struct {
 func (err *githubStepExitError) Error() string { return err.cause.Error() }
 func (err *githubStepExitError) Unwrap() error { return err.cause }
 
-// GitHubStepExitCode preserves a hosted runtime's exact primary process status.
-// All other errors use the unchanged ADR-03 mapping. CLI adapters may call this
+// GitHubStepExitCode preserves a hosted runtime's exact primary process status
+// unless the owning operation classified cancellation or a deadline as timeout.
+// That outer classification uses the frozen ADR-03 status even when the retained
+// cause includes a child process status. CLI adapters may call this
 // without allowing caller-defined error types to choose arbitrary exit statuses.
 func GitHubStepExitCode(err error) int {
+	var coded *e.Error
+	if errors.As(err, &coded) && coded.Code == e.CodeTimeout {
+		return e.ExitCode(err)
+	}
 	var step *githubStepExitError
 	if errors.As(err, &step) {
 		return step.status

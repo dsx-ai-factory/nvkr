@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -124,5 +125,51 @@ func TestGitHubReporterCancellationDoesNotClaimSuccess(t *testing.T) {
 	assertFactoryErrorCode(t, err, e.CodeTimeout)
 	if strings.Contains(log.String(), "Completed:") || !strings.Contains(log.String(), "exit 31") {
 		t.Fatalf("cancellation concealed: %s", &log)
+	}
+}
+
+func TestGitHubReporterTimeoutOverridesRetainedProcessStatus(t *testing.T) {
+	for _, mode := range []string{"process failure", "caller cancellation", "operation deadline"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			cause := errors.New("child was killed")
+			process := &githubStepExitError{status: 137, cause: e.Wrap(e.CodeEngineCapability, cause, "runtime failed")}
+			var cancellation error
+			wantStatus := 137
+			var stdout, stderr bytes.Buffer
+			options := GitHubStepOptions{Stdout: &stdout, Stderr: &stderr, SummaryPath: filepath.Join(t.TempDir(), "summary.md")}
+			err := githubProgress(ctx, options, "Inspect disk", nil, func(progress *githubStepProgress) error {
+				progress.phase("root scan")
+				switch mode {
+				case "caller cancellation":
+					cancel()
+					cancellation, wantStatus = context.Canceled, 31
+				case "operation deadline":
+					cancellation, wantStatus = context.DeadlineExceeded, 31
+					return e.Wrap(e.CodeTimeout, errors.Join(cancellation, process), "inspection deadline elapsed")
+				}
+				return process
+			})
+			if got := GitHubStepExitCode(err); got != wantStatus {
+				t.Fatalf("reported exit %d, want %d: %v", got, wantStatus, err)
+			}
+			if !errors.Is(err, process) || !errors.Is(err, cause) {
+				t.Fatalf("retained process or cause was lost: %v", err)
+			}
+			if cancellation != nil {
+				assertFactoryErrorCode(t, err, e.CodeTimeout)
+				if !errors.Is(err, cancellation) {
+					t.Fatalf("cancellation cause was lost: %v", err)
+				}
+			}
+			summary, readErr := os.ReadFile(options.SummaryPath)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if !strings.Contains(string(summary), fmt.Sprintf("| failed | %d |", wantStatus)) || !strings.Contains(stderr.String(), fmt.Sprintf("at root scan (exit %d,", wantStatus)) || strings.Contains(stdout.String(), "Completed:") {
+				t.Fatalf("exit or outcome differs between result, logs and summary: stdout=%s stderr=%s summary=%s", &stdout, &stderr, summary)
+			}
+		})
 	}
 }

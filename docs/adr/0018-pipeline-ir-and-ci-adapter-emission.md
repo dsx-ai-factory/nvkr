@@ -178,7 +178,9 @@ hour covers public toolchain pulls (each bounded to fifteen minutes), terminal o
 share the helper deadline; the hour is not a separate allowance for each operation. Strict inspection additionally
 reuses the selected profile's per-member plus acquisition join budget. Beyond the helper deadline, the job
 reserves fifteen minutes shared across provider pre-steps and successful carrier packing/uploads, and five
-minutes each for cleanup and failure-diagnostic upload. Each producer is
+minutes each for cleanup and failed Packer diagnostic upload. Strict inspection reserves another five minutes
+for its independently bounded, always-run diagnostic upload; build-provenance mode does not charge that absent
+upload. Each producer is
 independently bounded; earlier caller deadlines still win. The complete job remains capped at twenty-four hours; generic hosted jobs retain their
 six-hour cap. These configured allowances provide neither per-step transfer budgets, a maximum transferable-byte
 proof, nor a measurement of remaining provider-job time. Near the ceiling, slow image pulls or successful
@@ -607,6 +609,21 @@ arbitrary recipe arguments, source/destination URLs, file contents and environme
 The exact producer argv remains in the canonical Plan for deliberate local inspection. Packaging reports the
 actual bound image digest, and publication reports its persisted immutable reference. Logs and summaries remain
 diagnostics, not authority receipts, completion evidence or qualification.
+
+Strict native disk inspection retains the sanitized bounded progress log in one atomically published, no-replace regular file beneath
+the original held workspace. The helper drains progress into a package-owned memory collector and writes to
+caller log sinks only after the owned operation stops. The generated one-day, always-run diagnostic upload
+has a five-minute timeout and is optional and failure-tolerant; only its exact output-bound descriptor may tolerate a missing file. Required
+evidence and payload uploads remain mandatory. Retention failure is reported with a bounded, quoted cause and cannot replace the inspection verdict.
+Temporary siblings are not upload targets; publication happens only after complete writing and file sync.
+An existing destination is rejected, not overwritten or authenticated as this attempt's log; operators must
+retain the ephemeral, single-job workspace policy. Failure snapshots are folded in job logs with the same
+truncation marker as retained files, and summaries show the last accepted inspection phase. Successful operations
+do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit M2
+build-provenance mode emits neither inspection work nor its diagnostic upload. Changing the helper requires
+rebuilding and repinning its complete inspection image before claiming hosted operation.
+Retention uses a separate ten-second cleanup context with cancellation checks between filesystem operations;
+an already-entered regular-file syscall cannot be interrupted, so this is not a hard filesystem deadline.
 
 The compiler creates a private release preparation, a production SBOM-attestation stage producing the
 final release package, and one publish/sign/verify route. The attestation stage binds and verifies each

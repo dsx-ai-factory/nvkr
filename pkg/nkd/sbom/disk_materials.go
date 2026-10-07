@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -25,6 +26,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 )
+
+const maxDiskNestedImages = 256
 
 func inspectMaterialArchive(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64) (*FilesystemInspection, error) {
 	return inspectMaterialArchiveDepth(ctx, subject, platform, scanner, packageReaderDigest, maxBytes, 0)
@@ -68,6 +71,9 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 	if depth > 2 || subject == nil || subject.Size() <= 0 || subject.Size() > maxBytes {
 		return nil, e.New(e.CodeEngineCapability, "material archive exceeds bounded recursive inspection")
 	}
+	filesystemDepth, _ := ctx.Value(diskFilesystemDepthKey{}).(int)
+	diagnosticDepth := depth + filesystemDepth
+	ctx = context.WithValue(ctx, diskScanDepthKey{}, diagnosticDepth)
 	workspace, err := os.MkdirTemp("/tmp", "nkd-material-*")
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "creating material inspection workspace")
@@ -82,6 +88,7 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 	if _, err := subject.WriteToContext(ctx, file); err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "copying held material archive")
 	}
+	diskdiagnostic.Emit(ctx, "file-inventory", "start", diagnosticDepth, 0)
 	var files []DiskFile
 	if allowEmptyDebianPayload {
 		files, err = filesystemFileInventory(ctx, file, maxBytes)
@@ -91,6 +98,8 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 	if err != nil {
 		return nil, err
 	}
+	diskdiagnostic.Emit(ctx, "file-inventory", "complete", diagnosticDepth, len(files))
+	diskdiagnostic.Emit(ctx, "scanner-transport", "start", diagnosticDepth, 0)
 	layer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
 		return filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(subject, 0, subject.Size()))}, nil
 	})
@@ -118,6 +127,7 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 		return nil, e.Wrap(e.CodeEngineCapability, err, "holding bounded material scan transport")
 	}
 	defer func() { _ = held.Close() }()
+	diskdiagnostic.Emit(ctx, "scanner-transport", "complete", diagnosticDepth, 0)
 	inventory, err := inspectGeneratedDependencies(ctx, held, scanner)
 	if err != nil {
 		return nil, err
@@ -130,6 +140,8 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 	}
 	section := io.NewSectionReader(subject, 0, subject.Size())
 	reader := tar.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(section)})
+	diskdiagnostic.Emit(ctx, "member-walk", "start", diagnosticDepth, 0)
+	ordinal := 0
 	for {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -141,6 +153,7 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 		if header.Typeflag != tar.TypeReg {
 			continue
 		}
+		ordinal++
 		// Probe the held member without consuming the parent reader. archive/tar
 		// owns metadata/header decoding, including PAX/GNU headers; no filename or
 		// partial header grammar establishes an image format.
@@ -153,6 +166,7 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 			return nil, err
 		}
 		if archiveContent {
+			diskdiagnostic.Emit(ctx, "nested-scan", "start", diagnosticDepth, ordinal)
 			if err := budget.member(); err != nil {
 				return nil, err
 			}
@@ -172,11 +186,13 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 			if inspection != nil {
 				appendContainedArchive(result, inspection, path.Clean(header.Name), digest)
 			}
+			diskdiagnostic.Emit(ctx, "nested-scan", "complete", diagnosticDepth, ordinal)
 			continue
 		}
 		if !strings.HasSuffix(header.Name, ".deb") {
 			continue
 		}
+		diskdiagnostic.Emit(ctx, "nested-scan", "start", diagnosticDepth, ordinal)
 		if err := budget.member(); err != nil {
 			return nil, err
 		}
@@ -194,6 +210,7 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 			return nil, err
 		}
 		appendContainedArchive(result, inspection, path.Clean(header.Name), digest)
+		diskdiagnostic.Emit(ctx, "nested-scan", "complete", diagnosticDepth, ordinal)
 		if result.packageMetadataByDigest == nil {
 			result.packageMetadataByDigest = make(map[string]diskPackageKey)
 		}
@@ -204,6 +221,7 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 			result.packageMetadataByDigest[digest] = identity
 		}
 	}
+	diskdiagnostic.Emit(ctx, "member-walk", "complete", diagnosticDepth, ordinal)
 	if err := subject.AssertUnchangedContext(ctx); err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "rechecking staged archive")
 	}
@@ -240,6 +258,8 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 	if err := validateSBOMContext(ctx); err != nil {
 		return nil, err
 	}
+	filesystemDepth, _ := ctx.Value(diskFilesystemDepthKey{}).(int)
+	ctx = context.WithValue(ctx, diskScanDepthKey{}, depth+1+filesystemDepth)
 	if depth > 2 || subject == nil || subject.Size() <= 0 || maxBytes <= 0 || budget == nil {
 		return nil, e.New(e.CodeEngineCapability, "compressed material exceeds bounded recursive inspection")
 	}
@@ -295,7 +315,7 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding compressed Docker image manifest")
 	}
-	if len(manifest) == 0 || len(manifest) > 256 {
+	if len(manifest) == 0 || len(manifest) > maxDiskNestedImages {
 		return nil, e.New(e.CodeEngineCapability, "compressed material has no bounded supported Docker image manifest")
 	}
 	// tarball.Image selects the first manifest entry matching a normalized tag.
@@ -325,7 +345,7 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 	seen := make(map[string]bool)
 	for _, tag := range tags {
 		budget.images++
-		if budget.images > 256 {
+		if budget.images > maxDiskNestedImages {
 			return nil, e.New(e.CodeEngineCapability, "nested material exceeds its cumulative image budget")
 		}
 		image, err := tarball.Image(opener, &tag)
@@ -413,6 +433,9 @@ func compressedImageMarkers(ctx context.Context, archive *generatedInspectionFil
 			return docker, oci, nil
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				return false, false, e.Wrap(e.CodeTimeout, ctx.Err(), "compressed material marker scan canceled")
+			}
 			return false, false, e.Wrap(e.CodeVerifyFailed, err, "decoding compressed material tar headers")
 		}
 		if count >= 200000 {

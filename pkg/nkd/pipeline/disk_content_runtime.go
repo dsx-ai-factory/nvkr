@@ -43,6 +43,7 @@ func (container *DiskInspectionContainer) SelectionContext(ctx context.Context) 
 	}
 	selection := container.selection
 	selection.Workspace = nil
+	selection.Diagnostics = nil
 	selection.RuntimeExecutable = container.runtime.name
 	selection.compositionKind, selection.consumerPlatform, selection.scratchVolume = "", "", ""
 	return selection, nil
