@@ -36,7 +36,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	remoteOptions := registryOptions(ctx, options)
 	fetched, err := remote.Get(ref, remoteOptions...)
 	if err != nil {
-		return Inspection{}, e.Wrap(e.CodeFetchFailed, err, "fetch metadata index")
+		return Inspection{}, classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "fetch metadata index"))
 	}
 	if len(fetched.Manifest) > 8<<20 || digestBytes(fetched.Manifest) != ref.DigestStr() {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index identity/size differs")
@@ -63,7 +63,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	manifest := func(repo name.Repository, d Descriptor) (ociManifest, error) {
 		got, err := remote.Get(repo.Digest(d.Digest), remoteOptions...)
 		if err != nil {
-			return ociManifest{}, e.Wrap(e.CodeFetchFailed, err, "fetch metadata manifest")
+			return ociManifest{}, classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "fetch metadata manifest"))
 		}
 		if err := put(got.Manifest, d, 8<<20); err != nil {
 			return ociManifest{}, err
@@ -80,16 +80,16 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		}
 		layer, err := remote.Layer(repo.Digest(d.Digest), remoteOptions...)
 		if err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "fetch metadata blob")
+			return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "fetch metadata blob"))
 		}
 		reader, err := layer.Compressed()
 		if err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "open metadata blob")
+			return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "open metadata blob"))
 		}
 		defer reader.Close()
 		raw, err := io.ReadAll(io.LimitReader(reader, max+1))
 		if err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "read metadata blob")
+			return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "read metadata blob"))
 		}
 		return put(raw, d, max)
 	}

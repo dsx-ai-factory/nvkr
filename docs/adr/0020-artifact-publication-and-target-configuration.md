@@ -100,12 +100,14 @@ The M2 disk binding carries its evidence mode in signed release metadata; consum
 matching source-bound documents and refuses inspection claims in that mode. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
-the live inspection-and-packaging operation; full generated production execution remains unexercised. The ordinary
-local scheduler still rejects disk publication.
+the live inspection-and-packaging operation. M2 `build-provenance-v1` candidate delivery passed for both native
+architectures in generated run `37533806963` at validation commit `625980e`, including hosted publication,
+signing, verification and finalization under the explicit validation-branch dispatch/signing exception.
+Current main-only production execution, independent signed full-payload disk read-back and live mixed-attempt
+retry validation remain unexercised. The ordinary local scheduler still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
-composition or authorize release. A real generated
-disk publication on either native architecture remains unexercised.
+composition or authorize release.
 
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result

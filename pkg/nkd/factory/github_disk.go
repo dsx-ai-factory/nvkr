@@ -91,13 +91,12 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 			// runtime admission below must still authenticate the local image.
 			continue
 		}
-		pullCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
-		command := exec.CommandContext(pullCtx, plan.Environment.RuntimeBinary(), "pull", "--platform", root.Platform, image)
-		command.Stdout, command.Stderr = options.Stdout, options.Stderr
-		err := ownedcmd.Run(pullCtx, command)
-		stop()
-		if err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "prepare exact ARC toolchain")
+		if err := pullGitHubPublicImage(ctx, func(pullCtx context.Context) error {
+			command := exec.CommandContext(pullCtx, plan.Environment.RuntimeBinary(), "pull", "--platform", root.Platform, image)
+			command.Stdout, command.Stderr = options.Stdout, options.Stderr
+			return ownedcmd.Run(pullCtx, command)
+		}); err != nil {
+			return err
 		}
 	}
 	var inspector *sbom.DiskInspectionRuntime
@@ -161,6 +160,17 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		}
 	}
 	return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
+}
+
+// Classify the active pull before releasing its deadline, so cleanup cancellation
+// cannot turn an ordinary registry failure into a retryable timeout.
+func pullGitHubPublicImage(ctx context.Context, run func(context.Context) error) error {
+	ctx, stop := context.WithTimeout(ctx, 15*time.Minute)
+	defer stop()
+	if err := run(ctx); err != nil {
+		return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "prepare exact ARC toolchain"))
+	}
+	return nil
 }
 
 func completeGitHubDiskPublication(ctx context.Context, plan *Plan, expected LifecycleOutputPlan,
