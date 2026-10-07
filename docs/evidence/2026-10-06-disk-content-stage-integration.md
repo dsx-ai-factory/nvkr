@@ -13,7 +13,7 @@ original scope, including the then-duplicated held/plain path, not current count
 
 The [later cancellation review record](2026-10-06-disk-content-review-cancellation.md)
 binds the subsequent callback/hash-owner repairs and their fresh native results;
-the `3decca` manifest below identifies this historical parent-integration snapshot,
+the `3decca` manifest below identifies this historical stage-integration snapshot,
 not the later shipping source.
 
 ## Exact tested snapshot

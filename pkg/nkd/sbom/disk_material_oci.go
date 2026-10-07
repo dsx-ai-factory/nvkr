@@ -116,7 +116,7 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 func nestedOCIValidationError(ctx context.Context, err error, operation string) error {
 	var coded *e.Error
 	if ctx.Err() != nil {
-		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s canceled", operation)
+		return e.Wrap(e.CodeTimeout, errors.Join(ctx.Err(), err), "%s canceled", operation)
 	}
 	if errors.As(err, &coded) && coded.Code == e.CodeTimeout {
 		return err

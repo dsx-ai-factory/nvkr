@@ -193,6 +193,9 @@ func TestNestedOCIValidationErrorPreservesTimeout(t *testing.T) {
 			if test.canceled && !errors.Is(err, context.Canceled) {
 				t.Fatalf("lost actual cancellation cause: %v", err)
 			}
+			if !errors.Is(err, test.inner) {
+				t.Fatalf("lost primary validation cause: %v", err)
+			}
 			if !test.canceled && test.code == e.CodeTimeout && err != test.inner {
 				t.Fatalf("coded inner timeout was rewritten: %v", err)
 			}

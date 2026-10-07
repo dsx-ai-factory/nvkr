@@ -29,8 +29,8 @@ f70508759db870c7046134170783125c375919243dfbbfad761b70e962109c69  pkg/nkd/sbom/d
 The shared hashing owner now returns `CodeTimeout` on actual context-canceled
 reads; ordinary failures remain `CodeVerifyFailed`. The OCI scan callback maps
 canceled non-timeout errors to `CodeTimeout`, while retaining ordinary scanner
-codes and existing timeout diagnostics. Tests cover cancellation after the final
-copy write, six callback error controls, and distinct admission/marker/extraction/
+codes and existing timeout diagnostics. Tests cover post-copy hashing-owner
+cancellation, six callback error controls, and distinct admission/marker/extraction/
 sealing reasons. Redundant copy remapping and a duplicate held/plain scanner row
 were removed; no production deadline, capability or inventory gate changed.
 
@@ -65,9 +65,7 @@ Complete-tools/compiler/inspector image IDs were respectively:
 6fe5b341957b02b266610fdec2b7fdb11403a8f0160d7b5b03fcda8c76d8e15d
 ```
 
-The fresh race binary SHA-256 is
-`61fe0202200cfd015ccd969114858db510c3a49bd3c1de27eb98de8370a0fb2d`.
-It used the inspector's pinned tools, not its older embedded helper. Startup
+The fresh race binary used the inspector's pinned tools, not its older embedded helper. Startup
 verified all five tool hashes; the command record binds their exact digests.
 The tool run reported UID/GID 65534:65534 and cgroup CPU/memory/PIDs limits
 `200000 100000` / `4294967296` / `256`, with private 1 GiB tmpfs scratch.
