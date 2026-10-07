@@ -353,7 +353,7 @@ func compact(raw []byte) string {
 		return "(absent)"
 	}
 	if len(raw) <= 180 {
-		return string(raw)
+		return jsonDisplay(json.RawMessage(raw))
 	}
 	// Quote the raw JSON prefix to retain its escapes, and keep the byte budget
 	// without cutting a Unicode code point in half.
