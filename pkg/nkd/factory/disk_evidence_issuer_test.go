@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
@@ -193,6 +194,16 @@ func TestDiskEvidenceIssuerCoreOwnsCompleteJoin(t *testing.T) {
 			{"close during scan", e.CodeTimeout},
 		} {
 			t.Run(architecture+"/"+test.name, func(t *testing.T) {
+				// Keep the primary issuance, binding, cancellation and cleanup
+				// contracts in the fast suite; expand the matrix explicitly.
+				if architecture != "amd64" {
+					testutil.RequireExtended(t)
+				}
+				switch test.name {
+				case "issued", "subject substitution", "missing edge before scan", "cancel during scan", "close during scan":
+				default:
+					testutil.RequireExtended(t)
+				}
 				encryption := "none"
 				if test.name == "encrypted subject" {
 					encryption = "luks2"

@@ -212,7 +212,7 @@ jobs:
       - name: shellcheck
         run: make shellcheck
 
-      - name: test (race + coverage)
+      - name: test (fast default)
         run: make test
 
       - name: build

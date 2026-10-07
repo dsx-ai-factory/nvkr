@@ -8,10 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 func TestAttestedDocumentInventoryAndBundleSizeBounds(t *testing.T) {
+	testutil.RequireExtended(t)
 	digest := "sha256:" + strings.Repeat("a", 64)
 	for _, tc := range []struct {
 		name     string
@@ -180,6 +182,7 @@ func TestAttestedDocumentBundleByteBoundBeforeDecoding(t *testing.T) {
 }
 
 func TestAttestedDocumentInnerInventoryBound(t *testing.T) {
+	testutil.RequireExtended(t)
 	digest := "sha256:" + strings.Repeat("a", 64)
 	// A valid statement and bundle remain below the transport bound. The
 	// independent inner limit must reject before decoding the BOM fields.

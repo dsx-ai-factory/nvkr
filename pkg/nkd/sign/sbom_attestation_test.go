@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
@@ -49,6 +50,9 @@ func TestSBOMAttestationCreationRequiresExactPredicateAndVerification(t *testing
 		{name: "inventory over document limit", padding: sbom.MaxDocumentBytes, code: e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.padding > 0 && tc.code == "" {
+				testutil.RequireExtended(t)
+			}
 			predicate := document
 			if tc.padding != 0 {
 				large := *bom

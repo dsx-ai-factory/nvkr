@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
@@ -193,6 +194,7 @@ func TestDiskPublicationPreservesManifestAndPayloadSubjects(t *testing.T) {
 }
 
 func TestDiskPublicationLargeInventoryAttestationReadback(t *testing.T) {
+	testutil.RequireExtended(t)
 	request, _ := diskPublicationRequest(t, "amd64")
 	changeDiskFixtureBOM(&request, func(bom *sbom.BOM) {
 		bom.Metadata.Component.Properties = []sbom.Property{{Name: "fixture", Value: strings.Repeat("x", sbom.MaxDocumentBytes-4096)}}

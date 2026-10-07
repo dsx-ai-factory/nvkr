@@ -19,7 +19,10 @@ make check         # the full local gate, including the Go vulnerability check
 - [`.go-version`](.go-version) pins the exact Go patch used by CI. The local
   build and vulnerability gates require the same patch, while `GOTOOLCHAIN=local`
   prevents an implicit toolchain download.
-- **`make test`** runs pure logic with the race detector — no Docker needed.
+- **`make test`** runs the fast default suite without race/coverage instrumentation.
+  **`make test-race`** adds race detection and coverage; **`make test-full`** also
+  enables expensive capacity and full-product integration fixtures. Direct
+  `go test ./...` uses the fast default too.
 - Active local **development producer** paths such as `build` (and the build phase of an applicable `attest` or
   `bake-off`) need **Docker + git** and network for their fetch step. The ordinary `build` path is unqualified.
   The OS-image build owns the worker payload. Removed package/rootfs producer commands are not a development path.
@@ -29,10 +32,23 @@ make check         # the full local gate, including the Go vulnerability check
 ## Local development equals CI
 
 CI (`.github/workflows/merge-gate.yaml`) runs the same format, vet, lint,
-shellcheck, race-test, and Go vulnerability checks as `make check`, then also
+shellcheck, fast tests, and Go vulnerability checks as `make check`, then also
 compiles the binary. Run `make check` and `make build` before opening a PR. The
 vulnerability check needs access to the Go vulnerability database; see the
 [maintainer procedure](docs/cve-management.md) for triage and scope.
+
+Expensive capacity and full-product integration fixtures require
+`NKD_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
+Enable them selectively when changing large-document limits, attestation or
+publication readback, catalog serialization limits, maintained workflow
+generation, or the authoring lab. Go's `-short` flag keeps them skipped even when
+the environment variable is set. Ordinary contract tests and fast byte-admission
+checks still run by default. See [the timing investigation](docs/go-test-performance.md)
+for the exact opt-in cases, measurements, and remaining bottlenecks.
+
+For concurrency or process-lifetime changes, run targeted race tests for the
+affected packages. Whole-repository race and coverage runs are opt-in rather
+than a cost paid on every PR or agent turn.
 
 ## The invariants your change must respect
 

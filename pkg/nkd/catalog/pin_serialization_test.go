@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 // Exercise the byte ceiling with the real writer and check-mode resolver. The
 // opaque tag deliberately fills the limit without adding unrelated schema fields.
 func TestSourcePinCheckAndWriteShareExactSerializedBound(t *testing.T) {
+	testutil.RequireExtended(t)
 	for _, tc := range []struct {
 		name string
 		size int64

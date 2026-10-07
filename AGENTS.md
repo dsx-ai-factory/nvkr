@@ -91,7 +91,9 @@ retains its original scope; superseded requirements and plans are available only
 
 ```sh
 make check          # full local gate: fmt-check → vet → lint → shellcheck → test → vulncheck (run before pushing)
-make test           # unit tests with -race and coverage
+make test           # fast default tests; matches PR checks
+make test-race      # opt-in race + coverage for the default suite
+make test-full      # opt-in extended fixtures, race + coverage
 make lint           # golangci-lint v2 (.golangci.yml)
 make build          # build bin/nkdctl
 make nkd-exec-helper
@@ -203,7 +205,6 @@ completion:
 ```sh
 gofmt -l cmd client internal pkg
 go test ./... -count=1
-go test -race ./... -count=1
 go vet ./...
 golangci-lint run
 make shellcheck
@@ -214,8 +215,11 @@ git diff --check
 `make check` runs the repository gate, including shellcheck and the Go vulnerability scan. The direct commands
 above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
 outside a restricted sandbox. `make vulncheck` needs access to the Go module proxy and vulnerability database;
-run it with network access or report it as unverified. The `-race` gate has historically differed between macOS
-and Linux; when a change touches `pkg/nkd/sign` or `pkg/nkd/pipeline`, run it on Linux too. Record external
+run it with network access or report it as unverified. Default tests omit expensive capacity and integration
+matrices. Do not routinely enable `NKD_TEST_EXTENDED`, whole-suite race detection, or coverage. For concurrency
+or process-lifetime changes, run targeted `go test -race` checks on the affected packages; use Linux for
+affected `pkg/nkd/sign` or `pkg/nkd/pipeline` paths. Enable the relevant extended tests when changing their
+capacity limits or integration contracts; see `docs/go-test-performance.md` for the selection. Record external
 operational evidence separately from the contract suite.
 
 ## Troubleshooting

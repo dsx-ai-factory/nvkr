@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -13,8 +14,11 @@ import (
 // This measures complete modeled file projection, not Ubuntu discovery, a
 // native helper run or issuance of an opaque runtime observation.
 func TestCompleteDiskFileInventoryCapacity(t *testing.T) {
-	for _, count := range []int{8000, 50000} {
+	for _, count := range []int{16, 8000, 50000} {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			if count > 16 {
+				testutil.RequireExtended(t)
+			}
 			inspection := contentFixture("tarball", "amd64", "a")
 			inspection.report.Components = nil
 			inspection.report.Files = make([]DiskFile, count)
