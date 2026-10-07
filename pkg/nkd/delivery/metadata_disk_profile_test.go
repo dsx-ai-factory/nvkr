@@ -45,7 +45,7 @@ func TestInspectMetadataEnforcesDiskBindingWithoutPayloads(t *testing.T) {
 					if err := os.CopyFS(root, os.DirFS(base)); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := os.Stat(diskBlobPath(root, request.Objects[0].Output.Disk.PayloadDigest)); !os.IsNotExist(err) {
+					if _, err := os.Stat(fixtureBlobPath(root, request.Objects[0].Output.Disk.PayloadDigest)); !os.IsNotExist(err) {
 						t.Fatalf("metadata fixture contains a disk payload: %v", err)
 					}
 					original, err := InspectMetadata(t.Context(), root)

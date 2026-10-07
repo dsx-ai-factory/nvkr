@@ -295,7 +295,7 @@ changing decoded string values, and empty build-subject collections are arrays. 
 after the whole metadata closure is checked. The diagram presents published relationships, not an inferred
 build graph. Navigation adds no canonical identity or publication authority and leaves explicit release
 verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
-payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-release-browse-metadata.md)
+payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nke-recipes/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md)
 separately records the earlier external inspection scope. Current readers require publication-root v4 and
 reject that v3 release; current-schema external acceptance is not established by the dated record.
 

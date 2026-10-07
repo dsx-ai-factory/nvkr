@@ -169,7 +169,7 @@ func TestDiskPublicationPreservesManifestAndPayloadSubjects(t *testing.T) {
 			}
 			outputs[0].Disk.PayloadDigest = manifest
 			outputs[0].Components[0] = "caller-change"
-			if err := os.WriteFile(diskBlobPath(final, rawPin), []byte("source replaced"), 0o600); err != nil {
+			if err := os.WriteFile(fixtureBlobPath(final, rawPin), []byte("source replaced"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			outputs, _, err = publication.Artifacts("registry.example.test/release@" + result.RootDigest)
@@ -390,13 +390,13 @@ func TestPublicationAdmitsDiskMetadataAndInventoryBeforePayloadCapture(t *testin
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Remove(diskBlobPath(root, request.Objects[0].Output.Disk.PayloadDigest)); err != nil {
+				if err := os.Remove(fixtureBlobPath(root, request.Objects[0].Output.Disk.PayloadDigest)); err != nil {
 					t.Fatal(err)
 				}
 				want = "release object has no output or evidence binding"
 			} else {
 				orphan := bytes.Repeat([]byte{'o'}, 9<<20)
-				if err := os.WriteFile(diskBlobPath(root, digestBytes(orphan)), orphan, 0o600); err != nil {
+				if err := os.WriteFile(fixtureBlobPath(root, digestBytes(orphan)), orphan, 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}

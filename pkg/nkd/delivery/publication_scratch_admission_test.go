@@ -68,7 +68,7 @@ func TestPublicationAdmitsUniqueDiskScratchBeforeSnapshot(t *testing.T) {
 							if required != uint64(disk.Size) {
 								t.Fatalf("duplicate payload charged twice: need=%d, unique=%d", required, disk.Size)
 							}
-							if _, err := os.Lstat(diskBlobPath(filepath.Join(stage, "layout"), disk.PayloadDigest)); !os.IsNotExist(err) {
+							if _, err := os.Lstat(fixtureBlobPath(filepath.Join(stage, "layout"), disk.PayloadDigest)); !os.IsNotExist(err) {
 								t.Fatalf("disk snapshot preceded capacity admission: %v", err)
 							}
 							if !admitted {

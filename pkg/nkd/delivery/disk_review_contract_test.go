@@ -130,7 +130,7 @@ func TestReleaseSBOMSubjectGateRejectsSelfPinnedChanges(t *testing.T) {
 					object.SemanticDigest, object.Evidence.DocumentDigest = semantic, payload.Digest
 					object.Name = "sbom-" + strings.TrimPrefix(semantic, "sha256:")
 					for _, pin := range []string{oldPayload, oldManifest} {
-						if err := os.Remove(diskBlobPath(root, pin)); err != nil {
+						if err := os.Remove(fixtureBlobPath(root, pin)); err != nil {
 							t.Fatal(err)
 						}
 					}
@@ -200,11 +200,11 @@ func rewriteDiskPublicationRoot(t *testing.T, root string, inspection Inspection
 		t.Fatal(err)
 	}
 	for _, original := range index.Manifests {
-		if err := os.Remove(diskBlobPath(root, original.Digest)); err != nil {
+		if err := os.Remove(fixtureBlobPath(root, original.Digest)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := os.Remove(diskBlobPath(root, inspection.RootConfig.Digest)); err != nil {
+	if err := os.Remove(fixtureBlobPath(root, inspection.RootConfig.Digest)); err != nil {
 		t.Fatal(err)
 	}
 	pin, err := writer.writeIndex(ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex,
@@ -269,7 +269,7 @@ func TestDiskPayloadCopyRechecksExistingBlob(t *testing.T) {
 			if err := writer.copyDiskPayload(t.Context(), disk); err != nil {
 				t.Fatal(err)
 			}
-			path := diskBlobPath(writer.root, digestBytes(payload))
+			path := fixtureBlobPath(writer.root, digestBytes(payload))
 			switch condition {
 			case "changed":
 				if err := os.WriteFile(path, []byte("different"), 0o600); err != nil {
@@ -279,7 +279,7 @@ func TestDiskPayloadCopyRechecksExistingBlob(t *testing.T) {
 				if err := os.Remove(path); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Symlink(diskBlobPath(root, digestBytes(payload)), path); err != nil {
+				if err := os.Symlink(fixtureBlobPath(root, digestBytes(payload)), path); err != nil {
 					t.Fatal(err)
 				}
 			}

@@ -106,7 +106,15 @@ establish contracts, not GHCR, signing-service or production acceptance. Current
 The [recorded loopback replay](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI
 against a Docker registry carrying actual AMD64/ARM64 NKE CLI bundles and their dependency SBOMs. It is
 unsigned diagnostic evidence, separate from signed release consumption and the current metadata-only path.
-The [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-release-browse-metadata.md) records
+The [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nke-recipes/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md) records
 the scope and outcome of browsing the release published by Run `37533806963`. Current readers require
 publication-root v4 and reject that earlier v3 release; the dated record does not establish current-schema
 external acceptance.
+
+That record identifies the missing consumer source snapshots and distinguishes the original live observations
+from later local replays. Its [retained transport guard](https://github.com/dsx-ai-factory/nke-recipes/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata/inspect_transport.go.txt)
+is historical evidence with fixed local paths, not a maintained executable or a compiled repository test.
+The original guard bytes remain unchanged in Git history. It replaced the package-global
+`remote.DefaultTransport`; its request and byte counts describe that single execution through that transport,
+not later consumers or code using a different transport. The guard imports unretained local package sources,
+so it supplies only partial source provenance.
