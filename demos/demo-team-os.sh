@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Guided static OS-image material graph; intentionally does not start Packer.
 set -euo pipefail
 DEMO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
