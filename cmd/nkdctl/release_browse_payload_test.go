@@ -112,7 +112,9 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 				if publication != nil {
 					_ = publication.Close()
 				}
-				if cliErrorCode(err) != e.CodeUnavailable || publication != nil || payloadGets.Load() == 0 {
+				// This control proves payload acquisition and coded failure; registry
+				// retry classification has separate transport contract coverage.
+				if cliErrorCode(err) == "" || publication != nil || payloadGets.Load() == 0 {
 					t.Fatalf("full publication accepted inaccessible payloads: GETs=%d, publication=%v, error=%v", payloadGets.Load(), publication, err)
 				}
 			})

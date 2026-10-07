@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"syscall"
@@ -16,10 +17,18 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-func TestMetadataFetchErrorDistinguishesCertificateRejectionFromOutage(t *testing.T) {
+func TestMetadataFetchErrorDistinguishesRequestRejectionFromOutage(t *testing.T) {
 	certificate := &x509.Certificate{DNSNames: []string{"registry.example.test"}}
 	verification := &tls.CertificateVerificationError{Err: errors.New("certificate policy rejected")}
 	coded := e.Wrap(e.CodeVerifyFailed, verification, "metadata trust check failed")
+	policyRejection := errors.New("redirect policy refused request")
+	dialFailure := &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}
+	networkTimeout := &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}
+	nestedRequest := func(cause error) error {
+		return fmt.Errorf("redirected request: %w", &url.Error{
+			Op: "Get", URL: "https://registry.example.test/redirected", Err: cause,
+		})
+	}
 	for _, test := range []struct {
 		name      string
 		cause     error
@@ -34,9 +43,15 @@ func TestMetadataFetchErrorDistinguishesCertificateRejectionFromOutage(t *testin
 		{name: "hostname mismatch", cause: x509.HostnameError{Certificate: certificate, Host: "other.example.test"}, code: e.CodeFetchFailed, exit: 20},
 		{name: "unknown authority", cause: x509.UnknownAuthorityError{Cert: certificate}, code: e.CodeFetchFailed, exit: 20},
 		{name: "unavailable trust roots", cause: x509.SystemRootsError{Err: errors.New("trust roots unavailable")}, code: e.CodeFetchFailed, exit: 20},
-		{name: "dial refused", cause: &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}, code: e.CodeUnavailable, exit: 30, retryable: true},
+		{name: "HTTP response to HTTPS request", cause: http.ErrSchemeMismatch, code: e.CodeFetchFailed, exit: 20},
+		{name: "redirect policy rejection", cause: policyRejection, code: e.CodeFetchFailed, exit: 20},
+		{name: "nested redirect rejection", cause: nestedRequest(policyRejection), code: e.CodeFetchFailed, exit: 20},
+		{name: "dial refused", cause: dialFailure, code: e.CodeUnavailable, exit: 30, retryable: true},
 		{name: "connection reset", cause: &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}, code: e.CodeUnavailable, exit: 30, retryable: true},
-		{name: "network timeout", cause: &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}, code: e.CodeTimeout, exit: 31, retryable: true},
+		{name: "network timeout", cause: networkTimeout, code: e.CodeTimeout, exit: 31, retryable: true},
+		{name: "nested dial refused", cause: nestedRequest(dialFailure), code: e.CodeUnavailable, exit: 30, retryable: true},
+		{name: "nested network timeout", cause: nestedRequest(networkTimeout), code: e.CodeTimeout, exit: 31, retryable: true},
+		{name: "nested truncated stream", cause: nestedRequest(io.ErrUnexpectedEOF), code: e.CodeUnavailable, exit: 30, retryable: true},
 		{name: "stream EOF", cause: io.EOF, code: e.CodeUnavailable, exit: 30, retryable: true, stream: true},
 		{name: "truncated stream", cause: io.ErrUnexpectedEOF, code: e.CodeUnavailable, exit: 30, retryable: true, stream: true},
 		{name: "wrapped deadline", cause: context.DeadlineExceeded, code: e.CodeTimeout, exit: 31, retryable: true},
@@ -47,7 +62,7 @@ func TestMetadataFetchErrorDistinguishesCertificateRejectionFromOutage(t *testin
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			// HTTP request errors wrap their cause in url.Error, which satisfies
-			// net.Error even for a permanent certificate rejection. Body reads
+			// net.Error even for a permanent request rejection. Body reads
 			// report their stream error directly instead.
 			upstream := test.cause
 			if !test.stream {

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -172,6 +173,14 @@ func metadataFetchError(ctx context.Context, err error, operation string) error 
 	if ctx.Err() != nil {
 		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s", operation)
 	}
+	// url.Error reports net.Error even for permanent protocol or request-policy
+	// failures. Classify its underlying network cause, retaining the full error
+	// chain for all other checks and for the returned diagnostic.
+	networkCause := err
+	var requestErr *url.Error
+	for errors.As(networkCause, &requestErr) {
+		networkCause = requestErr.Err
+	}
 	code := e.CodeFetchFailed
 	var coded *e.Error
 	var registryErr *transport.Error
@@ -197,7 +206,7 @@ func metadataFetchError(ctx context.Context, err error, operation string) error 
 			registryErr.StatusCode == http.StatusRequestTimeout || registryErr.StatusCode == http.StatusTooManyRequests {
 			code = e.CodeUnavailable
 		}
-	case errors.As(err, &networkErr):
+	case errors.As(networkCause, &networkErr):
 		code = e.CodeUnavailable
 		if networkErr.Timeout() {
 			code = e.CodeTimeout
