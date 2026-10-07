@@ -28,7 +28,8 @@ _Avoid_: Producer, expected output, release
 
 **Release**:
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
-Inspection can expose checked artifact/evidence membership without establishing signature or policy acceptance.
+Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
+signature or policy acceptance.
 _Avoid_: Bundle, mutable tag, clearance
 
 **Verification Policy**:

@@ -1,9 +1,10 @@
 # Navigate release artifacts and evidence
 
-`nkdctl release browse` opens an exact release publication root and shows the artifacts and evidence it
-contains. It checks the complete content closure before displaying any output. It can read a registry or an
-existing local OCI layout, and runs on macOS as well as Linux. Inspection does not verify signatures or apply
-a consumer policy; use `release verify` for that separate decision.
+`nkdctl release browse` reads the bounded metadata and evidence of an exact release publication root and
+shows its declared artifacts and memberships. It validates the complete metadata closure before displaying
+any output, without downloading or reading artifact payload layers. It can read a registry or an existing
+local OCI layout, and runs on macOS as well as Linux. Metadata inspection does not verify payload bytes,
+signatures or consumer policy; use `release verify` for authenticated consumption.
 
 ## Start with the publication root
 
@@ -17,21 +18,23 @@ bin/nkdctl release browse --reference "$RELEASE_REF"
 
 The default text view shows the exact root and content identities, the recorded Definition and Environment
 identities, and each named output's type, derived payload reference, Build Digest, components and evidence.
-Executable and native-image platforms come from their checked payload configs. Platform is omitted for kinds where this
-reader has no payload platform observation; it is never inferred from an output name.
+Executable, native-image and disk platforms come from their checked config metadata. They describe the
+declared artifact platform, without observing payload bytes. Platform is omitted where the metadata provides
+no platform declaration; it is never inferred from an output name.
 
-The displayed qualification is the publication's declared value. Every format states that inspection checks
-integrity only and does not verify signatures or policy. Successful browsing does not establish an accepted
-Release, independent reproduction, or operational qualification.
+The displayed qualification is the publication's declared value. Every format labels the result as metadata
+inspection and states that payloads, signatures and policy are unverified. Successful browsing does not
+establish an accepted Release, independent reproduction, or operational qualification.
 
 Registry access uses the existing local credential keychain by default. Add `--anonymous` for a public
 registry. `--plain-http` explicitly enables HTTP for a local test registry. Inspection has a ten-minute default
 deadline; `--timeout 20m` changes it. A caller's earlier cancellation still wins. Registry downloads use a
 private system temporary directory that is removed on success, failure, or cancellation. By default, browsing
 does not write to the current working directory. With `--workspace`, only the private inspection child is removed; the
-caller-owned workspace remains. Opening a large image release downloads its full payload and evidence closure,
-including fetching each output and evidence manifest from its derived sibling repository and checking its
-digest, size, and media type.
+caller-owned workspace remains. Registry browsing fetches the release index, metadata manifests and configs,
+and bounded evidence documents from their derived sibling repositories. It checks exact metadata digests,
+sizes, schemas and memberships. Artifact payload layers, including container layers, executable archives and
+disk images, are not downloaded.
 
 ## Focus on one output
 
@@ -40,7 +43,8 @@ bin/nkdctl release browse --reference "$RELEASE_REF" --output nkectl-linux-arm64
 ```
 
 Selection is an exact output name. Unknown names fail with a coded usage error. Selection changes the display
-after the whole publication has been checked; it cannot hide invalid sibling artifacts or missing evidence.
+after all release metadata and evidence memberships have been checked; it cannot hide invalid sibling
+metadata or missing evidence. Payload integrity remains outside browsing's scope.
 Shared evidence keeps its complete list of output memberships in text and JSON even when only one output is
 shown. Evidence references identify the exact manifest under the derived owning output repository.
 
@@ -69,7 +73,8 @@ the publication metadata. Registry-provided labels are escaped before rendering.
 bin/nkdctl release browse --reference "$RELEASE_REF" --layout /path/to/release-layout
 ```
 
-The root digest must match the local index exactly. The repository namespace in the reference determines the
+The layout may contain the complete publication or only its metadata and evidence; browsing does not open
+artifact payload layers in either case. The root digest must match the local index exactly. The repository namespace in the reference determines the
 descriptive sibling references; a local view neither contacts that host nor proves those repositories contain
 the artifacts. Text explicitly labels artifact/evidence locators as derived, and the detached description
 makes no registry-availability claim in either acquisition mode. Registry and workspace flags cannot be combined
@@ -85,19 +90,21 @@ The existing Linux and capability requirements for policy verification still app
 
 ## Implementation and validation scope
 
-Delivery owns the held closure and the output/evidence projection. Lifecycle admits the reference and options,
-bounds the operation, opens or pulls the publication, obtains its detached description and closes the held
-resources. Presentation filters and formats only that description. No new release identity or publication
-format is introduced.
+Delivery owns the bounded metadata reader and the output/evidence projection. Lifecycle admits the reference
+and options, bounds the operation, reads or pulls the metadata, obtains its detached description and removes
+temporary resources. Presentation filters and formats only that description. No new release identity or
+publication format is introduced. Explicit release verification retains its full payload and policy checks.
 
 Contract tests cover anonymous and authenticated loopback registries, identical local/remote descriptions,
-exact sibling references and evidence subjects, payload-derived executable platform, defensive copies, closed
-owners, failed admission before filesystem/network work, temporary-workspace cleanup in a read-only current
-directory, rejection of evidence without output membership, empty Helm build-subject arrays, filtered shared
-membership, Unicode-safe JSON round trips and CLI option admission. Those fixtures establish contracts, not
-GHCR, signing-service or production acceptance. Current support and external evidence remain recorded in
+exact sibling references and evidence subjects, config-declared platforms, zero artifact payload-layer
+downloads including disk images, failed admission before filesystem/network work, temporary-workspace cleanup
+in a read-only current directory, rejection of evidence without output membership, empty Helm build-subject
+arrays, filtered shared membership, Unicode-safe JSON round trips and CLI option admission. Those fixtures
+establish contracts, not GHCR, signing-service or production acceptance. Current support and external evidence remain recorded in
 [reconciliation](adr/reconciliation.md).
 
-The [recorded loopback replay](evidence/2026-10-03-release-navigation.md) additionally exercised the built CLI
+The [recorded loopback replay](evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI
 against a Docker registry carrying actual AMD64/ARM64 NKE CLI bundles and their dependency SBOMs. It is
-unsigned diagnostic evidence, separate from signed release consumption.
+unsigned diagnostic evidence, separate from signed release consumption and the current metadata-only path.
+The [metadata browsing validation record](evidence/2026-10-06-release-browse-metadata.md) records the scope and
+outcome of browsing the release published by Run `37533806963`.

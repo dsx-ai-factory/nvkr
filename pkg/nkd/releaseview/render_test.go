@@ -12,7 +12,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-func TestRenderKeepsOutputEvidenceMembershipAndIntegrityScope(t *testing.T) {
+func TestRenderKeepsOutputEvidenceMembershipAndMetadataScope(t *testing.T) {
 	description := delivery.PublicationDescription{
 		Reference: "registry.test/releases@sha256:" + strings.Repeat("a", 64), RootDigest: "sha256:" + strings.Repeat("a", 64),
 		Outputs: []delivery.PublicationOutput{
@@ -32,6 +32,12 @@ func TestRenderKeepsOutputEvidenceMembershipAndIntegrityScope(t *testing.T) {
 			}
 			if strings.Contains(string(raw), "other") {
 				t.Fatalf("filtered view includes unrelated evidence: %s", raw)
+			}
+			if !strings.Contains(string(raw), "metadata inspection; payloads, signatures and policy not verified") {
+				t.Fatalf("view overclaims metadata inspection: %s", raw)
+			}
+			if format == "mermaid" && !strings.HasPrefix(string(raw), "flowchart TD\n  %% metadata inspection;") {
+				t.Fatalf("invalid Mermaid scope comment: %s", raw)
 			}
 			if format == "json" {
 				var got view

@@ -162,7 +162,7 @@ func TestInspectReleaseDefaultWorkspaceIsOwnedAndTemporary(t *testing.T) {
 		code e.Code
 	}{
 		{"success", 0, ""},
-		{"registry rejection", 1, e.CodeUnavailable},
+		{"registry rejection", 1, e.CodeFetchFailed},
 		{"timeout", 2, e.CodeTimeout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

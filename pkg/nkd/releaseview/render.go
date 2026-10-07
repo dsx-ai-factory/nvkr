@@ -40,13 +40,13 @@ type view struct {
 	delivery.PublicationDescription
 }
 
-// Render selects a presentation only after the owner checked the full closure.
+// Render selects a presentation only after the owner checked all metadata.
 // JSON is readable presentation, not canonical identity input or a receipt.
 func Render(description delivery.PublicationDescription, options Options) ([]byte, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
-	selected := view{Inspection: "integrity-only; signatures and policy not verified", SelectedOutput: options.Output,
+	selected := view{Inspection: "metadata inspection; payloads, signatures and policy not verified", SelectedOutput: options.Output,
 		TotalOutputs: len(description.Outputs), PublicationDescription: description}
 	if options.Output != "" {
 		selected.Outputs = nil
@@ -108,8 +108,8 @@ func renderText(selected view) string {
 
 func renderMermaid(selected view) string {
 	var out strings.Builder
-	out.WriteString("flowchart TD\n  %% Complete closure checked; signatures and policy not verified.\n")
-	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid("Release "+shortDigest(selected.RootDigest)+" | integrity only"))
+	fmt.Fprintf(&out, "flowchart TD\n  %%%% %s.\n", selected.Inspection)
+	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid("Release "+shortDigest(selected.RootDigest)+" | metadata inspection"))
 	outputs := make(map[string]string, len(selected.Outputs))
 	for i, output := range selected.Outputs {
 		id := fmt.Sprintf("o%d", i)

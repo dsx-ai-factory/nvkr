@@ -108,12 +108,15 @@ the content subject and bound by the release metadata. A second published lifecy
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
 
 `lifecycle.InspectRelease` is the bounded, context-first read-only entry point for registry or local release
-navigation. Delivery opens the complete held publication before projecting output and evidence membership;
-presentation may then focus on an exact output or render text, JSON, or Mermaid. Reference and transport
+navigation. Delivery validates the bounded metadata and evidence closure before projecting declared output
+and evidence membership, without downloading or reading artifact payload layers. Local inspection accepts a
+complete publication layout or a metadata-only layout. Presentation may then focus on an exact output or
+render text, JSON, or Mermaid; platform labels describe checked config metadata. Reference and transport
 admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
 by default; an explicit caller-owned workspace is retained while its private staging child is removed.
-These detached descriptions carry no signature or policy authority, and cannot restore a verified Release
-capability. The existing compact local `release inspect` view remains.
+Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
+signature or policy verification, and cannot restore a verified Release capability. Explicit Release
+verification retains its full payload and policy checks. The existing compact local `release inspect` view remains.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic

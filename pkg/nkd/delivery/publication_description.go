@@ -18,8 +18,8 @@ func ValidatePublicationReference(reference string) error {
 	return nil
 }
 
-// PublicationDescription is a detached, descriptive projection of a checked
-// closure. It carries no signature, policy or execution authority.
+// PublicationDescription is a detached projection of checked metadata or a held
+// publication. It carries no payload, signature, policy or execution authority.
 type PublicationDescription struct {
 	Reference             string                `json:"reference"`
 	ReferenceScope        string                `json:"referenceScope"`
@@ -61,23 +61,27 @@ func (publication *Publication) Description(reference string) (PublicationDescri
 	if publication.closed || publication.inspection.Root.Release == nil {
 		return PublicationDescription{}, e.New(e.CodeGateUnmet, "publication is not open")
 	}
-	if _, digest, ok := strings.Cut(reference, "@"); ok && isDigest(digest) && digest != publication.inspection.RootDigest {
+	return publicationDescription(reference, publication.inspection, publication.outputs, publication.platforms)
+}
+
+func publicationDescription(reference string, inspection Inspection, outputs []Output, platforms map[string]publicationPlatform) (PublicationDescription, error) {
+	if _, digest, ok := strings.Cut(reference, "@"); ok && isDigest(digest) && digest != inspection.RootDigest {
 		return PublicationDescription{}, e.New(e.CodeVerifyFailed, "checked publication root differs from requested subject")
 	}
-	outputRefs, err := OutputReferences(reference, publication.inspection)
+	outputRefs, err := OutputReferences(reference, inspection)
 	if err != nil {
 		return PublicationDescription{}, err
 	}
-	evidenceRefs, err := EvidenceReferences(reference, publication.inspection)
+	evidenceRefs, err := EvidenceReferences(reference, inspection)
 	if err != nil {
 		return PublicationDescription{}, err
 	}
-	root := publication.inspection.Root
+	root := inspection.Root
 	view := PublicationDescription{
-		Reference: reference, RootDigest: publication.inspection.RootDigest,
+		Reference: reference, RootDigest: inspection.RootDigest,
 		ReferenceScope:        "derived from supplied root reference; no registry availability claim",
 		DeclaredQualification: root.Qualification, Metadata: *root.Release,
-		Outputs: make([]PublicationOutput, 0, len(publication.outputs)), Evidence: []PublicationEvidence{},
+		Outputs: make([]PublicationOutput, 0, len(outputs)), Evidence: []PublicationEvidence{},
 	}
 	objects := make(map[string]PublishedObject, len(root.Objects))
 	for _, object := range root.Objects {
@@ -93,13 +97,13 @@ func (publication *Publication) Description(reference string) (PublicationDescri
 			BlobDigest: object.BlobDigest, SemanticDigest: object.SemanticDigest, Binding: binding,
 		})
 	}
-	for _, output := range cloneOutputs(publication.outputs) {
+	for _, output := range cloneOutputs(outputs) {
 		object, ok := objects[output.Name]
 		if !ok || object.Output == nil || outputRefs[output.Name] == "" {
 			return PublicationDescription{}, e.New(e.CodeVerifyFailed, "publication output has no bound repository")
 		}
 		output.Reference = outputRefs[output.Name]
-		platform := publication.platforms[output.Name]
+		platform := platforms[output.Name]
 		view.Outputs = append(view.Outputs, PublicationOutput{
 			Output: output, ArtifactType: object.ArtifactType, OS: platform.OS, Arch: platform.Arch,
 			BuildSubjects: append([]BuildSubject{}, object.Output.BuildSubjects...),

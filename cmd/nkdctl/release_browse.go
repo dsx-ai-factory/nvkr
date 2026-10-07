@@ -12,7 +12,7 @@ import (
 
 func releaseBrowseCmd() *cli.Command {
 	return &cli.Command{
-		Name: "browse", Usage: "navigate an exact OCI release and its evidence (integrity inspection only)",
+		Name: "browse", Usage: "inspect exact OCI release metadata and evidence (payloads and signatures not verified)",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "reference", Required: true, Usage: "publication root repository@sha256:digest"},
 			&cli.StringFlag{Name: "layout", Usage: "inspect a local OCI layout instead of pulling the registry"},
