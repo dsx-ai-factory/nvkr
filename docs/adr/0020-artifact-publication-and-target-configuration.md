@@ -205,7 +205,11 @@ The complete request is admitted before filesystem access. Delivery captures bou
 held directory descriptors into anonymous immutable capabilities, then verifies every manifest, config,
 compressed layer and expanded layer identity. Native config platform must equal its requested platform;
 platform metadata on input descriptors, when present, must agree. An opened aggregate requires platform
-metadata on every child. Only baseline ARM64 is admitted (an omitted variant or `v8`); other variants,
+metadata on every child. The shared native-image verifier admits baseline AMD64 (omitted variant) and
+baseline ARM64 (omitted variant or `v8`) for single-image inspection/import as well as aggregate children.
+This intentional native-admission restriction rejects AMD64 `v3` with `CodeVerifyFailed`; it does not
+rewrite image bytes or declare that variant invalid OCI. `TestContainerImageNativeVariantAdmission`
+records the standalone contract. Other variants,
 unknown structural index/manifest fields, duplicate JSON keys, nested indexes, artifact/attestation manifests,
 subject-bearing manifests, missing or repeated platforms/descriptors, unreachable blobs, wrong sizes,
 symlinks and nonregular files fail closed. Standard image-config metadata is retained without rewriting it.

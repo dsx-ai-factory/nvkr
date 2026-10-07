@@ -29,14 +29,6 @@ _Avoid_: Plan, release, proof of qualification
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
 _Avoid_: Producer, expected output, release
 
-**Runnable OCI image index**:
-A standard OCI index selecting exact native child image manifests by explicit platform. Its blob digest is
-separate from each child's identity and from logical Build identity. Delivery can hold and verify its byte
-closure. One named output can freeze an explicit platform set, an aggregate logical Build Digest and each
-child's native build and evidence bindings (ADR-11/12/20). The aggregate recipe identity remains distinct
-from the runnable index digest.
-_Avoid_: Release publication root, native image manifest, qualification receipt
-
 **Release**:
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
 Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
@@ -107,6 +99,14 @@ A review-only lock and regenerated execution-bundle change under explicit source
 Static checks and optional complete local diagnostic execution precede candidate handoff; neither is release
 acceptance. Scheduling and source-role alignment are operational policy, not additional lifecycle objects.
 _Avoid_: Release, qualified reproduction, automatic promotion
+
+**Runnable OCI image index**:
+An Artifact representation: a standard OCI index selecting exact native child image manifests by explicit platform. Its blob digest is
+separate from each child's identity and from logical Build identity. Delivery can hold and verify its byte
+closure. One named output can freeze an explicit platform set, an aggregate logical Build Digest and each
+child's native build and evidence bindings (ADR-11/12/20). The aggregate logical Build identity remains distinct
+from the runnable index digest.
+_Avoid_: Release publication root, native image manifest, qualification receipt
 
 **Binary bundle**:
 An Artifact format containing exact executable files and their installation metadata.

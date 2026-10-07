@@ -253,6 +253,7 @@ func TestImageIndexConsumerRejectsMissingOrSubstitutedEvidence(t *testing.T) {
 			{"missing inventory", 1, true, e.CodeProvenanceMissing},
 			{"first result substitution", 0, false, e.CodeReleaseIncomplete},
 			{"second result substitution", 1, false, e.CodeVerifyFailed},
+			{"later result unrelated target", 1, false, e.CodeReleaseIncomplete},
 		} {
 			t.Run(route+"/"+tc.name, func(t *testing.T) {
 				p, n, a := indexObservationFixture(t)
@@ -266,6 +267,10 @@ func TestImageIndexConsumerRejectsMissingOrSubstitutedEvidence(t *testing.T) {
 				} else {
 					result := a[child.ResultArtifactID]
 					result.BuildTarget = n.ImageIndex.Children[1-tc.child].BuildTarget
+					if tc.name == "later result unrelated target" {
+						result.BuildTarget = "unrelated-target"
+						result.Component = "unrelated-component"
+					}
 					a[child.ResultArtifactID] = result
 				}
 				if route == "prepare" {
@@ -274,12 +279,18 @@ func TestImageIndexConsumerRejectsMissingOrSubstitutedEvidence(t *testing.T) {
 						defer index.Close()
 					}
 					assertFactoryErrorCode(t, err, tc.code)
+					if tc.name == "later result unrelated target" && (!strings.Contains(err.Error(), "omits exact native producer result") || !strings.Contains(err.Error(), child.ResultArtifactID)) {
+						t.Fatalf("did not reach later-child exact-record join: %v", err)
+					}
 					if index != nil || binding != nil {
 						t.Fatal("failed consumer returned held index or binding")
 					}
 				} else {
 					observed, err := ObserveLifecyclePayload(t.Context(), p, p.LifecycleOutputs[0], a)
 					assertFactoryErrorCode(t, err, tc.code)
+					if tc.name == "later result unrelated target" && (!strings.Contains(err.Error(), "omits exact native producer result") || !strings.Contains(err.Error(), child.ResultArtifactID)) {
+						t.Fatalf("did not reach later-child exact-record join: %v", err)
+					}
 					if !reflect.DeepEqual(observed, LifecyclePayloadObservation{}) {
 						t.Fatalf("failed consumer returned observation: %+v", observed)
 					}

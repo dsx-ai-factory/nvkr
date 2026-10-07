@@ -25,6 +25,12 @@ both mean the admitted baseline; assembly emits the variant-free baseline descri
 identifies the exact index bytes, while child digests identify unchanged native manifests. These are OCI blob
 identities, not a new logical Build identity family.
 
+The shared native-image verifier enforces this baseline policy for single-image inspection and import as
+well as aggregate children: AMD64 configs omit `variant`; ARM64 configs omit it or use `v8`. AMD64 variants
+such as `v3` and nonbaseline ARM64 variants fail with `CodeVerifyFailed`. This intentionally narrows native
+admission; it does not rewrite configs or claim that those variants are invalid OCI.
+`TestContainerImageNativeVariantAdmission` exercises the single-image boundary directly.
+
 `WriteLayout` requires an existing parent directory. It writes held bytes into a private sibling using held
 directory descriptors, syncs files and directories, installs the complete layout with an atomic no-replace
 rename, then syncs the parent. Concurrent writers cannot replace an existing layout. A queued writer observes cancellation while waiting for an active copy. Cancellation before the
@@ -57,6 +63,15 @@ authenticated navigation and externally exercised acceptance have separate owner
 A discovery alias such as `candidate` can advance after complete closure readback while later signing or
 verification is still unfinished, or subsequently fails. Tag presence does not establish signature readiness.
 Consumers must resolve and authenticate the immutable subject and required evidence under their policy.
+
+Configured image-alias updates first read back the entire release closure, including sibling payloads and
+evidence, into a private workspace under the process temporary directory (`TMPDIR` on Unix, or the system
+default when unset). Operators should place `TMPDIR` on storage with capacity for the full selected release
+and concurrent verification scratch, including any disk-image payloads. Measure representative peak usage;
+no fixed scratch multiplier is established. The workspace is removed on ordinary success and error returns;
+process termination or cleanup failure can leave files requiring normal temporary-storage housekeeping.
+Helm discovery tags are published earlier in the child-publication loop; this later full-closure readback
+precedes only the configured image-alias updates. Scratch placement must not bypass readback verification.
 
 These changes cross ADR-11/12 producer and target selection, ADR-13/16 evidence and completeness,
 ADR-19 output membership and ADR-20 publication. Native hosted routing is a separate prerequisite owned by
