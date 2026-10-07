@@ -97,6 +97,11 @@ producer-only evidence. A consumer must explicitly opt in to `build-provenance-v
 policy-digest-bound. The historical validation run below predates this consumer-policy fix and does not validate
 this merged head or prove independent full-payload consumer acceptance.
 
+The [customer choices guide](../../docs/nke-m2-customer-choices.md) explains supplier replacement through
+the existing catalog interfaces and the precise scope of its graph tests. The
+[release transport evidence](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
+failed candidate's storage exhaustion and why correcting carrier selection alone does not complete delivery.
+
 The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source

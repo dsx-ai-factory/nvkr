@@ -215,7 +215,7 @@ these named outputs to the exact delivered artifacts.
   and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
   digest and skips content that is already present, so re-runs are cheap and mirrors are idempotent.
 - **Acquisition.** Digest-pinned acquisition of kubectl, Helm, and the
-  third-party images referenced by the NKE charts that are not inside the OS image. Pins live in the
+  required third-party images selected from the pinned NKE deployment configuration that are not inside the OS image. Pins live in the
   lockfile and are written by the pin-resolution command (resolve an upstream version to a digest and rewrite the
   lockfile), which M4 schedules and extends. Each acquired artifact carries an `acquired` provenance attestation
   recording the upstream reference, the lockfile pin, and the fetch time, and making no build claim.
@@ -306,7 +306,8 @@ establish cluster conformance or independently verify the OS image's runtime beh
   nothing is attested.
 - **Verify-only dispatch.** A manual dispatch that runs verification and the gate against an already-published
   manifest, building and publishing nothing. Used for red-run rehearsal here and by M4's manual release.
-- **Disk inventory.** Inspect the exact delivered disk and reconcile installed content with traced producer materials; emit signed evidence and fail closed on missing inventory or disagreement.
+- **Disk inventory verification.** Verify the M2 disk inventory and reconciliation evidence for the exact
+  delivered disk under the separate qualification identity; missing or substituted evidence fails closed.
 - **Carry-over.** Any approved artifact deferral from M2 is resolved or explicitly retained with its qualification waiver under M2's criterion 4.
 
 **Does not deliver.** Independent functional or runtime validation of OS image contents (owned by the NKE OS image build team);
@@ -431,8 +432,8 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
   images; spire-agent placement; which NKE images are outside the OS image). Tue Sep 16 is the M1 stop-loss; if
   M1 is not green on GitHub, the M2 fallbacks are taken immediately.
 - **External dependencies that decide the outcome:** NKE source reachable from GitHub-hosted runners through
-  private mirrors with vendored inputs; the NKE OS build runnable on a hosted amd64 runner from a single pinned
-  entrypoint; a GitHub organization, registry namespace, OIDC identities, and a GitHub App for the pin bot;
+  private mirrors with vendored inputs; under the proposed target, the NKE OS build and complete inspection runnable on admitted native
+  AMD64 and ARM64 execution routes; a GitHub organization, registry namespace, OIDC identities, and a GitHub App for the pin bot;
   registry-side tag immutability on the release repository or a namespace whose only push credential is the
   release workflow's; product-security approval of public Sigstore before NKE bytes are signed.
 
@@ -455,5 +456,6 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 - **Labels on every epic:** `nke_nkd`, `nkd-v1`, plus the milestone label listed in the table.
 - **Cross-epic** and **Facts** belong in the description of the parent initiative (NKX-14794) or a pinned
   comment there, not repeated in each epic.
-- **Do not create child stories from the archived story draft**; it predates the amd64-only, OS-image and
-  six-object decisions. Derive stories from the *Delivers* bullets and acceptance criteria of this document.
+- **Do not create child stories from the archived story draft**; it predates the current architecture scope,
+  OS-image evidence and public-object decisions. Derive stories from the *Delivers* bullets and acceptance
+  criteria of this document.

@@ -1,22 +1,22 @@
-package buildgraph
+package buildgraph_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // This opt-in integration authenticates the source-owned chart pin set through
-// actual Git acquisition. Static completeness is not Environment admission or a
+// actual Git acquisition. Static completeness is not runtime admission or a
 // successful runtime build. Ordinary tests still require 34 declared outputs and
 // independently load/resolve/compile all 24 native image rows.
 func TestMaintainedM2All34OutputGraphs(t *testing.T) {
-	const root = "../../../definitions/nke-m2"
+	t.Chdir("../../..")
+	const root = "definitions/nke-m2"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -36,45 +36,41 @@ func TestMaintainedM2All34OutputGraphs(t *testing.T) {
 	if os.Getenv("NKD_TEST_M2_ALL_OUTPUT_GRAPHS") != "1" {
 		t.Skip("explicit pinned-source Git integration was not requested; native image graphs are tested separately")
 	}
+	environmentPath := filepath.Join(root, "environment-github.yaml")
+	environment, err := definition.LoadEnvironment(t.Context(), environmentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exercise production's ordered overlay admission and complete cross-output
+	// packaging graph, not a test-owned catalog loader that omits overlays.
+	plan, err := factory.CompileDocuments(t.Context(), filepath.Join(root, "definition.yaml"), authored,
+		environmentPath, environment, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.Graph.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Builds) != len(authored.Outputs) || len(plan.LifecycleOutputs) != len(authored.Outputs) {
+		t.Fatal("compiled Plan does not preserve every required output")
+	}
+	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
+	for _, build := range plan.Builds {
+		builds[build.Name] = build
+	}
 	images := 0
 	for _, output := range authored.Outputs {
 		t.Run(output.Name, func(t *testing.T) {
-			selection := authored.Catalog
-			if output.Catalog != nil {
-				selection = *output.Catalog
+			build, ok := builds[output.Name]
+			if !ok || build.Graph.Platform != output.Platform {
+				t.Fatal("named output or native platform missing from compiled Plan")
 			}
-			if len(selection.Overlays) != 0 {
-				t.Fatal("fixture must use actual owning stack admission for new overlays")
-			}
-			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, selection.Base)))
-			if err != nil {
+			if err := build.Graph.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			resolved, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
-			if err != nil {
-				t.Fatal(err)
-			}
-			hosts := map[string]execution.HostPlatform{}
-			if output.Format == definition.OutputDiskImage {
-				name, err := DiskRootName(resolved.Components)
-				if err != nil {
-					t.Fatal(err)
-				}
-				hosts[name] = execution.HostPlatform(output.Platform)
-			}
-			graph, err := CompileForHostPlatforms(resolved, hosts)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := graph.Validate(); err != nil {
-				t.Fatal(err)
-			}
-			if graph.Platform != output.Platform {
-				t.Fatal("output platform changed")
-			}
-			if selection.Base == "./image-catalog" {
+			if output.Catalog != nil && output.Catalog.Base == "./image-catalog" {
 				pulls := 0
-				for _, node := range graph.Nodes {
+				for _, node := range build.Graph.Nodes {
 					if node.Kind == ir.KindPull && node.OutputType == "oci-image" {
 						pulls++
 					}
