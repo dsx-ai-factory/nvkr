@@ -249,8 +249,8 @@ reconciliation observations, selected admission/decoder failures, private issuer
 consumer architectures and export-owner revalidation. The issuer tests keep complete Plan, original Run,
 payload selection and material-trace checks concrete, while modeling stopped scan/profile observations;
 the public wrapper still requires the actual Packer capability and opaque inspection operations. Those
-tests do not establish full helper discovery. A separate [native ARM64 controlled ELF-protocol test](../evidence/2026-10-06-controlled-public-disk-evidence-issuer.md)
-exercises public producer/inspection owners, receipt issuance, exact export, six negative issuer rows
+tests do not establish full helper discovery. A separate opt-in [controlled ELF-protocol test](../../pkg/nkd/factory/disk_evidence_runtime_linux_test.go)
+targets public producer/inspection owners, receipt issuance, exact export, six negative issuer rows
 and the concrete memory-profile guard; it is not actual Docker/Packer/guestfish/Syft discovery.
 Native AMD64 public positive issuance, complete native NKE content runs, original live NKE strict joins,
 strict inventory publication and strict production acceptance remain unexercised.

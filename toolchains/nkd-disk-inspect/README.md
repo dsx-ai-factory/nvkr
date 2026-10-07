@@ -157,7 +157,7 @@ removes by ID, never by a reusable name after a failed creation. These are local
 daemon safeguards, not authenticated cross-process ownership or receipt protocols.
 Create's bounded, validated full ID also selects attached start. The fixed
 launcher requests `--log-driver=none`; the
-[Oct 5 native ARM64 replay](../../docs/evidence/2026-10-05-nke-os-inspector-launcher.md)
+[Oct 5 native ARM64 replay](../../docs/evidence/disk-inspection-observations.md#launcher-replay)
 checked attached report delivery and start by create ID against the unchanged
 Oct 2 image. Docker and native AMD64 execution of these changes remain unexercised.
 Cleanup discovery diagnostics revoke a result but do not prevent removal of a
@@ -211,9 +211,10 @@ require network package access.
 
 Runtime selection is currently a diagnostic, explicitly supplied opaque local
 capability. It is not an authored Definition selector or compiler Plan input.
-The live factory join is separate integration work. It must bind the observed
-image/tools to the inspected output's existing Plan and Build identities; this
-runtime capability alone does not authorize disk SBOM, publication or qualification.
+The optional [live factory join](../../docs/nke-os-live-inspection.md) is implemented and contract-tested,
+but its original live NKE bake/inspection acceptance remains unexercised. It binds the observed
+image/tools to the issuing Run, named output, Plan, Build and disk bytes; this diagnostic
+runtime capability alone does not authorize a full disk SBOM, publication or qualification.
 
 Source `toolchain.lock.json` pins frozen acquisition inputs and records the helper
 source location and build metadata. It does not bind a helper source commit or
@@ -221,7 +222,7 @@ standalone helper bytes. The selected complete image binds the actual helper
 bytes; the source lock is not an image digest or runtime closure.
 `go test ./toolchains/nkd-disk-inspect` checks the
 declared pins and architecture mappings against the Dockerfile, not its complete
-grammar or runtime closure. No AMD64 executable measurements are invented. Executable
+grammar or runtime closure. Native measurements belong to their exact preparation record. Executable
 hashes generated inside a local image are descriptive, not independent evidence.
 
 Installed-package inventory is not a complete disk SBOM. It excludes uninstalled
@@ -230,3 +231,33 @@ the live authenticated acquisition/consumption closure and semantic reconciliati
 of transformed content. A staged-output-only trace, including one missing guest
 APT acquisition records, cannot admit full-disk SBOM or publication. FDE and
 qualified reproduction remain unsupported by this diagnostic capability.
+
+## Select a native full-content profile
+
+The optional installed-package diagnostic above and the strict full-content path are different scopes.
+Strict profiles are authored as `diskInspectionProfiles[linux/amd64|linux/arm64]` in the Environment.
+Each needs an exact native repository image and measured `inspectorDigest`, `codecDigest`,
+`guestfishDigest`, `scannerDigest` and `packageReaderDigest`, plus resources, a positive deadline no
+greater than 600 seconds, a positive filesystem bound no greater than 16 GiB, and production
+`scratchStorage: private-volume`. The complete image binds the helper, appliance and runtime closure;
+package versions or helper-only hashes cannot replace it. Measure final source bytes and all executable
+pins together. Host/daemon capacity and complete inventory sizes require their own admission/evidence.
+
+After separately authorized publication supplies an exact reference, read back the matching native
+descriptor using `crane digest --platform linux/amd64 '<repository>@sha256:<digest>'`, or ARM64 on its
+native host. Local image inspection and executable measurements above do not publish, approve or
+authenticate that reference. The inspector and Packer source locks retain their general approval gates;
+the [M2 candidate](../../definitions/nke-m2/README.md) uses a separately recorded exception.
+
+The selected root's native host binding chooses the profile; guest package architecture remains a
+different field. The authenticated runtime accessor contract can be checked independently:
+
+```sh
+go test ./pkg/nkd/pipeline \
+  -run '^TestDiskInspectionSelectionProjectsAuthenticatedLogicalRuntime$' -count=1
+```
+
+That controlled test does not scan a real disk, measure a native closure or prove original live-Run
+reconciliation. Strict full-content discovery/receipt contracts are implemented, but successful complete
+native NKE inspection and reconciliation remain unexercised. M2 explicitly uses `build-provenance-v1`
+and defers deep inspection to M3; it does not prepare or execute these retained strict profiles.

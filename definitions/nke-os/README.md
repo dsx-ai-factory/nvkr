@@ -61,6 +61,68 @@ A successful attempt retains:
 This remains `unqualified-local-execution`. The [ARC build evidence](../../docs/evidence/2026-10-01-nke-arc-os-builds.md)
 records successful committed-code ARM64 and AMD64 Docker/KVM builds, boot smoke and QCOW2 uploads, alongside the
 earlier ARM64 Podman/TCG bake.
-The Docker/KVM workflow is an integration validation path, not generated hosted execution, publication, pipeline
-attestation, FDE support or qualified reproduction. The image-ID check binds loaded bytes to the attempt's
-Plan; it does not authenticate toolchain provenance.
+The standalone Docker/KVM validation workflow is an unqualified integration path. It does not publish or sign
+these disks. [M2](../nke-m2/README.md) separately selects ADR-18's admitted native ARC generated route and
+build-provenance publication scope. Neither route establishes FDE support or qualified reproduction.
+The local image-ID check binds loaded bytes to the attempt's Plan; it does not authenticate toolchain provenance.
+
+## Validate on native CI runners
+
+The separate [NKE OS validation workflow](../../.github/workflows/nke-os-validation.yaml) runs both native
+Docker/KVM architectures on every push to `main`, without path filters or canceling earlier pushes.
+Manual dispatch supports these modes:
+
+| Mode | What runs | Source and credentials |
+|---|---|---|
+| `preflight` | Native KVM access check on one or both ARC pools | No NKE acquisition or source credential; can inspect branch workflow bytes |
+| `toolchain` | Native source-locked toolchain assembly and image-ID observation on hosted runners | No KVM or private NKE source; trusted main workflow |
+| `full` | Native local lifecycle build, exact QCOW2 checks and source-owned boot smoke | Trusted main selector/fetch, reviewed source handoff and KVM runners |
+
+For a full dispatch, supply an exact main-reachable NKD commit or the copy-pr-bot mirror of a current,
+open, non-draft same-repository PR. Maintainers must vet the exact head first. The workflow does not
+authenticate an `/ok to test` comment or independently enforce human approval. `approved_nke_commit`
+must match the selected catalog lock and every source node in the trusted compiler's complete Plans.
+This is a consistency check; the input is not itself source-owner approval.
+
+The selector and source fetch use trusted main code. The fetch job alone receives the read-only
+`NKE_SOURCE_TOKEN`; it verifies the exact source commit/tree, removes persistent credentials, and
+transports bytes to the candidate job. Candidate execution receives private source content and declared
+build network, but no source token. The process-local Git transport override keeps canonical source pins.
+
+The runner identity must already have read/write KVM access; the workflow prints device ownership/mode
+and fails without changing permissions. Each full leg runs the required-KVM Packer exit-status regression;
+that controlled test checks error classification, while the later bake/boot smoke supplies real integration
+evidence. Runtime admission separately checks native architecture, Docker, CPU, memory, workspace and timeout.
+Ephemeral runner isolation and workflow/ref access restrictions remain provider/operator obligations.
+The source secret is repository-scoped: branch-authored workflows can reference it, so a workflow-local
+selector is not a GitHub authorization boundary. Restricted runner groups and a main-restricted secret
+environment are configuration follow-ups, not controls demonstrated by the existing diagnostic workflow.
+
+The wrapper builds the native toolchain and freezes its observed Docker image ID before compiling the
+attempt Plan. Source-lock Docker IDs remain null because diagnostic builds did not reproduce identical IDs.
+Do not invent a stable pin or reuse another attempt's observation. General toolchain approval and candidate
+published pins are separately described in [the Packer README](../../toolchains/nkd-packer/README.md).
+
+Each successful full leg must retain a completed Plan/Run, exactly one QCOW2 without a backing file,
+its SHA-256/size, and pinned source-owned boot smoke. Available Plan, Run, material manifest and bounded
+serial/build logs are retained on failure. Missing/oversized operational logs produce an incomplete marker;
+unsafe paths, substituted records and malformed evidence still fail. QCOW2 upload is automatic for main
+pushes and optional with short retention for manual full runs. Toolchain-only results are image observations,
+not NKE build evidence.
+
+## Acceptance boundary
+
+The [ARC evidence](../../docs/evidence/2026-10-01-nke-arc-os-builds.md) owns exact historical run inputs and
+results. Candidate `d1e28ce` passed both full bakes and boot smoke through the trusted main workflow;
+that dispatch exercised source/catalog inputs rather than the candidate's workflow edits. The later
+`GOENV=off` acquisition input and changed workflow steps still require their own native full-build/boot
+evidence and post-merge workflow checks. Unit and snippet tests cannot satisfy those external gates.
+
+Source preparation uses bounded Go download/verify/vendor phases, exact `go.mod`/`go.sum` checks,
+transport-only fallback and offline vendoring. Neither a checksum failure nor Packer/component execution
+is retried. Those source instructions are catalog-owned, and architecture-specific prepared-source receipts
+cannot be shared through an unauthenticated directory/cache copy.
+
+The workflow owns selection and transport. NKD modules own catalog validation, execution admission,
+held disk observation and completeness. [ADR-18](../../docs/adr/0018-pipeline-ir-and-ci-adapter-emission.md)
+owns execution policy; [reconciliation](../../docs/adr/reconciliation.md) owns current evidence status.

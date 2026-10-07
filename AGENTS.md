@@ -46,8 +46,8 @@ paths; macOS builds and runs tests and diagnostics.
 2. `docs/adr/reconciliation.md` owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 
-`docs/sadd.md` explains architecture, `CONTEXT.md` defines vocabulary, and `docs/milestones.md` plus
-`docs/epics-v1-spec.md` govern product acceptance. `docs/README.md` maps active documentation. Dated evidence
+`docs/sadd.md` explains architecture, `CONTEXT.md` defines vocabulary, `docs/milestones.md` is the outcome
+roadmap, and `docs/epics-v1-spec.md` owns detailed product acceptance. `docs/README.md` maps active documentation. Dated evidence
 retains its original scope; superseded requirements and plans are available only in Git history.
 
 ## Working contract
@@ -107,7 +107,7 @@ go test ./pkg/nkd/factory/... -run TestName -count=1
 # generated-bundle drift check (current Makefile target: maintained M2 candidate inputs)
 make workflows-check
 
-# M1 local demo (needs Docker and a local NKE clone; see docs/demo-m1.md)
+# M1 local demo (needs Docker and a local NKE clone; see demos/m1-local.md)
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
 ```
 
@@ -189,10 +189,14 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
   template already supplies `{#slug}` anchors (the SADD). Promote a bold label to a
   heading only when it names a topic with substantial content beneath it.
 - Keep `docs/sadd.md` and `CONTEXT.md` (domain vocabulary) consistent with any ADR change.
+- Put example-specific commands beside their Definition or toolchain. Before adding a user guide, consult
+  `docs/README.md` and update the existing task or reference owner. Use `docs/evidence/README.md` for scoped
+  external observations; routine gate transcripts and completed cleanup reports belong in CI and Git history.
 
 ## Key files
 
-Use `docs/README.md` for the documentation map and `scripts/README.md` for runnable demos. `definitions/nke-v1/`
+Use `docs/README.md` for documentation, `demos/README.md` for presentations and guided demos, and
+`scripts/README.md` for operational scripts. Generate alternate examples into scratch roots. `definitions/nke-v1/`
 contains the retained three-output NKE inputs; `definitions/nke-m2/` supplies the current checked-in candidate
 selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.

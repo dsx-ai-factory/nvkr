@@ -1,50 +1,63 @@
 # Documentation
 
-| Need | Read |
+Start with the [quickstart](quickstart.md): validate a Definition, inspect a Plan, and preview a Run
+without Docker. The [34-concept reference](user-concepts.md) explains the vocabulary and connects
+each concept to a worked example.
+
+## User tasks
+
+| I want to… | Read |
 |---|---|
-| Introduce NKD to the team and explore its concepts | [Slide deck](nkd-team-tour.html), [33 concept examples](demo-team-concepts.html), [HTML walkthrough](demo-team-walkthrough.html), [offline graph explorer](demo-team-explorer.html) |
-| Build the NKE v0.21.0 deploy release | [NKE deploy pipeline](nke-deploy-pipeline.md) |
-| Automate reviewable pin updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
-| Manage shared catalogs and understand replacement identity | [Authoring analysis](catalog-definition-authoring.md), [local replacement lab](examples/authoring-lab/README.md) |
-| Inspect the incomplete combined M2 candidate and its input gaps | [M2 candidate inputs](../definitions/nke-m2/README.md), [input mapping](m2-input-evidence-map.md), [customer supplier choices](nke-m2-customer-choices.md), [release carrier transport evidence](evidence/2026-10-06-m2-release-carrier-transport.md), [October 5 diagnostic observations](evidence/2026-10-05-m2-input-acquisition.md) |
-| Derive several pins from one upstream version file | [Generic pin-set example](generic-pin-set-example.md) |
-| Use Definition → Run → Release | [Lifecycle guide](lifecycle.md) |
-| Choose and run a demo | [Demo index](../scripts/README.md) |
-| Learn the six public objects | [Domain vocabulary](../CONTEXT.md) |
-| Understand architecture and failure behavior | [SADD](sadd.md) |
-| Review generated Plans, visualize dependencies and explain regeneration changes | [Plan and graph inspection](plan-and-graph-inspection.md) |
-| Inspect the single release registry graph and signing scope | [Publication architecture](publication-architecture.md) |
-| Browse a registry release and its artifact/evidence relationships | [Release navigation](release-navigation.md) |
-| Change an engineering contract | Current [ADRs](adr/); public lifecycle in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) |
-| Determine what works and what is deferred | [Implementation/evidence record](adr/reconciliation.md) |
-| Plan v1 delivery | [Milestones](milestones.md), [acceptance specification](epics-v1-spec.md) |
-| Build and verify the combined CLI, CWE image and Helm outputs | [Combined pipeline](combined-nke-pipeline.md), [hosted acceptance](evidence/2026-09-10-combined-run.md) |
-| Build or validate the NKE node image | [OS-image Definition](../definitions/nke-os/README.md), [validation plan](nke-os-validation-plan.md), [ARM64 execution evidence](evidence/2026-09-23-nke-arm64-local-os-build.md), [ARC ARM64/AMD64 evidence](evidence/2026-10-01-nke-arc-os-builds.md) |
-| Bind controller charts to image outputs without registry-specific bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
-| Pin and package NKE's external charts locally | [Acquired chart guide](nke-pin-set-usage.md) |
-| Reproduce the local NKE demonstration | [NKE demo](demo-m1.md) |
-| Inspect actual past execution | Dated [evidence](evidence/) |
-| Understand retained modules and cleanup decisions | [Repository cleanup](repository-cleanup.md) |
-| Understand code organization findings and their implementation | [Codebase organization audit](codebase-organization-audit.md) |
-| Find the failed operation and understand generated transfer steps | [CI steps and log guide](ci-step-and-log-readability.md) |
-| Understand slow repository checks and measured improvements | [CI test performance](ci-test-performance.md) |
-| Understand current GitHub files and execution limits | [GitHub audit](github-audit.md) |
-| Inspect artifact dependencies and SBOM scope | [Dependency SBOMs](dependency-sboms.md) |
-| Understand the internal staged disk-material tracing contract and its gaps | [Local disk material tracing](nke-os-material-trace.md) |
-| Check guest package capture bytes and understand their diagnostic scope | [APT capture contract](nke-os-acquisition-contract.md), [retained byte-correspondence evidence](evidence/2026-10-03-apt-capture-correspondence.md) |
-| Inspect installed packages before a local Run exports its QCOW2 (optional SDK path, not a full SBOM) | [Live disk inspection](nke-os-live-inspection.md), [diagnostic inspector runtime](../toolchains/nkd-disk-inspect/README.md), [recorded runtime-only inspection](evidence/2026-10-02-nke-os-disk-inspection.md) |
-| Build or contribute | [Development](../DEVELOPMENT.md), [contribution guide](../CONTRIBUTING.md) |
-| Triage repository vulnerabilities | [CVE management](cve-management.md), [security reporting](../SECURITY.md) |
-| Manage GitHub issues, discussions, and pull requests | [GitHub issue and PR management](github-issue-pr-management.md) |
+| Inspect my first Plan | [Quickstart](quickstart.md) |
+| Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
+| Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
+| Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
+| Find published outputs and verify a consumer claim | [Release quickstart](release-quickstart.md) |
+| Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
+| Build and recover the local NKE CLI publication | [Local NKE walkthrough](../demos/m1-local.md) |
 
-ADRs contain current decisions directly. Update the owning ADR and reconciliation when changing a contract;
-create a new ADR only for an independently owned decision. Keep the SADD and glossary consistent. A current
-implementation claim needs tests or a recorded run; proposed capability is labeled deferred in its owning section.
+Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nke-v1/README.md),
+[six-output deploy example](../definitions/nke-deploy/README.md), [34-output M2 candidate and committed workflow](../definitions/nke-m2/README.md),
+and [OS-image routes](../definitions/nke-os/README.md). The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
-Superseded plans, design drafts, and the former SRD are removed from the working tree. They remain available
-in Git history (the last baseline containing them is `1793699`). Current requirements live in the milestone
-specification and owning ADRs. Older FR/SEC/UC identifiers in contracts and code are historical trace labels;
-the current documents state the requirements directly.
+## Detailed references
 
-Dated evidence is preserved with its original scope, rather than rewritten as current operational acceptance.
-Current architecture diagrams live in the SADD and the publication architecture document.
+| Topic | Reference |
+|---|---|
+| Immutable attempts, completeness, consumer policy, and SDK | [Lifecycle](lifecycle.md) |
+| Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
+| Registry/layout browsing, credentials, and metadata limits | [Release navigation](release-navigation.md) |
+| Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
+| Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NKE acquired charts](nke-pin-set-usage.md) |
+| Reviewable updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
+| Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
+| Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
+| Bounded guest capture format and acquisition ownership | [OS acquisition contract](nke-os-acquisition-contract.md) |
+| Optional live-owner disk inspection and material observations | [OS live inspection](nke-os-live-inspection.md) |
+
+## Engineering and maintenance
+
+[CONTEXT](../CONTEXT.md) owns formal vocabulary; the [SADD](sadd.md) explains architecture and failure behavior.
+The [ADRs](adr) own engineering contracts, and [reconciliation](adr/reconciliation.md) is the current
+implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to the detailed
+[acceptance specification](epics-v1-spec.md).
+
+[Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
+Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
+[CI test performance](ci-test-performance.md) for the current profiling follow-up.
+[CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and
+[contribution guidance](../CONTRIBUTING.md) own ongoing maintainer procedures.
+
+The [evidence index](evidence/README.md) identifies retained external observations and their limits.
+Dated records describe their original subjects and revisions; they do not confer current production
+acceptance. Unit tests, a Plan, metadata browsing, and authenticated consumer verification establish
+different facts. Superseded plans and completed progress reports remain in Git history.
+
+## Demos
+
+The [demos directory](../demos/README.md) retains the original 13-slide deck, concept examples,
+HTML walkthrough, offline graph explorer, facilitator guide, and self-guided scripts. The presentation
+uses the recorded October 6 candidate and dated teaching fixtures; the task guides above own current
+user instructions.
+
+[NKE M2 customer choices](nke-m2-customer-choices.md) explains supplier replacement and its current validation scope.

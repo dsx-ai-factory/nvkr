@@ -1,9 +1,9 @@
 # Definition, Run, and Release workflow
 
-The public model has six objects: **Definition, Environment, Run, Artifact, Release, and Verification
-Policy**. [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) defines their contract. The
-[implementation record](adr/reconciliation.md) records contract verification,
-separately from external operational acceptance.
+This reference covers output completeness, immutable attempts, release verification and SDK use.
+Start with the [quickstart](quickstart.md) for CLI setup and the [concept reference](user-concepts.md)
+for the six public objects. [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
+lifecycle contract; [reconciliation](adr/reconciliation.md) owns current implementation and evidence.
 
 ## Declare outputs
 
@@ -30,8 +30,9 @@ registry destination. The [GitHub Environment](../definitions/nke-v1/environment
 corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
 host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
 binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
-planning input, not proof that a runtime supplied the declared capacity or capability; current execution adapters
-still reject selected builds with requirements until they can authenticate and enforce the selected binding.
+planning input, not proof that a runtime supplied the declared capacity or capability. Each execution adapter
+admits only its supported requirement bindings; unsupported requests fail before execution. Local direct-Packer
+and the explicit native ARC route retain their own admission boundaries.
 
 Environments also own the publication namespace, credentials, and signing identity policy. Catalog sources and
 locks own tool versions and byte pins; Definition selects the scanner, signer, and generators by name.
@@ -42,13 +43,13 @@ preserving build identity. A dry-run signing mode records intended operations an
 
 ## Inspect and generate
 
-The new command surface starts with these read-only operations:
+With `bin/nkdctl` built as described in the quickstart, inspect the three-output NKE example:
 
 ```sh
-go run ./cmd/nkdctl definition validate \
+bin/nkdctl definition validate \
   --definition definitions/nke-v1/definition.yaml
 
-go run ./cmd/nkdctl run plan \
+bin/nkdctl run plan \
   --definition definitions/nke-v1/definition.yaml \
   --environment definitions/nke-v1/environment-local.yaml
 ```
@@ -57,30 +58,33 @@ For saved generated Plans, `run plan --plan <path>` prints the required outputs 
 `--pretty` provides an indented display view. `run graph` exports complete linked producer/artifact graphs,
 and `run diff` explains changes between canonical Plans. See [Plan and graph inspection](plan-and-graph-inspection.md).
 
-Generation writes provider files and their commit manifest from the same admitted inputs. The matching
-`--check` invocation regenerates in memory and fails if committed files differ:
+Generation writes provider files and their commit manifest from the same admitted inputs. This example
+uses a temporary root: the repository's committed bundle selects M2, not the three-output Definition.
+The matching `--check` invocation regenerates in memory and fails if generated files differ:
 
 ```sh
-go run ./cmd/nkdctl run generate \
+NKD_LIFECYCLE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-lifecycle.XXXXXX")
+bin/nkdctl run generate \
   --definition definitions/nke-v1/definition.yaml \
   --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root .
+  --engine github --root "$NKD_LIFECYCLE_ROOT"
 
-go run ./cmd/nkdctl run generate \
+bin/nkdctl run generate \
   --definition definitions/nke-v1/definition.yaml \
   --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root . --check
+  --engine github --root "$NKD_LIFECYCLE_ROOT" --check
 ```
 
-Generated CI uses generic hosted runners. Publication and signing
-belong to the GitHub v1 lane. Generating a workflow does not prove that a provider ran it.
+Use the [M2 instructions](../definitions/nke-m2/README.md) to regenerate the committed bundle.
+Generated CI defaults to generic hosted runners; ADR-18 separately admits the explicit native ARC disk
+route. Publication and signing belong to the GitHub v1 lane. Generation does not prove provider execution.
 
 ## Run and verify
 
 Inspect a local attempt without creating its workspace or executing nodes:
 
 ```sh
-go run ./cmd/nkdctl run local \
+bin/nkdctl run local \
   --definition definitions/nke-v1/definition.yaml \
   --environment definitions/nke-v1/environment-local.yaml \
   --attempt review-001 --dry-run

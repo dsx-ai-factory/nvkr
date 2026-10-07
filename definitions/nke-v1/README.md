@@ -1,11 +1,15 @@
-# `definitions/nke-v1` — Combined NKE Definition
+# Combined CLI, image and chart example
 
-This Definition builds `nkectl`, the complete upstream CWE runtime image, and the source controller Helm chart from
-independently pinned CLI and controller module tags in NKE. It observes all three named outputs and generates one shared OCI release publication and signing
-jobs. Producer instructions remain catalog-owned; outputs select them directly. Runtime, destination, and signing choices live in independently selected
-Environments. The [combined hosted run and independent consumers](../../docs/evidence/2026-09-10-combined-run.md)
-passed for all three outputs, including real signing and complete Run finalization. That recorded run predates
-the controller tag/version correction described below; it does not validate a hosted run of these updated inputs.
+This retained example builds `nkectl`, the upstream CWE runtime image, and the source controller Helm chart
+from independently pinned NKE module tags. The chart depends on the exact built CWE image. Producer
+instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
+runtime, destination and signing.
+
+The repository's committed workflow uses [M2](../nke-m2/README.md). This three-output Definition is an
+alternative for learning or local execution. Its [historical hosted run](../../docs/evidence/2026-09-10-combined-run.md)
+passed real signing, complete Run finalization and independent consumption in a personal namespace.
+That record predates the current schema, tool pins, Helm binding and namespace; it does not validate
+a hosted run of these updated inputs.
 
 | File | Purpose |
 |---|---|
@@ -73,7 +77,7 @@ After verifying and extracting the Release, supply the repository containing its
 
 ```sh
 helm template controller ./controller \
-  --set-string image.repository=ghcr.io/nvidia/nke-recipes/cwe
+  --set-string image.repository=ghcr.io/dsx-ai-factory/nke-recipes/cwe
 ```
 
 Registry selection does not change the packaged chart bytes. Normal Helm values overrides still apply;
@@ -82,21 +86,24 @@ packaging contract. A new complete build/publication using this source chart rem
 
 ## Generate hosted CI
 
-The repository now commits the [M2 candidate](../nke-m2/README.md), selected by `make workflows-check`.
-This is the checked-in configuration, not a ratified canonical-product decision. The commands below
-replace it with this older three-output Definition; use a separate checkout
-when exploring this alternative.
+The repository commits the [M2 candidate](../nke-m2/README.md), selected by `make workflows-check`.
+This checked-in configuration is not a ratified canonical-product decision.
+
+Generate this alternative into a scratch directory. Generating it into the repository root would
+replace the maintained M2 bundle and fail `make workflows-check`. Pinned-tree access may be
+needed during catalog loading; configure your existing Git credentials or the transport override above.
 
 ```sh
+NKD_V1_BUNDLE=$(mktemp -d "${TMPDIR:-/tmp}/nkd-v1-bundle.XXXXXX")
 nkdctl run generate \
   --definition definitions/nke-v1/definition.yaml \
   --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root .
+  --engine github --root "$NKD_V1_BUNDLE"
 
 nkdctl run generate \
   --definition definitions/nke-v1/definition.yaml \
   --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root . --check
+  --engine github --root "$NKD_V1_BUNDLE" --check
 ```
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.

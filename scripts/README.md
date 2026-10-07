@@ -1,7 +1,8 @@
-# Runnable journeys
+# Operational scripts
 
 The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
+The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
 ## Definition → Run
 
@@ -12,14 +13,13 @@ nkdctl run plan --definition definitions/nke-v1/definition.yaml --environment de
 # Local execution; Docker, Go and acquisition/build network access are required.
 # Despite its historical name, the M1 script executes CLI + CWE + Helm.
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
-scripts/demo-m1-local.sh --publish
 ```
 
-`demo-m1-local.sh` also checks that the committed GitHub-hosted bundle
-(`.github/nkd-run/`) matches the current Definition/Environment
-(`nkdctl run generate --check`) before executing. Local attempts are immutable and
+`demo-m1-local.sh` generates and checks its three-output GitHub bundle in a fresh temporary directory,
+whose path it prints for inspection. The repository's committed bundle selects the 34-output M2 candidate.
+The local walkthrough publishes to its loopback registry using dry-run signing. Local attempts are immutable and
 `unqualified-local-execution`; plans remain `static-unqualified`. See the
-[M1 walkthrough and acceptance limits](../docs/demo-m1.md).
+[M1 walkthrough and acceptance limits](../demos/m1-local.md).
 
 The demo uses the loopback registry on port 5000. It generates its own valid
 immutable attempt names.

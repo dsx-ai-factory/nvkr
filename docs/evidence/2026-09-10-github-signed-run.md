@@ -44,7 +44,7 @@ Tool acquisition took 14s alongside source/build preparation.
 An independent Linux cosign-only consumer attempted the exact digest using the existing local GHCR login.
 GHCR denied private-package access before signature retrieval. The temporary credential copy was removed;
 that initial check stopped pending usable registry read access. No signature or policy failure is inferred from an
-access denial. See the [performance baseline](../github-run-performance.md).
+access denial. See the [performance baseline](2026-09-10-github-run-performance.md).
 
 
 ## Successful corrected Run
@@ -72,7 +72,7 @@ strict lifecycle reader accepted them.
 
 Elapsed time was 4m12s versus the 5m17s dry-run baseline: 65s / 20.5% faster while adding real signing.
 The [complete timing table](2026-09-10-github-signed-run-timings.csv) and
-[comparison](../github-run-performance.md#implemented-comparison) retain the measurement details and limits.
+[comparison](2026-09-10-github-run-performance.md#implemented-comparison) retain the measurement details and limits.
 This proves hosted pipeline-attested publication, not qualified reproduction, runtime conformance, full Release
 scope, or organizational ratification.
 

@@ -34,24 +34,16 @@ SBOM targets the delivered image manifest and records the scanned export digest.
 covers all these exact bytes recursively. Source-archive evidence is never relabeled as final-chart evidence.
 See [the registry graph](publication-architecture.md) for every remaining manifest and attachment.
 
-The change is locally contract-tested; the first NVIDIA Run predates it and has unsigned standalone SBOMs.
-Local publication and extraction were exercised with the separate-repository layout. A new hosted Run is required to demonstrate signed SBOM publication operationally.
+Current contract coverage and hosted publication evidence are recorded in
+[reconciliation](adr/reconciliation.md). Signed producer evidence in the M2 disk mode explicitly records
+deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
+The strict disk inventory/reconciliation contract is separate and remains an M3 requirement.
 
 ## Verification on real outputs
 
-Offline Linux/amd64 execution used the three artifacts downloaded from
-[Run 34453148217](https://github.com/njhensley/nke-recipes/actions/runs/34453148217), Syft **1.51.1**, and the
-actual SBOM executor with the regenerated plan. Producer records were measured local fixtures; this is not
-a new hosted run or an authenticated qualified producer report.
-
-| Output | Unique dependency components | Breakdown |
-|---|---:|---|
-| nkectl | 27 | Go modules |
-| CWE | 248 | 171 Go modules, 76 Alpine packages, 1 OS component |
-| Helm | 7 | 3 bundled charts, 4 external chart references |
-
-Two workspace modules in each binary/image inventory have `UNKNOWN` versions in Syft's report. The artifact
-and source commit still identify their bytes; no release version is guessed for them.
+[Recorded offline dependency scanning](evidence/2026-09-10-combined-run.md#offline-dependency-scanning)
+retains the exact artifact/scanner identities, inventory counts and measured-fixture limitations.
+Unknown package versions remain unknown; an artifact or source digest does not supply a missing release version.
 
 The opt-in `TestRealArtifactsThroughSBOMExecutor` test reads `NKD_SBOM_ARTIFACT_DIR`, `NKD_SBOM_PLAN`, and
 `NKD_SBOM_SCANNER`; `NKD_SBOM_OUTPUT_DIR` optionally retains the resulting documents. It exercises graph

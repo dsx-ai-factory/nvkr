@@ -2,7 +2,7 @@
 
 ## PLC-L1: Basic PLC: Software Architecture and Design Document
 
-- **Revision:** 2026-09-21 — subject-scoped reproduction and aggregate disk evidence
+- **Revision:** 2026-10-07 — current lifecycle, native disk route and evidence boundaries
 - **Status:** Draft; ADR-01 through ADR-22 pending named-decider ratification
 - **Review scope:** shared definition architecture, v1 artifact delivery, and the separate qualified release contract
 
@@ -36,7 +36,7 @@ separate acceptance decisions:
 |---|---|---|
 | Producer and consumer | NVIDIA's hosted workflow produces artifacts; consumers verify the published digest | Publisher provides signed expected identities; an operator reproduces and verifies in its own environment |
 | Claim | Production by a named workflow with signed SLSA v1 production provenance; ADR-16 §5 targets SLSA Build L2 | Exact-byte reproduction of each named claim subject within a signed builder profile, supported by authenticated execution observations |
-| Execution | GitHub-hosted amd64 runners; declared hermetic, wrapped, or acquired source lane | Profile-bounded execution with authenticated runtime and terminal receipts; unsupported providers fail closed |
+| Execution | Generic GitHub-hosted execution plus the explicit native KVM ARC disk route; declared hermetic, wrapped, or acquired source lane | Profile-bounded execution with authenticated runtime and terminal receipts; unsupported providers fail closed |
 | Publication | Signed artifact bytes in OCI; planned build/evidence qualification and release manifest | Operator-owned publication of a complete cleared release through the Publication Root protocol |
 | Consumer policy | Keyless build identity and issuer; separate qualification identity for the planned M3 gate | Trusted roles, reproduction, compatibility, conformance, evidence, policy, and fresh status |
 | Outside the lane | Reproduction, clearance, air gap, cluster-scoped qualification, registration | No relaxation from a v1 signature or a v1 qualification verdict |
@@ -137,7 +137,7 @@ evidence remains visible but never upgrades the aggregate that consumed it.
 | [ADR set](adr/) and [reconciliation](adr/reconciliation.md) | Design decisions, maturity, evidence, and unresolved critiques |
 | [v1 milestones](milestones.md) and [epic specification](epics-v1-spec.md) | M1–M4 product acceptance |
 | [Domain vocabulary](../CONTEXT.md) and [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) | Public object meanings and lifecycle contracts |
-| [Current local evidence](evidence/2026-09-08-m1-public-lifecycle-local.md) | Recorded execution, with the limits described under Current support boundary |
+| [Operational evidence](evidence/README.md) | Exact recorded subjects, execution results and acceptance limits |
 | [Contribution guide](../CONTRIBUTING.md) and [development guide](../DEVELOPMENT.md) | Repository verification and engineering workflow |
 
 # Architectural Details {#architectural-details}
@@ -387,29 +387,23 @@ milestone specification.
 
 ## Current support boundary
 
-This summary separates the current architecture from historical operational evidence. Detailed module
-contracts, migration verification and remaining external acceptance live in reconciliation.
+[Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
+Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
+`pipeline-attested` / `artifact-publication` consumer are implemented. Local unencrypted direct-Packer
+execution retains exact QCOW2 bytes; local disk publication remains closed.
 
-The public workflow includes local immutable attempts, a scoped Release consumer, and GitHub generation.
-Earlier contract coverage included executable/APT/Helm GPU closure on amd64 and arm64 with controlled
-producers. The [combined hosted Run](evidence/2026-09-10-combined-run.md) built the CLI, complete upstream CWE
-image and pinned quickstart Helm tree, then published, signed, verified and finalized all three outputs.
-Independent consumers authenticated the same artifacts and content subject. Downloaded CLI/image smoke checks
-and all three local chart renders passed, including exact CWE digest binding and updated checksums. This is
-pipeline-attested artifact-publication evidence for its then-current authoring and publication layout. It does
-not validate the direct-output migration or the current single-entry publication layout. Repository checks
-are recorded in reconciliation. Explicit derived pin sets have catalog contract coverage for atomic updates
-and pinned-tree re-derivation. Full v1 release qualification, fused large-output wrapped execution and
-registration remain unimplemented; cluster qualification is outside NKD. Qualified
-release authorization, its receipt assembly and release-specific trusted time have no retained implementation.
-Authenticated document/status diagnostics remain, but do not supply clearance. Air-gap execution is outside
-scope and its dormant implementation has been removed.
+The [recorded M2 candidate](evidence/2026-10-06-team-demo-pipeline.md) completed generated hosted delivery,
+signing, verification and finalization for all 34 outputs, including AMD64 and ARM64 disks. It used the
+explicit native ARC route, a validation-branch signing exception and `build-provenance-v1` disk evidence
+that records deferred inspection. This establishes candidate delivery for those exact inputs, not
+main-only execution, independent full-payload disk consumption, strict inventory/reconciliation,
+organizational approval or complete M1–M4 acceptance.
 
-[Reconciliation](adr/reconciliation.md) is the single detailed support and evidence matrix. Multi-architecture
-example coverage does not expand the amd64 NKE v1 delivery milestone.
-
-The [2026-09-08 local record](evidence/2026-09-08-m1-public-lifecycle-local.md) exercises the then-maintained NKE Definition,
-immutable Run, SBOM, loopback publication/pull-back and recovered CLI execution with dry-run signing.
+Full v1 release qualification/tag automation, qualified release authorization and air-gap execution
+remain unavailable. M3 owns full disk inventory and material-to-filesystem reconciliation. Subject-bound
+producer evidence, diagnostic installed-package inspection and full inspected evidence retain separate
+contracts. Passing tests or historical operational success cannot be transferred to another source,
+schema, policy or output.
 
 # Design Details {#design-details}
 
@@ -633,8 +627,8 @@ manifest in its own repository. The release signature remains the authority for 
 standalone artifact verification does not establish those release-wide claims (ADR-04/20). The pinned cosign 3.1.3
 adapter publishes signatures, production provenance and SBOMs as standard Sigstore bundles. It downloads only
 required bundles, verifies their exact bytes and predicate/subject bindings, and reads identity from the verified
-embedded certificate. Legacy attachment reports and artifact-copy verification are not supported. Hosted acceptance
-of the new signing layout remains pending.
+embedded certificate. Legacy attachment reports and artifact-copy verification are not supported. Hosted candidate results
+and remaining independent-consumer acceptance are scoped in reconciliation.
 
 | Change to the example | Identity effect |
 |---|---|
@@ -834,60 +828,38 @@ name, and records the complete selected binding in the full IR and Plan. Plan va
 from the exact Environment inventory, so a substituted class, capability resolution, or route is pipeline drift.
 These planning declarations affect Environment and Plan identity but remain outside build identity.
 
-Execution classes are not runtime evidence. The execution owner has both a process-local Linux diagnostic helper
-and a narrower local VM admission primitive. The diagnostic helper observes host platform, cgroup-v2-capped CPU
-and memory, available capacity relative to the executor's held workspace directory, and KVM exposure without
-accepting a request or granting authority. Local VM admission additionally binds the exact current Plan bytes and
-one VM node, its compiler-selected request and execution binding, and the current observation. CPU capacity is
-capped by process affinity and complete cgroup-v2 ancestry; memory is capped by host availability and complete
-cgroup-v2 headroom. It retains the workspace directory and any selected KVM device for one deadline-scoped
-callback, re-observes mutable capacity immediately before work, rejects class, resource, platform, or KVM
-availability mismatch, withholds the KVM handle for a disabled resolution, and closes every retained or borrowed
-handle on completion.
+Execution classes are not runtime evidence. The Linux diagnostic helper observes host platform,
+cgroup-capped CPU/memory, workspace capacity and KVM without authorizing execution. Separate local
+VM admission binds the exact Plan/node/request/class to current observations, retains workspace and
+selected KVM handles for one deadline-scoped callback, re-observes capacity before work and closes all
+handles. CPU is capped by affinity and cgroup ancestry; memory by availability and cgroup headroom.
+These are current-availability checks, not resource reservations or provider allocation proof.
 
-The local direct-Packer driver consumes that capability for unencrypted VM-image producers. Its run-owned resolver
-binds the full Plan subject, producer session, local runtime/daemon and already-local digest-pinned OCI toolchain
-before workspace mutation. Inside the admitted callback it authenticates one bounded input tar, uses only Docker
-named volumes, mounts consumer inputs read-only, fixes environment/hostname/user, disables image pulls and uses
-network-none except for an independently authorized direct-Packer build container. It never runs
-`packer init`, validates the exact selector, builds it once and returns one held QCOW2. For an Environment-authorized
-networked producer, only the build container uses default networking; preparation and validation remain offline.
-The authenticated extraction stage runs as root with only `CAP_CHOWN` and `CAP_DAC_OVERRIDE`, then assigns
-both fresh attempt volumes to the host UID/GID; every consumer operation runs as that host identity.
-The material manifest is derived from authenticated producer observations; an authored
-projection can change only its schema and per-binding kind vocabulary. Bounded in-process cleanup owns ordinary
-completion and cancellation; authenticated
-cross-process orphan recovery after a hard process or host failure remains deferred. Command/Make, encrypted-disk,
-general hosted and qualified VM adapters remain closed. ADR-18 defines the explicit native ARC disk exception, including exact Environment-authored manual
-dispatch branches matched by deployment policies and signing identity.
+The unencrypted direct-Packer driver consumes that capability. Its run-owned resolver binds source,
+Plan, runtime/daemon and already-local pinned native toolchain before mutation. It transports an
+authenticated input archive into private named volumes, mounts consumer inputs read-only, fixes the
+execution environment, validates one exact Packer selector and returns one held QCOW2. It performs no
+image pull or plugin initialization during production. Preparation/validation remain offline; build
+networking requires separate Environment authorization. Default bridge networking exposes the host
+gateway and peers as well as outbound access, so it is not an egress-only firewall.
 
-The local adapter does not apply subordinate container IDs or Docker user-namespace remapping. An escape from the
-Packer/QEMU consumer would therefore retain the invoking user's access to host resources. The read-only root,
-default-none network mode, dropped capabilities and no-new-privileges setting reduce exposure but do not establish a
-hosted or qualified identity boundary. The qualified lane requires an authenticated subordinate identity, user namespace
-or stronger provider sandbox plus recorded interoperability evidence. The explicit pipeline-attested ARC policy
-trusts the operator-managed ephemeral runner/daemon, with observed native capacity and bounded execution.
-Internal candidate toolchains use a separate packages:read preparation step. Its temporary registry
-credentials are deleted before source/producer execution; the held runtime independently revalidates
-the exact locally prepared image. Package Actions access is configured separately from workflow scopes.
+A narrow root extraction stage authenticates input bytes and assigns volume ownership with only the
+required ownership/filesystem capabilities. Consumer execution uses the invoking host UID/GID. The local
+adapter does not supply subordinate identities or user-namespace remapping; an escaped consumer would
+retain that user's host access. Qualified execution therefore needs a stronger authenticated boundary.
+The native ARC policy instead explicitly trusts the operator's ephemeral runner/daemon, enforces current
+native capacity/KVM admission and bounds the complete group. Source, registry-write and OIDC credentials
+remain outside producer jobs. Internal toolchain pulls use a separate read-only preparation step whose
+temporary credential configuration is removed before source/producer execution.
 
-The local capability and driver result are unqualified current-availability evidence, not authenticated provider
-allocation, reservation, pipeline attestation or qualification evidence. Holding a validated KVM descriptor proves
-availability through the callback lifetime; it does not prove that Packer or QEMU consumed that exact descriptor.
-The driver enforces whether the selected device is exposed but does not promote that into consumption proof.
-For Docker's separate daemon namespace, a fixed device projection additionally checks the kernel boot ID and
-admitted character-device numbers before Packer runs. Committed-head Docker/Packer/NKE ARM64 and AMD64 bakes and
-source-owned boot smoke passed through the local adapter on ARC, as recorded in
-[the 2026-10-01 evidence](evidence/2026-10-01-nke-arc-os-builds.md). This diagnostic execution does not establish
-qualification. The generated native ARC route also completed both builds in run `37445475840`, but strict
-inspection timed out. Producer-provenance disk jobs passed in run `37486058412`; aggregate transport then failed
-before publication, as the [dated evidence](evidence/2026-10-06-m2-release-carrier-transport.md) records.
-Historical validation run `37533806963` at `625980e` subsequently passed all 34 candidate outputs and
-publication/signing/verification/finalization. This does not validate the updated head, current main execution,
-strict inspection or independent full-payload consumer acceptance; see
-[reconciliation](adr/reconciliation.md#native-arc-disk-route). Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
-the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
-deferred.
+The retained KVM descriptor proves availability during the callback, not consumption by QEMU. Docker's
+fixed device projection additionally checks kernel boot identity and device numbers. Command/Make,
+encrypted-disk, general hosted and qualified VM adapters remain closed. Arbitrary devices, nested
+virtualization, NUMA, accelerators and additional provider-specific lowering are deferred. In-process
+cleanup owns success, failure and cancellation; authenticated orphan recovery after hard process/host
+failure is also deferred. ADR-10/18 own the detailed admission and driver contracts; reconciliation and
+[operational evidence](evidence/README.md) separate their tests from native runtime observations.
+
 Produced-artifact size remains an artifact and transport budget.
 
 ### High Availability {#high-availability}
@@ -897,8 +869,8 @@ retrievable inputs, CI capacity, registry writes/reads and identity services. Al
 on registry/evidence retention for later verification. An unavailable dependency causes a failed or bounded-out
 operation; it cannot turn verification into an optional step.
 
-Qualified offline verification substitutes a retained authenticated closure for online dependencies (ADR-15).
-The networked v1 lane has no such availability claim. Partial remote writes and recovery are covered above.
+Any future qualified offline lifecycle would require a retained authenticated closure (ADR-15); no air-gap
+implementation is retained. The networked v1 lane has no offline availability claim. Partial remote writes and recovery are covered above.
 
 ### Scalability {#scalability}
 
@@ -910,9 +882,9 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). M2 requires independent native
-AMD64 and ARM64 source, runner and producer-provenance delivery acceptance; M3 adds strict disk inspection
-and material reconciliation (ADR-13 §6). Organizational ratification remains separate.
+rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
+when selected by the Definition. M2 requires producer provenance; M3 adds strict inspection and material
+reconciliation (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios
 
@@ -938,9 +910,9 @@ already obtained.
 | Decision or acceptance gap | Responsible role | Blocks |
 |---|---|---|
 | Named-decider ratification of the ADR set | Architecture owners — **[INPUT NEEDED]** | Organizational acceptance of the proposed engineering baseline |
-| Live GitHub execution, source mirror access and protected environment | CI/release engineering and NKE source owners | M1 external acceptance |
-| Transparency disclosure, Fulcio/Rekor operations and deletion protection | Product security and service owners | First signed NKE run and sustainable consumer verification |
-| Wrapped-job isolation and capacity envelope | NKE build owner and CI engineering | Large OS-image delivery in M2 |
+| Default-branch production/PR trigger exercises, source access and protected-environment policy | CI/release engineering and NKE source owners | Remaining M1 acceptance beyond recorded manual candidate runs |
+| Transparency disclosure approval, Fulcio/Rekor operations and deletion protection | Product security and service owners | Organizational approval and sustainable consumer verification |
+| Native route approval, measured capacity envelope and independent full-payload disk consumption | NKE build owner and CI engineering | M2 acceptance beyond the scoped candidate delivery |
 | `curatedBy`, aggregate SBOM curation edges and `embeds` consistency | Catalog/build owners | Upstream composition binding beyond catalog pin validation |
 | M3 role policy and qualification implementation | Qualification owner | Build/evidence verdicts |
 | M4 concurrency, partial-write reconciliation, tag and retention protocol | Release engineering and registry owner | Reliable repeated and interrupted release publication |
@@ -961,9 +933,9 @@ reproduction of helper bytes.
 | Reviewers | **[INPUT NEEDED]** |
 | Approvers | **[INPUT NEEDED]** (per stakeholders) |
 | Status | Draft |
-| Revision | 2026-09-17 |
+| Revision | 2026-10-07 |
 | Related ADRs | ADR-01…ADR-22 (`docs/adr/`) |
-| Related planning documents | NKD v1 milestone plan — `docs/milestones.md`; NKD v1 milestone epics (specification) — `docs/epics-v1-spec.md` (product acceptance; ADRs own engineering contracts) |
+| Related acceptance documents | `docs/milestones.md` summarizes the roadmap; `docs/epics-v1-spec.md` owns product acceptance; ADRs own engineering contracts |
 | Current support record | `docs/adr/reconciliation.md` |
 | Related surface | `docs/lifecycle.md` |
 

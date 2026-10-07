@@ -75,6 +75,72 @@ inspected. [Recorded payload checks](2026-09-10-combined-payload-checks.json) co
   charts: `002-postgresql`, `004-spire-crds-post` and `007-controller`. The controller rendered the exact
   native CWE digest when supplied `image.repository=ghcr.io/njhensley/nke-recipes/cwe`.
 
+## Offline dependency scanning
+
+A separate offline Linux/amd64 exercise used artifacts downloaded from
+[Run 34453148217](https://github.com/njhensley/nke-recipes/actions/runs/34453148217),
+Syft 1.51.1, and the actual SBOM executor with a regenerated Plan. The measured producer records
+were local fixtures, not a new hosted Run or authenticated qualified producer report.
+
+| Output | Unique dependency components | Observed breakdown |
+|---|---:|---|
+| nkectl | 27 | Go modules |
+| CWE | 248 | 171 Go modules, 76 Alpine packages, one OS component |
+| Helm | 7 | Three bundled charts, four external chart references |
+
+Two workspace modules in each binary/image inventory retained `UNKNOWN` versions in Syft's report;
+no release version was guessed. Counts describe those exact observed artifacts, not present-day inputs,
+signed SBOM publication or a vulnerability scan. The [SBOM reference](../dependency-sboms.md)
+owns current format/stage scope and the opt-in real-artifact executor configuration.
+
+## Failed attempts and storage regressions
+
+The following September 10 observations retain their original subjects; no new execution was performed
+when this history was consolidated. A successful publication does not make a failed Run complete.
+
+### Hosted attempts
+
+| Run | Result and correction |
+|---|---|
+| [34430414883](https://github.com/njhensley/nke-recipes/actions/runs/34430414883), `d61ce88` | CLI and Helm source builds passed; CWE rejected the default Podman runtime. Both maintained Environments now select Docker, and graph admission rejects incompatible settings. The [failed Run record](2026-09-10-combined-first-failed-run.json) retains all three required outputs. |
+| [34430831748](https://github.com/njhensley/nke-recipes/actions/runs/34430831748), `16bbddb` | All three builds passed; CWE took 8m19s. Root-owned private image directories blocked host archive handoff. Generated Docker utilities now use runner ownership. A real Linux-volume experiment reproduced the failure and verified the correction. |
+| [34431910080](https://github.com/njhensley/nke-recipes/actions/runs/34431910080), `00656b2` | All builds, six package jobs, publication, signing and hosted verification passed. Independent consumers passed for all three repositories. Finalization failed because two source fetches restored the same receipt directory. Exact receipt-file carriers correct that collision. |
+| [34433727700](https://github.com/njhensley/nke-recipes/actions/runs/34433727700), `3c2afb2` | CWE exhausted runner disk space at the Go linker under the forced native snapshotter. The launcher now requires overlayfs; the receipt fix remains in place. No publication succeeded in this attempt. |
+| [34434756868](https://github.com/njhensley/nke-recipes/actions/runs/34434756868), `4557f64` | All 20 jobs passed, including all three builds, publication, real signing, verification and complete Run finalization. Independent cosign/NKD consumers and downloaded CLI/image/Helm checks passed. |
+
+An offline replay of the second attempt's successful producer carriers also passed all six package/archive
+handoffs. It verifies the packaging path, not new hosted execution or signatures.
+
+The third attempt published the common envelope digest
+`sha256:77b8f4f754820a0f59901e5f69a1ad1d49322f6d744cd9116ceb057ebf8e3504` to the `cwe`, `helm` and `nkectl`
+repositories under `ghcr.io/njhensley/nke-recipes`. Independent cosign signature and production-attestation
+checks and the public NKD `pipeline-attested` / `artifact-publication` consumer passed for all three references.
+Its native CWE manifest
+`sha256:38b30b65d4e8c333d9823f3376f9d623846c0474837e62182d973e4c8b7adecf` passed offline executable,
+SPIFFE helper, UI, profiles, license and CA checks, reporting `cloud-workflow-engine 0.0.0-ged9fb09b04fd`.
+The extracted CLI reported `nkectl v0.1.0-rc.2 (commit: ed9fb09b, built: 2026-08-18T15:22:55Z)`.
+The downloaded Helm tree passed all checksums and rendered all three local charts with that exact CWE digest.
+These successful publication checks do not change the third attempt's failed Run status.
+
+### Hosted storage regression
+
+The fourth attempt failed with `mapping output file failed: no space left on device`. The forced native
+snapshotter copied the large source/toolchain tree across Dockerfile steps. A real Docker regression using
+the launcher's exact settings and a 16 MiB repeated-copy fixture failed a 64 MiB storage budget at 164,436 KiB.
+After switching only the snapshotter to overlayfs, it passed at 33,256 KiB. The test runs in about two seconds:
+
+```sh
+NKD_BUILDKIT_TEST_IMAGE=moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef \
+  go test ./pkg/nkd/pipeline -run TestBuildKitSnapshotStorageBudget -count=1 -v
+```
+
+The [pinned BuildKit rootless documentation](https://github.com/moby/buildkit/blob/v0.33.0/docs/rootless.md)
+requires Linux 5.11+ or an Ubuntu kernel for unprivileged overlayfs. The launcher does not add privileged mode,
+a host socket, credentials or a FUSE device. Unsupported hosts fail instead of silently using native storage.
+The miniature storage test isolates the storage regression. The subsequent full hosted attempt separately
+passed the complete CWE build in 4m40s and finalized the combined Run.
+
+
 ## Validation and limits
 
 Before pushing, the full `make check` gate passed: formatting, vet, lint, shellcheck and race-enabled tests,
@@ -85,7 +151,7 @@ workflow lint checks passed. The real rootless snapshot-storage regression faile
 The [job timings](2026-09-10-combined-timings.csv) record a 4m40s CWE job and a 54s finalizer. The entire run
 spanned 9m25s from creation to completion, including scheduling. Earlier native-snapshot CWE successes took
 8m10s and 8m19s; these are individual observations on hosted runners, not a controlled performance benchmark.
-The [implementation record](../combined-nke-pipeline.md) retains the failed attempts and their corrections.
+The [hosted attempts](#hosted-attempts) retain the failed Runs and their corrections.
 
 This proves combined hosted `pipeline-attested` artifact publication and independent consumer acceptance.
 Subsequent coverage tests found that this run's production classifier incorrectly labeled the mixed,

@@ -372,7 +372,7 @@ snapshot against the pinned pull digest, validates the chart archive, and wraps 
 as the OCI chart layer. The layer digest therefore remains the upstream package pin; the enclosing manifest
 has its own digest. Acquired charts cannot be repacked or image-bound. Lifecycle observation independently
 reproduces the wrapper and checks its manifest. This path is exercised by a
-[local four-chart NKE Run](../evidence/2026-10-01-acquired-helm-packaging.md); it establishes neither upstream
+[local four-chart NKE Run](../evidence/producer-acquisition-observations.md#acquired-helm-charts); it establishes neither upstream
 signature verification nor qualification. Dependency scanning of acquired `raw` charts remains unsupported.
 
 Push, sign and pull-back verification are separate effects: later failure may leave bytes or partial evidence in

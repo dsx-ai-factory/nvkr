@@ -224,7 +224,7 @@ regions deliberately remain unsupported. Factory/lifecycle/delivery contracts ad
 process-local exact-QCOW2 observation described above. They use a controlled producer callback and do not
 establish production VM execution, NKE disk production, full-disk evidence, compatibility, or publication.
 The real-QEMU VMDK fixture replay is opt-in through `NKD_TEST_QEMU_IMG` and its exact executable pin;
-ordinary CI does not run it. Its [ARM64 replay evidence](../evidence/2026-10-02-vmdk-codec-admission.md)
+ordinary CI does not run it. Its [ARM64 replay evidence](../evidence/disk-inspection-observations.md#vmdk-codec-admission)
 keeps the earlier and linked follow-up replay identities separate from the contract suite
 and does not establish qualified reproduction.
 

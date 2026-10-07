@@ -10,8 +10,10 @@
 - **Relates to:** ADR-07 (reproduction identity & builder profile), ADR-08 (bake-off gate).
 
 - **Scope:** The numbered builder contract is for qualified execution; the later Decision sections define v1
-  source lanes and disk compilation. Nix, VM execution and fused large-output wrapped jobs remain capability-gated;
-  the admitted BuildKit wrapped lane has the narrower contract below.
+  source lanes and disk compilation. Unencrypted direct-Packer execution is admitted locally and through
+  ADR-18's explicit native ARC pipeline-attested route. Qualified Nix/VM execution, general hosted VM
+  adapters and general fused large-output wrapped jobs remain capability-gated. The BuildKit lane and
+  strict/M2 disk evidence modes retain their separate contracts.
 
 ## Context
 
@@ -101,7 +103,7 @@ Each component has exactly one declared production source lane, separate from th
 
 The lane must agree in provenance, Release membership, evidence records, and milestone scope. Unknown or
 indeterminate lanes are definition errors. The `buildkit-rootless` builder implements the wrapped-build lane
-for OCI-export archives on the admitted Docker or Podman runtime, locally and in generated lifecycle Runs. Other wrapped adapters and Nix
+for OCI-export archives on the admitted Docker or Podman runtime, locally and in generated lifecycle Runs. The direct-Packer VM route has the separate contract below. Other wrapped adapters and Nix
 qualified execution remain deferred. A component may select its own digest-pinned toolchain image while
 retaining the same pinned source as other components; this changes its build identity, not its source pin.
 
@@ -215,8 +217,11 @@ Artifact or qualification evidence. The supported route supplies no secret chann
 the adapter does not retain the generated SSH key, environment, home, configuration, cache, HTTP or output
 directories. The [2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
 Docker/Packer/NKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
-adapter on ARC, not generated hosted VM execution. Generated execution, maintained release acceptance and
-pipeline-attested or qualified production claims remain unproven. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
+adapter on ARC, separate from generated hosted execution. The later
+[M2 candidate](../evidence/2026-10-06-team-demo-pipeline.md) exercised the generated native route with
+explicit `build-provenance-v1` evidence and a validation-branch signing exception. Main-only execution,
+independent full-payload disk consumption, strict inspection and qualification remain unproved; the
+candidate does not establish complete maintained-release acceptance. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
 (`sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80`) and QEMU plugin 1.1.6
 (`sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6`), both matching HashiCorp's
 published `SHA256SUMS`. A minimal exact-version QEMU source returned exit zero, the single 28-byte success line
@@ -263,8 +268,7 @@ producer bytes fail before the toolchain container starts. This permits one sele
 selected component outputs, including a deterministic tarball or repository payload, while every material
 producer retains its own build or byte-preserving acquisition semantics.
 
-Direct Packer will
-receive the private absolute manifest path through its declared `materialManifestVariable`; the source must
+Direct Packer receives the private absolute manifest path through its declared `materialManifestVariable`; the source must
 cross-check every entry's architecture against the separately supplied architecture variable. The `vm-image`
 command/Make form has no admitted executable handoff and therefore cannot lower a material-bearing VM command.
 An adapter may not silently reuse the ordinary-container mount contract across the different VM executor boundary,
@@ -326,8 +330,9 @@ architecture, `forbidden` must be withheld, and `preferred` retains the cross-ar
 Plan compilation binds KVM or the fallback before work rather than choosing opportunistically at runtime. Build network
 remains the existing IR semantic and is not duplicated in resource requirements.
 
-NKE host CPU, memory, storage, platform, KVM policy, and timeout values remain unauthored until supported routes
-are measured. Guest vCPU, guest memory, and logical disk size are not host requests. Produced-artifact size is
+NKE host CPU, memory, storage, platform, KVM policy, and timeout requests require reviewed route measurements.
+The native candidate's authored profiles do not establish a general capacity bound or organizational acceptance.
+Guest vCPU, guest memory, and logical disk size are not host requests. Produced-artifact size is
 an artifact and transport concern rather than a runner-capacity field.
 
 For the [NKE Makefile at commit `6df693a`](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185),
@@ -349,8 +354,10 @@ component may select that `packer` driver only after the catalog carries an ADR-
 toolchain and material-supplier pins. That catalog choice changes the catalog snapshot and Build identity. It does
 not remove or invalidate the standalone Make entrypoint. Compiler lowering
 supports a direct-Packer producer with typed materials and a command producer without materials. A
-material-bearing `vm-image` command/Make producer, VM execution, disk collection, and publication remain
-capability-gated. Ordinary `oci-hermetic` producers use the admitted fixed material mount described above.
+material-bearing `vm-image` command/Make producer remains capability-gated. Unencrypted direct-Packer
+execution and disk collection are connected locally; ADR-18/20 admit the explicit native ARC hosted
+publication route. General hosted VM, qualified and encrypted execution remain unavailable. Ordinary
+`oci-hermetic` producers use the admitted fixed material mount described above.
 An override that changes NKE's derived
 output filename must also change the catalog artifact path; NKD never guesses it.
 
@@ -385,8 +392,10 @@ network, or credentials during build before output. An external reusable workflo
 Names, versions and known source pins feed production dependencies, the aggregate SBOM dependency graph, and a
 qualification cross-check against the upstream version manifest **at the pinned commit**. Missing or disagreeing
 members fail that check. This declaration does not prove the image's observed contents. ADR-13 separately
-requires traced materials and read-only final-disk inspection before disk delivery is admitted; those inventory
-adapters remain deferred. Embedded-software correctness and runtime validation remain the upstream build
+requires traced materials and read-only final-disk inspection for the strict evidence route. Its explicit
+M2 `build-provenance-v1` mode instead binds live producer/material evidence and records inspection as
+deferred to M3; it makes no inspected-inventory claim. Current implementation and evidence remain in
+[reconciliation](reconciliation.md). Embedded-software correctness and runtime validation remain the upstream build
 owner's duty. Where ADR-22's curated set exists, derive `embeds` from it and re-derive at validation. Both
 `embeds` and the curated-set machinery remain deferred.
 

@@ -86,13 +86,36 @@ The PR #108 metadata browsing replay below is a separate inspection operation. T
 `qualification: diagnostic` and the Plan's `pipeline-attested` lane are retained without conflating them.
 Neither is evidence of the `qualified` lane.
 
+## Metadata browsing validation
+
+On October 6, an earlier browser working tree on candidate
+`625980e30b1a9f5ef27a9b46534de65eefff385a` independently inspected this exact external root on
+macOS ARM64/Go 1.27.1. Its direct CLI read passed in 198.486 seconds. A separate live lifecycle
+inspection installed an HTTP guard rejecting requests for every one of the 111 declared payload
+layers; it passed in 174.276 seconds with **zero payload-layer requests**, 908 HTTP requests and
+2,249,434 response bytes including authentication/redirects. It did not download the 6,876,759,040
+declared disk-payload bytes.
+
+Direct CLI, guarded live inspection and local carrier JSON were byte-identical: 96,092 bytes,
+SHA-256 `ab2e7d4fd77f76b581cac8838b6d4d19bc01b8529c0df7418ab19014d6ef17b2`, 34 outputs and
+60 evidence members. Both live calls removed their private acquisition directories. The release
+metadata config was 88,076 bytes, schema `nkd.dev/publication-root/v3`, SHA-256
+`75ec2768aa4174d2d7f2fc6daad43040f0a8a05d0d1c96e3c325f4ebe889577d`.
+
+Full text/JSON/Mermaid and disk filtering passed, with eleven memberships per displayed disk;
+an unknown output returned `NKD-E-USAGE`/exit 2 with empty stdout. After final field-name guards,
+the rebuilt CLI `sha256:33aebe5e474ae40d11ca9d5a510c62ee46545bb289ffacecd18857a6fefb90ab`
+re-read the carrier with unchanged JSON. This is a source-specific metadata/transport observation,
+not payload integrity, signer authenticity, consumer-policy acceptance or qualification.
+The later exact PR #108 replay below is separate and did not install this guard.
+
 ## PR #108 metadata browsing replay
 
 The team demo now uses [PR #108](https://github.com/dsx-ai-factory/nke-recipes/pull/108) at exact head
 `00c71385580e798eb3d7f74b88fc694225cfe175`. The rebuilt CLI reports `00c71385 (00c71385)`;
 its executable SHA-256 is `5f8bc8f2e41eb527185230b0e173946b459d265fc2929522961a3e318d1f487a`.
 This changes browsing to inspect bounded metadata and evidence without opening artifact payload layers.
-The earlier [PR validation record](2026-10-06-release-browse-metadata.md) remains separately scoped;
+The earlier [guarded metadata validation](#metadata-browsing-validation) remains separately scoped;
 the commands here are fresh checks at the recorded PR head on October 6 Pacific (October 7 UTC).
 
 The original `nkd-metadata-release` carrier was reused and safely materialized as 193 regular files totaling
@@ -125,12 +148,12 @@ and retained its 11 evidence memberships. The unknown selector `not-a-release-ou
 and [focused ARM64 JSON](2026-10-06-team-demo-pipeline/pr108-browse-nke-node-image-arm64.json)
 are retained alongside the other views.
 
-The self-guided `docs/demo-team-release.sh` also passed against this metadata-only layout with
+The self-guided release script, then at `docs/demo-team-release.sh` and now
+[in demos](../../demos/demo-team-release.sh), also passed against this metadata-only layout with
 `--output nke-node-image-arm64 --mermaid --non-interactive`; its complete JSON was byte-identical to the
 native and live results. The [replay summary](2026-10-06-team-demo-pipeline/pr108-replay.json) records
 the executable identity, view checks, cleanup result and script identity. This replay did not install
-an additional HTTP payload-request guard; the earlier PR validation record separately records that
-guarded external check.
+an additional HTTP payload-request guard; the earlier [metadata validation](#metadata-browsing-validation) separately records that guarded external check.
 
 The offline explorer embeds that actual native browse result. Its platforms are config-declared;
 disk digest/size fields describe the published metadata. Successful browsing grants neither payload

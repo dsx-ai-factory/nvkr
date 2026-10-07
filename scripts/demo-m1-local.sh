@@ -65,7 +65,7 @@ Options:
   -h, --help        show this help
 
 Environment:
-  NKE_LOCAL_CLONE   path to a local github.com/NVIDIA/nke clone. When set, git is
+  NKE_LOCAL_CLONE   path to a local NKE clone containing the exact pinned commits. When set, git is
                     redirected to it for this process only, via GIT_CONFIG_COUNT.
                     The catalog keeps its https://github.com/dsx-ai-factory/nke identity and
                     the user's own git configuration is never modified.
@@ -160,14 +160,18 @@ printf 'registry ready: http://%s/v2/\n' "$REGISTRY_HOSTPORT"
 demo_section "2/8  Validate the pinned component catalog"
 "$NKD" catalog validate --data "$DEFINITIONS/catalog"
 
-demo_section "3/8  Validate the Definition and current generated hosted Run"
+demo_section "3/8  Validate the Definition and generate its hosted Run in scratch space"
 "$NKD" definition validate --definition "$DEFINITIONS/definition.yaml"
 "$NKD" run plan --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-local.yaml"
-# The committed bundle is generated with `go run`, whose stable development stamp
-# is independent of the dirty working-tree suffix embedded by `make build`.
-go run ./cmd/nkdctl run generate --definition "$DEFINITIONS/definition.yaml" \
-  --environment "$DEFINITIONS/environment-github.yaml" --engine github --root . --check
+# The committed workflow selects M2, while this demo selects the three-output v1
+# Definition. Generate and check that example with the same binary in a fresh root.
+HOSTED_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-m1-hosted.XXXXXX")
+"$NKD" run generate --definition "$DEFINITIONS/definition.yaml" \
+  --environment "$DEFINITIONS/environment-github.yaml" --engine github --root "$HOSTED_ROOT"
+"$NKD" run generate --definition "$DEFINITIONS/definition.yaml" \
+  --environment "$DEFINITIONS/environment-github.yaml" --engine github --root "$HOSTED_ROOT" --check
+printf 'scratch hosted bundle: %s\n' "$HOSTED_ROOT"
 
 demo_section "4/8  Build and publish all three outputs in one immutable Run"
 run_started=$SECONDS
@@ -283,6 +287,7 @@ LOCAL NKE WALKTHROUGH COMPLETE — UNQUALIFIED-LOCAL-EXECUTION, NO SIGNATURES
   nkectl sha256:       $NKECTL_SHA256
   nkectl version:      $VERSION_OUTPUT
   run record:          $WORKSPACE/lifecycle.json
+  hosted bundle:       $HOSTED_ROOT/.github/nkd-run/manifest.json
   SBOM index:          $sbom_index ($sbom_count CLI CycloneDX doc(s), unqualified composition evidence)
   signing record:      $signature_record
   SLSA v1 predicate:   $predicate_record

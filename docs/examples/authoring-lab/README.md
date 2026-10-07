@@ -116,5 +116,6 @@ The regression test executes this same program through the real CLI adapters:
 go test ./cmd/nkdctl -run '^TestAuthoringLab' -count=1
 ```
 
-For DRY recommendations and real NKE examples, read
-[shared catalog and Definition authoring](../../catalog-definition-authoring.md).
+For shared sources, complete per-output catalog stacks, and replacement identity, read
+[catalogs and components](../../catalogs-and-components.md). The
+[deploy Definition](../../../definitions/nke-deploy/README.md) provides the real NKE composition example.

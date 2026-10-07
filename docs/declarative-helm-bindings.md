@@ -86,9 +86,11 @@ installation or qualification is claimed. Acquired raw-chart dependency scanning
 
 ## Validation and migration
 
-[Recorded checks](evidence/2026-10-01-declarative-helm-bindings.md) cover slot accounting, unchanged templates,
-multiple images, registry-independent package bytes and real Helm rendering. A full six-output build remains
-unexercised.
+The [compiler contracts](../pkg/nkd/factory/compiler_contract_test.go) and
+[binding tests](../pkg/nkd/factory/helm_mapping_test.go) cover slot accounting, unchanged templates,
+multiple images and registry-independent package bytes. Real Helm rendering is opt-in; see
+[Development](../DEVELOPMENT.md#opt-in-integration-checks) for prerequisites and commands.
+These tests do not establish a full six-output build, installation or signed publication.
 
 Replace `helm.imageOutput` with `helm.images: {controller: cwe}`. Put the chart location and digest paths
 under the selected catalog component's `helm` field, then regenerate plans and workflows.

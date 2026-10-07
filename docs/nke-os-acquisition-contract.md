@@ -1,9 +1,16 @@
 # Source-owned APT capture
 
-NKD adds a diagnostic verifier for the guest package capture format emitted by
-an unpinned NKE source candidate. The maintained NKE OS source does not produce
-this capture. The verifier does not issue acquisition-origin authority, an installed
-inventory, a live-Run receipt or a full disk SBOM (ADR-10 and ADR-13).
+This contract describes the source-owned guest APT capture format and NKD's bounded held-archive
+verifier. The verifier establishes archive/member byte correspondence. It does not issue
+acquisition-origin authority, installed inventory, a live-Run receipt or a full disk SBOM.
+[ADR-10](adr/0010-pluggable-builder-types.md) owns the producer/carrier handoff;
+[ADR-13](adr/0013-supply-chain-evidence.md) owns evidence authority.
+
+The standalone [OS development inputs](../definitions/nke-os/README.md) and the newer
+[M2 candidate](../definitions/nke-m2/README.md) have different source selections. M2 pins the
+merged capture-capable NKE source and explicitly enables capture. Its generic disk collector can retain
+the declared carrier under the original Run/QCOW2 owner; that integration does not strengthen this
+standalone verifier's claim.
 
 ## Field ownership
 
@@ -61,44 +68,33 @@ regions, remain bound by the exact archive digest.
 
 ## Validation and remaining acceptance
 
-The [dated diagnostic record](evidence/2026-10-03-apt-capture-correspondence.md)
-records the actual tested verifier source blob, both exact retained capture
-digests, and the committed recheck log. The source hook belongs to the separate
-[NKE candidate PR](https://github.com/dsx-ai-factory/nke/pull/1211), not this
-verifier or the maintained NKE Definition. The ordinary suite includes a small
-Python `tarfile` fixture with exact archive and manifest-blob SHA-256 assertions;
-its payload is synthetic, not a Debian package or installer execution.
+The [retained byte-correspondence observations](evidence/producer-acquisition-observations.md#apt-capture-correspondence)
+record exact tested source blobs, native ARM64 and emulated AMD64 capture/package digests, and the
+committed recheck log. The original source hook was developed in NKE #1211; the later
+[merged-source handoff](evidence/producer-acquisition-observations.md#merged-capture-source-handoff)
+records its separate approval and source selection. A later source approval cannot retroactively expand
+an earlier diagnostic's execution scope.
 
-Each real capture was separately admitted through `heldfile.OpenContext` and
-`ObserveAcquisitionArchive` in the opt-in `TestObserveRealAcquisitionArchive`.
-Its `NKD_TEST_ACQUISITION_ARCHIVE` variable selects an existing real capture for
-this diagnostic test; it grants neither source nor live-Run authority.
+Ordinary tests include a Python `tarfile` fixture with exact archive and manifest-blob SHA-256 assertions.
+Its synthetic payload is neither a Debian package nor installer execution. The opt-in
+`TestObserveRealAcquisitionArchive` separately opens actual existing capture bytes through
+`heldfile.OpenContext` and checks `ObserveAcquisitionArchive`:
 
-The original diagnostic record attributes an ARM64 `hello` acquisition, version
-`2.10-5build1`, to a native Ubuntu 26.04 container.
-Its retained package is 25,642 bytes, SHA-256
-`8ab9e5cf329e88413dd502edd5e0907550132470ecb926d500d0d23a30c735d8`.
-NKD accepted the actual 30,720-byte capture, SHA-256
-`684ea432b9002ebb14fefcf81920e644dbd92d3afa7de8b24636f203d9e5504c`.
-NKD's retained recheck shows byte correspondence, and the Python fixture checks
-cross-language format acceptance. Neither retained check exercises APT cache
-cleanup, dpkg/python-apt matching, NKE autoinstall or a full image bake.
-The capture is not published as a retained CI artifact.
+```sh
+NKD_TEST_ACQUISITION_ARCHIVE=/path/to/capture.tar \
+  go test ./pkg/nkd/material -run TestObserveRealAcquisitionArchive -count=1 -v
+```
 
-The original record attributes the AMD64 capture to local container emulation;
-NKD's retained recheck verifies only its archive-to-manifest byte correspondence.
-Its actual `hello` package is 26,068 bytes, SHA-256
-`b6e9bef3c865aa17757cd9ffa820c05a37833f8a6b58287afc9f32dedb345965`.
-The capture is 30,720 bytes, SHA-256
-`4a23f41797a0a762a410f45d5725ca65e76377face354d8e62a67d82b05cc0f5`,
-not published as a retained CI artifact.
-This is not native AMD64 KVM evidence.
+The variable selects a diagnostic input, not a source/live-Run authorization. Compare logged identity,
+size, architecture and package count with the retained record; a different archive establishes its own
+byte correspondence. Those checks do not exercise APT cleanup, dpkg/python-apt matching, installer-to-target
+capture handoff, autoinstall or a full image bake. The historical real archives were local rather than
+retained Git/CI artifacts; their exact recheck log and source identity remain recorded.
 
-Live guest package capture integration remains incomplete until a real NKE bake demonstrates the
-installer/target capture handoff, and NKD admits and collects this extra payload
-while binding it to the live Run, exact producer and exact QCOW2. The current
-disk driver does not yet collect this declared acquisition carrier. Downloads
-outside APT, base-ISO contents and later package events outside the capture
-window also need explicit coverage. Missing historical repository metadata fails
-closed; a guessed package URL is never substituted. Do not promote this capture
-to a complete acquisition closure or disk SBOM.
+The source carrier collector is implemented. Complete capture acceptance still needs original same-attempt
+installer-to-target coverage and evidence joining the exact capture, producer, live Run and final QCOW2.
+Base-ISO content, downloads outside APT and events outside the capture window require separate coverage.
+Missing historical repository metadata fails closed; a guessed package URL is never substituted.
+Do not promote this diagnostic to complete acquisition closure or a full disk SBOM. M2's explicit
+build-provenance scope defers deep disk reconciliation to M3; current status belongs in
+[reconciliation](adr/reconciliation.md).

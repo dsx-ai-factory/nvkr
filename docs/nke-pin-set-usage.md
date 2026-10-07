@@ -59,7 +59,7 @@ Packages are under `.nkd/runs/acquired-helm-01/packages/`; `lifecycle.json` reco
 manifest digests. Choose a new attempt name for each run. Source access uses your Git credentials;
 a local NKE clone can be selected with Git's `url.<clone-path>.insteadOf` override without changing the catalog.
 
-[Recorded local execution](evidence/2026-10-01-acquired-helm-packaging.md) packaged all four real charts
+[Recorded local execution](evidence/producer-acquisition-observations.md#acquired-helm-charts) packaged all four real charts
 and checked their layers against the lock and downloaded bytes. This example performs no publication,
 signing or installation. Its SBOMs record composition only; dependency scanning of acquired `raw` charts
 is not supported. Acquired charts cannot use image binding, because that would change their pinned bytes.

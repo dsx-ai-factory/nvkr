@@ -80,12 +80,16 @@ Save the previous exact Plan before regeneration, then compare it to the regener
 ```sh
 git show HEAD:.github/nkd-run/plan.json > /tmp/nkd-plan-before.json
 nkdctl run generate \
-  --definition definitions/nke-deploy/definition.yaml \
-  --environment definitions/nke-deploy/environment-github.yaml --engine github --root .
+  --definition definitions/nke-m2/definition.yaml \
+  --environment definitions/nke-m2/environment-github.yaml --engine github --root .
 nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.json
 nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.json --details
 nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.json --format json
 ```
+
+The root regeneration uses the committed M2 inputs and the generator identity described in the
+[M2 instructions](../definitions/nke-m2/README.md). Generate alternative Definitions into scratch roots
+as shown in the [pipeline guide](generate-pipeline.md).
 
 The default text report identifies changed, added or removed per-output Build Digests, counts every changed
 field by category, and shows changes in shared authored inputs, provider tools and publication routes.
@@ -126,8 +130,6 @@ Contract tests cover exact-byte JSON, display-only pretty JSON, caller-mutation 
 Plans, bounded/no-follow file loading, complete graph vertices and edges including the maintained controller
 chart/CWE relationship, diagram escaping, stable named comparisons, ordered argv/patches, large integers,
 absent-versus-null values, and transport/execution changes that preserve Build Digests. CLI tests cover
-file views, graph formats, concise/full differences, exit status and failure before output. The
-[initial inspection record](evidence/2026-10-03-plan-views.md) retains its historical source scope; the
-[current review validation](evidence/2026-10-05-plan-view-review-validation.md) records the later tested
-source, producer-field regressions, option admission and display fixes.
+file views, graph formats, concise/full differences, exit status and failure before output. These
+contracts live in [the Plan-view tests](../pkg/nkd/planview/) and the CLI inspection tests.
 This is local inspection/contract evidence; it adds no registry, runner, signing or OS execution acceptance.
