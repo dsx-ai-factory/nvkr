@@ -7,6 +7,13 @@ For the browser experience, open the [HTML walkthrough](demo-team-walkthrough.ht
 what was published and the evidence attached to it. NKD's public journey is **Definition → Run → Release**.
 Catalogs supply reusable, pinned producers; Environments supply execution and publication settings.
 
+For the catalog examples, keep three nouns distinct: a **component** is a named piece with a recipe;
+an **output** is a deliverable the Definition promises; an **artifact** is the actual result produced.
+The [replacement comparison](demo-team-concepts.html#overlays) uses `diagnostics = doctor` and
+`tools = doctor + status` to show a default overlay, an output-specific overlay and alternate-component
+selection. Each starts from the same baseline. Its [runnable lab](demo-team-walkthrough.html#composition)
+checks which Build Digests change without executing a build.
+
 Use the [slide deck](nkd-team-tour.html) for the story and the [offline graph explorer](demo-team-explorer.html)
 for the hands-on stops. The explorer is a presentation companion built for this walkthrough. NKD itself
 provides native Plan inspection, linked graphs in Mermaid/DOT/JSON, semantic Plan comparisons, and release
@@ -210,7 +217,7 @@ are in [the lifecycle guide](lifecycle.md#run-and-verify).
 |---|---|---|
 | Native producer/artifact graphs and Plan comparisons | [Plan inspection](plan-and-graph-inspection.md) | Descriptive graph/diff views cannot authorize execution |
 | Pin previews, source/tool/action updates and deterministic maintenance | [Catalog maintenance](catalog-maintenance.md), `scripts/demo-catalog-change.sh --help` | Preview and data maintenance do not publish an accepted Release |
-| Catalog reuse, whole-producer overlays and toolchain substitutions | [Authoring lab](examples/authoring-lab/README.md) | Explicit replacements change the selected identity |
+| Catalog reuse, whole-producer overlays and output-specific selection | [Authoring lab](examples/authoring-lab/README.md), [toolchain substitution example](demo-team-concepts.html#toolchain-substitutions) | The lab exercises producer replacement and selection; toolchain substitution is a separate example |
 | Pin sets and acquired Helm charts | [Pin-set usage](nke-pin-set-usage.md), [generic example](generic-pin-set-example.md) | Pinned-tree access is required; referenced container images are not implicitly acquired |
 | Local CLI/image/chart execution and pull-back | [Local walkthrough](demo-m1.md) | Docker/source access required; local and dry-run signing are unqualified |
 | Image-bound chart packaging | [Declarative Helm bindings](declarative-helm-bindings.md) | Consumer chooses deployment topology and repository overrides |
@@ -270,3 +277,8 @@ they add no new artifact-execution or release-verification claim.
 Final publication checks also covered keyboard focus after concept and graph selection, preservation of
 browser shortcuts, return links to the originating slide, and fitting the complete 348-operation graph.
 All 13 slides fit at both 1280×720 and 1600×900; the final HTML links and demo-script ShellCheck passed.
+
+The subsequent [clarity audit](demo-team-clarity-audit.md) rewrites all 33 concept explanations,
+keeps their reading guides visible, and adds an interactive comparison of the three replacement scopes.
+The authoring lab replay, all concept routes at desktop/mobile widths, all 13 slides at both presentation
+resolutions, clipboard/offline/navigation checks and static HTML checks passed after that revision.
