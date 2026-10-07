@@ -64,7 +64,7 @@ func validateReleaseMetadata(root PublicationRoot) error {
 	}
 	m := root.Release
 	if len(m.InvocationID) > 2048 {
-		return e.New(e.CodeVerifyFailed, "release attempt binding is incomplete")
+		return e.New(e.CodeVerifyFailed, "release invocation identity exceeds the maximum length")
 	}
 	if !canonical.IsDigest(m.DefinitionDigest) || !canonical.IsDigest(m.EnvironmentDigest) ||
 		!canonical.IsDigest(m.PlanDigest) || !canonical.IsDigest(m.ContentSubject) {

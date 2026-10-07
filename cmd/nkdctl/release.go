@@ -154,6 +154,10 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 						return err
 					}
 					if policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication {
+						if exactInputCount != 0 {
+							return e.New(e.CodeUsage,
+								"exact-input verification requires pipeline-attested/artifact-publication policy")
+						}
 						_, err := (&lifecycle.Consumer{}).Verify(c.Context, c.String("reference"), policy)
 						return err
 					}

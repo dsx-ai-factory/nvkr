@@ -7,6 +7,10 @@ import (
 )
 
 func bindReleaseContent(plan *factory.Plan, run *Run) (*Run, error) {
+	return bindReleaseContentOutputs(plan.LifecycleOutputs, run)
+}
+
+func bindReleaseContentOutputs(outputs []factory.LifecycleOutputPlan, run *Run) (*Run, error) {
 	if run == nil || run.Status != RunComplete {
 		return nil, e.New(e.CodeGateUnmet, "content binding requires a complete Run")
 	}
@@ -18,7 +22,7 @@ func bindReleaseContent(plan *factory.Plan, run *Run) (*Run, error) {
 	copyRun.Expected = cloneRequired(run.Expected)
 	copyRun.Observed = cloneArtifacts(run.Observed)
 	copyRun.ContentSubject = contentSubject
-	if err := factory.ValidateLifecycleOutputs(plan.LifecycleOutputs, run.Observed); err != nil {
+	if err := factory.ValidateLifecycleOutputs(outputs, run.Observed); err != nil {
 		return nil, err
 	}
 	return &copyRun, nil

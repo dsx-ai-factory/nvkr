@@ -69,6 +69,29 @@ func TestReleaseVerifyRequiresCompleteExactInputSetBeforeAcquisition(t *testing.
 	}
 }
 
+func TestReleaseVerifyRejectsExactInputsOutsideSupportedPolicy(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		flags []string
+	}{
+		{name: "qualified release", flags: []string{"--lane", "qualified", "--scope", "release"}},
+		{name: "pipeline release", flags: []string{"--lane", "pipeline-attested", "--scope", "release",
+			"--identity", "^builder$", "--issuer", "issuer"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			args := []string{"nkdctl", "release", "verify",
+				"--reference", "registry.example.test/releases@sha256:" + strings.Repeat("a", 64),
+				"--definition", "definition.yaml", "--environment", "environment.yaml", "--plan", "plan.json",
+			}
+			app := &cli.App{Commands: []*cli.Command{cmdRelease()}}
+			err := app.RunContext(t.Context(), append(args, test.flags...))
+			if cliErrorCode(err) != e.CodeUsage {
+				t.Fatalf("unsupported exact-input policy returned %v", err)
+			}
+		})
+	}
+}
+
 func TestReleaseVerifyLoadsCompleteExactInputsBeforeAcquisition(t *testing.T) {
 	workspace := filepath.Join(t.TempDir(), "must-not-exist")
 	missing := filepath.Join(t.TempDir(), "missing-definition.yaml")

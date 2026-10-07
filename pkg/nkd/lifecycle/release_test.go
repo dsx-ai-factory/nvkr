@@ -200,7 +200,7 @@ func TestVerifiedReleaseRequiresExactDefinitionEnvironmentAndPlan(t *testing.T) 
 			}
 			if description.ReleaseSubject != verified.release.Subject ||
 				description.PolicyDigest != verified.release.PolicyDigest ||
-				description.PlanDigest != expectation.planDigest ||
+				description.PlanDigest != expectation.prepared.PlanDigest ||
 				description.ContentSubject != verified.release.ContentSubject {
 				t.Fatalf("incomplete exact-input receipt: %+v", description)
 			}

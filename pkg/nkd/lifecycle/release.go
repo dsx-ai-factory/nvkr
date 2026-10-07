@@ -57,12 +57,9 @@ type ExactInputDescription struct {
 // registry or signature work. Callers cannot construct an accepted expectation
 // from digest strings or mutable Plan fields.
 type ExactInputExpectation struct {
-	issued            bool
-	definitionDigest  string
-	environmentDigest string
-	planDigest        string
-	prepared          *Run
-	plan              *factory.Plan
+	issued   bool
+	prepared *Run
+	outputs  []factory.LifecycleOutputPlan
 }
 
 // ExactInputReceipt is an opaque result issued only after a verified publication
@@ -114,15 +111,12 @@ func PrepareExactInputs(definition Definition, environment Environment, plan *fa
 	// identity. Publications and durable evidence bind that identity, not the
 	// caller-specific relocated Plan bytes.
 	prepared.PlanDigest = planDigest
-	frozenPlan := *plan
-	frozenPlan.LifecycleOutputs = make([]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
+	frozenOutputs := make([]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
 	for index, output := range plan.LifecycleOutputs {
-		frozenPlan.LifecycleOutputs[index] = output
-		frozenPlan.LifecycleOutputs[index].Components = append([]string(nil), output.Components...)
+		frozenOutputs[index] = output
+		frozenOutputs[index].Components = append([]string(nil), output.Components...)
 	}
-	return &ExactInputExpectation{issued: true, definitionDigest: prepared.DefinitionDigest,
-		environmentDigest: prepared.EnvironmentDigest, planDigest: planDigest,
-		prepared: prepared, plan: &frozenPlan}, nil
+	return &ExactInputExpectation{issued: true, prepared: prepared, outputs: frozenOutputs}, nil
 }
 
 // Description returns the immutable identities authenticated by this receipt.
@@ -145,16 +139,16 @@ func (verified *VerifiedRelease) RequireExactInputs(expectation *ExactInputExpec
 	if !verified.valid || verified.publication == nil {
 		return nil, e.New(e.CodeGateUnmet, "release capability is not verified")
 	}
-	if expectation == nil || !expectation.issued || expectation.prepared == nil || expectation.plan == nil {
+	if expectation == nil || !expectation.issued || expectation.prepared == nil || len(expectation.outputs) == 0 {
 		return nil, e.New(e.CodeGateUnmet, "exact-input expectation was not issued")
 	}
 	description, err := verified.publication.Description(verified.release.Subject)
 	if err != nil {
 		return nil, err
 	}
-	if description.Metadata.DefinitionDigest != expectation.definitionDigest ||
-		description.Metadata.EnvironmentDigest != expectation.environmentDigest ||
-		description.Metadata.PlanDigest != expectation.planDigest {
+	if description.Metadata.DefinitionDigest != expectation.prepared.DefinitionDigest ||
+		description.Metadata.EnvironmentDigest != expectation.prepared.EnvironmentDigest ||
+		description.Metadata.PlanDigest != expectation.prepared.PlanDigest {
 		return nil, e.New(e.CodeVerifyFailed,
 			"verified publication does not bind the supplied Definition, Environment, and Plan")
 	}
@@ -165,7 +159,7 @@ func (verified *VerifiedRelease) RequireExactInputs(expectation *ExactInputExpec
 	if observed.Status != RunComplete {
 		return nil, e.New(e.CodeReleaseIncomplete, "verified publication omits a required compiled output")
 	}
-	bound, err := bindReleaseContent(expectation.plan, observed)
+	bound, err := bindReleaseContentOutputs(expectation.outputs, observed)
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +168,8 @@ func (verified *VerifiedRelease) RequireExactInputs(expectation *ExactInputExpec
 	}
 	return &ExactInputReceipt{issued: true, description: ExactInputDescription{
 		ReleaseSubject: verified.release.Subject, PolicyDigest: verified.release.PolicyDigest,
-		DefinitionDigest:  expectation.definitionDigest,
-		EnvironmentDigest: expectation.environmentDigest, PlanDigest: expectation.planDigest,
+		DefinitionDigest:  expectation.prepared.DefinitionDigest,
+		EnvironmentDigest: expectation.prepared.EnvironmentDigest, PlanDigest: expectation.prepared.PlanDigest,
 		ContentSubject: bound.ContentSubject,
 	}}, nil
 }
@@ -186,7 +180,7 @@ func (verified *VerifiedRelease) RequireExactInputs(expectation *ExactInputExpec
 func (consumer *Consumer) VerifyExactInputs(ctx context.Context, reference string, policy VerificationPolicy,
 	expectation *ExactInputExpectation,
 ) (*VerifiedRelease, *ExactInputReceipt, error) {
-	if expectation == nil || !expectation.issued || expectation.prepared == nil || expectation.plan == nil {
+	if expectation == nil || !expectation.issued || expectation.prepared == nil || len(expectation.outputs) == 0 {
 		return nil, nil, e.New(e.CodeGateUnmet, "exact-input expectation was not issued")
 	}
 	verified, err := consumer.Verify(ctx, reference, policy)
