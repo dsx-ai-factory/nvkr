@@ -5,9 +5,11 @@ package buildgraph_test
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"debug/elf"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -215,17 +217,17 @@ func TestNKEOSPublicSourcesLive(t *testing.T) {
 			if _, err := file.Seek(0, io.SeekStart); err != nil {
 				t.Fatal(err)
 			}
+			wantMachine := elf.EM_X86_64
+			if runtime.GOARCH == "arm64" {
+				wantMachine = elf.EM_AARCH64
+			}
 			if artifact.OutputType == "tarball" {
-				checkPublicOSBinaryBundle(t, file, cases, artifact.Component)
+				checkPublicOSBinaryBundle(t, file, cases, artifact.Component, wantMachine)
 				return
 			}
 			executable, err := elf.NewFile(file)
 			if err != nil {
 				t.Fatal(err)
-			}
-			wantMachine := elf.EM_X86_64
-			if runtime.GOARCH == "arm64" {
-				wantMachine = elf.EM_AARCH64
 			}
 			if executable.Machine != wantMachine {
 				t.Fatalf("binary architecture = %s, want %s", executable.Machine, wantMachine)
@@ -247,7 +249,8 @@ func TestNKEOSPublicSourcesLive(t *testing.T) {
 	}
 }
 
-func checkPublicOSBinaryBundle(t *testing.T, file *os.File, cases []publicOSSourceCase, component string) {
+// checkPublicOSBinaryBundle checks source-owned membership and native ELF architecture.
+func checkPublicOSBinaryBundle(t *testing.T, file *os.File, cases []publicOSSourceCase, component string, wantMachine elf.Machine) {
 	t.Helper()
 	var expected []string
 	for _, test := range cases {
@@ -258,6 +261,17 @@ func checkPublicOSBinaryBundle(t *testing.T, file *os.File, cases []publicOSSour
 	if len(expected) == 0 {
 		t.Fatalf("bundle %s has no source-owned expected membership", component)
 	}
+	if err := validatePublicOSBinaryBundle(file, expected, wantMachine); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// validatePublicOSBinaryBundle uses the standard ELF parser on each bounded member.
+// ReadAt leaves the tar stream position unchanged and cannot read another entry's bytes.
+func validatePublicOSBinaryBundle(file *os.File, expected []string, wantMachine elf.Machine) error {
+	if len(expected) == 0 {
+		return fmt.Errorf("binary bundle has no expected membership")
+	}
 	reader := tar.NewReader(file)
 	var actual []string
 	for {
@@ -266,23 +280,115 @@ func checkPublicOSBinaryBundle(t *testing.T, file *os.File, cases []publicOSSour
 			break
 		}
 		if err != nil {
-			t.Fatal(err)
+			return fmt.Errorf("read binary bundle: %w", err)
 		}
 		if header.Typeflag == tar.TypeDir && header.Name == "./" {
 			continue
 		}
 		if header.Typeflag != tar.TypeReg || header.Size <= 0 || len(actual) >= len(expected) {
-			t.Fatalf("unexpected binary bundle entry: %+v", header)
+			return fmt.Errorf("unexpected binary bundle entry: %+v", header)
 		}
 		name := strings.TrimPrefix(header.Name, "./")
 		if path.Base(name) != name {
-			t.Fatalf("unexpected binary bundle path: %q", header.Name)
+			return fmt.Errorf("unexpected binary bundle path: %q", header.Name)
+		}
+		offset, err := file.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return fmt.Errorf("locate binary bundle member %q: %w", name, err)
+		}
+		executable, err := elf.NewFile(io.NewSectionReader(file, offset, header.Size))
+		if err != nil {
+			return fmt.Errorf("bundle member %q is not a valid ELF: %w", name, err)
+		}
+		if executable.Machine != wantMachine {
+			return fmt.Errorf("bundle member %q architecture = %s, want %s", name, executable.Machine, wantMachine)
 		}
 		actual = append(actual, name)
 	}
 	slices.Sort(actual)
+	expected = slices.Clone(expected)
 	slices.Sort(expected)
 	if !slices.Equal(actual, expected) {
-		t.Fatalf("bundle membership = %v, want %v", actual, expected)
+		return fmt.Errorf("bundle membership = %v, want %v", actual, expected)
+	}
+	return nil
+}
+
+// TestNKEOSBinaryBundle exercises both architectures and malformed/mixed bundles
+// without containers; synthetic ELF headers are parser fixtures, not executable proof.
+func TestNKEOSBinaryBundle(t *testing.T) {
+	elfFixture := func(machine elf.Machine) []byte {
+		header := elf.Header64{
+			Type: uint16(elf.ET_EXEC), Machine: uint16(machine), Version: uint32(elf.EV_CURRENT),
+			Ehsize: 64, Phentsize: 56, Shentsize: 64,
+		}
+		copy(header.Ident[:], elf.ELFMAG)
+		header.Ident[elf.EI_CLASS] = byte(elf.ELFCLASS64)
+		header.Ident[elf.EI_DATA] = byte(elf.ELFDATA2LSB)
+		header.Ident[elf.EI_VERSION] = byte(elf.EV_CURRENT)
+		var data bytes.Buffer
+		if err := binary.Write(&data, binary.LittleEndian, header); err != nil {
+			t.Fatal(err)
+		}
+		return data.Bytes()
+	}
+	amd64, arm64 := elfFixture(elf.EM_X86_64), elfFixture(elf.EM_AARCH64)
+	type member struct {
+		name string
+		data []byte
+	}
+	for _, test := range []struct {
+		name     string
+		machine  elf.Machine
+		members  []member
+		expected []string
+		wantErr  string
+	}{
+		{name: "amd64", machine: elf.EM_X86_64, members: []member{{"./a", amd64}, {"./b", amd64}}, expected: []string{"b", "a"}},
+		{name: "arm64", machine: elf.EM_AARCH64, members: []member{{"a", arm64}, {"b", arm64}}, expected: []string{"a", "b"}},
+		{name: "foreign first", machine: elf.EM_AARCH64, members: []member{{"a", amd64}, {"b", arm64}}, expected: []string{"a", "b"}, wantErr: "member \"a\" architecture"},
+		{name: "foreign later", machine: elf.EM_X86_64, members: []member{{"a", amd64}, {"b", arm64}}, expected: []string{"a", "b"}, wantErr: "member \"b\" architecture"},
+		{name: "non ELF", machine: elf.EM_X86_64, members: []member{{"a", []byte("not an ELF")}}, expected: []string{"a"}, wantErr: "not a valid ELF"},
+		{name: "truncated ELF", machine: elf.EM_X86_64, members: []member{{"a", amd64[:24]}, {"b", amd64}}, expected: []string{"a", "b"}, wantErr: "not a valid ELF"},
+		{name: "duplicate", machine: elf.EM_X86_64, members: []member{{"a", amd64}, {"a", amd64}}, expected: []string{"a", "b"}, wantErr: "bundle membership"},
+		{name: "missing", machine: elf.EM_X86_64, members: []member{{"a", amd64}}, expected: []string{"a", "b"}, wantErr: "bundle membership"},
+		{name: "nested path", machine: elf.EM_X86_64, members: []member{{"subdir/a", amd64}}, expected: []string{"a"}, wantErr: "bundle path"},
+		{name: "empty membership", machine: elf.EM_X86_64, wantErr: "no expected membership"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var data bytes.Buffer
+			writer := tar.NewWriter(&data)
+			for _, entry := range test.members {
+				if err := writer.WriteHeader(&tar.Header{Name: entry.name, Size: int64(len(entry.data)), Typeflag: tar.TypeReg}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := writer.Write(entry.data); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			filename := filepath.Join(t.TempDir(), "bundle.tar")
+			if err := os.WriteFile(filename, data.Bytes(), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			file, err := os.Open(filename)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer file.Close()
+			expected := slices.Clone(test.expected)
+			err = validatePublicOSBinaryBundle(file, expected, test.machine)
+			if test.wantErr == "" && err != nil {
+				t.Fatal(err)
+			}
+			if test.wantErr != "" && (err == nil || !strings.Contains(err.Error(), test.wantErr)) {
+				t.Fatalf("bundle error = %v, want %q", err, test.wantErr)
+			}
+			if !slices.Equal(expected, test.expected) {
+				t.Fatal("validation mutated expected membership")
+			}
+		})
 	}
 }
