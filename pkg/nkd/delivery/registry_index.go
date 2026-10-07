@@ -2,6 +2,9 @@ package delivery
 
 import (
 	"context"
+	"errors"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -140,7 +143,20 @@ func captureRegistryBlob(ctx context.Context, closure *imageIndexClosure, reposi
 	})
 	closeErr := stream.Close()
 	if captureErr != nil {
-		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, captureErr, "capturing registry image blob"))
+		code := e.CodeVerifyFailed
+		var networkError net.Error
+		switch {
+		case errors.Is(captureErr, context.Canceled), errors.Is(captureErr, context.DeadlineExceeded):
+			code = e.CodeTimeout
+		case errors.As(captureErr, &networkError):
+			code = e.CodeUnavailable
+			if networkError.Timeout() {
+				code = e.CodeTimeout
+			}
+		case errors.Is(captureErr, io.EOF), errors.Is(captureErr, io.ErrUnexpectedEOF):
+			code = e.CodeUnavailable
+		}
+		return classifyContext(ctx, e.Wrap(code, captureErr, "capturing registry image blob"))
 	}
 	if closeErr != nil || held.Size() != descriptor.Size {
 		_ = held.Close()

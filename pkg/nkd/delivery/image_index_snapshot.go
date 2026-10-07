@@ -93,6 +93,9 @@ func (closure *imageIndexClosure) verify(ctx context.Context, platforms map[stri
 		if err := decodeImageJSON(manifestRaw, &manifest); err != nil {
 			return nil, err
 		}
+		if manifest.MediaType != descriptor.MediaType {
+			return nil, e.New(e.CodeVerifyFailed, "runnable image manifest media type differs from its descriptor")
+		}
 		if manifest.Subject != nil || manifest.Config.ArtifactType != "" {
 			return nil, e.New(e.CodeVerifyFailed, "runnable image cannot be a subject-bearing artifact")
 		}
