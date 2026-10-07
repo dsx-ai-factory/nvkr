@@ -85,7 +85,11 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 		if total < 0 || total > maxMetadataBytes {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "metadata exceeds total size bound")
 		}
-		if _, err := readBlob(ctx, root, m.Config, 8<<20); err != nil {
+		if object.Output != nil && object.Output.Format == "oci" {
+			if _, err := inspectImageMetadata(ctx, root, m); err != nil {
+				return Inspection{}, err
+			}
+		} else if _, err := readBlob(ctx, root, m.Config, 8<<20); err != nil {
 			return Inspection{}, err
 		}
 		if object.Evidence != nil {
