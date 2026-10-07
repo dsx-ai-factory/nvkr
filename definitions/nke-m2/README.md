@@ -90,7 +90,7 @@ the existing catalog interfaces and the precise scope of its graph tests. The
 [release transport evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
 failed candidate's storage exhaustion and why correcting carrier selection alone does not complete delivery.
 
-The [toolchain preparation guides](../../toolchains/nkd-packer/README.md)
+The [toolchain preparation guide](../../toolchains/nkd-packer/README.md)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
@@ -146,7 +146,7 @@ Assembly authenticates same-Plan, same-workflow metadata and evidence; it does n
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities, but
 hosted mixed-attempt reuse remains unexercised.
 
-Only source-fetch steps receive `NKE_SOURCE_TOKEN`; native build jobs receive source bytes without that
+Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN`; native build jobs receive source bytes without that
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
 before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
 package. Restrict `nkd-arc`, `nkd-release` and the signing identity to the selected refs. Maintained inputs

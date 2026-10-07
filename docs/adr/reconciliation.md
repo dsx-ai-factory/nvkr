@@ -265,3 +265,9 @@ Current publication-root v4 binds the exact Definition, Environment and Plan ide
 expectations are checked before external work; the lifecycle owner authenticates the complete output match
 and issues a policy/publication-bound opaque receipt. Current readers reject historical v3 roots, including
 the Run 37533806963 demo release. That browsing record does not establish current-schema external acceptance.
+
+Consumer Verification Policy binds `minimumDiskEvidence` into its typed digest. Pipeline-attested policy
+defaults to `build-provenance-v1`; explicit `strict` requires inspected-disk evidence. Qualified policy
+defaults to strict and rejects the producer-only minimum. Every disk in the authenticated closure must
+meet that policy before a capability is issued. Synthetic publication contracts cover enforcement and
+failed-policy cleanup; they do not establish production disk-release acceptance.

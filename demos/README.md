@@ -7,7 +7,8 @@ instructions, start with the [documentation](../docs/README.md) and [quickstart]
 
 The original presentation follows catalogs, generated pipelines, OS-image materials, and release
 navigation. Its featured release is the recorded October 6 M2 candidate; its graphs and results
-describe that snapshot.
+describe that snapshot. Current NKD requires publication-root v4 and rejects this historical v3 root.
+Use the embedded explorer for the recorded release; live browsing with current NKD needs a v4 publication.
 
 | Open | Purpose |
 |---|---|

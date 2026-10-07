@@ -8,7 +8,8 @@ on macOS and Linux; verification below requires Linux.
 
 Set `RELEASE_REF` to the exact publication-root reference emitted by a completed publication:
 the full registry/repository followed by `@sha256:` and its digest. A tag, URL, or individual output
-manifest is not a release root. Obtain this reference from the release publisher.
+manifest is not a release root. Obtain this reference from the release publisher. Current NKD requires
+publication-root v4; the historical v3 release featured in the team demo is rejected.
 
 ```sh
 : "${RELEASE_REF:?Set RELEASE_REF to an exact publication-root reference}"

@@ -31,12 +31,15 @@ Options:
   --non-interactive   skip guided pauses
   -h, --help          show this help
 
-Prerequisites: nkdctl built from this PR #108 checkout (or NKDCTL_BIN), Python 3,
+Prerequisites: a compatible nkdctl (or NKDCTL_BIN), Python 3,
 and registry access/credentials unless using --layout. New --out must not exist;
 its parent must exist. Registry browsing downloads bounded metadata and evidence
 documents, never artifact payload layers. --output and --mermaid each repeat the
 metadata read; use --layout with a saved metadata carrier for repeated offline
 views. --layout cannot use --anonymous.
+Current NKD requires publication-root v4. The recorded Run 37533806963 uses v3;
+use the embedded explorer, or set NKDCTL_BIN to the historical PR #108 CLI for
+that replay. For current browsing/verification, supply a current v4 publication.
 For Linux signature/policy verification, see demos/team-guide.md.
 EOF
 }

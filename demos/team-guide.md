@@ -154,7 +154,12 @@ policy. The archived workflow result and final Run record report 34 expected out
 match 34 observed outputs. Its successful finalization is distinct
 from the publication/signing jobs and from an independent consumer-policy decision.
 
-For a live metadata inspection, use this checkout's built CLI and the exact publication root:
+The saved release uses publication-root v3. Current NKD requires v4 and rejects it, including from
+a local layout. Use the embedded explorer for this historical snapshot. To replay the commands below,
+set `NKDCTL_BIN` to a separately built CLI from the exact historical PR #108 head above. For a current-CLI
+browse or verification exercise, replace `RELEASE_REF` with a current v4 publication root.
+
+Historical metadata replay:
 
 ```sh
 export RELEASE_REF='ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e'
