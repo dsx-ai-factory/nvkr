@@ -14,6 +14,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
 const helmDeploymentFixture = `# License retained
@@ -31,6 +32,50 @@ spec:
 
 func testHelmBinding(from, chart string) *HelmImageBinding {
 	return &HelmImageBinding{Chart: chart, Images: map[string]HelmImage{"controller": {From: from, Values: catalog.HelmImageValues{Digest: "image.digest"}}}}
+}
+
+func TestHelmDigestFormats(t *testing.T) {
+	for _, tc := range []struct {
+		name, format, digest, want string
+		code                       e.Code
+	}{
+		{name: "default OCI", digest: "sha256:" + strings.Repeat("a", 64), want: "sha256:" + strings.Repeat("a", 64)},
+		{name: "bare SHA256", format: "sha256-hex", digest: "sha256:" + strings.Repeat("a", 64), want: strings.Repeat("a", 64)},
+		{name: "unknown", format: "auto", digest: "sha256:" + strings.Repeat("a", 64), code: e.CodeInvalidCatalog},
+		{name: "untyped input", format: "sha256-hex", digest: strings.Repeat("a", 64), code: e.CodeVerifyFailed},
+		{name: "other algorithm", format: "sha256-hex", digest: "sha512:" + strings.Repeat("a", 128), code: e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			const original = "image: {digest: ''}\n"
+			path := filepath.Join(root, "values.yaml")
+			if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			binding := testHelmBinding("package/image", ".")
+			b := binding.Images["controller"]
+			b.Values.DigestFormat = tc.format
+			binding.Images["controller"] = b
+			err := bindHelmImages(t.Context(), root, *binding, map[string]string{"controller": tc.digest})
+			raw, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if tc.code != "" {
+				assertFactoryErrorCode(t, err, tc.code)
+				if string(raw) != original {
+					t.Fatal("failed binding changed chart bytes")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(raw), tc.want) || (tc.format == "sha256-hex" && strings.Contains(string(raw), "sha256:")) {
+				t.Fatalf("unexpected bound values: %s", raw)
+			}
+		})
+	}
 }
 
 func TestHelmImageBindingUpdatesChecksums(t *testing.T) {

@@ -36,6 +36,13 @@ are preserved; nested wrappers refresh binder-owned checksums outside the chart.
 and tag defaults stay unchanged. Values are reserialized with the YAML library: formatting can change,
 and document-level comments separated from the root mapping may be omitted. Template bytes stay unchanged. Unknown or unbound slots and missing or ambiguous value paths fail.
 
+For a source template that already adds `sha256:`, declare `values.digestFormat: sha256-hex`
+beside `values.digest`. NKD still authenticates the complete image manifest digest, but writes
+only its hex to that value. Omission preserves the full `sha256:<hex>` representation. Unknown
+formats fail closed; templates stay upstream-owned. The
+[OVN output example](../definitions/nke-ovn-source/README.md#native-image-and-helm-oci-outputs)
+uses this mapping for its six enabled image slots.
+
 ## Registry choice
 
 The installer supplies the repository holding that image:

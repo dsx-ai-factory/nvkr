@@ -23,6 +23,11 @@ func TestHelmProducerAdmissionAndIdentity(t *testing.T) {
 			b.Values.Digest = "images[0].digest"
 			c.Helm.Images["controller"] = b
 		}},
+		{name: "unknown digest format", change: func(c *Component) {
+			b := c.Helm.Images["controller"]
+			b.Values.DigestFormat = "guess"
+			c.Helm.Images["controller"] = b
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := goodComponent()
@@ -58,5 +63,28 @@ func TestHelmProducerAdmissionAndIdentity(t *testing.T) {
 				t.Fatal("chart mapping omitted from catalog identity")
 			}
 		})
+	}
+}
+
+func TestHelmDigestFormatIdentity(t *testing.T) {
+	c := goodComponent()
+	c.OutputType = "tarball"
+	c.Helm = &HelmPackaging{Chart: ".", Images: map[string]HelmImage{"image": {Values: HelmImageValues{Digest: "image.sha256"}}}}
+	original, err := base(c).SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := c.Helm.Images["image"]
+	b.Values.DigestFormat = "sha256-hex"
+	c.Helm.Images["image"] = b
+	if err := validateComponent("chart", c); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := base(c).SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if original == changed {
+		t.Fatal("digest representation omitted from catalog identity")
 	}
 }

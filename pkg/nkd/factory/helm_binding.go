@@ -83,7 +83,11 @@ func bindHelmImages(ctx context.Context, root string, binding HelmImageBinding, 
 		if !canonical.IsDigest(digest) {
 			return e.New(e.CodeVerifyFailed, "invalid image digest for Helm slot %q", slot)
 		}
-		selected[binding.Images[slot].Values.Digest].Value = digest
+		mapping := binding.Images[slot].Values
+		if mapping.DigestFormat == "sha256-hex" {
+			digest = strings.TrimPrefix(digest, "sha256:")
+		}
+		selected[mapping.Digest].Value = digest
 	}
 	encoded, err := yaml.Marshal(values)
 	if err != nil {

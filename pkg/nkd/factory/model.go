@@ -26,8 +26,9 @@ const (
 	ArtifactGraphSchema = "nkd.dev/artifact-graph/v4"
 	// DefaultRunsOn is the runner an unset Environment.runsOn falls back to. ADR-18 §8
 	// runs on a GENERIC hosted runner — the helper orchestrates the pinned container itself —
-	// so no bespoke self-hosted runner label is required; operators override runsOn only when
-	// they genuinely need a specific runner (e.g. a native arm64 host).
+	// so no bespoke self-hosted runner label is required. Ordinary native ARM64
+	// producers use ubuntu-24.04-arm when runsOn is unset in the ordinary hosted
+	// route; explicit routes (including the complete ARC projection) remain overrides.
 	DefaultRunsOn = "ubuntu-latest"
 )
 

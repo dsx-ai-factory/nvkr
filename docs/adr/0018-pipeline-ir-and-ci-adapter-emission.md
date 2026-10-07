@@ -109,7 +109,12 @@ execute a producer reference from the complete Plan through `factory execute-nod
 
 ### 3. Helper-owned isolation and narrowly admitted native ARC disks
 
-Jobs use generic hosted runners except the explicit native ARC disk policy below. The verified `nkd-exec` helper launches each pinned toolchain container
+Jobs use generic hosted runners except the explicit native ARC disk policy below. With `runsOn`
+unset and no ARC policy selected, ordinary native ARM64 producer fetch/acquisition/build operations select `ubuntu-24.04-arm`;
+AMD64 producers and utility operations retain `ubuntu-latest`. An explicit `runsOn` overrides
+this default; a VM execution binding and the complete native ARC routing projection keep their existing
+precedence. This is deterministic hosted routing, not runtime platform/capacity proof or
+qualified execution. The verified `nkd-exec` helper launches each pinned toolchain container
 through the shared `pipeline.Local.ExecNode` launcher used by local and hosted Run operations. Adapters render job topology, dependencies
 and declared transport; they do not reproduce isolation as provider-specific build syntax. Fetch/pull nodes
 materialize pinned inputs first; hermetic build and verification nodes enforce network denial, read-only inputs,

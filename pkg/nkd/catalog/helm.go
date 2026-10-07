@@ -20,6 +20,9 @@ type HelmImage struct {
 }
 type HelmImageValues struct {
 	Digest string `json:"digest"`
+	// DigestFormat is empty for the complete OCI digest, or sha256-hex when
+	// the source-owned template supplies the sha256: prefix itself.
+	DigestFormat string `json:"digestFormat,omitempty"`
 }
 
 var helmNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
@@ -36,6 +39,9 @@ func (h HelmPackaging) Validate() error {
 			return e.New(e.CodeInvalidCatalog, "invalid Helm image slot %q", slot)
 		}
 		p := b.Values.Digest
+		if b.Values.DigestFormat != "" && b.Values.DigestFormat != "sha256-hex" {
+			return e.New(e.CodeInvalidCatalog, "unsupported Helm digest format %q for slot %q", b.Values.DigestFormat, slot)
+		}
 		if err := documentpath.Validate(p); err != nil {
 			return err
 		}

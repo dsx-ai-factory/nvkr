@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -44,8 +45,8 @@ func TestNKEOVNForkGraphs(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
 			cat := loadOVNForkCatalog(t)
-			if len(cat.Components) != 2 {
-				t.Fatal("OVN selection must contain only the image and its Debian bundle")
+			if len(cat.Components) != 3 {
+				t.Fatal("OVN selection must contain the image, chart and Debian bundle")
 			}
 			for _, component := range cat.Components {
 				if !component.FromSource || component.Prebuilt != nil || component.Repo != "https://github.com/dsx-ai-factory/ovn-kubernetes" || component.Commit != ovnForkCommit {
@@ -56,7 +57,7 @@ func TestNKEOVNForkGraphs(t *testing.T) {
 				}
 			}
 			resolved, err := buildgraph.Resolve(cat, buildgraph.Selection{
-				Components: []string{"ovn-kube-ubuntu", "nke-cni-ovn"}, Platform: "linux/" + arch,
+				Components: []string{"ovn-kube-ubuntu", "ovn-kubernetes-chart", "nke-cni-ovn"}, Platform: "linux/" + arch,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -81,19 +82,24 @@ func TestNKEOVNForkGraphs(t *testing.T) {
 					if node.BuilderType != ir.BuilderBuildKit || node.Network != ir.NetworkDefault || node.OutputType != "oci-image" {
 						t.Fatal("source-owned Dockerfile must retain the declared wrapped BuildKit lane")
 					}
-				} else if node.Network != ir.NetworkNone || len(node.Materials) != 1 || node.Materials[0].Binding != "ovn-image" {
-					t.Fatalf("Debian packaging lost its exact offline image material: %+v", node)
+				} else if node.Component == "nke-cni-ovn" {
+					if node.Network != ir.NetworkNone || len(node.Materials) != 2 || node.Materials[0].Binding != "ovn-chart" || node.Materials[1].Binding != "ovn-image" {
+						t.Fatalf("Debian packaging lost its exact offline chart/image materials: %+v", node)
+					}
+				} else if node.Component != "ovn-kubernetes-chart" || node.Network != ir.NetworkNone || len(node.Materials) != 0 {
+					t.Fatalf("source chart must be packaged offline: %+v", node)
 				}
 			}
-			if builds != 2 {
-				t.Fatalf("build membership = %d, want 2", builds)
+			if builds != 3 {
+				t.Fatalf("build membership = %d, want 3", builds)
 			}
-			if _, err := buildgraph.Resolve(cat, buildgraph.Selection{Components: []string{"nke-cni-ovn"}, Platform: "linux/" + arch}); err == nil {
-				t.Fatal("missing source-built OCI material must fail closed")
-			} else {
+			for _, missing := range []string{"ovn-kube-ubuntu", "ovn-kubernetes-chart"} {
+				selected := []string{"nke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"}
+				selected = slices.DeleteFunc(selected, func(name string) bool { return name == missing })
+				_, err := buildgraph.Resolve(cat, buildgraph.Selection{Components: selected, Platform: "linux/" + arch})
 				var coded *nkderr.Error
 				if !errors.As(err, &coded) || coded.Code != nkderr.CodeInvalidCatalog {
-					t.Fatalf("missing image material returned %v", err)
+					t.Fatalf("missing %s material returned %v", missing, err)
 				}
 			}
 			_ = compileOVNForkPlan(t, cat, arch, "podman")
@@ -111,7 +117,7 @@ func compileOVNForkPlan(t *testing.T, cat *catalog.Catalog, arch, containerRunti
 		APIVersion: definition.DefinitionAPIVersion, Kind: definition.DefinitionKind,
 		Metadata: definition.Metadata{Name: "ovn-source-diagnostic"}, Catalog: definition.Catalog{Base: "catalog"},
 		Outputs: []definition.DefinitionOutput{{Name: "ovn", Platform: "linux/" + arch,
-			Format: definition.OutputExecutable, Components: []string{"nke-cni-ovn", "ovn-kube-ubuntu"}}},
+			Format: definition.OutputExecutable, Components: []string{"nke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"}}},
 	}, definition.Environment{
 		APIVersion: definition.EnvironmentAPIVersion, Kind: definition.EnvironmentKind,
 		Metadata:         definition.Metadata{Name: "ovn-source-diagnostic"},
@@ -198,7 +204,7 @@ func TestNKEOVNForkLive(t *testing.T) {
 	imageDigest := fmt.Sprintf("%x", imageHash.Sum(nil))
 	t.Logf("OVN OCI export: bytes=%d sha256=%s", imageSize, imageDigest)
 	for _, artifact := range plan.Graph.Artifacts {
-		if artifact.BuildTarget != "ovn" || artifact.Kind != "tarball" {
+		if artifact.BuildTarget != "ovn" || artifact.Kind != "tarball" || artifact.Component != "nke-cni-ovn" {
 			continue
 		}
 		file, err := os.Open(artifact.Path)

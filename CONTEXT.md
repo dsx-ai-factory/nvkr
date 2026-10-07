@@ -9,7 +9,9 @@ vocabulary preserves the distinctions needed to authenticate them.
 **Definition**:
 Authored product intent declaring named outputs, their exact catalog producers, target platforms and packaging
 intent. An output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
-deployment repository remains transport configuration.
+deployment repository remains transport configuration. Catalog-owned digest representation
+may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
+this does not change the authenticated image identity or rewrite templates.
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:

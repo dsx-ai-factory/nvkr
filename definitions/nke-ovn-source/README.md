@@ -36,14 +36,16 @@ bin/nkdctl catalog pin --dir definitions/nke-ovn-source/catalog \
    source-owned Dockerfile. It builds OVN-Kubernetes from the fork's Go source and
    emits one OCI image archive, named
    `localhost/nke/ovn-kubernetes:git-26cc199de8e814a7fe6d899a770fc04df0bbc2f9`.
-3. `nke-cni-ovn` consumes that exact image through the factory's held-material
-   boundary. It copies the chart from the authenticated fork checkout and packs
-   both Debian packages offline. No NKE package-folder command is invoked.
+3. `ovn-kubernetes-chart` archives the checked-in chart and its checked-in subcharts
+   offline. `nke-cni-ovn` consumes both that exact chart archive and image through
+   the factory's held-material boundary and packs both Debian packages offline.
+   No NKE package-folder command is invoked.
 
 ```text
 Pinned DSX OVN Git source
   ├─ source-owned Dockerfile → ovn-kube-ubuntu.oci.tar
-  └─ checked-in chart + authenticated image material
+  └─ checked-in chart → ovn-kubernetes-chart.tar
+       + authenticated image material
        → nke-cni-ovn.tar
            ├─ nke-cni-ovn-charts-1.5.18_1+git.26cc199de8e8_<arch>.deb
            └─ nke-cni-ovn-images-1.5.18_1+git.26cc199de8e8_<arch>.deb
@@ -60,6 +62,71 @@ The image package installs a deterministic gzip archive and SHA-256 sidecar unde
 `/usr/lib/nke/cni-ovn/1.5.18`. Its configuration hook checks the sidecar, bounds
 containerd readiness and import, then imports the archive into the `k8s.io`
 namespace. Import failures fail package configuration.
+
+## Native image and Helm OCI outputs
+
+[definition.yaml](definition.yaml) declares four independent deliverables:
+
+| Output | Platform | Delivery |
+|---|---|---|
+| `ovn-image-arm64` | `linux/arm64` | Native container image |
+| `ovn-image-amd64` | `linux/amd64` | Native container image |
+| `ovn-chart-arm64` | `linux/arm64` | Helm OCI chart bound to the ARM64 image |
+| `ovn-chart-amd64` | `linux/amd64` | Helm OCI chart bound to the AMD64 image |
+
+Each chart package depends on its corresponding image package. The existing
+generic Helm binder authenticates that image and writes its manifest SHA-256 hex
+into the six enabled image slots. `values.digestFormat: sha256-hex` is explicit
+because the fork's templates supply `sha256:` themselves. Templates, repositories
+and tags remain upstream-owned. Installers must set `global.useImageDigest=true`
+and override the six repository values to the repository holding that image,
+without replacing the bound `sha256` values. Enabling other subcharts needs
+additional image bindings and acceptance.
+
+Choose the matching architecture's chart and image repository together. Private
+GHCR requires independently provisioned Helm and node pull credentials; clearing
+`imagePullSecretName` is appropriate only when the node already has registry
+access or uses locally imported bytes. API endpoint and pod CIDR remain deployment
+inputs. Deployment overrides are not enforcement of the signed chart's defaults.
+
+[environment-github.yaml](environment-github.yaml) uses the existing native OCI/Helm
+publisher, SBOM/provenance and signing flow, not a separate OVN push script. Routes
+are `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/<output-name>@sha256:<digest>`.
+Helm also receives its chart-version discovery tag; digest references and signed
+Release membership remain authoritative. These are configured routes, not proof
+that those OVN outputs have been pushed.
+
+Generate and check the candidate in a disposable output root from the repository
+root, without replacing the maintained M2 workflow:
+
+```sh
+ovn_bundle_root=$(mktemp -d /tmp/nkd-ovn-bundle.XXXXXX)
+go run ./cmd/nkdctl run generate \
+  --definition definitions/nke-ovn-source/definition.yaml \
+  --environment definitions/nke-ovn-source/environment-github.yaml \
+  --engine github --root "$ovn_bundle_root"
+go run ./cmd/nkdctl run generate \
+  --definition definitions/nke-ovn-source/definition.yaml \
+  --environment definitions/nke-ovn-source/environment-github.yaml \
+  --engine github --root "$ovn_bundle_root" --check
+```
+
+Production execution requires installing that generated bundle in an admitted
+consumer checkout. The generator owns one `nkd-run.yml` per root; this PR does
+not replace the maintained M2 bundle. Dispatch remains default-branch-only,
+with the existing protected `nkd-release` environment and main signer policy.
+`NKE_SOURCE_TOKEN` must separately have read access to the internal OVN fork;
+secret existence does not prove that access. Registry write and OIDC tokens stay
+out of producer containers. Ordinary PR tests compile and regenerate without them.
+
+**Packer handoff is separate.** The Debian diagnostic shares its source chart and
+built image within one output, but adding an OS output alongside these deliverables
+does not reuse their producers automatically. It also does not stage the final
+digest-bound published chart. [Issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116)
+records the generic original-owner cross-output handoff required to build once,
+publish, and feed those same image/chart bytes into Debian/image-inputs/Packer.
+Independent rebuilds are not evidence of same bytes. This Definition contains
+only OVN image/chart outputs, not OS outputs.
 
 ## Packer interface
 
@@ -123,23 +190,34 @@ OVN producer, not an OVN-only maintained image or optional-material composer.
 ## Tests and limitations
 
 ```sh
-go test ./pkg/nkd/buildgraph -run '^TestNKEOVNForkGraphs$' -count=1
+go test ./pkg/nkd/buildgraph -run '^TestNKEOVNFork(Graphs|ReleaseOutputs)$' -count=1
 
 # Native Linux with host-side access to the fork, on a dedicated test host:
 NKD_OVN_SOURCE_RUNTIME=podman go test -v ./pkg/nkd/buildgraph \
   -run '^TestNKEOVNForkLive$' -count=1 -timeout 70m
 ```
 
-The graph test resolves both native architectures, checks the source and output
-closure, rejects the missing image material, and compiles the complete diagnostic
-factory Plan. Ordinary public-source CI runs only this credential-free contract.
+The graph tests resolve both native architectures, check the source and output
+closure, reject missing chart/image materials, and compile the diagnostic and
+four-output publication Plans. They verify all six native Helm bindings,
+cross-platform/missing-slot failures, publication-independent Build identity,
+ordinary native hosted routing and byte-exact bundle regeneration.
+Ordinary public-source CI runs only these credential-free contracts.
+The opt-in `TestOVNForkHelmDigestRendering` accepts
+`NKD_OVN_CHART_DIRECTORY=/path/to/pinned-fork/charts/ovn-kubernetes`. It renders
+the actual unchanged subchart templates against a controlled digest for two
+repository overrides, packages the bound chart as OCI, pushes to a temporary
+loopback registry and verifies byte-identical real Helm pull. It does not prove
+production GHCR publication or correspondence with a source-built image.
 The opt-in live test executes the real factory fetch/build operations and its
 authenticated material handoff, then independently extracts the Debian packages
 with `dpkg-deb` and checks metadata, layout, hook syntax and gzip/sidecar integrity.
 It also builds Helm from the existing pinned public-source producer, renders the
 packaged chart, rejects old/default image references and compares decompressed
 image bytes with the exact source-built OCI export. The
-[native ARM64 run](../../docs/evidence/2026-10-07-ovn-fork-source-build.md) passed.
+[original native ARM64 run](../../docs/evidence/2026-10-07-ovn-fork-source-build.md) passed.
+The [updated three-producer ARM64 run and chart OCI interoperability](../../docs/evidence/2026-10-07-ovn-release-outputs.md)
+also passed; that record separates measured local results from missing production acceptance.
 It stops before SBOM, signing and publication operations. Rootful Docker test
 ownership and SELinux workspace labeling follow the
 [existing diagnostic setup](../nke-os-source/README.md#tests).

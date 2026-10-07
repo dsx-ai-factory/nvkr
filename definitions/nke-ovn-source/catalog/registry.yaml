@@ -5,7 +5,7 @@ apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: nke-ovn-fork-source
-  description: Candidate OVN-only CNI packages from the internal DSX GitHub fork. Requires authenticated host-side source acquisition; not selected by maintained OS/M2 inputs.
+  description: Candidate native OVN image, Helm chart and CNI packages from the internal DSX GitHub fork. Requires authenticated host-side source acquisition; not selected by maintained OS/M2 inputs.
 sources:
   ovn-kubernetes:
     repo: https://github.com/dsx-ai-factory/ovn-kubernetes
@@ -45,12 +45,56 @@ components:
       - type=oci,dest=/src/nkd-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nke/ovn-kubernetes:git-26cc199de8e814a7fe6d899a770fc04df0bbc2f9
     writeDir: nkd-output
     artifactPath: nkd-output/ovn-kube-ubuntu.oci.tar
+  ovn-kubernetes-chart:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: ovn-kubernetes
+    outputType: tarball
+    helm:
+      chart: .
+      images:
+        control-plane:
+          values:
+            digest: ovnkube-control-plane.ovnkubeControlPlane.image.sha256
+            digestFormat: sha256-hex
+        node:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZone.image.sha256
+            digestFormat: sha256-hex
+        nbdb:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneNbdb.image.sha256
+            digestFormat: sha256-hex
+        sbdb:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneSbdb.image.sha256
+            digestFormat: sha256-hex
+        northd:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneNorthd.image.sha256
+            digestFormat: sha256-hex
+        ovn-host:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneOvnHost.image.sha256
+            digestFormat: sha256-hex
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        echo 'SOURCE ACCESS EXCEPTION: DSX OVN chart is internal; source credentials are host-side only.' >&2
+        test -f /src/charts/ovn-kubernetes/Chart.yaml
+        grep -qx 'version: 1.5.18' /src/charts/ovn-kubernetes/Chart.yaml
+        tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/charts -cf /src/nkd-output/ovn-kubernetes-chart.tar ovn-kubernetes
+    writeDir: nkd-output
+    artifactPath: nkd-output/ovn-kubernetes-chart.tar
   nke-cni-ovn:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
     outputType: tarball
     materials:
+      ovn-chart: ovn-kubernetes-chart
       ovn-image: ovn-kube-ubuntu
     buildCommand:
       - bash
@@ -65,10 +109,10 @@ components:
         readonly images="$out/images"
         readonly image_dir="$images/usr/lib/nke/cni-ovn/$stream"
         readonly image_name="ovn-images_${stream}_linux_{{.Arch}}.tgz"
-        test -f /src/charts/ovn-kubernetes/Chart.yaml
-        grep -qx "version: $stream" /src/charts/ovn-kubernetes/Chart.yaml
         mkdir -p "$charts/DEBIAN" "$charts/etc/dgx/ovn-kubernetes" "$images/DEBIAN" "$image_dir" "$out/debs"
-        cp -a /src/charts/ovn-kubernetes/. "$charts/etc/dgx/ovn-kubernetes/"
+        tar -xf /nkd/inputs/materials/ovn-chart -C "$charts/etc/dgx"
+        test -f "$charts/etc/dgx/ovn-kubernetes/Chart.yaml"
+        grep -qx "version: $stream" "$charts/etc/dgx/ovn-kubernetes/Chart.yaml"
         # Fork-specific keys: the old upstream global.image override does not apply.
         cat >"$charts/etc/dgx/ovn-kubernetes/values-nke.yaml" <<'EOF'
         global:

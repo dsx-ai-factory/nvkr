@@ -346,6 +346,29 @@ Qualified interfaces require package-issued opaque receipts. Caller structs, pat
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the
 owning signed protocol, never serialization of an in-process capability.
 
+## Candidate OVN outputs and Helm digest representation
+
+The separate `definitions/nke-ovn-source` Definition selects native image and
+digest-bound Helm OCI chart deliverables for both ARM64 and AMD64. Contract tests
+compile the four-output Plan, enforce six exact same-platform image bindings,
+reject missing slots/outputs and cross-platform joins, keep publication destinations
+out of Build identity, and regenerate the bundle byte-for-byte. Catalog-declared
+`values.digestFormat: sha256-hex` supports upstream templates that already add the
+algorithm prefix; unknown formats fail before chart mutation. Ordinary ARM64
+producer operations in the ordinary hosted route automatically use `ubuntu-24.04-arm`
+when `runsOn` is unset; explicit runner selections and the complete VM/ARC routing
+projection retain precedence.
+
+These are candidate inputs and contracts, not maintained M2 membership or proof
+of GHCR publication, signed Release acceptance or OS integration. The internal
+fork still requires separately established source access. Generic authenticated
+cross-output image/final-chart handoff into OS material composition is absent and
+tracked in [issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116).
+Independent selections may rebuild equal pinned sources; they do not establish
+same-byte correspondence. The [updated native ARM64 producer test and real Helm
+OCI push/pull interoperability](../evidence/2026-10-07-ovn-release-outputs.md) passed;
+they do not establish hosted publication, OS integration or signed Release acceptance.
+
 ## Output-local publication and metadata assembly
 
 ADR-18/20 admit the explicit GitHub `publication.mode: per-output-v1` selected by the M2 Environment.

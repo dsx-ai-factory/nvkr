@@ -339,6 +339,11 @@ old Definitions and generated plans must be migrated/regenerated.
 Helm values and catalog pin sets share bounded dotted-field/literal `[key=value]` traversal in
 `internal/documentpath`. Pin sets require complete selected-list membership; Helm mappings select explicit
 values while permitting unrelated chart settings. All digest targets must exist as distinct string scalars.
+A catalog slot's optional `values.digestFormat: sha256-hex` writes the validated SHA-256 hex
+without its algorithm prefix for source templates that already supply `sha256:`. Omission
+writes the full OCI digest. Unknown formats fail catalog/Plan admission; the format is catalog
+identity and frozen package dataflow, not inferred from a value path or template. No template
+rewriting or new digest algorithm is introduced.
 
 Packaging inspects each native image package, writes its manifest digest to the mapped values and refreshes
 wrapper-level checksums when the chart is nested. With `chart: "."`, no bookkeeping is written
