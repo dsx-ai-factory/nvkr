@@ -20,6 +20,15 @@ const (
 	MaxRetainedBytes    = 32 << 10
 	MaxForwardedRecords = 512
 	MaxFailureBytes     = 4096
+	// MaxParsedRecords bounds JSON work per helper operation, independently of
+	// retention. It conservatively covers six helper records and 33 filesystem
+	// passes (the ISO plus 32 installer members). Each pass has at most 14
+	// filesystem records, eight archive records per root/selected member, a
+	// selected-member pair, and two pairs per nested OCI image: transport and scan.
+	// One excess member is included for the start emitted before its budget
+	// rejection. The SBOM parity test
+	// binds these descriptive values to the owning inspection limits.
+	MaxParsedRecords = 6 + (1+32)*(14+8*(16384+1)+2*(16384+1)+4*256)
 )
 
 // Record is diagnostic only. All text fields have a closed vocabulary.
@@ -104,6 +113,8 @@ type Receiver struct {
 	lastForwarded Record
 	kind, subject string
 	failure       []byte
+	parsedRecords int
+	exhausted     bool
 }
 
 func NewReceiver(collector *Collector) *Receiver { return &Receiver{collector: collector} }
@@ -122,6 +133,9 @@ func (receiver *Receiver) Write(raw []byte) (int, error) {
 	receiver.mu.Lock()
 	defer receiver.mu.Unlock()
 	for _, value := range raw {
+		if receiver.exhausted {
+			break // Keep draining without framing or parsing the rejected remainder.
+		}
 		if value == '\n' {
 			if receiver.dropping {
 				receiver.unexpected = true
@@ -154,6 +168,17 @@ func (receiver *Receiver) accept(line []byte) {
 		receiver.rememberFailure(append(bytes.Clone(line), '\n'))
 		return
 	}
+	// Charge every prefixed candidate before any JSON pass, including malformed
+	// records. Saturate the counter and preserve the last accepted phase; volume
+	// rejection must not stop owned child/daemon streams from being drained.
+	if receiver.parsedRecords == MaxParsedRecords {
+		receiver.exhausted, receiver.unexpected, receiver.truncated = true, true, true
+		if receiver.collector != nil {
+			receiver.collector.markTruncated()
+		}
+		return
+	}
+	receiver.parsedRecords++
 	raw := line[len(Prefix):]
 	var record Record
 	decoder := json.NewDecoder(bytes.NewReader(raw))

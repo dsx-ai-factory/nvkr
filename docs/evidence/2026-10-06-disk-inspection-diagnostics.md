@@ -110,8 +110,8 @@ not as macOS skips. The source snapshot has these SHA-256 identities:
 These are controlled contract tests, not actual guestfish appliance/ISO execution, native AMD64 execution,
 full disk reconciliation or hosted acceptance. An existing diagnostic destination still fails no-replace
 publication; it is not authenticated as this attempt's log. Ephemeral single-job workspace policy remains
-required. A total accepted-record CPU ceiling is deferred: fixed pinned helper emission, bounded record
-parsing/memory and the operation deadline remain the current limits, rather than inventing a new evidence gate.
+required. At this historical snapshot a total accepted-record CPU ceiling was deferred; the separate
+parsing-ceiling validation below supersedes that implementation limitation.
 
 The [retained terminal record](2026-10-06-disk-inspection-diagnostics.log) contains the verbatim executed
 native commands/selectors and actual compact terminal outputs above. Its SHA-256 is
@@ -159,3 +159,58 @@ Commands and actual terminal outputs are retained in the
 This is controlled contract validation, not native AMD64 execution, a real full disk inspection or hosted
 acceptance. The historical macOS aggregate failure above remains unresolved as an aggregate cause;
 this union uses the complete native Linux equivalent test stage plus the host non-test gates.
+
+## Diagnostic parsing-ceiling validation
+
+The follow-up on base `ba87e272ada8c561c69819062a97fdcd66283ab8` bounds prefixed diagnostic candidates
+before canonical or JSON decoding, including malformed candidates. The 5,424,414-record allowance is derived
+from six fixed helper records plus 33 filesystem passes, each allowing 14 filesystem records, eight archive
+records per root/selected member, each selected member's start/complete pair and 256 image-scan pairs. The
+16,384 selected-member allowance includes an extra rejected-member start. Existing installer/image caps are
+named without changing their values, and the SBOM parity test binds the ceiling to the owning caps.
+Exhaustion fails inspection, drains without further framing/JSON work and preserves the last accepted phase;
+no partial report is accepted and no rejected bytes enter retained diagnostics.
+
+Boundary-minus-one, exact/over-ceiling, byte chunking, malformed candidates, post-ceiling flood/raw discard,
+independent sequential receiver budgets, concurrent writes and actual child cancellation/join regressions pass.
+The 5,424,414 figure and these results describe the pre-OCI emission set. The combined OCI implementation
+adds a transport start/complete pair per nested image and raises the parser ceiling to 5,441,310. Its current
+source adds a two-image emission regression; this historical run does not exercise that regression or the
+maximum 256-image shape.
+The complete Linux ARM64 race/atomic-coverage `./... -count=1` gate passed on the same already-local image
+and unchanged harness/assertions/deadlines: factory 271.377 seconds, lifecycle 42.567 seconds, pipeline
+20.780 seconds, sbom 102.422 seconds and diskdiagnostic 5.638 seconds. Host format, vet, lint, shellcheck,
+vulnerability, build and generated-workflow drift checks passed; the Plan digest is unchanged. The focused
+host diagnostic race suite passed in 4.459 seconds. Two independent source reviews found no blocking issue.
+
+The complete changed-Go diff, including tests, is SHA-256
+`1526bc078de0b0b765eb8fa5436cd570866c1ae1dd415456037def015b9603f4` relative to the stated base.
+The [verbatim command/terminal record](2026-10-06-disk-inspection-volume.log) has SHA-256
+`678a28d10235113ede88b9884de7c4b60fbc2d9c9730114deec872c329bc1337` (trailing blank separator normalized).
+This is contract validation, not native AMD64 execution, a new Mac aggregate-gate pass, rebuilt-helper
+deployment, full NKE disk inspection or hosted acceptance. Historical limitations above remain separately scoped.
+
+## Updated execution-parent integration
+
+The signed local conflict union combines diagnostic head `34774c5e112d1467c7137789284f93aa6c15e9ff`
+with execution parent `8ff3e010a0109cbd7c64d34bca4dcb3b70e7cd03`. It preserves the parent's
+qualified-root rejection of provenance-only disks, Packer diagnostic-route error aggregation and derived
+deadlines, alongside strict-only inspection collection, retention and exact upload admission. The parent's
+Plan inspection modules and documentation remain intact. No test assertion, timeout, dependency or inventory
+gate was changed by conflict resolution; the source and both parent-relative Go diffs are identified below.
+
+The frozen tracked Go/module/version content manifest is
+`4e365fa45b87fd4c2808e2b62297063670add1ebb8f39fcac92219b14bc21131`, unchanged before and after validation.
+The corresponding Go diff is `18640ffdcd0e545a449ed5e5434734588767a3783206972642607a7f5acef273`
+against the execution parent and `d9feedceb53eeafe3b59bdd97b7255e55d50b941a0cb47074ef2cc99431b698e`
+against the diagnostic parent. Complete native Linux ARM64 race/atomic-coverage tests passed: factory
+238.962 seconds, lifecycle 36.887 seconds, pipeline 22.610 seconds, Plan inspection 36.114 seconds and
+SBOM 74.521 seconds. The existing complete-tool image, read-only source/modules and private ignored-output
+harness were reused without pulls, network, skipped tests or extended deadlines. Host format, vet, lint,
+shellcheck, vulnerability, build and generated-workflow drift gates passed; the Plan digest stayed
+`sha256:850cea27b78f621ccb48242b41a8210c4df6efaee139d4102bfc325270e6cb05`. Actionlint also passed.
+
+The [executed commands and actual terminal outputs](2026-10-06-disk-inspection-updated-parent-union.log)
+have SHA-256 `db67f567e181598616ed7b5cf77b5e09e5e591be6ac1ee01d40595a9c72bb3e5`.
+This remains controlled contract validation, not native AMD64 execution, a full NKE disk inspection,
+rebuilt-helper deployment, hosted acceptance or a successful macOS aggregate gate.

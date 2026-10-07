@@ -19,6 +19,53 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 )
 
+// A helper emits six top-level records. Each filesystem pass adds at most 14
+// records, its archive root adds eight, each charged selected member adds an
+// outer pair plus at most eight recursive-archive records, and each charged
+// image adds a scan pair and an OCI transport pair. Include the rejected excess
+// member's start record.
+// ISO inspection can perform one outer pass plus every admitted installer member.
+func TestDiagnosticParsingBudgetCoversInspectionEmissions(t *testing.T) {
+	maximum := 6 + (1+maxDiskInstallerMembers)*(14+8*(maxDiskInstalledPackages+1)+2*(maxDiskInstalledPackages+1)+4*maxDiskNestedImages)
+	if diskdiagnostic.MaxParsedRecords != maximum {
+		t.Fatalf("diagnostic parsing ceiling %d differs from inspection emission bound %d", diskdiagnostic.MaxParsedRecords, maximum)
+	}
+}
+
+func TestNestedOCIProgressCountsTransportAndScanPerImage(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held scanner execution requires native Linux")
+	}
+	const imageCount = 2
+	archive := nestedOCIFixture(t, []string{"arm64", "arm64"}, false, nil)
+	script := []byte("#!/bin/sh\nprintf '%s' '{\"schema\":{\"version\":\"16.1.10\"},\"artifacts\":[]}\n")
+	scannerPath := filepath.Join(t.TempDir(), "scanner")
+	if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var diagnostics bytes.Buffer
+	ctx := context.WithValue(diskdiagnostic.WithWriter(t.Context(), &diagnostics), diskScanDepthKey{}, 1)
+	inspection, err := inspectNestedOCILayout(ctx, archive, archive, "linux/arm64", Scanner{Path: scannerPath, Digest: rawDigest(script)}, 1<<20, &materialInspectionBudget{remaining: 1 << 20})
+	if err != nil || inspection == nil {
+		t.Fatalf("nested OCI inspection failed: %v", err)
+	}
+	counts := make(map[string]int)
+	for _, line := range bytes.Split(bytes.TrimSpace(diagnostics.Bytes()), []byte("\n")) {
+		var record diskdiagnostic.Record
+		if err := json.Unmarshal(bytes.TrimPrefix(line, []byte(diskdiagnostic.Prefix)), &record); err != nil {
+			t.Fatalf("decode diagnostic record: %v", err)
+		}
+		counts[record.Phase+":"+record.Event]++
+	}
+	for _, phase := range []string{"scanner-transport", "nested-scan"} {
+		for _, event := range []string{"start", "complete"} {
+			if got, want := counts[phase+":"+event], imageCount; got != want {
+				t.Fatalf("%s %s records = %d, want one per image (%d)", phase, event, got, want)
+			}
+		}
+	}
+}
+
 func TestExportProgressTracksActualFirstBytes(t *testing.T) {
 	var diagnostic, payload bytes.Buffer
 	ctx := diskdiagnostic.WithWriter(t.Context(), &diagnostic)

@@ -82,3 +82,58 @@ func TestDiskBuildProvenanceReleaseContract(t *testing.T) {
 		}
 	}
 }
+
+func TestQualifiedPublicationRejectsDiskBuildProvenance(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, test := range []struct{ name, mode string }{
+			{"strict", ""},
+			{"producer provenance", sbom.DiskBuildProvenance},
+		} {
+			t.Run(arch+"/"+test.name, func(t *testing.T) {
+				request, _ := diskPublicationRequest(t, arch)
+				path := filepath.Join(t.TempDir(), "publication")
+				if _, err := BuildPublicationRoot(t.Context(), path, request); err != nil {
+					t.Fatal(err)
+				}
+				inspection, err := Inspect(t.Context(), path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				root := inspection.Root
+				// These describe a structurally complete qualified root; they do
+				// not create clearance, signatures or qualified publication proof.
+				pin := request.Release.DefinitionDigest
+				root.Qualification = QualificationQualified
+				root.PublicationIdentity, root.PublicationManifest = pin, pin
+				root.ReleaseSetDigest, root.InventoryDigest, root.ClearanceDigest = pin, pin, pin
+				if err := root.Validate(); err != nil {
+					t.Fatalf("complete strict qualified description rejected before mode mutation: %v", err)
+				}
+				changed := false
+				for index := range root.Objects {
+					object := &root.Objects[index]
+					if object.Output != nil && object.Output.Disk != nil {
+						object.Output.Disk.EvidenceMode = test.mode
+						changed = true
+					}
+				}
+				if !changed {
+					t.Fatal("fixture has no disk output to exercise qualification admission")
+				}
+				err = root.Validate()
+				if test.mode == "" {
+					if err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+				assertRegistryCode(t, err, e.CodeGateUnmet)
+				if !strings.Contains(err.Error(), "producer-provenance-only disk output") {
+					t.Fatalf("qualified rejection missed disk evidence gate: %v", err)
+				}
+				_, err = root.Digest()
+				assertRegistryCode(t, err, e.CodeGateUnmet)
+			})
+		}
+	}
+}

@@ -311,6 +311,8 @@ func inspectInstallerMembers(ctx context.Context, archive *os.File, platform, gu
 type diskFilesystemOrdinalKey struct{}
 type diskFilesystemDepthKey struct{}
 
+const maxDiskInstallerMembers = 32
+
 // The production caller supplies the concrete filesystem owner. This private
 // seam tests held SquashFS member/correspondence projection, not native decoding.
 func inspectInstallerMembersWith(ctx context.Context, archive *os.File, inspect func(inspectionArchive) (*FilesystemInspection, error)) (*FilesystemInspection, error) {
@@ -333,7 +335,7 @@ func inspectInstallerMembersWith(ctx context.Context, archive *os.File, inspect 
 			continue
 		}
 		count++
-		if count > 32 || header.Size <= 0 || header.Size > MaxDiagnosticDiskBytes {
+		if count > maxDiskInstallerMembers || header.Size <= 0 || header.Size > MaxDiagnosticDiskBytes {
 			return nil, e.New(e.CodeEngineCapability, "installer base filesystem exceeds its supported budget")
 		}
 		member, err := createGeneratedInspectionFile(ctx, header.Size, func(destination io.Writer) error { _, err := io.Copy(destination, reader); return err })

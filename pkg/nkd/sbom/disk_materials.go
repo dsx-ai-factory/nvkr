@@ -24,6 +24,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
+const maxDiskNestedImages = 256
+
 func inspectMaterialArchive(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64) (*FilesystemInspection, error) {
 	return inspectMaterialArchiveDepth(ctx, subject, platform, scanner, packageReaderDigest, maxBytes, 0)
 }
@@ -310,7 +312,7 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding compressed Docker image manifest")
 	}
-	if len(manifest) == 0 || len(manifest) > 256 {
+	if len(manifest) == 0 || len(manifest) > maxDiskNestedImages {
 		return nil, e.New(e.CodeEngineCapability, "compressed material has no bounded supported Docker image manifest")
 	}
 	// tarball.Image selects the first manifest entry matching a normalized tag.
@@ -340,7 +342,7 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 	seen := make(map[string]bool)
 	for _, tag := range tags {
 		budget.images++
-		if budget.images > 256 {
+		if budget.images > maxDiskNestedImages {
 			return nil, e.New(e.CodeEngineCapability, "nested material exceeds its cumulative image budget")
 		}
 		image, err := tarball.Image(opener, &tag)
