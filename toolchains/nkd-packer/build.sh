@@ -126,17 +126,14 @@ if [[ -z "${runtime}" ]]; then
 fi
 [[ -n "${runtime}" ]] || { echo "podman or docker is required" >&2; exit 1; }
 
-build_inputs=()
 if [[ -n "${NKD_BUILD_ARCHIVES:-}" || -n "${NKD_BUILD_CA_BUNDLE:-}" ]]; then
   [[ "${runtime##*/}" == docker ]] || { echo 'archive/CA inputs require Docker Buildx' >&2; exit 1; }
 fi
 if [[ -n "${NKD_BUILD_ARCHIVES:-}" ]]; then
   [[ -d "${NKD_BUILD_ARCHIVES}" ]] || { echo 'archive context is not a directory' >&2; exit 1; }
-  build_inputs+=(--build-context "nkd_archives=${NKD_BUILD_ARCHIVES}" --build-arg NKD_ARCHIVE_MODE=local)
 fi
 if [[ -n "${NKD_BUILD_CA_BUNDLE:-}" ]]; then
   [[ -f "${NKD_BUILD_CA_BUNDLE}" ]] || { echo 'build CA bundle is not a regular file' >&2; exit 1; }
-  build_inputs+=(--secret "id=nkd_ca_bundle,src=${NKD_BUILD_CA_BUNDLE}")
 fi
 
 uid="$(id -u)"
@@ -208,8 +205,14 @@ if [[ "${runtime##*/}" == docker ]]; then
     --build-arg SOURCE_DATE_EPOCH=0)
 fi
 
+if [[ -n "${NKD_BUILD_ARCHIVES:-}" ]]; then
+  build_command+=(--build-context "nkd_archives=${NKD_BUILD_ARCHIVES}" --build-arg NKD_ARCHIVE_MODE=local)
+fi
+if [[ -n "${NKD_BUILD_CA_BUNDLE:-}" ]]; then
+  build_command+=(--secret "id=nkd_ca_bundle,src=${NKD_BUILD_CA_BUNDLE}")
+fi
+
 build_command+=(
-  "${build_inputs[@]}"
   --platform "linux/${arch}" \
   --build-arg "TARGETARCH=${arch}" \
   --build-arg "BASE_IMAGE=${base_image}" \

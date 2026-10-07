@@ -24,20 +24,23 @@ func TestPreparedPrivateImageRequiresExactLocalDigest(t *testing.T) {
 		{"malformed", `{`, false, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			calls, pulls := 0, 0
+			var calls [][]string
 			got, err := observeContainerImageWith(t.Context(), ir.Node{ID: "private", Toolchain: ref, Platform: "linux/amd64"}, func(args ...string) ([]byte, error) {
-				calls++
-				if calls == 1 && test.missing {
+				calls = append(calls, slices.Clone(args))
+				if len(calls) == 1 && test.missing {
 					return nil, errors.New("image absent")
 				}
 				if args[0] == "pull" {
-					pulls++
 					return nil, nil
 				}
 				return []byte(test.document), nil
 			})
-			if pulls != map[bool]int{false: 0, true: 1}[test.missing] {
-				t.Fatal("present private image unexpectedly needed registry credentials")
+			wantCalls := [][]string{{"image", "inspect", "--format", "{{json .RepoDigests}}", ref}}
+			if test.missing {
+				wantCalls = append(wantCalls, []string{"pull", "--platform", "linux/amd64", ref}, wantCalls[0])
+			}
+			if !slices.EqualFunc(calls, wantCalls, func(got, want []string) bool { return slices.Equal(got, want) }) {
+				t.Fatalf("toolchain lookup/pull argv = %v, want %v", calls, wantCalls)
 			}
 			if test.want != "" {
 				if code(err) != test.want || got != "" {

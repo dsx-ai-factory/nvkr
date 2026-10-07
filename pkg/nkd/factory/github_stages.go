@@ -26,6 +26,13 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	if stage.DiskOutput != "" {
 		limit = 1440
 	}
+	executionLimit := limit
+	if stage.DiskOutput != "" {
+		if limit <= githubDiskJobHeadroomMinutes {
+			return 0, e.New(e.CodeEngineCapability, "GitHub disk job has no execution budget after reserved headroom")
+		}
+		executionLimit -= githubDiskJobHeadroomMinutes
+	}
 	var total uint64
 	declared := false
 	undeclared := 0
@@ -39,28 +46,49 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 		if node.Requirements.TimeoutSeconds%60 != 0 {
 			minutes++
 		}
-		if minutes > limit || total > limit-minutes {
+		if minutes > executionLimit || total > executionLimit-minutes {
 			return 0, e.New(e.CodeEngineCapability,
-				"GitHub stage %q timeout exceeds the %d-minute job limit",
-				stage.ID, limit)
+				"GitHub stage %q execution timeout exceeds the %d-minute job limit",
+				stage.ID, executionLimit)
 		}
 		total += minutes
 	}
 	if !declared {
+		if stage.DiskOutput != "" {
+			return githubDefaultStageTimeoutMinutes + int(githubDiskJobHeadroomMinutes), nil
+		}
 		return githubDefaultStageTimeoutMinutes, nil
 	}
 	// Once any node declares a timeout, the stage budget is the sum of its
 	// serial node budgets. Give each undeclared node the bounded adapter default
 	// rather than silently counting it as zero.
 	for range undeclared {
-		if total > limit-githubDefaultStageTimeoutMinutes {
+		if total > executionLimit-githubDefaultStageTimeoutMinutes {
 			return 0, e.New(e.CodeEngineCapability,
-				"GitHub stage %q timeout exceeds the %d-minute job limit",
-				stage.ID, limit)
+				"GitHub stage %q execution timeout exceeds the %d-minute job limit",
+				stage.ID, executionLimit)
 		}
 		total += githubDefaultStageTimeoutMinutes
 	}
+	if stage.DiskOutput != "" {
+		total += githubDiskJobHeadroomMinutes
+	}
 	return int(total), nil
+}
+
+// Disk output collection, job finalization and artifact upload continue after
+// the producer deadline. Keep a small fixed margin in the provider job timeout.
+const githubDiskJobHeadroomMinutes uint64 = 15
+
+func githubStageExecutionTimeoutMinutes(stage githubStage) (int, error) {
+	jobMinutes, err := githubStageTimeoutMinutes(stage)
+	if err != nil {
+		return 0, err
+	}
+	if stage.DiskOutput != "" {
+		return jobMinutes - int(githubDiskJobHeadroomMinutes), nil
+	}
+	return jobMinutes, nil
 }
 
 func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {

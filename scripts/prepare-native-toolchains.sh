@@ -67,7 +67,13 @@ helper_status=0
 grep -F '[NKD-E-USAGE]' "${output}/helper-admission.log" >/dev/null
 # Match the owner's private scratch layout. QEMU redirects exactly /tmp to
 # /var/tmp for snapshot overlays, which is read-only in this container.
+probe_name="nkd-inspector-probe-${arch}-$$"
+cleanup_probe() {
+  docker rm -f "${probe_name}" >/dev/null 2>&1 || true
+}
+trap cleanup_probe EXIT
 "${run[@]}" --cpus 2 --memory 4g --memory-swap 4g --pids-limit 512 \
+  --name "${probe_name}" \
   --tmpfs /tmp:rw,nosuid,nodev,size=2147483648,mode=1777 \
   --env HOME=/tmp/probe-work --env TMPDIR=/tmp/probe-work \
   --env LIBGUESTFS_CACHEDIR=/tmp/probe-work --env LIBGUESTFS_TMPDIR=/tmp/probe-work \
