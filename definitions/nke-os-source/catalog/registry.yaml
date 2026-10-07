@@ -30,51 +30,18 @@ sources:
     toolchainImagesByArch:
       amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
       arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
-    vendorCommand:
-      - bash
-      - -ec
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-        pins="$(sha256sum go.mod go.sum)"
-        timeout --kill-after=10s 240s go mod download
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
-        GOPROXY=off timeout --kill-after=10s 60s go mod verify
-        GOPROXY=off timeout --kill-after=10s 120s go mod vendor
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
   crictl-1-35-0:
     repo: https://github.com/kubernetes-sigs/cri-tools
     constraint: 1.35.0
     toolchainImagesByArch:
       amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
       arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
-    vendorCommand:
-      - bash
-      - -ec
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-        pins="$(sha256sum go.mod go.sum)"
-        timeout --kill-after=10s 240s go mod download
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
-        GOPROXY=off timeout --kill-after=10s 60s go mod verify
-        GOPROXY=off timeout --kill-after=10s 120s go mod vendor
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
   crictl-1-36-0:
     repo: https://github.com/kubernetes-sigs/cri-tools
     constraint: 1.36.0
     toolchainImagesByArch:
       amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
       arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
-    vendorCommand:
-      - bash
-      - -ec
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-        pins="$(sha256sum go.mod go.sum)"
-        timeout --kill-after=10s 240s go mod download
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
-        GOPROXY=off timeout --kill-after=10s 60s go mod verify
-        GOPROXY=off timeout --kill-after=10s 120s go mod vendor
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
   helm-3-20-2:
     repo: https://github.com/helm/helm
     constraint: 3.20.2
@@ -174,7 +141,7 @@ components:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: spire-tpm-1-9-0
-    outputType: host-package
+    outputType: raw
     buildCommand:
       - bash
       - -ec
@@ -182,16 +149,13 @@ components:
         export GOENV=off GOWORK=off GOPROXY=off
         go build -mod=vendor -ldflags "-s -w -buildid=" \
           -o /src/nkd-output/tpm_attestor_agent ./cmd/tpm_attestor_agent
-    versionStamp:
-      BUILD_VERSION: '{{.Tag}}'
-      GIT_VERSION: '{{.Commit}}'
     writeDir: nkd-output
     artifactPath: nkd-output/tpm_attestor_agent
   get-tpm-pubhash-1-9-0:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: spire-tpm-1-9-0
-    outputType: host-package
+    outputType: raw
     buildCommand:
       - bash
       - -ec
@@ -199,16 +163,13 @@ components:
         export GOENV=off GOWORK=off GOPROXY=off
         go build -mod=vendor -ldflags "-s -w -buildid=" \
           -o /src/nkd-output/get_tpm_pubhash ./cmd/get_tpm_pubhash
-    versionStamp:
-      BUILD_VERSION: '{{.Tag}}'
-      GIT_VERSION: '{{.Commit}}'
     writeDir: nkd-output
     artifactPath: nkd-output/get_tpm_pubhash
   crictl-1-34-0:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: crictl-1-34-0
-    outputType: host-package
+    outputType: raw
     buildCommand:
       - bash
       - -ec
@@ -225,7 +186,7 @@ components:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: crictl-1-35-0
-    outputType: host-package
+    outputType: raw
     buildCommand:
       - bash
       - -ec
@@ -242,7 +203,7 @@ components:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: crictl-1-36-0
-    outputType: host-package
+    outputType: raw
     buildCommand:
       - bash
       - -ec
@@ -259,13 +220,19 @@ components:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: helm-3-20-2
-    outputType: host-package
+    outputType: raw
     buildCommand:
       - bash
       - -ec
       - |
         export GOENV=off GOWORK=off GOPROXY=off
-        go build -mod=vendor -ldflags "-s -w -buildid= -X helm.sh/helm/v3/internal/version.version=$BUILD_VERSION -X helm.sh/helm/v3/internal/version.gitCommit=$GIT_VERSION -X helm.sh/helm/v3/internal/version.gitTreeState=clean" \
+        # Match the pinned upstream Makefile's client-go-derived defaults.
+        client_version="$(go list -mod=vendor -m k8s.io/client-go | awk '{print $2}')"
+        test "$client_version" = v0.35.1
+        IFS=. read -r client_major k8s_minor client_patch <<<"${client_version#v}"
+        k8s_major=$((client_major + 1))
+        # Removed negative-test fixture links are not cmd/helm compilation inputs.
+        go build -mod=vendor -ldflags "-s -w -buildid= -X helm.sh/helm/v3/pkg/chartutil.k8sVersionMajor=$k8s_major -X helm.sh/helm/v3/pkg/chartutil.k8sVersionMinor=$k8s_minor -X helm.sh/helm/v3/pkg/lint/rules.k8sVersionMajor=$k8s_major -X helm.sh/helm/v3/pkg/lint/rules.k8sVersionMinor=$k8s_minor -X helm.sh/helm/v3/internal/version.version=$BUILD_VERSION -X helm.sh/helm/v3/internal/version.gitCommit=$GIT_VERSION -X helm.sh/helm/v3/internal/version.gitTreeState=clean" \
           -o /src/nkd-output/helm ./cmd/helm
     versionStamp:
       BUILD_VERSION: '{{.Tag}}'
@@ -287,7 +254,7 @@ components:
           test -d "$directory" || continue
           plugin="$(basename "$directory")"
           test "$plugin" != windows || continue
-          go build -mod=vendor -ldflags "-s -w -buildid=" \
+          go build -mod=vendor -ldflags "-s -w -buildid= -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=$BUILD_VERSION" \
             -o "/src/nkd-output/bin/$plugin" "./$directory"
         done
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -295,6 +262,8 @@ components:
           -cf /src/nkd-output/cni-plugins-1-6-0.tar .
     writeDir: nkd-output
     artifactPath: nkd-output/cni-plugins-1-6-0.tar
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
   containerd-2-1-7:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
@@ -310,7 +279,7 @@ components:
           tags=urfave_cli_no_docs
           if test "$binary" = containerd-shim-runc-v2; then tags="$tags no_grpc"; fi
           go build -mod=vendor -tags "$tags" \
-            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=containerd" \
+            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=github.com/containerd/containerd/v2" \
             -o "/src/nkd-output/bin/$binary" "./cmd/$binary"
         done
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -336,7 +305,7 @@ components:
           tags=urfave_cli_no_docs
           if test "$binary" = containerd-shim-runc-v2; then tags="$tags no_grpc"; fi
           go build -mod=vendor -tags "$tags" \
-            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=containerd" \
+            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=github.com/containerd/containerd/v2" \
             -o "/src/nkd-output/bin/$binary" "./cmd/$binary"
         done
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -362,7 +331,7 @@ components:
           tags=urfave_cli_no_docs
           if test "$binary" = containerd-shim-runc-v2; then tags="$tags no_grpc"; fi
           go build -mod=vendor -tags "$tags" \
-            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=containerd" \
+            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=github.com/containerd/containerd/v2" \
             -o "/src/nkd-output/bin/$binary" "./cmd/$binary"
         done
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -387,7 +356,7 @@ components:
         build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
         for binary in kubeadm kubectl kubelet kube-apiserver kube-controller-manager kube-scheduler kube-proxy; do
           go build -mod=vendor -tags selinux,notest,grpcnotrace \
-            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date" \
+            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
             -o "/src/nkd-output/bin/$binary" "./cmd/$binary"
         done
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -415,7 +384,7 @@ components:
         build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
         for binary in kubeadm kubectl kubelet kube-apiserver kube-controller-manager kube-scheduler kube-proxy; do
           go build -mod=vendor -tags selinux,notest,grpcnotrace \
-            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date" \
+            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
             -o "/src/nkd-output/bin/$binary" "./cmd/$binary"
         done
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -443,7 +412,7 @@ components:
         build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
         for binary in kubeadm kubectl kubelet kube-apiserver kube-controller-manager kube-scheduler kube-proxy; do
           go build -mod=vendor -tags selinux,notest,grpcnotrace \
-            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date" \
+            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
             -o "/src/nkd-output/bin/$binary" "./cmd/$binary"
         done
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -461,12 +430,13 @@ components:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: helm-4-1-4
-    outputType: host-package
+    outputType: raw
     buildCommand:
       - bash
       - -ec
       - |
         export GOENV=off GOWORK=off GOPROXY=off
+        # Removed negative-test fixture links are not cmd/helm compilation inputs.
         go build -mod=vendor -ldflags "-s -w -buildid= -X helm.sh/helm/v4/internal/version.version=$BUILD_VERSION -X helm.sh/helm/v4/internal/version.gitCommit=$GIT_VERSION -X helm.sh/helm/v4/internal/version.gitTreeState=clean" \
           -o /src/nkd-output/helm ./cmd/helm
     versionStamp:

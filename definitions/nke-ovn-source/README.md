@@ -1,8 +1,8 @@
 # OVN source-build option
 
-Candidate, selectable CNI producer catalog for the requested
+Candidate, selectable CNI producer catalog for the
 [`dsx-ai-factory/ovn-kubernetes`](https://github.com/dsx-ai-factory/ovn-kubernetes) fork.
-It adds an OVN option to PR #113; it does not remove Calico or change the maintained
+It does not remove Calico or change the maintained
 OS/M2 Definitions. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
 and `nke-cni-ovn` deliberately preserve the existing producer names. A maintained
 replacement must use the predecessor-digest-bound catalog overlay contract and
@@ -69,6 +69,52 @@ source-owned NKE composer expands the flat Debian archive into image-inputs.
 Packer consumes the resulting authenticated image-inputs archive; it does not
 clone Git or build OVN. CNI packages are staged in the OS for subsequent cluster
 configuration, not proof that an OVN cluster has been deployed.
+
+### NKE with OVN, including both OS images
+
+The following is an integration map, **not an executable OVN-enabled OS
+Definition or a completed OS test**. It combines the candidate output with the
+existing maintained producer names in `definitions/nke-m2/os-catalog/registry.yaml`:
+
+```text
+For each native platform: linux/arm64 and linux/amd64
+  DSX fork → ovn-kube-ubuntu → nke-cni-ovn.tar  [tested candidate producer]
+                                  │ bind as material "ovn"
+  nke-agent ───────────────────────┤
+  nke-kubeadm-distro ──────────────┤
+  nke-spire-agent ─────────────────┤
+  nke-cni-calico ──────────────────┤  still required by current composer
+                                  ▼
+                         nke-image-inputs → image-inputs.tar
+                                  │
+  native patched installer ISO ───┤
+                                  ▼
+                    source-owned Packer → non-fde/nke-node.qcow2
+                                  │
+                       boot + agent CNI/version selection
+                                  ▼
+                             OVN workload cluster
+```
+
+| Native architecture | Existing OS producer | Existing installer producer | Candidate OVN package architecture |
+|---|---|---|---|
+| ARM64 | `nke-node-image` | `nke-patched-installer-iso` | `arm64` |
+| AMD64 | `nke-node-image-amd64` | `nke-patched-installer-iso-amd64` | `amd64` |
+
+Both existing OS producers select `nke-node-non-fde.qemu.nke-non-fde`. The
+material manifest schema is `nke.dev/os-image-materials/v1`; its inputs are
+`image-inputs` (archive) and `installer-iso` (disk image). NKD supplies exact
+authenticated files and the source-owned Packer interface consumes them. Packer
+does not choose the Git repository, download OVN or compile its binaries.
+
+To make this map runnable, replace the old OVN producers using a catalog overlay
+bound to the exact predecessor digest, regenerate matching toolchain/Plan inputs,
+and verify composer/package compatibility plus fresh OS bakes on **both** native
+architectures. Boot/import and agent CNI selection require separate acceptance;
+the existing image may also contain Calico packages without deploying Calico.
+The current fork's cluster-time configuration/version compatibility is not yet
+proven. Publication/signing follows the selected Environment's existing OCI route,
+not this producer diagnostic.
 
 The current NKE composer still requires its `calico`, `kubeadm-distro`, `ovn` and
 `spire-agent` archive bindings plus the agent package. This PR adds a choice of

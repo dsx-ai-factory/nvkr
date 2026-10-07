@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"debug/buildinfo"
 	"debug/elf"
 	"encoding/binary"
 	"errors"
@@ -197,6 +198,16 @@ func TestNKEOSPublicSourcesLive(t *testing.T) {
 	if report == nil || len(report.Artifacts) != len(names) {
 		t.Fatalf("terminal artifact membership does not match %v", names)
 	}
+	var observed []string
+	for _, artifact := range report.Artifacts {
+		observed = append(observed, artifact.Component)
+	}
+	slices.Sort(observed)
+	expected := slices.Clone(names)
+	slices.Sort(expected)
+	if !slices.Equal(observed, expected) {
+		t.Fatalf("terminal artifact identities = %v, want %v", observed, expected)
+	}
 	for _, artifact := range report.Artifacts {
 		t.Run(artifact.Component, func(t *testing.T) {
 			if artifact.Qualification != pipeline.ArtifactUnqualified || artifact.InputDigest == "" || artifact.Size <= 0 {
@@ -223,6 +234,7 @@ func TestNKEOSPublicSourcesLive(t *testing.T) {
 			}
 			if artifact.OutputType == "tarball" {
 				checkPublicOSBinaryBundle(t, file, cases, artifact.Component, wantMachine)
+				probePublicOSBundle(t, ctx, file, artifact.Component, cat.Components[artifact.Component].Tag)
 				return
 			}
 			executable, err := elf.NewFile(file)
@@ -244,6 +256,172 @@ func TestNKEOSPublicSourcesLive(t *testing.T) {
 					t.Fatalf("version smoke failed: %v: %s", err, output)
 				}
 				t.Logf("version smoke: %s", output)
+				if artifact.Component == "helm-3-20-2" {
+					probeHelmKubeVersion(t, ctx, artifact.AbsPath)
+				}
+			}
+		})
+	}
+}
+
+// probeHelmKubeVersion exercises both independently stamped upstream packages.
+func probeHelmKubeVersion(t *testing.T, ctx context.Context, binary string) {
+	t.Helper()
+	chart := t.TempDir()
+	if err := os.Mkdir(filepath.Join(chart, "templates"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"Chart.yaml":           "apiVersion: v2\nname: kube-version-probe\nversion: 0.1.0\nkubeVersion: '>=1.35.0-0'\n",
+		"templates/probe.yaml": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-version-probe\ndata:\n  version: {{ .Capabilities.KubeVersion.Version | quote }}\n",
+	} {
+		if err := os.WriteFile(filepath.Join(chart, name), []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, args := range [][]string{{"template", "probe", chart}, {"lint", chart}} {
+		probeCtx, stop := context.WithTimeout(ctx, 10*time.Second)
+		cmd := exec.CommandContext(probeCtx, binary, args...)
+		cmd.WaitDelay = 5 * time.Second
+		output, err := cmd.CombinedOutput()
+		stop()
+		if err != nil || (args[0] == "template" && !strings.Contains(string(output), "v1.35.0")) {
+			t.Fatalf("Helm Kubernetes defaults %v: %v: %s", args, err, output)
+		}
+		t.Logf("Helm Kubernetes defaults %s: %s", args[0], output)
+	}
+}
+
+// probePublicOSBundle uses the standard tar codec after exact membership admission.
+// It runs only cheap native version queries, never service startup or CNI ADD.
+func probePublicOSBundle(t *testing.T, ctx context.Context, file *os.File, component, tag string) {
+	t.Helper()
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	reader := tar.NewReader(file)
+	dir := t.TempDir()
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Typeflag == tar.TypeDir {
+			continue
+		}
+		name := strings.TrimPrefix(header.Name, "./")
+		if strings.Contains(name, "/") || name == "." || name == ".." || name == "" || header.Size > 256<<20 {
+			t.Fatal("invalid admitted binary member")
+		}
+		binary := filepath.Join(dir, name)
+		out, err := os.OpenFile(binary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, copyErr := io.CopyN(out, reader, header.Size)
+		if err := errors.Join(copyErr, out.Close()); err != nil {
+			t.Fatal(err)
+		}
+		info, err := buildinfo.ReadFile(binary)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Go intentionally omits -ldflags with -trimpath. Read the compiler
+		// identity here; stamp declarations are guarded by the contract test,
+		// and CLI-visible versions are checked through native probes below.
+		if info.GoVersion != "go1.27.1" {
+			t.Fatalf("built compiler version = %q, want go1.27.1", info.GoVersion)
+		}
+		var args []string
+		switch {
+		case name == "kubectl":
+			args = []string{"version", "--client", "-o", "json"}
+		case name == "kubeadm":
+			args = []string{"version", "-o", "short"}
+		case name == "containerd-shim-runc-v2":
+			args = []string{"-v"}
+		case strings.HasPrefix(component, "kubernetes-"), strings.HasPrefix(component, "containerd-"):
+			args = []string{"--version"}
+		case strings.HasPrefix(component, "cni-plugins-"):
+			args = nil
+		default:
+			t.Fatal("unexpected bundle producer")
+		}
+		probeCtx, stop := context.WithTimeout(ctx, 10*time.Second)
+		cmd := exec.CommandContext(probeCtx, binary, args...)
+		cmd.WaitDelay = 5 * time.Second
+		if strings.HasPrefix(component, "cni-plugins-") {
+			cmd.Env = append(os.Environ(), "CNI_COMMAND=VERSION")
+		}
+		output, err := cmd.CombinedOutput()
+		stop()
+		want := strings.TrimPrefix(tag, "v")
+		if strings.HasPrefix(component, "cni-plugins-") {
+			want = "supportedVersions"
+		}
+		if err != nil || !strings.Contains(string(output), want) {
+			t.Fatalf("native %s version probe: %v: %s", name, err, output)
+		}
+		t.Logf("native %s version probe: %s", name, output)
+		if strings.HasPrefix(component, "cni-plugins-") {
+			aboutCtx, aboutStop := context.WithTimeout(ctx, 10*time.Second)
+			about := exec.CommandContext(aboutCtx, binary)
+			about.WaitDelay = 5 * time.Second
+			about.Env = append(os.Environ(), "CNI_COMMAND=")
+			output, err := about.CombinedOutput()
+			aboutStop()
+			if err != nil || !strings.Contains(string(output), tag) {
+				t.Fatalf("CNI %s build version: %v: %s", name, err, output)
+			}
+			t.Logf("native %s build version: %s", name, output)
+		}
+	}
+}
+
+// TestNKEOSPublicSourceBuildContracts guards upstream stamps and acquisition scope.
+func TestNKEOSPublicSourceBuildContracts(t *testing.T) {
+	cat := loadPublicOSSourceCatalog(t)
+	for _, test := range publicOSSourceCases() {
+		t.Run(test.name, func(t *testing.T) {
+			component := cat.Components[test.name]
+			command := strings.Join(component.BuildCommand, "\n")
+			if len(test.members) == 0 && component.OutputType != "raw" {
+				t.Fatal("standalone ELF must not be declared as a Debian host package")
+			}
+			var stamps []string
+			switch {
+			case strings.HasPrefix(test.name, "crictl-"):
+				if len(component.VendorCommand) != 0 {
+					t.Fatal("cri-tools must use its pinned committed vendor closure")
+				}
+			case strings.HasPrefix(test.name, "kubernetes-"):
+				for _, namespace := range []string{"k8s.io/component-base/version", "k8s.io/client-go/pkg/version"} {
+					for _, key := range []string{"gitVersion", "gitCommit", "gitMajor", "gitMinor", "gitTreeState", "buildDate"} {
+						stamps = append(stamps, namespace+"."+key+"=")
+					}
+				}
+			case test.name == "helm-3-20-2":
+				for _, namespace := range []string{"pkg/chartutil", "pkg/lint/rules"} {
+					for _, key := range []string{"k8sVersionMajor", "k8sVersionMinor"} {
+						stamps = append(stamps, "helm.sh/helm/v3/"+namespace+"."+key+"=")
+					}
+				}
+			case strings.HasPrefix(test.name, "containerd-"):
+				stamps = []string{"version.Package=github.com/containerd/containerd/v2"}
+			case strings.HasPrefix(test.name, "cni-plugins-"):
+				stamps = []string{"github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion="}
+			case strings.Contains(test.name, "tpm"):
+				if len(component.VersionStamp) != 0 {
+					t.Fatal("TPM producers do not consume version stamps")
+				}
+			}
+			for _, stamp := range stamps {
+				if !strings.Contains(command, stamp) {
+					t.Fatalf("upstream stamp %q missing", stamp)
+				}
 			}
 		})
 	}

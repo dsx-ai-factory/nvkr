@@ -1,37 +1,4 @@
 {
-  "purpose": "Descriptive extraction of every component and dependency from NKE v0.21.0; not an executable catalog or pin lock.",
-  "sourceBuildPolicy": {
-    "publicSource": "Compile from pinned Git; a build failure is not permission to acquire a prebuilt replacement.",
-    "unavailablePublicSource": "Retain the existing digest-pinned acquired input, declare the exception beside the catalog entry and report it during preparation.",
-    "acquisitionFailure": "Fail closed on missing, inaccessible or digest-mismatching bytes; do not omit the component.",
-    "exceptions": [
-      {
-        "component": "dsx-imds-node-attestor-agent",
-        "reason": "The release SBOM has no source URL, source commit or version; current GitHub checks did not establish an accessible public source.",
-        "sourceAvailability": "unresolved",
-        "mode": "retain-existing-prebuilt",
-        "payloads": {
-          "amd64": {
-            "url": "https://nke-prod-assets.s3.us-west-2.amazonaws.com/dsx-imds-node-attestor-agent/linux-amd64/dsx-imds-node-attestor-agent",
-            "releaseDeclaredSHA256": "fa134f877968550e33f683ed2b1acb05aa64028ce3eaeaf85603e05bbbef1350"
-          },
-          "arm64": {
-            "url": "https://nke-prod-assets.s3.us-west-2.amazonaws.com/dsx-imds-node-attestor-agent/linux-arm64/dsx-imds-node-attestor-agent",
-            "releaseDeclaredSHA256": "88226ee3a848e09c620a99aad9c99c64e6c04e7a862836eb206d6e6f9fae2bf5"
-          }
-        },
-        "accessObservation": "2026-10-07 anonymous HEAD requests returned HTTP 403 on both existing URLs; payload bytes were not reauthenticated.",
-        "implementationStatus": "Proposed catalog migration; not yet wired into executable inputs."
-      }
-    ]
-  },
-  "source": {
-    "releaseUrl": "https://github.com/dsx-ai-factory/nke/releases/tag/v0.21.0",
-    "assetUrl": "https://github.com/dsx-ai-factory/nke/releases/download/v0.21.0/SBOM.cdx.json",
-    "assetId": 601972512,
-    "sha256": "546477fbb07f5915aa425a0b633a279de7c62dd884da7aeb9d7f6270551ac626",
-    "releaseSourceCommit": "33fb71b2f4224b470ebc628a9165fc4b92870406"
-  },
   "metadata": {
     "timestamp": "2026-09-30T20:29:07.725476+00:00",
     "component": {

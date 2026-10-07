@@ -42,6 +42,20 @@ locally generated evidence identity.
 
 ### 2. External evidence for acquired artifacts
 
+**NKE OS source-migration policy (proposed; candidate catalogs only).** Publicly
+available component sources are compiled from exact reviewed Git pins. A failed
+source build never authorizes fallback to a release binary. Where public source
+cannot be established, preserve the existing exact prebuilt payload as an explicitly
+documented source-availability exception, with its reason, per-platform digest and
+evidence state. An internal Git source available to the operator may still be built;
+its access restriction is not a prebuilt exception. Producer metadata/docs and
+preparation logs identify these limitations without introducing a new schema field
+or waiving evidence policy. A warning reports the declared exception only: missing,
+inaccessible, unpinned or digest-mismatching bytes still fail closed. Source availability
+is not automatically discovered or enforced by NKD; reviewers must approve declarations
+before maintained Definition integration. Existing evidence gates and the waiver
+limitations below remain unchanged.
+
 A `prebuilt` (no-compile) component carries a **verified reference** to the upstream's external SBOM/provenance.
 The reference is a canonical transport location (HTTPS, OCI, or a mirror key); the content digest is a separate
 exact identity, and the URL need not embed it. The referenced bytes **must hash to the declared digest or fail

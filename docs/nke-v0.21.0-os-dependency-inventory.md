@@ -11,7 +11,17 @@ The [recorded ARM64 integration test](evidence/2026-10-07-direct-os-source-build
 - [SBOM.cdx.json asset](https://github.com/dsx-ai-factory/nke/releases/download/v0.21.0/SBOM.cdx.json), asset ID 601972512, 248,989 bytes.
 - Downloaded asset SHA-256: `546477fbb07f5915aa425a0b633a279de7c62dd884da7aeb9d7f6270551ac626`. This is measured download integrity, not signature authentication.
 - SBOM metadata release source: `33fb71b2f4224b470ebc628a9165fc4b92870406`.
-- NKeR comparison: `d6cdf8dabb6bbda3af925ddb49eb16cde3eae8d9`, current main at read-back.
+- NKD comparison: `d6cdf8dabb6bbda3af925ddb49eb16cde3eae8d9`, current main at read-back.
+- Reproduce the [machine-readable inventory](nke-v0.21.0-dependency-inventory.json) as a pure projection of the authenticated-by-hash downloaded asset:
+
+  ```sh
+  gh release download v0.21.0 --repo dsx-ai-factory/nke --pattern SBOM.cdx.json
+  printf '%s  SBOM.cdx.json\n' 546477fbb07f5915aa425a0b633a279de7c62dd884da7aeb9d7f6270551ac626 | shasum -a 256 -c -
+  jq '{metadata, components, dependencies, compositions, externalReferences}' SBOM.cdx.json
+  ```
+
+  This projection intentionally omits the CycloneDX document envelope; it is not a complete standalone SBOM. Policy is in ADR-13; source URL/digest are above, not synthetic SBOM fields.
+
 - [Machine-readable inventory](nke-v0.21.0-dependency-inventory.json) preserves every component record and all dependency edges from the asset, including evidence labels and source/distribution references. This file is descriptive evidence, not a replacement lock or authored lifecycle object.
 
 ## What the asset does and does not establish
@@ -23,7 +33,7 @@ The asset is CycloneDX 1.6, document version 2. It has 211 component records, 11
 
 The metadata explicitly says the asset is not a complete OS package or container-layer inventory.
 Source-declared input digests identify upstream archives or native container manifests, not locally rebuilt outputs.
-Qualification rows describe separately scoped RC evidence; they do not certify a new NKeR build or identify every installed guest package.
+Qualification rows describe separately scoped RC evidence; they do not certify a new NKD build or identify every installed guest package.
 The recorded source pins are enough to identify declared inputs, but not a complete transitive compiler, package, container-base or OS closure.
 Source reconstruction must derive new producer identities and evidence. It must not require locally built bytes to equal these upstream download digests or inherit v0.21.0 qualification.
 
@@ -40,7 +50,7 @@ Source reconstruction must derive new producer identities and evidence. It must 
 | CoreDNS images | 1.12.1, 1.13.1, 1.14.2 | coredns/coredns |
 | etcd images | 3.6.5-0, 3.6.6-0, 3.6.8-0 | etcd-io/etcd plus the owning image packaging; image suffix is not an upstream source tag |
 | pause images | 3.10.1, 3.10.2 | Verify owning Kubernetes image-release source revision independently; do not infer one from the image tag |
-| OVN image and chart | 1.4.0 / release-1.4 | ovn-kubernetes/ovn-kubernetes; current NKeR already builds the image and composes its chart |
+| OVN image and chart | 1.4.0 / release-1.4 | ovn-kubernetes/ovn-kubernetes; current NKD already builds the image and composes its chart |
 | Calico images and manifests | 3.30.1 | projectcalico/calico, with each external image's actual source ownership verified |
 | Tigera operator image | 1.38.1 | tigera/operator |
 | SPIRE agent | 1.14.1 | spiffe/spire |
@@ -53,12 +63,12 @@ Current GitHub checks resolved all 25 source tags listed above for Kubernetes, c
 They have not established transitive closures, permitted licenses, build compatibility or production pins. Pause image-release sources still require separate resolution.
 Use ADR-22 catalog pinning to record commit, tree and source epoch once producer declarations and toolchains are complete. Never hand-populate a guessed source lock.
 
-## Current NKeR comparison
+## Current NKD comparison
 
 Current M2 uses NKE `ff21ba8c07cafff74b68e238a8876af11e5beded` for most image preparation.
 SPIRE alone uses `726f76944404e1106626b8333d3576bdf67b575b`, which omits the DSX plugin.
 Those are not the release source `33fb71b2f4224b470ebc628a9165fc4b92870406`.
-NKeR compiles the NKE agent and builds the upstream OVN image, but other OS-package producers currently invoke NKE package preparation or packaging.
+NKD compiles the NKE agent and builds the upstream OVN image, but other OS-package producers currently invoke NKE package preparation or packaging.
 Retaining the current older SPIRE pin is not complete v0.21.0 membership.
 
 The native-toolchain overlay is digest-bound to the current catalog and an exact producer list.
@@ -66,17 +76,17 @@ Changing that catalog requires recomputing the overlay and regenerating generate
 
 ## Source-build PR boundaries
 
-The user selected source compilation for publicly available sources, with an explicit prebuilt exception when public source is unavailable. This is not automatic fallback on a source-build failure.
+The proposed [ADR-13 source-migration policy](adr/0013-supply-chain-evidence.md#2-external-evidence-for-acquired-artifacts) selects pinned source compilation where public source is established and a declared exact-byte prebuilt exception where it is unresolved. This is not automatic fallback on a source-build failure.
 
 1. Declare independently pinned sources/producers for binaries and images, for both AMD64 and ARM64 and each preserved Kubernetes matrix row.
 2. Realize each producer's dependency closure before compilation. Do not reuse a downloaded release binary as its alleged source-built result.
 3. Supply exact toolchain images with the build inputs each producer needs. The current Packer toolchain contains gcc/libc development inputs but no libseccomp development package; runc's default Makefile enables seccomp and CGO.
 4. Use admitted isolated execution. Calico's upstream top-level image target invokes Docker; calling it unchanged from an ordinary offline build is not supported by the current material boundary. Model the individual builds and image assembly explicitly.
-5. Package only authenticated producer outputs with pinned nfpm. Preserve package names, file layout, Depends/Conflicts/Provides, scripts, service units, configuration and image-import behavior.
+5. Package only authenticated producer outputs with pinned packaging tools (nfpm or dpkg-deb). Preserve package names, file layout, Depends/Conflicts/Provides, scripts, service units, configuration and image-import behavior.
 6. Preserve image reference names or explicitly patch every consumer manifest/configuration to the rebuilt image names. A new digest alone does not update kubeadm/Calico image selection.
 7. Keep the existing image-inputs material handoff and source-owned Packer project. The composer currently expects agent plus four package archives.
 8. Remove every active invocation of `os-image/packages`, including the indirect agent Debian target's packaging path. Relocating download scripts is not source compilation.
-9. Preserve the standalone NKE Make path unless separately authorized to migrate it. This NKeR change does not delete the NKE folder.
+9. Preserve the standalone NKE Make path unless separately authorized to migrate it. This NKD change does not delete the NKE folder.
 10. Validate package content/hooks and executable graphs locally, then perform fresh full image builds and cluster-time Kubernetes/CNI selection on both architectures. A plan, source-tag lookup or unit test is not runtime proof.
 
 ## Declared unavailable-public-source exceptions
@@ -107,7 +117,7 @@ NKE's development code names a neighboring `dsx-identity` checkout. GitHub searc
 - Ubuntu: package versions/digests and transitive APT dependencies are absent. For this package-folder migration, retain and capture the source-owned installer/APT behavior. A fully source-rebuilt Ubuntu distribution is a separate scope.
 - Image release sources: pause tags and etcd image packaging suffixes cannot be converted to source commits by string substitution.
 
-No source-build implementation, refreshed generated bundle, new full OS bake or implementation PR is claimed by this inventory.
+Beyond the experimental public-source catalog and separately tested OVN fork packages, no completed package/image migration, regenerated maintained bundle or new full OS bake is claimed.
 
 ## Complete OS-material name/version inventory
 
