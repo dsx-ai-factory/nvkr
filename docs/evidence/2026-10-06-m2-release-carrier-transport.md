@@ -45,10 +45,16 @@ The [dated deferral record](2026-10-06-m2-inspection-deferral.md) retains its or
 
 ## External authority still pending
 
-The main baseline at `a54f6a2dea2fb32b4eae8014af2d6adc802f667d` restricts authored dispatch/signing to `main`.
+The `main` baseline is `d6cdf8dabb6bbda3af925ddb49eb16cde3eae8d9` (main/#106).
+`a54f6a2dea2fb32b4eae8014af2d6adc802f667d` is the previous PR #97 head, not the main baseline;
+both commits restrict authored dispatch/signing to `main`.
 October 7 read-back still listed `main` and `codex/m2-arc-validation` for
 [nkd-arc](2026-10-07-m2-validation-branch-release/arc-branches.json), and those two plus
 `feat/nke-deploy-pipeline` for [nkd-release](2026-10-07-m2-validation-branch-release/release-branches.json).
-The local integration's proposed `codex/m2-native-arc-foundation` exception is not admitted by either retrieved
-external policy. This document grants no branch publication authority. External-policy alignment remains pending;
-an authored YAML restriction or local exception is not proof of environment protection.
+The later PR #97 head `562a609cb3939097fb6a6ad89a77f25aa739a0d5` temporarily included the exact
+`codex/m2-native-arc-foundation` dispatch/signing exception. Its
+[cancelled hosted attempt](2026-10-07-pr97-review-fix-contracts.md#later-hosted-attempt)
+encountered deployment-policy rejection before protected jobs executed steps.
+The maintained authored Environment removes that temporary exception and restricts dispatch/signing to `main`.
+The rejected attempt grants no branch publication authority or completed release acceptance; historical external-policy
+alignment remains separate from the corrected authored route.

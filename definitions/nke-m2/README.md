@@ -59,9 +59,8 @@ under `nke.dev/os-image-materials/v1`; every selected material and disk target r
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
 the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The maintained signer identity
-admits `main` and, temporarily for the human-authorized PR #97 candidate pipeline test,
-`codex/m2-native-arc-foundation`. This exact-branch exception authorizes candidate execution,
-not organizational publication acceptance. Native disk
+admits only `main`; the temporary PR #97 branch-test exception has been removed after the
+cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
 Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
@@ -86,8 +85,10 @@ Runner labels do not supply runtime-capacity or full-inspector profile authority
 The current candidate selects `diskEvidence: build-provenance-v1`, authenticating both held disks and their
 material producers without deep inspection. Profiles remain available for strict mode but are not pulled or
 executed in this mode; its signed evidence reports inspection as `not-performed`. Ilya Kislenko's October 7
-scope decision preserves producer provenance for M2 and full scan plus material reconciliation for M3,
-on both native architectures ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+task-chat instruction preserves main/#106's producer-provenance M2 floor and full scan plus material
+reconciliation for M3 ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
+extension, and both disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
 M2 candidate requires publication, signatures and consumer verification for every selected output.
 The [failed delivery attempt](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md)
@@ -110,13 +111,15 @@ lists repository-owned native preparation and measurement commands, their curren
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
 read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. Manual dispatch and signing temporarily
-admit `codex/m2-native-arc-foundation` as well as `main`; both must also be admitted by
-the `nkd-arc` and `nkd-release` deployment environments. Ilya Kislenko authorized this scoped
-PR #97 test on October 7, 2026. Remove the branch from the authored dispatch/signing policy,
-regenerate the bundle and remove its exact deployment-policy entries after the validation run
-finishes, or before PR #97 merges into `main`, whichever comes first. Existing unrelated
-deployment-policy entries are not changed by this exception.
+each internal toolchain package's Manage Actions access settings. Maintained manual dispatch and
+signing admit only `main`. The October 7 branch attempt at `562a609` used a temporary exact
+`codex/m2-native-arc-foundation` authored exception; it was cancelled after GitHub environment
+protection rejected that branch before attestation, disk execution and finalization steps ran
+([run 37661490433](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37661490433)).
+That exception is removed from the authored inputs and regenerated bundle. No deployment-policy
+entry was added, and existing unrelated entries are not changed here. Any further branch test
+needs a separate non-merge candidate and actual environment admission; this maintained bundle
+does not authorize it.
 The equivalent validation-branch bundle completed all jobs in
 [run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963);
 that run used a different exact branch exception and is not evidence for this PR's head.

@@ -138,11 +138,14 @@ closure. These documents have no inspected dependency inventory and explicitly b
 to `build-provenance-v1` and `nkd:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
-On October 7, 2026, Ilya Kislenko directed: "Preserve main/#106: producer provenance for M2, inspection for M3"
-in the PR #97 review-fix task ([review discussion](https://github.com/dsx-ai-factory/nke-recipes/pull/97#discussion_r4209677062)).
-This supersedes the October 6 proposed strict M2 target: M2 requires producer provenance for both native
-AMD64 and ARM64 disks; deep disk/content inspection and material-to-filesystem reconciliation belong to M3.
-This is the named human scope decision for this task, not organizational ratification of the ADR set.
+The October 7, 2026 PR #97 task chat contains Ilya Kislenko's instruction:
+"Preserve main/#106: producer provenance for M2, inspection for M3". This records the task-chat instruction,
+not an independently published decider approval; no such approval record is supplied here.
+It supersedes the task's October 6 proposed strict M2 target while retaining main/#106's AMD64-only product
+acceptance floor. Deep disk/content inspection and material-to-filesystem reconciliation belong to M3.
+The native ARM64 route and authored outputs are an implementation extension, not a milestone-scope approval.
+Every disk actually selected by a Definition retains exact producer/material, delivery and evidence obligations;
+the AMD64 product floor cannot waive ARM64 completeness. Organizational ratification of the ADR set remains separate.
 Historical signed documents may retain the earlier `deferred-m3` scope token; do not rewrite those bytes or
 interpret that token as inspection evidence. M3 qualification requires the strict inspected evidence below.
 Unknown modes fail closed; an omitted producer mode retains the strict contract. Document validators check the

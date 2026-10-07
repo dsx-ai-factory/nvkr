@@ -5,14 +5,15 @@ These milestones define production acceptance for the `pipeline-attested` lane. 
 [implementation record](adr/reconciliation.md) records progress and external evidence.
 A local dry run or a passing contract test does not complete a milestone.
 
-M2 requires producer provenance for native AMD64 and ARM64 disks. M3 adds deep disk/content inspection and
+M2's product acceptance floor requires producer provenance for the AMD64 disk. M3 adds deep disk/content inspection and
 material reconciliation. The [evidence decision](adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)
-records the October 7, 2026 scope decision; organizational ratification remains separate.
+records the October 7, 2026 task-chat instruction to preserve that M2/M3 boundary; it is not an independently
+published decider approval or organizational ratification.
 
 | Milestone | Outcome | Exit criterion |
 |---|---|---|
 | M1 — Vertical slice | One pinned NKE CLI build through a generated GitHub workflow | A green default-branch Run builds from the pinned source entrypoint, publishes to OCI, keyless-signs and attaches production provenance; independent cosign verification succeeds |
-| M2 — Breadth | The complete in-scope artifact set, including native AMD64 and ARM64 NKE OS images | One Run delivers both exact-subject disks and every required output, with signatures, producer/source-lane provenance and independent consumer verification; recorded fallbacks remain visible |
+| M2 — Breadth | The complete in-scope AMD64 artifact set, including the NKE OS image | One Run delivers the exact-subject disk and every required output, with signatures, producer/source-lane provenance and independent consumer verification; recorded fallbacks remain visible |
 | M3 — Qualification | Automated build and evidence checks under a separate qualification identity | Schema, pin consistency, signature/provenance, tooling smoke checks and exact-disk inspection with material reconciliation pass; signed evidence records verdicts and approved waivers; tampering or missing evidence fails closed |
 | M4 — Automated releases | Reviewed pin updates produce immutable, qualified v1 Release manifests | Scheduled detection opens a reviewable update; merging produces a signed manifest and immutable tag; manual dispatch re-verifies an existing manifest without rebuilding; overlapping and interrupted release runs never move an immutable tag; a signed revocation withdraws a release from the channel |
 
@@ -30,8 +31,12 @@ even if the same content checks pass.
 
 ## Artifact scope
 
-M2 requires native AMD64 and ARM64 OS images, each independently produced and verified. M3 inspects each disk.
-Other outputs retain their explicit selected architectures. Source lanes are `hermetic-build`, `wrapped-build`, or `acquired`; production provenance
+V1's product acceptance floor targets one AMD64 variant per delivered artifact, including one OS image.
+The native ARM64 route is an implementation extension, tracked in the
+[implementation record](adr/reconciliation.md#native-arc-disk-route); it does not expand this milestone floor.
+Every additional architecture explicitly selected by a Definition remains an independently required output
+for that Run and Release. The acceptance floor cannot waive its delivery or evidence obligations.
+M3 inspects each selected disk. Source lanes are `hermetic-build`, `wrapped-build`, or `acquired`; production provenance
 records the actual lane. Every separately delivered Artifact is signed and attested in OCI. The Release binds exact named outputs without a deployment topology.
 Each named output selects its producers and concrete target directly. Shared build content does not collapse
 separate required outputs or let one output's evidence satisfy another.

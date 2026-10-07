@@ -62,10 +62,17 @@ does not establish why the manifest could not be retrieved.
 October 7 read-back of the deployment branch policies still listed `main` and `codex/m2-arc-validation`
 for [nkd-arc](2026-10-07-m2-validation-branch-release/arc-branches.json), and those two branches plus
 `feat/nke-deploy-pipeline` for [nkd-release](2026-10-07-m2-validation-branch-release/release-branches.json).
-The PR #97 integration head at `a54f6a2dea2fb32b4eae8014af2d6adc802f667d` has main-only authored signing.
-The local PR integration proposes the separate `codex/m2-native-arc-foundation` exception; neither external
-environment's retrieved policy admits that branch. No deployment-policy mutation or workflow dispatch
-was performed while collecting this evidence. The historical exception and success do not authorize a new branch.
+The separate `main` baseline is `d6cdf8dabb6bbda3af925ddb49eb16cde3eae8d9` (main/#106).
+`a54f6a2dea2fb32b4eae8014af2d6adc802f667d` is the previous PR #97 head;
+both commits have main-only authored dispatch/signing. The later PR #97 head
+`562a609cb3939097fb6a6ad89a77f25aa739a0d5` temporarily admitted the separate exact
+`codex/m2-native-arc-foundation` exception in source. Its
+[cancelled run 37661490433](2026-10-07-pr97-review-fix-contracts.md#later-hosted-attempt)
+encountered branch rejection on both deployment environments before protected jobs executed steps.
+The maintained authored Environment removes that temporary exception and restricts dispatch/signing to `main`.
+No deployment-policy mutation or workflow dispatch was performed while collecting this evidence.
+The successful `625980e...` validation-branch run and the rejected `562a609...` attempt preserve separate
+historical scopes; neither authorizes a new branch or proves completion at the corrected head.
 
 ## Retrieval sources
 
