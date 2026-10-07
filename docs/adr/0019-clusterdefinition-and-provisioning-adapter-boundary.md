@@ -40,9 +40,10 @@ cannot appear as one of its own content members. Consumers authenticate and reco
 before accepting or exposing materialized outputs. Names inside publication records cannot select arbitrary destination paths.
 
 No cluster composition or realization is emitted or published. Definition v4, Run/Release v3 and publication
-root v3 reject earlier topology-bearing fields rather than dropping them during decoding. Retired cluster
+root v4 reject earlier topology-bearing fields rather than dropping them during decoding. Retired cluster
 identity families remain reserved and cannot mint new identities. Historical signed bytes retain their original
-meaning; this migration grants no compatibility alias or authority to a decoded legacy description.
+meaning; current readers reject pre-v4 publication roots rather than granting a compatibility alias or authority
+to a decoded legacy description.
 
 ### 3. Downstream systems own deployment
 

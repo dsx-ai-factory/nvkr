@@ -97,20 +97,12 @@ func (verified *VerifiedRelease) Description() (Release, error) {
 }
 
 // PrepareExactInputs validates and freezes the consumer's Definition,
-// Environment, and compiled Plan before any registry or signature work.
+// Environment, and canonical compiled Plan bytes before any registry or signature work.
 func PrepareExactInputs(definition Definition, environment Environment, plan *factory.Plan) (*ExactInputExpectation, error) {
 	prepared, err := PrepareRun(definition, environment, plan, "consumer-verification")
 	if err != nil {
 		return nil, err
 	}
-	planDigest, err := plan.IdentityDigest()
-	if err != nil {
-		return nil, err
-	}
-	// Execution may relocate workspace paths while retaining the compiler-issued
-	// identity. Publications and durable evidence bind that identity, not the
-	// caller-specific relocated Plan bytes.
-	prepared.PlanDigest = planDigest
 	frozenOutputs := make([]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
 	for index, output := range plan.LifecycleOutputs {
 		frozenOutputs[index] = output

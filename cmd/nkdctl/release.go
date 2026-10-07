@@ -17,9 +17,12 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const releaseVerificationResultSchemaVersion = "nkd.dev/release-verification-result/v1"
+
 type releaseVerificationResult struct {
-	Release     lifecycle.Release                `json:"release"`
-	ExactInputs *lifecycle.ExactInputDescription `json:"exactInputs,omitempty"`
+	SchemaVersion string                           `json:"schemaVersion"`
+	Release       lifecycle.Release                `json:"release"`
+	ExactInputs   *lifecycle.ExactInputDescription `json:"exactInputs,omitempty"`
 }
 
 type releaseVerifyOperation func(context.Context, string, lifecycle.VerificationPolicy,
@@ -132,7 +135,7 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 					&cli.StringFlag{Name: "identity"}, &cli.StringFlag{Name: "issuer"}, &cli.StringFlag{Name: "cosign"}, &cli.StringFlag{Name: "cosign-digest"},
 					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require with --environment and --plan"},
 					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require with --definition and --plan"},
-					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment; unreadable or invalid Plan bytes report pipeline drift"},
+					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment; unreadable or undecodable Plan bytes report pipeline drift, while validation errors keep their code"},
 					&cli.StringFlag{Name: "workspace", Value: ".nkd/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
 				},
 				Action: func(c *cli.Context) error {
@@ -155,7 +158,7 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 					}
 					if policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication {
 						if exactInputCount != 0 {
-							return e.New(e.CodeUsage,
+							return e.New(e.CodeEngineCapability,
 								"exact-input verification requires pipeline-attested/artifact-publication policy")
 						}
 						_, err := (&lifecycle.Consumer{}).Verify(c.Context, c.String("reference"), policy)
@@ -194,6 +197,7 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 					}
 					var raw []byte
 					if result.ExactInputs != nil {
+						result.SchemaVersion = releaseVerificationResultSchemaVersion
 						raw, err = canonical.Marshal(result)
 					} else {
 						raw, err = canonical.Marshal(result.Release)

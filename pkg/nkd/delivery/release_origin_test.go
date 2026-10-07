@@ -9,7 +9,7 @@ import (
 )
 
 func TestReleasePublicationOrigin(t *testing.T) {
-	for _, mutation := range []string{"valid", "tag", "missing preparation", "missing signing", "oversized", "missing run"} {
+	for _, mutation := range []string{"valid", "tag", "missing preparation", "missing signing", "oversized signing", "missing run", "oversized run"} {
 		t.Run(mutation, func(t *testing.T) {
 			request, _ := diskPublicationRequest(t, "arm64")
 			request.Release.PlanDigest = digestBytes([]byte("plan"))
@@ -25,10 +25,12 @@ func TestReleasePublicationOrigin(t *testing.T) {
 				origin.PreparedInvocationID = ""
 			case "missing signing":
 				origin.SignedInvocationID = ""
-			case "oversized":
+			case "oversized signing":
 				origin.SignedInvocationID = strings.Repeat("a", 2049)
 			case "missing run":
 				request.Release.InvocationID = ""
+			case "oversized run":
+				request.Release.InvocationID = strings.Repeat("a", 2049)
 			}
 			out := filepath.Join(t.TempDir(), "publication")
 			_, err := BuildPublicationRoot(t.Context(), out, request)

@@ -145,16 +145,79 @@ bin/nkdctl release verify \
 The three inputs are admitted together before signature or registry work. A
 successful response includes a package-issued exact-input description bound to
 the publication subject, consumer policy, and its Definition, Environment, Plan
-and content digests. This narrows what the consumer accepted; it does not grant a stronger
-lane, full Release scope, qualification, or deployment acceptance.
+and content digests. This narrows what the consumer accepted; it does not grant
+a stronger lane, full Release scope, qualification, or deployment acceptance.
 The Plan is generated pipeline state; an unreadable or undecodable Plan reports
 pipeline drift, while a decoded Plan that fails validation preserves its validation
 error rather than being reclassified by the command adapter.
 
+Without the three exact-input flags, `release verify` writes the verified `Release`
+description directly:
+
+```json
+{
+  "schemaVersion": "nkd.dev/release/v3",
+  "subject": "registry.example/releases@sha256:<release-digest>",
+  "lane": "pipeline-attested",
+  "scope": "artifact-publication",
+  "artifacts": [
+    {
+      "name": "nkectl",
+      "kind": "executable",
+      "digest": "sha256:<artifact-digest>",
+      "reference": "registry.example/releases-nkectl@sha256:<artifact-digest>",
+      "buildDigest": "sha256:<build-digest>",
+      "components": ["nkectl"]
+    }
+  ],
+  "contentSubject": "sha256:<content-digest>",
+  "policyDigest": "sha256:<policy-digest>"
+}
+```
+
+With all three exact-input flags, the output is a wrapper containing that same
+verified `Release` description and the defensive exact-input description:
+
+```json
+{
+  "schemaVersion": "nkd.dev/release-verification-result/v1",
+  "release": {
+    "schemaVersion": "nkd.dev/release/v3",
+    "subject": "registry.example/releases@sha256:<release-digest>",
+    "lane": "pipeline-attested",
+    "scope": "artifact-publication",
+    "artifacts": [
+      {
+        "name": "nkectl",
+        "kind": "executable",
+        "digest": "sha256:<artifact-digest>",
+        "reference": "registry.example/releases-nkectl@sha256:<artifact-digest>",
+        "buildDigest": "sha256:<build-digest>",
+        "components": ["nkectl"]
+      }
+    ],
+    "contentSubject": "sha256:<content-digest>",
+    "policyDigest": "sha256:<policy-digest>"
+  },
+  "exactInputs": {
+    "releaseSubject": "registry.example/releases@sha256:<release-digest>",
+    "policyDigest": "sha256:<policy-digest>",
+    "definitionDigest": "sha256:<definition-digest>",
+    "environmentDigest": "sha256:<environment-digest>",
+    "planDigest": "sha256:<plan-digest>",
+    "contentSubject": "sha256:<content-digest>"
+  }
+}
+```
+
+Artifact entries retain their type-specific optional fields, such as `disk` for
+disk-image outputs. Exact-input mode changes only the top-level JSON shape; it does
+not replace or weaken the verified Release description. The opaque receipt remains
+live and process-local and is never serialized by the CLI.
+
 `RELEASE_REF` is a registry reference pinned with `@sha256:…`; the identity and issuer belong to the
 consumer's trusted build policy. Signature and production-attestation verification are both required by this
-scope. The CLI prints the verified description; exact-input mode wraps it with
-the descriptive receipt. The SDK retains a live, policy-bound capability until closed.
+scope. The SDK retains a live, policy-bound capability until closed.
 The stock verifier remains Linux-only, and unit tests do not establish live signing-service
 acceptance. Full v1 release scope (`--scope release`) and qualified acceptance remain capability-gated.
 

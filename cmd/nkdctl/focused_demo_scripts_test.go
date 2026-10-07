@@ -106,6 +106,10 @@ func TestReleaseConsumerForwardsExactInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	callerDir, err = filepath.EvalSymlinks(callerDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cmd := exec.Command("bash", script,
 		"--reference", "registry.test/release@"+digest,
 		"--identity", "identity",

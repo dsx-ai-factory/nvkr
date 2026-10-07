@@ -69,7 +69,7 @@ func TestReleaseVerifyRequiresCompleteExactInputSetBeforeAcquisition(t *testing.
 	}
 }
 
-func TestReleaseVerifyRejectsExactInputsOutsideSupportedPolicy(t *testing.T) {
+func TestReleaseVerifyReportsUnsupportedExactInputPolicy(t *testing.T) {
 	for _, test := range []struct {
 		name  string
 		flags []string
@@ -85,7 +85,7 @@ func TestReleaseVerifyRejectsExactInputsOutsideSupportedPolicy(t *testing.T) {
 			}
 			app := &cli.App{Commands: []*cli.Command{cmdRelease()}}
 			err := app.RunContext(t.Context(), append(args, test.flags...))
-			if cliErrorCode(err) != e.CodeUsage {
+			if cliErrorCode(err) != e.CodeEngineCapability {
 				t.Fatalf("unsupported exact-input policy returned %v", err)
 			}
 		})
@@ -154,9 +154,10 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 	if err := json.Unmarshal(raw, &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Release.Subject != reference || result.ExactInputs == nil ||
+	if result.SchemaVersion != releaseVerificationResultSchemaVersion ||
+		result.Release.Subject != reference || result.ExactInputs == nil ||
 		result.ExactInputs.ReleaseSubject != reference || result.ExactInputs.PolicyDigest != policyDigest ||
 		result.ExactInputs.PlanDigest != planDigest {
-		t.Fatalf("exact verification receipt was not serialized: %+v", result)
+		t.Fatalf("exact-input description was not serialized in the versioned result: %+v", result)
 	}
 }

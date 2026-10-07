@@ -77,8 +77,9 @@ and callers cannot select an export path. This local retention contract does not
 `delivery` owns checked publication membership and canonical release-content identity. A consumer may optionally
 prepare an exact Definition, Environment and compiled Plan expectation before external work, then require the held
 verified publication to match its authenticated input identities and complete output binding. Lifecycle performs
-that compiler-owned join and issues an opaque descriptive receipt bound to the publication subject, consumer policy
-and matched identities; it grants no stronger lane or scope. Consumers
+that compiler-owned join and issues an opaque receipt bound to the publication subject, consumer policy and matched
+identities. Its defensive description exposes those matches without serializing or restoring the receipt; neither
+the receipt nor its description grants a stronger lane or scope. Consumers
 do not reconstruct bindings from caller-provided digests or publication fields. Existing domain modules retain their
 canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse

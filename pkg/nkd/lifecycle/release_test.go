@@ -208,10 +208,111 @@ func TestVerifiedReleaseRequiresExactDefinitionEnvironmentAndPlan(t *testing.T) 
 	}
 }
 
+func TestConsumerVerifyExactInputsClosesPublicationOnMismatch(t *testing.T) {
+	fixture := newExactInputFixture(t)
+	otherPlan, err := Compile(t.Context(), "definition.yaml", fixture.definition, "environment.yaml", fixture.environment, "other-generator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, otherPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var held *delivery.Publication
+	verified, receipt, err := fixture.consumer(t, &held).VerifyExactInputs(t.Context(), fixture.reference, exactInputPolicy(), expectation)
+	assertCode(t, err, nkderr.CodeVerifyFailed)
+	if verified != nil || receipt != nil {
+		t.Fatalf("failed exact-input narrowing returned capabilities: verified=%v receipt=%v", verified != nil, receipt != nil)
+	}
+	if held == nil {
+		t.Fatal("failed exact-input narrowing did not materialize the publication")
+	}
+	if _, err := held.Description(fixture.reference); err == nil {
+		t.Fatal("failed exact-input narrowing left its publication open")
+	} else {
+		assertCode(t, err, nkderr.CodeGateUnmet)
+	}
+}
+
+func TestPrepareExactInputsFreezesLifecycleOutputs(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*factory.Plan)
+	}{
+		{name: "output", mutate: func(plan *factory.Plan) {
+			plan.LifecycleOutputs[0].Name = "mutated-output"
+		}},
+		{name: "nested components", mutate: func(plan *factory.Plan) {
+			plan.LifecycleOutputs[0].Components[0] = "mutated-component"
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newExactInputFixture(t)
+			expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			originalPlanDigest := expectation.prepared.PlanDigest
+			test.mutate(fixture.plan)
+
+			verified, err := fixture.consumer(t, nil).Verify(t.Context(), fixture.reference, exactInputPolicy())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = verified.Close() }()
+			receipt, err := verified.RequireExactInputs(expectation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			description, err := receipt.Description()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if description.PlanDigest != originalPlanDigest {
+				t.Fatalf("receipt plan digest = %s, want frozen %s", description.PlanDigest, originalPlanDigest)
+			}
+		})
+	}
+}
+
+func TestVerifiedReleaseRejectsPublicationInputMetadataMismatch(t *testing.T) {
+	fixture := newExactInputFixture(t)
+	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(*delivery.ReleaseMetadata)
+	}{
+		{name: "definition", mutate: func(metadata *delivery.ReleaseMetadata) {
+			metadata.DefinitionDigest = "sha256:" + repeat("9", 64)
+		}},
+		{name: "environment", mutate: func(metadata *delivery.ReleaseMetadata) {
+			metadata.EnvironmentDigest = "sha256:" + repeat("9", 64)
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			mismatched := fixture.withReleaseMetadata(t, test.mutate)
+			verified, err := mismatched.consumer(t, nil).Verify(t.Context(), mismatched.reference, exactInputPolicy())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = verified.Close() }()
+			if _, err := verified.RequireExactInputs(expectation); err == nil {
+				t.Fatal("publication with mismatched input metadata satisfied exact-input expectation")
+			} else {
+				assertCode(t, err, nkderr.CodeVerifyFailed)
+			}
+		})
+	}
+}
+
 type exactInputFixture struct {
 	definition  Definition
 	environment Environment
 	plan        *factory.Plan
+	request     delivery.PublicationRequest
 	layout      string
 	rootDigest  string
 	reference   string
@@ -280,24 +381,17 @@ func newExactInputFixture(t *testing.T) exactInputFixture {
 	layout, publication = attestFixtureLayout(t, layout)
 	reference := "registry.example.test/product@" + publication.RootDigest
 	return exactInputFixture{definition: definition, environment: environment, plan: plan,
-		layout: layout, rootDigest: publication.RootDigest, reference: reference}
+		request: request, layout: layout, rootDigest: publication.RootDigest, reference: reference}
 }
 
 func (fixture exactInputFixture) open(t *testing.T) (*VerifiedRelease, Definition, Environment, *factory.Plan) {
 	t.Helper()
-	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
-		Ref: fixture.reference, Digest: fixture.rootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
-		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
-	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
-		return delivery.OpenPublication(t.Context(), fixture.layout, fixture.rootDigest)
-	}}
+	consumer := fixture.consumer(t, nil)
 	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	verified, receipt, err := consumer.VerifyExactInputs(t.Context(), fixture.reference, VerificationPolicy{
-		Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer",
-	}, expectation)
+	verified, receipt, err := consumer.VerifyExactInputs(t.Context(), fixture.reference, exactInputPolicy(), expectation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,6 +399,46 @@ func (fixture exactInputFixture) open(t *testing.T) (*VerifiedRelease, Definitio
 		t.Fatal(err)
 	}
 	return verified, fixture.definition, fixture.environment, fixture.plan
+}
+
+func (fixture exactInputFixture) consumer(t *testing.T, captured **delivery.Publication) *Consumer {
+	t.Helper()
+	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
+		Ref: fixture.reference, Digest: fixture.rootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
+		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
+	return &Consumer{verifier: verifier, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {
+		if reference != fixture.reference {
+			return nil, nkderr.New(nkderr.CodeUnverifiedRef, "fixture received an unexpected publication reference")
+		}
+		publication, err := delivery.OpenPublication(ctx, fixture.layout, fixture.rootDigest)
+		if err == nil && captured != nil {
+			*captured = publication
+		}
+		return publication, err
+	}}
+}
+
+func (fixture exactInputFixture) withReleaseMetadata(t *testing.T, mutate func(*delivery.ReleaseMetadata)) exactInputFixture {
+	t.Helper()
+	request := fixture.request
+	metadata := *request.Release
+	mutate(&metadata)
+	request.Release = &metadata
+	layout := filepath.Join(t.TempDir(), "publication")
+	publication, err := delivery.BuildPublicationRoot(t.Context(), layout, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout, publication = attestFixtureLayout(t, layout)
+	fixture.request = request
+	fixture.layout = layout
+	fixture.rootDigest = publication.RootDigest
+	fixture.reference = "registry.example.test/product@" + publication.RootDigest
+	return fixture
+}
+
+func exactInputPolicy() VerificationPolicy {
+	return VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer"}
 }
 
 func TestConsumerRejectsRecordForWrongObservedSigner(t *testing.T) {

@@ -106,5 +106,5 @@ args=(release verify --reference "$REFERENCE" --lane pipeline-attested --scope a
 
 printf '\nARTIFACT PUBLICATION VERIFIED\n  reference: %s\n  policy: pipeline-attested/artifact-publication\n' "$REFERENCE"
 if [ "$EXACT_INPUTS" -eq 3 ]; then
-  printf '  exact inputs: Definition, Environment, and Plan receipt emitted\n'
+  printf '  exact inputs: Definition, Environment, and Plan matched (description emitted)\n'
 fi

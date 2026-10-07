@@ -344,8 +344,9 @@ back. Static/dry-run evidence cannot satisfy either production or qualified poli
 The live consumer can additionally require an exact authored Definition, selected Environment and compiled
 Plan. Lifecycle prepares and freezes that expectation before external work, then matches publication-root v4's
 authenticated Definition, Environment, Plan and content identities and reuses required/observed output joining.
-A package-issued descriptive receipt records the matched identities without strengthening lane or scope. Missing,
-extra, duplicate and substituted output joins are contract-tested. No complete M2 publication has exercised it.
+The opaque receipt remains process-local. Its defensive exact-input description records the matched identities for
+presentation without strengthening lane or scope or restoring verification authority. Missing, extra, duplicate
+and substituted output joins are contract-tested. No complete M2 publication has exercised it.
 
 Qualified interfaces require package-issued opaque receipts. Caller structs, paths, digest strings, parsed
 records and injected success booleans remain descriptions. Authority crossing a process boundary requires the
@@ -478,8 +479,8 @@ removed; `canonical.KindAICRBundle` remains a permanently reserved, retired dige
 §2). Reintroducing it is a new decision, not an implicit re-admission.
 
 The output-only migration introduced v3 plans, artifact graphs and lifecycle bindings. The locality migration
-below advances plans/artifact graphs to v4 and removes lifecycle bindings. Public Runs/Releases, publication
-roots and validation vectors retain v3; Inventory/ReleaseSet use v4; disk manifests use v2. The former release
+below advances plans/artifact graphs to v4 and removes lifecycle bindings. Public Runs/Releases and validation
+vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. The former release
 authorization v9, reproduction-result v3 and evidence-waiver v3 implementations are retired. Changed media types follow their owning schemas. Old schemas and
 removed fields are rejected rather than reinterpreted, including empty legacy fields. Retired recipe,
 cluster/composition/realization and staging digest families remain reserved and cannot mint new identities.
