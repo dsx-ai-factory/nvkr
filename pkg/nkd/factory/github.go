@@ -263,10 +263,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))
 			fmt.Fprintln(&body, "    permissions:\n      contents: read\n      packages: read")
 			if target.CredentialRef != "" {
-				// Finalization only reads the published metadata closure. Use the
-				// job-scoped token directly so a same-named repository secret cannot
-				// widen this job's packages:read permission.
-				fmt.Fprintln(&body, "    env:\n      NKD_REGISTRY_USER: '${{ github.actor }}'\n      NKD_CREDENTIAL: '${{ github.token }}'")
+				secret := strings.TrimPrefix(target.CredentialRef, "github:")
+				fmt.Fprintf(&body, "    env:\n      NKD_REGISTRY_USER: '${{ github.actor }}'\n      NKD_CREDENTIAL: '${{ secrets.%s }}'\n", secret)
 			}
 		}
 		fmt.Fprintln(&body, "    steps:")

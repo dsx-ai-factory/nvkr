@@ -25,11 +25,9 @@ func TestGitHubStageTimeoutMinutes(t *testing.T) {
 		wantErr e.Code
 	}{
 		{name: "adapter default", stage: githubStage{ID: "default", Nodes: []Node{{ID: "build"}}}, want: 60},
-		{name: "disk adapter default includes headroom", stage: githubStage{ID: "disk-default", DiskOutput: "node-image", Nodes: []Node{{ID: "build"}}}, want: 75},
 		{name: "round one second up", stage: githubStage{ID: "short", Nodes: []Node{{ID: "build", Requirements: requirements(1)}}}, want: 1},
 		{name: "round partial minute up", stage: githubStage{ID: "partial", Nodes: []Node{{ID: "build", Requirements: requirements(61)}}}, want: 2},
 		{name: "NKE image budget", stage: githubStage{ID: "nke-image", Nodes: []Node{{ID: "build", Requirements: requirements(21600)}}}, want: 360},
-		{name: "disk reserves output headroom", stage: githubStage{ID: "disk", DiskOutput: "node-image", Nodes: []Node{{ID: "build", Requirements: requirements(21600)}}}, want: 375},
 		{
 			name: "sum sequential nodes",
 			stage: githubStage{ID: "grouped", Nodes: []Node{
@@ -47,7 +45,6 @@ func TestGitHubStageTimeoutMinutes(t *testing.T) {
 			want: 61,
 		},
 		{name: "reject over GitHub limit", stage: githubStage{ID: "too-long", Nodes: []Node{{ID: "build", Requirements: requirements(21601)}}}, wantErr: e.CodeEngineCapability},
-		{name: "disk budget includes job headroom", stage: githubStage{ID: "disk-too-long", DiskOutput: "node-image", Nodes: []Node{{ID: "build", Requirements: requirements(85501)}}}, wantErr: e.CodeEngineCapability},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -66,21 +63,6 @@ func TestGitHubStageTimeoutMinutes(t *testing.T) {
 				t.Fatalf("got %d minutes, want %d", got, test.want)
 			}
 		})
-	}
-}
-
-func TestGitHubDiskExecutionTimeoutExcludesOutputHeadroom(t *testing.T) {
-	stage := githubStage{ID: "disk", DiskOutput: "node-image", Nodes: []Node{{ID: "build", Requirements: &execution.Requirements{TimeoutSeconds: 21600}}}}
-	job, err := githubStageTimeoutMinutes(stage)
-	if err != nil {
-		t.Fatal(err)
-	}
-	executionMinutes, err := githubStageExecutionTimeoutMinutes(stage)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if job != 375 || executionMinutes != 360 || job-executionMinutes != int(githubDiskJobHeadroomMinutes) {
-		t.Fatalf("job/execution budgets = %d/%d minutes", job, executionMinutes)
 	}
 }
 

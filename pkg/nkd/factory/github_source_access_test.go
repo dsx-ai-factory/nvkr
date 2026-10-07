@@ -222,15 +222,29 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			if err := yamlv3.Unmarshal(bundle.Files[GitHubWorkflowPath], &tree); err != nil {
 				t.Fatal(err)
 			}
-			mutatedJobs := mutateOneExpandedWorkflowJob(&tree, tc.old, tc.replacement)
-			if mutatedJobs != 1 {
-				t.Fatalf("mutation changed %d expanded jobs, want exactly one", mutatedJobs)
+			mutated := false
+			var mutate func(*yamlv3.Node)
+			mutate = func(node *yamlv3.Node) {
+				if !mutated && node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, tc.old) {
+					node.Value = strings.Replace(node.Value, tc.old, tc.replacement, 1)
+					mutated = true
+				}
+				for _, child := range node.Content {
+					mutate(child)
+				}
+			}
+			mutate(&tree)
+			if !mutated {
+				t.Fatal("mutation did not apply")
 			}
 			raw, err := yamlv3.Marshal(&tree)
 			if err != nil {
 				t.Fatal(err)
 			}
-			changed.Files[GitHubWorkflowPath] = raw
+			changed.Files[GitHubWorkflowPath], err = compactGitHubWorkflow(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if err := validateGitHubWorkflowSize(changed.Files[GitHubWorkflowPath]); err != nil {
 				t.Fatal(err)
 			}
@@ -241,87 +255,6 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
 		})
 	}
-}
-
-func mutateOneExpandedWorkflowJob(document *yamlv3.Node, old, replacement string) int {
-	if document == nil || len(document.Content) != 1 {
-		return 0
-	}
-	root := document.Content[0]
-	if root.Kind != yamlv3.MappingNode {
-		return 0
-	}
-	var jobs *yamlv3.Node
-	for index := 0; index+1 < len(root.Content); index += 2 {
-		if root.Content[index].Value == "jobs" {
-			jobs = root.Content[index+1]
-			break
-		}
-	}
-	if jobs == nil || jobs.Kind != yamlv3.MappingNode {
-		return 0
-	}
-	for index := 1; index < len(jobs.Content); index += 2 {
-		if mutateWorkflowAlias(jobs.Content[index], old, replacement) {
-			return 1
-		}
-	}
-	return 0
-}
-
-func mutateWorkflowAlias(node *yamlv3.Node, old, replacement string) bool {
-	for index, child := range node.Content {
-		if child.Kind == yamlv3.AliasNode && child.Alias != nil && containsWorkflowScalar(child.Alias, old) {
-			isolated := expandWorkflowAliases(child)
-			if replaceWorkflowScalar(isolated, old, replacement) {
-				node.Content[index] = isolated
-				return true
-			}
-		}
-		if mutateWorkflowAlias(child, old, replacement) {
-			return true
-		}
-	}
-	return false
-}
-
-func containsWorkflowScalar(node *yamlv3.Node, value string) bool {
-	if node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, value) {
-		return true
-	}
-	for _, child := range node.Content {
-		if containsWorkflowScalar(child, value) {
-			return true
-		}
-	}
-	return false
-}
-
-func expandWorkflowAliases(node *yamlv3.Node) *yamlv3.Node {
-	if node.Kind == yamlv3.AliasNode && node.Alias != nil {
-		return expandWorkflowAliases(node.Alias)
-	}
-	copy := *node
-	copy.Anchor = ""
-	copy.Alias = nil
-	copy.Content = make([]*yamlv3.Node, len(node.Content))
-	for index, child := range node.Content {
-		copy.Content[index] = expandWorkflowAliases(child)
-	}
-	return &copy
-}
-
-func replaceWorkflowScalar(node *yamlv3.Node, old, replacement string) bool {
-	if node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, old) {
-		node.Value = strings.Replace(node.Value, old, replacement, 1)
-		return true
-	}
-	for _, child := range node.Content {
-		if replaceWorkflowScalar(child, old, replacement) {
-			return true
-		}
-	}
-	return false
 }
 
 func TestCatalogSourceCredentialsAreRepositoryScoped(t *testing.T) {

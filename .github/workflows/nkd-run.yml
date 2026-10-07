@@ -232,7 +232,7 @@ jobs:
   nkd-disk-nke-node-image-amd64:
     name: &nkd_72 'Build, inspect and package nke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1215
+    timeout-minutes: 1200
     needs: [&nkd_73 build-runner-arc-amd64-kvm, *nkd_69, &nkd_74 nkd-nke-node-image-amd64-fetch-source-3f-1d671fc59ece, &nkd_75 nkd-nke-node-image-amd64-fetch-source-59-9a6e0c5686fc, &nkd_76 nkd-nke-node-image-amd64-fetch-source-68-feb1288193d6, &nkd_77 nkd-nke-node-image-amd64-fetch-source-a9-97b7ca05e592, &nkd_78 nkd-nke-node-image-amd64-fetch-source-f9-f4e1a567d407]
     if: *nkd_1
     environment: 'nkd-arc'
@@ -380,7 +380,7 @@ jobs:
   nkd-disk-nke-node-image-arm64:
     name: &nkd_111 'Build, inspect and package nke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1215
+    timeout-minutes: 1200
     needs: [&nkd_112 build-runner-arc-arm64-kvm, *nkd_110, &nkd_113 nkd-nke-node-image-arm64-fetch-source-7d-6080999efb52, &nkd_114 nkd-nke-node-image-arm64-fetch-source-7d-96615eb80dbe, &nkd_115 nkd-nke-node-image-arm64-fetch-source-a9-759f7b8c2561, &nkd_116 nkd-nke-node-image-arm64-fetch-source-c5-eb40a4b80bf4, &nkd_117 nkd-nke-node-image-arm64-fetch-source-cc-3b90dd492df7]
     if: *nkd_1
     environment: 'nkd-arc'
@@ -1506,7 +1506,7 @@ jobs:
     if: *nkd_1
     environment: 'nkd-release'
     permissions: &nkd_219 {contents: read, packages: write}
-    env: &nkd_220 {NKD_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}', NKD_REGISTRY_USER: '${{ github.actor }}'}
+    env: &nkd_220 {NKD_CREDENTIAL: &nkd_221 '${{ secrets.GITHUB_TOKEN }}', NKD_REGISTRY_USER: '${{ github.actor }}'}
     steps:
       - *nkd_2
       - *nkd_40
@@ -4941,7 +4941,7 @@ jobs:
     if: *nkd_46
     environment: 'nkd-release'
     permissions: *nkd_66
-    env: {NKD_REGISTRY_USER: '${{ github.actor }}', NKD_CREDENTIAL: '${{ github.token }}'}
+    env: {NKD_REGISTRY_USER: '${{ github.actor }}', NKD_CREDENTIAL: *nkd_221}
     steps:
       - *nkd_2
       - *nkd_79

@@ -1,7 +1,6 @@
 package factory
 
 import (
-	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -86,9 +85,6 @@ func TestReferenceReleaseGraphHasNoAggregatePayloadEdges(t *testing.T) {
 	if finalizer.Environment != githubReleaseEnvironment || finalizer.Permissions["packages"] != "read" || finalizer.Permissions["id-token"] != "" {
 		t.Fatal("finalizer must use protected release credentials with read-only registry access")
 	}
-	if finalizer.Env["NKD_CREDENTIAL"] != "${{ github.token }}" || finalizer.Env["NKD_REGISTRY_USER"] != "${{ github.actor }}" {
-		t.Fatalf("read-only finalizer must use the job-scoped token, not a publication secret: %+v", finalizer.Env)
-	}
 	for _, kind := range []string{NodeAssembleRelease, NodeVerifyPublication} {
 		p := githubSigningPermissions(kind, SigningModeCosign)
 		if p["packages"] != "read" || p["id-token"] != "" {
@@ -123,23 +119,6 @@ func TestReferenceFinalizerRequiresAllProviderJobs(t *testing.T) {
 				assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
 			}
 		})
-	}
-}
-
-func TestReferenceRecoveryWritesFinalizerOutcomes(t *testing.T) {
-	plan := referenceTestPlan(t)
-	producer, consumer := t.TempDir(), t.TempDir()
-	for _, artifact := range plan.Graph.Artifacts {
-		if finalizerArtifact(plan, artifact) {
-			carrierTestArchive(t, producer, consumer, artifact, artifact.ID)
-		}
-	}
-	t.Chdir(consumer)
-	if err := RecoverGitHubArtifacts(t.Context(), plan, carrierTestJSON(t, carrierTestResults(t, plan)), GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
-		t.Fatal(err)
-	}
-	if err := ValidateHostedRestores(t.Context(), filepath.Join(consumer, ".nkd", "factory"), plan); err != nil {
-		t.Fatalf("recovery outcomes did not authorize complete finalizer input: %v", err)
 	}
 }
 

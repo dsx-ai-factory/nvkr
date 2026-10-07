@@ -46,7 +46,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 			return e.New(e.CodeEngineCapability, "ARC disk job contains an unrelated credential")
 		}
 	}
-	minutes, err := githubStageExecutionTimeoutMinutes(stage)
+	minutes, err := githubStageTimeoutMinutes(stage)
 	if err != nil {
 		return err
 	}
