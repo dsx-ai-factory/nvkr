@@ -89,6 +89,10 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 			if _, err := inspectImageMetadata(ctx, root, m); err != nil {
 				return Inspection{}, err
 			}
+		} else if object.Output != nil && object.Output.Format == "disk-image" {
+			if _, err := inspectDiskOutputMetadata(ctx, root, object, m); err != nil {
+				return Inspection{}, err
+			}
 		} else if _, err := readBlob(ctx, root, m.Config, 8<<20); err != nil {
 			return Inspection{}, err
 		}
@@ -289,4 +293,21 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member artifact type differs from its release binding")
 	}
 	return m, nil
+}
+
+// inspectDiskOutputMetadata binds the exact disk wrapper and config to the
+// release's output description without opening the QCOW2 payload.
+func inspectDiskOutputMetadata(ctx context.Context, root string, object PublishedObject, manifest ociManifest) (publicationPlatform, error) {
+	if object.Output == nil || object.Output.Disk == nil {
+		return publicationPlatform{}, e.New(e.CodeVerifyFailed, "disk metadata requires a release binding")
+	}
+	m, config, err := inspectDiskMetadata(ctx, root, Descriptor{MediaType: manifest.MediaType, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}, object.OS+"/"+object.Arch, maxDeliveryFileBytes)
+	if err != nil {
+		return publicationPlatform{}, err
+	}
+	disk := object.Output.Disk
+	if m.Layers[0].Digest.String() != disk.PayloadDigest || m.Layers[0].Size != disk.Size || m.Annotations[diskEncryptionAnnotation] != disk.Encryption {
+		return publicationPlatform{}, e.New(e.CodeVerifyFailed, "disk metadata differs from its release binding")
+	}
+	return publicationPlatform{OS: config.OS, Arch: config.Architecture}, nil
 }

@@ -76,14 +76,9 @@ func metadataObjectPlatform(ctx context.Context, root string, object PublishedOb
 			return platform, e.New(e.CodeVerifyFailed, "image metadata has an unexpected transport path")
 		}
 		if object.Output.Format == "disk-image" {
-			m, config, err := inspectDiskMetadata(ctx, root, Descriptor{MediaType: manifest.MediaType, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}, object.OS+"/"+object.Arch, maxDeliveryFileBytes)
+			platform, err = inspectDiskOutputMetadata(ctx, root, object, manifest)
 			if err != nil {
 				return platform, err
-			}
-			platform = publicationPlatform{OS: config.OS, Arch: config.Architecture}
-			disk := object.Output.Disk
-			if m.Layers[0].Digest.String() != disk.PayloadDigest || m.Layers[0].Size != disk.Size || m.Annotations[diskEncryptionAnnotation] != disk.Encryption {
-				return platform, e.New(e.CodeVerifyFailed, "disk metadata differs from its release binding")
 			}
 		} else {
 			config, err := inspectImageMetadata(ctx, root, manifest)
