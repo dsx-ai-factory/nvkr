@@ -114,7 +114,7 @@ notices: ## Regenerate THIRD_PARTY_NOTICES.md from the linked module set.
 notices-check: ## Verify THIRD_PARTY_NOTICES.md matches the linked module set (drift gate).
 	./scripts/gen-notices.sh --check
 
-ADDLICENSE_VERSION ?= v1.1.1
+ADDLICENSE_VERSION := v1.1.1
 LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # Not stamped: generated or machine-managed files, files tests compare byte for
 # byte, recorded evidence and example data, templates that emit workflows, and
@@ -122,25 +122,29 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nkd-run.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
-	-ignore '.nkd/**' -ignore '.nkd-inputs/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nkd-run\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nkd(-inputs)?/|^bin/
+	-ignore '.nkd/**' -ignore '.nkd-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nkd-run\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nkd(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
+# addlicense walks every directory under its argument, including untracked ones
+# such as other worktrees, so hand it Git's file list instead of ".".
+LICENSE_FILES := git ls-files -z --cached --others --exclude-standard
 
 .PHONY: license
 license: ## Add the SPDX license header to source files that lack one.
-	$(ADDLICENSE) -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES) .
+	$(LICENSE_FILES) | xargs -0 $(ADDLICENSE) -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES)
 
 .PHONY: license-header-check
 license-header-check: ## Fail when a source file has no license header.
-	$(ADDLICENSE) -check -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES) .
+	@$(LICENSE_FILES) | xargs -0 $(ADDLICENSE) -check -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES) \
+		|| { echo "ERROR: the files above have no license header; run 'make license'" >&2; exit 1; }
 	@# addlicense accepts a file that merely mentions "copyright" near the top, so also
 	@# require a license line in the first 20 lines of every tracked source file.
-	@missing=$$(git ls-files '*.go' '*.py' '*.sh' '*.yaml' '*.yml' '*Dockerfile*' \
+	@missing=$$(git ls-files '*.go' '*.py' '*.sh' '*.yaml' '*.yml' '*.jq' '*Dockerfile*' '*Makefile' \
 		| grep -v -E '$(LICENSE_UNCHECKED)' \
 		| while read -r f; do \
 			head -20 "$$f" | grep -q -E 'SPDX-License-Identifier|Licensed under the Apache License' || echo "$$f"; \
 		done); \
-	 [ -z "$$missing" ] || { echo "ERROR: no license line in the first 20 lines of:"; echo "$$missing" | sed 's/^/    /'; exit 1; }
+	 [ -z "$$missing" ] || { echo "ERROR: no license line in the first 20 lines of:"; echo "$$missing" | sed 's/^/    /'; echo "Run 'make license'; add the header by hand to a Makefile or *.jq." >&2; exit 1; }
 
 .PHONY: workflows-check
 workflows-check: ## Verify the committed Run generation matches the catalog (ADR-21 drift gate).

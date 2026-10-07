@@ -204,6 +204,7 @@ completion:
 
 ```sh
 gofmt -l cmd client internal pkg
+make license-header-check
 go test ./... -count=1
 go test -race ./... -count=1
 go vet ./...
@@ -214,8 +215,8 @@ make vulncheck
 git diff --check
 ```
 
-`make check` runs the repository gate, including shellcheck, Python report-tool tests and the Go vulnerability
-scan. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
+`make check` runs the repository gate, including the license header check, shellcheck, Python report-tool tests
+and the Go vulnerability scan. New source files need the two-line SPDX header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
 outside a restricted sandbox. `make vulncheck` needs access to the Go module proxy and vulnerability database;
 run it with network access or report it as unverified. The `-race` gate has historically differed between macOS
 and Linux; when a change touches `pkg/nkd/sign` or `pkg/nkd/pipeline`, run it on Linux too. Record external
