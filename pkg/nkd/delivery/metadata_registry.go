@@ -2,6 +2,8 @@ package delivery
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"io"
@@ -164,8 +166,8 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	return inspection, nil
 }
 
-// metadataFetchError preserves ADR-03 retryability without treating upstream
-// checksum/size verification errors or definitive registry rejections as outages.
+// metadataFetchError preserves ADR-03 retryability without treating certificate
+// or checksum/size verification errors or definitive registry rejections as outages.
 func metadataFetchError(ctx context.Context, err error, operation string) error {
 	if ctx.Err() != nil {
 		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s", operation)
@@ -173,12 +175,23 @@ func metadataFetchError(ctx context.Context, err error, operation string) error 
 	code := e.CodeFetchFailed
 	var coded *e.Error
 	var registryErr *transport.Error
+	var certificateErr *tls.CertificateVerificationError
+	var invalidCertificateErr x509.CertificateInvalidError
+	var hostnameErr x509.HostnameError
+	var unknownAuthorityErr x509.UnknownAuthorityError
+	var systemRootsErr x509.SystemRootsError
 	var networkErr net.Error
 	switch {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		code = e.CodeTimeout
 	case errors.As(err, &coded):
 		code = coded.Code
+	case errors.As(err, &certificateErr), errors.As(err, &invalidCertificateErr),
+		errors.As(err, &hostnameErr), errors.As(err, &unknownAuthorityErr), errors.As(err, &systemRootsErr):
+		// HTTP's url.Error also implements net.Error for deterministic trust
+		// failures. Keep these nonretryable, including direct X.509 errors
+		// returned by TLS verification callbacks.
+		code = e.CodeFetchFailed
 	case errors.As(err, &registryErr):
 		if registryErr.StatusCode >= 500 && registryErr.StatusCode < 600 ||
 			registryErr.StatusCode == http.StatusRequestTimeout || registryErr.StatusCode == http.StatusTooManyRequests {
