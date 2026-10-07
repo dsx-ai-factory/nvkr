@@ -43,16 +43,20 @@ plus one bounded incoming child before deduplication. Layers are not extracted o
 The compiler, lifecycle and delivery interfaces implement these membership contracts. Registry aliases,
 authenticated navigation and externally exercised acceptance have separate owner and evidence records.
 
-| Owner | Required change and invariant |
+| Owner | Enforced invariant and contract coverage |
 |---|---|
-| Definition and target admission | Author one OCI output with a sorted, explicit finite platform set, mutually exclusive with a single-platform field. Reject unsupported/missing platform routes before work. Decide and test schema compatibility explicitly; no `platform: multi`, host default or implicit expansion. |
-| Compiler and build identity | Expand that output into separately keyed internal `(output, platform, producer)` uses and one index assembly operation. Freeze every required child before execution. The build owner derives aggregate logical identity from a sorted typed child-build vector, independent of registry routes. Public output names remain authored names. |
-| Terminal observations and completeness | Bind each exact child manifest to its platform, producer, observed successful result and child Build Digest. Equal Build Digests cannot satisfy another platform or output use. Reject missing, duplicate and substituted children before assembling an index. |
-| SBOM and signed evidence | Preserve mandatory native-image SBOM and source/provenance subjects for every child. Extend evidence keys beyond the current output/stage/component tuple so two architectures cannot overwrite each other. Any aggregate summary supplements rather than replaces exact child coverage. |
-| Release metadata and signing | Encode the index digest, sorted child descriptors and platform-scoped build/evidence membership under the signed output. Version changed durable schemas explicitly; never reinterpret an old single-manifest binding as aggregate authority. Sign/attest the intended index subject and retain independently required child evidence. |
-| Registry and discovery | Teach the registry adapter to push and read back the exact index plus all children into the output repository before the release root. Define one optional non-authoritative CWE tag update only after complete publication/readback; a failed child must not advance that alias. The current automatic Helm aliases do not authorize a CWE tag policy. |
-| Consumer and navigation | Authenticate the signed index/child membership and required evidence, then expose checked per-platform child manifest and evidence identities. A single guessed OS/architecture or flattened child list is insufficient. Navigation must preserve the same authenticated-versus-diagnostic distinction as other payloads. |
-| Helm binding | Admit a chart's platform only when the image output's declared and observed platform coverage includes it. Bind the digest of the complete runnable index, preserving normal OCI platform selection. No arbitrary child substitution or post-generation manifest rewrite. |
+| Definition and target admission | Definition v5 admits a sorted finite OCI `platforms` set, mutually exclusive with `platform`; unsupported or missing routes fail before work. Covered by `definition/platforms_test.go` and `factory/image_index_plan_test.go`. |
+| Compiler and build identity | The compiler derives independent native uses and one index package operation; the build owner derives aggregate identity from a sorted typed child-build vector, independent of registry routes. Covered by `TestImageIndexPlanFreezesNativeMembershipAndEvidence`. |
+| Terminal observations and completeness | Every native manifest joins its exact platform, producer result, Build Digest and inventory. Missing or substituted members fail closed. Covered by `TestImageIndexConsumerRejectsMissingOrSubstitutedEvidence` and lifecycle image-index tests. |
+| SBOM and signed evidence | Mandatory native subjects retain platform-scoped evidence keys; aggregate summaries cannot replace child coverage. Covered by `TestImageIndexAttestationBindsNativeSubjectAndAggregateAttachment` and aggregate publication membership tests. |
+| Release metadata and signing | PublicationRoot v4 and Run/Release v4 bind the exact index and native build/evidence membership; legacy shapes are rejected. Covered by publication and lifecycle image-index contract tests. |
+| Registry and discovery | The registry adapter publishes and reads back the index and all children before the release root. Explicit image aliases advance only after complete closure readback. Covered by `TestRegistryImageIndexRoundTripPreservesEveryChild` and `TestImageTagsDoNotAdvanceAfterAnyClosureReadbackFailure`. |
+| Consumer and navigation | Held publication validation and consumer checks bind exact native membership and required evidence; navigation preserves the authenticated-versus-diagnostic distinction. Covered by `TestImageIndexPublicationHeldViewBindsChildrenAndEvidence` and publication membership tests. |
+| Helm binding | Platform coverage is checked and the factory selects the complete index digest for chart bindings. Aggregate observation and generic Helm mapping tests cover these paths separately; a combined extracted-chart assertion remains follow-up coverage. |
+
+A discovery alias such as `candidate` can advance after complete closure readback while later signing or
+verification is still unfinished, or subsequently fails. Tag presence does not establish signature readiness.
+Consumers must resolve and authenticate the immutable subject and required evidence under their policy.
 
 These changes cross ADR-11/12 producer and target selection, ADR-13/16 evidence and completeness,
 ADR-19 output membership and ADR-20 publication. Native hosted routing is a separate prerequisite owned by
@@ -89,16 +93,16 @@ type ImageIndexChildBinding struct {
 
 `delivery.Output` and `delivery.OutputBinding` carry
 `ImageIndex *ImageIndexBinding` as `json:"imageIndex,omitempty"`; it is absent for existing native single-image
-outputs and mandatory for aggregate image outputs. The public publication output description will project
+outputs and mandatory for aggregate image outputs. The public publication output description projects
 the checked same binding. No OS/architecture pair is assigned to the aggregate. Structural validation of
 these descriptive values does not authenticate a producer or authorize a release; factory observation and
 the authenticated consumer own those checks. `ImageIndexBinding.Clone()` must copy both slices.
 
-`delivery.EvidenceBinding` gains `Platform string` as `json:"platform,omitempty"`. Aggregate native child
+`delivery.EvidenceBinding` carries `Platform string` as `json:"platform,omitempty"`. Aggregate native child
 SBOM evidence must populate it. Each mandatory key is `(output, platform, stage, component)`; for an image
 child, `stage=build-output`, `subjectKind=oci-manifest`, `subjectDigest=manifestDigest` and
 `inspectionInputDigest=buildSubject`. Its expected build identity is that child's `buildDigest`, not the
-aggregate recipe digest. Nonaggregate evidence keeps its existing key semantics with an empty platform.
+aggregate Build Digest. Nonaggregate evidence keeps its existing key semantics with an empty platform.
 The required set comes from frozen Definition/Plan membership, never from whatever children were observed.
 
 The compiler owner exposes its own `factory.ImageIndexPlan` with `requiredPlatforms` and sorted
@@ -149,3 +153,15 @@ build, runnable application behavior, registry acceptance, a hosted job, signatu
 acceptance. The final integration stage requires real native AMD64 and ARM64 CWE production, exact child
 SBOM/provenance, standard OCI pull/run through the index, failed-child/tag tests and complete signed release
 consumption. Recorded execution must distinguish native and emulated checks.
+
+## Deferred measurement and coverage
+
+Repeated aggregate reconstruction during packaging, observation and evidence collection deliberately
+reauthenticates bytes. Representative multi-layer peak held/scratch usage has not been measured; this is a
+follow-up performance task, not a demonstrated exhaustion or timeout defect. Measure each phase and their
+combined peak before proposing reuse. Any reuse must remain a run/lifetime-bound opaque verified capability;
+a caller-provided `ImageIndexBinding` is not authority.
+
+A combined chart-packaging fixture that extracts the chart layer and compares its mapped image digest to
+the aggregate index (and against both native child digests) is also follow-up coverage. Existing aggregate
+observation and generic Helm mapping tests are separate evidence and do not establish that combined assertion.

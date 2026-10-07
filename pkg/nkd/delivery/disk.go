@@ -558,6 +558,10 @@ func publicationDiskPayloads(ctx context.Context, root, expectedRoot string) (ma
 					return nil, e.New(e.CodeVerifyFailed, "image index storage selection exceeds supported bounds")
 				}
 				reachable[object.DescriptorDigest] = true
+				// Storage selection conservatively traverses both native encodings so
+				// untrusted media labels cannot hide a disk payload or its byte cost.
+				// This is not aggregate admission: the image-index owner subsequently
+				// requires OCI-only children and validates exact descriptor/body media.
 				for _, child := range children.Manifests {
 					if child.MediaType != MediaOCIManifest && child.MediaType != MediaDockerManifest {
 						return nil, e.New(e.CodeVerifyFailed, "image index storage selection requires native manifests")

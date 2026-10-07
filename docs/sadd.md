@@ -315,7 +315,7 @@ All structured identities use ADR-01's canonical codec and named digest families
 integer-only numeric profile; an arbitrary JSON serialization is not an identity implementation. Raw SHA-256
 remains appropriate for exact blob integrity. These distinctions explain why one build can produce different
 run evidence without changing Build Digest. The retired `nkd.recipe` family remains reserved for historical
-identities. Definition v4, catalog v3, IR v4 and Run plan/artifact graph v4 readers reject old shapes; signed bytes are not converted.
+identities. Definition v5, catalog v3, IR v4 and Run plan/artifact graph v5 readers reject old shapes; signed bytes are not converted.
 Compiler-handoff and execution-settings digest families remain reserved after removal. Production SLSA
 build-type `/v2` parameters bind the original Definition and Environment identities directly.
 

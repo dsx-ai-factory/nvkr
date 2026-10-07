@@ -418,6 +418,10 @@ func TestImageIndexNoReplaceCancellationAndConcurrentClose(t *testing.T) {
 	}
 	// Separate output races Close; either a complete held closure is installed or
 	// admission rejects the closed capability. Never use-after-close or partial.
+	description, err := index.Description()
+	if err != nil {
+		t.Fatal(err)
+	}
 	another := filepath.Join(t.TempDir(), "index")
 	done := make(chan error, 1)
 	go func() { done <- index.WriteLayout(context.Background(), another) }()
@@ -427,6 +431,12 @@ func TestImageIndexNoReplaceCancellationAndConcurrentClose(t *testing.T) {
 		if _, statErr := os.Lstat(another); !os.IsNotExist(statErr) {
 			t.Fatal("closed race left partial output")
 		}
+	} else {
+		opened, err := OpenImageIndex(t.Context(), another, description.Digest, imageIndexPlatforms)
+		if err != nil {
+			t.Fatalf("successful concurrent write installed invalid closure: %v", err)
+		}
+		defer opened.Close()
 	}
 }
 
