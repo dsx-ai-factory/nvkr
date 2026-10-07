@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Regenerate THIRD_PARTY_NOTICES.md from the modules linked into the nkdctl
 # binary. Tools invoked as separate processes are deliberately excluded: they
 # are not linked, so Apache-2.0 section 4(d) does not reach them.

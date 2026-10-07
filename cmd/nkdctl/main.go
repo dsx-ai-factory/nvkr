@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command nkdctl exposes the Definition -> Run -> Release lifecycle.
 // Commands own flags, presentation, and coded exit behavior; pkg/nkd/lifecycle
 // owns the public workflow and delegates to domain authority modules.

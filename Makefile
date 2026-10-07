@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # nkdctl — Definition -> Run -> Release tooling.
 # Run `make help` for targets; `make check` is the full local completion gate.
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 apiVersion: nkd.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nke-m2-native-toolchains

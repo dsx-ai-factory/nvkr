@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package buildgraph derives a pinned graph from the producers selected by one
 // Definition output. Selections are explicit; there is no catalog grouping or
 // matching language between the Definition and its component producers.

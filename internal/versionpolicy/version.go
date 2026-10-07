@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package versionpolicy owns version syntax admission. Validation never returns
 // a normalized version: callers retain the original text for lookup and identity.
 package versionpolicy

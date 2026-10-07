@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package pipeline executes exact producer instructions and observes their results.
 // Local.Run executes a build graph; ExecNode executes one referenced instruction.
 // This package owns source snapshots, process lifetimes, and terminal artifact

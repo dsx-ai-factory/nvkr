@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package execution owns engine-neutral requirements for an executable NKD step.
 // Requirements describe minimum runner capacity; they are not proof that a selected
 // runner provides that capacity and they are not observations of a completed Run.

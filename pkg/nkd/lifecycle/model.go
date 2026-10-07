@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package lifecycle owns the Definition-to-Run-to-Release workflow.
 // PrepareFiles freezes a Run attempt for ExecuteLocal; GenerateFiles prepares
 // hosted execution, and Consumer.Verify authenticates a published Release under

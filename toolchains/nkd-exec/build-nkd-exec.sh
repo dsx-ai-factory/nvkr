@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Reproducibly build the ADR-18 `nkd-exec` helper (== nkdctl) for linux/amd64 and
 # linux/arm64, capture the per-arch binary digest (the ADR-07 RunnerDigest), and OPTIONALLY
 # assemble the pinned helper image (the ADR-18 HelperImage). It is deliberately hermetic

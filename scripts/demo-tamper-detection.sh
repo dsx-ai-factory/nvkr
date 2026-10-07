@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # CUJ: a security reviewer changes bytes at several public boundaries and observes
 # exact-scope, immutable-publication, and archive-shape failures.
 
