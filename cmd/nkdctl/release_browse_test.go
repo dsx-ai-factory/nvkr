@@ -118,8 +118,8 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 		"--reference", reference,
 		"--lane", "pipeline-attested", "--scope", "artifact-publication",
 		"--identity", "^builder$", "--issuer", "issuer", "--anonymous",
-		"--definition", "definitions/nke-deploy/definition.yaml",
-		"--environment", "definitions/nke-deploy/environment-github.yaml",
+		"--definition", "definitions/nke-m2/definition.yaml",
+		"--environment", "definitions/nke-m2/environment-github.yaml",
 		"--plan", ".github/nkd-run/plan.json",
 	}
 	app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}

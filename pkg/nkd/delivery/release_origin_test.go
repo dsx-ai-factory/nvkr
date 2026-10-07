@@ -28,7 +28,7 @@ func TestReleasePublicationOrigin(t *testing.T) {
 			case "oversized":
 				origin.SignedInvocationID = strings.Repeat("a", 2049)
 			case "missing run":
-				request.Release.PlanDigest, request.Release.InvocationID = "", ""
+				request.Release.InvocationID = ""
 			}
 			out := filepath.Join(t.TempDir(), "publication")
 			_, err := BuildPublicationRoot(t.Context(), out, request)
