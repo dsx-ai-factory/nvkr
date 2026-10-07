@@ -134,7 +134,7 @@ CONTAINER_RUNTIME=docker NKE_OS_ARCH=arm64 scripts/nke-os-local.sh team-os-arm64
 
 This takes substantially longer than the presentation and produces local unqualified execution evidence.
 The maintained Docker wrapper freezes the observed toolchain image ID per attempt. The [recorded ARM64
-and AMD64 builds and boot smoke](../docs/evidence/2026-10-01-nke-arc-os-builds.md) describe exact historical Runs.
+and AMD64 builds and boot smoke](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) describe exact historical Runs.
 They do not establish qualification, FDE support or production acceptance for a different checkout.
 
 ## Stop 3: navigate the candidate release
@@ -148,9 +148,9 @@ checkout's supported paths and from the small examples in Stops 1 and 2.
 
 Use the explorer's **Pipeline Release** button during the presentation, or open
 [the ARM64 disk directly](demo-team-explorer.html#publication/nke-node-image-arm64). See its
-[capture, status and exact identities](../docs/evidence/2026-10-06-team-demo-pipeline.md). The saved CLI browse view
+[capture, status and exact identities](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md). The saved CLI browse view
 is a metadata description; opening it does not refetch metadata or verify published payloads, signatures or
-policy. The completed workflow result and final Run record are retained in the capture: 34 expected outputs
+policy. The archived workflow result and final Run record report 34 expected outputs that
 match 34 observed outputs. Its successful finalization is distinct
 from the publication/signing jobs and from an independent consumer-policy decision.
 
@@ -235,7 +235,7 @@ checkout's maintained paths without retroactively changing those support claims.
 
 ## Walkthrough validation
 
-[Recorded October 6–7 checks](../docs/evidence/2026-10-07-team-presentation-validation.md) cover the
-PR #108 CLI, catalog/OS scripts, retained release snapshot, original browser pages and clarity pass.
+[Recorded October 6–7 checks](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-07-team-presentation-validation.md) cover the
+PR #108 CLI, catalog/OS scripts, embedded release snapshot, original browser pages and clarity pass.
 They distinguish presentation and metadata inspection from production execution and independent
 consumer verification. Later document edits do not inherit those earlier results.

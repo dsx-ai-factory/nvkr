@@ -79,7 +79,7 @@ CI come from its selected catalog and lock, rather than edits to rendered YAML.
 Pull requests check generation. The maintained publication route admits default-branch manual dispatch;
 signing receives OIDC permission only in its isolated job. Generic hosted runners are the default, with
 ADR-18's explicitly admitted native ARC disk routes. Dated validation-branch exceptions and completed Runs
-are scoped in [reconciliation](docs/adr/reconciliation.md) and the [evidence index](docs/evidence/README.md).
+are scoped in [reconciliation](docs/adr/reconciliation.md).
 
 ## Test timing and cache use
 
@@ -89,7 +89,7 @@ cache is scoped by platform, exact Go version, dependencies, and commit; a compa
 restored and an updated cache saved only after successful checks. Other jobs cannot populate that key.
 
 [CI test performance](docs/ci-test-performance.md) owns the measured Merge Gate follow-up and focused
-profiling commands. Artifact-build workflow timings are a separate [dated comparison](docs/evidence/2026-09-10-github-run-performance.md).
+profiling commands.
 
 ## Opt-in integration checks
 

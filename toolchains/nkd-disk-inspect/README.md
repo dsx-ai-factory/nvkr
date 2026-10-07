@@ -4,10 +4,10 @@ This image supplies upstream `virt-inspector`, `guestfish`, libguestfs, a Linux
 appliance kernel, QEMU, `dpkg-deb` and the exact native Syft archive selected by
 the source lock for the full content helper. The build records package inventory
 and the inspector/codec/guestfish/package-reader/scanner executable hashes.
-The [native ARC preparation record](../../docs/evidence/2026-10-06-native-arc.md) contains final-source native ARM64 and AMD64 assembly, executable measurements and appliance filesystem probes.
+The [native ARC preparation record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md) contains final-source native ARM64 and AMD64 assembly, executable measurements and appliance filesystem probes.
 This source configuration is not a published or qualified NKD toolchain.
 Both native `images` slots and license/security approval gates remain unresolved.
-The [October 6 candidate exception](../../docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
+The [October 6 candidate exception](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
 separately authorizes internal publication and M2 selection of the recorded native images;
 it does not claim completed organizational reviews.
 The Dockerfile
@@ -157,7 +157,7 @@ removes by ID, never by a reusable name after a failed creation. These are local
 daemon safeguards, not authenticated cross-process ownership or receipt protocols.
 Create's bounded, validated full ID also selects attached start. The fixed
 launcher requests `--log-driver=none`; the
-[Oct 5 native ARM64 replay](../../docs/evidence/disk-inspection-observations.md#launcher-replay)
+[Oct 5 native ARM64 replay](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md#launcher-replay)
 checked attached report delivery and start by create ID against the unchanged
 Oct 2 image. Docker and native AMD64 execution of these changes remain unexercised.
 Cleanup discovery diagnostics revoke a result but do not prevent removal of a

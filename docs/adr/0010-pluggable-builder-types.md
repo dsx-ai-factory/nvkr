@@ -215,10 +215,10 @@ diagnostic marker without discarding a separately verified successful disk. Abso
 replacement of an existing diagnostic set fail closed. These files are non-authoritative diagnostics, not Build,
 Artifact or qualification evidence. The supported route supplies no secret channel and rejects FDE before work;
 the adapter does not retain the generated SSH key, environment, home, configuration, cache, HTTP or output
-directories. The [2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
+directories. The [2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
 Docker/Packer/NKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
 adapter on ARC, separate from generated hosted execution. The later
-[M2 candidate](../evidence/2026-10-06-team-demo-pipeline.md) exercised the generated native route with
+[M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) exercised the generated native route with
 explicit `build-provenance-v1` evidence and a validation-branch signing exception. Main-only execution,
 independent full-payload disk consumption, strict inspection and qualification remain unproved; the
 candidate does not establish complete maintained-release acceptance. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
@@ -366,7 +366,7 @@ historical `NVIDIA/nke` Make-target example above; `5ac0ce2389c06d0291535fb6bf0f
 `dsx-ai-factory/nke` merge that introduced the staged-material contract. The current development catalog pins
 `726f76944404e1106626b8333d3576bdf67b575b`, while the recorded 2026-09-23 Podman bake used the older
 `de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NKD bytes. The
-[2026-10-01 ARC evidence](../evidence/2026-10-01-nke-arc-os-builds.md) records committed NKD candidates
+[2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed NKD candidates
 `bb6e870` and `1f989e9` executing the current NKE pin on ARM64 and AMD64, with successful builds and boot
 smoke in the unqualified diagnostic lane. Later runtime and workflow changes require their own execution proof.
 

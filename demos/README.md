@@ -46,5 +46,5 @@ remain unverified. The [facilitator guide](team-guide.md) explains the separate 
 | Verify a signed publication under a consumer policy | [Release consumer script](../scripts/demo-release-consumer.sh) |
 
 Operational scripts stay in `scripts/`. Their [usage guide](../scripts/README.md) explains runtime,
-credentials, storage ownership, and cleanup. [Recorded observations](../docs/evidence/README.md)
-retain the exact subjects and limits of earlier demonstrations.
+credentials, storage ownership, and cleanup. The [facilitator guide](team-guide.md) and
+[reconciliation](../docs/adr/reconciliation.md) describe the subjects and limits of recorded demonstrations.

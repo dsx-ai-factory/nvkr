@@ -63,6 +63,6 @@ run "$NKD" run local --definition "$DEFINITION" --environment "$ENVIRONMENT" --a
 printf '\nExpected: pending, static-unqualified, zero observed outputs; no attempt workspace or QCOW2 is created.\n'
 printf 'A successful real local Run retains .nkd/runs/<attempt>/outputs/nke-node-image-%s.qcow2.\n' "$ARCH"
 printf 'Read definitions/nke-os/README.md before running the actual build wrapper.\n'
-printf 'Historical native ARM64 and AMD64 bake/boot evidence: docs/evidence/2026-10-01-nke-arc-os-builds.md\n'
+printf 'Historical native ARM64 and AMD64 bake/boot scope: definitions/nke-os/README.md\n'
 printf 'The linked presentation pipeline is a separate candidate; its exact artifacts and status belong to its recorded Run.\n'
 printf 'This maintained-checkout walkthrough does not execute generated hosted disk publication or claim qualification.\n'

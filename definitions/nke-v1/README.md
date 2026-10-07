@@ -6,7 +6,7 @@ instructions live in the catalog; the Definition selects and packages outputs; t
 runtime, destination and signing.
 
 The repository's committed workflow uses [M2](../nke-m2/README.md). This three-output Definition is an
-alternative for learning or local execution. Its [historical hosted run](../../docs/evidence/2026-09-10-combined-run.md)
+alternative for learning or local execution. Its [historical hosted run](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
 passed real signing, complete Run finalization and independent consumption in a personal namespace.
 That record predates the current schema, tool pins, Helm binding and namespace; it does not validate
 a hosted run of these updated inputs.

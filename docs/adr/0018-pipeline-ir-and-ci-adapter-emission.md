@@ -220,7 +220,7 @@ trusted source-fetch job alone receives it. That job verifies the selected commi
 credential-free Git checkout, and uploads it as a one-day internal artifact with an exact SHA-256 passed as a
 job output. The build job verifies the archive digest and Git commit/tree before candidate code runs. Candidate
 code receives no authority-bearing evidence role. The build job's logs, image observations, QCOW2 digest and boot
-result are explicitly unqualified diagnostic output. The [2026-10-01 runs](../evidence/2026-10-01-nke-arc-os-builds.md) exercise both
+result are explicitly unqualified diagnostic output. The [2026-10-01 runs](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) exercise both
 ARC pools from `nke-recipes`; they do not establish lasting availability or provider isolation. Shared Actions
 caches are disabled for the trusted bootstrap and generated helper so candidate cache writes are not restored
 into those trusted binaries. Mirror selection checks an open, non-draft same-repository PR head, not a human

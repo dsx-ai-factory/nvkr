@@ -21,7 +21,7 @@ scopes fail before work.
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
 ARC hosted route is separately admitted under ADR-18. The
-[recorded 34-output M2 candidate](../evidence/2026-10-06-team-demo-pipeline.md) completed generated native
+[recorded 34-output M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated native
 disk builds, publication, signing, verification and Run finalization under a validation-branch exception.
 Its `build-provenance-v1` evidence binds live producer/material subjects and explicitly defers inspection.
 This is scoped candidate pipeline-attested delivery, not a claim of main-only workflow execution,
@@ -87,7 +87,7 @@ disk. Retention closes before immutable Run recording and does not mask the prim
 secrets are not admitted through this sink.
 
 Diagnostic installed-package inspection of a retained QCOW2 is distinct from full content inspection. The
-[recorded native observations](../evidence/disk-inspection-observations.md) cover exact ARM64 subjects,
+[recorded native observations](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md) cover exact ARM64 subjects,
 unchanged-helper replays, 730 installed packages and scoped mount/cancellation behavior. They do not prove
 current-helper execution, Docker/native AMD64 inspection, original-live-Run joins or complete disk coverage.
 The diagnostic runtime binds caller-selected runtime/image/tool identities; those are not automatically
@@ -125,7 +125,7 @@ selects only one successfully sealed sink-issued route with bounded retention; e
 select workspace content. Both-native generation and tampering tests cover this projection, not a fresh
 ephemeral-runner timeout or diagnostic-upload exercise.
 
-The [October 7 PR #97 contract record](../evidence/2026-10-07-pr97-review-fix-contracts.md)
+The [October 7 PR #97 contract record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-07-pr97-review-fix-contracts.md)
 records native Linux ARM64 race execution of the sealed diagnostic coordinator and
 the explicitly enabled strict hosted-completion test. Both use controlled ELF/bytes
 with concrete public owners; neither establishes a real NKE bake, provider upload,
@@ -151,7 +151,7 @@ The root reader rejects extra blobs and bounds control/evidence to 512 MiB per r
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
 config-declared platforms and derived sibling locators, without reading payload layers or verifying policy.
 Filtering follows complete metadata validation; detached views establish no registry-availability claim.
-[Registry browsing of the recorded candidate](../evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
+[Registry browsing of the recorded candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
 retains the external scope and binary identity.
 
 The generator/validator/writer enforce a 500,000-byte workflow limit. YAML compaction must preserve expanded
@@ -181,7 +181,7 @@ Both native builds and terminal checks completed in run `37445475840`; both deep
 The user earlier moved deep disk/content inspection and dependent reconciliation to M3. The narrower candidate
 `diskEvidence: build-provenance-v1` selects live producer/material evidence with signed uninspected scope,
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
-The [inspection deferral record](../evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
+The [inspection deferral record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
 The strict inspection path remains available. The October 7, 2026 PR #97 task chat contains Ilya Kislenko's
 instruction: "Preserve main/#106: producer provenance for M2, inspection for M3". This is a task-chat instruction,
 not an independently published decider approval; no such approval record is supplied here.
@@ -192,12 +192,12 @@ additional ARM64 outputs are an implementation extension. Both native jobs and e
 required for this candidate's complete Run and Release; the product floor waives none of those requirements.
 Organizational ADR ratification remains separate.
 Both candidate disk jobs succeeded in run `37486058412`, but the aggregate release download failed with ENOSPC
-before publication. The [dated carrier evidence](../evidence/2026-10-06-m2-release-carrier-transport.md) records
+before publication. The [dated carrier evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records
 that failed attempt. The subsequent validation-branch run `37533806963` at commit `625980e` passed
 all candidate outputs and aggregate publication, signing, verification and finalization. That historical run
 predates the consumer-policy and timeout changes here; it is not evidence for this updated head, current main
 execution, strict inspection or independent full-payload consumer acceptance. Per-output storage peaks remain unmeasured.
-The [October 6 preparation record](../evidence/2026-10-06-native-arc.md) retains final-source
+The [October 6 preparation record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md) retains final-source
 ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
 and unprivileged libguestfs appliance filesystem probes. The earlier preparation Environment admitted
 `codex/m2-arc-validation` through `githubDispatchBranches` and its signer identity.
@@ -224,7 +224,7 @@ values, not chart defaults; chart-test images and NKE images outside the disk re
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
-[acquisition observations](../evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain source
+[acquisition observations](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain source
 approval, mixed-source candidate and HTTP-403 limits without copying locks into this ledger.
 
 Current Definition v4/catalog v3/IR v4/Plan and artifact-graph v4 reject retired recipe, cluster, category,
@@ -239,14 +239,14 @@ organization and migration reports do not remain a second status ledger. Tests i
 strict input admission, held-byte substitution, durable attempt commit, cancellation/join, terminal evidence
 and exact output/Plan bindings; passing repository gates do not establish external acceptance.
 
-## Recorded external evidence
+## External run references
 
-The [evidence index](../evidence/README.md) locates retained observations and their exact date, source, lane
-and limits. Core hosted records include real keyless signing and independent consumption, the combined
-CLI/image/chart publication and payload checks, local ARM64 image production, native ARC bake/boot results,
-and the 34-output M2 candidate. Specialist records retain significant credential/discovery failures,
-acquisition correspondence and native disk inspection/codec behavior. Historical layout or source success
-never establishes a current source, policy, full inventory or qualified result.
+The references above identify exact Runs and archived observations with their source, lane, and limits.
+Raw records belong with CI or release artifacts; earlier investigations remain in Git history.
+Run `37533806963` at `625980e` records the 34-output candidate, including both disk outputs and aggregate
+finalization. Its branch exception and `build-provenance-v1` mode do not establish independent full-payload
+disk consumption, strict inspection, qualification, or organizational acceptance. Historical layout or
+source success never establishes a current source, policy, full inventory, or qualified result.
 
 ## Remaining decisions
 

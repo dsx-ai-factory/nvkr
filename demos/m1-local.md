@@ -9,8 +9,8 @@ Plans are `static-unqualified`; executed local Run records use `unqualified-loca
 signature or attestation. The CLI build is offline; the CWE wrapped build uses network access. Calling the
 whole journey hermetic, signed, or M1-complete would be incorrect.
 
-Real hosted signing and independent consumption were [recorded for the combined outputs](../docs/evidence/2026-09-10-combined-run.md)
-in September. The [producer observations](../docs/evidence/producer-acquisition-observations.md#local-rendering-and-packaging)
+Real hosted signing and independent consumption were [recorded for the combined outputs](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
+in September. The [producer observations](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#local-rendering-and-packaging)
 retain the earlier local execution's CLI pull-back and version checks. These dated inputs do not establish
 this checkout's combined local journey or transfer acceptance to newer wire schemas.
 

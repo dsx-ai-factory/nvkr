@@ -1,3 +1,0 @@
-GOBIN="/Users/nhensley/.codex/worktrees/27e7/nke-recipes/bin" go -C toolchains/govulncheck install tool
-"/Users/nhensley/.codex/worktrees/27e7/nke-recipes/bin/govulncheck" ./...
-No vulnerabilities found.

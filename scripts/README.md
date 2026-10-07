@@ -34,8 +34,8 @@ CONTAINER_RUNTIME=docker NKE_OS_ARCH=amd64 scripts/nke-os-local.sh local-amd64-d
 ```
 
 Use a different immutable attempt name for each run. The Podman path has a recorded
-[full build and boot smoke](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
-The [ARC evidence](../docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
+[full build and boot smoke](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
+The [ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
 Docker/KVM builds and boot smoke at an earlier exact commit, not validation of the latest changes.
 See the [Definition guide](../definitions/nke-os/README.md) for route requirements and limitations.
 Set `NKE_LOCAL_CLONE` to reuse an exact local NKE checkout. On macOS the same

@@ -20,7 +20,7 @@ reproduction. M4 does not grant the separate qualified-lane clearance.
 
 Generated execution defaults to generic GitHub-hosted runners. ADR-18 admits only the explicit native
 KVM ARC disk route; it does not permit arbitrary self-hosted labels or qualified claims. The
-[34-output M2 candidate](evidence/2026-10-06-team-demo-pipeline.md) succeeded under that route and an
+[34-output M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) succeeded under that route and an
 explicit validation-branch signing exception. It does not establish main-only execution, independent
 full-payload disk consumption, full inventory, organizational approval or complete milestone acceptance.
 

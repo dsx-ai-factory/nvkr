@@ -28,7 +28,7 @@ This mixed-source candidate tests the build path; it is not the intended complet
 The exception's acceptance owner, expiry and production-content approval are not recorded. Exiting the exception
 requires restoring the intended DSX IMDS payload with verified native materials and both-architecture content
 checks, or a named, explicitly approved content-scope decision; a successful build cannot silently approve omission.
-The [merged-source handoff](../../docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
+The [merged-source handoff](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
 records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
 `agent/v*` tag pattern. Exact commit acquisition itself is not protected-ref or source-review
@@ -53,7 +53,7 @@ Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB
 224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
 include the held subject snapshot. These are admission budgets, not measured full-M2 usage.
 The inspector and Packer source locks retain their outstanding organizational approval gates;
-the [candidate exception and publication evidence](../../docs/evidence/2026-10-06-native-arc.md)
+the [candidate exception and publication evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md)
 records the narrower authorization and exact registry read-back.
 The retained measurements came from developer-host preparation and publication. A hosted toolchain build,
 its matching measurements and provenance, and completed organizational clearance are not recorded here;
@@ -75,7 +75,7 @@ The product acceptance floor remains AMD64; this candidate retains the separatel
 extension, and both disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
 M2 candidate requires publication, signatures and consumer verification for every selected output.
-The [failed delivery attempt](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md)
+The [failed delivery attempt](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md)
 records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
 Per-output storage peaks still require measured admission.
 The signed disk mode is descriptive. `VerificationPolicy.minimumDiskEvidence` defaults to `build-provenance-v1`
@@ -87,7 +87,7 @@ consumer acceptance.
 
 The [customer choices guide](../../docs/nke-m2-customer-choices.md) explains supplier replacement through
 the existing catalog interfaces and the precise scope of its graph tests. The
-[release transport evidence](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
+[release transport evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
 failed candidate's storage exhaustion and why correcting carrier selection alone does not complete delivery.
 
 The [toolchain preparation guides](../../toolchains/nkd-packer/README.md)
@@ -179,7 +179,7 @@ private-source credentials. Pinning and graph tests establish their own contract
 
 ## Recorded delivery and remaining acceptance
 
-[Run 37533806963](../../docs/evidence/2026-10-06-team-demo-pipeline.md) completed all 34 outputs and aggregate
+[Run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed all 34 outputs and aggregate
 publication, signing, verification and finalization. It used an exact validation-branch dispatch/signing
 exception absent from the maintained main-only inputs. Independent full-payload signed disk consumption,
 main-only execution and hosted mixed-attempt retry acceptance remain unexercised. Earlier deep inspections

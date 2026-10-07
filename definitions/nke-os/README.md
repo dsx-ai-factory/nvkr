@@ -58,7 +58,7 @@ A successful attempt retains:
 .nkd/runs/<attempt>/lifecycle.json
 ```
 
-This remains `unqualified-local-execution`. The [ARC build evidence](../../docs/evidence/2026-10-01-nke-arc-os-builds.md)
+This remains `unqualified-local-execution`. The [ARC build evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md)
 records successful committed-code ARM64 and AMD64 Docker/KVM builds, boot smoke and QCOW2 uploads, alongside the
 earlier ARM64 Podman/TCG bake.
 The standalone Docker/KVM validation workflow is an unqualified integration path. It does not publish or sign
@@ -112,7 +112,7 @@ not NKE build evidence.
 
 ## Acceptance boundary
 
-The [ARC evidence](../../docs/evidence/2026-10-01-nke-arc-os-builds.md) owns exact historical run inputs and
+The [ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) owns exact historical run inputs and
 results. Candidate `d1e28ce` passed both full bakes and boot smoke through the trusted main workflow;
 that dispatch exercised source/catalog inputs rather than the candidate's workflow edits. The later
 `GOENV=off` acquisition input and changed workflow steps still require their own native full-build/boot

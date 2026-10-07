@@ -41,7 +41,7 @@ The strict disk inventory/reconciliation contract is separate and remains an M3 
 
 ## Verification on real outputs
 
-[Recorded offline dependency scanning](evidence/2026-09-10-combined-run.md#offline-dependency-scanning)
+[Recorded offline dependency scanning](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md#offline-dependency-scanning)
 retains the exact artifact/scanner identities, inventory counts and measured-fixture limitations.
 Unknown package versions remain unknown; an artifact or source digest does not supply a missing release version.
 

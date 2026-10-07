@@ -77,7 +77,7 @@ GitHub is the maintained hosted generator and signing/publication provider. Actu
 declared runtime, source access, and capabilities; the combined candidate's hosted disk jobs use explicit
 KVM routes. Consumer verification requires Linux, pinned tools, and an explicit identity and issuer policy.
 
-The [recorded October 6 candidate](docs/evidence/2026-10-06-team-demo-pipeline.md) completed all 34 outputs,
+The [October 6 candidate Run](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963) completed all 34 outputs,
 publication, keyless signing, workflow verification, and Run finalization, including both disk images.
 The record covers that validation branch and does not establish independent full-payload consumer
 acceptance or general production readiness.

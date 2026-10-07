@@ -48,10 +48,9 @@ Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures 
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and
 [contribution guidance](../CONTRIBUTING.md) own ongoing maintainer procedures.
 
-The [evidence index](evidence/README.md) identifies retained external observations and their limits.
-Dated records describe their original subjects and revisions; they do not confer current production
-acceptance. Unit tests, a Plan, metadata browsing, and authenticated consumer verification establish
-different facts. Superseded plans and completed progress reports remain in Git history.
+Reconciliation cites scoped external Runs and historical observations. Unit tests, a Plan, metadata
+browsing, and authenticated consumer verification establish different facts. Historical captures,
+superseded plans, and completed progress reports remain in Git history.
 
 ## Demos
 

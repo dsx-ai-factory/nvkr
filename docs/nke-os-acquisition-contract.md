@@ -68,10 +68,10 @@ regions, remain bound by the exact archive digest.
 
 ## Validation and remaining acceptance
 
-The [retained byte-correspondence observations](evidence/producer-acquisition-observations.md#apt-capture-correspondence)
+The [retained byte-correspondence observations](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#apt-capture-correspondence)
 record exact tested source blobs, native ARM64 and emulated AMD64 capture/package digests, and the
 committed recheck log. The original source hook was developed in NKE #1211; the later
-[merged-source handoff](evidence/producer-acquisition-observations.md#merged-capture-source-handoff)
+[merged-source handoff](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#merged-capture-source-handoff)
 records its separate approval and source selection. A later source approval cannot retroactively expand
 an earlier diagnostic's execution scope.
 

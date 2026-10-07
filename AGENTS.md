@@ -159,7 +159,7 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 | Log a warning and continue on a validation, pin, or signature problem | Return a coded error; fail closed |
 | Emit an arbitrary self-hosted runner label or a `git tag` trigger in a generated workflow | Generic hosted runners, with only ADR-18's explicitly admitted native ARC disk exception; sign through the admitted default-branch workflow |
 | Hand-edit `.github/workflows/nkd-run.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
-| Claim a feature works because a unit test with a fake passes | Record external evidence under `docs/evidence/` and keep the reconciliation row honest |
+| Claim a feature works because a unit test with a fake passes | Cite the exact external Run or release artifact and its scope in reconciliation |
 | Write repo paths, commands, or code identifiers into a product spec or epic | Specs use product nouns only; implementation detail belongs in ADRs and code |
 | Append an amendment chain for an existing decision | Update its owning ADR section and reconciliation directly; label lane and deferred behavior |
 | Modify the NKE checkout or catalog to make a local run work | Use the Git `insteadOf` override in the demo script; the catalog stays canonical |
@@ -178,8 +178,8 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 
 ## Documentation conventions
 
-- Deliverables (audits, plans, specs, demo scripts, evidence) go in `docs/` as `docs/<topic>.md`; summarize in
-  chat, do not paste the document.
+- Guides, plans, and specifications go in `docs/`; guided presentations and demos go in `demos/`.
+  Keep raw Run records and logs with CI or release artifacts; summarize deliverables in chat.
 - ADRs follow the header template in `docs/adr/0001-*.md`. Update the current owning decision directly; create
   a new ADR only for a distinct decision. Update reconciliation and preserve lane-specific authority. Avoid
   amendment/addendum histories while the design is pre-ratification.
@@ -190,8 +190,8 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
   heading only when it names a topic with substantial content beneath it.
 - Keep `docs/sadd.md` and `CONTEXT.md` (domain vocabulary) consistent with any ADR change.
 - Put example-specific commands beside their Definition or toolchain. Before adding a user guide, consult
-  `docs/README.md` and update the existing task or reference owner. Use `docs/evidence/README.md` for scoped
-  external observations; routine gate transcripts and completed cleanup reports belong in CI and Git history.
+  `docs/README.md` and update the existing task or reference owner. Cite immutable external Run/artifact
+  references and their limits in reconciliation; historical investigations belong in Git history.
 
 ## Key files
 

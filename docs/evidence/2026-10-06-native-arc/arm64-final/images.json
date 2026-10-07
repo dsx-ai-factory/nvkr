@@ -1,9 +1,0 @@
-{
-  "scope": "unqualified-diagnostic",
-  "platform": "linux/arm64",
-  "baseSourceCommit": "61ec66fa4ffaf75fee291450f7572d244f2e624f",
-  "sourceHasUncommittedChanges": true,
-  "inspectorImageID": "sha256:3aed46be99e43aa273533808f3604e384e8c7f80c33ba7716bb382316ebf343e",
-  "packerImageID": "sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db",
-  "publicationApproved": false
-}

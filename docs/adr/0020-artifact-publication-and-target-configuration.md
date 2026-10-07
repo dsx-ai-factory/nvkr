@@ -295,7 +295,7 @@ changing decoded string values, and empty build-subject collections are arrays. 
 after the whole metadata closure is checked. The diagram presents published relationships, not an inferred
 build graph. Navigation adds no canonical identity or publication authority and leaves explicit release
 verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
-payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](../evidence/2026-10-06-release-browse-metadata.md)
+payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-release-browse-metadata.md)
 separately records the earlier external inspection scope. Current readers require publication-root v4 and
 reject that v3 release; current-schema external acceptance is not established by the dated record.
 
@@ -372,7 +372,7 @@ snapshot against the pinned pull digest, validates the chart archive, and wraps 
 as the OCI chart layer. The layer digest therefore remains the upstream package pin; the enclosing manifest
 has its own digest. Acquired charts cannot be repacked or image-bound. Lifecycle observation independently
 reproduces the wrapper and checks its manifest. This path is exercised by a
-[local four-chart NKE Run](../evidence/producer-acquisition-observations.md#acquired-helm-charts); it establishes neither upstream
+[local four-chart NKE Run](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#acquired-helm-charts); it establishes neither upstream
 signature verification nor qualification. Dependency scanning of acquired `raw` charts remains unsupported.
 
 Push, sign and pull-back verification are separate effects: later failure may leave bytes or partial evidence in
@@ -433,7 +433,7 @@ The container-image delivery adapter has contract tests for exact OCI-export arc
 manifest/config/layer closure, decompressed layer identities, platform selection, safe archive members and
 unchanged image identities inside a publication root. Public OCI outputs lower to one built OCI-export
 component, checked against its producer bytes before publication; consumer projection checks the native image
-and its platform. The [combined hosted Run](../evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
+and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
 source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
 finalization. This historical layout had three duplicated publications. Independent consumers authenticated all three; downloaded payload checks
 exercise the native image, recovered CLI and rendered chart binding. Acquired native OCI and Docker-schema-2
