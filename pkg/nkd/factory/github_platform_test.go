@@ -2,6 +2,7 @@ package factory
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -146,6 +147,13 @@ func TestGitHubNativePreflightObservesKernelPlatform(t *testing.T) {
 			raw, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail {
 				t.Fatalf("preflight error %v: %s", err, raw)
+			}
+			if tc.fail {
+				var exit *exec.ExitError
+				want := e.ExitCode(e.New(e.CodeEngineCapability, "foreign runner"))
+				if !errors.As(err, &exit) || exit.ExitCode() != want {
+					t.Fatalf("preflight exit = %v, want %d", err, want)
+				}
 			}
 			if tc.fail && !strings.Contains(string(raw), "NKD-E-ENGINE-CAPABILITY") {
 				t.Fatalf("uncoded failure: %s", raw)

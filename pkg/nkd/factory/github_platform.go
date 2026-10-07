@@ -88,7 +88,7 @@ func githubPlatformCheck(plan *Plan, runner string) string {
 	if platform == "linux/arm64" {
 		machine = "aarch64"
 	}
-	return fmt.Sprintf("set -eu\nif [ \"$(uname -s)/$(uname -m)\" != %s ]; then printf 'NKD-E-ENGINE-CAPABILITY: expected native %s runner\\n' >&2; exit 1; fi", shellQuote("Linux/"+machine), platform)
+	return fmt.Sprintf("set -eu\nif [ \"$(uname -s)/$(uname -m)\" != %s ]; then printf 'NKD-E-ENGINE-CAPABILITY: expected native %s runner\\n' >&2; exit %d; fi", shellQuote("Linux/"+machine), platform, e.ExitCode(e.New(e.CodeEngineCapability, "foreign runner")))
 }
 
 func writeGitHubPlatformCheck(out *bytes.Buffer, plan *Plan, runner string) {
