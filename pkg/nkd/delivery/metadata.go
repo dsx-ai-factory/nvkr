@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -25,13 +24,9 @@ func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
 	if index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 || index.Manifests[0].ArtifactType != MediaPublicationRoot {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata release requires one root manifest")
 	}
-	manifestRaw, err := readBlob(ctx, root, index.Manifests[0], 8<<20)
+	manifest, err := readPublicationManifest(ctx, root, index.Manifests[0])
 	if err != nil {
 		return Inspection{}, err
-	}
-	var manifest ociManifest
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || manifest.ArtifactType != MediaPublicationRoot || manifest.Config.MediaType != MediaPublicationRootConfig || len(manifest.Layers) != 0 {
-		return Inspection{}, e.New(e.CodeVerifyFailed, "invalid release metadata manifest")
 	}
 	config, err := readBlob(ctx, root, manifest.Config, 8<<20)
 	if err != nil {

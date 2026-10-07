@@ -14,6 +14,7 @@ func referenceTestPlan(t *testing.T) *Plan {
 	original := signedTestPlan(t, cosignSigningProfile(), ghcrTarget())
 	env := original.Environment
 	env.Publication.Mode = "per-output-v1"
+	env.Publication.CredentialRef = "github:GITHUB_TOKEN"
 	second := original.Definition.Outputs[0]
 	second.Name = "worker-two"
 	original.Definition.Outputs = append(original.Definition.Outputs, second)
@@ -116,6 +117,38 @@ func TestReferenceFinalizerRequiresAllProviderJobs(t *testing.T) {
 				}
 			} else {
 				assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
+			}
+		})
+	}
+}
+
+func TestReferencePublicationRejectsUnscopedCredentials(t *testing.T) {
+	for _, credential := range []string{"", "github:GITHUB_TOKEN", "github:REGISTRY_AUTH"} {
+		t.Run(credential, func(t *testing.T) {
+			plan := referenceTestPlan(t)
+			env := plan.Environment.Clone()
+			env.Publication.CredentialRef = credential
+			env.Publication.Anonymous = credential == ""
+			if env.Publication.Anonymous {
+				env.Publication.RepositoryPrefix = "registry.example/nkd-tools"
+			}
+			stack, err := catalog.ApplyStack(plan.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err = Compile(t.Context(), plan.Definition, env, stack, plan.GeneratorVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.DefinitionPath, plan.EnvironmentPath = "definitions/definition.yaml", "definitions/environment.yaml"
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if credential == "github:REGISTRY_AUTH" {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if bundle != nil {
+					t.Fatal("unsupported credential produced a partial bundle")
+				}
+			} else if err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

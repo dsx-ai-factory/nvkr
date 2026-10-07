@@ -23,6 +23,30 @@ func Inspect(ctx context.Context, root string) (Inspection, error) {
 	return inspectPublication(ctx, root, nil)
 }
 
+// readPublicationManifest validates the same control contract for full and
+// metadata-only inspection, without traversing output payloads.
+func readPublicationManifest(ctx context.Context, root string, descriptor Descriptor) (ociManifest, error) {
+	if descriptor.MediaType != MediaOCIManifest || descriptor.ArtifactType != MediaPublicationRoot {
+		return ociManifest{}, e.New(e.CodeVerifyFailed, "invalid publication-root descriptor media type")
+	}
+	raw, err := readBlob(ctx, root, descriptor, 8<<20)
+	if err != nil {
+		return ociManifest{}, err
+	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return ociManifest{}, e.Wrap(e.CodeVerifyFailed, err, "invalid publication-root JSON")
+	}
+	var manifest ociManifest
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return ociManifest{}, e.Wrap(e.CodeVerifyFailed, err, "decoding publication-root manifest")
+	}
+	if manifest.SchemaVersion != 2 || manifest.MediaType != descriptor.MediaType ||
+		manifest.ArtifactType != MediaPublicationRoot || len(manifest.Layers) != 0 || manifest.Config.MediaType != MediaPublicationRootConfig {
+		return ociManifest{}, e.New(e.CodeVerifyFailed, "publication-root manifest has an invalid schema or config/layer contract")
+	}
+	return manifest, nil
+}
+
 // fetchOutputs is used only by Pull to fill the private staging layout from the
 // exact signed sibling repository/digest bindings, before full closure checks.
 func inspectPublication(ctx context.Context, root string, fetchOutputs func(PublicationRoot) error) (Inspection, error) {
@@ -71,16 +95,9 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 			if rootConfig.Digest != "" {
 				return Inspection{}, e.New(e.CodeVerifyFailed, "publication index contains multiple root configs")
 			}
-			manifestRaw, err := readBlob(ctx, root, descriptor, 8<<20)
+			manifest, err := readPublicationManifest(ctx, root, descriptor)
 			if err != nil {
 				return Inspection{}, err
-			}
-			var manifest ociManifest
-			if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
-				return Inspection{}, e.Wrap(e.CodeVerifyFailed, err, "decoding publication-root manifest")
-			}
-			if manifest.ArtifactType != MediaPublicationRoot || len(manifest.Layers) != 0 || manifest.Config.MediaType != MediaPublicationRootConfig {
-				return Inspection{}, e.New(e.CodeVerifyFailed, "publication-root manifest has an invalid config/layer contract")
 			}
 			rootConfig = manifest.Config
 		}

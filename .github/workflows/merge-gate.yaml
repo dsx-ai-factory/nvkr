@@ -141,6 +141,7 @@ jobs:
               - '.github/workflows/nkd-run.yml'
               - '.github/workflows/merge-gate.yaml'
             actions:
+              - '.github/actionlint.yaml'
               - '.github/workflows/**'
               - '.github/actions/**'
             pipeline:

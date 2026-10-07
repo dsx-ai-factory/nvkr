@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/google/go-containerregistry/pkg/registry"
 )
 
@@ -84,6 +86,63 @@ func TestMetadataTransportExcludesPayloadAndPreservesConsumerRelease(t *testing.
 			if reads.Load() == 0 {
 				t.Fatal("consumer did not recover payload")
 			}
+		})
+	}
+}
+
+func TestMetadataRejectsMalformedRootControlDocuments(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		mutate    func(*ociIndex, *ociManifest)
+		duplicate bool
+	}{
+		{name: "schema", mutate: func(_ *ociIndex, m *ociManifest) { m.SchemaVersion = 99 }},
+		{name: "body media", mutate: func(_ *ociIndex, m *ociManifest) { m.MediaType = "invalid/non-oci" }},
+		{name: "descriptor media", mutate: func(i *ociIndex, _ *ociManifest) { i.Manifests[0].MediaType = MediaDockerManifest }},
+		{name: "duplicate schema", duplicate: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, _ := diskPublicationRequest(t, "amd64")
+			full := filepath.Join(t.TempDir(), "full")
+			if _, err := BuildPublicationRoot(t.Context(), full, request); err != nil {
+				t.Fatal(err)
+			}
+			root := filepath.Join(t.TempDir(), "metadata")
+			if _, err := ExportMetadata(t.Context(), full, root); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := InspectMetadata(t.Context(), root); err != nil {
+				t.Fatal(err)
+			}
+			index, manifest := fixtureManifest(t, root)
+			if test.mutate != nil {
+				test.mutate(&index, &manifest)
+			}
+			raw, err := json.Marshal(manifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.duplicate {
+				raw = append([]byte(`{"schemaVersion":99,`), raw[1:]...)
+			}
+			old := index.Manifests[0].Digest
+			writer := layoutWriter{root: root}
+			descriptor, err := writer.addBlobBytes(raw, index.Manifests[0].MediaType)
+			if err != nil {
+				t.Fatal(err)
+			}
+			descriptor.ArtifactType = MediaPublicationRoot
+			index.Manifests[0] = descriptor
+			if _, err := writer.writeIndex(index); err != nil {
+				t.Fatal(err)
+			}
+			if old != descriptor.Digest {
+				if err := os.Remove(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(old, "sha256:"))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err = InspectMetadata(t.Context(), root)
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
 		})
 	}
 }

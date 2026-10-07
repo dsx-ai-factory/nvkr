@@ -129,7 +129,7 @@ func pullGitHubImages(ctx context.Context, images []string, platform, user, toke
 	}
 	for _, image := range images {
 		if err := run(ctx, directory, platform, image); err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "pull exact private toolchain")
+			return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "pull exact private toolchain"))
 		}
 	}
 	return nil

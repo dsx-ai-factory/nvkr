@@ -34,6 +34,14 @@ func githubBootstrapRunner(runner string) string {
 }
 
 func admitGitHubRequirements(plan *Plan, adapter string) error {
+	if PerOutputPublication(plan) {
+		for _, name := range sortedKeys(plan.Targets) {
+			target := plan.Targets[name]
+			if target.CredentialRef != "" && target.CredentialRef != "github:GITHUB_TOKEN" {
+				return e.New(e.CodeEngineCapability, "%s per-output target %q requires the job-scoped GITHUB_TOKEN; custom publication credentials cannot be narrowed for read-only jobs", adapter, name)
+			}
+		}
+	}
 	if plan.Environment.GitHubARC == "" {
 		return rejectUnsupportedPlanRequirements(plan, adapter)
 	}

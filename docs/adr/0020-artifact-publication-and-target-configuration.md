@@ -233,6 +233,8 @@ exact Plan/invocation-bound production predicate, output signatures/provenance a
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
 read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
+GitHub per-output publication admits only anonymous access or the job-scoped `github:GITHUB_TOKEN`;
+custom static publication credentials are rejected because job permissions cannot narrow their authority.
 Legacy publication without this mode retains its full-closure assembly/finalization path. Local execution and
 dry-run signing do not admit the new mode. Interrupted runs can leave independently published outputs; no
 cross-run reuse, rollback, retention protocol or atomic multi-repository transaction is added.
