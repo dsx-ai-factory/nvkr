@@ -245,7 +245,8 @@ func releaseBrowsePayloadFixture(t *testing.T, arch string) browsePayloadFixture
 	}
 	fixture.layout = filepath.Join(root, "release")
 	_, err = delivery.BuildPublicationRoot(t.Context(), fixture.layout, delivery.PublicationRequest{
-		Release: &delivery.ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: objects,
+		Release: &delivery.ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build,
+			InvocationID: "metadata-fixture", ContentSubject: content}, Objects: objects,
 	})
 	if err != nil {
 		t.Fatal(err)

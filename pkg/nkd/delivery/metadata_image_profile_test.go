@@ -126,7 +126,8 @@ func metadataImageProfileFixture(t *testing.T, media types.MediaType, edit func(
 		t.Fatal(err)
 	}
 	publication := PublicationRoot{SchemaVersion: PublicationRootSchema, Qualification: QualificationDiagnostic,
-		Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content},
+		Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build,
+			InvocationID: "metadata-fixture", ContentSubject: content},
 		Objects: []PublishedObject{
 			{Name: output.Name, Kind: "container-image", ArtifactType: string(media), DescriptorDigest: image.Digest, Size: image.Size,
 				SemanticDigest: image.Digest, BlobDigest: image.Digest, OS: "linux", Arch: "amd64",
