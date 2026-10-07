@@ -82,8 +82,9 @@ packaging contract. A new complete build/publication using this source chart rem
 
 ## Generate hosted CI
 
-The repository now commits the [NKE v0.21.0 deploy pipeline](../../docs/nke-deploy-pipeline.md).
-The commands below replace it with this older three-output Definition; use a separate checkout
+The repository now commits the [M2 candidate](../nke-m2/README.md), selected by `make workflows-check`.
+This is the checked-in configuration, not a ratified canonical-product decision. The commands below
+replace it with this older three-output Definition; use a separate checkout
 when exploring this alternative.
 
 ```sh
@@ -112,18 +113,20 @@ nkdctl catalog pin --dir definitions/nke-v1/catalog --tag v0.1.1-rc.9 nke-contro
 
 Repin only through `nkdctl catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
 
-The committed generated workflow is `.github/workflows/nkd-run.yml`, with exact inputs under
-`.github/nkd-run/`. Pull requests check regeneration only. To execute, dispatch the workflow on the default
-branch. The GitHub Environment targets the `nkectl`, `cwe` and `nke-helm` repositories under
-`ghcr.io/nvidia/nke-recipes` and uses the
+The generated workflow path is `.github/workflows/nkd-run.yml`, with exact inputs under
+`.github/nkd-run/`. Its current repository selection is M2, not this three-output alternative; use
+`make workflows-check` for that maintained selection. Dispatch runs whichever reviewed bundle is committed
+at the selected ref and does not choose a different Definition. This alternative's GitHub Environment targets
+the `nkectl`, `cwe` and `nke-helm` repositories under `ghcr.io/dsx-ai-factory/nke-recipes` and uses the
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
 environment `nkd-release` with a deployment branch policy admitting only `main`. Registry access and NKE source
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
 [implementation/evidence record](../../docs/adr/reconciliation.md).
 
-The GitHub Environment fetches pinned source directly from the internal `NVIDIA/nke` repository.
+The GitHub Environment fetches pinned source directly from the internal `dsx-ai-factory/nke` repository.
 Its `sourceAccess` entry references the repository Actions secret `NKE_SOURCE_TOKEN`, which must grant
-read-only Contents access to `NVIDIA/nke`. Only the matching fetch step receives the token; Git configuration
+read-only Contents access to `dsx-ai-factory/nke`. Only admitted source retrieval and pinned-source revalidation
+steps receive the token; Git configuration
 is process-local, and the pinned commit/tree checks remain mandatory. The local Environment continues to
 use the existing command-scoped mirror override described above.
 

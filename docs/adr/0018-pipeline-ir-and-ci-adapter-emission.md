@@ -109,12 +109,15 @@ execute a producer reference from the complete Plan through `factory execute-nod
 
 ### 3. Helper-owned isolation and narrowly admitted native ARC disks
 
-Jobs use generic hosted runners except the explicit native ARC disk policy below. The verified `nkd-exec` helper launches each pinned toolchain container
+Jobs use generic hosted runners except the explicit native ARC disk policy below. The same-Run, source-bootstrapped `nkd-exec` helper launches each pinned toolchain container
 through the shared `pipeline.Local.ExecNode` launcher used by local and hosted Run operations. Adapters render job topology, dependencies
 and declared transport; they do not reproduce isolation as provider-specific build syntax. Fetch/pull nodes
 materialize pinned inputs first; hermetic build and verification nodes enforce network denial, read-only inputs,
 private output and a fixed credential-free environment. Shared code prevents semantic drift; it does not alone
 prove byte identity across hosts.
+The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions artifact delivery;
+it does not independently checksum the downloaded helper before restoring its execute bit. This delivery
+contract is not the qualified exact-helper-byte verification required below.
 
 Landlock/seccomp application and process replacement run on one dedicated locked OS thread. Restrictions are
 thread-local before exec; a Go scheduler handoff must not change the thread that enters the build command.
@@ -165,10 +168,26 @@ Before toolchain preparation or producer work the helper binds the native host a
 CPU/memory, held-workspace capacity and KVM through the existing single-use VM admission. It repeats admission
 inside the producer deadline, uses the same guarded Docker device projection, and closes/joins all held owners.
 Published native Packer pins remain required. The strict disk-evidence mode additionally requires the full
-inspector image and measured executable pins. Explicit M2 `diskEvidence: build-provenance-v1` omits inspector
+inspector image and measured executable pins. Explicit candidate `diskEvidence: build-provenance-v1` omits inspector
 preparation and execution; it authenticates live producer/material evidence under ADR-13/20 instead.
-The whole ARC group has a bounded sum of serial operation budgets, capped at 24 hours; generic hosted jobs
-retain their six-hour cap. Current availability is not a capacity reservation. The local runtime observations
+This is the M2 producer-provenance scope; full inspection and material reconciliation belong to M3 (ADR-13 §6).
+The ARC group sums only executed material-producer budgets, applying the selected VM class ceiling to its
+root producer. Synthetic SBOM/package nodes do not each add an adapter-default hour. One shared adapter-default
+hour covers public toolchain pulls (each bounded to fifteen minutes), terminal observation,
+`CompleteHostedDiskPublication` and, in per-output mode, offline `executePackage` preparation. These operations
+share the helper deadline; the hour is not a separate allowance for each operation. Strict inspection additionally
+reuses the selected profile's per-member plus acquisition join budget. Beyond the helper deadline, the job
+reserves fifteen minutes shared across provider pre-steps and successful carrier packing/uploads, and five
+minutes each for cleanup and failure-diagnostic upload. Each producer is
+independently bounded; earlier caller deadlines still win. The complete job remains capped at twenty-four hours; generic hosted jobs retain their
+six-hour cap. These configured allowances provide neither per-step transfer budgets, a maximum transferable-byte
+proof, nor a measurement of remaining provider-job time. Near the ceiling, slow image pulls or successful
+carrier transfers can exhaust the shared reserves; fifteen minutes is an allowance, not evidence that those
+transfers fit. Runner capacity and transfer headroom require separate operational evidence.
+On failure the sealed Packer sink can emit one exact diagnostic-route description. The generated job uploads
+only that bounded route, with one-day retention and a five-minute upload limit; early admission or failed
+sealing emits no route. Diagnostic transport grants no artifact, receipt or release authority.
+Current availability is not a capacity reservation. The local runtime observations
 remain unqualified descriptions; the complete hosted finalizer, signing and consumer checks own the production claim.
 
 Native preparation is a separate read-only-permission workflow that builds both images and records exact local
@@ -225,8 +244,8 @@ belong to Environment/profile configuration; component toolchains remain produce
 
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
-- The exact runner bytes that execute from-source nodes are always measured and verified against the
-  builder-profile runner pin.
+- Qualified execution requires the exact runner bytes that execute from-source nodes to be measured and
+  verified against the builder-profile runner pin.
 - A self-hosting execution builds the runner **from pinned source** — its own pinned producer definition, because the tool is not a
   trusted pre-built binary — under a pinned bootstrap toolchain, producing a digest-pinned runner. Its stage-two
   observation records `bootstrapped`, measures that actual bootstrap toolchain, and verifies both identities.
@@ -390,6 +409,11 @@ is an explicit limitation of the unqualified local lane, not an accepted hosted 
 Qualified adapters require an authenticated subordinate identity, user namespace or stronger provider sandbox.
 The pipeline-attested native ARC exception instead explicitly trusts the operator-managed ephemeral runner and
 daemon under §3; interoperability evidence remains required before claiming operational acceptance.
+For network-enabled ARC builds, the pool operator must also document and enforce isolation from cloud/cluster
+metadata, workload and credential services, permitting only the outbound acquisition traffic required by the
+producer. Container bridge networking does not establish these restrictions. Network-isolation configuration
+and a fresh native negative-reachability demonstration are external acceptance evidence, not implied by the
+Environment declaration; that evidence is not recorded here.
 
 Fresh Docker volumes and `docker cp` content are root-owned. One fixed input-extraction container runs as root
 with only `CAP_CHOWN` and `CAP_DAC_OVERRIDE`, mounts only the attempt's input and work volumes, and has no network

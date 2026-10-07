@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package delivery owns publication bytes, output membership, and content identity.
 // BuildPublicationRoot assembles exact artifacts into an OCI layout; OpenPublication
 // and PullPublication check and hold its closure for consumption. Close each returned
@@ -12,11 +15,12 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 const (
 	BinaryBundleSchemaVersion  = "nkd.dev/binary-bundle/v1"
-	PublicationRootSchema      = "nkd.dev/publication-root/v3"
+	PublicationRootSchema      = "nkd.dev/publication-root/v4"
 	ObjectConfigSchema         = "nkd.dev/delivery-object/v1"
 	QualificationDiagnostic    = "diagnostic"
 	QualificationQualified     = "qualified"
@@ -25,8 +29,8 @@ const (
 	MediaBinaryBundle          = "application/vnd.nkd.binary-bundle.v1"
 	MediaBinaryBundleConfig    = "application/vnd.nkd.binary-bundle.config.v1+json"
 	MediaBinaryBundleLayer     = "application/vnd.nkd.binary-bundle.layer.v1.tar+gzip"
-	MediaPublicationRoot       = "application/vnd.nkd.publication-root.v3"
-	MediaPublicationRootConfig = "application/vnd.nkd.publication-root.config.v3+json"
+	MediaPublicationRoot       = "application/vnd.nkd.publication-root.v4"
+	MediaPublicationRootConfig = "application/vnd.nkd.publication-root.config.v4+json"
 	MediaDeliveryObject        = "application/vnd.nkd.delivery-object.v1"
 	MediaDeliveryObjectConfig  = "application/vnd.nkd.delivery-object.config.v1+json"
 	MediaReleaseSet            = "application/vnd.nkd.release-set.v4+json"
@@ -144,6 +148,11 @@ func (root PublicationRoot) Validate() error {
 		} {
 			if !isDigest(value) {
 				return e.New(e.CodeGateUnmet, "qualified publication root has no exact %s", field)
+			}
+		}
+		for _, object := range root.Objects {
+			if object.Output != nil && object.Output.Disk != nil && object.Output.Disk.EvidenceMode == sbom.DiskBuildProvenance {
+				return e.New(e.CodeGateUnmet, "qualified publication root cannot accept producer-provenance-only disk output %q", object.Name)
 			}
 		}
 	default:

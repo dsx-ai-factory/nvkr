@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Diagnostic libguestfs runtime. Ubuntu archive signatures authenticate the
 # frozen repository; the resulting image digest must be recorded after building.
 FROM scratch AS nkd_archives

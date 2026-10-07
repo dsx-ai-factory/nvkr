@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -91,13 +94,18 @@ func PrepareGitHubImages(ctx context.Context, plan *Plan, stageID string, option
 	}
 	return pullGitHubImages(ctx, githubStagePrivateImages(plan, stage), stage.Nodes[0].Platform,
 		os.Getenv("NKD_TOOLCHAIN_READ_USER"), os.Getenv(githubImageToken), func(ctx context.Context, config, platform, image string) error {
-			command := exec.CommandContext(ctx, "docker", "--config", config, "pull", "--platform", platform, image)
-			// The registry token exists only in the private config, never in a
-			// child environment, command argument, producer mount or log.
-			command.Env = []string{"PATH=" + os.Getenv("PATH"), "DOCKER_HOST=unix:///var/run/docker.sock"}
+			command := githubImagePullCommand(ctx, config, platform, image)
 			command.Stdout, command.Stderr = options.Stdout, options.Stderr
 			return ownedcmd.Run(ctx, command)
 		})
+}
+
+func githubImagePullCommand(ctx context.Context, config, platform, image string) *exec.Cmd {
+	command := exec.CommandContext(ctx, "docker", "--config", config, "pull", "--platform", platform, image)
+	// Only the separate private configuration holds the registry credential.
+	// Do not inherit source tokens, OIDC tokens or a caller-selected Docker host.
+	command.Env = []string{"PATH=" + os.Getenv("PATH"), "DOCKER_HOST=unix:///var/run/docker.sock"}
+	return command
 }
 
 func pullGitHubImages(ctx context.Context, images []string, platform, user, token string,

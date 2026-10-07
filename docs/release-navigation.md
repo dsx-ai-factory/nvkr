@@ -106,5 +106,7 @@ establish contracts, not GHCR, signing-service or production acceptance. Current
 The [recorded loopback replay](evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI
 against a Docker registry carrying actual AMD64/ARM64 NKE CLI bundles and their dependency SBOMs. It is
 unsigned diagnostic evidence, separate from signed release consumption and the current metadata-only path.
-The [metadata browsing validation record](evidence/2026-10-06-release-browse-metadata.md) records the scope and
-outcome of browsing the release published by Run `37533806963`.
+The [historical v3 metadata browsing validation record](evidence/2026-10-06-release-browse-metadata.md) records
+the scope and outcome of browsing the release published by Run `37533806963`. Current readers require
+publication-root v4 and reject that earlier v3 release; the dated record does not establish current-schema
+external acceptance.

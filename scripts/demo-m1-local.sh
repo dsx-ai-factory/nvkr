@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Local combined NKE walkthrough. The historical M1 name predates the addition
 # of CWE and Helm: the current Definition builds and publishes all three outputs.
 # The CLI build is offline; CWE wraps the upstream network-enabled Dockerfile.

@@ -1,8 +1,9 @@
 # NKE v0.21.0 deploy pipeline
 
 [Definition](../definitions/nke-deploy/definition.yaml) → build/acquire → SBOMs → package → one signed Release.
-This six-output Definition remains available for local execution. The committed GitHub workflow
-now uses the [combined M2 Definition](../definitions/nke-m2/README.md).
+This is the retained six-output deploy Definition, not the current checked-in GitHub workflow selection.
+The Makefile drift target and committed `nkd-run.yml` now select the [M2 candidate](../definitions/nke-m2/README.md).
+That configuration change is not a ratified canonical-product or publication-namespace decision.
 
 | Output | Input |
 |---|---|
@@ -81,18 +82,52 @@ go run ./cmd/nkdctl run generate \
 make workflows-check
 ```
 
-Dispatching `nkd-run.yml` from `main` runs M2, not the six-output deploy Definition:
+Dispatch selects the inputs already committed at the workflow ref, not a Definition argument.
+The following command currently selects the M2 candidate on a ref containing the current bundle, requiring
+the native ARC routes; it does not select these six deploy outputs. To dispatch this alternative, first
+review and commit its generated bundle in the intended operator repository/ref.
 
 ```sh
 gh workflow run nkd-run.yml --repo dsx-ai-factory/nke-recipes --ref main
 ```
 
-Installation stays with NKE. The local deploy Definition does not package an installer/deploy
-bundle, build NKTP or the provider image, mirror all runtime images, or establish release qualification.
+When generated from this deploy Definition, the workflow builds, inventories, packages, publishes, signs,
+verifies and finalizes its six required outputs.
+Generated wiring is not evidence of a completed release.
+
+Catalog revalidation needs private Git access in bootstrap and finalization. Credentials are scoped to those
+steps and source fetches, with repository-specific Git helpers. The merge gate acquires a fixed NKE checkout
+before running the generator, with no persisted token. Fork PRs without private-source access fail closed;
+no privileged PR trigger is used.
+
+To inspect this alternative's generation, use a separate checkout with Git access configured.
+These commands replace that checkout's generated selection; they are not the current repository drift gate:
+
+```sh
+go run ./cmd/nkdctl run generate \
+  --definition definitions/nke-deploy/definition.yaml \
+  --environment definitions/nke-deploy/environment-github.yaml \
+  --engine github --root .
+go run ./cmd/nkdctl run generate \
+  --definition definitions/nke-deploy/definition.yaml \
+  --environment definitions/nke-deploy/environment-github.yaml \
+  --engine github --root . --check
+```
+
+For the maintained M2 bundle, use `make workflows-check`; it pins the generator version and selects
+`definitions/nke-m2/definition.yaml` plus its GitHub Environment. Running that target against a generated
+six-output alternative correctly reports drift. Canonical-product/path governance remains pending as recorded
+in the [implementation record](adr/reconciliation.md#native-arc-disk-route); no parallel generated deploy workflow
+is maintained at the fixed workflow path.
+
+Installation stays with NKE. Accounted manifests/templates are not delivered as standalone outputs.
+This pipeline does not package an installer/deploy bundle, build NKTP or the provider image, mirror all
+runtime images, or establish NKE release qualification.
 
 ## Validation
 
-Historical validation of the six-output deploy Definition, before M2 replaced the committed workflow: `make check notices-check workflows-check build`, uncached `go test ./... -count=1`,
+At this guide's original deploy-validation checkpoint, the then-selected deploy bundle passed
+`make check notices-check workflows-check build`, uncached `go test ./... -count=1`,
 `actionlint`, relaxed `yamllint`, and `git diff --check`. Dry-runs passed for the six-output deploy Definition and both upstream controller Definitions, with
 zero observed artifacts (`static-unqualified`). Docker was stopped; no complete build or hosted publication
 was exercised. Contract tests cover acquired-chart SBOMs and repository-scoped validation credentials.

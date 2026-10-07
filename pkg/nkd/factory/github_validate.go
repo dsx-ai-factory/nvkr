@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -8,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"sigs.k8s.io/yaml"
@@ -47,6 +51,7 @@ type githubStep struct {
 	ContinueOnError bool              `json:"continue-on-error,omitempty"`
 	If              string            `json:"if,omitempty"`
 	With            map[string]string `json:"with,omitempty"`
+	TimeoutMinutes  int               `json:"timeout-minutes,omitempty"`
 }
 
 // ValidateGitHubBundle performs local schema and semantic analysis only. It does not
@@ -92,6 +97,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	stages, nodeJobs, err := githubStages(plan)
 	if err != nil {
+		return err
+	}
+	if err := validateGitHubCarrierUploads(plan, document, stages, artifacts, nodeJobs, actions); err != nil {
 		return err
 	}
 	byNode := make(map[string]githubStage, len(plan.Graph.Nodes))
@@ -355,7 +363,11 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
 		}
-		for _, input := range stage.inputs(artifacts, nodeJobs) {
+		carrierInputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
+		if err != nil {
+			return err
+		}
+		for _, input := range carrierInputs {
 			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("restore-inputs", "stage", stage.ID)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not restore exact input %q", jobID, input)
 			}
@@ -445,6 +457,90 @@ func stepUses(steps []githubStep, action string) bool {
 	return false
 }
 
+// Validate transport against the admitted graph, not by parsing provider pattern
+// syntax. Every restored carrier has exactly one uploader in its producer job.
+// Raw disk subjects are deliberately absent: their selected wrapper and producer
+// record are mandatory carrier inputs at the shared projection boundary.
+func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, stages []githubStage,
+	artifacts map[string]Artifact, nodeJobs map[string]string, actions githubActionRefs) error {
+	uploads := map[string][]string{}
+	patterns := map[string]string{}
+	for jobID, job := range document.Jobs {
+		for _, step := range job.Steps {
+			if step.Uses == actions.Upload {
+				uploads[step.With["name"]] = append(uploads[step.With["name"]], jobID)
+			}
+		}
+	}
+	require := func(id string) error {
+		jobs := uploads[githubArtifactName(id)]
+		if len(jobs) != 1 || jobs[0] != nodeJobs[artifacts[id].Producer] {
+			return e.New(e.CodeEngineCapability, "GitHub restored carrier %q requires exactly one uploader in its producer job", id)
+		}
+		return nil
+	}
+	for _, stage := range stages {
+		inputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
+		if err != nil {
+			return err
+		}
+		for _, id := range inputs {
+			if err := require(id); err != nil {
+				return err
+			}
+		}
+		if len(inputs) > 0 {
+			selected := make([]Artifact, len(inputs))
+			for index, id := range inputs {
+				selected[index] = artifacts[id]
+			}
+			patterns[stage.ID], err = githubCarrierPattern(selected)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if len(plan.LifecycleOutputs) > 0 {
+		var carriers []Artifact
+		for _, artifact := range plan.Graph.Artifacts {
+			if finalizerArtifact(plan, artifact) {
+				carriers = append(carriers, artifact)
+			}
+			if _, raw := diskPublicationRequirement(plan, artifact); raw {
+				continue
+			}
+			if err := require(artifact.ID); err != nil {
+				return err
+			}
+		}
+		var err error
+		patterns["nkd-lifecycle-run"], err = githubCarrierPattern(carriers)
+		if err != nil {
+			return err
+		}
+	}
+	for jobID, job := range document.Jobs {
+		for _, step := range job.Steps {
+			if step.Uses != actions.Download {
+				continue
+			}
+			if pattern := step.With["pattern"]; pattern != "" {
+				if step.With["name"] != "" || pattern != patterns[jobID] {
+					return e.New(e.CodeEngineCapability, "GitHub job %q downloads a carrier pattern outside its admitted graph", jobID)
+				}
+				continue
+			}
+			if step.With["name"] == "" {
+				continue
+			}
+			if len(uploads[step.With["name"]]) != 1 {
+				return e.New(e.CodeEngineCapability, "GitHub job %q downloads %q without exactly one uploader", jobID, step.With["name"])
+			}
+		}
+	}
+	return nil
+}
+
 func joinRuns(steps []githubStep) string {
 	var runs []string
 	for _, step := range steps {
@@ -490,8 +586,35 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		}
 	}
 	if stage.DiskOutput != "" {
-		if !hasExactGitHubRun(steps, githubRunnerCommand("run-disk", "output", stage.DiskOutput)) {
-			return e.New(e.CodeEngineCapability, "disk stage requires its grouped live executor")
+		executors, diagnostics := 0, 0
+		actions, err := resolveGitHubActions(plan.Actions)
+		if err != nil {
+			return err
+		}
+		var expected bytes.Buffer
+		writeGitHubPackerDiagnosticStep(&expected, stage, actions)
+		var diagnostic struct {
+			Steps []githubStep `json:"steps"`
+		}
+		if err := yaml.UnmarshalStrict([]byte("steps:\n"+expected.String()), &diagnostic); err != nil {
+			return e.Wrap(e.CodeInternal, err, "decode fixed Packer diagnostic transport")
+		}
+		for i, step := range steps {
+			if step.ID == "run-disk" {
+				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes {
+					return e.New(e.CodeEngineCapability, "disk stage requires its bounded unconditional live executor")
+				}
+				executors++
+			}
+			if step.Name == "Upload failed Packer diagnostics" {
+				if diagnostics != 0 || i == 0 || steps[i-1].ID != "run-disk" || !reflect.DeepEqual(step, diagnostic.Steps[0]) {
+					return e.New(e.CodeEngineCapability, "disk diagnostics require the exact failure-only sealed route transport")
+				}
+				diagnostics++
+			}
+		}
+		if executors != 1 || diagnostics != 1 {
+			return e.New(e.CodeEngineCapability, "disk stage requires one live executor and one failure diagnostic transport")
 		}
 		return nil
 	}

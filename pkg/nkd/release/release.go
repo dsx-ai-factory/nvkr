@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package release validates diagnostic Inventory, ReleaseSet and PromotionPolicy
 // documents and authenticates their exact canonical bytes. These operations do
 // not grant release clearance; qualified promotion and publication are deferred.

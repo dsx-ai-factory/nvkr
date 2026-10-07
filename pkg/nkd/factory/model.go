@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package factory compiles and executes complete Run plans.
 // CompileDocuments resolves catalogs and derives a Plan from Definition and
 // Environment; Compile accepts an already resolved catalog. RunLocal executes the

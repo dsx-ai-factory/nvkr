@@ -140,6 +140,9 @@ jobs:
               - '.github/nkd-run/**'
               - '.github/workflows/nkd-run.yml'
               - '.github/workflows/merge-gate.yaml'
+              # `make license-header-check` also covers the stamped files here
+              # (dependabot, issue templates, the other workflows).
+              - '.github/**'
             actions:
               - '.github/actionlint.yaml'
               - '.github/workflows/**'
@@ -219,6 +222,9 @@ jobs:
 
       - name: fmt-check
         run: make fmt-check
+
+      - name: license-header-check
+        run: make license-header-check
 
       - name: vet
         run: make vet

@@ -1,0 +1,57 @@
+[
+  {
+    "completed_at": "2026-10-06T22:37:40Z",
+    "conclusion": "success",
+    "head_sha": "625980e30b1a9f5ef27a9b46534de65eefff385a",
+    "html_url": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/job/112534817109",
+    "id": 112534817109,
+    "name": "Assemble release from verified output references",
+    "run_id": 37533806963,
+    "started_at": "2026-10-06T22:33:39Z",
+    "status": "completed"
+  },
+  {
+    "completed_at": "2026-10-06T22:38:30Z",
+    "conclusion": "success",
+    "head_sha": "625980e30b1a9f5ef27a9b46534de65eefff385a",
+    "html_url": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/job/112536227308",
+    "id": 112536227308,
+    "name": "Publish release",
+    "run_id": 37533806963,
+    "started_at": "2026-10-06T22:37:48Z",
+    "status": "completed"
+  },
+  {
+    "completed_at": "2026-10-06T22:46:17Z",
+    "conclusion": "success",
+    "head_sha": "625980e30b1a9f5ef27a9b46534de65eefff385a",
+    "html_url": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/job/112536512974",
+    "id": 112536512974,
+    "name": "Sign and attest release and deliverables: release",
+    "run_id": 37533806963,
+    "started_at": "2026-10-06T22:38:37Z",
+    "status": "completed"
+  },
+  {
+    "completed_at": "2026-10-06T22:54:26Z",
+    "conclusion": "success",
+    "head_sha": "625980e30b1a9f5ef27a9b46534de65eefff385a",
+    "html_url": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/job/112539131258",
+    "id": 112539131258,
+    "name": "Verify release and deliverable signatures: release",
+    "run_id": 37533806963,
+    "started_at": "2026-10-06T22:46:23Z",
+    "status": "completed"
+  },
+  {
+    "completed_at": "2026-10-06T23:03:17Z",
+    "conclusion": "success",
+    "head_sha": "625980e30b1a9f5ef27a9b46534de65eefff385a",
+    "html_url": "https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963/job/112541818732",
+    "id": 112541818732,
+    "name": "Finalize Run and check completeness",
+    "run_id": 37533806963,
+    "started_at": "2026-10-06T22:54:32Z",
+    "status": "completed"
+  }
+]

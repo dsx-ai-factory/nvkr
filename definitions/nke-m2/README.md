@@ -41,6 +41,9 @@ For the temporary branch build test, only `nke-spire-agent-source` is pinned to
 `726f76944404e1106626b8333d3576bdf67b575b` using `catalog pin --commit`. That older package
 omits the DSX IMDS plugin whose S3 download returned HTTP 403 on both hosted architectures.
 This mixed-source candidate tests the build path; it is not the intended complete M2 image.
+The exception's acceptance owner, expiry and production-content approval are not recorded. Exiting the exception
+requires restoring the intended DSX IMDS payload with verified native materials and both-architecture content
+checks, or a named, explicitly approved content-scope decision; a successful build cannot silently approve omission.
 The [merged-source handoff](../../docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
 records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
@@ -55,7 +58,9 @@ under `nke.dev/os-image-materials/v1`; every selected material and disk target r
 
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
-the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The signer identity admits only the `main` ref; this is not organizational source or publication approval. Native disk
+the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The maintained signer identity
+admits only `main`; the temporary PR #97 branch-test exception has been removed after the
+cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
 Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
@@ -64,29 +69,60 @@ Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB
 224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
 include the held subject snapshot. These are admission budgets, not measured full-M2 usage.
 The inspector and Packer source locks retain their outstanding organizational approval gates;
-the [candidate exception and publication evidence](https://github.com/dsx-ai-factory/nke-recipes/pull/106)
+the [candidate exception and publication evidence](../../docs/evidence/2026-10-06-native-arc.md)
 records the narrower authorization and exact registry read-back.
+The retained measurements came from developer-host preparation and publication. A hosted toolchain build,
+its matching measurements and provenance, and completed organizational clearance are not recorded here;
+native preparation commands alone do not supply that evidence.
+The candidate exception's organizational acceptance owner and expiry are not recorded. Leaving that exception
+requires recorded license/security clearance and the hosted closure/measurement/provenance evidence; a
+developer-host image push does not supply those approvals.
 The candidate Environment selects Docker through the existing typed runtime controls;
 it declares no storage-driver field or ambient runtime-variable workaround. Storage behavior
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
-M2 selects `diskEvidence: build-provenance-v1`: deep disk/content inspection and dependent reconciliation
-are deferred to M3. The existing profiles are retained for the strict mode but are not pulled or executed
-in this mode. A complete M2 Run must authenticate both held disks and their material producers, generate
-exact-subject source evidence with explicit deferred-inspection scope, publish/sign all required outputs
-as one release, and pass consumer verification. It reports normal M2 success when those gates pass.
+The current candidate selects `diskEvidence: build-provenance-v1`, authenticating both held disks and their
+material producers without deep inspection. Profiles remain available for strict mode but are not pulled or
+executed in this mode; its signed evidence reports inspection as `not-performed`. Ilya Kislenko's October 7
+task-chat instruction preserves main/#106's producer-provenance M2 floor and full scan plus material
+reconciliation for M3 ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
+extension, and both disk outputs remain mandatory for completion of this Definition.
+Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
+M2 candidate requires publication, signatures and consumer verification for every selected output.
+The [failed delivery attempt](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md)
+records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
+Per-output storage peaks still require measured admission.
+The signed disk mode is descriptive. `VerificationPolicy.minimumDiskEvidence` defaults to `build-provenance-v1`
+for pipeline-attested verification. Explicit `strict` rejects producer-only evidence; qualified policy defaults
+to strict and rejects the producer-only minimum. The selected minimum is
+policy-digest-bound. The historical validation run below predates these consumer-policy and timeout changes
+and does not validate this updated head, current main execution, strict inspection or independent full-payload
+consumer acceptance.
+
+The [customer choices guide](../../docs/nke-m2-customer-choices.md) explains supplier replacement through
+the existing catalog interfaces and the precise scope of its graph tests. The
+[release transport evidence](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
+failed candidate's storage exhaustion and why correcting carrier selection alone does not complete delivery.
 
 The [input evidence map](../../docs/m2-input-evidence-map.md#native-acquisition-build-and-measurement-commands)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
 read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. The generated workflow has no feature-branch execution exception. Its signing policy admits only
-`main`, which must also be admitted by the `nkd-arc` and `nkd-release` deployment environments.
+each internal toolchain package's Manage Actions access settings. Maintained manual dispatch and
+signing admit only `main`. The October 7 branch attempt at `562a609` used a temporary exact
+`codex/m2-native-arc-foundation` authored exception; it was cancelled after GitHub environment
+protection rejected that branch before attestation, disk execution and finalization steps ran
+([run 37661490433](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37661490433)).
+That exception is removed from the authored inputs and regenerated bundle. No deployment-policy
+entry was added, and existing unrelated entries are not changed here. Any further branch test
+needs a separate non-merge candidate and actual environment admission; this maintained bundle
+does not authorize it.
 The equivalent validation-branch bundle completed all jobs in
 [run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963);
-that run used an exact branch exception absent from these maintained inputs.
+that run used a different exact branch exception and is not evidence for this PR's head.
 
 The Environment selects `publication.mode: per-output-v1`. Each output is packaged, published, signed and
 verified independently. Release assembly combines authenticated references and evidence from the same Plan

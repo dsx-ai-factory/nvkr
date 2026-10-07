@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package sbom
 
 import (
@@ -10,7 +13,7 @@ import (
 // DiskBuildProvenance records producer evidence, never an installed inventory.
 const DiskBuildProvenance = "build-provenance-v1"
 
-// ForDiskBuildProvenance explicitly labels the M2 scope on an exact source-bound
+// ForDiskBuildProvenance explicitly labels producer-only scope on an exact source-bound
 // subject. The factory must authenticate that subject against its live producer.
 func ForDiskBuildProvenance(bom *BOM, digest string) (*BOM, error) {
 	result, err := ForSubject(bom, digest, "build-output", "")
@@ -19,7 +22,7 @@ func ForDiskBuildProvenance(bom *BOM, digest string) (*BOM, error) {
 	}
 	result.Metadata.Props = append(result.Metadata.Props,
 		Property{Name: "nkd:diskEvidence", Value: DiskBuildProvenance},
-		Property{Name: "nkd:diskInspection", Value: "deferred-m3"})
+		Property{Name: "nkd:diskInspection", Value: "not-performed"})
 	sort.Slice(result.Metadata.Props, func(i, j int) bool { return result.Metadata.Props[i].Name < result.Metadata.Props[j].Name })
 	if err := ValidateDiskBuildProvenance(result); err != nil {
 		return nil, err
@@ -43,7 +46,10 @@ func ValidateDiskBuildProvenance(bom *BOM) error {
 			return e.New(e.CodeVerifyFailed, "disk build provenance carries an inspection claim")
 		}
 	}
-	if props["nkd:diskEvidence"] != DiskBuildProvenance || props["nkd:diskInspection"] != "deferred-m3" || props["nkd:evidenceStage"] != "build-output" {
+	// Read the original uninspected token without rewriting signed bytes. New
+	// producers emit only not-performed; neither spelling proves inspection.
+	uninspected := props["nkd:diskInspection"] == "not-performed" || props["nkd:diskInspection"] == "deferred-m3"
+	if props["nkd:diskEvidence"] != DiskBuildProvenance || !uninspected || props["nkd:evidenceStage"] != "build-output" {
 		return e.New(e.CodeProvenanceMissing, "disk build provenance lacks explicit evidence scope")
 	}
 	return nil

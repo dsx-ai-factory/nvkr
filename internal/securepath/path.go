@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package securepath owns descriptor-relative filesystem access shared by
 // execution snapshots and transport archives. Returned handles belong to callers;
 // these observations do not confer artifact or release authority.

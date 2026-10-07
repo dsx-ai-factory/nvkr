@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package packertransport owns the bounded argv contract shared by Packer
 // catalog authoring and execution. It validates only NKD-owned transport
 // framing. The pinned Packer executable remains authoritative for HCL variable

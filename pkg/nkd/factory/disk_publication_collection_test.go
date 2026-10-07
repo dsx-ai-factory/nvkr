@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -91,7 +94,7 @@ func TestDiskPublicationCollectionPinsLayoutNotPayload(t *testing.T) {
 				t.Fatal(err)
 			}
 			request := delivery.PublicationRequest{Release: &delivery.ReleaseMetadata{DefinitionDigest: expected.BuildDigest,
-				EnvironmentDigest: expected.BuildDigest, ContentSubject: content}, Objects: objects}
+				EnvironmentDigest: expected.BuildDigest, PlanDigest: disk.PlanDigest, ContentSubject: content}, Objects: objects}
 			publication := filepath.Join(t.TempDir(), "diagnostic")
 			if _, err := delivery.BuildPublicationRoot(t.Context(), publication, request); err != nil {
 				t.Fatal(err)
