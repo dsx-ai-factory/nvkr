@@ -84,7 +84,8 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 
 .PHONY: test
 test: ## Unit tests with race + coverage (pure logic; no docker required).
-	go test -race -covermode=atomic -coverprofile=coverage.out $(PKG)
+	# Full factory race/coverage contracts exceed Go's default 10m package budget on hosted runners.
+	go test -timeout 20m -race -covermode=atomic -coverprofile=coverage.out $(PKG)
 	@go tool cover -func=coverage.out | tail -1
 
 .PHONY: cover

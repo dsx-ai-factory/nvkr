@@ -50,8 +50,9 @@ separate required outputs or let one output's evidence satisfy another.
 | NKE Helm charts | Pinned chart sources | OCI packages / M2 |
 | Operator tooling | Acquired kubectl and Helm | OCI package / M2 |
 
-The NKE OS build team owns embedded-software correctness and runtime validation. NKD's deferred disk delivery
-requires an inventory reconciling traced materials with read-only inspection of the exact disk. Embedded components retain matrix rows for
+The NKE OS build team owns embedded-software correctness and runtime validation. M3 qualification
+requires an inventory reconciling traced materials with read-only inspection of the exact disk;
+that inventory is not required for M2 delivery. Embedded components retain matrix rows for
 traceability, but do not imply separate NKD builds or delivery. A deferred member stays explicit in authored
 requirements and planned qualification waivers; it must never disappear because a build failed.
 That inventory proves composition for the exact disk subject. It does not establish qualified reproduction of
