@@ -78,12 +78,13 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	return int(total), nil
 }
 
-// Disk stages execute producers, then one live completion operation. Synthetic
-// SBOM/package nodes are recorded by completion, not separate hour-long jobs.
+// Disk stages execute producers, then terminal observation and publication
+// preparation under one shared reserve. Synthetic SBOM/package nodes are
+// recorded by completion, not separate hour-long jobs.
 // Bound each real producer and reuse the strict inspector's member accounting.
 func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, error) {
 	maximum := uint64(githubMaximumDiskJobTimeoutMinutes * 60)
-	total := uint64(githubDefaultStageTimeoutMinutes * 60) // terminal observation and packaging
+	total := uint64(githubDefaultStageTimeoutMinutes * 60) // shared terminal observation and publication preparation
 	members, roots := 0, 0
 	platform := ""
 	for _, node := range stage.Nodes {

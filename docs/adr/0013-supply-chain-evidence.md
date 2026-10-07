@@ -131,22 +131,26 @@ metadata; they do not claim dependency inspection. The separate full-disk profil
 and does not require a second catalog scanner selection; when both select the same native platform their
 pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
 
-The narrower pipeline-attested producer-provenance candidate explicitly selects `Environment.diskEvidence: build-provenance-v1`.
+The pipeline-attested M2 producer-provenance route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
 It retains the original held disk, exact producer results and authenticated transitive material handoffs,
 and publishes source-bound per-component CycloneDX producer documents under the existing signed evidence
 closure. These documents have no inspected dependency inventory and explicitly bind `nkd:diskEvidence`
 to `build-provenance-v1` and `nkd:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
-It does not complete the October 6 proposed strict M2 engineering target, pending named-decider ratification,
-which requires full disk/content inspection and material-to-filesystem reconciliation on both native architectures.
+On October 7, 2026, Ilya Kislenko directed: "Preserve main/#106: producer provenance for M2, inspection for M3"
+in the PR #97 review-fix task ([review discussion](https://github.com/dsx-ai-factory/nke-recipes/pull/97#discussion_r4209677062)).
+This supersedes the October 6 proposed strict M2 target: M2 requires producer provenance for both native
+AMD64 and ARM64 disks; deep disk/content inspection and material-to-filesystem reconciliation belong to M3.
+This is the named human scope decision for this task, not organizational ratification of the ADR set.
 Historical signed documents may retain the earlier `deferred-m3` scope token; do not rewrite those bytes or
-interpret that token as inspection evidence. M3 qualification separately checks the delivered evidence.
+interpret that token as inspection evidence. M3 qualification requires the strict inspected evidence below.
 Unknown modes fail closed; an omitted producer mode retains the strict contract. Document validators check the
 declared mode and reject invented inspection claims. Consumer acceptance is separately controlled by
-`VerificationPolicy.minimumDiskEvidence`, included in the policy digest. An omitted value defaults to `strict`
-and rejects `build-provenance-v1`; an explicit `build-provenance-v1` minimum admits producer-only evidence while
-also accepting stricter inspected evidence. Producer metadata cannot lower the consumer's minimum. Mode changes
+`VerificationPolicy.minimumDiskEvidence`, included in the policy digest. For `pipeline-attested`, an omitted
+value defaults to `build-provenance-v1`, admitting producer-only evidence and stricter inspected evidence;
+explicit `strict` rejects producer-only evidence. Qualified policy defaults to strict and rejects the
+producer-only minimum. Producer metadata cannot lower the consumer's selected minimum. Mode changes
 affect Environment/Plan and signed release metadata, not raw payload identity. Only the explicit native ARC
 publication route admits this mode.
 
@@ -245,8 +249,8 @@ the public wrapper still requires the actual Packer capability and opaque inspec
 tests do not establish full helper discovery. A separate [native ARM64 controlled ELF-protocol test](../evidence/2026-10-06-controlled-public-disk-evidence-issuer.md)
 exercises public producer/inspection owners, receipt issuance, exact export, six negative issuer rows
 and the concrete memory-profile guard; it is not actual Docker/Packer/guestfish/Syft discovery.
-Native AMD64 public positive issuance, complete native NKE content runs, original live NKE joins,
-publication and production acceptance remain unexercised.
+Native AMD64 public positive issuance, complete native NKE content runs, original live NKE strict joins,
+strict inventory publication and strict production acceptance remain unexercised.
 Complete inventory documents are bounded to 32 MiB, composition helper reports to 16 MiB,
 and signed SBOM transports to 64 MiB. These document/bundle policies apply to every SBOM subject,
 not only disks; malformed or oversized SBOM evidence returns `CodeVerifyFailed` (exit 22) before

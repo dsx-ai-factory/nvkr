@@ -461,6 +461,7 @@ func stepUses(steps []githubStep, action string) bool {
 func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, stages []githubStage,
 	artifacts map[string]Artifact, nodeJobs map[string]string, actions githubActionRefs) error {
 	uploads := map[string][]string{}
+	patterns := map[string]string{}
 	for jobID, job := range document.Jobs {
 		for _, step := range job.Steps {
 			if step.Uses == actions.Upload {
@@ -485,9 +486,23 @@ func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, s
 				return err
 			}
 		}
+		if len(inputs) > 0 {
+			selected := make([]Artifact, len(inputs))
+			for index, id := range inputs {
+				selected[index] = artifacts[id]
+			}
+			patterns[stage.ID], err = githubCarrierPattern(selected)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	if len(plan.LifecycleOutputs) > 0 {
+		var carriers []Artifact
 		for _, artifact := range plan.Graph.Artifacts {
+			if finalizerArtifact(plan, artifact) {
+				carriers = append(carriers, artifact)
+			}
 			if _, raw := diskPublicationRequirement(plan, artifact); raw {
 				continue
 			}
@@ -495,10 +510,24 @@ func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, s
 				return err
 			}
 		}
+		var err error
+		patterns["nkd-lifecycle-run"], err = githubCarrierPattern(carriers)
+		if err != nil {
+			return err
+		}
 	}
 	for jobID, job := range document.Jobs {
 		for _, step := range job.Steps {
-			if step.Uses != actions.Download || step.With["name"] == "" {
+			if step.Uses != actions.Download {
+				continue
+			}
+			if pattern := step.With["pattern"]; pattern != "" {
+				if step.With["name"] != "" || pattern != patterns[jobID] {
+					return e.New(e.CodeEngineCapability, "GitHub job %q downloads a carrier pattern outside its admitted graph", jobID)
+				}
+				continue
+			}
+			if step.With["name"] == "" {
 				continue
 			}
 			if len(uploads[step.With["name"]]) != 1 {

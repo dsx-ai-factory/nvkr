@@ -170,14 +170,20 @@ inside the producer deadline, uses the same guarded Docker device projection, an
 Published native Packer pins remain required. The strict disk-evidence mode additionally requires the full
 inspector image and measured executable pins. Explicit candidate `diskEvidence: build-provenance-v1` omits inspector
 preparation and execution; it authenticates live producer/material evidence under ADR-13/20 instead.
-That narrower candidate does not complete the proposed strict M2 target pending named-decider ratification.
+This is the M2 producer-provenance scope; full inspection and material reconciliation belong to M3 (ADR-13 §6).
 The ARC group sums only executed material-producer budgets, applying the selected VM class ceiling to its
-root producer. Synthetic SBOM/package nodes do not each add an adapter-default hour. One adapter-default hour
-covers terminal observation and live packaging; strict inspection additionally reuses the selected profile's
-per-member plus acquisition join budget. The job reserves fifteen minutes for provider setup/transport and
-five minutes each for cleanup and failure-diagnostic upload beyond the helper deadline. Each producer is
+root producer. Synthetic SBOM/package nodes do not each add an adapter-default hour. One shared adapter-default
+hour covers public toolchain pulls (each bounded to fifteen minutes), terminal observation,
+`CompleteHostedDiskPublication` and, in per-output mode, offline `executePackage` preparation. These operations
+share the helper deadline; the hour is not a separate allowance for each operation. Strict inspection additionally
+reuses the selected profile's per-member plus acquisition join budget. Beyond the helper deadline, the job
+reserves fifteen minutes shared across provider pre-steps and successful carrier packing/uploads, and five
+minutes each for cleanup and failure-diagnostic upload. Each producer is
 independently bounded; earlier caller deadlines still win. The complete job remains capped at twenty-four hours; generic hosted jobs retain their
-six-hour cap. These configured allowances do not measure remaining provider-job time or prove runner capacity.
+six-hour cap. These configured allowances provide neither per-step transfer budgets, a maximum transferable-byte
+proof, nor a measurement of remaining provider-job time. Near the ceiling, slow image pulls or successful
+carrier transfers can exhaust the shared reserves; fifteen minutes is an allowance, not evidence that those
+transfers fit. Runner capacity and transfer headroom require separate operational evidence.
 On failure the sealed Packer sink can emit one exact diagnostic-route description. The generated job uploads
 only that bounded route, with one-day retention and a five-minute upload limit; early admission or failed
 sealing emits no route. Diagnostic transport grants no artifact, receipt or release authority.

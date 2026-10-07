@@ -43,7 +43,10 @@ func ValidateDiskBuildProvenance(bom *BOM) error {
 			return e.New(e.CodeVerifyFailed, "disk build provenance carries an inspection claim")
 		}
 	}
-	if props["nkd:diskEvidence"] != DiskBuildProvenance || props["nkd:diskInspection"] != "not-performed" || props["nkd:evidenceStage"] != "build-output" {
+	// Read the original uninspected token without rewriting signed bytes. New
+	// producers emit only not-performed; neither spelling proves inspection.
+	uninspected := props["nkd:diskInspection"] == "not-performed" || props["nkd:diskInspection"] == "deferred-m3"
+	if props["nkd:diskEvidence"] != DiskBuildProvenance || !uninspected || props["nkd:evidenceStage"] != "build-output" {
 		return e.New(e.CodeProvenanceMissing, "disk build provenance lacks explicit evidence scope")
 	}
 	return nil

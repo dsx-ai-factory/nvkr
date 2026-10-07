@@ -1,0 +1,64 @@
+{
+  "attestationVerified": true,
+  "cosignVersion": "v3.1.3",
+  "digest": "sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+  "dryRun": false,
+  "identity": "^https://github\\.com/dsx-ai-factory/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/(main|codex/m2-arc-validation)$",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "observedIdentity": "https://github.com/dsx-ai-factory/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/codex/m2-arc-validation",
+  "observedIssuer": "https://token.actions.githubusercontent.com",
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "ran": [
+    [
+      ".nkd/factory/tools/cosign/cosign-linux-amd64",
+      "download",
+      "attestation",
+      "--predicate-type",
+      "https://sigstore.dev/cosign/sign/v1",
+      "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e"
+    ],
+    [
+      ".nkd/factory/tools/cosign/cosign-linux-amd64",
+      "verify-blob-attestation",
+      "--bundle",
+      "/tmp/nkd-cosign-oci-verify-2533522157/4ee8fd2becd87c04f03cfb9f28defc8027c189df1975c9be51d7009a9a64b3e6.json",
+      "--type",
+      "https://sigstore.dev/cosign/sign/v1",
+      "--digest",
+      "292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "--digestAlg",
+      "sha256",
+      "--certificate-identity-regexp",
+      "^https://github\\.com/dsx-ai-factory/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/(main|codex/m2-arc-validation)$",
+      "--certificate-oidc-issuer",
+      "https://token.actions.githubusercontent.com"
+    ],
+    [
+      ".nkd/factory/tools/cosign/cosign-linux-amd64",
+      "download",
+      "attestation",
+      "--predicate-type",
+      "https://slsa.dev/provenance/v1",
+      "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e"
+    ],
+    [
+      ".nkd/factory/tools/cosign/cosign-linux-amd64",
+      "verify-blob-attestation",
+      "--bundle",
+      "/tmp/nkd-cosign-oci-verify-2533522157/33433364b853d02ecef508c95605ab1ccfdedcd283dae4dbf237bc7a5a611fba.json",
+      "--type",
+      "https://slsa.dev/provenance/v1",
+      "--digest",
+      "292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+      "--digestAlg",
+      "sha256",
+      "--certificate-identity-regexp",
+      "^https://github\\.com/dsx-ai-factory/nke-recipes/\\.github/workflows/nkd-run\\.yml@refs/heads/(main|codex/m2-arc-validation)$",
+      "--certificate-oidc-issuer",
+      "https://token.actions.githubusercontent.com"
+    ]
+  ],
+  "ref": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e",
+  "schemaVersion": "nkd.dev/oci-verification-record/v1",
+  "signatureVerified": true
+}

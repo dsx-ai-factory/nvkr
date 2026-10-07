@@ -59,8 +59,9 @@ under `nke.dev/os-image-materials/v1`; every selected material and disk target r
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
 the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The maintained signer identity
-admits only `main`; the earlier exact validation-branch allowance is historical preparation evidence, not
-current authored signing authority or organizational publication approval. Native disk
+admits `main` and, temporarily for the human-authorized PR #97 candidate pipeline test,
+`codex/m2-native-arc-foundation`. This exact-branch exception authorizes candidate execution,
+not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
 Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
@@ -84,18 +85,20 @@ is diagnostic evidence, not this Environment's configuration or production appro
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
 The current candidate selects `diskEvidence: build-provenance-v1`, authenticating both held disks and their
 material producers without deep inspection. Profiles remain available for strict mode but are not pulled or
-executed in this mode; its signed evidence reports inspection as `not-performed`. This is narrower than the
-proposed strict M2 engineering target, pending named-decider ratification, requiring both native disks to pass
-full scan, acquisition/material reconciliation and receipt-gated packaging. After the inspection implementation
-and measured pins are updated, omitting `diskEvidence` selects that strict contract. A complete producer-provenance
-candidate still requires publication, signatures and consumer verification for every selected output, but cannot
-be reported as completion of the proposed strict target. The [failed delivery attempt](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md)
+executed in this mode; its signed evidence reports inspection as `not-performed`. Ilya Kislenko's October 7
+scope decision preserves producer provenance for M2 and full scan plus material reconciliation for M3,
+on both native architectures ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
+M2 candidate requires publication, signatures and consumer verification for every selected output.
+The [failed delivery attempt](../../docs/evidence/2026-10-06-m2-release-carrier-transport.md)
 records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
 Per-output storage peaks still require measured admission.
-The signed disk mode is descriptive. `VerificationPolicy.minimumDiskEvidence` defaults to `strict` and rejects
-producer-only evidence. A consumer must explicitly opt in to `build-provenance-v1`; the selected minimum is
-policy-digest-bound. The historical validation run below predates this consumer-policy fix and does not validate
-this merged head or prove independent full-payload consumer acceptance.
+The signed disk mode is descriptive. `VerificationPolicy.minimumDiskEvidence` defaults to `build-provenance-v1`
+for pipeline-attested verification. Explicit `strict` rejects producer-only evidence; qualified policy defaults
+to strict and rejects the producer-only minimum. The selected minimum is
+policy-digest-bound. The historical validation run below predates these consumer-policy and timeout changes
+and does not validate this updated head, current main execution, strict inspection or independent full-payload
+consumer acceptance.
 
 The [customer choices guide](../../docs/nke-m2-customer-choices.md) explains supplier replacement through
 the existing catalog interfaces and the precise scope of its graph tests. The
@@ -107,11 +110,16 @@ lists repository-owned native preparation and measurement commands, their curren
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
 read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. The generated workflow has no feature-branch execution exception. Its signing policy admits only
-`main`, which must also be admitted by the `nkd-arc` and `nkd-release` deployment environments.
+each internal toolchain package's Manage Actions access settings. Manual dispatch and signing temporarily
+admit `codex/m2-native-arc-foundation` as well as `main`; both must also be admitted by
+the `nkd-arc` and `nkd-release` deployment environments. Ilya Kislenko authorized this scoped
+PR #97 test on October 7, 2026. Remove the branch from the authored dispatch/signing policy,
+regenerate the bundle and remove its exact deployment-policy entries after the validation run
+finishes, or before PR #97 merges into `main`, whichever comes first. Existing unrelated
+deployment-policy entries are not changed by this exception.
 The equivalent validation-branch bundle completed all jobs in
 [run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963);
-that run used an exact branch exception absent from these maintained inputs.
+that run used a different exact branch exception and is not evidence for this PR's head.
 
 The Environment selects `publication.mode: per-output-v1`. Each output is packaged, published, signed and
 verified independently. Release assembly combines authenticated references and evidence from the same Plan

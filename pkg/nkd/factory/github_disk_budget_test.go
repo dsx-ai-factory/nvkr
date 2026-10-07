@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,45 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
+
+func TestGitHubDiskBudgetRejectsSummedAndInspectionBounds(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		for _, test := range []struct {
+			name, wantMessage string
+			strict            bool
+			profileSeconds    uint64
+			materialSeconds   []uint64
+		}{
+			{"summed producers under individual caps", `GitHub disk stage "disk" exceeds its job duration bound`, false, 600, []uint64{21600, 21600, 21600}},
+			{"strict inspection pushes bounded producer sum over maximum", `GitHub disk stage "disk" inspection exceeds its job duration bound`, true, 600, []uint64{60600}},
+			{"strict inspection profile exceeds owning bound", "disk evidence join requires its selected bounded inspection timeout", true, 601, []uint64{60}},
+		} {
+			t.Run(platform+"/"+test.name, func(t *testing.T) {
+				plan := &Plan{Environment: definition.Environment{DiskEvidence: sbom.DiskBuildProvenance,
+					DiskInspectionProfiles: map[string]definition.DiskInspectionProfile{platform: {TimeoutSeconds: test.profileSeconds}}}}
+				if test.strict {
+					plan.Environment.DiskEvidence = ""
+				}
+				stage := githubStage{ID: "disk", DiskOutput: "image", Nodes: []Node{{ID: "root", Kind: NodeBuild,
+					Requirements:     &execution.Requirements{TimeoutSeconds: 21600},
+					ExecutionBinding: &execution.Binding{Class: execution.Class{HostPlatform: execution.HostPlatform(platform), MaxTimeoutSeconds: 21600}}}}}
+				for _, seconds := range test.materialSeconds {
+					stage.Nodes = append(stage.Nodes, Node{ID: "material", Kind: NodeAcquire, Requirements: &execution.Requirements{TimeoutSeconds: seconds}})
+				}
+				for _, node := range stage.Nodes {
+					if _, err := githubDiskProducerTimeoutSeconds(node); err != nil {
+						t.Fatalf("individual producer must remain under its cap: %v", err)
+					}
+				}
+				budget, minutes, err := githubDiskStageBudget(plan, stage)
+				var coded *e.Error
+				if budget != 0 || minutes != 0 || !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability || coded.Msg != test.wantMessage {
+					t.Fatalf("budget=%s minutes=%d error=%v; want no projection and %s %q", budget, minutes, err, e.CodeEngineCapability, test.wantMessage)
+				}
+			})
+		}
+	}
+}
 
 func TestGitHubDiskBudgetUsesClassAndLiveCompletion(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {

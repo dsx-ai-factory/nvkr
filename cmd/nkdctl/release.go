@@ -81,7 +81,7 @@ func cmdRelease() *cli.Command {
 				Name: "verify", Usage: "verify one pinned reference under an explicit Verification Policy scope",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true}, &cli.StringFlag{Name: "scope", Required: true},
-					&cli.StringFlag{Name: "minimum-disk-evidence", Value: string(lifecycle.DiskEvidenceStrict), Usage: "minimum accepted disk evidence: strict or build-provenance-v1"},
+					&cli.StringFlag{Name: "minimum-disk-evidence", Usage: "minimum accepted disk evidence: strict or build-provenance-v1 (default: build-provenance-v1 for pipeline-attested; strict for qualified)"},
 					&cli.StringFlag{Name: "identity"}, &cli.StringFlag{Name: "issuer"}, &cli.StringFlag{Name: "cosign"}, &cli.StringFlag{Name: "cosign-digest"},
 					&cli.StringFlag{Name: "workspace", Value: ".nkd/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
 				},

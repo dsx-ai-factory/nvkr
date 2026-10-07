@@ -459,30 +459,43 @@ func TestConsumerRejectsDifferentCheckedPublicationSubject(t *testing.T) {
 	assertCode(t, err, nkderr.CodeGateUnmet)
 }
 
-func TestVerificationPolicyBindsStrictDiskEvidenceByDefault(t *testing.T) {
-	base := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
-		IdentityRegexp: "^builder$", Issuer: "issuer"}
-	implicit, err := base.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	explicit := base
-	explicit.MinimumDiskEvidence = DiskEvidenceStrict
-	explicitDigest, err := explicit.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if explicitDigest != implicit {
-		t.Fatalf("omitted strict default digest %s differs from explicit strict digest %s", implicit, explicitDigest)
-	}
-	producerOnly := base
-	producerOnly.MinimumDiskEvidence = DiskEvidenceBuildProvenance
-	producerOnlyDigest, err := producerOnly.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if producerOnlyDigest == implicit {
-		t.Fatal("producer-provenance opt-in did not change policy identity")
+func TestVerificationPolicyBindsLaneDiskEvidenceDefault(t *testing.T) {
+	for _, test := range []struct {
+		lane, scope string
+		minimum     DiskEvidenceRequirement
+	}{
+		{LanePipeline, ScopeArtifactPublication, DiskEvidenceBuildProvenance},
+		{LaneQualified, ScopeRelease, DiskEvidenceStrict},
+	} {
+		t.Run(test.lane, func(t *testing.T) {
+			base := VerificationPolicy{Lane: test.lane, Scope: test.scope,
+				IdentityRegexp: "^builder$", Issuer: "issuer"}
+			implicit, err := base.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			explicit := base
+			explicit.MinimumDiskEvidence = test.minimum
+			explicitDigest, err := explicit.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if explicitDigest != implicit {
+				t.Fatalf("omitted default digest %s differs from explicit %s digest %s", implicit, test.minimum, explicitDigest)
+			}
+			if test.lane == LaneQualified {
+				return
+			}
+			stricter := base
+			stricter.MinimumDiskEvidence = DiskEvidenceStrict
+			strictDigest, err := stricter.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strictDigest == implicit {
+				t.Fatal("strict minimum did not change policy identity")
+			}
+		})
 	}
 }
 
@@ -498,7 +511,8 @@ func TestConsumerDiskEvidenceMinimumFailsClosed(t *testing.T) {
 		artifact delivery.Output
 		want     nkderr.Code
 	}{
-		{name: "default requires inspected disk", artifact: producerDisk, want: nkderr.CodeGateUnmet},
+		{name: "pipeline default admits producer evidence", artifact: producerDisk},
+		{name: "qualified default requires inspected disk", policy: VerificationPolicy{Lane: LaneQualified}, artifact: producerDisk, want: nkderr.CodeGateUnmet},
 		{name: "explicit strict requires inspected disk", policy: strict, artifact: producerDisk, want: nkderr.CodeGateUnmet},
 		{name: "strict inventory satisfies strict policy", policy: strict, artifact: strictDisk},
 		{name: "strict inventory satisfies producer minimum", policy: producerAllowed, artifact: strictDisk},
@@ -526,7 +540,7 @@ func TestConsumerDiskEvidenceMinimumRejectsAnyWeakMember(t *testing.T) {
 		{Name: "node-amd64", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{}},
 		{Name: "node-arm64", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: string(DiskEvidenceBuildProvenance)}},
 	}
-	assertCode(t, requireDiskEvidence(VerificationPolicy{}, artifacts), nkderr.CodeGateUnmet)
+	assertCode(t, requireDiskEvidence(VerificationPolicy{MinimumDiskEvidence: DiskEvidenceStrict}, artifacts), nkderr.CodeGateUnmet)
 }
 
 func TestVerificationPolicyRejectsUnknownDiskEvidenceMinimum(t *testing.T) {
@@ -539,16 +553,16 @@ func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
 			for _, mode := range []struct {
-				name  string
-				value string
-			}{{name: "strict"}, {name: "producer-only", value: string(DiskEvidenceBuildProvenance)}} {
+				name, value, inspection string
+			}{{name: "strict"}, {name: "producer-only", value: string(DiskEvidenceBuildProvenance)},
+				{name: "historical producer-only", value: string(DiskEvidenceBuildProvenance), inspection: "deferred-m3"}} {
 				t.Run(mode.name, func(t *testing.T) {
-					layout, digest := testDiskPublication(t, arch, mode.value)
+					layout, digest := testDiskPublication(t, arch, mode.value, mode.inspection)
 					reference := "registry.example.test/product@" + digest
-					for _, minimum := range []DiskEvidenceRequirement{"", DiskEvidenceBuildProvenance} {
-						name := "default-strict"
-						if minimum == DiskEvidenceBuildProvenance {
-							name = "explicit-producer-minimum"
+					for _, minimum := range []DiskEvidenceRequirement{"", DiskEvidenceBuildProvenance, DiskEvidenceStrict} {
+						name := "default-producer-minimum"
+						if minimum != "" {
+							name = "explicit-" + string(minimum)
 						}
 						t.Run(name, func(t *testing.T) {
 							verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
@@ -565,7 +579,7 @@ func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
 							}}
 							policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: minimum}
 							verified, err := consumer.Verify(t.Context(), reference, policy)
-							accepted := mode.value == "" || minimum == DiskEvidenceBuildProvenance
+							accepted := mode.value == "" || minimum != DiskEvidenceStrict
 							if !accepted {
 								assertCode(t, err, nkderr.CodeGateUnmet)
 								if verified != nil || verifier.calls != 1 || held == nil {
@@ -595,7 +609,7 @@ func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
 	}
 }
 
-func testDiskPublication(t *testing.T, arch, evidenceMode string) (string, string) {
+func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string) (string, string) {
 	t.Helper()
 	ctx := t.Context()
 	payload := []byte("synthetic qcow2 envelope for consumer policy")
@@ -639,6 +653,13 @@ func testDiskPublication(t *testing.T, arch, evidenceMode string) (string, strin
 		bom, err = sbom.ForDiskBuildProvenance(bom, payloadDigest)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if inspection != "" {
+			for i := range bom.Metadata.Props {
+				if bom.Metadata.Props[i].Name == "nkd:diskInspection" {
+					bom.Metadata.Props[i].Value = inspection
+				}
+			}
 		}
 	} else {
 		bom.Metadata.Component.Type = "operating-system"

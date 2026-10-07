@@ -455,6 +455,12 @@ func newPublicDiskEvidenceFixture(t *testing.T, ctx context.Context, mode string
 
 func (fixture publicDiskEvidenceFixture) produce(t *testing.T, ctx context.Context) (*LocalRunResult, *pipeline.PackerArtifact) {
 	t.Helper()
+	owner, artifact, _ := fixture.produceWithDiagnostics(t, ctx)
+	return owner, artifact
+}
+
+func (fixture publicDiskEvidenceFixture) produceWithDiagnostics(t *testing.T, ctx context.Context) (*LocalRunResult, *pipeline.PackerArtifact, *pipeline.PackerDiagnosticSink) {
+	t.Helper()
 	owner := localDiskRunResult(t, fixture.plan)
 	t.Cleanup(func() { _ = owner.Close() })
 	session, err := pipeline.NewNodeSession(ctx)
@@ -529,7 +535,7 @@ func (fixture publicDiskEvidenceFixture) produce(t *testing.T, ctx context.Conte
 	if original == nil {
 		t.Fatal("real public executor did not issue original artifact")
 	}
-	return owner, original
+	return owner, original, diagnostics
 }
 
 const publicDiskEvidenceRuntimeSource = `package main

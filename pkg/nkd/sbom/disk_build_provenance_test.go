@@ -16,6 +16,22 @@ func TestDiskBuildProvenanceScopeAdmission(t *testing.T) {
 		want   e.Code
 	}{
 		{"valid", func(b *BOM) *BOM { return b }, ""},
+		{"historical uninspected scope", func(b *BOM) *BOM {
+			for i := range b.Metadata.Props {
+				if b.Metadata.Props[i].Name == "nkd:diskInspection" {
+					b.Metadata.Props[i].Value = "deferred-m3"
+				}
+			}
+			return b
+		}, ""},
+		{"unknown inspection scope", func(b *BOM) *BOM {
+			for i := range b.Metadata.Props {
+				if b.Metadata.Props[i].Name == "nkd:diskInspection" {
+					b.Metadata.Props[i].Value = "inspected"
+				}
+			}
+			return b
+		}, e.CodeProvenanceMissing},
 		{"nil", func(*BOM) *BOM { return nil }, e.CodeProvenanceMissing},
 		{"invalid schema", func(b *BOM) *BOM { b.Version = 2; return b }, e.CodeInvalidCatalog},
 		{"missing scope", func(b *BOM) *BOM {
@@ -41,6 +57,11 @@ func TestDiskBuildProvenanceScopeAdmission(t *testing.T) {
 			bom, err := ForDiskBuildProvenance(base, "sha256:"+strings.Repeat("b", 64))
 			if err != nil {
 				t.Fatal(err)
+			}
+			for _, property := range bom.Metadata.Props {
+				if property.Name == "nkd:diskInspection" && property.Value != "not-performed" {
+					t.Fatalf("new producer emitted historical scope: %q", property.Value)
+				}
 			}
 			assertDiskScopeCode(t, ValidateDiskBuildProvenance(test.change(bom)), test.want)
 		})

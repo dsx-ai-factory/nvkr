@@ -16,6 +16,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 const (
@@ -41,13 +42,13 @@ const (
 )
 
 // DiskEvidenceRequirement is the minimum disk evidence a consumer accepts.
-// The build-provenance value admits producer-only evidence; strict is the
-// default and requires inspected disk evidence.
+// Pipeline-attested verification defaults to producer-only evidence. Qualified
+// verification requires strict evidence and cannot select the weaker minimum.
 type DiskEvidenceRequirement string
 
 const (
 	DiskEvidenceStrict          DiskEvidenceRequirement = "strict"
-	DiskEvidenceBuildProvenance DiskEvidenceRequirement = "build-provenance-v1"
+	DiskEvidenceBuildProvenance DiskEvidenceRequirement = sbom.DiskBuildProvenance
 )
 
 var namePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
@@ -160,8 +161,16 @@ func (policy VerificationPolicy) Digest() (string, error) {
 	if err := policy.Validate(); err != nil {
 		return "", err
 	}
-	if policy.MinimumDiskEvidence == "" {
-		policy.MinimumDiskEvidence = DiskEvidenceStrict
-	}
+	policy.MinimumDiskEvidence = policy.diskEvidenceMinimum()
 	return canonical.Digest(canonical.KindVerificationPolicy, policy)
+}
+
+func (policy VerificationPolicy) diskEvidenceMinimum() DiskEvidenceRequirement {
+	if policy.MinimumDiskEvidence != "" {
+		return policy.MinimumDiskEvidence
+	}
+	if policy.Lane == LaneQualified {
+		return DiskEvidenceStrict
+	}
+	return DiskEvidenceBuildProvenance
 }

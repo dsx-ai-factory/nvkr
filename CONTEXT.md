@@ -131,8 +131,9 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nkd:diskInspection: not-performed`; this supplies neither an installed inventory nor milestone
-acceptance. Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
+documents report `nkd:diskInspection: not-performed`; this supplies no installed inventory. M2 accepts producer
+provenance with its remaining delivery gates; M3 requires strict inspection and material reconciliation.
+Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
 
 **Inventory**:

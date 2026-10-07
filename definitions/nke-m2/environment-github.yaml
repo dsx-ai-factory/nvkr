@@ -4,6 +4,7 @@ metadata:
   description: M2 candidate publication namespace; native disk execution with build provenance; deep inspection and reconciliation deferred to M3.
   name: nke-m2-github
 githubARC: native-kvm-v1
+githubDispatchBranches: [codex/m2-native-arc-foundation]
 diskEvidence: build-provenance-v1
 executionClasses:
   - name: arc-amd64-kvm
@@ -66,7 +67,7 @@ runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
 signing:
-  identity: ^https://github\.com/dsx-ai-factory/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/main$
+  identity: ^https://github\.com/dsx-ai-factory/nke-recipes/\.github/workflows/nkd-run\.yml@refs/heads/(main|codex/m2-native-arc-foundation)$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
 sourceAccess:

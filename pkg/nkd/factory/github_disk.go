@@ -2,6 +2,8 @@ package factory
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -49,9 +51,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	ctx, cancel := context.WithTimeout(ctx, stage.diskExecutionBudget)
 	defer cancel()
 	defer func() {
-		if returnErr != nil && ctx.Err() != nil {
-			returnErr = e.Wrap(e.CodeTimeout, returnErr, "ARC disk execution exhausted its bounded deadline")
-		}
+		returnErr = classifyGitHubDiskError(returnErr, "ARC disk execution")
 	}()
 	workspace, _, err := securepath.OpenDirectory(".")
 	if err != nil {
@@ -112,17 +112,34 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	if err != nil {
 		return err
 	}
+	return coordinateGitHubDiskExecution(ctx, diagnostics, func(ctx context.Context) (returnErr error) {
+		return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, inspector, diagnostics, options)
+	})
+}
+
+// The dispatcher is private and entered only after complete Plan, credentials,
+// native host and VM admission. It cannot replace the concrete diagnostic owner.
+// Production cleanup inside dispatch finishes before the sink seals its route.
+func coordinateGitHubDiskExecution(ctx context.Context, diagnostics *pipeline.PackerDiagnosticSink,
+	dispatch func(context.Context) error,
+) (returnErr error) {
 	defer func() {
+		returnErr = classifyGitHubDiskError(returnErr, "ARC disk execution")
 		closed := diagnostics.Close()
 		returnErr = joinFactoryCleanupError(returnErr, closed, "close ARC diagnostics")
 		if returnErr != nil && closed == nil {
-			// Only the sealed sink can issue this fixed, bounded route. Early
-			// admission failure must not upload a preexisting workspace path.
 			if retained := diagnostics.RetainedPath(); retained != "" {
 				returnErr = publishGitHubPackerDiagnosticRoute(returnErr, os.Getenv("GITHUB_OUTPUT"), retained)
 			}
 		}
 	}()
+	return dispatch(ctx)
+}
+
+func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStage, root Node,
+	admission vmAdmission, inspector *sbom.DiskInspectionRuntime, diagnostics *pipeline.PackerDiagnosticSink,
+	options GitHubStepOptions,
+) (returnErr error) {
 	session, err := pipeline.NewNodeSession(ctx)
 	if err != nil {
 		return err
@@ -142,6 +159,32 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	owner := &LocalRunResult{SchemaVersion: LocalRunSchemaVersion, Qualification: TierLocalExecution, PlanDigest: digest, Workspace: ".nkd/factory"}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, owner.Close(), "close ARC disk owner") }()
 	_, artifacts := planIndex(plan)
+	return executeGitHubDiskNodes(ctx, plan, stage, owner, options, func(nodeCtx context.Context, node Node) error {
+		switch {
+		case node.ID == root.ID:
+			return populateDiskProducerCompletion(nodeCtx, plan, node.ID, owner, func(ctx context.Context, selected Node, _ ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
+				return dispatchAdmittedVMProducer(ctx, admission, plan, selected, executor, owner)
+			})
+		case node.IRNode != "":
+			return executeProducer(nodeCtx, plan, node, plan.Environment.RuntimeBinary(), 1, options.Stdout, options.Stderr, session.ExecNode, owner)
+		case node.Kind == NodeVerify:
+			return executeHeldDiskObservation(nodeCtx, plan, node, artifacts, owner)
+		default:
+			return e.New(e.CodeEngineCapability, "unsupported grouped disk operation")
+		}
+	}, func(ctx context.Context) error {
+		for _, expected := range plan.LifecycleOutputs {
+			if expected.Name == stage.DiskOutput {
+				return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, options)
+			}
+		}
+		return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
+	})
+}
+
+func executeGitHubDiskNodes(ctx context.Context, plan *Plan, stage githubStage, owner *LocalRunResult,
+	options GitHubStepOptions, dispatch func(context.Context, Node) error, complete func(context.Context) error,
+) error {
 	for _, node := range stage.Nodes {
 		if node.Kind == NodeSBOM || node.Kind == NodePackage {
 			continue
@@ -155,35 +198,42 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 			}
 			nodeCtx, stop = context.WithTimeout(ctx, time.Duration(seconds)*time.Second)
 		}
+		var dispatchedErr error
 		err := githubProgress(nodeCtx, options, githubNodeLabel(plan, node), githubNodeDetails(plan, node), func(_ *githubStepProgress) error {
-			switch {
-			case node.ID == root.ID:
-				return populateDiskProducerCompletion(nodeCtx, plan, node.ID, owner, func(ctx context.Context, selected Node, _ ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
-					return dispatchAdmittedVMProducer(ctx, admission, plan, selected, executor, owner)
-				})
-			case node.IRNode != "":
-				return executeProducer(nodeCtx, plan, node, plan.Environment.RuntimeBinary(), 1, options.Stdout, options.Stderr, session.ExecNode, owner)
-			case node.Kind == NodeVerify:
-				return executeHeldDiskObservation(nodeCtx, plan, node, artifacts, owner)
-			default:
-				return e.New(e.CodeEngineCapability, "unsupported grouped disk operation")
-			}
+			dispatchedErr = dispatch(nodeCtx, node)
+			return dispatchedErr
 		})
-		if err != nil && nodeCtx.Err() != nil {
-			err = e.Wrap(e.CodeTimeout, err, "ARC disk producer %q exhausted its bounded deadline", node.ID)
+		// Progress reports cancellation of its context. Preserve a distinct
+		// dispatcher failure when that cancellation only coincided with it.
+		if dispatchedErr != nil {
+			err = dispatchedErr
 		}
+		operation := "operation"
+		if node.Kind == NodeBuild || node.Kind == NodeAcquire {
+			operation = "producer"
+		}
+		err = classifyGitHubDiskError(err, fmt.Sprintf("ARC disk %s %q", operation, node.ID))
 		stop()
 		if err != nil {
 			return err
 		}
 		owner.Nodes = append(owner.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "ok"})
 	}
-	for _, expected := range plan.LifecycleOutputs {
-		if expected.Name == output {
-			return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, options)
-		}
+	return complete(ctx)
+}
+
+func classifyGitHubDiskError(err error, operation string) error {
+	var coded *e.Error
+	if err == nil || (errors.As(err, &coded) && coded.Code == e.CodeTimeout) {
+		return err
 	}
-	return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
+	if errors.Is(err, context.DeadlineExceeded) {
+		return e.Wrap(e.CodeTimeout, err, "%s exhausted its bounded deadline", operation)
+	}
+	if errors.Is(err, context.Canceled) {
+		return e.Wrap(e.CodeTimeout, err, "%s canceled", operation)
+	}
+	return err
 }
 
 // The caller obtains retained only from the successfully sealed diagnostic sink.

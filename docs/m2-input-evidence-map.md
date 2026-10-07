@@ -36,8 +36,9 @@ is the exact pinned NKE deployment values, not unmodified chart defaults. This d
 runtime/publication completion or resolve the separately owned external-NKE-image checkpoint.
 `docs/epics-v1-spec.md`, Epic M2 Goal/Acquisition/acceptance criteria 2–3, and
 `docs/milestones.md:36–55` require external NKE and third-party image rows in addition to these packages.
-The October 6 proposed strict M2 engineering target requires both native AMD64 and ARM64 disks, pending
-named-decider ratification, not recorded organizational scope approval. The selected runtime-image rows
+Ilya Kislenko's October 7, 2026 scope decision retains both native AMD64 and ARM64 disks with producer provenance
+for M2 and strict content inspection/material reconciliation for M3 ([ADR-13 §6](adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+Organizational ratification remains separate. The selected runtime-image rows
 preserve the requested candidate matrix; each disk still has independent execution
 and evidence obligations. Deployment-value membership is human-transcribed from the
 pinned tree, not derived or machine-verified by the literal membership regression.
@@ -103,7 +104,7 @@ capture-enabled installer bake or a live evidence join.
 | Scratch and memory | ADR-13's bounded private-volume inspection contract | Actual final filesystem/inventory/document sizes and host/daemon headroom must be measured; installed-package inventory is insufficient |
 | Registry namespace | M2 candidate Environment explicitly authors `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` | Separate from production `cwe`/`nkectl` routes; live blob limits, retention and package access not verified here |
 | Registry credential | Existing `github:GITHUB_TOKEN` reference | Runtime values are not inspected or serialized; production credential admission/read-back required |
-| Signing identity | Maintained M2 `nkd-run.yml` identity regex admits only `main`; Actions issuer | Earlier validation-branch authority is historical; external deployment-policy alignment and a current keyless run remain unverified |
+| Signing identity | M2 `nkd-run.yml` identity regex admits `main` plus temporary `codex/m2-native-arc-foundation` for the human-authorized PR #97 candidate test; Actions issuer | Remove the exact branch exception after validation or before merge; a current successful keyless run remains unverified |
 | Private source transport | Exact `https://github.com/dsx-ai-factory/nke` CLI/controller and `https://github.com/dsx-ai-factory/nke.git` OS keys, sharing the existing `github:NKE_SOURCE_TOKEN` mirror mapping | Source credential must remain in trusted fetch, outside candidate build execution |
 | Generated runner route | ADR-18 explicit `native-kvm-v1` exception, native AMD64/ARM64 classes in the M2 Environment | Environment protection, ephemeral pool isolation and successful strict receipt-gated execution remain unverified; producer-provenance disk jobs do not establish complete production acceptance |
 
@@ -111,14 +112,16 @@ capture-enabled installer bake or a live evidence join.
 producer-declared build network permission. It selects both native ARC classes and measured inspection profiles. The same 34-output Definition
 now generates M2 with the candidate-only native toolchain overlay. Generation is not runtime admission
 or release acceptance; package Actions read access and full native execution remain separate checks.
-The current `diskEvidence: build-provenance-v1` selection is narrower than the proposed strict inspected M2
-target pending ratification. Both producer-provenance disk jobs passed, but aggregate carrier transport failed
+The current `diskEvidence: build-provenance-v1` selection implements the M2 producer-provenance scope;
+strict inspection and material reconciliation belong to M3. Both producer-provenance disk jobs passed, but aggregate carrier transport failed
 before publication in [run 37486058412](evidence/2026-10-06-m2-release-carrier-transport.md).
 Historical validation-branch run `37533806963` at commit `625980e` subsequently passed candidate delivery;
-it does not validate this merged head or establish independent full-payload consumer acceptance. Toolchain preparation/publication
+it does not validate this updated head, current main execution, strict inspection or independent full-payload
+consumer acceptance. Toolchain preparation/publication
 measurements do not establish a hosted build with matching provenance or completed license/security clearance.
 Signed disk-mode bindings describe evidence scope. `VerificationPolicy.minimumDiskEvidence` defaults to
-strict inspected evidence; producer-only evidence requires explicit `build-provenance-v1` consumer opt-in.
+`build-provenance-v1` for pipeline-attested verification; explicit `strict` requires inspected evidence.
+Qualified verification defaults to strict and rejects the producer-only minimum.
 The minimum is policy-digest-bound and cannot be lowered by producer metadata.
 
 Runtime selection uses the narrowly admitted typed `runtime: docker` and

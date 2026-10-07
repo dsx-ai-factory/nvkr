@@ -98,19 +98,15 @@ transitive material trace. Both paths rehash the exported QCOW2, use the same at
 transaction, preserve every producer evidence slot and bind raw payload separately from OCI identity.
 The disk binding carries its descriptive evidence mode in signed release metadata. Document validators require
 matching source-bound documents and reject invented inspection claims. Consumer acceptance is independently
-bound by `VerificationPolicy.minimumDiskEvidence` in the policy digest: the omitted default is strict and rejects
-producer-only evidence, while explicit `build-provenance-v1` admits that narrower mode. Neither path accepts a
+bound by `VerificationPolicy.minimumDiskEvidence` in the policy digest: pipeline-attested policy defaults to
+`build-provenance-v1`, while explicit `strict` requires inspected evidence. Qualified policy defaults to strict
+and rejects producer-only acceptance. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. It does not complete the proposed strict M2 target pending
-named-decider ratification. Both builds completed but strict inspection timed out in run `37445475840`.
-The narrower candidate completed both disk jobs in run `37486058412`, but aggregate release transport failed
-with insufficient hosted-runner storage before publication. [Recorded transport evidence](../evidence/2026-10-06-m2-release-carrier-transport.md)
-records that earlier failed attempt. The subsequent validation-branch run `37533806963` at commit
-`625980e` passed candidate publication, signing, verification and finalization. It predates these consumer-policy
-and timeout changes and does not validate this merged head. Current main-only execution, independent full-payload
-consumer read-back and live mixed-attempt retry validation remain unexercised. The ordinary local scheduler
+the original producer/material owners instead. Producer provenance is the M2 acceptance scope; full inspection
+and material reconciliation belong to M3 (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
+in [reconciliation: Native ARC disk route](reconciliation.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate

@@ -262,10 +262,11 @@ projects the root QCOW2 without binary-bundle packaging. A process-local held-QC
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
 verdict. Production VM execution and held-result population use the separately admitted native ARC route;
 direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
-live producer/material evidence and reports inspection as not performed. It does not complete the proposed
-strict M2 target pending named-decider ratification. ADR-13's strict mode requires a full inventory reconciling
-traced materials with read-only inspection of each native AMD64 and ARM64 disk; M3 qualification separately
-checks that evidence. That composition claim does not establish NKE-owned runtime correctness.
+live producer/material evidence and reports inspection as not performed, satisfying the M2 disk-evidence floor.
+M2 still requires the remaining delivery and consumer gates. ADR-13's strict mode requires a full inventory
+reconciling traced materials with read-only inspection of each native AMD64 and ARM64 disk; these are M3
+qualification requirements under Ilya Kislenko's October 7 scope decision. That composition claim does not
+establish NKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
@@ -878,7 +879,10 @@ source-owned boot smoke passed through the local adapter on ARC, as recorded in
 qualification. The generated native ARC route also completed both builds in run `37445475840`, but strict
 inspection timed out. Producer-provenance disk jobs passed in run `37486058412`; aggregate transport then failed
 before publication, as the [dated evidence](evidence/2026-10-06-m2-release-carrier-transport.md) records.
-A complete generated M2 production Run remains unproven. Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
+Historical validation run `37533806963` at `625980e` subsequently passed all 34 candidate outputs and
+publication/signing/verification/finalization. This does not validate the updated head, current main execution,
+strict inspection or independent full-payload consumer acceptance; see
+[reconciliation](adr/reconciliation.md#native-arc-disk-route). Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
 the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
 deferred.
 Produced-artifact size remains an artifact and transport budget.
@@ -903,8 +907,9 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). The proposed M2 engineering target
-requires independent native AMD64 and ARM64 source, runner and inspection acceptance, pending named-decider ratification.
+rollback helpers are removed and those workflows remain deferred (ADR-16). M2 requires independent native
+AMD64 and ARM64 source, runner and producer-provenance delivery acceptance; M3 adds strict disk inspection
+and material reconciliation (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios
 

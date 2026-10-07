@@ -168,10 +168,7 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 }
 
 func requireDiskEvidence(policy VerificationPolicy, artifacts []delivery.Output) error {
-	minimum := policy.MinimumDiskEvidence
-	if minimum == "" {
-		minimum = DiskEvidenceStrict
-	}
+	minimum := policy.diskEvidenceMinimum()
 	for _, artifact := range artifacts {
 		if artifact.Kind != OutputDiskImage {
 			continue

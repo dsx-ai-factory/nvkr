@@ -1,5 +1,11 @@
 # M2 disk inspection deferral
 
+This dated record preserves the October 6 implementation and validation observations below.
+The October 7 decision preserves main/#106's scope: producer provenance for M2, deep inspection and
+material-to-filesystem reconciliation for M3, as recorded in [ADR-13](../adr/0013-supply-chain-evidence.md).
+The subsequent [successful validation-branch run](2026-10-07-m2-validation-branch-release.md) is separate
+historical execution evidence; it does not validate the later consumer-policy, timeout or current-head changes.
+
 The user moved deep disk inspection and material-to-installed-filesystem reconciliation
 to M3. M2 continues normal pipeline-attested delivery of individual artifacts as one
 cohesive release, with signing, provenance, exact membership and completeness.

@@ -86,8 +86,9 @@ func TestSDKRejectsUnsupportedGenerationBeforeInputsAndUnconfiguredConsumer(t *t
 }
 
 func TestSDKExposesTypedDiskEvidencePolicy(t *testing.T) {
+	runtimeValue := string(client.DiskEvidenceBuildProvenance)
 	policy := client.VerificationPolicy{Lane: "pipeline-attested", Scope: "artifact-publication",
-		IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: client.DiskEvidenceBuildProvenance}
+		IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: client.DiskEvidenceRequirement(runtimeValue)}
 	if err := policy.Validate(); err != nil {
 		t.Fatal(err)
 	}

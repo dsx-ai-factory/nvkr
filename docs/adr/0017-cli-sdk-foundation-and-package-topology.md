@@ -105,9 +105,10 @@ JSON cannot restore executable authority. Consumer verification takes one pinned
 policy (ADR-04), returning inspectable views plus a closeable capability. The reference selects the sole
 ADR-20 release index: delivery owns its metadata/descriptor/evidence join, checked named outputs, exact sibling
 artifact references, and release content projection. Lifecycle applies consumer policy and assembles the Release
-view. `VerificationPolicy.minimumDiskEvidence` is part of the policy digest and defaults to `strict`, so a
-producer-signed `build-provenance-v1` mode cannot silently weaken consumer acceptance. Explicitly selecting that
-minimum opts into producer-only evidence; inspected evidence satisfies either minimum. The signed mode remains
+view. `VerificationPolicy.minimumDiskEvidence` is part of the policy digest. Pipeline-attested policy defaults
+to `build-provenance-v1`; explicitly selecting `strict` requires inspected evidence. Qualified policy defaults
+to strict and rejects the producer-only minimum. Inspected evidence satisfies either minimum; producer metadata
+cannot weaken the selected consumer policy. The signed mode remains
 descriptive and does not grant authority.
 Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
