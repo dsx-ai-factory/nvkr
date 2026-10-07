@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package provenance emits deterministic SLSA build provenance per built artifact
 // (ADR-09). Each statement is an in-toto v1 Statement carrying an
 // https://slsa.dev/provenance/v1 predicate; build-time fields are OMITTED so the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package errors defines nkdctl's coded, structured errors. Every failure that a
 // user can hit carries a stable machine-readable Code that maps deterministically
 // to a process exit code, so the CLI and CI adapters can fail closed and name the

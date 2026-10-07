@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package catalog models the declarative SourceBuildRegistry, its components, and the
 // DataProvider seam through which all catalog reads flow (SRD §4.6/§4.7). The
 // catalog is split like go.mod/go.sum: a hand-authored registry that declares

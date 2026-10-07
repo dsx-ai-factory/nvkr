@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Verify one signed lifecycle publication through the public Release consumer.
 set -euo pipefail
 CALLER_DIR=$(pwd -P)

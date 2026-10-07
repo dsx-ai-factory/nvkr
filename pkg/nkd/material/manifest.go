@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package material models the deterministic, execution-local input manifest for
 // a component build, and diagnostic byte correspondence for held guest-package
 // captures. It does not acquire or stage artifacts, authenticate acquisition

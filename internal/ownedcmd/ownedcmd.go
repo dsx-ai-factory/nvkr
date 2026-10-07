@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package ownedcmd runs short-lived external tools as owned process groups.
 //
 // Callers retain domain-specific error classification. Run, Output, and

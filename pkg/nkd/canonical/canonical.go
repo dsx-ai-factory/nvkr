@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package canonical is the single canonical codec for every digest-addressed
 // object in nkdctl (ADR-01). It implements NKD's explicitly narrower,
 // JCS-derived integer-only profile: UTF-8, object keys sorted lexicographically by

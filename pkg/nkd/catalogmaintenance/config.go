@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package catalogmaintenance owns review-only catalog refreshes and their
 // scheduled GitHub adapter. It grants no build, publication or release authority.
 package catalogmaintenance

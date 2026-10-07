@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package delivery owns publication bytes, output membership, and content identity.
 // BuildPublicationRoot assembles exact artifacts into an OCI layout; OpenPublication
 // and PullPublication check and hold its closure for consumption. Close each returned

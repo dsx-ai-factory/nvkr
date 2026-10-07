@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package ir defines nkdctl's engine-neutral pipeline IR: the fully-pinned build
 // DAG that is the single source of truth for emission, build, and verification
 // (SRD §4.5, §5.1). The full IR may carry compiler-selected Environment metadata,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package status authenticates signed status declarations and complete checkpoints.
 // AcceptDiagnosticCheckpoint owns protected high-water storage, signature and
 // complete-set verification, and commit-before-decision ordering. Diagnostic
