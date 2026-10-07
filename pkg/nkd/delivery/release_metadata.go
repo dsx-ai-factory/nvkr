@@ -11,10 +11,10 @@ import (
 // ReleaseMetadata is the release-wide context stored in the sole release index
 // metadata document. Output identities and evidence membership live on Objects.
 type ReleaseMetadata struct {
-	PlanDigest        string `json:"planDigest,omitempty"`
 	InvocationID      string `json:"invocationId,omitempty"`
 	DefinitionDigest  string `json:"definitionDigest"`
 	EnvironmentDigest string `json:"environmentDigest"`
+	PlanDigest        string `json:"planDigest"`
 	ContentSubject    string `json:"contentSubject"`
 }
 
@@ -63,10 +63,11 @@ func validateReleaseMetadata(root PublicationRoot) error {
 		return nil
 	}
 	m := root.Release
-	if (m.PlanDigest == "") != (m.InvocationID == "") || (m.PlanDigest != "" && (!canonical.IsDigest(m.PlanDigest) || len(m.InvocationID) > 2048)) {
-		return e.New(e.CodeVerifyFailed, "release attempt binding is incomplete")
+	if len(m.InvocationID) > 2048 {
+		return e.New(e.CodeVerifyFailed, "release invocation identity exceeds the maximum length")
 	}
-	if !canonical.IsDigest(m.DefinitionDigest) || !canonical.IsDigest(m.EnvironmentDigest) || !canonical.IsDigest(m.ContentSubject) {
+	if !canonical.IsDigest(m.DefinitionDigest) || !canonical.IsDigest(m.EnvironmentDigest) ||
+		!canonical.IsDigest(m.PlanDigest) || !canonical.IsDigest(m.ContentSubject) {
 		return e.New(e.CodeVerifyFailed, "release metadata has incomplete identities")
 	}
 	outputs := map[string]PublishedObject{}

@@ -151,13 +151,14 @@ inputs.
 
 That non-circular root/discovery/signature protocol is mandatory for a qualified publication claim. The delivery
 module implements its transport representation as an OCI image index with artifact type
-`application/vnd.nkd.publication-root.v3`: every child is an exact OCI manifest or nested index, and the canonical
+`application/vnd.nkd.publication-root.v4`: every child is an exact OCI manifest or nested index, and the canonical
 root config binds each child's name, kind, artifact type, OCI descriptor digest, exact payload or root blob
 digest, semantic digest, size, and optional platform. The registry tag is only a discovery hint; the publisher
 returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
-The config uses `nkd.dev/publication-root/v3` and `application/vnd.nkd.publication-root.config.v3+json`.
+The config uses `nkd.dev/publication-root/v4` and `application/vnd.nkd.publication-root.config.v4+json`.
+Its release metadata binds the exact Definition, Environment, compiled Plan and release-content identities.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
 removed. Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
 remain implemented. The retired clearance and publication-manifest families remain reserved and nonminting;
@@ -245,7 +246,8 @@ dry-run signing do not admit the new mode. Interrupted runs can leave independen
 cross-run reuse, rollback, retention protocol or atomic multi-repository transaction is added.
 
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
-output names, sibling repository locators, descriptor identities, output-to-Build-Digest/component mappings, content subject and
+the Definition, Environment and compiled Plan identities, output names, sibling repository locators, descriptor
+identities, output-to-Build-Digest/component mappings, content subject and
 required evidence membership. There is no separately published lifecycle-binding object. Output identity is
 the deliverable manifest digest (APT retains its typed repository identity); input layout-index hashes are not
 Artifact identities. The qualified representation in §4 remains a separate protocol, not a compatibility path

@@ -60,6 +60,9 @@ func TestReleaseConsumerRejectsUnsafeInputsBeforeExecution(t *testing.T) {
 	}{
 		{"path escape", []string{"--work", ".nkd/../outside", "--cosign-digest", validDigest}, "unsafe path component"},
 		{"nonhex digest", []string{"--work", ".nkd/release-input-test", "--cosign-digest", "sha256:" + strings.Repeat("g", 64)}, "64 lowercase hex"},
+		{"partial exact inputs", []string{"--work", ".nkd/release-input-test", "--cosign-digest", validDigest, "--definition", "definition.yaml"}, "must be supplied together"},
+		{"empty exact inputs", []string{"--work", ".nkd/release-input-test", "--cosign-digest", validDigest,
+			"--definition", "", "--environment", "", "--plan", ""}, "requires a non-empty path"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -72,6 +75,102 @@ func TestReleaseConsumerRejectsUnsafeInputsBeforeExecution(t *testing.T) {
 				t.Fatalf("unsafe input was not rejected before execution: %v\n%s", err, output)
 			}
 		})
+	}
+}
+
+func TestReleaseConsumerForwardsExactInputs(t *testing.T) {
+	script := demoScript(t, "demo-release-consumer.sh")
+	temp := t.TempDir()
+	captured := filepath.Join(temp, "args")
+	recorder := filepath.Join(temp, "nkdctl")
+	if err := os.WriteFile(recorder, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	work := filepath.Join(".nkd", "release-input-"+filepath.Base(filepath.Dir(temp))+"-"+filepath.Base(temp))
+	workPath := filepath.Join(filepath.Dir(filepath.Dir(script)), work)
+	if _, err := os.Lstat(workPath); !os.IsNotExist(err) {
+		t.Fatalf("test workspace already exists or cannot be checked: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(workPath); err != nil {
+			t.Errorf("remove test workspace: %v", err)
+		}
+	})
+
+	digest := "sha256:" + strings.Repeat("a", 64)
+	definition := "selected-definition.yaml"
+	environment := "selected-environment.yaml"
+	plan := "selected-plan.json"
+	callerDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	callerDir, err = filepath.EvalSymlinks(callerDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("bash", script,
+		"--reference", "registry.test/release@"+digest,
+		"--identity", "identity",
+		"--issuer", "issuer",
+		"--cosign", "/bin/true",
+		"--cosign-digest", digest,
+		"--definition", definition,
+		"--environment", environment,
+		"--plan", plan,
+		"--work", work,
+	)
+	cmd.Env = append(os.Environ(), "NKDCTL_BIN="+recorder, "CAPTURE_ARGS="+captured)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("consumer failed: %v\n%s", err, output)
+	}
+
+	raw, err := os.ReadFile(captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Join([]string{
+		"--definition", filepath.Join(callerDir, definition),
+		"--environment", filepath.Join(callerDir, environment),
+		"--plan", filepath.Join(callerDir, plan),
+	}, "\n") + "\n"
+	if !strings.Contains(string(raw), want) {
+		t.Fatalf("consumer did not forward the selected exact inputs:\n%s", raw)
+	}
+}
+
+func TestReleaseConsumerIgnoresGenericInheritedExactInputNames(t *testing.T) {
+	script := demoScript(t, "demo-release-consumer.sh")
+	temp := t.TempDir()
+	captured := filepath.Join(temp, "args")
+	recorder := filepath.Join(temp, "nkdctl")
+	if err := os.WriteFile(recorder, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	work := filepath.Join(".nkd", "release-env-"+filepath.Base(filepath.Dir(temp))+"-"+filepath.Base(temp))
+	workPath := filepath.Join(filepath.Dir(filepath.Dir(script)), work)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(workPath); err != nil {
+			t.Errorf("remove test workspace: %v", err)
+		}
+	})
+	digest := "sha256:" + strings.Repeat("a", 64)
+	cmd := exec.Command("bash", script,
+		"--reference", "registry.test/release@"+digest,
+		"--identity", "identity", "--issuer", "issuer",
+		"--cosign", "/bin/true", "--cosign-digest", digest, "--work", work)
+	cmd.Env = append(os.Environ(), "NKDCTL_BIN="+recorder, "CAPTURE_ARGS="+captured,
+		"DEFINITION=unrelated", "ENVIRONMENT=production", "PLAN=unrelated")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("consumer inherited generic exact-input names: %v\n%s", err, output)
+	}
+	raw, err := os.ReadFile(captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "--definition") || strings.Contains(string(raw), "--environment") || strings.Contains(string(raw), "--plan") {
+		t.Fatalf("consumer forwarded inherited generic inputs:\n%s", raw)
 	}
 }
 

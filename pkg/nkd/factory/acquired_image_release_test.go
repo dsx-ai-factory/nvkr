@@ -91,6 +91,13 @@ func TestAcquiredImageReleaseEvidenceRetainsNativeSubject(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				planDigest, err := plan.IdentityDigest()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if metadata.PlanDigest != planDigest {
+					t.Fatalf("release metadata Plan identity = %q, want %q", metadata.PlanDigest, planDigest)
+				}
 				request := delivery.PublicationRequest{Release: metadata, Objects: objects}
 				path := filepath.Join(t.TempDir(), "diagnostic")
 				if _, err := delivery.BuildPublicationRoot(t.Context(), path, request); err != nil {

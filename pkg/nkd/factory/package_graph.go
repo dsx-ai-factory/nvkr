@@ -353,7 +353,7 @@ func packageMediaType(kind string) string {
 	case PackageHelm:
 		return "application/vnd.nkd.helm-bundle.v1"
 	default:
-		return "application/vnd.nkd.publication-root.v3"
+		return delivery.MediaPublicationRoot
 	}
 }
 

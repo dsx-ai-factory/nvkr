@@ -10,6 +10,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sign"
 )
 
@@ -40,6 +41,34 @@ type VerifiedRelease struct {
 	publication *delivery.Publication
 }
 
+// ExactInputDescription is the defensive projection of a successful exact-input
+// check. It identifies both the authenticated publication and the exact authored
+// and compiled inputs matched against it.
+type ExactInputDescription struct {
+	ReleaseSubject    string `json:"releaseSubject"`
+	PolicyDigest      string `json:"policyDigest"`
+	DefinitionDigest  string `json:"definitionDigest"`
+	EnvironmentDigest string `json:"environmentDigest"`
+	PlanDigest        string `json:"planDigest"`
+	ContentSubject    string `json:"contentSubject"`
+}
+
+// ExactInputExpectation is an opaque, package-issued snapshot prepared before
+// registry or signature work. Callers cannot construct an accepted expectation
+// from digest strings or mutable Plan fields.
+type ExactInputExpectation struct {
+	issued   bool
+	prepared *Run
+	outputs  []factory.LifecycleOutputPlan
+}
+
+// ExactInputReceipt is an opaque result issued only after a verified publication
+// has matched a package-issued ExactInputExpectation.
+type ExactInputReceipt struct {
+	issued      bool
+	description ExactInputDescription
+}
+
 func NewConsumer(options ConsumerOptions) (*Consumer, error) {
 	root := options.WorkspaceRoot
 	if root == "" {
@@ -67,6 +96,97 @@ func (verified *VerifiedRelease) Description() (Release, error) {
 	return description, nil
 }
 
+// PrepareExactInputs validates and freezes the consumer's Definition,
+// Environment, and canonical compiled Plan bytes before any registry or signature work.
+func PrepareExactInputs(definition Definition, environment Environment, plan *factory.Plan) (*ExactInputExpectation, error) {
+	prepared, err := PrepareRun(definition, environment, plan, "consumer-verification")
+	if err != nil {
+		return nil, err
+	}
+	frozenOutputs := make([]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
+	for index, output := range plan.LifecycleOutputs {
+		frozenOutputs[index] = output
+		frozenOutputs[index].Components = append([]string(nil), output.Components...)
+	}
+	return &ExactInputExpectation{issued: true, prepared: prepared, outputs: frozenOutputs}, nil
+}
+
+// Description returns the immutable identities authenticated by this receipt.
+func (receipt *ExactInputReceipt) Description() (ExactInputDescription, error) {
+	if receipt == nil || !receipt.issued {
+		return ExactInputDescription{}, e.New(e.CodeGateUnmet, "exact-input receipt was not issued")
+	}
+	return receipt.description, nil
+}
+
+// RequireExactInputs checks that this already verified publication realizes a
+// package-prepared exact-input expectation. It grants no stronger release scope
+// or evidence lane.
+func (verified *VerifiedRelease) RequireExactInputs(expectation *ExactInputExpectation) (*ExactInputReceipt, error) {
+	if verified == nil {
+		return nil, e.New(e.CodeGateUnmet, "release capability is not verified")
+	}
+	verified.mu.RLock()
+	defer verified.mu.RUnlock()
+	if !verified.valid || verified.publication == nil {
+		return nil, e.New(e.CodeGateUnmet, "release capability is not verified")
+	}
+	if expectation == nil || !expectation.issued || expectation.prepared == nil || len(expectation.outputs) == 0 {
+		return nil, e.New(e.CodeGateUnmet, "exact-input expectation was not issued")
+	}
+	description, err := verified.publication.Description(verified.release.Subject)
+	if err != nil {
+		return nil, err
+	}
+	if description.Metadata.DefinitionDigest != expectation.prepared.DefinitionDigest ||
+		description.Metadata.EnvironmentDigest != expectation.prepared.EnvironmentDigest ||
+		description.Metadata.PlanDigest != expectation.prepared.PlanDigest {
+		return nil, e.New(e.CodeVerifyFailed,
+			"verified publication does not bind the supplied Definition, Environment, and Plan")
+	}
+	observed, err := bindObserved(expectation.prepared, verified.release.Artifacts)
+	if err != nil {
+		return nil, err
+	}
+	if observed.Status != RunComplete {
+		return nil, e.New(e.CodeReleaseIncomplete, "verified publication omits a required compiled output")
+	}
+	bound, err := bindReleaseContentOutputs(expectation.outputs, observed)
+	if err != nil {
+		return nil, err
+	}
+	if bound.ContentSubject != description.Metadata.ContentSubject {
+		return nil, e.New(e.CodeVerifyFailed, "verified publication content does not realize the exact compiled output set")
+	}
+	return &ExactInputReceipt{issued: true, description: ExactInputDescription{
+		ReleaseSubject: verified.release.Subject, PolicyDigest: verified.release.PolicyDigest,
+		DefinitionDigest:  expectation.prepared.DefinitionDigest,
+		EnvironmentDigest: expectation.prepared.EnvironmentDigest, PlanDigest: expectation.prepared.PlanDigest,
+		ContentSubject: bound.ContentSubject,
+	}}, nil
+}
+
+// VerifyExactInputs authenticates one publication and immediately narrows it to
+// a previously prepared exact-input expectation. A failed narrowing closes the
+// verified publication before returning.
+func (consumer *Consumer) VerifyExactInputs(ctx context.Context, reference string, policy VerificationPolicy,
+	expectation *ExactInputExpectation,
+) (*VerifiedRelease, *ExactInputReceipt, error) {
+	if expectation == nil || !expectation.issued || expectation.prepared == nil || len(expectation.outputs) == 0 {
+		return nil, nil, e.New(e.CodeGateUnmet, "exact-input expectation was not issued")
+	}
+	verified, err := consumer.Verify(ctx, reference, policy)
+	if err != nil {
+		return nil, nil, err
+	}
+	receipt, err := verified.RequireExactInputs(expectation)
+	if err != nil {
+		_ = verified.Close()
+		return nil, nil, err
+	}
+	return verified, receipt, nil
+}
+
 func (verified *VerifiedRelease) Close() error {
 	if verified == nil {
 		return nil
@@ -92,6 +212,9 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 		return nil, e.Wrap(e.CodeTimeout, err, "release verification canceled")
 	}
 	if err := policy.Validate(); err != nil {
+		return nil, err
+	}
+	if err := delivery.ValidatePublicationReference(reference); err != nil {
 		return nil, err
 	}
 	digest := referenceDigest(reference)

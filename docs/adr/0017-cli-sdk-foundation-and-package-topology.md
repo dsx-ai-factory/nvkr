@@ -76,8 +76,13 @@ failed Run. Its durable marker makes interruption
 distinct from completion on a reused attempt. Marker removal plus attempt-directory sync is the success commit
 point; handle cleanup after it is non-authoritative. Serialized descriptions cannot restore the held capability,
 and callers cannot select an export path. This local retention contract does not enable disk publication.
-`delivery` owns checked publication membership and canonical release-content identity;
-Release consumers do not reconstruct compiler bindings. Existing domain modules retain their
+`delivery` owns checked publication membership and canonical release-content identity. A consumer may optionally
+prepare an exact Definition, Environment and compiled Plan expectation before external work, then require the held
+verified publication to match its authenticated input identities and complete output binding. Lifecycle performs
+that compiler-owned join and issues an opaque receipt bound to the publication subject, consumer policy and matched
+identities. Its defensive description exposes those matches without serializing or restoring the receipt; neither
+the receipt nor its description grants a stronger lane or scope. Consumers
+do not reconstruct bindings from caller-provided digests or publication fields. Existing domain modules retain their
 canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
@@ -104,7 +109,8 @@ current lifecycle uses them. SDK callers obtain an opaque prepared Run and execu
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
 policy (ADR-04), returning inspectable views plus a closeable capability. The reference selects the sole
 ADR-20 release index: delivery owns its metadata/descriptor/evidence join, checked named outputs, exact sibling
-artifact references, and release content projection. Lifecycle applies consumer policy and assembles the Release
+artifact references, exact Definition, Environment, Plan and content identities, and release content projection.
+Lifecycle applies consumer policy and assembles the Release
 view. `VerificationPolicy.minimumDiskEvidence` is part of the policy digest. Pipeline-attested policy defaults
 to `build-provenance-v1`; explicitly selecting `strict` requires inspected evidence. Qualified policy defaults
 to strict and rejects the producer-only minimum. Inspected evidence satisfies either minimum; producer metadata

@@ -185,17 +185,18 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 		if err != nil {
 			return nil, err
 		}
-		metadata = &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest, ContentSubject: contentSubject}
+		planDigest, err := plan.IdentityDigest()
+		if err != nil {
+			return nil, err
+		}
+		metadata = &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest,
+			PlanDigest: planDigest, ContentSubject: contentSubject}
 		if PerOutputPublication(plan) {
-			digest, err := plan.IdentityDigest()
+			run, err := factoryRunContext(planDigest, time.Now().UTC(), time.Now().UTC())
 			if err != nil {
 				return nil, err
 			}
-			run, err := factoryRunContext(digest, time.Now().UTC(), time.Now().UTC())
-			if err != nil {
-				return nil, err
-			}
-			metadata.PlanDigest, metadata.InvocationID = digest, run.InvocationID()
+			metadata.InvocationID = run.InvocationID()
 		}
 		outputByName := make(map[string]delivery.Output, len(outputs))
 		transportPaths := make(map[string]string, len(outputs))
