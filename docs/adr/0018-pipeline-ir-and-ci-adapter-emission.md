@@ -118,8 +118,9 @@ qualified execution. The same-Run, source-bootstrapped `nkd-exec` helper launche
 through the shared `pipeline.Local.ExecNode` launcher used by local and hosted Run operations. Adapters render job topology, dependencies
 and declared transport; they do not reproduce isolation as provider-specific build syntax. Fetch/pull nodes
 materialize pinned inputs first; hermetic build and verification nodes enforce network denial, read-only inputs,
-private output and a fixed credential-free environment. Shared code prevents semantic drift; it does not alone
-prove byte identity across hosts.
+private output and a fixed credential-free environment. The local byte-observation exception in §8 executes
+no producer code and carries no container-isolation or qualification claim. Shared code prevents semantic
+drift; it does not alone prove byte identity across hosts.
 The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions artifact delivery;
 it does not independently checksum the downloaded helper before restoring its execute bit. This delivery
 contract is not the qualified exact-helper-byte verification required below.
@@ -227,7 +228,7 @@ trusted source-fetch job alone receives it. That job verifies the selected commi
 credential-free Git checkout, and uploads it as a one-day internal artifact with an exact SHA-256 passed as a
 job output. The build job verifies the archive digest and Git commit/tree before candidate code runs. Candidate
 code receives no authority-bearing evidence role. The build job's logs, image observations, QCOW2 digest and boot
-result are explicitly unqualified diagnostic output. The [2026-10-01 runs](../evidence/2026-10-01-nke-arc-os-builds.md) exercise both
+result are explicitly unqualified diagnostic output. The [2026-10-01 runs](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) exercise both
 ARC pools from `nke-recipes`; they do not establish lasting availability or provider isolation. Shared Actions
 caches are disabled for the trusted bootstrap and generated helper so candidate cache writes are not restored
 into those trusted binaries. Mirror selection checks an open, non-draft same-repository PR head, not a human
@@ -511,8 +512,14 @@ fused-job contract. Invoking an upstream reusable workflow needs a separate exec
 v1 invokes pinned source entrypoints instead.
 
 Maintained local and hosted Runs share the factory producer operation and `pipeline.Local.ExecNode` launcher.
-A producer reference resolves the exact embedded IR instruction; utility operations retain their pinned execution
-containers. Local execution schedules the whole Run graph once in bounded ready batches, retains source receipts
+A producer reference resolves the exact embedded IR instruction. Offline utility operations retain their pinned
+execution containers except ordinary local non-disk terminal observation: it reopens and hashes produced bytes
+in the host process, sharing collection's filesystem view after private BuildKit output promotion. That step
+executes no producer code or signature verifier and retains a static-unqualified observation; it does not claim
+container isolation or runtime authentication. Disk observation retains its original held-owner path, and
+hosted utility jobs are unchanged.
+
+Local execution schedules the whole Run graph once in bounded ready batches, retains source receipts
 through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted build and utility jobs enter through
 `factory.ExecuteNode`; hosted source fetch delegates through a private factory source owner to the same producer primitive. Neither path converts a whole producer
 report into a second scheduling result model.

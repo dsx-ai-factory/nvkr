@@ -164,22 +164,21 @@ be reissued as bundles before the updated consumer can accept them.
 
 ## Validation boundary
 
-Contract tests cover missing, substituted, duplicate and unbound evidence, wrong subjects/stages/documents,
-failed signing/verification, raw-evidence rejection, isolated repositories, referrer discovery and failed fetches
-that leave no accepted output. The finalizer compares decoded SBOMs with independently restored handoffs and
-final Helm package inspection. The extra attestation stage adds one internal handoff; it does not add a product.
+Contract tests in [delivery](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/delivery), [signing](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/sign) and
+[factory](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/factory) cover missing, substituted, duplicate and unbound evidence, wrong subjects
+and stages, failed signing/verification, raw-evidence rejection, isolated repositories and failed fetches.
+Legacy finalization compares restored raw SBOM handoffs and final Helm package inspection; per-output
+finalization authenticates exact document bindings through signed metadata and independently verifies bundles.
 
-A synthetic offline experiment with pinned cosign 2.6.3 created a real CycloneDX bundle, preserved the exact
-canonical document through NKD decoding, and verified an ephemeral local-key signature. That experiment had
-no transparency-log entry and used an explicit fixture trust root; it is not evidence of keyless policy success.
-The native completion gate, uncached suite, Linux sign/SBOM race tests, actionlint and byte-exact workflow
-regeneration passed. A new authorized GitHub/GHCR run remains required for production signing, repository permissions, transparency
-verification and hosted finalization.
+The [recorded M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed hosted publication,
+signing, verification and finalization for 34 outputs, including both native disks. It used an explicitly
+admitted validation branch and `build-provenance-v1` disk evidence. This does not establish main-only
+execution, independent full-payload disk consumption, strict disk inspection or qualification. Current
+support and remaining acceptance are owned by [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md).
 
-The earlier loopback rehearsal at
-`localhost:5000/nkd-separated-rehearsal/releases@sha256:35232ed384a2bc7d1bfdecfda8238086d0e0e341de85602e064c145c3aac2fc2`
-predates SBOM co-location and attestations. It demonstrated recovery of the original CLI/Helm bytes and exact
-CWE binding, but its five-manifest release index is not the current layout.
+Earlier [hosted release history](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/hosted-release-history.md#cosign-bundle-discovery) retains
+the mixed-attestation discovery incident and its exact cosign interoperability limits. Historical
+layouts and unsigned loopback replays do not establish acceptance of the current publication format.
 
 See the pinned [cosign attestation options](https://github.com/sigstore/cosign/blob/v3.1.3/cmd/cosign/cli/options/attest_blob.go)
 and [verification options](https://github.com/sigstore/cosign/blob/v3.1.3/cmd/cosign/cli/options/verify.go) for the adapter's command contract.

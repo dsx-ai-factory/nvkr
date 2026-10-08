@@ -5,7 +5,7 @@ The format is generic because the catalog supplies the file path and field selec
 
 ## Upstream declares the versions
 
-Commit [versions.yaml](examples/generic-pin-set/versions.yaml) in the platform repository, then tag it `v1.4.0`:
+Commit [versions.yaml](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/generic-pin-set/versions.yaml) in the platform repository, then tag it `v1.4.0`:
 
 ```yaml
 dependencies:
@@ -17,7 +17,7 @@ The controller repository must contain tag `controller/v0.9.3`; helper packages 
 
 ## The catalog maps them to pins
 
-The complete [registry.yaml](examples/generic-pin-set/registry.yaml) makes these mappings:
+The complete [registry.yaml](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/generic-pin-set/registry.yaml) makes these mappings:
 
 | Upstream field | Catalog member | What NKD resolves |
 |---|---|---|
@@ -65,5 +65,5 @@ A pin set does not discover runtime dependencies. Pinning a Helm chart does not 
 Model each image as a separate acquired catalog member, with an explicit version field in the upstream
 version file. Nested pin sets work when a pinned source declares another explicit set.
 
-See [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#7-derived-pin-sets-one-source-may-curate-other-sources-pins)
+See [ADR-22](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/0022-catalog-pinning-and-the-lock-contract.md#7-derived-pin-sets-one-source-may-curate-other-sources-pins)
 for the YAML/JSON selectors and limits.

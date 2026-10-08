@@ -80,7 +80,7 @@ lint: ## Run golangci-lint (see .golangci.yml; install: https://golangci-lint.ru
 .PHONY: shellcheck
 shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed — https://www.shellcheck.net/"; exit 1; }
-	shellcheck -S warning scripts/*.sh toolchains/**/*.sh
+	shellcheck -S warning scripts/*.sh demos/*.sh toolchains/**/*.sh
 
 .PHONY: vulncheck
 vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinned upstream scanner.
@@ -120,6 +120,19 @@ notices: ## Regenerate THIRD_PARTY_NOTICES.md from the linked module set.
 .PHONY: notices-check
 notices-check: ## Verify THIRD_PARTY_NOTICES.md matches the linked module set (drift gate).
 	./scripts/gen-notices.sh --check
+
+# Only the pages listed in docs/index.yml are published to the Fern site; contributor,
+# ADR and evidence documents stay on GitHub and are not checked here. Fern is
+# deliberately unpinned: install it with `npm install -g fern-api@latest`.
+.PHONY: docs-check
+docs-check: ## Validate the published Fern docs (needs node and fern-api).
+	@command -v fern >/dev/null 2>&1 || { echo "fern not installed — npm install -g fern-api@latest" >&2; exit 1; }
+	@pages="$$(sed -n 's|^ *path: \(.*\.md\)$$|docs/\1|p' docs/index.yml)"; \
+	 [ -n "$$pages" ] || { echo "no pages listed in docs/index.yml" >&2; exit 1; }; \
+	 python3 tools/check-docs-mdx $$pages
+	fern check
+	fern docs md check
+	fern docs broken-links
 
 ADDLICENSE_VERSION := v1.1.1
 LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES

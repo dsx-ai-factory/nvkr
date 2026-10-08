@@ -48,11 +48,13 @@ wrap the QCOW2 as a binary bundle. Local unencrypted direct-Packer execution and
 supported as described below. The compiler can describe disk publication and its evidence graph, and dry-run
 can inspect that Plan. The ordinary local scheduler rejects disk publication with `engine-capability` before
 runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
-General hosted VM execution, qualified execution and FDE remain capability-gated before output work.
-ADR-18 separately admits the pipeline-attested native ARC disk route and its generated grouped jobs;
-that operator-trusted exception does not establish qualified execution or complete release acceptance.
-The complete live full-disk evidence and publication path is implemented as guarded APIs, not an exercised
-production workflow.
+ADR-18 separately admits generated native ARC jobs for unencrypted direct-Packer outputs. The recorded
+M2 candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
+deferring inspection, under a validation-branch exception. General hosted VM adapters, FDE and qualified
+execution remain capability-gated. The strict live full-disk evidence/publication path has guarded APIs
+without a successful real NKE join; main-only execution, independent full-payload disk consumption,
+M3 inventory/qualification and organizational acceptance remain separate gaps in
+[reconciliation](reconciliation.md).
 
 Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
@@ -281,7 +283,8 @@ Status operation and state contracts cover commit-before-withdrawal, authenticat
 protected reads and kernel-released locks. Catalog maintenance contracts cover no-op bytes, source check mode,
 whole-update CAS and artifact selection before upstream calls. Lifecycle binary observation now requires its
 complete Plan and retained raw producer bytes, including exact IR/result metadata; packaged bytes alone are
-insufficient. The organization audit records these ownership changes and their validation scope.
+insufficient. The owning package tests and [reconciliation](reconciliation.md) record these current
+ownership and contract boundaries; completed organization reports are not a second status owner.
 
 The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and
 Linux race tests provide contract evidence; repository checks are recorded in reconciliation.

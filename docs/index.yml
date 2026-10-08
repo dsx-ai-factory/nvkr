@@ -1,0 +1,52 @@
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Operator-facing pages only. Contributor, audit, planning, ADR and OS-build
+# internals stay in the repository on GitHub and are intentionally not listed.
+
+navigation:
+  - section: Get Started
+    contents:
+      - page: Quickstart
+        path: quickstart.md
+      - page: Concepts
+        path: user-concepts.md
+      - page: Definition, Run, and Release
+        path: lifecycle.md
+
+  - section: Catalogs and Components
+    contents:
+      - page: Catalogs and Components
+        path: catalogs-and-components.md
+      - page: Catalog Refreshes
+        path: catalog-maintenance.md
+      - page: Generic Pin Sets
+        path: generic-pin-set-example.md
+      - page: Pin NKE Deploy Charts
+        path: nke-pin-set-usage.md
+      - page: Declarative Helm Bindings
+        path: declarative-helm-bindings.md
+      - page: M2 Inputs and Customer Choices
+        path: nke-m2-customer-choices.md
+      - page: Authoring Lab
+        path: examples/authoring-lab/README.md
+
+  - section: Generate and Build
+    contents:
+      - page: Generate a Pipeline
+        path: generate-pipeline.md
+      - page: Build a Node Image
+        path: node-images.md
+
+  - section: Inspect and Verify
+    contents:
+      - page: Plan and Graph Inspection
+        path: plan-and-graph-inspection.md
+      - page: Browse and Verify a Release
+        path: release-quickstart.md
+      - page: Release Navigation
+        path: release-navigation.md
+      - page: Publication Architecture
+        path: publication-architecture.md
+      - page: Dependency SBOMs
+        path: dependency-sboms.md

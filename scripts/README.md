@@ -1,7 +1,8 @@
-# Runnable journeys
+# Operational scripts
 
 The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
+The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
 ## Definition → Run
 
@@ -12,14 +13,13 @@ nkdctl run plan --definition definitions/nke-v1/definition.yaml --environment de
 # Local execution; Docker, Go and acquisition/build network access are required.
 # Despite its historical name, the M1 script executes CLI + CWE + Helm.
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
-scripts/demo-m1-local.sh --publish
 ```
 
-`demo-m1-local.sh` also checks that the committed GitHub-hosted bundle
-(`.github/nkd-run/`) matches the current Definition/Environment
-(`nkdctl run generate --check`) before executing. Local attempts are immutable and
+`demo-m1-local.sh` generates and checks its three-output GitHub bundle in a fresh temporary directory,
+whose path it prints for inspection. The repository's committed bundle selects the 34-output M2 candidate.
+The local walkthrough publishes to its loopback registry using dry-run signing. Local attempts are immutable and
 `unqualified-local-execution`; plans remain `static-unqualified`. See the
-[M1 walkthrough and acceptance limits](../docs/demo-m1.md).
+[M1 walkthrough and acceptance limits](../demos/m1-local.md).
 
 The demo uses the loopback registry on port 5000. It generates its own valid
 immutable attempt names.
@@ -34,8 +34,8 @@ CONTAINER_RUNTIME=docker NKE_OS_ARCH=amd64 scripts/nke-os-local.sh local-amd64-d
 ```
 
 Use a different immutable attempt name for each run. The Podman path has a recorded
-[full build and boot smoke](../docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
-The [ARC evidence](../docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
+[full build and boot smoke](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
+The [ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
 Docker/KVM builds and boot smoke at an earlier exact commit, not validation of the latest changes.
 See the [Definition guide](../definitions/nke-os/README.md) for route requirements and limitations.
 Set `NKE_LOCAL_CLONE` to reuse an exact local NKE checkout. On macOS the same
@@ -70,9 +70,16 @@ scripts/demo-release-consumer.sh --help
 
 The consumer takes one digest-pinned reference and one explicit Verification
 Policy with `artifact-publication` scope. This does not establish M3 qualification or M4 Release-manifest
-acceptance. Run it on Linux: it requires a real statically linked, digest-pinned Linux
-cosign executable and a signed GitHub publication; local dry-run output is
-deliberately insufficient.
+acceptance. It requires a real statically linked, digest-pinned Linux cosign executable
+and a signed current v4 GitHub publication; local dry-run output is insufficient.
+On macOS the script automatically builds a Linux amd64 NKD helper and verifies inside
+the pinned Docker toolchain image. Linux defaults to native execution; `--runtime docker`
+selects the container route explicitly, and `--runtime native` selects the host CLI.
+Docker mode needs the pinned Go toolchain and a Linux amd64 cosign executable.
+Use `--anonymous` for public registry access, or `--registry-config /path/to/auth-dir`
+with inline credentials in `config.json` for private access. Host credential helpers
+are rejected in container mode. Neither route relaxes executable pins, signer policy,
+release membership, or payload verification.
 Supplying `--definition`, `--environment`, and `--plan` together additionally
 requires the verified publication to bind those exact authored and compiled
 identities and realize their complete output set. Partial or empty exact-input

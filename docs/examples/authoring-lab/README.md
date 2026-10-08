@@ -38,8 +38,8 @@ output-selection: changed Build Digests: diagnostics
 
 ## Read the inputs and results
 
-[registry.yaml](catalog/registry.yaml) defines seven producers. [definition.yaml](definition.yaml) selects
-seven required outputs. [environment.yaml](environment.yaml) supplies utility execution settings without
+[registry.yaml](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/authoring-lab/catalog/registry.yaml) defines seven producers. [definition.yaml](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/authoring-lab/definition.yaml) selects
+seven required outputs. [environment.yaml](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/authoring-lab/environment.yaml) supplies utility execution settings without
 publication or signing. The `upstream/` files are the fixture's source-owned build inputs.
 
 | Output | Selection and relationship |
@@ -82,7 +82,7 @@ unmodified `run plan --json` result streams.
    controller chart whose own files did not change, because its exact source tree changed. The `tools`
    graphs retain their Build Digests.
 2. **Whole producer:** `doctor` becomes a prebuilt supplier script, replacing the complete source-build
-   producer. Its digest comes from the retained [supplier script](supplier-doctor.sh); both architecture
+   producer. Its digest comes from the retained [supplier script](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/authoring-lab/supplier-doctor.sh); both architecture
    entries identify those same fixture bytes. The placeholder HTTPS URL is not downloaded. The graph
    switches from build to acquisition, and both outputs selecting `doctor` through that stack change.
 3. **Per-output catalog:** only `tools` selects the supplier overlay. `diagnostics` still selects the
@@ -116,5 +116,6 @@ The regression test executes this same program through the real CLI adapters:
 go test ./cmd/nkdctl -run '^TestAuthoringLab' -count=1
 ```
 
-For DRY recommendations and real NKE examples, read
-[shared catalog and Definition authoring](../../catalog-definition-authoring.md).
+For shared sources, complete per-output catalog stacks, and replacement identity, read
+[catalogs and components](../../catalogs-and-components.md). The
+[deploy Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-deploy/README.md) provides the real NKE composition example.

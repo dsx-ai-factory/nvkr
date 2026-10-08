@@ -1,12 +1,10 @@
-# NKD v1 — Milestone epics (specification, Jira-ready)
+# NKD v1 acceptance specification
 
-Revised 2026-10-07. The earlier version was posted to Jira 2026-09-09 as NKX-15957 (M1), NKX-15958 (M2),
-NKX-15959 (M3), NKX-15960 (M4); these local revisions do not update those issues. Production acceptance for
-M1–M4 uses the six-object public model. This specifies
-required behavior; the implementation record separately identifies completed work and external evidence.
-T-shirt sizes describe relative effort, not delivery guarantees. Owners and dates remain planning inputs.
-The architecture description, milestone document and current decisions govern the local contract. Dated
-posting and execution records retain their original scope.
+This specification owns M1–M4 artifact scope, numbered acceptance criteria, approved fallbacks and
+completion requirements. The [roadmap](milestones.md) summarizes outcomes; the
+[implementation record](adr/reconciliation.md) owns current support and operational evidence. Current
+ADRs own the engineering contracts pending named-decider ratification. Candidate success is not
+organizational approval or complete milestone acceptance.
 
 **What NKD v1 is.** A generator and evidence layer. From a digest-pinned Definition of NKE artifacts and a
 separately selected Environment it emits committed GitHub Actions workflows that build or acquire each artifact, publish it to an OCI
@@ -79,26 +77,35 @@ v1 contract lives in the record that owns the topic (signing, publication, prove
 tiers, generated pipelines, release tags). The *implementation record* tracks support, the *evidence log* records
 actual runs, and *consumer instructions* describe independent verification.
 
+## Artifact scope
+
+V1 acceptance targets one amd64 variant per delivered artifact, including one OS image. Embedded
+components retain rows for traceability without implying separate NKD builds or delivery. Every
+separately delivered artifact is signed and attested; the Release binds exact named outputs.
+
+| Artifact or capability | Production source | Delivery / milestone |
+|---|---|---|
+| GitHub workflow generator | NKD | Committed workflows / M1 |
+| NKE CLI | Pinned NKE source, hermetic build | OCI executable package / M1 |
+| nke-agent | NKE OS build | Inside OS image / M2 |
+| CWE controller | Pinned NKE build; recorded acquisition fallback | OCI image / M2 |
+| NKE container images | OS-embedded or separately built/acquired, enumerated in Definition | Inside OS image or OCI images / M2 |
+| NKE OS image | Pinned wrapped NKE build; recorded prebuilt-image fallback | OCI disk-image artifact / M2 |
+| Kubernetes node and control-plane components | NKE OS build | Inside OS image / M2 |
+| CNI | NKE OS build | Inside OS image / M2 |
+| Helm | Digest-pinned acquisition | Operator tooling package / M2 |
+| Spire-agent | Placement decision: embedded or acquired | Inside OS image or OCI artifact / M2 |
+| Third-party container images | Digest-pinned acquisition when outside OS image | OCI images / M2 |
+| NKE Helm charts | Pinned chart sources | OCI packages / M2 |
+| Operator tooling | Acquired kubectl and Helm | OCI package / M2 |
+
+A deferred member stays explicit in authored requirements and planned qualification waivers; it must
+never disappear because a build failed. Disk inventory proves composition for the exact disk subject,
+not reproduction of the QCOW2, decoded RAW stream or encrypted delivery bytes.
+
 ---
 
 ## Epic M1 — Vertical slice
-
-| Field | Value |
-|---|---|
-| **Jira key** | [NKX-15957](https://jirasw.nvidia.com/browse/NKX-15957) (created 2026-09-09) |
-| **Issue type** | Epic |
-| **Epic name** | NKD M1 Vertical Slice |
-| **Summary** | One generated GitHub Actions run builds the NKE CLI from a pinned commit, keyless-signs it, attaches SLSA provenance, pushes to OCI; `cosign verify` passes from a clean machine |
-| **Priority / Rank** | Highest / 1 |
-| **T-shirt size** | **XS** — historical sizing for the CLI vertical slice |
-| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m1-vertical-slice` |
-| **Milestone label** | M1 — Vertical slice |
-| **Due date (best estimate)** | 2026-09-16 |
-| **Linear status** | BUILDING |
-| **Depends on** | — (external: GitHub org and registry namespace, OIDC identity, private NKE source access, product-security approval of public Sigstore) |
-| **Blocks** | M2, M3, M4 |
-| **Related** | NKX-14794 (NKD Design & Contracts) |
-| **Eng PIC / Product PIC** | TBD / TBD |
 
 **Goal.** One generated workflow builds the NKE CLI from a pinned NKE commit, signs it, attaches provenance,
 pushes everything to OCI, and verifies it. Acceptance requires every signing and publication mechanism to run against the real services. Later milestones add build types, the gate and release tagging.
@@ -164,29 +171,11 @@ any CI engine other than GitHub Actions.
 
 ## Epic M2 — Breadth
 
-| Field | Value |
-|---|---|
-| **Jira key** | [NKX-15958](https://jirasw.nvidia.com/browse/NKX-15958) (created 2026-09-09) |
-| **Issue type** | Epic |
-| **Epic name** | NKD M2 Breadth |
-| **Summary** | The in-scope AMD64 artifact set is delivered and signed in OCI with producer provenance, including the NKE OS image and exact output membership |
-| **Priority / Rank** | High / 2 |
-| **T-shirt size** | **M** — historical sizing for AMD64 artifact breadth; additional architecture scope requires re-sizing |
-| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m2-breadth` |
-| **Milestone label** | M2 — Breadth |
-| **Due date (best estimate)** | 2026-09-25 (signed OS image and the M2 core) |
-| **Linear status** | PRIORITIZED |
-| **Depends on** | M1; external: the native AMD64 OS execution route and capacity, intended embedded payload and verified materials, external image/chart membership and toolchain clearance |
-| **Blocks** | M3 (artifacts to qualify), M4 (artifacts to tag) |
-| **Related** | NKX-14794 |
-| **Eng PIC / Product PIC** | TBD / TBD |
-
 **Goal.** The in-scope AMD64 artifact set is delivered, including
 the native AMD64 NKE OS image built from its pinned source and published as a signed disk-image
 artifact with exact-subject producer provenance and authenticated material evidence. The image already contains
 Kubernetes (node side and control-plane images), CNI, and node-agent. Around it: the CWE controller image and the
-NKE cluster images that are not baked into the OS image (enumerated by name in the definition as a Sep 10
-checkpoint output), the operator tooling package, and chart packages. The Release binds
+NKE cluster images that are not baked into the OS image (enumerated by name in the Definition by the source owner), the operator tooling package, and chart packages. The Release binds
 these named outputs to the exact delivered artifacts.
 
 **Delivers**
@@ -221,7 +210,7 @@ these named outputs to the exact delivered artifacts.
   lockfile and are written by the pin-resolution command (resolve an upstream version to a digest and rewrite the
   lockfile), which M4 schedules and extends. Each acquired artifact carries an `acquired` provenance attestation
   recording the upstream reference, the lockfile pin, and the fetch time, and making no build claim.
-- **Spire-agent.** Placement is decided at the Sep 10 checkpoint and recorded in the definition: inside the OS
+- **Spire-agent.** Placement requires a recorded owner decision in the Definition: inside the OS
   image (its matrix row then reads "inside the OS image" and it joins the embedded-component declaration) or
   acquired by digest as a named output in the Release. Until decided it is a dated deferral, not an omission.
 - **Packages.** An operator tooling package (kubectl, Helm); NKE chart packages where sources are available. Each is one signed,
@@ -256,30 +245,13 @@ incomplete; a build failure cannot create an implicit deferral.
 **Definition of done**
 - Tests cover tag-move refusal for image, blob, and package pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege, network or credentials before any output is written; the credential-free build phase; release membership rejecting a member digest that differs from the published digest; and an embedded-component declaration that disagrees with the upstream version manifest.
 - The evidence log has one row per artifact-matrix row: published reference and digest with its source lane, "inside the OS image" (node-agent, Kubernetes, CNI, and spire-agent if so decided), or the deferral reason and date; plus the single run URL from criterion 5 and the consumer transcripts from criteria 1-4.
-- Every fallback taken and every deferral is recorded in the owning decision record, the implementation record, and the milestone document's source-lane column.
+- Every fallback taken and every deferral is recorded in the owning decision record, the implementation record, and this specification's artifact source/delivery matrix.
 - An independent review of the publication code, the wrapped-build policy (where privilege and network are allowed, and that no credential is present), and the definition and lockfile changes is closed.
-- The OS-build feasibility result (entrypoint, container, privilege, network, disk, wall time, output size, registry blob limit) and the Sep 10 decisions (OS build path, NKE image path, spire-agent placement, NKE images outside the OS image) are recorded.
+- The OS-build feasibility result (entrypoint, container, privilege, network, disk, wall time, output size, registry blob limit) and the owner decisions (OS build path, NKE image path, spire-agent placement, NKE images outside the OS image) are recorded.
 
 ---
 
 ## Epic M3 — Qualification
-
-| Field | Value |
-|---|---|
-| **Jira key** | [NKX-15959](https://jirasw.nvidia.com/browse/NKX-15959) (created 2026-09-09) |
-| **Issue type** | Epic |
-| **Epic name** | NKD M3 Qualification |
-| **Summary** | An automated, fail-closed build/evidence gate (schema, pin consistency, signature and provenance presence, tooling smoke) runs after signing on every artifact and emits signed qualification evidence under its own identity |
-| **Priority / Rank** | High / 3 |
-| **T-shirt size** | **S** — one gate module, a node kind, signed evidence, and tamper negatives; embedded-software correctness and runtime validation remain with the NKE OS image build team |
-| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m3-qualification` |
-| **Milestone label** | M3 — Qualification |
-| **Due date (best estimate)** | 2026-10-01 |
-| **Linear status** | PLANNING |
-| **Depends on** | M1 (signing and verification), M2 (artifacts to qualify) |
-| **Blocks** | M4 (release requires the gate) |
-| **Related** | NKX-14794 |
-| **Eng PIC / Product PIC** | TBD / TBD |
 
 **Goal.** An automated, fail-closed gate runs on every delivered artifact after signing and emits signed
 qualification evidence under its own identity. This checks producer selections and build evidence. It does not
@@ -335,23 +307,6 @@ vulnerability scanning; booting the image; cluster conformance; deployment topol
 ---
 
 ## Epic M4 — Automated releases
-
-| Field | Value |
-|---|---|
-| **Jira key** | [NKX-15960](https://jirasw.nvidia.com/browse/NKX-15960) (created 2026-09-09) |
-| **Issue type** | Epic |
-| **Epic name** | NKD M4 Automated Releases |
-| **Summary** | A pin update flows unattended to a reviewable PR; merging produces a signed, immutably tagged release manifest; a manual dispatch re-issues a release under a chosen tag; a signed revocation withdraws a release from the channel |
-| **Priority / Rank** | High / 4 |
-| **T-shirt size** | **S** — bump chain, release manifest, immutable tag, dispatch and revocation marker are mostly definition; the GitHub App token and registry tag-immutability are configuration. The concurrent-run and interrupted-publication rules are the one design item; re-size to M if the registry offers no conditional tag create |
-| **Components / Labels** | `release_eng` / `nke_nkd`, `nkd-v1`, `m4-automated-releases` |
-| **Milestone label** | M4 — Automated releases |
-| **Due date (best estimate)** | 2026-10-01 |
-| **Linear status** | PLANNING |
-| **Depends on** | M1 (trigger model), M2 (publication), M3 (gate); external: a GitHub App for the pin bot, registry-side tag immutability or a namespace whose only push credential is the release workflow's |
-| **Blocks** | — |
-| **Related** | NKX-14794 |
-| **Eng PIC / Product PIC** | TBD / TBD |
 
 **Goal.** A pin update flows unattended from detection to a reviewable pull request; merging to the default
 branch produces a signed, immutably tagged release; a manual dispatch re-issues a release under a chosen tag; a
@@ -410,56 +365,39 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 1. A scheduled run of the pin-update workflow (schedule enabled in the committed workflow; a dispatch against an injected upstream change may be used to demonstrate it) opens a pull request whose body lists, for every changed source, lockfile, and action pin, the old and new tag, commit, tree hash, and digest; the pull request's own build-and-qualify run starts automatically and is green.
 2. Merging that pull request produces a signed, attested release manifest under the tag computed by the decision record's rule from the definition digest and repository commit; the manifest lists the source lane, digest, signature, provenance, and qualification evidence of every artifact published by that run; consumer verification of the manifest succeeds against the qualification identity; the channel tag resolves to the new manifest digest.
 3. A dispatch with a release-tag input equal to an existing tag is refused with the tag-immutability error code; afterwards the existing tag still resolves to its prior digest and the channel tag is unchanged.
-4. A dispatch with a new release-tag input and a source-manifest reference publishes a manifest under the requested tag whose member digests are identical to the source manifest's, without running any build or acquisition job; consumer verification of the new manifest succeeds. (Pre-authorized to slip to Oct 2.)
+4. A dispatch with a new release-tag input and a source-manifest reference publishes a manifest under the requested tag whose member digests are identical to the source manifest's, without running any build or acquisition job; consumer verification of the new manifest succeeds.
 5. Two default-branch runs started for different commits within the same window both complete: each creates its own immutable tag exactly once, no existing tag moves, the channel tag ends at the manifest chosen by the recorded winner rule, and the run logs show the conditional tag creation. A run for the same commit started while the first is still publishing records "already released" and publishes no second manifest.
 6. A release run cancelled after the manifest is published and before the channel tag moves leaves the immutable tag resolving to the manifest and the channel unchanged; the re-run records "already released", moves the channel, and publishes nothing new. The run, plan and subject records for the interrupted attempt are retrievable from the durable store after the CI log has expired or been deleted.
-7. A revocation dispatch against a released manifest digest attaches a signed revocation marker under the qualification identity, the channel tag no longer resolves to that digest, the immutable tag still does, `cosign verify` against the revoked digest still succeeds, and release-scope consumer verification of the revoked digest fails naming the revocation. A revocation dispatch from a pull-request ref or without the qualification environment is refused. (Pre-authorized to slip to Oct 2.)
+7. A revocation dispatch against a released manifest digest attaches a signed revocation marker under the qualification identity, the channel tag no longer resolves to that digest, the immutable tag still does, `cosign verify` against the revoked digest still succeeds, and release-scope consumer verification of the revoked digest fails naming the revocation. A revocation dispatch from a pull-request ref or without the qualification environment is refused.
 
 **Definition of done**
 - Tests cover the pin refresh end to end on a fixture definition and lockfile, deterministic serialization of the release manifest, the "already released" no-op on a re-run, tag immutability and conditional tag creation against a registry, the channel winner rule, the interrupted-publication re-run, the revocation marker's shape and role, and release-scope verification rejecting a revoked digest.
 - An independent review of the release step, the pin tooling, the revocation dispatch's identity and environment restriction, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required) is closed before the release run is declared evidence; the final decision-record text is reviewed.
 - The evidence log records the pull request URL, run URLs, manifest reference, consumer transcripts, the tag-move refusal, the overlapping-run and interrupted-run logs, and the revocation transcript.
-- The owning decision records are final, including the release-manifest and revocation-marker schemas registered before implementation, the tag rule, the winner rule and the durable-record store and retention period; the implementation record, contributor guidance (including the explicit list of capabilities excluded from v1), and the milestone document's source-lane column match what shipped.
+- The owning decision records are final, including the release-manifest and revocation-marker schemas registered before implementation, the tag rule, the winner rule and the durable-record store and retention period; the implementation record, contributor guidance (including the explicit list of capabilities excluded from v1), and this specification's artifact source/delivery matrix match what shipped.
 
 ---
 
-## Cross-epic
+## Shared dependencies and limits
 
-- **Sizes and order:** M1 XS → M2 M → M3 S → M4 S are historical estimates for the AMD64 product floor.
-  Additional architecture scope and strict disk inspection/reconciliation in M3 require re-sizing before commitment.
-- **M2 core:** the OS image and the operator tooling package with exact output membership. Everything
-  else remains required unless a recorded decision defers it. A permitted fallback still requires an implemented,
-  admitted path and exact-subject evidence.
-- **Never cut:** the independent reviews and the decision-record and evidence-log work.
-- **Checkpoints:** Thu Sep 10 decides the M2 shape (wrapped OS build or QCOW2 mirror; built or mirrored NKE
-  images; spire-agent placement; which NKE images are outside the OS image). Tue Sep 16 is the M1 stop-loss; if
-  M1 is not green on GitHub, the M2 fallbacks are taken immediately.
-- **External dependencies that decide the outcome:** NKE source reachable from GitHub-hosted runners through
-  private mirrors with vendored inputs; the NKE OS build runnable on admitted operator-managed native
-  AMD64 virtualization pools, with complete inspection and reconciliation added in M3;
-  a GitHub organization, registry namespace, OIDC identities, and a GitHub App for the pin bot;
-  registry-side tag immutability on the release repository or a namespace whose only push credential is the
-  release workflow's; product-security approval of public Sigstore before NKE bytes are signed.
+M1 precedes M2 artifact delivery; M3 needs their signed artifacts, and M4 needs the qualification gate.
+Independent reviews, decision ratification and scoped evidence are required at every stage.
 
----
+| Owner | Required decision or evidence |
+|---|---|
+| NKE build owners | Buildable pinned entrypoints, vendored private inputs, external image/chart list, OS contents and Spire-agent placement |
+| CI/release engineering | Admitted runner virtualization, privilege, disk, wall-time and isolation requirements, including the narrowly selected native route |
+| Registry/identity owners | Registry blob limits and retention, protected publication environment, keyless identities, source access and public-transparency disclosure approval |
+| Qualification owner | Separate signing identity, explicit waivers and independent negative verification transcripts |
+| Release owner | Pin-bot permissions, immutable-tag enforcement, rerun/concurrency behavior and channel policy |
 
-## Posting to Jira
+The OS build's execution route and source lane, NKE image build/acquisition choice, Spire-agent placement,
+and images delivered outside the disk require recorded owner decisions. Unsupported execution may use
+only the explicitly approved acquisition fallback; provenance and the acceptance record must identify it.
+Production acceptance still requires the selected default-branch run and independent consumer evidence.
+The native candidate route and a validation-branch dispatch do not satisfy those requirements by analogy.
 
-- **Generated artifacts.** `docs/jira/` holds the dry-run preview, the per-epic descriptions in Jira wiki
-  markup, the request payloads and a posting script that prints every command unless given `--post`. Field
-  names and allowed values were validated against project NKX on 2026-09-09.
-- **One Epic per section above.** The field table maps directly: *Epic name* → Epic Name (required in NKX),
-  *Summary* → Summary, *Priority / Rank* → Priority using NKX's scheme (Highest → `P0 - Must have`, High →
-  `P1 - Should have`; rank in the backlog by the number), *Components / Labels* → Components and Labels, *Due
-  date* → Due date, *Depends on* / *Blocks* → issue links of type "Blocks", *Related* → issue link of type
-  "Relates". *T-shirt size*, *Eng PIC / Product PIC* and *Linear status* have no field on the NKX Epic screen
-  and are carried in the description under *Planning metadata*; new epics start in Backlog, unassigned.
-- **Description** is everything from **Goal** through **Definition of done** for that epic, converted to wiki
-  markup. Keep the acceptance-criteria numbering; child stories reference criteria by epic and number (for
-  example "M2 AC 3").
-- **Labels on every epic:** `nke_nkd`, `nkd-v1`, plus the milestone label listed in the table.
-- **Cross-epic** and **Facts** belong in the description of the parent initiative (NKX-14794) or a pinned
-  comment there, not repeated in each epic.
-- **Do not create child stories from the archived story draft**; it predates the current architecture scope,
-  OS-image evidence and public-object decisions. Derive stories from the *Delivers* bullets and acceptance
-  criteria of this document.
+Outside v1: non-OCI delivery, upstream from-source replacement builds, acquired upstream-signature
+verification, vulnerability scanning, deployment topology, cluster E2E qualification, air gap,
+builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
+publication and signing provider. Per-built-artifact SBOM composition remains in scope.

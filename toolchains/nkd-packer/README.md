@@ -39,7 +39,7 @@ capability-dropped container profile. A non-native image may be assembled with
 followed by the same validation and a real bake on a native host before
 publication.
 
-The [October 6 native preparation record](../../docs/evidence/2026-10-06-native-arc.md#native-amd64-assembly-and-validation)
+The [October 6 native preparation record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md#native-amd64-assembly-and-validation)
 records a successful AMD64 Docker assembly and this script's native validation.
 It includes the retained image archive and exact identities; it grants no
 publication or redistribution approval.
@@ -90,7 +90,7 @@ After license approval and a vulnerability scan, the exact external publication
 sequence is:
 
 ```sh
-IMAGE_REPOSITORY=<approved-registry>/nkd-packer-toolchain
+IMAGE_REPOSITORY='<approved-registry>/nkd-packer-toolchain'
 IMAGE_TAG=nke-726f7694-amd64
 toolchains/nkd-packer/build.sh --arch amd64 --tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
 docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
@@ -117,10 +117,45 @@ the lock records that the source is not ready for maintained catalog use; the
 required review remains an organizational publication gate, not a technical
 control implemented by this source lock.
 
-The [October 6 candidate record](../../docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
+The [October 6 candidate record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
 records the user's explicit exception for four measured native images used only by M2.
 That exception permits the candidate overlay; it does not mark these general review gates approved.
 
 This source and a successful container build prove only the toolchain layout.
 They do not prove an NKE QCOW2 bake, bootability, publication, pipeline
 attestation or qualified reproduction.
+
+## Native preparation and catalog selection
+
+Run preparation from the final composed NKD checkout with its pinned Go toolchain. Check the source lock
+without network, then build and inspect only the matching architecture on each native Linux host:
+
+```sh
+toolchains/nkd-packer/build.sh --check
+packer_arch=arm64
+CONTAINER_RUNTIME=podman toolchains/nkd-packer/build.sh --arch "$packer_arch"
+podman image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
+  "localhost/nkd-packer-toolchain:dev-${packer_arch}"
+```
+
+Use `packer_arch=amd64` on the separate native AMD64 host. Docker is an explicit alternative supported
+by the build script. A cross-build does not supply native execution proof. A rebuilt image differing from
+a recorded runtime-specific local pin must be investigated; do not overwrite or bypass the check.
+Preparation neither pushes nor signs an image, writes a source lock, or supplies an approved repository digest.
+The native preparation script/workflow can retain exact image archives and measurements for a separately
+authorized publication owner.
+
+Consume a reviewed published native image through the catalog's existing `toolchainSubstitutions` contract:
+bind the exact predecessor catalog digest, native `arch`, existing `from` pin, measured `to` pin and sorted
+explicit component set. For each M2 disk, the nine source-map consumers are `nke-agent`, `nke-cni-calico`,
+`nke-cni-ovn`, `nke-image-inputs`, `nke-kubeadm-distro`, `nke-node-image`, `nke-patched-installer-iso`,
+`nke-spire-agent` and `ovn-kubernetes-chart`. Preserve `ovn-kube-ubuntu`'s independent BuildKit override.
+An upstream index tag or inherited local ID cannot replace the selected native publication pin.
+After publication, read back the exact repository reference's native descriptor, for example
+`crane digest --platform linux/arm64 '<repository>@sha256:<digest>'`, with the matching platform.
+
+The source lock's historical `validatedNKE` commit is not validation of the capture-enabled M2 source.
+The [M2 README](../../definitions/nke-m2/README.md) owns current source selections, candidate exceptions
+and generated execution requirements; the machine-managed locks and overlay own their exact values.
+Native preparation and registry read-back do not establish source-owner release acceptance, runtime
+isolation, a full image bake, organizational approval or independent consumer acceptance.

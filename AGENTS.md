@@ -46,8 +46,8 @@ paths; macOS builds and runs tests and diagnostics.
 2. `docs/adr/reconciliation.md` owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 
-`docs/sadd.md` explains architecture, `CONTEXT.md` defines vocabulary, and `docs/milestones.md` plus
-`docs/epics-v1-spec.md` govern product acceptance. `docs/README.md` maps active documentation. Dated evidence
+`docs/sadd.md` explains architecture, `CONTEXT.md` defines vocabulary, `docs/milestones.md` is the outcome
+roadmap, and `docs/epics-v1-spec.md` owns detailed product acceptance. `docs/README.md` maps active documentation. Dated evidence
 retains its original scope; superseded requirements and plans are available only in Git history.
 
 ## Working contract
@@ -107,7 +107,10 @@ go test ./pkg/nkd/factory/... -run TestName -count=1
 # generated-bundle drift check (current Makefile target: maintained M2 candidate inputs)
 make workflows-check
 
-# M1 local demo (needs Docker and a local NKE clone; see docs/demo-m1.md)
+# Fern operator docs (pages in docs/index.yml; needs node + `npm install -g fern-api@latest`)
+make docs-check
+
+# M1 local demo (needs Docker and a local NKE clone; see demos/m1-local.md)
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
 ```
 
@@ -159,7 +162,7 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 | Log a warning and continue on a validation, pin, or signature problem | Return a coded error; fail closed |
 | Emit an arbitrary self-hosted runner label or a `git tag` trigger in a generated workflow | Generic hosted runners, with only ADR-18's explicitly admitted native ARC disk exception; sign through the admitted default-branch workflow |
 | Hand-edit `.github/workflows/nkd-run.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
-| Claim a feature works because a unit test with a fake passes | Record external evidence under `docs/evidence/` and keep the reconciliation row honest |
+| Claim a feature works because a unit test with a fake passes | Cite the exact external Run or release artifact and its scope in reconciliation |
 | Write repo paths, commands, or code identifiers into a product spec or epic | Specs use product nouns only; implementation detail belongs in ADRs and code |
 | Append an amendment chain for an existing decision | Update its owning ADR section and reconciliation directly; label lane and deferred behavior |
 | Modify the NKE checkout or catalog to make a local run work | Use the Git `insteadOf` override in the demo script; the catalog stays canonical |
@@ -178,8 +181,8 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 
 ## Documentation conventions
 
-- Deliverables (audits, plans, specs, demo scripts, evidence) go in `docs/` as `docs/<topic>.md`; summarize in
-  chat, do not paste the document.
+- Guides, plans, and specifications go in `docs/`; guided presentations and demos go in `demos/`.
+  Keep raw Run records and logs with CI or release artifacts; summarize deliverables in chat.
 - ADRs follow the header template in `docs/adr/0001-*.md`. Update the current owning decision directly; create
   a new ADR only for a distinct decision. Update reconciliation and preserve lane-specific authority. Avoid
   amendment/addendum histories while the design is pre-ratification.
@@ -189,10 +192,14 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
   template already supplies `{#slug}` anchors (the SADD). Promote a bold label to a
   heading only when it names a topic with substantial content beneath it.
 - Keep `docs/sadd.md` and `CONTEXT.md` (domain vocabulary) consistent with any ADR change.
+- Put example-specific commands beside their Definition or toolchain. Before adding a user guide, consult
+  `docs/README.md` and update the existing task or reference owner. Cite immutable external Run/artifact
+  references and their limits in reconciliation; historical investigations belong in Git history.
 
 ## Key files
 
-Use `docs/README.md` for the documentation map and `scripts/README.md` for runnable demos. `definitions/nke-v1/`
+Use `docs/README.md` for documentation, `demos/README.md` for presentations and guided demos, and
+`scripts/README.md` for operational scripts. Generate alternate examples into scratch roots. `definitions/nke-v1/`
 contains the retained three-output NKE inputs; `definitions/nke-m2/` supplies the current checked-in candidate
 selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.

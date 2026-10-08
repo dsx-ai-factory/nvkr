@@ -2,7 +2,7 @@
 
 Catalog maintenance combines existing atomic pin updates with matching generated Run files. It does not
 choose a new release policy: each selected independent source still uses the exact constraint in its
-registry. The maintained [NKE example](examples/catalog-maintenance/nke-deploy.yaml) selects `nke` and
+registry. The maintained [NKE example](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/catalog-maintenance/nke-deploy.yaml) selects `nke` and
 `nke-helm`, whose constraints remain `v0.21.0`. A normal upstream check therefore preserves the current
 pins. Broader constraints or a different exact release require an authored, reviewed registry change.
 The explicit controller chart package/app-version remains an authored producer input; maintenance does

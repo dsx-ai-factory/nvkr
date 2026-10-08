@@ -5,6 +5,18 @@ summary. A build also names the component, selected output, producer instruction
 commit where present. Utility operations identify their package format or publication route and list their
 exact declared input and expected output artifacts, including producers.
 
+## Recognize the operations
+
+Jobs describe the operation; steps identify the selected component or output. Fetch and build steps obtain
+the pinned source and execute its producer. Offline processing verifies observed artifacts, creates SBOMs,
+and packages outputs. Helm binding embeds the selected image digest before packaging the chart. Publication,
+signing/attestation, and signature verification have separate isolation and credentials.
+
+The finalizer recovers artifact and evidence carriers and checks the complete frozen output set, even after
+a producer failure. Each operation logs its Plan node, result, exit code, and elapsed time. A publication
+reference appears after it is persisted; a failed step retains the child process's original error.
+These diagnostic messages support investigation; authenticated records establish the release claim.
+
 ## Finding a failure
 
 Start with the failed job's summary. Each executed operation records its result, exit status, elapsed seconds
@@ -52,7 +64,8 @@ meaningful step names, pinned provider actions, credentials, permissions, depend
 There is no new authored transport manifest. Source-fetch credentials stay on `run-node`, while
 `pack-outputs` remains a separate step.
 
-These are actual excerpts from the maintained generated workflow:
+These excerpts illustrate a controller-chart operation and finalizer. Exact names and node IDs come from
+the selected Plan; the repository currently generates the 34-output M2 workflow.
 
 ```yaml
       - name: 'Build nke-controller-chart (controller-chart)'
@@ -77,9 +90,10 @@ expected stage and bootstrap jobs, rejects duplicate or unknown fields and statu
 job outputs without logging them. It records ordinary carrier failures and continues; cancellation or a
 failure to persist outcomes stops recovery. The finalizer still authenticates completeness and evidence.
 
-## Measured generated workflow
+## Historical six-output workflow comparison
 
-The maintained six-output `nke-deploy` Definition, with identical canonical Plan bytes:
+The October 4 compact-helper review used the six-output `nke-deploy` Definition and identical canonical Plan bytes.
+These measurements describe that review, rather than the current M2 workflow:
 
 | Item | Initial PR #90 (`582ab01`) | Compact helper |
 |---|---:|---:|
@@ -98,6 +112,7 @@ conservative 21,000-byte limit still applies to every generated run script, incl
 Workflow and manifest bytes change; the Plan digest and bytes remain unchanged. Transport count and payload
 size are unchanged by this refactor, including the remaining work to minimize OS-image transfer.
 
-[Current validation evidence](evidence/2026-10-04-ci-runner-encapsulation.md) records the compact-helper
-checks. [Initial shell-wrapper evidence](evidence/2026-10-03-ci-log-readability.md) retains its historical
-subjects and scope. These static counts do not establish hosted duration or Release acceptance.
+Current contracts live in [compact-helper tests](../pkg/nkd/factory/github_compact_test.go),
+[reporter tests](../pkg/nkd/factory/github_reporter_test.go), and
+[finalization tests](../pkg/nkd/factory/github_finalize_test.go). They cover generated commands and failure
+handling; neither these tests nor the historical static counts establish hosted duration or Release acceptance.
