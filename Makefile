@@ -124,15 +124,34 @@ notices-check: ## Verify THIRD_PARTY_NOTICES.md matches the linked module set (d
 # Only the pages listed in docs/index.yml are published to the Fern site; contributor,
 # ADR and evidence documents stay on GitHub and are not checked here. Fern is
 # deliberately unpinned: install it with `npm install -g fern-api@latest`.
+#
+# The Fern checks run on an isolated copy holding only index.yml, the listed pages and
+# fern/ without its registered versions. A link from a published page to anything else
+# in the repository (an unpublished page, source, a script) therefore fails here the
+# way it is a dead link on the site, instead of resolving against the full checkout.
+# Registered release snapshots are materialized only when publishing, so they are
+# left out of this check. `broken-links --strict` is required: without it Fern prints
+# the errors and still exits 0.
+DOCS_PAGES := $(shell sed -n 's|^ *path: \(.*\.md\)$$|docs/\1|p' docs/index.yml 2>/dev/null)
+
 .PHONY: docs-check
 docs-check: ## Validate the published Fern docs (needs node and fern-api).
 	@command -v fern >/dev/null 2>&1 || { echo "fern not installed — npm install -g fern-api@latest" >&2; exit 1; }
-	@pages="$$(sed -n 's|^ *path: \(.*\.md\)$$|docs/\1|p' docs/index.yml)"; \
-	 [ -n "$$pages" ] || { echo "no pages listed in docs/index.yml" >&2; exit 1; }; \
-	 python3 tools/check-docs-mdx $$pages
-	fern check
-	fern docs md check
-	fern docs broken-links
+	@[ -n "$(DOCS_PAGES)" ] || { echo "no pages listed in docs/index.yml" >&2; exit 1; }
+	python3 tools/check-docs-mdx $(DOCS_PAGES)
+	@set -e; \
+	 work="$$(mktemp -d)"; trap 'rm -rf "$$work"' EXIT; \
+	 tar -cf - docs/index.yml $(DOCS_PAGES) | tar -xf - -C "$$work"; \
+	 mkdir "$$work/fern"; \
+	 for f in fern/*; do [ "$${f##*/}" = versions ] || cp -R "$$f" "$$work/fern/"; done; \
+	 if grep -q '^ *versions:' "$$work/fern/docs.yml"; then \
+	   command -v yq >/dev/null 2>&1 || { echo "yq is required to ignore registered versions in fern/docs.yml" >&2; exit 1; }; \
+	   yq -i 'del(.products[].versions)' "$$work/fern/docs.yml"; \
+	 fi; \
+	 cd "$$work"; \
+	 echo "fern check"; fern check; \
+	 echo "fern docs md check"; fern docs md check; \
+	 echo "fern docs broken-links --strict"; fern docs broken-links --strict
 
 ADDLICENSE_VERSION := v1.1.1
 LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES

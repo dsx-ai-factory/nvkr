@@ -57,7 +57,7 @@ bin/nkdctl release verify --reference "$RELEASE_REF" \
 This scope checks artifact bytes, signatures, and production attestations under that policy. It does not
 provide qualified acceptance or the capability-gated full `release` scope.
 
-From macOS, use the [consumer script](../scripts/demo-release-consumer.sh) to run the
+From macOS, use the [consumer script](https://github.com/dsx-ai-factory/nke-recipes/blob/main/scripts/demo-release-consumer.sh) to run the
 same verification inside its pinned Linux Docker image. It builds a Linux amd64 `nkdctl`
 helper with the repository's pinned Go toolchain; supply a static Linux amd64 cosign
 executable and its trusted digest:

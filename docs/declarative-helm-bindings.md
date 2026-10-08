@@ -40,7 +40,7 @@ For a source template that already adds `sha256:`, declare `values.digestFormat:
 beside `values.digest`. NKD still authenticates the complete image manifest digest, but writes
 only its hex to that value. Omission preserves the full `sha256:<hex>` representation. Unknown
 formats fail closed; templates stay upstream-owned. The
-[OVN output example](../definitions/nke-ovn-source/README.md#native-image-and-helm-oci-outputs)
+[OVN output example](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-ovn-source/README.md#native-image-and-helm-oci-outputs)
 uses this mapping for its six enabled image slots.
 
 ## Registry choice
