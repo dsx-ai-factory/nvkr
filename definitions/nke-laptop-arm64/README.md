@@ -67,7 +67,9 @@ diagnostic seed, UI and vendor notices in a tar+gzip archive, using deterministi
 metadata. The producer writes `nicosim-runtime-assets.tar.gz`; the final bundle
 member and verified extraction use `nico-sim-runtime-assets`, the component name.
 Treat that member as archive data, not an executable/install target.
-Its three-component Plan is contract-tested;
-the earlier recorded Runs built only the server/CLI. Artifact-only runtime
-consumption, the QCOW2-to-tenant handoff, profiles and the deploy-only adapter
-still need validation/integration. This separate build is not a complete Colima/NICoSim demo.
+Its three-component Plan is contract-tested; the earlier recorded Runs built
+only the server/CLI. A [new Docker Run and artifact-only startup probe](../../docs/evidence/2026-10-08-colima-nicosim-assets.md)
+completed and consumed verified extracted seed/UI without NKE source mounted.
+It still uses the mock backend. The QCOW2-to-tenant handoff, profiles and the
+deploy-only adapter need validation/integration. This separate build is not a
+complete Colima/NICoSim demo.

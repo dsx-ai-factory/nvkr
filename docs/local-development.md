@@ -427,14 +427,46 @@ generic bundle's executable-mode/install hint. The data producer uses sorted arc
 source timestamps/ownership/modes and a timestamp-free gzip header. It does not
 add credentials, production fleet profiles or VM state. The archive retains
 source-owned paths (`internal/seed/default-seed.yaml` and `ui/`) for the deployment
-consumer. Its selection and Plan are contract-tested; a new real Run and an
-artifact-only startup probe are still required to establish that handoff.
+consumer. The [three-component Colima Docker Run and artifact-only startup](evidence/2026-10-08-colima-nicosim-assets.md)
+completed separately: delivery verified/extracted the final bundle, and the
+mock-runtime probe initialized SQLite and served exact packaged UI bytes without
+mounting NKE source. Deployment/tenant acceptance remains separate.
 Its build is not proof of real VM provisioning or tenant readiness;
 the earlier [Podman smoke](evidence/2026-10-07-local-nicosim-build.md) selected a mock
 VM backend. The later [committed Colima Docker Run](evidence/2026-10-08-colima-nicosim-build.md)
 completed 1/1 with the earlier two-component selection and passed the same limited
 startup probe using seed/UI from the source snapshot. It does not prove the new
 archive producer, real VM provisioning or the complete demo.
+
+To inspect/consume a completed simulator bundle inside the same Linux source
+export, use NKD's delivery commands rather than unpacking guessed OCI blobs:
+
+```sh
+(
+set -euo pipefail
+NKD_SIM_ATTEMPT=first-simulator
+NKD_SIM_RUN="$(pwd -P)/.nkd/runs/$NKD_SIM_ATTEMPT"
+NKD_SIM_BOOT="$(pwd -P)/.nkd/laptop-bootstrap/$NKD_SIM_ATTEMPT"
+jq -e '.status == "complete" and (.expected|length) == 1 and
+       (.observed|length) == 1 and .failure == null' "$NKD_SIM_RUN/lifecycle.json"
+"$NKD_SIM_BOOT/nkdctl" publish root \
+  --bundle "nicosim-tools-arm64=$NKD_SIM_RUN/packages/nicosim-tools-arm64" \
+  --out "$NKD_SIM_BOOT/consumer-publication"
+"$NKD_SIM_BOOT/nkdctl" publish extract \
+  --layout "$NKD_SIM_BOOT/consumer-publication" --bundle nicosim-tools-arm64 \
+  --out "$NKD_SIM_BOOT/consumer-bundle"
+sha256sum "$NKD_SIM_BOOT/consumer-bundle/"*
+)
+```
+
+Both output directories must be new; the commands refuse overwrites. This local
+diagnostic wrapper verifies bundle structure and member bytes, not signatures or
+release qualification. Extraction uses a private directory owned by the invoking
+user. A container consumer must use that observed UID/GID (for example,
+`--user "$(id -u):$(id -g)"` inside Linux), not hard-coded UID 1000. Treat
+`nico-sim-runtime-assets` as tar+gzip data, with `ui/` and the diagnostic seed
+relative to the simulator's working directory. The guide does not yet provide a
+complete deploy-only site/tenant script.
 
 ## Find outputs and interpret the result
 

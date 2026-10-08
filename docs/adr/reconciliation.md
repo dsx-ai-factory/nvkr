@@ -205,7 +205,7 @@ with source-built Linux ARM64 NICoSim server/CLI components and a pinned runtime
 archive producer. That additional producer packages the diagnostic seed, UI and
 vendor notices with fixed source timestamps/ownership/modes and sorted paths.
 The three-component Plan and exact toolchain substitution are contract-tested;
-the recorded Runs below predate the archive producer. The exact-commit
+the earlier two-component Runs below predate the archive producer. The exact-commit
 Podman Run completed 1/1 and an offline non-root mock-runtime probe initialized
 SQLite and served the prepared source's UI; see the
 [simulator evidence](../evidence/2026-10-07-local-nicosim-build.md). It uses an
@@ -215,8 +215,13 @@ an exact attempt-local substitution for the selected simulator producers. Contra
 cover preflight without a cached image and reject ambiguous/mixed projection inputs
 before replacement toolchain work. The committed-head [Colima Docker Run](../evidence/2026-10-08-colima-nicosim-build.md)
 completed 1/1 and its bounded offline non-root mock-runtime SQLite/UI probe passed.
-This does not establish real VM provisioning. Artifact-only seed/UI consumption,
-integration into the combined set and the complete
+The subsequent [three-component Docker Run](../evidence/2026-10-08-colima-nicosim-assets.md)
+completed 1/1, and existing delivery commands verified/extracted its final bundle.
+An offline non-root mock-runtime probe initialized SQLite and served the exact
+packaged UI without NKE source mounted; a bounded repack probe matched archive
+bytes despite changed temporary filesystem timestamps/permissions.
+Neither probe establishes real VM provisioning or qualification. Integration
+into the combined set and the complete
 Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
 qualification authority.
 The laptop launcher additionally enters an explicitly selected Colima ARM64
