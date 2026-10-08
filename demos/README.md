@@ -68,3 +68,40 @@ rendering, registry availability or NVKE Recipes execution.
 After editing the explorer’s executable inline script, recompute the base64-encoded SHA-256 of its
 exact text between `<script>` and `</script>` (including whitespace), and replace the `script-src` hash
 in its Content Security Policy. The hash permits only those exact offline script bytes.
+
+## Pages preview
+
+The [demo home](index.html) brings the deck, concept gallery, walkthrough and explorer together.
+Build the same five-page site locally, then open <http://127.0.0.1:8765>:
+
+```sh
+SITE_DIR="$(mktemp -d)/nvke-recipes"
+bash scripts/build-demo-site.sh "$SITE_DIR"
+python3 -m http.server 8765 --bind 127.0.0.1 --directory "$SITE_DIR"
+```
+
+The builder copies only the five HTML pages and adds `.nojekyll`; no Node installation or templating is
+needed. Markdown guides and scripts remain on GitHub. Use a new output directory when rebuilding.
+
+Before every deployment, the workflow checks that Pages uses private visibility, the GitHub Actions build
+source, and enforced HTTPS. Missing or different settings stop publication.
+
+The [preview workflow](../.github/workflows/demo-pages-preview.yaml) can publish directly from
+`codex/nvke-recipes-pages` without merging or changing the default branch. It builds a downloadable artifact
+on pushes that change a demo HTML file, the builder, or the workflow. Deployment stays off until a
+repository administrator completes this one-time setup:
+
+1. In **Settings → Pages**, choose **GitHub Actions** as the build source, enforce HTTPS, and select **Private** visibility for
+   this internal site. Private Pages requires GitHub Enterprise Cloud; if unavailable, retain the local
+   preview until the publication audience is agreed. Repository privacy alone does not make Pages private.
+2. In **Settings → Environments → github-pages**, allow deployments from the exact branch
+   `codex/nvke-recipes-pages` and retain any required reviewers.
+3. In **Settings → Secrets and variables → Actions → Variables**, set the repository variable
+   `DEMO_PAGES_PREVIEW` to `true`, then push a site change to that branch.
+4. Open the URL reported by the workflow's deployment job. Set the variable to `false` to stop subsequent
+   deployments; this leaves an already published site online.
+
+This uses the repository's single Pages site; it does not create an isolated URL for each PR. The workflow
+uses a branch push trigger so it can start before its file reaches `main`. See GitHub's
+[custom Pages workflow guidance](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+and [Pages access controls](https://docs.github.com/en/enterprise-cloud@latest/pages/getting-started-with-github-pages/changing-the-visibility-of-your-github-pages-site).

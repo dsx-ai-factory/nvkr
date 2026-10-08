@@ -1,0 +1,129 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore NVKE Recipes: declarative builds, artifact graphs, and verifiable releases.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <link rel="icon" href="data:,">
+  <title>NVKE Recipes · Explore builds and releases</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0e11;--surface:#13191e;--border:#2a343c;--text:#edf2f5;--muted:#a3b0ba;--green:#94d331;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:17px/1.6 var(--sans)}
+    a{color:inherit;text-decoration:none}
+    a:focus-visible{outline:3px solid var(--green);outline-offset:6px}
+    .skip{position:absolute;top:-70px;left:20px;background:var(--green);color:#101509;padding:10px 16px;z-index:5}
+    .skip:focus{top:12px}
+    .wrap{padding-inline:clamp(24px,5vw,160px)}
+    header{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:88px;border-bottom:1px solid var(--border)}
+    .brand{display:flex;align-items:center;gap:13px;font-size:19px;font-weight:700;letter-spacing:-.4px}
+    .mark{display:grid;grid-template-columns:repeat(2,8px);gap:4px;transform:rotate(-8deg)}
+    .mark i{width:8px;height:8px;background:var(--green)}
+    .mark i:last-child{opacity:.4}
+    nav{display:flex;gap:28px;font-size:14px;color:var(--muted)}
+    nav a:hover,footer a:hover{color:var(--green)}
+    .hero{display:grid;grid-template-columns:1.12fr 1fr;align-items:center;gap:clamp(40px,5vw,100px);padding-block:clamp(56px,6vw,100px)}
+    .eyebrow{margin:0 0 21px;color:var(--green);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+    h1{font-size:clamp(42px,4.1vw,92px);line-height:1.07;letter-spacing:-.05em;font-weight:650;margin:0 0 25px}
+    h1 span{color:var(--green)}
+    .lede{max-width:50ch;margin:0;color:var(--muted);font-size:clamp(17px,1.3vw,27px);line-height:1.6}
+    .actions{display:flex;gap:13px;flex-wrap:wrap;margin-top:30px}
+    .button{display:inline-flex;align-items:center;gap:20px;justify-content:center;min-height:48px;padding:10px 20px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-weight:650;transition:background .15s,border-color .15s}
+    .button.primary{background:var(--green);color:#111a08;border-color:var(--green)}
+    .button:hover{background:#202b33;border-color:#566b7a}
+    .button.primary:hover{background:#a8e647;border-color:#a8e647}
+    .tour-note{margin:15px 0 0;font-size:12px;color:var(--muted)}
+    .release-panel{border:1px solid var(--border);background:linear-gradient(145deg,#172019,#11181d 55%);border-radius:14px;padding:24px 24px 17px;box-shadow:0 20px 80px #0003}
+    .panel-head{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:var(--muted)}
+    .panel-head strong{font-weight:500;color:var(--text)}
+    .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:8px}
+    .release-graph{display:block;width:100%;height:auto;margin:10px 0 0;overflow:visible}
+    .release-graph .edge{fill:none;stroke:#5e8050;stroke-width:1.5}
+    .release-graph .box{fill:#172027;stroke:#3b4b55}
+    .release-graph .root{fill:#20351c;stroke:#7cad42}
+    .release-graph text{font-family:var(--sans);fill:var(--text);font-size:14px}
+    .release-graph .small{fill:var(--muted);font-size:11px}
+    .release-graph .label{fill:var(--green);font-size:11px;font-weight:650;letter-spacing:.7px}
+    .panel-foot{font-size:12px;color:var(--muted);margin:4px 0 0;border-top:1px solid var(--border);padding-top:15px}
+    .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:22px}
+    h2{font-size:22px;font-weight:600;letter-spacing:-.6px;margin:0}
+    .section-head p{font-size:14px;color:var(--muted);margin:0}
+    .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+    .card{display:flex;flex-direction:column;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:28px;transition:border-color .15s,background .15s}
+    .card:hover{border-color:#78945b;background:#17201f}
+    .card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+    .card-number{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+    .icon{width:32px;height:32px;stroke:var(--green);stroke-width:1.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .card h3{margin:0 0 10px;font-size:23px;font-weight:600;letter-spacing:-.5px}
+    .card p{margin:0 0 28px;max-width:43ch;color:var(--muted);font-size:15px;line-height:1.6}
+    .card-link{margin-top:auto;color:var(--green);font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:20px}
+    .start{display:flex;align-items:center;justify-content:space-between;gap:32px;padding-block:33px;margin-top:30px;border-top:1px solid var(--border)}
+    .start p{margin:3px 0 0;color:var(--muted);font-size:14px}
+    .start h2{font-size:18px}
+    .start code{display:block;color:#d7e7c4;border:1px solid var(--border);background:#10161a;border-radius:6px;padding:15px 22px;font:13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:nowrap}
+    footer{display:flex;justify-content:space-between;gap:20px;border-top:1px solid var(--border);padding-block:24px;font-size:12px;color:var(--muted)}
+    footer p{margin:0}
+    .preview{display:inline-block;border:1px solid #485e32;background:#192413;color:#b8d995;border-radius:20px;padding:2px 10px;margin-right:10px;font-size:11px}
+    @media(min-width:1900px){body{font-size:22px}.brand{font-size:25px}nav{font-size:18px}.button{font-size:18px;min-height:58px}.card{padding:40px}.card h3{font-size:30px}.card p{font-size:20px}.card-link{font-size:17px}.section-head h2{font-size:28px}.section-head p,.start p{font-size:18px}.panel-head,.panel-foot,.tour-note,footer{font-size:16px}.eyebrow,.card-number{font-size:16px}.start h2{font-size:24px}.start code{font-size:18px}}
+    @media(max-width:1000px){.hero{gap:30px}.card{padding:22px}.card h3{font-size:20px}}
+    @media(max-width:760px){header{min-height:76px}nav{gap:16px;font-size:12px}.brand{font-size:17px}.hero{grid-template-columns:1fr;padding-block:42px;gap:36px}h1{font-size:clamp(41px,8.5vw,62px)}.cards{grid-template-columns:1fr}.card{padding:25px}.card-top{margin-bottom:16px}.card p{max-width:none;margin-bottom:20px}.section-head{display:block}.section-head p{margin-top:4px}.start{align-items:flex-start;flex-direction:column;gap:18px}.start code{font-size:12px;padding:13px}.release-panel{padding:18px}.preview{margin-bottom:7px}footer{flex-direction:column;gap:7px}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="wrap">
+    <a class="brand" href="index.html" aria-label="NVKE Recipes home"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>NVKE Recipes</a>
+    <nav aria-label="Main navigation"><a href="demo-team-concepts.html">Concepts</a><a href="https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/README.md">User docs ↗</a></nav>
+  </header>
+  <main id="main" class="wrap">
+    <section class="hero" aria-labelledby="welcome">
+      <div>
+        <p class="eyebrow">Builds with a traceable story</p>
+        <h1 id="welcome">Understand the build.<br><span>Follow the release.</span></h1>
+        <p class="lede">See how pinned sources become planned builds, published artifacts, and signed evidence.</p>
+        <div class="actions"><a class="button primary" href="nkd-team-tour.html">Start the tour <span aria-hidden="true">→</span></a><a class="button" href="demo-team-explorer.html#publication/nke-node-image-arm64">Explore a release <span aria-hidden="true">↗</span></a></div>
+        <p class="tour-note">14 slides · About 15 minutes · Examples one click away</p>
+      </div>
+      <div class="release-panel">
+        <div class="panel-head"><strong><span class="dot"></span>Inside a release</strong><span>An illustrated map</span></div>
+        <svg class="release-graph" viewBox="0 0 500 335" role="img" aria-labelledby="release-map-title release-map-desc">
+          <title id="release-map-title">One release connects its outputs and evidence</title>
+          <desc id="release-map-desc">An immutable release reference connects a CLI, container images, and OS disks. Evidence records are bound to exact subjects and named outputs.</desc>
+          <path class="edge" d="M250 88V125H86V157 M250 125V157 M250 125H414V157 M86 221V257H250V275 M414 221V257H250 M250 221V275"/>
+          <rect class="root" x="115" y="18" width="270" height="70" rx="8"/>
+          <text class="label" x="133" y="43">RELEASE</text><text x="133" y="66">One immutable reference</text>
+          <rect class="box" x="12" y="157" width="148" height="64" rx="7"/><text x="28" y="184">CLI</text><text class="small" x="28" y="205">Executable artifacts</text>
+          <rect class="box" x="176" y="157" width="148" height="64" rx="7"/><text x="192" y="184">Containers</text><text class="small" x="192" y="205">OCI image artifacts</text>
+          <rect class="box" x="340" y="157" width="148" height="64" rx="7"/><text x="356" y="184">OS disks</text><text class="small" x="356" y="205">QCOW2 artifacts</text>
+          <rect class="box" x="89" y="275" width="322" height="49" rx="7"/><text x="106" y="296">Evidence bound to exact subjects</text><text class="small" x="106" y="313">Provenance · software inventory · signatures</text>
+          <text class="small" x="264" y="117">named outputs</text>
+        </svg>
+        <p class="panel-foot">Follow the relationships. Inspect the claims. Apply your trust policy.</p>
+      </div>
+    </section>
+    <section aria-labelledby="explore">
+      <div class="section-head"><h2 id="explore">Choose where to go next</h2><p>Start with the story. Go deeper when you need to.</p></div>
+      <div class="cards">
+        <a class="card" href="demo-team-concepts.html">
+          <div class="card-top"><svg class="icon" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="9" height="9" rx="1"/><rect x="19" y="4" width="9" height="9" rx="1"/><rect x="4" y="19" width="9" height="9" rx="1"/><rect x="19" y="19" width="9" height="9" rx="1"/></svg><span class="card-number">01 / UNDERSTAND</span></div>
+          <h3>Explore the concepts</h3><p>Catalogs, pins, overlays, substitutions, generators, and signing—with clear examples of what each one does.</p><span class="card-link">Browse 34 concepts <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="demo-team-explorer.html#publication/nke-node-image-arm64">
+          <div class="card-top"><svg class="icon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="6" r="3"/><circle cx="6" cy="25" r="3"/><circle cx="26" cy="25" r="3"/><path d="M16 9v7M6 22v-6h20v6"/></svg><span class="card-number">02 / INSPECT</span></div>
+          <h3>Follow the graphs</h3><p>Navigate a saved Plan or a real release. Select an output and trace its contributing components and evidence.</p><span class="card-link">Open the graph explorer <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="card" href="demo-team-walkthrough.html">
+          <div class="card-top"><svg class="icon" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="26" height="22" rx="3"/><path d="m9 12 4 4-4 4m8 0h6"/></svg><span class="card-number">03 / TRY IT</span></div>
+          <h3>Run a guided example</h3><p>Use small CLI steps to inspect a catalog, build your first artifact, and browse a published release.</p><span class="card-link">Open the walkthrough <span aria-hidden="true">→</span></span>
+        </a>
+      </div>
+    </section>
+    <section class="start" aria-labelledby="first-build"><div><h2 id="first-build">Prefer to start in the terminal?</h2><p>Build a tiny greeting executable. <a href="demo-team-walkthrough.html#execute" style="color:var(--green)">Setup and prerequisites →</a></p></div><code>bash demos/demo-local.sh --pause</code></section>
+  </main>
+  <footer class="wrap"><p><span class="preview">Feature branch preview</span>NVKE Recipes · Concepts and guided examples</p><a href="https://github.com/dsx-ai-factory/nke-recipes/tree/codex/nvke-recipes-pages">View source on GitHub ↗</a></footer>
+</body>
+</html>

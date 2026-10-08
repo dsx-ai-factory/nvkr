@@ -4,6 +4,10 @@ The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
 The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
+`build-demo-site.sh` packages the five self-contained HTML demo pages into a fresh directory for local
+preview or GitHub Pages. It does not build artifacts or publish the site. See the
+[Pages preview setup](../demos/README.md#pages-preview) for commands and feature-branch deployment.
+
 ## Definition → Run
 
 ```sh
