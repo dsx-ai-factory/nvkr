@@ -1,9 +1,10 @@
 # Development guide
 
-Use the Go version in [.go-version](.go-version) with `GOTOOLCHAIN=local`, golangci-lint v2 built with a compatible
-Go compiler, and ShellCheck. Docker or podman is needed for actual local builds; planning and generation need
-neither a registry nor a source checkout. Linux is required for held-executable qualified/signing authority;
-macOS supports development, planning and contract tests.
+Use the Go version in [.go-version](.go-version) with `GOTOOLCHAIN=local`, the golangci-lint version pinned in
+[Merge Gate](.github/workflows/merge-gate.yaml) built with a compatible Go compiler, and ShellCheck. Docker or
+podman is needed for actual local builds; planning and generation need neither a registry nor a source checkout.
+Linux is required for held-executable qualified/signing authority; macOS supports development, planning and
+contract tests. Match CI's linter version when diagnosing a gate failure.
 
 The ordinary test gate (`go test ./...`, `make test`, and `make check`) also requires Bash 3.2 or later,
 Git, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
@@ -23,12 +24,13 @@ make build
 make check
 ```
 
-`make help` lists targets. The full release-blocking verification includes:
+`make help` lists targets. The repository completion gate is `make check`. To run its checks individually,
+with uncached tests and an additional whitespace check, use:
 
 ```sh
-gofmt -l cmd client internal pkg
+make fmt-check
+make license-header-check
 go test ./... -count=1
-go test -race ./... -count=1
 go vet ./...
 golangci-lint run
 make shellcheck
@@ -44,8 +46,11 @@ pinned). CI runs the same target as the `docs` job of the merge gate. The Fern c
 only the listed pages, so a published page must not link to an unpublished page or to a file outside `docs/`; use a
 GitHub URL for those. Registered release versions are ignored by this check (it needs `yq` once any exist).
 
-Changes to sign/pipeline authority also need Linux tests. Containerized tests require an init process to reap
-children; Linux signing fixtures build static helpers while retaining race instrumentation in the parent suite.
+For concurrency or process-lifetime changes, run targeted race tests on the affected packages. Whole-suite
+race detection and coverage are opt-in with `make test-race`; `make test-full` additionally enables expensive
+capacity and integration fixtures. Changes to sign/pipeline authority also need Linux tests. Containerized tests
+require an init process to reap children; Linux signing fixtures build static helpers while retaining race
+instrumentation in the parent suite.
 Passing these checks proves contracts, not CI, signing-service or registry acceptance.
 
 ## Work with product inputs
@@ -95,8 +100,23 @@ event stream for seven days and summarizes slow packages/tests, including failur
 cache is scoped by platform, exact Go version, dependencies, and commit; a compatible prior check cache is
 restored and an updated cache saved only after successful checks. Other jobs cannot populate that key.
 
-[CI test performance](docs/ci-test-performance.md) owns the measured Merge Gate follow-up and focused
-profiling commands.
+Use the summary to select a slow test before profiling it. CI may report unchanged packages as cached;
+use the uncached local run above for complete timings. Package durations overlap and cannot be summed as
+workflow wall time. Race detection and coverage change execution costs; keep instrumentation consistent when
+comparing measurements. These uninstrumented commands match the ordinary test gate and inspect canonical
+string encoding and the full-size disk-publication inventory fixture:
+
+```sh
+go test -run '^TestMarshalStringBytes$' -bench BenchmarkMarshalString -benchtime=3x -count=3 ./pkg/nkd/canonical
+profile_dir=$(mktemp -d)
+NKD_TEST_EXTENDED=1 go test \
+  -run '^TestDiskPublicationLargeInventoryAttestationReadback$' -count=1 \
+  -o "$profile_dir/delivery.test" -cpuprofile "$profile_dir/delivery.cpu" ./pkg/nkd/delivery
+go tool pprof "$profile_dir/delivery.cpu"
+```
+
+The delivery command explicitly enables the expensive fixture; it is not part of the ordinary test gate.
+These measurements diagnose local test costs, not hosted build duration or Release acceptance.
 
 ## Opt-in integration checks
 
@@ -124,7 +144,8 @@ NKD_TEST_DISK_EVIDENCE_RUNTIME=1 go test -race ./pkg/nkd/factory \
 
 An opted-in run fails on inadequate capacity rather than skipping its positive case. It checks public
 owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NKE image.
-Actual native disk build/inspection evidence remains separately scoped in the evidence index.
+Actual native disk build/inspection observations remain separately scoped in
+[reconciliation](docs/adr/reconciliation.md#native-disk-execution-and-inspection).
 
 ## Repository layout
 

@@ -49,7 +49,7 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
-[CI test performance](ci-test-performance.md) for the current profiling follow-up.
+[test timing and profiling](../DEVELOPMENT.md#test-timing-and-cache-use) for focused performance diagnosis.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and
 [contribution guidance](../CONTRIBUTING.md) own ongoing maintainer procedures.
 

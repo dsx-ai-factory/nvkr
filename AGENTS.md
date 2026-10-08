@@ -210,7 +210,7 @@ Run checks proportionate to the change, with the full release-blocking gate befo
 completion:
 
 ```sh
-gofmt -l cmd client internal pkg
+make fmt-check
 make license-header-check
 go test ./... -count=1
 go vet ./...

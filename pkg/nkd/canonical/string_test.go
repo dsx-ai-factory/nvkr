@@ -34,7 +34,7 @@ func TestMarshalStringBytes(t *testing.T) {
 }
 
 // Use the same instrumentation as CI when investigating large inventory costs:
-// go test -race -cover -run '^$' -bench BenchmarkMarshalString ./pkg/nkd/canonical
+// go test -run '^$' -bench BenchmarkMarshalString ./pkg/nkd/canonical
 func BenchmarkMarshalString(b *testing.B) {
 	for _, tc := range []struct{ name, value string }{
 		{"small", "pkg:generic/example@1.0.0"},

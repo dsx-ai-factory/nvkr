@@ -214,8 +214,8 @@ jobs:
           go-version-file: .go-version
           cache: false
 
-      # This job owns its instrumented build cache. Other jobs must not win a
-      # shared immutable key with a cache that never compiled the race tests.
+      # This job owns its check build cache. Other jobs must not win a shared
+      # immutable key with a cache that never compiled the contract tests.
       - name: Locate Go caches
         id: cache-paths
         run: |
