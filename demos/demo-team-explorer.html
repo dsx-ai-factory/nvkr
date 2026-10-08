@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H/wAZKENW6YlBLsTs6ypLO9pjhtKAihkwS/Mw2omlDE='; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-vBpqsdsE0xUqTtJtTTEVRfs0de/dryEYhKIY1+Q7s+I='; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
 <link rel="icon" href="data:,"><title>NKD · Plan and release explorer</title>
 <style>
 :root{color-scheme:dark;--bg:#0c111c;--panel:#121b2b;--panel2:#182437;--border:#2a3a52;--ink:#f0f5fc;--muted:#9facbf;--blue:#79b8ff;--green:#79d8b4;--amber:#edc587;--violet:#c1a4f0;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
@@ -52,6 +52,7 @@ SPDX-License-Identifier: Apache-2.0
   const NS = 'http://www.w3.org/2000/svg';
   const MAX_NODES = 1500;
   const MAX_RELATIONSHIPS = 6000;
+  let selectionGeneration = 0;
   function admitRelationships(rows, fields) {
     if(rows.length>MAX_RELATIONSHIPS)fail("This companion supports at most "+MAX_RELATIONSHIPS+" records or relationships.");
     let count=0;
@@ -247,12 +248,20 @@ SPDX-License-Identifier: Apache-2.0
     $('zoom-value').textContent=(zoom<.1?(zoom*100).toFixed(1):Math.round(zoom*100))+'%';
   }
   function showError(error){$('error').textContent='Could not open this data: '+(error instanceof Error?error.message:String(error));$('error').style.display='block';}
-  function loadPlan(output=''){try{const data=JSON.parse($('embedded-plan').textContent);load(data,data._demo.label,data._demo.note,'plan',output);}catch(e){showError(e);}}
+  function loadPlan(output=''){selectionGeneration++;try{const data=JSON.parse($('embedded-plan').textContent);load(data,data._demo.label,data._demo.note,'plan',output);}catch(e){showError(e);}}
   $('sample-plan').addEventListener('click',()=>loadPlan());
-  function loadPublication(output=''){try{const data=JSON.parse($('embedded-publication').textContent),outputs=array(data.outputs);const focus=(outputs.some(o=>o.name===output)?output:'')||(outputs.find(o=>o.kind==='disk-image'&&o.arch==='arm64')||outputs[0]||{}).name;load(data,'NKE M2 · release inspection','Historical v3 metadata browse of Run 37533806963, commit 625980e. '+outputs.length+' outputs / '+array(data.evidence).length+' evidence records. Payloads were not read; current NKD rejects this historical root.','publication',focus);}catch(e){showError(e);}}
+  function loadPublication(output=''){selectionGeneration++;try{const data=JSON.parse($('embedded-publication').textContent),outputs=array(data.outputs);const focus=(outputs.some(o=>o.name===output)?output:'')||(outputs.find(o=>o.kind==='disk-image'&&o.arch==='arm64')||outputs[0]||{}).name;load(data,'NKE M2 · release inspection','Historical v3 metadata browse of Run 37533806963, commit 625980e. '+outputs.length+' outputs / '+array(data.evidence).length+' evidence records. Payloads were not read; current NKD rejects this historical root.','publication',focus);}catch(e){showError(e);}}
   $('sample-publication').addEventListener('click',()=>loadPublication());
-  $('sample-release').addEventListener('click',()=>{try{load(JSON.parse($('embedded-release').textContent),'NKE CLI · two architectures','Recorded 2026-10-03 unsigned loopback inspection. The temporary registry was stopped. The historical unsigned sample is embedded in this page.','release');}catch(e){showError(e);}});
-  $('file-input').addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>25*1024*1024)fail('Choose a JSON file no larger than 25 MiB.');const data=JSON.parse(await file.text());load(data,file.name,'Imported local JSON; descriptive data only. No authenticity, integrity, signature or policy checks are performed.','file');}catch(e){showError(e);}finally{event.target.value='';}});
+  $('sample-release').addEventListener('click',()=>{selectionGeneration++;try{load(JSON.parse($('embedded-release').textContent),'NKE CLI · two architectures','Recorded 2026-10-03 unsigned loopback inspection. The temporary registry was stopped. The historical unsigned sample is embedded in this page.','release');}catch(e){showError(e);}});
+  $('file-input').addEventListener('change',async event=>{
+    const file=event.target.files[0];if(!file)return;
+    const generation=++selectionGeneration;event.target.value='';
+    try{
+      if(file.size>25*1024*1024)fail('Choose a JSON file no larger than 25 MiB.');
+      const text=await file.text();if(generation!==selectionGeneration)return;
+      const data=JSON.parse(text);load(data,file.name,'Imported local JSON; descriptive data only. No authenticity, integrity, signature or policy checks are performed.','file');
+    }catch(e){if(generation===selectionGeneration)showError(e);}
+  });
   $('output-filter').addEventListener('change',()=>{$('graph-scroll').scrollTo(0,0);render();});$('search').addEventListener('input',()=>{renderList();highlight();});$('zoom-in').addEventListener('click',()=>setZoom(zoom+.15));$('zoom-out').addEventListener('click',()=>setZoom(zoom-.15));$('actual-size').addEventListener('click',()=>setZoom(1));$('fit').addEventListener('click',()=>{const r=$('graph-scroll').getBoundingClientRect();setZoom(Math.min((r.width-30)/width,(r.height-30)/height,1),true);$('graph-scroll').scrollTo(0,0);});$('clear-selection').addEventListener('click',()=>select(''));
   document.addEventListener('keydown',e=>{if(e.key==='Escape')select('');});
   function fromHash(){
