@@ -162,7 +162,15 @@ components:
         [ "${1:-}" = configure ] || exit 0
         readonly image_dir=/usr/lib/nke/cni-ovn/1.5.18
         readonly image_name=ovn-images_1.5.18_linux_{{.Arch}}.tgz
-        readonly ctr="${NKE_CTR_BIN:-/usr/local/bin/ctr}"
+        if [ -n "${NKE_CTR_BIN:-}" ]; then
+          ctr="$(command -v "$NKE_CTR_BIN")" || { echo "OVN import: ctr is not executable: $NKE_CTR_BIN" >&2; exit 1; }
+        elif [ -x /usr/local/bin/ctr ]; then
+          ctr=/usr/local/bin/ctr
+        else
+          ctr="$(command -v ctr)" || { echo 'OVN import: ctr not found' >&2; exit 1; }
+        fi
+        [ -f "$ctr" ] && [ -x "$ctr" ] || { echo "OVN import: ctr is not executable: $ctr" >&2; exit 1; }
+        readonly ctr
         readonly log=/var/log/nke-cni-ovn-postinst.log
         cd "$image_dir"
         sha256sum --strict -c "$image_name.sha256"

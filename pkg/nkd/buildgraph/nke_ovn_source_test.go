@@ -417,25 +417,48 @@ func TestNKEOVNPostinstImportDiagnostics(t *testing.T) {
 			}
 			for _, tc := range []struct {
 				name, argument, importStatus, gzipStatus string
-				wantFailure                              bool
+				override, wantCtr, wantDiagnostic        string
+				localCtr, pathCtr, wantImport            bool
 			}{
-				{name: "success", argument: "configure", importStatus: "0", gzipStatus: "0"},
-				{name: "import failure", argument: "configure", importStatus: "42", gzipStatus: "0", wantFailure: true},
-				{name: "gzip failure", argument: "configure", importStatus: "0", gzipStatus: "43", wantFailure: true},
-				{name: "other package action", argument: "abort-upgrade", importStatus: "42", gzipStatus: "43"},
+				{name: "explicit override", argument: "configure", importStatus: "0", gzipStatus: "0", override: "override-ctr", localCtr: true, pathCtr: true, wantCtr: "override-ctr", wantImport: true},
+				{name: "bare executable override", argument: "configure", importStatus: "0", gzipStatus: "0", override: "ctr", localCtr: true, pathCtr: true, wantCtr: "ctr", wantImport: true},
+				{name: "import failure", argument: "configure", importStatus: "42", gzipStatus: "0", override: "override-ctr", wantCtr: "override-ctr", wantImport: true, wantDiagnostic: "OVN import failed; see "},
+				{name: "gzip failure", argument: "configure", importStatus: "0", gzipStatus: "43", override: "override-ctr", wantCtr: "override-ctr", wantImport: true, wantDiagnostic: "OVN import failed; see "},
+				{name: "other package action", argument: "abort-upgrade", override: "missing-ctr"},
+				{name: "missing override", argument: "configure", override: "missing-ctr", localCtr: true, pathCtr: true, wantDiagnostic: "OVN import: ctr is not executable: "},
+				{name: "nonexecutable override", argument: "configure", override: "nonexecutable-ctr", localCtr: true, pathCtr: true, wantDiagnostic: "OVN import: ctr is not executable: "},
+				{name: "local binary preference", argument: "configure", importStatus: "0", gzipStatus: "0", localCtr: true, pathCtr: true, wantCtr: "local-ctr", wantImport: true},
+				{name: "PATH fallback", argument: "configure", importStatus: "0", gzipStatus: "0", pathCtr: true, wantCtr: "ctr", wantImport: true},
+				{name: "absent ctr", argument: "configure", wantDiagnostic: "OVN import: ctr not found"},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					root := t.TempDir()
 					logPath := filepath.Join(root, "import.log")
+					callsPath := filepath.Join(root, "ctr-calls")
 					for name, script := range map[string]string{
 						"sha256sum": "#!/bin/sh\nexit 0\n",
 						"gzip":      "#!/bin/sh\nprintf image\nexit \"$TEST_GZIP_STATUS\"\n",
 						"timeout":   "#!/bin/sh\nshift 2\nexec \"$@\"\n",
-						"ctr": "#!/bin/sh\n[ \"$1\" = version ] && exit 0\n" +
-							"[ \"$*\" = '-n k8s.io images import -' ] || exit 99\n" +
-							"cat >/dev/null\nprintf 'private import details\\n' >&2\nexit \"$TEST_IMPORT_STATUS\"\n",
 					} {
 						if err := os.WriteFile(filepath.Join(root, name), []byte(script), 0o755); err != nil {
+							t.Fatal(err)
+						}
+					}
+					ctrScript := "#!/bin/sh\nprintf '%s %s\\n' \"$0\" \"$1\" >>\"$TEST_CTR_CALLS\"\n" +
+						"[ \"$1\" = version ] && exit 0\n" +
+						"[ \"$*\" = '-n k8s.io images import -' ] || exit 99\n" +
+						"while IFS= read -r line; do :; done\nprintf 'private import details\\n' >&2\nexit \"$TEST_IMPORT_STATUS\"\n"
+					for name, enabled := range map[string]bool{
+						"override-ctr": tc.override == "override-ctr", "local-ctr": tc.localCtr, "ctr": tc.pathCtr,
+					} {
+						if enabled {
+							if err := os.WriteFile(filepath.Join(root, name), []byte(ctrScript), 0o755); err != nil {
+								t.Fatal(err)
+							}
+						}
+					}
+					if tc.override == "nonexecutable-ctr" {
+						if err := os.WriteFile(filepath.Join(root, tc.override), []byte(ctrScript), 0o644); err != nil {
 							t.Fatal(err)
 						}
 					}
@@ -443,20 +466,34 @@ func TestNKEOVNPostinstImportDiagnostics(t *testing.T) {
 					// are controlled fixtures; the actual pipeline and failure handler run.
 					script := strings.ReplaceAll(hook, "/usr/lib/nke/cni-ovn/1.5.18", root)
 					script = strings.ReplaceAll(script, "/var/log/nke-cni-ovn-postinst.log", logPath)
-					ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+					script = strings.ReplaceAll(script, "/usr/local/bin/ctr", filepath.Join(root, "local-ctr"))
+					// Allow subprocess scheduling under the concurrent full-package gate;
+					// this test bound does not change the hook's production timeouts.
+					ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 					defer cancel()
 					cmd := exec.CommandContext(ctx, bash, "--noprofile", "--norc", "-c", script, "postinst", tc.argument)
-					cmd.Env = []string{"PATH=" + root + string(os.PathListSeparator) + os.Getenv("PATH"),
-						"NKE_CTR_BIN=" + filepath.Join(root, "ctr"), "TEST_IMPORT_STATUS=" + tc.importStatus, "TEST_GZIP_STATUS=" + tc.gzipStatus}
-					cmd.WaitDelay = time.Second
+					// Isolate PATH so a host ctr cannot make missing-tool cases pass.
+					cmd.Env = []string{"PATH=" + root, "TEST_CTR_CALLS=" + callsPath,
+						"TEST_IMPORT_STATUS=" + tc.importStatus, "TEST_GZIP_STATUS=" + tc.gzipStatus}
+					if tc.override != "" {
+						override := filepath.Join(root, tc.override)
+						if tc.override == "ctr" {
+							override = "ctr"
+						}
+						cmd.Env = append(cmd.Env, "NKE_CTR_BIN="+override)
+					}
+					cmd.WaitDelay = 5 * time.Second
 					output, err := cmd.CombinedOutput()
 					if ctx.Err() != nil {
 						t.Fatalf("hook did not finish: %v", ctx.Err())
 					}
-					if tc.wantFailure {
+					if tc.wantDiagnostic != "" {
 						var exit *exec.ExitError
-						if !errors.As(err, &exit) || exit.ExitCode() != 1 || !strings.Contains(string(output), "OVN import failed; see "+logPath) {
-							t.Fatalf("missing import failure status/diagnostic: %v: %s", err, output)
+						if !errors.As(err, &exit) || exit.ExitCode() != 1 || !strings.Contains(string(output), tc.wantDiagnostic) {
+							t.Fatalf("missing failure status/diagnostic: %v: %s", err, output)
+						}
+						if tc.wantImport && !strings.Contains(string(output), logPath) {
+							t.Fatalf("missing import log path: %s", output)
 						}
 					} else if err != nil || len(output) != 0 {
 						t.Fatalf("successful package action changed: %v: %s", err, output)
@@ -464,13 +501,22 @@ func TestNKEOVNPostinstImportDiagnostics(t *testing.T) {
 					if strings.Contains(string(output), "private import details") {
 						t.Fatal("hook dumped import log contents")
 					}
+					calls, callsErr := os.ReadFile(callsPath)
+					if tc.wantCtr != "" {
+						selected := filepath.Join(root, tc.wantCtr)
+						if callsErr != nil || string(calls) != selected+" version\n"+selected+" -n\n" {
+							t.Fatalf("unexpected ctr selection/calls: %v: %q", callsErr, calls)
+						}
+					} else if !errors.Is(callsErr, os.ErrNotExist) {
+						t.Fatalf("invalid tool or other package action reached readiness: %v: %q", callsErr, calls)
+					}
 					log, readErr := os.ReadFile(logPath)
-					if tc.argument == "configure" {
+					if tc.wantImport {
 						if readErr != nil || string(log) != "private import details\n" {
 							t.Fatalf("import output was not retained in its log: %v: %q", readErr, log)
 						}
 					} else if !errors.Is(readErr, os.ErrNotExist) {
-						t.Fatalf("other package action ran import: %v", readErr)
+						t.Fatalf("rejected tool or other package action ran import: %v", readErr)
 					}
 				})
 			}

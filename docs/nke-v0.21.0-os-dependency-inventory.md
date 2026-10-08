@@ -93,7 +93,7 @@ The proposed [ADR-13 source-migration policy](adr/0013-supply-chain-evidence.md#
 
 For a component whose public source cannot be established, retain its existing acquired input and declare the exception explicitly beside its catalog entry. Record the component, reason, exact acquisition URL, per-architecture payload digests in the machine-managed artifact lock, and external evidence status. An unavailable source is not an excluded component: the bytes are still required inputs to the image.
 
-The existing catalog acquired lane is `prebuilt`, not `fromSource: true` or `exclusionReason`. A catalog comment can document why this lane was selected without inventing a new executable schema field. Upstream evidence references must still follow ADR-13; absence of provenance, a source revision or a complete SBOM must remain explicit. This source-build exception is not an authenticated evidence waiver or qualification approval.
+The existing catalog acquisition lane is `prebuilt`, not `fromSource: true` or `exclusionReason`. A catalog comment can document why this lane was selected without inventing a new executable schema field. Upstream evidence references must still follow ADR-13; absence of provenance, a source revision or a complete SBOM must remain explicit. This source-build exception is not an authenticated evidence waiver or qualification approval.
 
 Preparation should display a warning naming each retained prebuilt exception. Acquisition still fails on inaccessible, missing or digest-mismatching bytes. A public-source compilation failure must not select a prebuilt input automatically. A successful rebuilt component must be reported as source-built; an exception remains acquired in its evidence.
 
