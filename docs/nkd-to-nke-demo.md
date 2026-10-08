@@ -45,12 +45,12 @@ values, infrastructure provisioning and tenant lifecycle.
 | --- | --- | --- |
 | Controller image | `cwe`, built from NKE Git | Copy unchanged manifest/layers to a registry reachable by the nodes; bind the new repository and digest |
 | Four external charts | `postgresql`, `spire-crds`, `temporal`, `spire` | Publish/copy their OCI layouts without rewriting bytes; use the matching versions in NKE's manifest |
-| Controller chart/templates | `controller-chart` is image-bound; Lia's deploy path currently installs a chart from its NKE checkout | Decide/test use of the packaged chart through NKE's chart override, or align the installer checkout and exact built controller source. Do not claim the installer automatically consumes this packaged chart |
+| Controller chart/templates | `controller-chart` is image-bound; the separate `site` selection matches the installer source | Prepared local chart inputs now cover inventory rendering and the executor's local-path branch; complete staged installation and image override still need validation |
 | CAPNICo provider | `capnico-controller-arm64`, built from pinned public Git | Reachable development image plus NKE's `CAPNICO_IMAGE=repository:tag` override. The current override is tag-shaped; do not silently turn it into a digest contract |
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
 | Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` candidate | Five-tool Plan covers matching Helm/kubectl/clusterctl/ORAS/Kind, but its full Run is unexercised and it is not part of `all`. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
 | Dependency images | Twelve acquired ARM64 image outputs | Align chart values or node mirrors with the reachable image locations; stage 4 and NKTP also need inputs outside this set |
-| NKTP | Separate `definition-site.json` declares the source chart and locked dependency preparation | Four-output site Run still unexercised; runtime images are not a complete mirrored NKD set. Installer inventory rendering still prepares source-tree chart dependencies |
+| NKTP | Separate `definition-site.json` declares the source chart and locked dependency preparation | Four-output site Run still unexercised; the packaged chart handoff has real rendering/dry-run evidence, but runtime images are not a complete mirrored NKD set |
 | Profiles content image | Operator-supplied `images.profiles` | Accessible repository/revision, producer/output or an explicit existing image. The current laptop Definition does not build it |
 | Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | Complete the bake/boot and connect the exact disk to the infrastructure's OS profile. No automatic QCOW2-to-NICo-profile handoff is implemented here |
 | Site cluster, NICo access, SPIRE bootstrap CA, tenant login | Operator's authorized test configuration | Not build artifacts. Keep secrets and kubeconfig outside Git; do not invent credentials, site identity or trust roots |
@@ -77,9 +77,11 @@ chart items/overrides. The separate wrapper
 without building the image. Setting that variable on the executor directly
 does not select a different CAPNICo image.
 These installation hooks must not be confused with the older Tilt/source helper.
-However, `deploy/lib/describe_site.py` still renders source-tree charts and builds
-their dependencies during inventory preparation. Passing a packaged chart to
-installation alone does not establish a rebuild-free complete journey.
+With the default deploy path, `deploy/lib/describe_site.py` still renders
+source-tree charts and builds their dependencies during inventory preparation.
+The prepared-input adapter below gives both rendering and the executor's
+local-path branch the same exact archives, without changing the NKE checkout.
+This has real render and executor dry-run evidence, not a completed staged install.
 
 Tool versions need alignment too: the acquired operator bundle contains Helm
 `v4.1.4`, while the installer pins `v4.2.4`, ORAS `1.3.3` and
@@ -123,6 +125,83 @@ Run was retained. A fresh non-overlapping attempt on the
 preserved 24 GiB profile is preparing materials; see the
 [execution evidence](evidence/2026-10-08-colima-local-os-build.md).
 Passing preflight or building materials is not bake/boot evidence.
+
+## Prepare charts without rebuilding them
+
+`scripts/nke-prepare-chart-inputs.py` accepts all six exact Helm OCI layouts
+needed by the pinned installer. NKD verifies the selected manifest, all layout
+blobs, chart/config identity and bounded archive structure, then exports the
+unchanged `.tgz` bytes. The adapter copies only tracked deploy files into a new
+private directory, replaces each chart source with its prepared local archive,
+and revalidates the result with NKE's own deploy-item reader. It does not run
+Make, fetch chart dependencies, modify NKE, install a site or mint a Release.
+
+Prerequisites: Python 3.9 or newer, Git, a native `nkdctl` built from this change,
+and a clean NKE Git checkout at
+`8fb2d53368823bd386b4fbd55b4ab6d3c0931345`. Linux ARM64 tools from a Colima Run
+must execute inside Colima, not directly on macOS. For a host-side handoff,
+`make build` creates the native `bin/nkdctl` using the repository's pinned Go.
+
+The following prepares inputs after the separate `site` and `components` Runs
+complete. It is not evidence that those two Runs have already completed together:
+
+```sh
+# From the NKE Recipes checkout; choose existing, completed attempts.
+set -euo pipefail
+: "${NKD_SITE_ATTEMPT:?Set the completed site attempt}"
+: "${NKD_COMPONENTS_ATTEMPT:?Set the completed components attempt}"
+: "${NKE_INSTALLER_CHECKOUT:?Set the clean, exact pinned NKE checkout}"
+: "${NKD_CHART_INPUTS:?Set a NEW output directory outside NKE and all OCI layouts}"
+make build
+
+# These are diagnostic observations, not signed Release authority.
+jq -s -e 'length == 2 and all(.[];
+       .status == "complete" and .failure == null and
+       (.expected|length) == (.observed|length))' \
+  ".nkd/runs/$NKD_SITE_ATTEMPT/lifecycle.json" \
+  ".nkd/runs/$NKD_COMPONENTS_ATTEMPT/lifecycle.json" >/dev/null
+
+chart_args=()
+for item in controller nktp postgresql spire-crds temporal spire; do
+  case "$item" in
+    controller) attempt="$NKD_SITE_ATTEMPT"; output=controller-chart ;;
+    nktp) attempt="$NKD_SITE_ATTEMPT"; output=nktp ;;
+    *) attempt="$NKD_COMPONENTS_ATTEMPT"; output="$item" ;;
+  esac
+  manifest=$(jq -er --arg name "$output" \
+    '[.observed[] | select(.name == $name and .kind == "helm-oci")] |
+     select(length == 1) | .[0].digest' \
+    ".nkd/runs/$attempt/lifecycle.json")
+  chart_args+=(--chart "$item=$(pwd)/.nkd/runs/$attempt/packages/$output"
+               --manifest "$item=$manifest")
+done
+python3 scripts/nke-prepare-chart-inputs.py \
+  --nke-checkout "$NKE_INSTALLER_CHECKOUT" --nkdctl "$(pwd)/bin/nkdctl" \
+  "${chart_args[@]}" --out "$NKD_CHART_INPUTS"
+export DEPLOY_PATH="$NKD_CHART_INPUTS/deploy"
+```
+
+Run the block in Bash. Use absolute paths for the three path variables. Versions
+must match NKE's selected items, including controller `0.0.0` and NKTP
+`0.1.0-rc.2`; an older chart fails rather than being silently substituted.
+The output is private configuration with `charts/<item>.tgz` and otherwise
+unchanged deploy semantics. Existing destinations, dirty/wrong source pins,
+missing or extra items, wrong manifests, unsafe archives and output paths inside
+NKE or a producer layout fail without leaving prepared output.
+
+NKE's renderer consumes these archives through `DEPLOY_PATH`. Its executor also
+consumes them through the local-path branch, but **a release-manifest chart
+reference takes precedence over that path** unless explicitly overridden.
+Do not claim setting `DEPLOY_PATH` alone forces the complete staged wrapper to
+use local archives when `RELEASE_FILE` supplies different chart references.
+Preserve the wrapper's source/readiness checks; do not disable them to make the
+demo pass. Registry transport, a consistent manifest/override selection and the
+real installation remain separate handoff work.
+
+The [real six-chart handoff probe](evidence/2026-10-08-local-chart-handoff.md)
+passed native NKE rendering and executor dry-run without fetching or rebuilding
+chart dependencies. It deliberately records four completed-Run charts separately
+from two manual packaging probes; it is not a full NKD site Run or deployment.
 
 ## Registry and release-manifest handoff
 
@@ -209,9 +288,10 @@ A full result requires all of the following recorded against one explicit input 
 5. A committed source change is repinned, rebuilt, deployed and observed with the
    new identity. Test resources are cleaned up through the authorized NKE workflow.
 
-Remaining implementation: align the demo's NKE producers/pins; add the missing
-NKTP/profiles membership; implement/test the artifact-to-installer handoff and
-registry transport. The requested scenario is already selected: local Colima plus
+Remaining implementation: exercise the aligned site/tools selections, combine
+the required membership and add profiles; integrate the tested chart adapter
+with the staged manifest/override selection and registry transport. The requested
+scenario is already selected: local Colima plus
 CAPNICo/NICoSim with QCOW2-backed tenant VMs, not a production NICo site or CAPD
 substitute. The wrapper still needs to create/admit its owned local management
 cluster, NICo endpoint, registry and bootstrap trust configuration, plus verify

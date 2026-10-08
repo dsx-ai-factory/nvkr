@@ -235,9 +235,18 @@ attempt substitutions do not override a pinned runtime entrypoint. A
 passed. A complete four-output NKD Run and deployment remain unexercised; the
 site set is separate from `all`. Dependency charts remain acquisitions and the
 wrapper's Helm 4.3.0 does not match the installer's preferred 4.2.4; its readiness
-script warns rather than failing solely on that mismatch. Source-tree
-inventory rendering still prepares chart dependencies, despite existing staged
-installation hooks for packaged charts and a prepared CAPNICo image.
+script warns rather than failing solely on that mismatch. Default source-tree
+inventory rendering still prepares chart dependencies. A diagnostic prepared-input
+adapter now uses NKE's strict item reader and NKD-owned manifest/blob/archive
+verification to give rendering and the executor's local-path branch the same six
+unchanged chart archives, without NKE checkout edits or dependency builds.
+Contract tests reject wrong/missing pins, unsafe archives, destination replacement
+and destinations inside source/producer paths. A
+[real chart handoff probe](../evidence/2026-10-08-local-chart-handoff.md) passed
+native Helm rendering and executor dry-run. Four inputs came from a completed
+NKD Run; controller/NKTP came from manual packaging probes. It is not a complete
+site Run, signed Release or deployment. Staged release-manifest chart refs can
+override local paths and still require consistent transport/selection integration.
 The separate local `definition-tools.json` declares one source-built Linux ARM64
 bundle of Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3, ORAS 1.3.3 and Kind 0.32.0,
 matching the selected installer's source-owned tool pins. Native Docker/Podman

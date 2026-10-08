@@ -199,13 +199,33 @@ func cmdPublish() *cli.Command {
 		},
 		Subcommands: []*cli.Command{
 			publishBundleCmd(), publishRootCmd(), publishPushCmd(), publishPullCmd(),
-			publishInspectCmd(), publishGetCmd(), publishExtractCmd(), publishAPTCmd(),
+			publishInspectCmd(), publishGetCmd(), publishExtractCmd(), publishChartCmd(), publishAPTCmd(),
 		},
 		Action: func(*cli.Context) error {
 			return e.New(e.CodeUnsupported,
 				"standalone publish is disabled: --verified/--release/--complete booleans are not authority; qualified release publication is not implemented")
 		},
 	}
+}
+
+func publishChartCmd() *cli.Command {
+	return &cli.Command{Name: "chart", Usage: "diagnostically verify a pinned Helm OCI layout and extract its unchanged archive (no Release authority)",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "layout", Required: true}, &cli.StringFlag{Name: "manifest", Required: true},
+			&cli.StringFlag{Name: "name", Required: true}, &cli.StringFlag{Name: "version", Required: true},
+			&cli.StringFlag{Name: "out", Required: true},
+		}, Action: func(c *cli.Context) error {
+			result, err := delivery.ExportHelmChart(c.Context, c.String("layout"), c.String("manifest"), c.String("name"), c.String("version"), c.String("out"))
+			if err != nil {
+				return err
+			}
+			raw, err := canonical.Marshal(result)
+			if err != nil {
+				return e.Wrap(e.CodeInternal, err, "encoding chart extraction observation")
+			}
+			fmt.Println(string(raw))
+			return nil
+		}}
 }
 
 func publishBundleCmd() *cli.Command {
