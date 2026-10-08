@@ -42,6 +42,7 @@ are still required on the Linux execution host.
 | Native Linux ARM64, Docker already installed | `CONTAINER_RUNTIME=docker`; no Podman or host Go |
 | Native Linux ARM64, rootless Podman | Default Podman route |
 | Apple Silicon Mac, no runtime | Install Podman and create/start its Linux VM |
+| Apple Silicon Mac, Colima Docker VM | `CONTAINER_RUNTIME=docker COLIMA_PROFILE=NAME`; launcher executes inside that explicit ARM64 profile |
 | Apple Silicon Mac, only Docker Desktop | Not supported by this launcher yet; use Podman or a native Linux ARM64 Docker host |
 | AMD64 machine | This ARM64 launcher rejects emulation; use a native ARM64 execution host |
 
@@ -69,7 +70,7 @@ Docker endpoints are rejected: nested bind paths must belong to the local daemon
 host. You can SSH to a native ARM64 host and run there; pointing a laptop's
 `DOCKER_HOST` at it is not this route.
 
-### Apple Silicon Mac
+### Apple Silicon Mac with Podman
 
 Install Git if absent and Podman using its
 [official macOS installer](https://podman.io/docs/installation). Only if
@@ -104,6 +105,46 @@ The launcher never installs host packages, creates/starts/resizes VMs, deletes
 caches or prunes attempts automatically. Execution downloads/builds begin only
 after you request a build. Private-source authentication must work on the Linux
 execution host; cloning this repository does not grant access to other sources.
+
+### Apple Silicon Mac with Colima
+
+An explicitly selected Colima **Linux ARM64 Docker VM** is another execution
+host for the existing OS producer. It is not a tenant node: the tenant must boot
+the QCOW2 built by NKD. The launcher enters the profile over SSH and uses Docker
+inside Linux, rather than running authority-bearing paths on macOS or forwarding
+a Mac Docker socket. It does not switch your default Docker context.
+
+Install Colima if absent, then explicitly create a dedicated profile. The following
+uses the checkout paths on your machine; run it from the NKE Recipes root:
+
+```sh
+brew install colima
+colima list
+# Only if this dedicated profile does not already exist:
+colima start --profile nkd-demo --arch aarch64 --runtime docker --vm-type vz \
+  --cpus 8 --memory 16 --disk 150 --activate=false --ssh-config=false \
+  --mount "$(pwd -P):w"
+colima ssh --profile nkd-demo -- bash -c \
+  'sudo apt-get update && sudo apt-get install -y git jq coreutils'
+CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
+  bash scripts/nke-full-arm64-local.sh --check os
+CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
+  bash scripts/nke-full-arm64-local.sh first-colima-os 1 os
+```
+
+These are explicit setup mutations, not actions performed by `--check`. If reusing
+a profile, inspect its architecture/runtime/resources and mounts first; do not
+reset it. Mount an optional `NKE_LOCAL_CLONE` at the same absolute path too before
+using the local Git override. Otherwise canonical source acquisition requires Git
+authentication inside Colima. `DOCKER_HOST` and `DOCKER_CONTEXT` from the Mac are
+not propagated into the VM. The Linux launcher checks native architecture, daemon
+reachability, tools, Buildx and OS capacity before bootstrap downloads.
+
+Colima's configured 150 GiB disk does not provide 150 GiB of physical host free
+space. This shared checkout still needs about 90 GiB free before a fresh OS
+attempt, with at least 64 GiB remaining at Packer admission. An internal sparse
+VM disk on the same nearly full Mac is not a safe workaround. A Colima entrypoint
+or successful preflight alone does not prove an OS bake or tenant lifecycle.
 
 ### Check before the expensive build
 
@@ -200,7 +241,8 @@ the maintained older-SPIRE exception, omitting the DSX IMDS plugin.
 ## Prepare the ARM64 execution host
 
 Execution requires Linux ARM64 and rootless Podman or explicitly selected local Docker, with `git`, `jq` and GNU `timeout`. On an
-Apple Silicon Mac the launcher enters `podman-machine-default` as `core`; the
+Apple Silicon Mac the launcher enters `podman-machine-default` as `core`, or the
+explicit `COLIMA_PROFILE` for Docker; the
 repository and optional source clone must be visible through the VM's `/Users` mount.
 
 ```sh
@@ -285,7 +327,8 @@ declared dependency preparation still need network access.
 
 The Podman route reuses the exact recorded local Packer image if present.
 Otherwise it builds locked toolchain sources with `--diagnostic-local`; Docker
-also builds and natively validates its toolchain. Fresh bytes are not relabeled
+also builds and natively validates its toolchain, including when executing inside
+Colima. Fresh bytes are not relabeled
 as the older maintained ID. The launcher freezes the actual image ID through
 the existing catalog-overlay contract in `.nkd/laptop-bootstrap/ATTEMPT/`, then
 compiles the executable Plan from those inputs. Runtime rechecks the exact image.

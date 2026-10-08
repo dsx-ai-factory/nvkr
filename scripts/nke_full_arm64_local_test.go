@@ -20,6 +20,12 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 	}{
 		{"no runtime", "Linux", "aarch64", "missing", "providers", "running", "100000", "ok", "CONTAINER_RUNTIME must", true},
 		{"Docker Desktop is explicit", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "Docker Desktop on macOS", true},
+		{"Colima Mac forwards check only", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "--check os", false},
+		{"Colima without Mac Docker CLI", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "--check os", false},
+		{"Colima missing CLI", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "Missing Colima", true},
+		{"Colima stopped profile", "Darwin", "arm64", "docker", "os", "stopped", "100000", "ok", "absent or stopped", true},
+		{"Colima absent profile", "Darwin", "arm64", "docker", "os", "absent", "100000", "ok", "absent or stopped", true},
+		{"Colima invalid profile", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "simple profile name", true},
 		{"stopped VM", "Darwin", "arm64", "podman", "providers", "stopped", "100000", "ok", "podman machine start", true},
 		{"missing VM", "Darwin", "arm64", "podman", "providers", "absent", "100000", "ok", "Missing podman-machine-default", true},
 		{"Mac forwards check only", "Darwin", "arm64", "podman", "providers", "running", "100000", "ok", "--check providers", false},
@@ -27,6 +33,9 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		{"capacity fails before pull", "Linux", "aarch64", "podman", "os", "running", "38000", "ok", "No downloads started", true},
 		{"Docker daemon unavailable", "Linux", "aarch64", "docker", "providers", "running", "100000", "failed", "daemon is unreachable", true},
 		{"Docker providers without Go", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
+		{"simulator without OS capacity", "Linux", "aarch64", "podman", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/podman", false},
+		{"simulator missing toolchain before bootstrap", "Linux", "aarch64", "podman", "simulator", "running", "32000", "missing-toolchain", "No downloads or attempt creation", true},
+		{"simulator Docker is not exercised", "Linux", "aarch64", "docker", "simulator", "running", "32000", "ok", "cached Podman only", true},
 		{"remote context overrides local host", "Linux", "aarch64", "docker", "providers", "running", "100000", "remote", "Remote Docker endpoints", true},
 		{"OS diagnostics without cached Packer", "Linux", "aarch64", "docker", "os", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
 		{"mutable bootstrap pin rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "admitted bootstrap image/platform/runtime", true},
@@ -70,6 +79,17 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			toolchainDir := filepath.Join(dir, "toolchains", "nkd-packer")
+			if err := os.MkdirAll(toolchainDir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			lock, err := os.ReadFile(filepath.Join("..", "toolchains", "nkd-packer", "toolchain.lock.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(toolchainDir, "toolchain.lock.json"), lock, 0600); err != nil {
+				t.Fatal(err)
+			}
 			for _, name := range []string{"bash", "dirname", "git", "jq", "timeout", "awk"} {
 				path, err := exec.LookPath(name)
 				if err != nil {
@@ -89,6 +109,7 @@ case "$1 $2" in
   'machine inspect') [ "$TEST_STATE" != absent ] || exit 1; case "$*" in *--format*) echo "$TEST_STATE";; esac ;;
   'machine ssh') printf '%s\n' "$*" ;;
   'version --format') [ "$TEST_DAEMON" != failed ] ;;
+  'image inspect') [ "$TEST_DAEMON" != missing-toolchain ] ;;
   *) exit 99 ;;
 esac`,
 				"docker": `printf '%s\n' "$*" >>"$TEST_CALLS"
@@ -99,7 +120,16 @@ case "$1 $2" in
   'buildx version') exit 0 ;;
   *) exit 99 ;;
 esac`,
+				"colima": `printf '%s\n' "$*" >>"$TEST_CALLS"
+case "$1 $2" in
+  'status --profile') [ "$TEST_STATE" = running ] ;;
+  'ssh --profile') printf '%s\n' "$*" ;;
+  *) exit 99 ;;
+esac`,
 			} {
+				if tc.name == "Colima without Mac Docker CLI" && name == "docker" || tc.name == "Colima missing CLI" && name == "colima" {
+					continue
+				}
 				if err := os.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\n"+body+"\n"), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -115,9 +145,16 @@ esac`,
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, filepath.Join(tools, "bash"), launcher, "--check", tc.lane)
-			cmd.Env = append(os.Environ(), "PATH="+tools, "CONTAINER_RUNTIME="+tc.runtime, "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=",
+			cmd.Env = append(os.Environ(), "PATH="+tools, "CONTAINER_RUNTIME="+tc.runtime, "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_SYSTEM="+tc.system, "TEST_ARCH="+tc.arch, "TEST_STATE="+tc.state, "TEST_DISK="+tc.disk, "TEST_DAEMON="+tc.daemon,
 				"TEST_CALLS="+filepath.Join(dir, "calls"))
+			if strings.HasPrefix(tc.name, "Colima ") {
+				profile := "nkd-demo"
+				if tc.name == "Colima invalid profile" {
+					profile = "../default"
+				}
+				cmd.Env = append(cmd.Env, "COLIMA_PROFILE="+profile)
+			}
 			if tc.daemon == "remote" {
 				cmd.Env = append(cmd.Env, "DOCKER_CONTEXT=remote-arm64", "DOCKER_HOST=unix:///var/run/docker.sock")
 			}
@@ -129,10 +166,20 @@ esac`,
 				t.Fatalf("check created attempt storage: %v", err)
 			}
 			calls, _ := os.ReadFile(filepath.Join(dir, "calls"))
-			for _, forbidden := range []string{"pull ", "run ", "buildx build", "image inspect", "machine init", "machine start"} {
+			for _, forbidden := range []string{"pull ", "run ", "buildx build", "machine init", "machine start", "start --", "context use"} {
 				if strings.Contains(string(calls), forbidden) {
 					t.Fatalf("check performed mutation/producer work %q: %s", forbidden, calls)
 				}
+			}
+			if tc.name == "Colima Mac forwards check only" {
+				for _, required := range []string{"ssh --profile nkd-demo -- bash -c", "env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker", "--check os"} {
+					if !strings.Contains(string(calls), required) {
+						t.Fatalf("missing explicit VM forwarding %q: %s", required, calls)
+					}
+				}
+			}
+			if tc.lane != "simulator" && strings.Contains(string(calls), "image inspect") {
+				t.Fatalf("unrelated preflight inspected a toolchain: %s", calls)
 			}
 		})
 	}

@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nke-local-nicosim-arm64
+  description: Source-built Linux ARM64 NICoSim tools for a local NICo demo; not a complete demo or OS boot acceptance.
+sources:
+  nke-nicosim:
+    repo: https://github.com/dsx-ai-factory/nke.git
+    constraint: 0.21.x
+    # Existing locally exercised Go/GCC toolchain. This host-local image ID is
+    # diagnostic only, not a published portable toolchain or qualification pin.
+    toolchainImagesByArch:
+      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        cd controller/nico-sim
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        pins="$(sha256sum go.mod go.sum)"
+        timeout --kill-after=10s 540s go mod download
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+components:
+  nico-sim:
+    fromSource: true
+    source: nke-nicosim
+    cgo: true
+    platforms: [linux/arm64]
+    outputType: host-package
+    artifactPath: controller/nico-sim/bin/nico-sim
+    writeDir: controller/nico-sim/bin
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        make -C controller/nico-sim build-static
+  nico-simctl:
+    fromSource: true
+    source: nke-nicosim
+    cgo: true
+    platforms: [linux/arm64]
+    outputType: host-package
+    artifactPath: controller/nico-sim/bin/nico-simctl
+    writeDir: controller/nico-sim/bin
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        cd controller/nico-sim
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
+          -ldflags '-linkmode external -extldflags -static' \
+          -o bin/nico-simctl ./cmd/nico-simctl

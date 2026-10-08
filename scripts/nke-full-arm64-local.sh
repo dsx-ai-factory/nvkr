@@ -8,13 +8,16 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "${repo_root}"
 usage() {
   printf '%s\n' \
-    'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers]' \
-    '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers]' \
+    'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers|simulator]' \
+    '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers|simulator]' \
     'all: 23 outputs; components: 22; os: one disk; providers: two source-built images.' \
+    'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
+    'simulator currently requires Podman and the recorded cached Go/GCC toolchain; no fresh bootstrap for that lane.' \
     'This subset is NOT a full source-built NKE distribution.' \
     'No host Go/Make or installed nkdctl needed: bootstrap uses the pinned utility image.' \
-    'CONTAINER_RUNTIME=podman (default) or docker (native Linux ARM64 only).' \
-    'Apple Silicon uses podman-machine-default; no VM is created, reset or resized automatically.' \
+    'CONTAINER_RUNTIME=podman (default) or docker (native Linux ARM64 / explicitly selected Colima).' \
+    'On Apple Silicon: Podman uses podman-machine-default; Docker requires COLIMA_PROFILE.' \
+    'No VM is created, started, reset or resized automatically; Docker Desktop is not admitted.' \
     '--check performs prerequisite diagnostics only: no pull, build or attempt creation.' \
     'NKE_LOCAL_CLONE supplies pinned Git objects, not uncommitted changes.' \
     'See docs/local-development.md for clean setup and acceptance limits.'
@@ -36,18 +39,44 @@ fi
 if [[ ! "${attempt}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ || ! "${jobs}" =~ ^[1-9][0-9]*$ ]]; then
   echo 'Supply a fresh attempt name and positive job count.' >&2; exit 2
 fi
-case "${lane}" in all|components|os|providers) ;; *) echo 'Select all, components, os or providers.' >&2; exit 2 ;; esac
+case "${lane}" in all|components|os|providers|simulator) ;; *) echo 'Select all, components, os, providers or simulator.' >&2; exit 2 ;; esac
 runtime="${CONTAINER_RUNTIME:-podman}"
 case "${runtime}" in podman|docker) ;; *) echo 'CONTAINER_RUNTIME must be podman or docker.' >&2; exit 2 ;; esac
-if ! command -v "${runtime}" >/dev/null; then
+host_system="$(uname -s)"
+# Colima supplies Docker inside Linux; its Mac SSH entrypoint needs no Mac
+# Docker CLI. Native execution and the Podman Mac route still need their CLI.
+if [[ "${host_system}" != Darwin || "${runtime}" != docker ]] && ! command -v "${runtime}" >/dev/null; then
   echo "Missing ${runtime}. Install a container runtime first; see docs/local-development.md#start-from-a-clean-machine." >&2
   exit 1
 fi
-if [[ "$(uname -s)" == Darwin ]]; then
+if [[ "${host_system}" == Darwin ]]; then
   [[ "$(uname -m)" == arm64 ]] || { echo 'The macOS ARM64 launcher requires Apple Silicon.' >&2; exit 1; }
   if [[ "${runtime}" == docker ]]; then
-    echo 'Docker Desktop on macOS is not an admitted OS/bootstrap route. Use native Linux ARM64 Docker or install Podman and initialize its VM; see docs/local-development.md.' >&2
-    exit 1
+    profile="${COLIMA_PROFILE:-}"
+    if [[ -z "${profile}" ]]; then
+      echo 'Docker Desktop on macOS is not an admitted OS/bootstrap route. For Colima, explicitly set COLIMA_PROFILE to a running ARM64 Docker profile; see docs/local-development.md.' >&2
+      exit 1
+    fi
+    if [[ ! "${profile}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+      echo 'COLIMA_PROFILE must be a simple profile name (letters, digits, underscore or hyphen).' >&2; exit 2
+    fi
+    if ! command -v colima >/dev/null; then
+      echo 'Missing Colima. Install and explicitly start the selected ARM64 Docker profile; no VM was created.' >&2; exit 1
+    fi
+    if ! colima status --profile "${profile}" >/dev/null 2>&1; then
+      echo "Colima profile ${profile} is absent or stopped. Start that profile explicitly; no VM was created or started." >&2; exit 1
+    fi
+    # Execute beside the daemon: host-side Docker socket forwarding does not
+    # give NKD access to the Linux workspace/kernel used by nested producers.
+    # Do not inherit a Mac Docker context/endpoint into the selected VM.
+    if [[ "${check_only}" == 1 ]]; then
+      printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh --check %q' \
+        "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${lane}"
+    else
+      printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh %q %q %q' \
+        "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${attempt}" "${jobs}" "${lane}"
+    fi
+    exec colima ssh --profile "${profile}" -- bash -c "${remote_command}"
   fi
   if ! podman machine inspect podman-machine-default >/dev/null 2>&1; then
     echo 'Missing podman-machine-default. See the clean-machine guide for podman machine init; no VM was created.' >&2
@@ -121,6 +150,17 @@ if [[ "${lane}" == all || "${lane}" == os ]]; then
   fi
   if [[ "${free}" -lt 92160 ]]; then echo 'Warning: less than 90 GiB free; material preparation may exhaust the later 64 GiB gate.' >&2; fi
   if [[ "${runtime}" == docker ]]; then docker buildx version >/dev/null || { echo 'Install the Docker Buildx plugin for OS toolchain bootstrap.' >&2; exit 1; }; fi
+fi
+if [[ "${lane}" == simulator ]]; then
+  if [[ "${runtime}" != podman ]]; then
+    echo 'The incremental simulator lane currently supports cached Podman only; fresh Docker toolchain binding is not implemented.' >&2
+    exit 1
+  fi
+  simulator_toolchain="$(jq -er '.localPodmanImages.arm64' toolchains/nkd-packer/toolchain.lock.json)"
+  if ! timeout --kill-after=5s 30s podman image inspect "${simulator_toolchain}" >/dev/null 2>&1; then
+    echo "Missing cached simulator Go/GCC toolchain ${simulator_toolchain}. No downloads or attempt creation; fresh simulator toolchain binding is not implemented." >&2
+    exit 1
+  fi
 fi
 echo "Prerequisite diagnostics passed for ${lane}/${runtime}. Git authorization and cgroup/resource/toolchain admission remain execution gates."
 if [[ "${check_only}" == 1 ]]; then exit 0; fi

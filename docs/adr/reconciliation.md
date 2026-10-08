@@ -200,6 +200,23 @@ short timeouts. They do not establish runtime capacity.
 The [full source-built distribution remains incomplete](../full-nke-source-build.md);
 fleet profiles and separately published OVN outputs are not selected, and the
 dependency-image/chart/tool acquisitions have not become source builds.
+A separate local `definition-simulator.json` now selects one executable bundle
+with source-built Linux ARM64 NICoSim server/CLI components. The exact-commit
+Podman Run completed 1/1 and an offline non-root mock-runtime probe initialized
+SQLite and served the prepared source's UI; see the
+[simulator evidence](../evidence/2026-10-07-local-nicosim-build.md). It uses an
+already-cached host-local Go/GCC image; launcher admission rejects a missing pin
+before downloads. Fresh simulator toolchain binding, its Docker launcher route,
+seed/UI artifact delivery, integration into the combined set and the complete
+Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
+qualification authority.
+The laptop launcher additionally enters an explicitly selected Colima ARM64
+Docker profile before invoking the existing Linux local runner. It does not
+select Docker Desktop, switch contexts, create/start/reset VMs, change OS
+requirements or introduce a new producer. The [real Colima preflight](../evidence/2026-10-08-colima-local-preflight.md)
+passed provider prerequisites and reached the OS capacity check, which failed
+before downloads. Colima producer execution, a fresh Docker/Packer bake and
+QCOW2-backed tenant provisioning remain unexercised.
 Mixed local offline utility
 admission is restricted to non-disk observation/SBOM/ordinary packaging and retains
 complete-Plan validation plus the original helper Plan digest. Workspace image

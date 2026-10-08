@@ -1,4 +1,9 @@
-# NKD artifacts for Lia's NKE site demo
+# NKD artifacts for NKE's staged site installer
+
+This document covers the staged-installer boundary only. It is not an analysis
+of Lia's complete local Colima/NICoSim environment. See the
+[whole-demo analysis](lia-local-demo-analysis.md) for the transcript, local
+provider/runtime distinction, missing artifacts and exact-byte deployment tasks.
 
 The intended developer journey is: build the ARM64 artifacts with NKD, make the
 exact produced images and charts reachable by NKE, run the NKE site installer,
@@ -12,7 +17,7 @@ and blockers rather than inventing a completed installation recipe.
 
 ## Which demo
 
-This targets Lia's staged NICo site-controller install in
+This targets the staged NICo site-controller installer introduced in
 [NKE PR #1160](https://github.com/dsx-ai-factory/nke/pull/1160), inspected at
 `8fb2d53368823bd386b4fbd55b4ab6d3c0931345` on October 7, 2026. The PR is open,
 based on `deploy/nico-layout`; its install scripts must not be assumed present on
@@ -20,10 +25,15 @@ NKE `main` or on the older artifact pins. Its authoritative instructions are
 [deploy/README.md](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/deploy/README.md)
 and the [site-controller guide](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/docs/site-bootstrap/install-site-controller.md).
 
-It installs onto an existing Kubernetes site cluster with NICo credentials and
-bootstrap trust material. It is not a laptop-only Kind/CAPD demonstration, and
-`tilt up` is not a substitute for validating this path. A laptop-only variant
-would need a deliberately different provider/install scenario and its own test.
+It takes an existing Kubernetes site kubeconfig, NICo endpoint and bootstrap
+trust material. That is the installer's starting boundary, not proof that Lia's
+demo used remote hardware. Her local environment is Colima plus NICoSim, as the
+user clarified. Kind hosting the management cluster does not imply a CAPD
+infrastructure provider; CAPNICo can use NICoSim. The exact simulator backend
+used in the demonstrated session is not established by the meeting transcript.
+The requested acceptance target is now explicit: tenant nodes use the existing
+NKD-built ARM64 QCOW2 through a real NICoSim VM backend. A newly built tenant-node
+OCI image is neither required nor a substitute for this target.
 
 ## Responsibility and input map
 

@@ -10,10 +10,15 @@ For first-time ARM64 NKE development, use the [local build guide](../docs/local-
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
 OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
 `providers` selects only the source-built CAPNICo and provisioned-provider images.
+`simulator` separately builds a Linux ARM64 NICoSim server/CLI bundle from pinned
+source; it is not part of `all` yet and does not start a simulator or deploy a site.
+This incremental lane requires the exact cached Podman Go/GCC toolchain;
+`--check simulator` rejects a missing image before bootstrap downloads.
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
 The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.
-`CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, not Docker Desktop
-on macOS. The guide covers clean Podman VM setup and attempt-pinned fresh Packer
+`CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, or explicitly
+selected `COLIMA_PROFILE=NAME` on Apple Silicon; not Docker Desktop on macOS.
+The guide covers clean Podman/Colima VM setup and attempt-pinned fresh Packer
 bootstrap. Check-only diagnostics never pull/build or create attempts.
 Despite its historical filename, this launcher does not yet build a full
 source-built NKE distribution; see the [remaining work](../docs/full-nke-source-build.md).
