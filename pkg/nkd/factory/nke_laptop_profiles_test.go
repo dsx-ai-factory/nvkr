@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,7 +43,7 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 	if !found {
 		t.Fatal("missing cloud-init producer stanza")
 	}
-	stanza, _, found = strings.Cut(stanza, "\nsed '1d;98d'")
+	stanza, _, found = strings.Cut(stanza, "\nsed '1d;98d;")
 	if !found {
 		t.Fatal("missing source-template append boundary")
 	}
@@ -126,6 +127,132 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 	}
 }
 
+// Run the authored mechanical projection, not a second template transformer.
+// The producer's source checksum authenticates the real template before this
+// operation; these fixtures cover the emitted policy, not guest APT readiness.
+func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-laptop-arm64", "profiles-catalog", "registry.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registry struct {
+		Components map[string]struct {
+			BuildCommand []string `yaml:"buildCommand"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(raw, &registry); err != nil {
+		t.Fatal(err)
+	}
+	command := registry.Components["nke-local-profiles"].BuildCommand
+	if len(command) != 3 {
+		t.Fatal("unexpected profiles producer")
+	}
+	projection := ""
+	for _, line := range strings.Split(command[2], "\n") {
+		if strings.HasPrefix(line, "sed '1d;98d;") {
+			if projection != "" {
+				t.Fatal("ambiguous source template projection")
+			}
+			projection = line
+		}
+	}
+	if projection == "" {
+		t.Fatal("missing local APT projection")
+	}
+	for _, scenario := range []string{"update-enabled", "update-disabled"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			source := filepath.Join(root, "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl")
+			destination := filepath.Join(root, "bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl")
+			for _, path := range []string{source, destination} {
+				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			lines := make([]string, 98)
+			for index := range lines {
+				lines[index] = "# unchanged"
+			}
+			lines[0] = "#cloud-config"
+			lines[5] = "package_update: true"
+			if scenario == "update-disabled" {
+				lines[5] = "package_update: false"
+			}
+			packages := []string{"nke-agent", "nke-kubeadm-distro-1.34.2", "nke-cni-ovn-images-1.4.0", "teleport-ent=18.6.4"}
+			lines[89] = "runcmd:"
+			for index, name := range packages {
+				lines[90+index] = "  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 " + name
+			}
+			lines[97] = "  - curl http://foreign-agent/override"
+			original := strings.Join(lines, "\n") + "\n"
+			if err := os.WriteFile(source, []byte(original), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", "-euc", projection)
+			cmd.Dir, cmd.WaitDelay = root, time.Second
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("project first-boot policy: %v\n%s", err, out)
+			}
+			data, err := os.ReadFile(destination)
+			if err != nil {
+				t.Fatal(err)
+			}
+			value := string(data)
+			if strings.Count(value, "package_update: false") != 1 || strings.Count(value, "Dir::Etc::sourceparts=-") != len(packages) {
+				t.Fatal("first-boot package refresh or install projection differs")
+			}
+			for _, forbidden := range []string{"package_update: true", "apt-get install -y -o DPkg", "--ignore-missing", "foreign-agent", "#cloud-config"} {
+				if strings.Contains(value, forbidden) {
+					t.Fatalf("unexpected first-boot behavior %q", forbidden)
+				}
+			}
+			for _, name := range packages {
+				if !strings.Contains(value, "apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 "+name+" || exit 1") {
+					t.Fatalf("lost source-owned package selection %q", name)
+				}
+			}
+			var config struct {
+				Runcmd []string `yaml:"runcmd"`
+			}
+			if err := yaml.Unmarshal(data, &config); err != nil || len(config.Runcmd) != len(packages) {
+				t.Fatalf("projected command list differs: %v", err)
+			}
+			for _, failure := range []bool{false, true} {
+				t.Run(fmt.Sprintf("install-failure-%t", failure), func(t *testing.T) {
+					fixture := t.TempDir()
+					status := "0"
+					if failure {
+						status = "100"
+					}
+					if err := os.WriteFile(filepath.Join(fixture, "apt-get"), []byte("#!/bin/sh\nexit "+status+"\n"), 0o700); err != nil {
+						t.Fatal(err)
+					}
+					ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+					defer cancel()
+					// Match cloud-init's ordinary shell commands, without set -e.
+					run := exec.CommandContext(ctx, "sh", "-c", strings.Join(config.Runcmd, "\n")+"\nprintf done > completion-marker\n")
+					run.Dir, run.WaitDelay = fixture, time.Second
+					run.Env = append(os.Environ(), "PATH="+fixture+string(os.PathListSeparator)+os.Getenv("PATH"))
+					out, err := run.CombinedOutput()
+					if (err != nil) != failure {
+						t.Fatalf("install failure propagation differs: %v\n%s", err, out)
+					}
+					_, markerErr := os.Stat(filepath.Join(fixture, "completion-marker"))
+					if failure && !os.IsNotExist(markerErr) || !failure && markerErr != nil {
+						t.Fatal("completion marker does not match installation result")
+					}
+				})
+			}
+			unchanged, err := os.ReadFile(source)
+			if err != nil || string(unchanged) != original {
+				t.Fatal("source template was modified")
+			}
+		})
+	}
+}
+
 // This admits one diagnostic artifact, not image/profile runtime compatibility.
 func TestLaptopProfilesArtifactContract(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -192,7 +319,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					for _, required := range []string{
 						"sha256sum -c -", "231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a",
 						"861964b7d4bbc6d4c82c8e77891cf1cd3ceb344666d344708b54e4492f910d09",
-						"sed '1d;98d'", "net.ifnames=1", "update-grub", "bootcmd:",
+						"sed '1d;98d;", "package_update: false", "Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list", "Dir::Etc::sourceparts=-", " || exit 1", "net.ifnames=1", "update-grub", "bootcmd:",
 						"/etc/default/grub.d/zz-nkd-local-network.cfg", "${GRUB_CMDLINE_LINUX} net.ifnames=1",
 						"set -eu", "test ! -L", "test -f", "= \"$expected\"",
 						"FROM alpine@sha256:", "nico-vms-cp.yaml", "nico-vms-worker.yaml",

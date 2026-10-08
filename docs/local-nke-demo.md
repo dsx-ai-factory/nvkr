@@ -102,6 +102,17 @@ An older completed profiles Run may contain the incorrect reboot-only naming
 change; rebuild the profiles
 lane with a fresh attempt and pass that exact Run to the consumer.
 
+The laptop profile also disables first-boot `package_update` and restricts APT
+installs to `/etc/apt/sources.list.d/nke-local.list`, disabling other source
+parts. The pinned image provisioner prepares that `file:/usr/lib/nke/debs`
+repository and its APT lists during the bake. A missing package/dependency
+terminates the installation commands before service restarts or the completion
+marker; it is not permission to fetch Ubuntu packages or silently skip
+installation. This profile change does not rebuild the disk or establish
+complete offline deployment:
+kube-vip and the workload still have separate runtime acquisition requirements.
+Real first-boot installation with this correction remains unvalidated.
+
 Cache the pinned service images using the existing build/management setup.
 The integrated adapter uses the existing `kind` Docker bridge. On a clean
 dedicated VM, inspect `docker network ls` and `ip route`, then create it once if

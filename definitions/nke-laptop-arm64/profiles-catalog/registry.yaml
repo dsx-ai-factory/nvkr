@@ -25,7 +25,7 @@ components:
       - sh
       - -ec
       - |
-        # Exact fixture bytes make these two mechanical edits fail closed when
+        # Exact fixture bytes make these mechanical edits fail closed when
         # upstream changes. All preparation stays inside the declared writeDir.
         printf '%s\n' \
           '231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a  controller/test/fixtures/Dockerfile' \
@@ -37,8 +37,13 @@ components:
         # Preserve the NKE Dockerfile except for freezing its base image bytes.
         sed 's|FROM ${BASE_REGISTRY}/alpine:3.24.1|FROM alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6|' controller/test/fixtures/Dockerfile > bin/profiles-context/Dockerfile
         # At the authenticated fixture revision, line 98 downloads a different
-        # agent over HTTP. Remove only that override; source APT commands remain
-        # and their installed bytes still need downstream runtime verification.
+        # agent over HTTP. Remove that override. The accepted disk already has
+        # the local NKE repository and its APT lists. Do not refresh public
+        # Ubuntu repositories on first boot. APT may read only that file:
+        # repository; no public source or source-parts directory is selected.
+        # Explicit exit propagation prevents cloud-init continuing after an
+        # install failure. Installed bytes still need downstream runtime
+        # verification; this is not full offline acceptance.
         # The tested image first boots with predictable physical NIC names.
         # OVN's source-owned reconciliation persists that uplink in netplan.
         # Keep the same naming policy on reboot; switching to eth0 afterward
@@ -58,7 +63,7 @@ components:
           '      printf "%s\n" "$expected" > "$file"' \
           '    fi' \
           '    update-grub' > bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
-        sed '1d;98d' controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl >> bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
+        sed '1d;98d;s/^package_update: true$/package_update: false/;s|apt-get install -y |apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- |g;/apt-get install -y /s/$/ || exit 1/' controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl >> bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
         # Downstream owns this local endpoint and must bind/read back the actual
         # disk bytes. This URL is not a digest, receipt or production location.
         printf '%b\n' \

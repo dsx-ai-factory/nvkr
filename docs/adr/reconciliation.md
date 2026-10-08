@@ -241,6 +241,12 @@ are intentionally not shipped in this PR. Private diagnostic logs and Run record
 are not authenticated external acceptance or qualified reproduction. The retained
 older disk's SPIRE/DSX exception, failed full boot smoke and direct-source OS
 integration remain open. No complete combined 23-output Run is claimed.
+The diagnostic laptop profile disables first-boot package refresh and selects
+only the baked file-based APT repository. Install errors terminate the commands
+before service restarts or the completion marker. This removes the authored
+public APT fallback, not runtime container acquisitions; corrected first-boot
+package/tenant acceptance remains
+unestablished.
 
 The diagnostic local launcher can compile an attempt-scoped substitution from a
 freshly measured, native-validated Packer toolchain image ID; this does not update

@@ -32,14 +32,14 @@ the four-output `site` lane. This is not an approved release pin.
 | Input | Produced content |
 | --- | --- |
 | NKE fixture Dockerfile | Same copy/materialization layout; base changed from its `alpine:3.24.1` tag to the already maintained exact Alpine digest, observed as Alpine 3.24.2 |
-| ARM64 VM cloud-init fixture | Source template retained except its exact, SHA-guarded line 98 HTTP agent-download override is removed; the source APT install remains. An idempotent boot command adds `net.ifnames=0` through an exact `zz-nkd-local-network.cfg` snippet after the installer's `99-console.cfg` override, matching NICoSim's single-NIC `eth0` seed across reboot. An existing different snippet or symlink fails |
+| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. An idempotent boot command adds `net.ifnames=1` through an exact `zz-nkd-local-network.cfg` snippet after the installer's `99-console.cfg` override, preserving the physical uplink name that OVN records on first boot. An existing different snippet or symlink fails |
 | NKE VM config profiles | Source `nico-vms-cp` and `nico-vms-worker`, unchanged |
 | NKE fixture runbooks | All nine source runbooks, unchanged |
 | Local OS metadata | One `nke-local-26-04-arm64-plain` entry: ARM64, Ubuntu 26.04, injected Kubernetes version, diagnostic `local-plain-tpm` variant |
 | Local boot script | ARM64 console, local QCOW2 URL, no LUKS key or FDE claim |
 
 The producer prepares a private context only in its declared `bin` write
-directory. It checks both upstream file hashes before the two mechanical edits;
+directory. It checks both upstream file hashes before the mechanical edits;
 source drift fails instead of editing an arbitrary line. The fixture files in
 the NKE checkout and the accepted source closure remain unchanged. BuildKit
 resolves the pinned image base; Dockerfile build steps use network mode `none`.
@@ -47,7 +47,12 @@ The enclosing wrapped producer still has declared build networking and is not
 a qualified or completely hermetic closure.
 
 Cloud-init still installs source-declared NKE/Kubernetes/CNI packages using APT,
-including the unversioned `nke-agent` command. Removing the HTTP override does
+including the unversioned `nke-agent` command. The laptop projection selects only
+`/etc/apt/sources.list.d/nke-local.list`, whose `file:/usr/lib/nke/debs` package
+bytes and indexes are prepared during the bake. Missing packages terminate the
+command sequence before service restarts and the completion marker; they do not
+authorize public-repository downloads. This does not prevent separate runtime
+container-image acquisitions or prove complete offline deployment. Removing the HTTP override does
 not guarantee preservation of the held disk's installed agent bytes: the
 downstream runtime must verify the selected packages and resulting executable.
 Its Calico and OVN branches select 3.30.1 and 1.4.0 respectively. Successful
