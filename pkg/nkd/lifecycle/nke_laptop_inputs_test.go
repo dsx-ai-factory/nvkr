@@ -94,25 +94,56 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	}
 }
 
-// Compile the actual maintained catalogs, not just the membership documents.
-// The full 22/23-output matrices are intentionally opt-in; the provider subset
-// stays cheap enough to catch catalog/pin drift in the default gate.
+// The actual CAPNICo catalog has no derived remote pin set. Keep its compiler
+// contract in the default gate and prove it needs no Git executable. Provider
+// membership is checked above; this one-output test is not full-provider proof.
+func TestLaptopARM64CAPNICoCatalogCompilation(t *testing.T) {
+	t.Chdir("../../..")
+	root := filepath.Join("definitions", "nke-laptop-arm64")
+	path := filepath.Join(root, "definition-providers.json")
+	doc, err := authored.LoadDefinition(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Outputs) != 2 || doc.Outputs[0].Name != "capnico-controller-arm64" || doc.Outputs[0].Catalog != nil {
+		t.Fatal("provider Definition no longer starts with the catalog-local CAPNICo output")
+	}
+	doc.Outputs = doc.Outputs[:1]
+	envPath := filepath.Join(root, "environment-local.json")
+	env, err := authored.LoadEnvironment(t.Context(), envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir()) // Any attempted remote Git derivation must fail.
+	plan, err := factory.CompileDocuments(t.Context(), path, doc, envPath, env, "laptop-capnico-contract")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "capnico-controller-arm64" || plan.Qualification != factory.TierStaticUnqualified {
+		t.Fatal("unexpected CAPNICo compiled membership or tier")
+	}
+}
+
+// Compile the complete, unmodified maintained catalogs. These integration
+// matrices validate derived chart pins against exact NKE Git bytes, including
+// when only the provisioned provider is selected. They require authenticated
+// NKE Git access or an exact local Git mirror; the default gate has neither.
 func TestLaptopARM64CatalogCompilation(t *testing.T) {
+	testutil.RequireExtended(t)
 	t.Chdir("../../..")
 	root := filepath.Join("definitions", "nke-laptop-arm64")
 	for _, tc := range []struct {
-		file     string
-		outputs  int
-		extended bool
+		file    string
+		outputs int
 	}{
-		{"definition-providers.json", 2, false},
-		{"definition-components.json", 22, true},
-		{"definition.json", 23, true},
+		{"definition-providers.json", 2},
+		{"definition-components.json", 22},
+		{"definition.json", 23},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
-			if tc.extended {
-				testutil.RequireExtended(t)
-			}
 			path := filepath.Join(root, tc.file)
 			doc, err := authored.LoadDefinition(t.Context(), path)
 			if err != nil {

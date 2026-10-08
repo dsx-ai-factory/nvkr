@@ -374,19 +374,24 @@ The launcher downloads the exact Go archive from the toolchain lock, verifies it
 SHA-256 inside the pinned utility container and uses it to compile a static Linux ARM64
 `nkdctl`, then runs it inside Linux, previews the selection and executes the 22-output
 Run. Producer and utility containers still use their pinned images. One job is the conservative
-starting point. Omit `NKE_LOCAL_CLONE` to use canonical remote Git URLs:
-
-```sh
-env -u NKE_LOCAL_CLONE \
-  bash scripts/nke-full-arm64-local.sh remote-components 1 components
-```
-
-This remote-only command has not been validated end to end. Private-source Git
-authentication must work inside the VM, not just in the Mac's
-`gh` session. Never put a PAT into catalogs, commands or logs. Charts, images and
-declared dependency preparation still need network access.
+starting point. The tested path uses the exact local Git clone shown above.
+Canonical remote fetch is available when `NKE_LOCAL_CLONE` is absent, but is not
+a validated first-time-developer quickstart here. Private-source Git authentication
+must work inside the VM, not just in the Mac's `gh` session. A remote-only setup
+recipe remains unvalidated; do not infer it from the local-clone result. Never put
+a PAT into catalogs, commands or logs. Charts, images and declared dependency
+preparation still need network access.
 
 ## Build the complete selection, including the OS
+
+For this seven-lane laptop demo, use this guide's
+`nke-full-arm64-local.sh ... os` route, including Docker/Colima TCG. The separate
+[OS-only guide](../definitions/nke-os/README.md) and `nke-os-local.sh` retain the
+older Podman/TCG and native Docker/KVM routes. Native Docker/KVM does not fall
+back to Colima TCG. The older Podman wrapper requires its maintained image ID;
+this laptop launcher can instead validate fresh toolchain bytes and bind their
+exact ID in an attempt overlay. These are distinct admission contracts, not
+interchangeable commands.
 
 The Podman route reuses the exact recorded local Packer image if present.
 Otherwise it builds locked toolchain sources with `--diagnostic-local`; Docker

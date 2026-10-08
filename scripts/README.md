@@ -99,6 +99,13 @@ immutable attempt names.
 The non-FDE OS-image bootstrap uses one shared catalog. Its authored routes are ARM64 Podman/TCG and native
 ARM64 and AMD64 Linux Docker/KVM:
 
+These older OS-only commands differ from the laptop launcher above: Docker
+requires KVM, and Podman requires its maintained toolchain image ID. A fresh
+toolchain build can fail that ID check. For Docker/Colima TCG and attempt-pinned
+fresh toolchain bytes, follow the
+[laptop OS route](../docs/local-development.md#build-the-complete-selection-including-the-os)
+instead; its validation does not change the older wrapper's pin contract.
+
 ```sh
 CONTAINER_RUNTIME=podman scripts/nke-os-local.sh local-arm64-podman-001 1
 CONTAINER_RUNTIME=docker NKE_OS_ARCH=arm64 scripts/nke-os-local.sh local-arm64-docker-001 1

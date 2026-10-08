@@ -32,9 +32,15 @@ The combined, components and OS selections reuse catalogs under `definitions/nke
 In particular, `os-tcg.json` binds its override to that OS catalog's exact
 `requiresCatalogDigest`. An M2 catalog repin can therefore invalidate this local
 example. Review the changed source/material/toolchain contract before updating
-that binding; do not bypass it. Default tests compile the provider subset and
-OS selection. `NKD_TEST_EXTENDED=1 go test ./pkg/nkd/lifecycle -run '^TestLaptopARM64CatalogCompilation$' -count=1` also compiles the actual 22/23-output
-selections offline. Compilation is not a full runtime build or acceptance run.
+that binding; do not bypass it. Default tests check exact provider membership
+and compile the actual CAPNICo catalog and OS selection without remote Git.
+`NKD_TEST_EXTENDED=1 go test ./pkg/nkd/lifecycle -run '^TestLaptopARM64CatalogCompilation$' -count=1`
+compiles the complete, unmodified two-provider and 22/23-output catalogs. Those
+integration tests require authenticated NKE Git access or an exact local Git
+mirror: the shared controller catalog validates its derived chart pin set against
+the locked NKE tree even when only its provider is selected. No source build or
+chart download runs during compilation, but compilation is not network-free
+without that mirror. It is not a runtime build or acceptance run.
 The operator catalog pins native ARM64 Helm and kubectl assets.
 The CAPNICo catalog builds the public v0.0.45 Git source using its source-owned
 Dockerfile; the provisioned provider reuses the maintained controller catalog's
