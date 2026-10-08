@@ -33,13 +33,16 @@ source-owned workflows. PR #113 is a separate draft, not merged support on main.
 | DSX IMDS | Release inventory retains payload digests but no established source revision | Accessible source with an approved pin, or a declared unavailable-source exception and accessible digest-matching payload. An older plugin-free SPIRE package is not completion |
 | OS material assembly | Existing OS graph produces image-inputs and stages them for source-owned Packer | Connect direct-source binary/image packages, remove package-folder calls including indirect agent packaging, and preserve the source-owned material contract |
 | Shared published/embedded image/chart bytes | [Issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116) records the missing generic handoff | An authenticated original-owner cross-output reuse contract. Independent rebuilds cannot be relabeled as identical published bytes |
-| Local OS runtime | Existing Podman/TCG class, capacity gates and exact cached toolchain | Reconstruct and validate a fresh-machine toolchain pin; provide enough real free workspace capacity, complete the bake and boot smoke |
+| Local OS runtime | Podman/TCG class, native Docker/TCG Environment, check-only diagnostics and containerized NKD bootstrap; fresh toolchains freeze native-validated IDs in attempt overlays | Exercise fresh Packer bootstrap and native Docker execution externally; provide enough real free workspace capacity, complete the bake and boot smoke. Docker Desktop on macOS is not supported by this launcher |
 
 Do not use an upstream release SBOM hash as the expected hash of a new source
 build. New bytes receive new identities. The release inventory guides membership
 and versions; it does not prove the source-to-binary relationship or qualification.
 The [two-provider Run evidence](evidence/2026-10-07-laptop-provider-builds.md)
 records exact inputs, image subjects, archive hashes and the limited help probes.
+The [container-bootstrap evidence](evidence/2026-10-07-local-container-bootstrap.md)
+records a later complete 22-output component Run, not the disk or a deployed site.
+See the [Lia demo handoff](nkd-to-nke-demo.md) for installer alignment and E2E blockers.
 
 ## What needs external input
 

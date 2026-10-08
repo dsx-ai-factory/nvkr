@@ -10,6 +10,11 @@ For first-time ARM64 NKE development, use the [local build guide](../docs/local-
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
 OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
 `providers` selects only the source-built CAPNICo and provisioned-provider images.
+Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
+The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.
+`CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, not Docker Desktop
+on macOS. The guide covers clean Podman VM setup and attempt-pinned fresh Packer
+bootstrap. Check-only diagnostics never pull/build or create attempts.
 Despite its historical filename, this launcher does not yet build a full
 source-built NKE distribution; see the [remaining work](../docs/full-nke-source-build.md).
 

@@ -86,6 +86,15 @@ maintained toolchain. There is no toolchain publication workflow in this reposit
 `images` remains `null` because a local image ID is not an OCI repository
 digest. The build command fails if a rebuilt image differs from its recorded
 runtime-specific local ID.
+For first-time **local diagnostic** execution, `--diagnostic-local` permits fresh
+native assembly against the same locked sources without matching the older local
+image ID. Archive/executable digests, image structure and all native tool/Packer
+validation remain enforced. Cross-architecture diagnostic builds are rejected.
+The developer launcher freezes the observed ID in an attempt-specific catalog
+overlay before execution. This does not update maintained pins, establish
+reproducibility, authorize redistribution or change publication gates. Default
+builds retain the recorded-ID check. Never use a mutable tag as execution identity.
+
 After license approval and a vulnerability scan, the exact external publication
 sequence is:
 

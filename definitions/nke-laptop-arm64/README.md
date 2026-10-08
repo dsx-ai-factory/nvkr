@@ -13,8 +13,9 @@ not a full source-built NKE distribution. See the
 | OS-only loop | `definition-os.json` | One disk with its complete material closure |
 | Source-built provider loop | `definition-providers.json` | Two native provider images, no disk |
 
-All use `environment-local.json`: native rootless Podman, Linux ARM64 and no
-publication. The OS selects TCG and the maintained local Packer subject through
+Use `environment-local.json` for rootless Podman, or `environment-local-docker.json`
+with `CONTAINER_RUNTIME=docker` on native Linux ARM64. Neither publishes or signs.
+The OS selects TCG and the recorded local Packer subject through
 `os-tcg.json`. The CLI catalog adds an explicit ARM64 producer; its pin starts
 at the maintained CLI release and its stamps follow machine-managed pins.
 The operator catalog pins native ARM64 Helm and kubectl assets.
@@ -31,9 +32,16 @@ bin/nkdctl run local \
 
 NKE_LOCAL_CLONE=/absolute/path/to/nke \
   bash scripts/nke-full-arm64-local.sh arm64-components-01 1 components
+
+# No host Go, Make or installed nkdctl needed for the launcher:
+bash scripts/nke-full-arm64-local.sh --check providers
+CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh docker-providers-01 1 providers
 ```
 
 Use a fresh attempt for execution. `NKE_LOCAL_CLONE` supplies pinned Git objects,
 not dirty checkout bytes; omit it for canonical remote fetch. See the guide for
-commit-based development, exact outputs, resource checks and the unresolved fresh
-Packer bootstrap constraint. Full-set success is not established by the dry-run.
+commit-based development, clean-machine installation, exact outputs and resource
+checks. Fresh toolchains freeze native-validated IDs in attempt-scoped overlays,
+not under an older maintained ID. Docker Desktop on macOS is not admitted here.
+Historical Runs do not prove the new bootstrap paths; preflight/dry-run do not
+prove full-set success.

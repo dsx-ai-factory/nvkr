@@ -5,6 +5,7 @@ package packer_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -130,6 +131,90 @@ func TestToolchainRejectsInvalidBuildInputsBeforeRuntime(t *testing.T) {
 			}
 			if _, err := os.Stat(marker); !os.IsNotExist(err) {
 				t.Fatalf("runtime reached before input admission: %v", err)
+			}
+		})
+	}
+}
+
+func TestDiagnosticToolchainPinDoesNotGrantMaintainedAcceptance(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("requires jq")
+	}
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip("requires a supported native architecture")
+	}
+	foreignArch := "amd64"
+	if runtime.GOARCH == foreignArch {
+		foreignArch = "arm64"
+	}
+	const measured = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	for _, tc := range []struct {
+		name, arch, message string
+		flags               []string
+		wantRuntime         bool
+		wantError           bool
+	}{
+		{"maintained pin mismatch fails", runtime.GOARCH, "does not match locked", nil, true, true},
+		{"diagnostic pin requires native smoke", runtime.GOARCH, "validated local toolchain", []string{"--diagnostic-local"}, true, false},
+		{"diagnostic cross build is not native proof", foreignArch, "requires native validation", []string{"--diagnostic-local", "--cross-build-only"}, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for _, name := range []string{"build.sh", "toolchain.lock.json"} {
+				data, err := os.ReadFile(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if name == "toolchain.lock.json" {
+					var lock map[string]json.RawMessage
+					if err := json.Unmarshal(data, &lock); err != nil {
+						t.Fatal(err)
+					}
+					// Synthetic local pins exercise either host architecture without
+					// rewriting the maintained source lock or adding approval claims.
+					lock["localPodmanImages"] = json.RawMessage(`{"amd64":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","arm64":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}`)
+					data, err = json.Marshal(lock)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := os.WriteFile(filepath.Join(dir, name), data, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			fake := filepath.Join(dir, "podman")
+			log := filepath.Join(dir, "calls")
+			const script = `#!/bin/sh
+printf '%s\n' "$*" >>"$TEST_CALLS"
+case "$1 $2" in
+  'build --platform') exit 0 ;;
+  'image inspect')
+    if [ "$3" = --format ]; then echo "$TEST_IMAGE_ID";
+    else printf '[{"Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' "$TEST_ARCH"; fi ;;
+  'run --rm') case "$*" in *"$TEST_IMAGE_ID -ec "*) exit 0;; *) exit 98;; esac ;;
+  *) exit 99 ;;
+esac
+`
+			if err := os.WriteFile(fake, []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			args := append([]string{filepath.Join(dir, "build.sh"), "--arch", tc.arch}, tc.flags...)
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", args...)
+			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_CALLS="+log,
+				"TEST_ARCH="+tc.arch, "TEST_IMAGE_ID="+measured, "NKD_BUILD_ARCHIVES=", "NKD_BUILD_CA_BUNDLE=")
+			out, err := cmd.CombinedOutput()
+			if (err != nil) != tc.wantError || !strings.Contains(string(out), tc.message) {
+				t.Fatalf("error=%v output=%s; want error=%t message=%s", err, out, tc.wantError, tc.message)
+			}
+			calls, _ := os.ReadFile(log)
+			if (len(calls) > 0) != tc.wantRuntime {
+				t.Fatalf("runtime reached=%t; want %t: %s", len(calls) > 0, tc.wantRuntime, calls)
+			}
+			smoke := strings.Contains(string(calls), "run --rm")
+			if smoke == tc.wantError {
+				t.Fatalf("native smoke=%t; want %t: %s", smoke, !tc.wantError, calls)
 			}
 		})
 	}

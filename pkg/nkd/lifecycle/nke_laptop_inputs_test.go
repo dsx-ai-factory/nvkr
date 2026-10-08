@@ -137,4 +137,15 @@ func TestLaptopARM64OSExecutionClassAdmission(t *testing.T) {
 			}
 		})
 	}
+	dockerPath := filepath.Join(root, "environment-local-docker.json")
+	dockerEnv, err := authored.LoadEnvironment(t.Context(), dockerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dockerEnv.RuntimeBinary() != "docker" || dockerEnv.Publication != nil || dockerEnv.Signing != nil {
+		t.Fatal("Docker developer environment grants an unintended route")
+	}
+	if _, err := factory.CompileDocuments(t.Context(), definitionPath, d, dockerPath, dockerEnv, "test"); err != nil {
+		t.Fatalf("native Docker TCG Plan: %v", err)
+	}
 }

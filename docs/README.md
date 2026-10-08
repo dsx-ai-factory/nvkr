@@ -9,6 +9,7 @@ each concept to a worked example.
 | I want to… | Read |
 |---|---|
 | Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-laptop-arm64/README.md) |
+| Connect NKD artifacts to Lia's NKE site demo and see E2E blockers | [Build-to-demo handoff](nkd-to-nke-demo.md), [tested container bootstrap](evidence/2026-10-07-local-container-bootstrap.md) |
 | Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md), [provider build evidence](evidence/2026-10-07-laptop-provider-builds.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |

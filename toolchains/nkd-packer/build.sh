@@ -9,10 +9,12 @@ lock="${here}/toolchain.lock.json"
 
 usage() {
   cat <<'EOF'
-Usage: build.sh [--check] [--cross-build-only] [--arch amd64|arm64] [--tag IMAGE]
+Usage: build.sh [--check] [--cross-build-only] [--diagnostic-local] [--arch amd64|arm64] [--tag IMAGE]
 
   --check             Validate the source lock without building an image.
   --cross-build-only  Build a non-native image without claiming runtime validation.
+  --diagnostic-local  Validate fresh native bytes for an attempt-specific local pin,
+                      not the older recorded local image ID. No maintained-pin update.
   --arch              Build one host architecture. Defaults to the normalized host arch.
   --tag               Local image name. Defaults to localhost/nkd-packer-toolchain:dev-ARCH.
 
@@ -23,6 +25,7 @@ EOF
 
 check_only=0
 cross_build_only=0
+diagnostic_local=0
 arch=""
 tag=""
 while [[ $# -gt 0 ]]; do
@@ -33,6 +36,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --cross-build-only)
       cross_build_only=1
+      shift
+      ;;
+    --diagnostic-local)
+      diagnostic_local=1
       shift
       ;;
     --arch)
@@ -121,6 +128,10 @@ if [[ "${arch}" != "${native_arch}" && "${cross_build_only}" -ne 1 ]]; then
 fi
 
 runtime="${CONTAINER_RUNTIME:-}"
+if [[ "${diagnostic_local}" -eq 1 && "${arch}" != "${native_arch}" ]]; then
+  echo '--diagnostic-local requires native validation; cross builds are not admitted' >&2
+  exit 1
+fi
 if [[ -z "${runtime}" ]]; then
   runtime="$(command -v podman || command -v docker || true)"
 fi
@@ -264,9 +275,12 @@ case "${runtime##*/}" in
   docker) pin_family=localDockerImages ;;
 esac
 expected_local_image="$(jq -r --arg arch "${arch}" --arg family "${pin_family}" '.[$family][$arch] // empty' "${lock}")"
-if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" ]]; then
+if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" && "${diagnostic_local}" -ne 1 ]]; then
   echo "local toolchain image ID ${image_id} does not match locked ${arch} ID ${expected_local_image}" >&2
   exit 1
+fi
+if [[ "${diagnostic_local}" -eq 1 ]]; then
+  echo 'Diagnostic local toolchain: bind the measured ID in attempt inputs; no maintained-pin, publication or qualification claim.' >&2
 fi
 if [[ "${arch}" != "${native_arch}" ]]; then
   printf 'built structurally checked cross-architecture toolchain %s (%s)\n' "${tag}" "${image_id}"
@@ -291,7 +305,7 @@ fi
   --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --env TMPDIR=/nkd/work/tmp \
   --entrypoint sh \
-  "${tag}" -ec '
+  "${image_id}" -ec '
   mkdir -p "${HOME}" "${TMPDIR}"
   test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.15.4"
   plugin=/nkd/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.6_x5.0_linux_'"${arch}"'

@@ -22,8 +22,105 @@ NKD is the project; `nkdctl` is its command-line tool. You provide three inputs:
 
 `run plan` describes the work. `run local` executes it as a new immutable attempt.
 Local builds are unqualified diagnostics, not signed releases or cluster deployment.
+For the next step, see [NKD artifacts for Lia's site demo](nkd-to-nke-demo.md).
+That guide distinguishes the tested artifact build from the still-unvalidated
+installation and tenant-provisioning handoff.
 
-## Set up the CLI
+## Start from a clean machine
+
+The launcher needs no host Go, Make, installed `nkdctl`, Packer, QEMU, Helm or
+Kubernetes. It compiles NKD from this checkout in the pinned utility container.
+This launcher admits one fixed bootstrap image and requires the maintained
+ARM64 utility platform/runtime before downloads or attempt creation. It is not
+a generic Environment validator; complete document validation remains NKD-owned.
+Component tooling runs in catalog-pinned containers; Packer creates the node OS
+inside QEMU. Git, Bash, a working native container runtime, `jq` and GNU `timeout`
+are still required on the Linux execution host.
+
+| Starting point | Route |
+| --- | --- |
+| Native Linux ARM64, Docker already installed | `CONTAINER_RUNTIME=docker`; no Podman or host Go |
+| Native Linux ARM64, rootless Podman | Default Podman route |
+| Apple Silicon Mac, no runtime | Install Podman and create/start its Linux VM |
+| Apple Silicon Mac, only Docker Desktop | Not supported by this launcher yet; use Podman or a native Linux ARM64 Docker host |
+| AMD64 machine | This ARM64 launcher rejects emulation; use a native ARM64 execution host |
+
+### Native Linux with Docker
+
+Install Docker using its [official Linux instructions](https://docs.docker.com/engine/install/).
+The OS bootstrap also needs the Docker Buildx plugin. On Ubuntu:
+
+```sh
+sudo apt-get update
+sudo apt-get install git jq coreutils
+docker version
+docker buildx version
+git clone https://github.com/dsx-ai-factory/nke-recipes.git
+cd nke-recipes
+# Before PR #118 merges, check out its implementation branch:
+git switch --track origin/codex/full-nke-arm64-local
+CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh --check providers
+CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh first-providers 1 providers
+```
+
+Run as a user authorized for the local Docker daemon. Docker daemon access is a
+trusted host capability, not independently isolated provider execution. Remote
+Docker endpoints are rejected: nested bind paths must belong to the local daemon
+host. You can SSH to a native ARM64 host and run there; pointing a laptop's
+`DOCKER_HOST` at it is not this route.
+
+### Apple Silicon Mac
+
+Install Git if absent and Podman using its
+[official macOS installer](https://podman.io/docs/installation). Only if
+`podman-machine-default` does not exist, initialize it:
+
+```sh
+podman machine init --cpus 8 --memory 16384 --disk-size 150 podman-machine-default
+podman machine start podman-machine-default
+podman machine ssh --username core podman-machine-default \
+  'for tool in git jq timeout; do command -v "$tool" || exit 1; done'
+git clone https://github.com/dsx-ai-factory/nke-recipes.git
+cd nke-recipes
+# Before PR #118 merges, check out its implementation branch:
+git switch --track origin/codex/full-nke-arm64-local
+bash scripts/nke-full-arm64-local.sh --check providers
+bash scripts/nke-full-arm64-local.sh first-providers 1 providers
+```
+
+The default Fedora CoreOS VM commonly includes these small tools. If a check
+reports one missing, use that VM distribution's installation mechanism;
+Fedora CoreOS uses `rpm-ostree install` and a subsequent reboot, not an
+unconditional `dnf install`. See the
+[CoreOS package-layering guide](https://docs.fedoraproject.org/en-US/fedora-coreos/os-extensions/).
+Do not
+reinitialize/reset an existing VM; start it if stopped. Allocate fewer resources
+for component-only development if needed; the OS still requires its authored
+capacity. VM disk size is **not** free host workspace space: on macOS this
+checkout uses shared `/Users` storage. Allow about 90 GiB free there before a
+fresh OS attempt, in addition to adequate VM storage.
+
+The launcher never installs host packages, creates/starts/resizes VMs, deletes
+caches or prunes attempts automatically. Execution downloads/builds begin only
+after you request a build. Private-source authentication must work on the Linux
+execution host; cloning this repository does not grant access to other sources.
+
+### Check before the expensive build
+
+```sh
+bash scripts/nke-full-arm64-local.sh --check components
+bash scripts/nke-full-arm64-local.sh --check os
+# Native Linux Docker alternative:
+CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh --check os
+```
+
+`--check` performs no image pulls, producer work or attempt creation. It diagnoses
+tools, VM state, runtime reachability, architecture and preliminary OS resources.
+It does not prove Git authorization, future image availability, cgroup-capped
+capacity or Packer success. Complete-Plan and held-runtime admission remain
+execution gates and recheck capacity immediately before Packer.
+
+## Optional host CLI for inspection
 
 Use your existing checkout, or clone it:
 
@@ -38,7 +135,7 @@ bin/nkdctl run --help
 bash scripts/nke-full-arm64-local.sh --help
 ```
 
-You need Git, Make and the exact Go version printed by `cat .go-version`.
+These optional host CLI commands need Git, Make and the exact Go version printed by `cat .go-version`.
 Building may download Go modules. See [Development](../DEVELOPMENT.md) for setup
 and repository checks. Git access is required while repositories are private;
 a public guide does not grant access to private sources.
@@ -102,7 +199,7 @@ the maintained older-SPIRE exception, omitting the DSX IMDS plugin.
 
 ## Prepare the ARM64 execution host
 
-Execution requires Linux ARM64 and rootless Podman, with `git` and `jq`. On an
+Execution requires Linux ARM64 and rootless Podman or explicitly selected local Docker, with `git`, `jq` and GNU `timeout`. On an
 Apple Silicon Mac the launcher enters `podman-machine-default` as `core`; the
 repository and optional source clone must be visible through the VM's `/Users` mount.
 
@@ -169,7 +266,8 @@ NKE_LOCAL_CLONE=/absolute/path/to/nke \
   bash scripts/nke-full-arm64-local.sh first-components 1 components
 ```
 
-The launcher uses the required host Go version to compile a static Linux ARM64
+The launcher downloads the exact Go archive from the toolchain lock, verifies its
+SHA-256 inside the pinned utility container and uses it to compile a static Linux ARM64
 `nkdctl`, then runs it inside Linux, previews the selection and executes the 22-output
 Run. Producer and utility containers still use their pinned images. One job is the conservative
 starting point. Omit `NKE_LOCAL_CLONE` to use canonical remote Git URLs:
@@ -185,26 +283,24 @@ declared dependency preparation still need network access.
 
 ## Build the complete selection, including the OS
 
-The OS inputs require the exact local Packer image in
-`toolchains/nkd-packer/toolchain.lock.json`. On macOS check it with:
+The Podman route reuses the exact recorded local Packer image if present.
+Otherwise it builds locked toolchain sources with `--diagnostic-local`; Docker
+also builds and natively validates its toolchain. Fresh bytes are not relabeled
+as the older maintained ID. The launcher freezes the actual image ID through
+the existing catalog-overlay contract in `.nkd/laptop-bootstrap/ATTEMPT/`, then
+compiles the executable Plan from those inputs. Runtime rechecks the exact image.
+Nothing updates maintained locks, pushes images or grants publication/qualification
+approval. Native tool validation failures stop execution. See the
+[toolchain guide](../toolchains/nkd-packer/README.md).
 
-```sh
-podman machine ssh --username core podman-machine-default \
-  podman image inspect \
-  sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
-```
-
-Fresh Packer bootstrap is currently blocked: rebuilding the current Dockerfile
-did not match that older local pin. The launcher refuses a replacement rather
-than weakening the check. Until that native pin is refreshed and validated, the OS
-route requires the already-present exact image; this is not a fresh-machine full
-build quickstart. See the [toolchain guide](../toolchains/nkd-packer/README.md).
-
-When the exact image and required capacity are available:
+When prerequisite diagnostics pass:
 
 ```sh
 NKE_LOCAL_CLONE=/absolute/path/to/nke \
   bash scripts/nke-full-arm64-local.sh first-full 1 all
+# Native Linux Docker alternative:
+CONTAINER_RUNTIME=docker \
+  bash scripts/nke-full-arm64-local.sh first-full-docker 1 all
 ```
 
 `all` selects one combined 23-output Definition. `os` selects only the disk and
@@ -373,10 +469,20 @@ a hermetic or byte-reproducible OS claim.
 
 ## Validation status
 
+The new container-bootstrap Run `laptop-container-components-arm64-20261007-01`
+completed with exit zero, 22 expected and 22 observed outputs, and no failure.
+It built the runner inside the pinned utility container using the verified Go
+archive, then executed the Linux ARM64 Run in the existing rootless Podman VM.
+The produced CLI executed `version`; the packaged controller chart's digest
+binding matched the observed controller image. See the
+[container-bootstrap evidence](evidence/2026-10-07-local-container-bootstrap.md).
+This trial used an existing development VM and a local NKE Git transport override;
+it is not a clean-machine or remote-only authentication test.
+
 The separate source-built provider Run `laptop-providers-arm64-20261007-01`
 completed with 2/2 observed outputs and both produced images passed offline help
 probes. See the [exact provider evidence](evidence/2026-10-07-laptop-provider-builds.md).
-This is not a complete 22-output component or 23-output combined Run.
+That older provider trial is not the complete 22-output component Run above.
 
 The laptop component Run `laptop-dev-arm64-20261007-05` completed with launcher
 exit 0, `status: complete`, 20 expected and 20 observed outputs, no failure, and
@@ -396,5 +502,7 @@ tests, alongside mixed disk/non-disk utility admission and native Linux ARM64
 race checks. The OS trial built its materials and patched ISO, then failed
 capacity re-admission before Packer. That historical Run predates the two provider
 additions. A complete 22-output component Run or combined 23-output Run is not
-established by it. Raw attempts remain in `.nkd`; repository tests do not prove a disk bake,
-remote-only Git access, registry publication or a fresh-machine Packer bootstrap.
+established by that historical trial. Raw attempts remain in `.nkd`; repository tests do not prove a disk bake,
+remote-only Git access or registry publication. These historical Runs used the
+earlier launcher; they do not prove the new container bootstrap, fresh Packer
+assembly or a clean-machine Docker run. Record those separately.
