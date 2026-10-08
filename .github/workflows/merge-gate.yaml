@@ -125,6 +125,7 @@ jobs:
               - 'pkg/**'
               - 'definitions/**'
               - 'scripts/**'
+              - 'demos/**'
               - 'testdata/**'
               - 'toolchains/**'
               - 'go.mod'

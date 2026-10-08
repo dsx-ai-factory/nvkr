@@ -80,7 +80,7 @@ lint: ## Run golangci-lint (see .golangci.yml; install: https://golangci-lint.ru
 .PHONY: shellcheck
 shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed — https://www.shellcheck.net/"; exit 1; }
-	shellcheck -S warning scripts/*.sh toolchains/**/*.sh
+	shellcheck -S warning scripts/*.sh demos/*.sh toolchains/**/*.sh
 
 .PHONY: vulncheck
 vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinned upstream scanner.
