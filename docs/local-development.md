@@ -111,6 +111,9 @@ The OS requires 8 CPUs, 10 GiB available memory, at least 64 GiB available works
 capacity and a six-hour execution ceiling. Runtime checks those requirements;
 configured VM size alone is not admission. TCG is selected, not KVM. Allow additional
 disk headroom for snapshots, OCI layouts and repeated attempts.
+The failed laptop OS preparation alone used about 17 GiB before Packer. Roughly
+90 GiB free before a fresh combined attempt is a practical starting allowance,
+not a guarantee: the gate still requires 64 GiB remaining when Packer starts.
 
 A capacity rejection reports CPU, memory and workspace as `observed/required`,
 with units. Those measurements are not reservations. Free capacity or choose a
@@ -235,6 +238,44 @@ changes your local image store, not a registry. Podman's returned image ID is no
 the OCI manifest digest recorded by NKD. CLI help/version and image import are
 smoke checks, not controller deployment or Kubernetes acceptance.
 
+## Inspect the packaged controller chart
+
+The image-bound chart is the Helm content layer of its local OCI layout. Locate
+that layer using the OCI index and manifest, rather than guessing a blob filename:
+
+```sh
+NKD_LOCAL_RUN="$(pwd)/.nkd/runs/first-components"
+NKD_LOCAL_CHART="$NKD_LOCAL_RUN/packages/controller-chart"
+NKD_LOCAL_MANIFEST=$(jq -er '.manifests | select(length == 1) |
+  .[0].digest | sub("^sha256:"; "")' "$NKD_LOCAL_CHART/index.json")
+NKD_LOCAL_LAYER=$(jq -er '.layers |
+  map(select(.mediaType == "application/vnd.cncf.helm.chart.content.v1.tar+gzip")) |
+  select(length == 1) | .[0].digest | sub("^sha256:"; "")' \
+  "$NKD_LOCAL_CHART/blobs/sha256/$NKD_LOCAL_MANIFEST")
+
+# Native Linux ARM64:
+"$NKD_LOCAL_RUN/operator-tools/fetch/helm/helm" show chart \
+  "$NKD_LOCAL_CHART/blobs/sha256/$NKD_LOCAL_LAYER"
+```
+
+On macOS, replace the last command with:
+
+```sh
+podman machine ssh --username core podman-machine-default \
+  "$NKD_LOCAL_RUN/operator-tools/fetch/helm/helm" show chart \
+  "$NKD_LOCAL_CHART/blobs/sha256/$NKD_LOCAL_LAYER"
+```
+
+This uses the acquired native Helm executable and the final packaged chart, not
+the earlier source archive. `show chart` should identify `nke-controller` version
+`0.1.1` for this pin. `show values` can inspect its bound image values instead.
+These are read-only development views, not signed artifact verification or a
+deployment. Loading an image into Podman does not provide a registry endpoint
+from which a Kubernetes cluster can pull it. The chart retains its source-owned
+image repository while NKD binds the new image digest; this local Run does not
+publish that digest there. Deployment needs an explicit development registry and
+matching chart repository setting, outside this build-only example.
+
 ## Rebuild a committed local source change
 
 `NKE_LOCAL_CLONE` changes Git transport only. It supplies the pinned commit;
@@ -291,11 +332,22 @@ a hermetic or byte-reproducible OS claim.
 
 ## Validation status
 
-The trial laptop produced all 20 ordinary payloads before exposing a final-observation
-path mismatch. Regression tests now cover that fix and mixed disk/non-disk utility
-admission, including native Linux ARM64 race checks. A fresh ordinary Run is being
-exercised; until its retained record is `complete`, payload production alone is not
-a complete Run. The OS trial built its materials and patched ISO, then failed
+The laptop component Run `laptop-dev-arm64-20261007-05` completed with launcher
+exit 0, `status: complete`, 20 expected and 20 observed outputs, no failure, and
+lane `unqualified-local-execution`. It used rootless Podman, four jobs and the
+local Git transport override. The produced ARM64 CLI executed help/version, its
+controller OCI archive imported into Podman, and the final packaged chart opened
+with the acquired Helm executable. Its bound image digest matched the observed
+controller image. The launcher remained unchanged throughout this Run.
+
+Comparing this Run with the preceding completed component Run found matching
+build identities for all 20 outputs and matching payload digests for 18. The
+controller image and its image-bound chart differed. This trial therefore does
+not establish exact-byte reproducibility; neither Run is qualified.
+
+The earlier acquired-image final-observation failure is covered by regression
+tests, alongside mixed disk/non-disk utility admission and native Linux ARM64
+race checks. The OS trial built its materials and patched ISO, then failed
 capacity re-admission before Packer. No new completed combined 21-output Run is
 claimed. Raw attempts remain in `.nkd`; repository tests do not prove a disk bake,
 remote-only Git access, registry publication or a fresh-machine Packer bootstrap.

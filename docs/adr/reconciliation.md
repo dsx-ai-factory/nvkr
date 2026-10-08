@@ -193,8 +193,10 @@ admission is restricted to non-disk observation/SBOM/ordinary packaging and reta
 complete-Plan validation plus the original helper Plan digest. Workspace image
 observation uses factory-owned relocation without weakening exact acquired producer
 bindings; absolute binary observation remains supported. Contract tests cover these
-boundaries. The initial laptop component attempt produced its payloads but failed
-final observation; a corrected full-set runtime result is not yet established.
+boundaries. The initial laptop component attempt failed final observation. The
+corrected rootless Podman component Run `laptop-dev-arm64-20261007-05` completed
+with launcher exit 0 and 20 expected/observed outputs in the unqualified local
+lane; it exercised local Git transport and four jobs, not the combined disk set.
 The OS trial prepared materials and the patched ISO but failed capacity re-admission
 before Packer. Fresh native Podman toolchain reconstruction still mismatches the
 older local pin. Neither this example nor its previews establish M2 or release acceptance.
