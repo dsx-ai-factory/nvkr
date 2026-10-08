@@ -5,7 +5,7 @@
   },
   "kind": "Definition",
   "metadata": {
-    "name": "nke-laptop-arm64-os",
+    "name": "nke-local-dev-arm64-os",
     "description": "Local ARM64 non-FDE TCG disk and its material closure; no publication or signing; retains mixed SPIRE exception."
   },
   "outputs": [

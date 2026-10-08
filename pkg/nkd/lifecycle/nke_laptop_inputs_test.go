@@ -16,7 +16,7 @@ import (
 )
 
 func TestLaptopARM64DefinitionMembership(t *testing.T) {
-	root, err := filepath.Abs(filepath.Join("..", "..", "..", "definitions", "nke-laptop-arm64"))
+	root, err := filepath.Abs(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 // membership is checked above; this one-output test is not full-provider proof.
 func TestLaptopARM64CAPNICoCatalogCompilation(t *testing.T) {
 	t.Chdir("../../..")
-	root := filepath.Join("definitions", "nke-laptop-arm64")
+	root := filepath.Join("definitions", "nke-local-dev-arm64")
 	path := filepath.Join(root, "definition-providers.json")
 	doc, err := authored.LoadDefinition(t.Context(), path)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestLaptopARM64CAPNICoCatalogCompilation(t *testing.T) {
 func TestLaptopARM64CatalogCompilation(t *testing.T) {
 	testutil.RequireExtended(t)
 	t.Chdir("../../..")
-	root := filepath.Join("definitions", "nke-laptop-arm64")
+	root := filepath.Join("definitions", "nke-local-dev-arm64")
 	for _, tc := range []struct {
 		file    string
 		outputs int
@@ -170,7 +170,7 @@ func TestLaptopARM64CatalogCompilation(t *testing.T) {
 
 func TestLaptopARM64OSExecutionClassAdmission(t *testing.T) {
 	t.Chdir("../../..")
-	root := filepath.Join("definitions", "nke-laptop-arm64")
+	root := filepath.Join("definitions", "nke-local-dev-arm64")
 	definitionPath := filepath.Join(root, "definition-os.json")
 	d, err := authored.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {

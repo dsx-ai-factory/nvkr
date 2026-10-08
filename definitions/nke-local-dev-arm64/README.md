@@ -1,6 +1,10 @@
-# ARM64 local NKE example
+# Local NKE development on ARM64
 
 Start with the [first-time developer guide](../../docs/local-development.md).
+`nke-local-dev-arm64` names the development workflow and artifact architecture,
+not the host operating system. On Apple Silicon macOS, execution runs inside an
+explicitly selected Colima Linux VM; native Linux ARM64 is also supported. Every
+selected artifact targets `linux/arm64`, not Darwin.
 This example selects the ARM64 counterpart of the combined M2 artifact selection
 plus CAPNICo and the provisioned provider, without publication or signing. It is
 not a full source-built NKE distribution. See the
@@ -47,10 +51,10 @@ Dockerfile; the provisioned provider reuses the maintained controller catalog's
 existing source producer. Neither provider is replaced with an acquired image.
 
 ```sh
-bin/nkdctl definition validate --definition definitions/nke-laptop-arm64/definition.json
+bin/nkdctl definition validate --definition definitions/nke-local-dev-arm64/definition.json
 bin/nkdctl run local \
-  --definition definitions/nke-laptop-arm64/definition.json \
-  --environment definitions/nke-laptop-arm64/environment-local.json \
+  --definition definitions/nke-local-dev-arm64/definition.json \
+  --environment definitions/nke-local-dev-arm64/environment-local.json \
   --attempt arm64-preview --dry-run
 
 NKE_LOCAL_CLONE=/absolute/path/to/nke \

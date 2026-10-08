@@ -187,7 +187,7 @@ and Helm OCI interoperability tests do not establish hosted or release acceptanc
 
 ## Local ARM64 development inputs
 
-The `definitions/nke-laptop-arm64` example selects 23 outputs or its 22-output
+The `definitions/nke-local-dev-arm64` example selects 23 outputs or its 22-output
 non-disk subset without publication/signing. Separate selections cover providers,
 site, tools, profiles and simulator assets. The historical `all` selection is
 not a complete seven-lane demo or source-built distribution. See the

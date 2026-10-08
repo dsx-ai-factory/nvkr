@@ -37,7 +37,7 @@ Checked on October 7, 2026:
 - NKE `main` at `6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4`: Colima setup,
   NICo provider, simulator, custom node builder, Tilt and backend E2E scripts.
 - NKD local-build branch at `91a8f7e348d82bc3ac6e1bdec61747d342d9328e`:
-  [laptop Definition](../definitions/nke-laptop-arm64/definition.json), catalog
+  [laptop Definition](../definitions/nke-local-dev-arm64/definition.json), catalog
   pins and the retained complete 22-output component Run.
 
 The user identifies Lia's environment as local Colima plus NICoSim. Neither the

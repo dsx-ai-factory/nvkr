@@ -3,7 +3,7 @@
   "catalog": {"base": "./capnico-catalog"},
   "kind": "Definition",
   "metadata": {
-    "name": "nke-laptop-arm64-providers",
+    "name": "nke-local-dev-arm64-providers",
     "description": "Compile CAPNICo and the provisioned provider from pinned Git; build-only development loop, not a full NKE build."
   },
   "outputs": [

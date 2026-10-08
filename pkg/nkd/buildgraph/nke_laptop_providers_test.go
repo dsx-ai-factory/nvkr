@@ -15,7 +15,7 @@ import (
 )
 
 func TestLaptopCAPNICoSourceBuild(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nke-laptop-arm64", "capnico-catalog")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "capnico-catalog")))
 	if err != nil {
 		t.Fatal(err)
 	}

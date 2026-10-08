@@ -139,8 +139,8 @@ if [[ -n "${NKE_LOCAL_CLONE:-}" ]]; then
   # source identity. The bare NKE form also prefix-matches sibling repository
   # names, so use this override only for this maintained NKE selection.
 fi
-environment="definitions/nke-laptop-arm64/environment-local.json"
-if [[ "${runtime}" == docker ]]; then environment="definitions/nke-laptop-arm64/environment-local-docker.json"; fi
+environment="definitions/nke-local-dev-arm64/environment-local.json"
+if [[ "${runtime}" == docker ]]; then environment="definitions/nke-local-dev-arm64/environment-local-docker.json"; fi
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
@@ -197,8 +197,8 @@ if [[ "${runtime}" == docker ]]; then network=bridge; fi
   '
 runner="${bootstrap}/nkdctl"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }
-definition="definitions/nke-laptop-arm64/definition.json"
-if [[ "${lane}" != all ]]; then definition="definitions/nke-laptop-arm64/definition-${lane}.json"; fi
+definition="definitions/nke-local-dev-arm64/definition.json"
+if [[ "${lane}" != all ]]; then definition="definitions/nke-local-dev-arm64/definition-${lane}.json"; fi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.
@@ -243,7 +243,7 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   # or a hand-edited maintained lock. Each output retains its own catalog scope.
   if [[ "${baseline}" != "${image}" ]]; then
   jq -e --arg root "${repo_root}" --arg out "${repo_root}/${bootstrap}" --arg lane "${lane}" '
-    def absolute: if startswith("/") then . else $root + "/definitions/nke-laptop-arm64/" + . end;
+    def absolute: if startswith("/") then . else $root + "/definitions/nke-local-dev-arm64/" + . end;
     def locate: .base |= absolute | if .overlays then .overlays |= map(absolute) else . end;
     .catalog |= locate |
     .outputs |= map(if .catalog then .catalog |= locate else . end) |

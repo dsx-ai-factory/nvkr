@@ -22,7 +22,7 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	path := filepath.Join("definitions", "nke-laptop-arm64", "definition-tools.json")
+	path := filepath.Join("definitions", "nke-local-dev-arm64", "definition-tools.json")
 	for _, tc := range []struct {
 		name, environment  string
 		foreign, duplicate bool

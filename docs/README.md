@@ -8,7 +8,7 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
-| Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-laptop-arm64/README.md) |
+| Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-local-dev-arm64/README.md) |
 | Build once, then exercise a real QCOW2 tenant without rebuilding | [Integrated local demo command and current validation limits](local-nke-demo.md) |
 | Boot an existing NKD disk through the real local NICoSim VM backend | [Artifact-only QCOW2 guest probe](local-qcow2-guest-probe.md) |
 | Test the real NKE management Kind/CAPI path with existing NKD-built tools | [Deploy-only management diagnostic](local-management-cluster.md) |

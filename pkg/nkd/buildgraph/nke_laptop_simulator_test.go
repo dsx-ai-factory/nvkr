@@ -15,7 +15,7 @@ import (
 )
 
 func TestLaptopNICoSimSourceBuild(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nke-laptop-arm64", "simulator-catalog")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "simulator-catalog")))
 	if err != nil {
 		t.Fatal(err)
 	}

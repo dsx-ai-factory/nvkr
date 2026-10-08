@@ -76,12 +76,12 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			if err := os.WriteFile(launcher, data, 0600); err != nil {
 				t.Fatal(err)
 			}
-			inputs := filepath.Join(dir, "definitions", "nke-laptop-arm64")
+			inputs := filepath.Join(dir, "definitions", "nke-local-dev-arm64")
 			if err := os.MkdirAll(inputs, 0700); err != nil {
 				t.Fatal(err)
 			}
 			for _, name := range []string{"environment-local.json", "environment-local-docker.json"} {
-				env, err := os.ReadFile(filepath.Join("..", "definitions", "nke-laptop-arm64", name))
+				env, err := os.ReadFile(filepath.Join("..", "definitions", "nke-local-dev-arm64", name))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -320,7 +320,7 @@ func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 			}
 			for _, path := range []string{
 				"scripts/nke-full-arm64-local.sh", "scripts/nke-os-plan.jq",
-				"definitions/nke-laptop-arm64/environment-local-docker.json",
+				"definitions/nke-local-dev-arm64/environment-local-docker.json",
 				"toolchains/nkd-packer/toolchain.lock.json",
 			} {
 				data, err := os.ReadFile(filepath.Join("..", path))
@@ -395,14 +395,14 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 				}
 			}
 			for _, path := range []string{"scripts/nke-full-arm64-local.sh", "scripts/nke-os-plan.jq",
-				"definitions/nke-laptop-arm64/environment-local-docker.json", "toolchains/nkd-packer/toolchain.lock.json"} {
+				"definitions/nke-local-dev-arm64/environment-local-docker.json", "toolchains/nkd-packer/toolchain.lock.json"} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
 					t.Fatal(err)
 				}
 				write(path, data, 0600)
 			}
-			write("definitions/nke-laptop-arm64/definition-simulator.json", []byte(`{"catalog":{"base":"simulator-catalog"},"outputs":[]}`), 0600)
+			write("definitions/nke-local-dev-arm64/definition-simulator.json", []byte(`{"catalog":{"base":"simulator-catalog"},"outputs":[]}`), 0600)
 			write("toolchains/nkd-packer/build.sh", []byte(`#!/bin/sh
 printf 'toolchain-build %s\n' "$*" >>"$TEST_CALLS"
 case " $* " in *' --print-validated-image-id '*) ;; *) exit 99;; esac

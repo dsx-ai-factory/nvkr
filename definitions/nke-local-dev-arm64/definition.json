@@ -5,8 +5,8 @@
   },
   "kind": "Definition",
   "metadata": {
-    "name": "nke-laptop-arm64-components",
-    "description": "Local ARM64 CLI, controller, source-built providers, tools, five charts and twelve acquired dependency images; not a full source-built NKE distribution; no publication or signing."
+    "name": "nke-local-dev-arm64",
+    "description": "Local ARM64 M2 counterpart plus source-built providers: 23 outputs, no publication or signing; not a full source-built NKE distribution; retains the mixed SPIRE-source exception."
   },
   "outputs": [
     {
@@ -59,6 +59,30 @@
       ],
       "format": "oci",
       "name": "cwe",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/os-catalog",
+        "overlays": [
+          "./os-tcg.json"
+        ]
+      },
+      "components": [
+        "nke-agent",
+        "nke-cni-calico",
+        "nke-cni-ovn",
+        "nke-image-inputs",
+        "nke-kubeadm-distro",
+        "nke-node-image",
+        "nke-patched-installer-iso",
+        "nke-spire-agent",
+        "ovn-kube-ubuntu",
+        "ovn-kubernetes-chart",
+        "ubuntu-installer-iso"
+      ],
+      "format": "disk-image",
+      "name": "nke-node-image-arm64",
       "platform": "linux/arm64"
     },
     {

@@ -30,7 +30,7 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	definitionPath := filepath.Join("definitions", "nke-laptop-arm64", "definition-site.json")
+	definitionPath := filepath.Join("definitions", "nke-local-dev-arm64", "definition-site.json")
 	environmentPath := filepath.Join(filepath.Dir(definitionPath), "environment-local-docker.json")
 	doc, err := definition.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
@@ -129,7 +129,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	definitionPath := filepath.Join("definitions", "nke-laptop-arm64", "definition-site.json")
+	definitionPath := filepath.Join("definitions", "nke-local-dev-arm64", "definition-site.json")
 	for _, tc := range []struct {
 		name, environment string
 		foreign, unbound  bool

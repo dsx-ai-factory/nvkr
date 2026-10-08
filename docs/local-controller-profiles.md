@@ -20,10 +20,10 @@ same commands without `COLIMA_PROFILE`. Podman uses `CONTAINER_RUNTIME=podman`.
 Docker and Podman have compiler/preflight contracts. No private profiles-build
 acceptance report is shipped here; check your own completed Run and image content.
 
-The [Definition](../definitions/nke-laptop-arm64/definition-profiles.json)
+The [Definition](../definitions/nke-local-dev-arm64/definition-profiles.json)
 selects `controller-profiles` from its own
-[catalog](../definitions/nke-laptop-arm64/profiles-catalog/registry.yaml).
-Its [machine-managed lock](../definitions/nke-laptop-arm64/profiles-catalog/pins.lock.yaml)
+[catalog](../definitions/nke-local-dev-arm64/profiles-catalog/registry.yaml).
+Its [machine-managed lock](../definitions/nke-local-dev-arm64/profiles-catalog/pins.lock.yaml)
 selects the same NKE `8fb2d53368823bd386b4fbd55b4ab6d3c0931345` candidate as
 the four-output `site` lane. This is not an approved release pin.
 

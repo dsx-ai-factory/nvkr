@@ -23,7 +23,7 @@ import (
 // Exercise the emitted shell, not a duplicate of its GRUB mutation. This models
 // the loader's main-file/drop-in order; the real guest reboot remains acceptance.
 func TestLaptopProfilesGRUBDropIn(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-laptop-arm64", "profiles-catalog", "registry.yaml"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog", "registry.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 // The producer's source checksum authenticates the real template before this
 // operation; these fixtures cover the emitted policy, not guest APT readiness.
 func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-laptop-arm64", "profiles-catalog", "registry.yaml"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog", "registry.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	path := filepath.Join("definitions", "nke-laptop-arm64", "definition-profiles.json")
+	path := filepath.Join("definitions", "nke-local-dev-arm64", "definition-profiles.json")
 	for _, tc := range []struct {
 		name, environment string
 		foreign           bool
