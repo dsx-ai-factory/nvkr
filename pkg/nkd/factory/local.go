@@ -770,7 +770,10 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		return executeLocalProducer(ctx, plan, node, options, run)
 	}
 
-	if node.Network == ir.NetworkNone {
+	// Terminal observation reopens and hashes the local producer's host bytes;
+	// it executes no producer code. Use the same filesystem view as collection,
+	// rather than a VM bind-mount view after private BuildKit output promotion.
+	if node.Network == ir.NetworkNone && node.Kind != NodeVerify {
 		if _, ok := runners[node.Platform]; !ok {
 			return e.New(e.CodeEngineCapability, "factory node %s has no linux runner for %s", node.ID, node.Platform)
 		}

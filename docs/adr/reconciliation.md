@@ -18,6 +18,12 @@ are implemented. Browsing does not verify payload bytes, signatures or consumer 
 artifact-publication result does not satisfy full v1 release or qualified acceptance; unsupported stronger
 scopes fail before work.
 
+Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
+same filesystem view as collection after private BuildKit output promotion. It executes no producer code or
+signature verifier and remains static-unqualified. This is not a container-isolation or runtime-authentication
+claim; producer execution, other offline utilities and the held-disk observation path retain their existing
+contracts (ADR-18 §8).
+
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
 ARC hosted route is separately admitted under ADR-18. The
