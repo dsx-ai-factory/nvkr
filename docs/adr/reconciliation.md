@@ -232,7 +232,9 @@ isolated Helm configuration before offline packaging. The tiny local wrapper
 retains the existing pinned Helm bytes and owns a shell-capable entrypoint;
 attempt substitutions do not override a pinned runtime entrypoint. A
 [bounded real Helm preparation/package probe](../evidence/2026-10-08-local-site-chart-preparation.md)
-passed. A complete four-output NKD Run and deployment remain unexercised; the
+passed. The later [four-output Colima Run](../evidence/2026-10-08-colima-site-and-tools-build.md)
+completed with no failure, and its exact controller image passed offline native
+help. Deployment remains unexercised; the
 site set is separate from `all`. Dependency charts remain acquisitions and the
 wrapper's Helm 4.3.0 does not match the installer's preferred 4.2.4; its readiness
 script warns rather than failing solely on that mismatch. Default source-tree
@@ -245,13 +247,16 @@ and destinations inside source/producer paths. A
 [real chart handoff probe](../evidence/2026-10-08-local-chart-handoff.md) passed
 native Helm rendering and executor dry-run. Four inputs came from a completed
 NKD Run; controller/NKTP came from manual packaging probes. It is not a complete
-site Run, signed Release or deployment. Staged release-manifest chart refs can
+site Run, signed Release or deployment. The later handoff replay used all six
+charts from completed Runs and again passed rendering/executor dry-run. Staged release-manifest chart refs can
 override local paths and still require consistent transport/selection integration.
 The separate local `definition-tools.json` declares one source-built Linux ARM64
 bundle of Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3, ORAS 1.3.3 and Kind 0.32.0,
 matching the selected installer's source-owned tool pins. Native Docker/Podman
-compiler and no-work preflight contracts pass; no complete tool Run or installation
-is recorded. Four sources use bounded module preparation with unchanged manifest
+compiler and no-work preflight contracts pass. The later Colima Docker Run completed
+all five source components into one observed bundle; verified extraction, independent
+hashing and all five native version commands passed. No installation is recorded.
+Four sources use bounded module preparation with unchanged manifest
 checks; Kubernetes uses its committed vendor/staging workspace. All five compile
 offline. Helm reuses PR #113's exact target-checked removal of four upstream
 negative-test symlinks in diagnostic Local preparation. Held hosted source fetch
@@ -276,10 +281,19 @@ The 16 GiB native attempt subsequently lost QEMU to the Colima host's global
 OOM killer while a separate simulator build was active. Packer's continuing
 SSH wait did not establish guest liveness. Graceful cancellation recorded a failed
 Run with zero observed outputs and no accepted disk; its container was cleaned up.
-The dedicated profile was resized to 24 GiB, and a fresh non-overlapping attempt
-passed preflight and began bootstrap. This is recovery progress, not successful
-bake evidence. A completed Colima QCOW2 bake, guest boot and tenant provisioning
-remain unestablished. No runtime, identity or `.nkd` containment requirement was relaxed.
+The dedicated profile was resized to 24 GiB. Fresh non-overlapping Run
+`laptop-colima-os-arm64-20261008-04` completed its real Packer bake and terminal
+observation: one expected/observed disk, launcher exit 0, no failure, unqualified
+local lane. The retained non-FDE QCOW2 is 2,851,733,504 bytes with SHA-256
+`38da250fa91eb5582067dcbf200a156f0fc71a085ce6a2b30c408a65059e129d`;
+independent hashing/size checks matched. The installer identified Ubuntu 26.04.1.
+Independent copied-disk probing reached SSH, completed cloud-init, passed root
+growth and agent probes with diagnostic CPU/UID harness projections, but the full
+source smoke exited 1 in its SPIRE checks. The retained older package lacks the
+required DSX IMDS plugin; its configured unauthenticated URL returned 403.
+A complete boot-smoke pass and tenant provisioning remain unestablished; the
+older SPIRE and acquired-input exceptions remain. No NKD runtime, identity or `.nkd` containment
+requirement was relaxed, and this is not full-disk evidence or qualification.
 Mixed local offline utility
 admission is restricted to non-disk observation/SBOM/ordinary packaging and retains
 complete-Plan validation plus the original helper Plan digest. Workspace image

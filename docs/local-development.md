@@ -177,10 +177,11 @@ for the NKD checkout itself.
 
 The October 8 shared-mount trial failed during the SPIRE source snapshot with
 `too many open files in system`, before Packer. An explicit clean-cache diagnostic
-reduced the Colima host VM process from 48,737 open file handles to 33; the next
-trial moves Run storage to native ext4 rather than adding automatic cache flushes
+reduced the Colima host VM process from 48,737 open file handles to 33; later
+trials used native ext4 rather than adding automatic cache flushes
 or raising Mac limits. See the [Docker execution evidence](evidence/2026-10-08-colima-local-os-build.md).
-That investigation does not prove the retry or the QCOW2 succeeds.
+That investigation alone did not prove the retry; the later completed bake and
+separate failed full smoke are recorded in that evidence document.
 
 Colima's configured 150 GiB disk does not provide 150 GiB of physical host free
 space. Allow about 90 GiB free on both the host and the selected Run filesystem
@@ -196,8 +197,11 @@ separate simulator build was active. Packer continued waiting for SSH; that was
 not evidence of a live guest. The attempt was canceled and recorded failed with
 zero accepted disks. Run component/simulator builds before the OS, not concurrently
 on this laptop. The dedicated profile was subsequently resized to 24 GiB and a
-fresh OS attempt passed preflight; that larger configuration is not yet a completed
-bake guarantee. Do not lower the authored execution requirement to hide capacity
+fresh OS attempt completed and exported one exact, hash/size-checked non-FDE
+Ubuntu 26.04.1 QCOW2. This single-job result is not a capacity guarantee. A copied
+disk booted and reached SSH, but its complete source smoke failed in SPIRE checks;
+the retained older SPIRE package omits the required DSX IMDS plugin. Do not lower
+the authored execution requirement or remove smoke assertions to hide these
 failures. The [OS execution evidence](evidence/2026-10-08-colima-local-os-build.md)
 records the kernel failure and recovery separately from earlier progress.
 
@@ -505,14 +509,16 @@ NKTP's three repositories are registered in temporary Helm configuration, Helm
 validates its source-owned lock, and subsequent chart packaging is offline.
 These dependency archives remain acquisitions, not independent source builds.
 
-Compiler/preflight tests and a bounded Helm dependency/package probe cover these
-inputs. **A complete four-output Run is not recorded yet.** Require Run status
+The [completed Colima site Run](evidence/2026-10-08-colima-site-and-tools-build.md)
+observed all four outputs with no failure. Require your own Run status
 `complete`, exactly four expected/observed outputs and no failure before using
 them. Helm 4.3.0 in this build wrapper does not match the installer's preferred
 4.2.4; the readiness check warns rather than failing solely on that mismatch.
 The source installer can consume packaged charts and a prepared
-CAPNICo image, but its inventory rendering still prepares source-tree chart
-dependencies. See the [installer handoff analysis](nkd-to-nke-demo.md); this is
+CAPNICo image. The [prepared chart adapter](nkd-to-nke-demo.md#prepare-charts-without-rebuilding-them)
+avoids source-tree dependency preparation during inventory rendering and local
+executor selection; actual staged installation and release-manifest overrides
+remain separate checks. See the [installer handoff analysis](nkd-to-nke-demo.md); this is
 not yet the promised deploy-only, QCOW2-backed site/tenant journey.
 
 ## Build the installer tools from source
@@ -563,15 +569,48 @@ external links before the preparation command, so this input is not a working
 hosted tools pipeline or a qualified build. Kubernetes uses its committed vendor
 tree rather than downloading a substitute workspace.
 
-**Current evidence: Docker/Podman Plan compilation and no-work preflight contracts
-pass; the complete five-component Run is not yet recorded.** The
-[dated evidence](evidence/2026-10-08-local-installer-tools-plan.md) records exact
-source pins, independent review and the real Colima preflight. Require terminal
+**Current evidence: the complete five-component Colima Run passed, its one bundle
+was verified/extracted, and all five native version probes passed.** The
+[completed Run evidence](evidence/2026-10-08-colima-site-and-tools-build.md) records
+exact subjects, executable hashes and limitations; the
+[earlier contract evidence](evidence/2026-10-08-local-installer-tools-plan.md) records
+source pins, independent review and preflight. Require your own terminal
 Run status `complete`, exactly one required/observed output, no failure and verified
 bundle extraction before putting these executables on the installer's Linux PATH.
 Do not run Linux executables directly on macOS. The acquired `operator-tools`
 in `all` and `components` is unchanged; `tools` is a separate candidate selection,
 not yet part of a complete combined demo Definition.
+
+After `first-tools` completes, extract through the delivery owner inside the same
+Linux source export, without rebuilding or installing globally:
+
+```sh
+(
+set -euo pipefail
+NKD_TOOLS_RUN="$(pwd -P)/.nkd/runs/first-tools"
+NKD_TOOLS_BOOT="$(pwd -P)/.nkd/laptop-bootstrap/first-tools"
+jq -e '.status == "complete" and (.expected|length) == 1 and
+       (.observed|length) == 1 and .failure == null' "$NKD_TOOLS_RUN/lifecycle.json"
+"$NKD_TOOLS_BOOT/nkdctl" publish root \
+  --bundle "installer-tools-arm64=$NKD_TOOLS_RUN/packages/installer-tools-arm64" \
+  --out "$NKD_TOOLS_BOOT/consumer-publication"
+"$NKD_TOOLS_BOOT/nkdctl" publish extract \
+  --layout "$NKD_TOOLS_BOOT/consumer-publication" --bundle installer-tools-arm64 \
+  --out "$NKD_TOOLS_BOOT/consumer-bundle"
+sha256sum "$NKD_TOOLS_BOOT/consumer-bundle/"*
+"$NKD_TOOLS_BOOT/consumer-bundle/helm" version --short
+"$NKD_TOOLS_BOOT/consumer-bundle/kubectl" version --client
+"$NKD_TOOLS_BOOT/consumer-bundle/clusterctl" version
+"$NKD_TOOLS_BOOT/consumer-bundle/oras" version
+"$NKD_TOOLS_BOOT/consumer-bundle/kind" version
+)
+```
+
+Both destination directories must be new. This diagnostic delivery verifies
+local bytes, not signatures, approved toolchains or a Release. Version success
+does not prove registry/cluster reachability. Use the extracted directory on the
+installer's Linux PATH only after matching its selected tool pins; do not replace
+macOS tools with these Linux executables.
 
 ## Find outputs and interpret the result
 

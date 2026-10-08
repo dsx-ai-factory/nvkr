@@ -9,7 +9,9 @@ and built the upstream OVN image. Creating the SPIRE private source snapshot the
 failed with `NKD-E-BUILD-FAILED`: `too many open files in system`.
 
 No QCOW2 was produced or accepted, and no guest boot, site install, tenant or
-workload is established by this attempt. The source graph still retains the
+workload is established by that first attempt. The later fresh native Run 04
+completed and exported one accepted disk, as recorded below. Boot smoke and the
+complete site/tenant/workload remain separate acceptance gates. The source graph still retains the
 older plugin-free SPIRE and acquired-dependency exceptions; it is not the PR #113
 direct-source graph or a complete source-built distribution.
 
@@ -166,7 +168,97 @@ colima ssh --profile nkd-demo -- bash -c \
   'cd /mnt/lima-colima-nkd-demo/nkd-local/nke-recipes-55fe7478247762bf4136a5bfc0b70a1b4a302c34 && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=/Users/ikislenko/Workspace/github/nke bash scripts/nke-full-arm64-local.sh laptop-colima-os-arm64-20261008-04 1 os'
 ```
 
-This is a fresh immutable attempt, not resume/reuse of failed Run 03. Its bootstrap
-has started. Completion, accepted QCOW2 digest/size and guest boot remain
-unestablished. The 24 GiB configuration is a recovery candidate, not a proven
-capacity guarantee or a qualified execution profile.
+This is a fresh immutable attempt, not resume/reuse of failed Run 03. It completed
+all material preparation, patched the ISO, passed Packer validation, installed
+Ubuntu, connected over SSH, provisioned staged NKE packages, cleaned/trimmed the
+guest and compressed the final disk. Packer reported a successful build after
+1 hour 55 minutes. NKD's terminal observation then completed and the launcher
+exited 0 with one expected and one observed output, no failure and lane
+`unqualified-local-execution`.
+
+| Record | Exact value |
+| --- | --- |
+| Attempt | `laptop-colima-os-arm64-20261008-04` |
+| Plan identity | `sha256:c64a8befaa704f3da3eefd40cae1560c2eb2d9bf1e583a01540b763c25d2e4f9` |
+| Build identity | `sha256:7f7a7d3da4d9385c3e8ab293e1d13e83d631d46b5209d84b3befd708e98b1d95` |
+| Output | `nke-node-image-arm64`, `disk-image`, `qcow2`, encryption `none` |
+| Producer outcome | `build-nke-node-image`, `succeeded` |
+| Exact QCOW2 SHA-256 | `38da250fa91eb5582067dcbf200a156f0fc71a085ce6a2b30c408a65059e129d` |
+| Exact bytes | `2851733504` |
+| Retained output | `.nkd/runs/laptop-colima-os-arm64-20261008-04/outputs/nke-node-image-arm64.qcow2` inside the committed native export above |
+
+Independent `sha256sum` and `stat` of the retained file matched the observation;
+the file has mode `0444`. The guest installer console identified Ubuntu 26.04.1
+LTS. This plain disk must not be described or selected as the example profiles'
+Ubuntu 24.04 FDE image. The 24 GiB host configuration worked for this single-job
+bake; it is not a qualified execution profile or a capacity guarantee.
+
+The successful Run still uses the older plugin-free SPIRE package and acquired
+inputs. It is not PR #113's direct-source graph, full-disk inspected evidence,
+publication/signing, qualified reproduction, a complete combined 23-output Run
+or a running tenant. The separate boot check below reached Linux and SSH but
+failed the full image contract; its result must not be inferred from the bake.
+
+After the producer containers exited, the sparse Colima disk still consumed
+physical Mac storage: the guest reported about 95 GiB free while macOS reported
+15 GiB free. An explicit `fstrim` of the idle dedicated data filesystem discarded
+52.3 GiB of already-free blocks, increasing Mac free space to 66 GiB. No files,
+successful Run or accepted artifact were deleted. This is an observed diagnostic
+maintenance action, not automatic launcher behavior or a storage reservation.
+
+## Independent guest boot: partial success, full contract failure
+
+The exact source-owned `os-image/packer/scripts/boot-smoke.sh` and its companion
+scripts came from NKE `ff21ba8c07cafff74b68e238a8876af11e5beded`. The test
+converted the accepted read-only QCOW2 to an independent 20 GiB target, generated
+private NoCloud/SSH inputs outside Git and used the measured Packer/QEMU image
+above. The accepted disk's SHA-256 and size remained unchanged afterward.
+
+Three diagnostic invocations separated harness failures from image checks:
+
+1. The source harness's ARM64 TCG CPU, `max,pauth-impdef=on`, remained at UEFI
+   without Linux/SSH. It was explicitly stopped; this was not a naturally expired
+   complete timeout. It does not establish the exact cause of the stall.
+2. A private QEMU argument adapter changed only that CPU to the produced Plan's
+   `cortex-a57`. Linux booted, cloud-init finished and the root filesystem grew,
+   but host OpenSSH exited with `No user exists for uid 502`: the non-root
+   container's UID had no passwd entry. That invocation was stopped too.
+3. The same CPU adapter plus a private read-only passwd projection for the
+   observed UID allowed the unchanged source assertions to run. SSH connected,
+   cloud-init reported `done`, `lvm-growth-firstboot.service` was active and the
+   root-size assertion passed. NKE agent, SPIRE and configure units were enabled;
+   agent/updater version probes returned `v0.2.1-81-gff21ba8`. The script then
+   exited **1** in its SPIRE-content assertion section. It did not print its final
+   image-contract success message or execute the later conntrack acceptance.
+
+The container was native ARM64, non-root, networkless, capability-dropped, with
+a read-only root filesystem, 6 GiB container memory and four allocated CPUs.
+The guest used two CPUs and 2 GiB RAM; its boot budget was 900 seconds, with an
+outer bounded process timeout. Only the independent target/private work was
+writable. QEMU stopped and the owned container was removed; no assertions were
+removed to obtain a pass. The CPU/passwd projections are diagnostic harness
+adaptations, not changes to NKE source or the produced disk, and are not yet a
+maintained copy-pastable demo boot adapter.
+
+Inspection of the retained material
+`spire-agent_1.14.1+tpm1.9.0-1_arm64.deb` with `dpkg-deb --contents` confirms it
+contains `spire-agent`, `tpm_attestor_agent` and `get_tpm_pubhash`, but no
+`dsx-imds-node-attestor-agent`. The full source contract requires that plugin
+immediately after its SPIRE/TPM executable checks. The remote script did not
+trace individual assertions, so the log alone does not identify the exact first
+failed assertion; the missing required package member is independently verified.
+
+NKE's selected source lock specifies the ARM64 DSX payload SHA-256
+`88226ee3a848e09c620a99aad9c99c64e6c04e7a862836eb206d6e6f9fae2bf5` at
+`https://nke-prod-assets.s3.us-west-2.amazonaws.com/dsx-imds-node-attestor-agent/linux-arm64/dsx-imds-node-attestor-agent`.
+Unauthenticated bounded HEAD and ranged GET requests on October 8 returned HTTP 403. This
+does not prove the object is absent or that authorized acquisition is impossible.
+An organization-scoped GitHub search for `dsx-identity` was denied by SAML
+conditional-access policy, so an accessible source/pin was not established.
+Do not omit the plugin or weaken smoke checks and describe the image as complete.
+
+Private console logs and SSH material remain outside Git in the dedicated VM's
+`nkd-local/os-boot-smoke.GtecjK` probe directory. No site, NICoSim VM tenant,
+server-backed attestation or workload has been accepted. The next gate is an
+accessible pinned DSX input, a fresh correctly packaged image, and a passing
+complete boot contract before the deploy-only journey.

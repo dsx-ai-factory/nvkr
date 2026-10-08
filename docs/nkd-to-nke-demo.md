@@ -48,11 +48,11 @@ values, infrastructure provisioning and tenant lifecycle.
 | Controller chart/templates | `controller-chart` is image-bound; the separate `site` selection matches the installer source | Prepared local chart inputs now cover inventory rendering and the executor's local-path branch; complete staged installation and image override still need validation |
 | CAPNICo provider | `capnico-controller-arm64`, built from pinned public Git | Reachable development image plus NKE's `CAPNICO_IMAGE=repository:tag` override. The current override is tag-shaped; do not silently turn it into a digest contract |
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
-| Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` candidate | Five-tool Plan covers matching Helm/kubectl/clusterctl/ORAS/Kind, but its full Run is unexercised and it is not part of `all`. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
+| Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` | Five-tool Run, verified extraction and native version probes passed; integration into the complete journey and `all` remains. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
 | Dependency images | Twelve acquired ARM64 image outputs | Align chart values or node mirrors with the reachable image locations; stage 4 and NKTP also need inputs outside this set |
-| NKTP | Separate `definition-site.json` declares the source chart and locked dependency preparation | Four-output site Run still unexercised; the packaged chart handoff has real rendering/dry-run evidence, but runtime images are not a complete mirrored NKD set |
+| NKTP | Separate four-output `site` Run completed the source chart and locked dependency preparation | Packaged chart handoff has real rendering/dry-run evidence, but runtime images are not a complete mirrored NKD set and staged installation remains unexercised |
 | Profiles content image | Operator-supplied `images.profiles` | Accessible repository/revision, producer/output or an explicit existing image. The current laptop Definition does not build it |
-| Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | Complete the bake/boot and connect the exact disk to the infrastructure's OS profile. No automatic QCOW2-to-NICo-profile handoff is implemented here |
+| Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection; Run 04's bake completed and a copied disk reached SSH/cloud-init | Full smoke failed in SPIRE checks; retained material lacks DSX IMDS. Restore an accessible pinned input, pass the full contract and connect the exact disk to a plain 26.04.1 profile. No automatic QCOW2-to-NICo-profile handoff is implemented here |
 | Site cluster, NICo access, SPIRE bootstrap CA, tenant login | Operator's authorized test configuration | Not build artifacts. Keep secrets and kubeconfig outside Git; do not invent credentials, site identity or trust roots |
 
 The artifact catalog currently builds the controller from NKE `v0.21.0`, commit
@@ -66,8 +66,9 @@ The additional `site` Definition aligns four candidate producers to PR #1160's
 exact commit: CLI, controller image, image-bound controller chart and NKTP chart.
 It uses the source-owned CLI Make build and controller Dockerfile, rather than
 assuming the older linker/module contracts still work. Compiler contracts and
-an isolated NKTP dependency/package probe pass; no complete four-output Run or
-installation is recorded. This separate selection does not replace the retained
+an isolated NKTP dependency/package probe pass. The later Colima
+[four-output site Run](evidence/2026-10-08-colima-site-and-tools-build.md) completed;
+no installation is recorded. This separate selection does not replace the retained
 22-output Run or become part of `all` automatically.
 
 At the same installer source, `deploy/nke-deploy.sh` already supports packaged
@@ -89,8 +90,8 @@ Tool versions need alignment too: the acquired operator bundle contains Helm
 that is not a hard version gate, but neither is it a matched tool pin.
 The site build wrapper uses pinned Helm 4.3.0. The separate
 [source-tool selection](local-development.md#build-the-installer-tools-from-source)
-declares all five matching tools, with compiler/preflight evidence only. It still
-needs a complete Run, verified extraction and integration into the deploy-only
+declares all five matching tools. Its later Run, verified extraction and native
+version probes passed; it still needs integration into the deploy-only
 journey; it does not replace the build wrapper automatically.
 
 ## Build and inspect today
@@ -121,10 +122,13 @@ The first fresh Docker disk attempt failed before Packer during SPIRE snapshot
 preparation. The native-filesystem retry reached kernel installation but failed
 after Colima's global OOM killer terminated QEMU. It was canceled and recorded failed
 with zero accepted disks. Its run-owned build container was cleaned up; the failed
-Run was retained. A fresh non-overlapping attempt on the
-preserved 24 GiB profile is preparing materials; see the
+Run was retained. The fresh non-overlapping attempt on the preserved 24 GiB
+profile completed one disk build and exported the independently hash-checked
+2,851,733,504-byte non-FDE QCOW2; boot smoke remains a separate check. See the
 [execution evidence](evidence/2026-10-08-colima-local-os-build.md).
-Passing preflight or building materials is not bake/boot evidence.
+The observed installer is Ubuntu 26.04.1, not the fixture profile's Ubuntu
+24.04 FDE choice. The exact disk/profile handoff still needs to honor that
+distinction. Passing preflight or building materials is not bake/boot evidence.
 
 ## Prepare charts without rebuilding them
 
@@ -143,7 +147,8 @@ must execute inside Colima, not directly on macOS. For a host-side handoff,
 `make build` creates the native `bin/nkdctl` using the repository's pinned Go.
 
 The following prepares inputs after the separate `site` and `components` Runs
-complete. It is not evidence that those two Runs have already completed together:
+complete. Two separate Runs are recorded; this is not a combined Run or a
+completed deployment:
 
 ```sh
 # From the NKE Recipes checkout; choose existing, completed attempts.
@@ -201,7 +206,9 @@ real installation remain separate handoff work.
 The [real six-chart handoff probe](evidence/2026-10-08-local-chart-handoff.md)
 passed native NKE rendering and executor dry-run without fetching or rebuilding
 chart dependencies. It deliberately records four completed-Run charts separately
-from two manual packaging probes; it is not a full NKD site Run or deployment.
+from two manual packaging probes. A later
+[completed-Run handoff](evidence/2026-10-08-colima-site-and-tools-build.md) repeated
+both probes with all six charts from completed NKD Runs. Neither is deployment.
 
 ## Registry and release-manifest handoff
 
