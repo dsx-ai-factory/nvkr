@@ -310,6 +310,14 @@ bootstrap CA, Kind-only telemetry TLS settings and disabled reference API
 authentication remain explicit diagnostic exceptions. This establishes local
 site installation, not a full source-built distribution, QCOW2 tenant/workload
 acceptance, qualified execution or authenticated Release.
+The internal downstream network guard now has
+[native setup/restoration evidence](../evidence/2026-10-08-local-network-guard.md)
+for normal completion and a deliberate joined consumer failure. It binds
+created bridge identity, exact owner-comment rules, private file capabilities,
+temporary QEMU controls and original sysctls, with fail-closed ownership and
+unjoined-producer negatives. This primitive is not yet integrated into the
+site entrypoint or a complete tenant command. No guest DHCP/DNS delivery, BGP
+route, tenant or workload acceptance is established by its listeners.
 Four sources use bounded module preparation with unchanged manifest
 checks; Kubernetes uses its committed vendor/staging workspace. All five compile
 offline. Helm reuses PR #113's exact target-checked removal of four upstream

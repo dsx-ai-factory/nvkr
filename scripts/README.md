@@ -21,6 +21,11 @@ See the [site command and prerequisites](../docs/local-site-integration.md) and
 [real replay evidence](../docs/evidence/2026-10-08-local-site-integration.md).
 It requires an existing private NICoSim endpoint and is not tenant/workload E2E.
 
+The internal `nke-local-network.py` guard has real native setup/restoration
+evidence, including a deliberate consumer failure. It is not yet wired into
+the site entrypoint or a complete tenant command; see the
+[scope and restoration readback](../docs/evidence/2026-10-08-local-network-guard.md).
+
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
 OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
@@ -38,7 +43,7 @@ not a deployment; see the [site handoff](../docs/nkd-to-nke-demo.md).
 `tools` separately selects source-built Linux ARM64 Helm, kubectl, clusterctl,
 ORAS and Kind at the staged installer's pinned versions. Compiler/preflight
 contracts, complete build, verified extraction and native version probes passed;
-complete deployment remains unexercised. Helm's
+site-only deployment passed; complete tenant/workload E2E remains unexercised. Helm's
 exact fixture preparation is diagnostic Local-only, not a supported held hosted
 fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
 `profiles` separately builds the diagnostic plain ARM64/Ubuntu 26.04 controller

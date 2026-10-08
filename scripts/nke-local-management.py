@@ -181,11 +181,23 @@ def execute(argv, phase, work, env, timeout, diagnostic_optional=False, output=N
             except (VM.SmokeError, OSError, subprocess.TimeoutExpired) as err:
                 raise UnjoinedProcess(f"{phase}: stop/join failed; refusing concurrent cleanup") from err
     if process.returncode:
-        raise VM.SmokeError(f"{phase}: failed (exit {process.returncode}); private phase log retained")
+        raise VM.SmokeError(f"{phase}: failed (exit {process.returncode}); private phase log retained", process.returncode)
 
 
-def capture(argv, phase, work, env, timeout=30, text=True):
+def capture(argv, phase, work, env, timeout=30, text=True, volatile=False):
     """Capture a bounded private result with the same stop/join ownership."""
+    if volatile:
+        # Native Linux cleanup must not require writable diagnostic storage.
+        # memfd is a stdlib-managed anonymous RAM file, not a release receipt.
+        if not hasattr(os, "memfd_create"):
+            raise VM.SmokeError("volatile cleanup capture requires native Linux")
+        with os.fdopen(os.memfd_create("nkd-cleanup", os.MFD_CLOEXEC), "w+b") as output:
+            execute(argv, phase, work, env, timeout, diagnostic_optional=True, output=output)
+            if os.fstat(output.fileno()).st_size > 8 * 1024**2:
+                raise VM.SmokeError(phase + ": result exceeds diagnostic bound")
+            output.seek(0)
+            raw = output.read(8 * 1024**2)
+        return raw.decode() if text else raw
     result = work / (phase + ".stdout")
     with result.open("xb") as output:
         execute(argv, phase, work, env, timeout, output=output)

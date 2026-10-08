@@ -33,6 +33,12 @@ charts, exact controller/profiles/CAPNICo image handoff and runtime image-ID
 checks, site health, registration and API access, then owned cleanup. This
 supersedes the earlier site-installation gap, not the tenant/workload gap.
 
+The internal downstream [network guard](evidence/2026-10-08-local-network-guard.md)
+also passed native setup/restoration and a deliberate consumer-failure replay.
+It is not yet connected to the site entrypoint, simulator/guest lifetime or
+disk serving. Its running DHCP/DNS process does not establish guest delivery,
+BGP routes or tenant provisioning.
+
 **The artifact-build part is tested; the complete NKD-to-demo E2E is not yet
 validated.** Do not use the completed 22-output local Run as proof that a site or
 tenant was installed. The [first-time build guide](local-development.md) is the
