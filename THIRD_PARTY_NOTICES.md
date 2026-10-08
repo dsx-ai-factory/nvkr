@@ -35,8 +35,8 @@ Regenerate with `make notices`.
 | `github.com/urfave/cli/v2` | v2.27.7 | MIT |
 | `github.com/xrash/smetrics` | v0.0.0-20240521201337-686a1a2994c1 | MIT |
 | `go.yaml.in/yaml/v2` | v2.4.2 | Apache-2.0 |
-| `go.yaml.in/yaml/v3` | v3.0.4 | MIT |
-| `golang.org/x/sync` | v0.22.0 | BSD-3-Clause |
+| `go.yaml.in/yaml/v3` | v3.0.5 | MIT |
+| `golang.org/x/sync` | v0.23.0 | BSD-3-Clause |
 | `golang.org/x/sys` | v0.48.0 | BSD-3-Clause |
 | `oras.land/oras-go/v2` | v2.6.2 | Apache-2.0 |
 | `sigs.k8s.io/yaml` | v1.6.0 | MIT |
@@ -1843,7 +1843,7 @@ limitations under the License.
 
 ## go.yaml.in/yaml/v3
 
-Version: v3.0.4
+Version: v3.0.5
 
 ```
 This project is covered by two different licenses: MIT and Apache.
@@ -1919,7 +1919,7 @@ limitations under the License.
 
 ## golang.org/x/sync
 
-Version: v0.22.0
+Version: v0.23.0
 
 ```
 Copyright 2009 The Go Authors.
