@@ -132,6 +132,20 @@
   @media(prefers-reduced-motion:reduce){.progress>i{transition:none;}}
 
   .replacement-table td:first-child{width:60%;}
+
+  @media print {
+    :root {--bg:#fff;--panel:#f4f6f8;--panel-2:#eef1f4;--border:#7b8794;--text:#17212b;--dim:#425466;--accent:#174f82;--accent-bright:#174f82;--accent-tint:#eaf1f8;}
+    body,.slide {background:var(--bg);color:var(--text);}
+    .slide h1,.slide h2,.slide h3,.slide p,pre {color:var(--text);}
+    a,a:hover {color:var(--accent-bright);}
+    .code {background:var(--panel);}
+    .source a,.source a:hover {background:var(--accent-tint);border-color:var(--border);}
+    pre .c {color:var(--dim);}
+    .diagram text {fill:var(--text);}
+    .diagram .nsub,.diagram .elabel {fill:var(--dim);}
+    .diagram .node-accent {fill:var(--accent-tint);}
+    .diagram marker path {fill:var(--accent);}
+  }
 </style></head><body><div class="deck-top"><span class="brand">NKD<span class="sub"> · Team introduction</span></span><nav class="deck-links" aria-label="NKD HTML guides"><a id="concept-link" href="demo-team-concepts.html?from=1#overview">Concept gallery ↗</a><a id="walkthrough-link" href="demo-team-walkthrough.html">Guided demos ↗</a></nav><span class="sect" id="sect"></span></div><section class="slide center" data-title="Start here"><div class="slide-inner"><div class="label">NKD / TEAM INTRODUCTION</div><h1>From intent to<br>inspectable release.</h1><p class="lede">Choose the deliverables. See the work. Follow the exact bytes and their evidence.</p><div class="hero-path"><span>Definition</span><b>→</b><span>Run</span><b>→</b><span>Release</span></div><div class="chips"><a class="chip" href="demo-team-concepts.html?from=1#catalog">Catalogs &amp; pins</a><a class="chip" href="demo-team-concepts.html?from=1#graphs">Plan graphs</a><a class="chip" href="demo-team-concepts.html?from=1#generators">Generated CI</a><a class="chip" href="demo-team-concepts.html?from=1#os-images">OS images</a><a class="chip" href="demo-team-concepts.html?from=1#browse">Release navigation</a></div><p class="source">Team walkthrough · PR #108 · October 6, 2026 · About 12 minutes + guided demos</p></div></section>
 <section class="slide" data-title="The authoring model"><div class="slide-inner"><div class="label">01 / DECLARE</div><h2>Three inputs explain the work.</h2><div class="cards"><article class="card"><span class="big">Catalog</span><h3>How to produce it</h3><p>Reusable component recipes and the exact inputs they use.</p></article><article class="card"><span class="big">Definition</span><h3>What must ship</h3><p>Named deliverables, the components they select and their target platforms.</p></article><article class="card"><span class="big">Environment</span><h3>Where it runs</h3><p>Runtime, registry destination and signing settings.</p></article></div><p>NKD derives the work from these inputs.</p><p class="source"><a href="demo-team-concepts.html?from=2#catalog">Catalogs</a><a href="demo-team-concepts.html?from=2#definition">Definitions</a><a href="demo-team-concepts.html?from=2#environment">Environments</a></p></div></section>
 <section class="slide" data-title="Catalog to outputs"><div class="slide-inner"><div class="label">02 / SELECT</div><h2>Choose components. Name the deliverables.</h2><div class="two"><div><div class="code small"><pre>outputs:
