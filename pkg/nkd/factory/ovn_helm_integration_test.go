@@ -3,6 +3,9 @@
 
 package factory
 
+// This file checks NVIDIA's supplied OVN chart against generic Helm packaging.
+// Component-specific Go tests are not a requirement for adding a catalog.
+
 import (
 	"bytes"
 	"context"

@@ -189,6 +189,11 @@ OVN producer, not an OVN-only maintained image or optional-material composer.
 
 ## Tests and limitations
 
+The OVN-specific Go tests below are regression coverage for this NVIDIA-supplied catalog. They are not
+an NKD extension or a requirement for adding another catalog. Catalogs using existing NKD capabilities
+need declarations and pins, not component-specific Go code. These tests exercise the generic compiler
+and executor and check this catalog's packaging and chart behavior.
+
 ```sh
 go test ./pkg/nkd/buildgraph -run '^TestNKEOVNFork(Graphs|ReleaseOutputs)$' -count=1
 

@@ -4,6 +4,11 @@ A catalog defines reusable components and how to build or acquire them. A Defini
 components belong in each required output. Start with the [quickstart](quickstart.md) for CLI setup;
 the [concept reference](user-concepts.md) explains the broader lifecycle.
 
+Adding a catalog with existing NKD capabilities requires declarations and pins, not Go code or
+component-specific Go tests. The NKE and OVN tests in this repository are regression coverage for
+NVIDIA's supplied catalogs, not catalog authoring requirements. Generic validation checks declarations
+and dependency graphs; actual builds and output checks validate the declared producer commands.
+
 The example packages two application tools: `app-cli` for users and `config-cli` for administrators.
 The `client-bundle` contains `app-cli`; the `admin-bundle` contains both tools.
 

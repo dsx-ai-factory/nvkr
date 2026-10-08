@@ -3,6 +3,9 @@
 
 package buildgraph_test
 
+// This file validates NVIDIA's supplied OVN catalog through generic NKD APIs.
+// Component-specific Go tests are not a requirement for adding a catalog.
+
 import (
 	"context"
 	"crypto/sha256"
