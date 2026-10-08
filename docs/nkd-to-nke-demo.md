@@ -9,6 +9,11 @@ The intended developer journey is: build the ARM64 artifacts with NKD, make the
 exact produced images and charts reachable by NKE, run the NKE site installer,
 create a tenant and verify it, then rebuild and retest a source change.
 
+The exact packaged simulator also passed a later
+[native libvirt-backed startup probe](evidence/2026-10-08-native-nicosim-libvirt-startup.md)
+after explicit VM prerequisite installation. That probe created no guests and
+does not establish tenant provisioning, networking or workload acceptance.
+
 **The artifact-build part is tested; the complete NKD-to-demo E2E is not yet
 validated.** Do not use the completed 22-output local Run as proof that a site or
 tenant was installed. The [first-time build guide](local-development.md) is the

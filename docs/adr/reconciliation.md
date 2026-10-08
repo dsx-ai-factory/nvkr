@@ -220,7 +220,13 @@ completed 1/1, and existing delivery commands verified/extracted its final bundl
 An offline non-root mock-runtime probe initialized SQLite and served the exact
 packaged UI without NKE source mounted; a bounded repack probe matched archive
 bytes despite changed temporary filesystem timestamps/permissions.
-Neither probe establishes real VM provisioning or qualification. Integration
+Neither probe establishes real VM provisioning or qualification.
+The later [native libvirt startup probe](../evidence/2026-10-08-native-nicosim-libvirt-startup.md)
+used the exact delivery-verified bundle after scoped VM prerequisite installation:
+non-root session-hypervisor/SQLite initialization, one metadata gateway and exact
+packaged UI passed; the owned server stopped/joined. No guest was created, the
+link-local bind failed and BGP was disabled; full networking/TPM/guest acceptance
+is still absent. Integration
 into the combined set and the complete
 Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
 qualification authority.
