@@ -48,7 +48,7 @@ values, infrastructure provisioning and tenant lifecycle.
 | Controller chart/templates | `controller-chart` is image-bound; Lia's deploy path currently installs a chart from its NKE checkout | Decide/test use of the packaged chart through NKE's chart override, or align the installer checkout and exact built controller source. Do not claim the installer automatically consumes this packaged chart |
 | CAPNICo provider | `capnico-controller-arm64`, built from pinned public Git | Reachable development image plus NKE's `CAPNICO_IMAGE=repository:tag` override. The current override is tag-shaped; do not silently turn it into a digest contract |
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
-| Operator CLI/tools | `nkectl`, `operator-tools` | CLI is Linux ARM64; run it on the Linux execution host. Installer also needs `clusterctl`, Python, curl and ORAS, which this output does not supply |
+| Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` candidate | Five-tool Plan covers matching Helm/kubectl/clusterctl/ORAS/Kind, but its full Run is unexercised and it is not part of `all`. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
 | Dependency images | Twelve acquired ARM64 image outputs | Align chart values or node mirrors with the reachable image locations; stage 4 and NKTP also need inputs outside this set |
 | NKTP | Separate `definition-site.json` declares the source chart and locked dependency preparation | Four-output site Run still unexercised; runtime images are not a complete mirrored NKD set. Installer inventory rendering still prepares source-tree chart dependencies |
 | Profiles content image | Operator-supplied `images.profiles` | Accessible repository/revision, producer/output or an explicit existing image. The current laptop Definition does not build it |
@@ -81,11 +81,15 @@ However, `deploy/lib/describe_site.py` still renders source-tree charts and buil
 their dependencies during inventory preparation. Passing a packaged chart to
 installation alone does not establish a rebuild-free complete journey.
 
-Tool versions need alignment too: the local operator bundle contains Helm
-`v4.1.4`, while this installer guide requires `v4.2.4`, ORAS `1.3.3` and
-`clusterctl v1.12.3`. Do not treat a present executable as a matching tool pin.
-The site build wrapper uses pinned Helm 4.3.0; it does not claim to pass that
-separate installer's 4.2.4 tool gate.
+Tool versions need alignment too: the acquired operator bundle contains Helm
+`v4.1.4`, while the installer pins `v4.2.4`, ORAS `1.3.3` and
+`clusterctl v1.12.3`. Its readiness script warns on a Helm version mismatch;
+that is not a hard version gate, but neither is it a matched tool pin.
+The site build wrapper uses pinned Helm 4.3.0. The separate
+[source-tool selection](local-development.md#build-the-installer-tools-from-source)
+declares all five matching tools, with compiler/preflight evidence only. It still
+needs a complete Run, verified extraction and integration into the deploy-only
+journey; it does not replace the build wrapper automatically.
 
 ## Build and inspect today
 

@@ -14,6 +14,7 @@ not a full source-built NKE distribution. See the
 | Source-built provider loop | `definition-providers.json` | Two native provider images, no disk |
 | NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive, not included in the 23-output set |
 | Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart; not included in the 23-output set |
+| Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; separate from the acquired `operator-tools` in `all` |
 
 Use `environment-local.json` for rootless Podman, or `environment-local-docker.json`
 with `CONTAINER_RUNTIME=docker` on native Linux ARM64, including execution inside
@@ -95,6 +96,15 @@ CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
 Docker/Podman compiler contracts and an [isolated Helm preparation/package
 probe](../../docs/evidence/2026-10-08-local-site-chart-preparation.md) pass.
 A complete four-output NKD Run remains unexercised. The wrapper uses the existing
-pinned Helm 4.3.0, not the installer's required 4.2.4. Read the
+pinned Helm 4.3.0, not the installer's preferred 4.2.4. Its readiness script warns
+on this mismatch; a warning is not a matched pin. Read the
 [handoff gaps](../../docs/nkd-to-nke-demo.md) before treating these inputs as a
 working deployment. Do not run another large build alongside the OS bake.
+
+The separate `tools` selection compiles Helm 4.2.4, kubectl 1.36.0, clusterctl
+1.12.3, ORAS 1.3.3 and Kind 0.32.0 from their machine-pinned upstream Git trees.
+It reuses PR #113's preparation/offline-build approach and does not change the
+older acquired `operator-tools` output or the OS graph. See the
+[source-tool instructions and limits](../../docs/local-development.md#build-the-installer-tools-from-source).
+Compiler and preflight contracts pass; a complete five-component Run and tool
+installation are still unexercised. These are Linux binaries, not Mac binaries.

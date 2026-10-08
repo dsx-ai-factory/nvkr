@@ -20,6 +20,11 @@ does not require a previously cached toolchain; Docker bootstrap requires Buildx
 outputs. Its local pinned Helm wrapper prepares NKTP's locked dependencies before
 offline packaging. It is a compiler-tested candidate, not a completed four-output
 Run or deployment; see the [site handoff](../docs/nkd-to-nke-demo.md).
+`tools` separately selects source-built Linux ARM64 Helm, kubectl, clusterctl,
+ORAS and Kind at the staged installer's pinned versions. Compiler/preflight
+contracts pass; its complete build and deployment remain unexercised. Helm's
+exact fixture preparation is diagnostic Local-only, not a supported held hosted
+fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
 The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.
 `CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, or explicitly

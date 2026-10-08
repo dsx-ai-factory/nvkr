@@ -234,9 +234,22 @@ attempt substitutions do not override a pinned runtime entrypoint. A
 [bounded real Helm preparation/package probe](../evidence/2026-10-08-local-site-chart-preparation.md)
 passed. A complete four-output NKD Run and deployment remain unexercised; the
 site set is separate from `all`. Dependency charts remain acquisitions and the
-wrapper's Helm 4.3.0 does not satisfy the installer's 4.2.4 tool gate. Source-tree
+wrapper's Helm 4.3.0 does not match the installer's preferred 4.2.4; its readiness
+script warns rather than failing solely on that mismatch. Source-tree
 inventory rendering still prepares chart dependencies, despite existing staged
 installation hooks for packaged charts and a prepared CAPNICo image.
+The separate local `definition-tools.json` declares one source-built Linux ARM64
+bundle of Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3, ORAS 1.3.3 and Kind 0.32.0,
+matching the selected installer's source-owned tool pins. Native Docker/Podman
+compiler and no-work preflight contracts pass; no complete tool Run or installation
+is recorded. Four sources use bounded module preparation with unchanged manifest
+checks; Kubernetes uses its committed vendor/staging workspace. All five compile
+offline. Helm reuses PR #113's exact target-checked removal of four upstream
+negative-test symlinks in diagnostic Local preparation. Held hosted source fetch
+rejects these external links before the command; no containment or qualified
+admission is relaxed. The acquired `operator-tools`, `all`, OS source graph and
+combined-demo gaps remain unchanged. Tool/transitive organizational approval is
+not established by compiler tests or NKD's own vulnerability gate.
 The laptop launcher additionally enters an explicitly selected Colima ARM64
 Docker profile before invoking the existing Linux local runner. It does not
 select Docker Desktop, switch contexts, create/start/reset VMs, change OS

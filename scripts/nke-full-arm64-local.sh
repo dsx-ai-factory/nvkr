@@ -8,12 +8,13 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "${repo_root}"
 usage() {
   printf '%s\n' \
-    'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers|simulator|site]' \
-    '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers|simulator|site]' \
+    'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers|simulator|site|tools]' \
+    '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers|simulator|site|tools]' \
     'all: 23 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
     'simulator bootstraps the same pinned Go/GCC toolchain on Podman or Docker.' \
     'site: four source-aligned installer outputs (controller, CLI, controller chart and NKTP chart).' \
+    'tools: one source-built Linux ARM64 bundle (Helm, kubectl, clusterctl, ORAS and Kind).' \
     'This subset is NOT a full source-built NKE distribution.' \
     'No host Go/Make or installed nkdctl needed: bootstrap uses the pinned utility image.' \
     'CONTAINER_RUNTIME=podman (default) or docker (native Linux ARM64 / explicitly selected Colima).' \
@@ -40,7 +41,7 @@ fi
 if [[ ! "${attempt}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ || ! "${jobs}" =~ ^[1-9][0-9]*$ ]]; then
   echo 'Supply a fresh attempt name and positive job count.' >&2; exit 2
 fi
-case "${lane}" in all|components|os|providers|simulator|site) ;; *) echo 'Select all, components, os, providers, simulator or site.' >&2; exit 2 ;; esac
+case "${lane}" in all|components|os|providers|simulator|site|tools) ;; *) echo 'Select all, components, os, providers, simulator, site or tools.' >&2; exit 2 ;; esac
 runtime="${CONTAINER_RUNTIME:-podman}"
 case "${runtime}" in podman|docker) ;; *) echo 'CONTAINER_RUNTIME must be podman or docker.' >&2; exit 2 ;; esac
 host_system="$(uname -s)"
