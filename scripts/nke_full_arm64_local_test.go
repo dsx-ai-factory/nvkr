@@ -369,3 +369,88 @@ esac
 		})
 	}
 }
+
+func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
+	const validated = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const plan = `{"builds":[{"name":"nicosim-tools-arm64","catalogDigest":"catalog","components":["nico-sim"],"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}}]}`
+	for _, tc := range []struct {
+		name, returned, buildExit string
+		wantError                 bool
+	}{
+		{"freeze validated ID without resolving tag", validated, "0", false},
+		{"reject empty result", "", "0", true},
+		{"reject result mixed with diagnostics", "diagnostic\n" + validated, "0", true},
+		{"failed validation cannot proceed", validated, "42", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			write := func(name string, data []byte, mode os.FileMode) {
+				t.Helper()
+				path := filepath.Join(dir, name)
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, data, mode); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, path := range []string{"scripts/nke-full-arm64-local.sh", "scripts/nke-os-plan.jq",
+				"definitions/nke-laptop-arm64/environment-local-docker.json", "toolchains/nkd-packer/toolchain.lock.json"} {
+				data, err := os.ReadFile(filepath.Join("..", path))
+				if err != nil {
+					t.Fatal(err)
+				}
+				write(path, data, 0600)
+			}
+			write("definitions/nke-laptop-arm64/definition-simulator.json", []byte(`{"catalog":{"base":"simulator-catalog"},"outputs":[]}`), 0600)
+			write("toolchains/nkd-packer/build.sh", []byte(`#!/bin/sh
+printf 'toolchain-build %s\n' "$*" >>"$TEST_CALLS"
+case " $* " in *' --print-validated-image-id '*) ;; *) exit 99;; esac
+printf '%s\n' "$TEST_RETURNED"
+exit "$TEST_BUILD_EXIT"
+`), 0700)
+			write("tools/runner", []byte(`#!/bin/sh
+printf '%s\n' "$*" >>"$TEST_CALLS"
+case "$1 $2" in
+  'run plan') printf '%s\n' "$TEST_PLAN";;
+  'run local') jq -e --arg id "$TEST_VALIDATED" '.toolchainSubstitutions[0].to == $id' "$TEST_REPO/.nkd/laptop-bootstrap/id-probe/toolchain-attempt.json";;
+  *) exit 99;;
+esac
+`), 0700)
+			write("tools/uname", []byte("#!/bin/sh\nif [ \"$1\" = -s ]; then echo Linux; else echo aarch64; fi\n"), 0700)
+			write("tools/id", []byte("#!/bin/sh\necho 1000\n"), 0700)
+			write("tools/docker", []byte(`#!/bin/sh
+printf '%s\n' "$*" >>"$TEST_CALLS"
+case "$1 $2" in
+  'version --format'|'buildx version'|'pull --platform') exit 0;;
+  'info --format') echo linux/arm64;;
+  'context inspect') echo unix:///var/run/docker.sock;;
+  'run --rm') cp "$TEST_REPO/tools/runner" "$TEST_REPO/.nkd/laptop-bootstrap/id-probe/nkdctl";;
+  'image inspect') echo 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';;
+  *) exit 99;;
+esac
+`), 0700)
+			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", filepath.Join(dir, "scripts/nke-full-arm64-local.sh"), "id-probe", "1", "simulator")
+			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
+				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
+				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
+				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"))
+			out, err := cmd.CombinedOutput()
+			if (err != nil) != tc.wantError {
+				t.Fatalf("error=%v output=%s, want failure=%t", err, out, tc.wantError)
+			}
+			calls, err := os.ReadFile(filepath.Join(dir, "calls"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(calls), "image inspect") {
+				t.Fatalf("launcher resolved validated bytes through a mutable tag: %s", calls)
+			}
+			if reached := strings.Contains(string(calls), "run local"); reached == tc.wantError {
+				t.Fatalf("local execution reached=%t; want %t: %s", reached, !tc.wantError, calls)
+			}
+		})
+	}
+}

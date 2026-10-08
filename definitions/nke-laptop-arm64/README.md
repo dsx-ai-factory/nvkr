@@ -100,8 +100,10 @@ commit `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`, rather than combining older
 controller and CLI release pins. It uses the source-owned CLI Make build and
 controller Dockerfile, preserves chart versions `0.0.0` and `0.1.0-rc.2`, and binds
 the controller chart to the produced image. Its local Helm wrapper registers
-NKTP's three repositories before fetching locked chart dependencies; packaging
-then runs offline. Those dependency archives are not independent source builds
+NKTP's three repositories before fetching locked chart dependencies and verifies
+the three exact archive SHA-256 pins before offline packaging. A missing,
+additional or republished same-version archive fails preparation. Those
+dependency archives are not independent source builds
 or upstream-signature-verified inputs.
 
 ```sh

@@ -4,15 +4,123 @@
 package factory
 
 import (
+	"context"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
+
+// The negative cases run the actual compiled preparation command with Helm
+// mocked, but real archive checks. An explicit local archive fixture adds a
+// positive byte-check probe; neither mode proves upstream signature trust.
+func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
+	if _, err := exec.LookPath("sha256sum"); err != nil {
+		t.Skip("archive-byte contracts require sha256sum")
+	}
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	definitionPath := filepath.Join("definitions", "nke-laptop-arm64", "definition-site.json")
+	environmentPath := filepath.Join(filepath.Dir(definitionPath), "environment-local-docker.json")
+	doc, err := definition.LoadDefinition(t.Context(), definitionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := definition.LoadEnvironment(t.Context(), environmentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := CompileDocuments(t.Context(), definitionPath, doc, environmentPath, env, "contract-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var command []string
+	for _, build := range plan.Builds {
+		if build.Name == "nktp" {
+			for _, node := range build.Graph.Nodes {
+				if node.Kind == ir.KindFetch {
+					command = node.VendorCmd
+				}
+			}
+		}
+	}
+	if len(command) == 0 {
+		t.Fatal("missing compiled NKTP preparation command")
+	}
+	archives := []string{"metrics-server-3.13.1.tgz", "opentelemetry-kube-stack-0.22.0.tgz", "prometheus-node-exporter-4.56.1.tgz"}
+	for _, tc := range []struct {
+		name, message string
+		count         int
+		fixture       bool
+	}{
+		{"republished archives fail hashes", "FAILED", 3, false},
+		{"missing archive fails count", "Expected exactly three", 2, false},
+		{"additional archive fails count", "Expected exactly three", 4, false},
+		{"held acquired archive bytes pass", "", 3, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := os.Getenv("NKD_TEST_NKTP_CHART_ARCHIVES")
+			if tc.fixture && fixture == "" {
+				t.Skip("positive byte probe requires explicit NKD_TEST_NKTP_CHART_ARCHIVES")
+			}
+			dir := t.TempDir()
+			chart := filepath.Join(dir, "nktp/deploy/charts/nktp")
+			tools := filepath.Join(dir, "tools")
+			for _, path := range []string{filepath.Join(chart, "charts"), tools} {
+				if err := os.MkdirAll(path, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, name := range []string{"Chart.yaml", "Chart.lock"} {
+				if err := os.WriteFile(filepath.Join(chart, name), []byte("unchanged source fixture\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := range tc.count {
+				name := "additional.tgz"
+				if i < len(archives) {
+					name = archives[i]
+				}
+				data := []byte("republished archive\n")
+				if tc.fixture {
+					data, err = os.ReadFile(filepath.Join(fixture, name))
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := os.WriteFile(filepath.Join(chart, "charts", name), data, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(tools, "helm"), []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "PATH="+tools+string(os.PathListSeparator)+os.Getenv("PATH"))
+			out, err := cmd.CombinedOutput()
+			if tc.fixture {
+				if err != nil || strings.Count(string(out), ".tgz: OK") != 3 {
+					t.Fatalf("held archive checks failed: %v: %s", err, out)
+				}
+			} else if err == nil || !strings.Contains(string(out), tc.message) {
+				t.Fatalf("preparation error=%v output=%s; want failure %q", err, out, tc.message)
+			}
+		})
+	}
+}
 
 // These are compiler contracts, not a four-output build or installation test.
 func TestLaptopSiteArtifactContract(t *testing.T) {
@@ -87,7 +195,11 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						}
 						if build.Name == "nktp" {
 							command := strings.Join(node.VendorCmd, " ")
-							for _, required := range []string{"sh -euc", "HELM_REPOSITORY_CONFIG=/tmp/", "HELM_REPOSITORY_CACHE=/tmp/", "helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts", "helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts", "helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/", "helm dependency build nktp/deploy/charts/nktp --skip-refresh", "sha256sum -c -"} {
+							for _, required := range []string{"sh -euc", "HELM_REPOSITORY_CONFIG=/tmp/", "HELM_REPOSITORY_CACHE=/tmp/", "helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts", "helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts", "helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/", "helm dependency build nktp/deploy/charts/nktp --skip-refresh", "sha256sum -c -",
+								"084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz",
+								"df7d63a331d9d164a276f5b4395c6383c00fe801abcc6b2ea969de182914dc32  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.22.0.tgz",
+								"70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz",
+								`[ "$#" -ne 3 ]`} {
 								if !strings.Contains(command, required) {
 									t.Fatalf("NKTP dependency preparation lacks %q", required)
 								}

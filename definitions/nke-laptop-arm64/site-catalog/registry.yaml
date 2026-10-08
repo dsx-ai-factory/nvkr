@@ -44,9 +44,9 @@ sources:
     constraint: 0.21.x
     toolchainImagesByArch:
       arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
-    # The source-owned Chart.lock selects the dependency versions. Fetch captures
-    # their bytes before offline packaging; this does not authenticate upstream
-    # chart signatures or turn the dependency charts into source builds.
+    # The source-owned Chart.lock selects the dependency versions. Fetch checks
+    # their captured archive digests before offline packaging. These pins do not
+    # authenticate upstream signatures or make the dependencies source builds.
     vendorCommand:
       - sh
       - -euc
@@ -61,6 +61,16 @@ sources:
         helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
         helm dependency build nktp/deploy/charts/nktp --skip-refresh
         printf '%s\n' "$pins" | sha256sum -c -
+        set -- nktp/deploy/charts/nktp/charts/*.tgz
+        if [ "$#" -ne 3 ]; then
+          echo 'Expected exactly three pinned NKTP dependency-chart archives.' >&2
+          exit 1
+        fi
+        printf '%s\n' \
+          '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz' \
+          'df7d63a331d9d164a276f5b4395c6383c00fe801abcc6b2ea969de182914dc32  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.22.0.tgz' \
+          '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+          | sha256sum -c -
 components:
   nkectl:
     fromSource: true

@@ -4,6 +4,7 @@
 package packer_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -14,6 +15,93 @@ import (
 	"testing"
 	"time"
 )
+
+func TestToolchainValidatedImageID(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("requires jq")
+	}
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip("requires a supported native architecture")
+	}
+	const measured = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	for _, tc := range []struct {
+		name, inspected, smokeExit string
+		flags                      []string
+		wantError, wantID          bool
+	}{
+		{name: "exact validated ID", inspected: measured, smokeExit: "0", wantID: true},
+		{name: "normalize Podman-style ID", inspected: strings.TrimPrefix(measured, "sha256:"), smokeExit: "0", wantID: true},
+		{name: "native smoke failure emits no ID", inspected: measured, smokeExit: "42", wantError: true},
+		{name: "invalid inspected ID emits no ID", inspected: "mutable:tag", smokeExit: "0", wantError: true},
+		{name: "lock check is not validation", inspected: measured, smokeExit: "0", flags: []string{"--check"}, wantError: true},
+		{name: "cross mode is not native proof", inspected: measured, smokeExit: "0", flags: []string{"--cross-build-only"}, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for _, name := range []string{"build.sh", "toolchain.lock.json"} {
+				data, err := os.ReadFile(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(dir, name), data, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			fake := filepath.Join(dir, "docker")
+			log := filepath.Join(dir, "calls")
+			const script = `#!/bin/sh
+printf '%s\n' "$1 $2 $3" >>"$TEST_CALLS"
+case "$1 $2" in
+  'buildx version'|'version --format') echo 'runtime diagnostic';;
+  'buildx build') printf 'archive\n';;
+  'image load') cat >/dev/null; echo 'load diagnostic';;
+  'image inspect')
+    [ "$3" != --format ] || exit 97
+    printf '[{"Id":"%s","Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' "$TEST_IMAGE_ID" "$TEST_ARCH";;
+  'run --rm')
+    case "$*" in *"$TEST_EXPECTED_ID -ec "*) ;; *) exit 98;; esac
+    echo 'native smoke diagnostic'
+    exit "$TEST_SMOKE_EXIT";;
+  *) exit 99;;
+esac
+`
+			if err := os.WriteFile(fake, []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			args := append([]string{filepath.Join(dir, "build.sh"), "--arch", runtime.GOARCH,
+				"--diagnostic-local", "--print-validated-image-id"}, tc.flags...)
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", args...)
+			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_CALLS="+log,
+				"TEST_ARCH="+runtime.GOARCH, "TEST_IMAGE_ID="+tc.inspected, "TEST_EXPECTED_ID="+measured,
+				"TEST_SMOKE_EXIT="+tc.smokeExit, "NKD_BUILD_ARCHIVES=", "NKD_BUILD_CA_BUNDLE=")
+			var diagnostics bytes.Buffer
+			cmd.Stderr = &diagnostics
+			out, err := cmd.Output()
+			if (err != nil) != tc.wantError {
+				t.Fatalf("error=%v stdout=%s stderr=%s; want error=%t", err, out, diagnostics.String(), tc.wantError)
+			}
+			want := ""
+			if tc.wantID {
+				want = measured + "\n"
+				if !strings.Contains(diagnostics.String(), "native smoke diagnostic") {
+					t.Fatalf("ID returned without native smoke: %s", diagnostics.String())
+				}
+			}
+			if string(out) != want {
+				t.Fatalf("stdout=%q; want only validated ID %q", out, want)
+			}
+			calls, _ := os.ReadFile(log)
+			if strings.Contains(string(calls), "image inspect --format") {
+				t.Fatalf("identity re-resolved through mutable tag: %s", calls)
+			}
+			if len(tc.flags) > 0 && len(calls) > 0 {
+				t.Fatalf("unsupported output mode performed runtime work: %s", calls)
+			}
+		})
+	}
+}
 
 func TestToolchainDockerExportAndLoad(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
@@ -53,12 +141,9 @@ case "$1 $2" in
     test "$(cat)" = test-image-archive
     exit "${TEST_LOAD_EXIT}"
     ;;
-  "image inspect")
-    if [[ "$3" == --format ]]; then
-      printf 'sha256:%064d\n' 1
-    else
-      printf '[{"Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' "${TEST_ARCH}"
-    fi
+		"image inspect")
+    [[ "$3" != --format ]]
+    printf '[{"Id":"sha256:%064d","Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' 1 "${TEST_ARCH}"
     ;;
   "run --rm") exit 0 ;;
   *) echo "unexpected runtime command: $*" >&2; exit 99 ;;
@@ -189,8 +274,8 @@ printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
   'build --platform') exit 0 ;;
   'image inspect')
-    if [ "$3" = --format ]; then echo "$TEST_IMAGE_ID";
-    else printf '[{"Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' "$TEST_ARCH"; fi ;;
+    [ "$3" != --format ] || exit 97
+    printf '[{"Id":"%s","Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' "$TEST_IMAGE_ID" "$TEST_ARCH" ;;
   'run --rm') case "$*" in *"$TEST_IMAGE_ID -ec "*) exit 0;; *) exit 98;; esac ;;
   *) exit 99 ;;
 esac

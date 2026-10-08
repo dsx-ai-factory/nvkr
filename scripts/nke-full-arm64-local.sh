@@ -231,9 +231,12 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
     image="$(jq -er '.localPodmanImages.arm64' toolchains/nkd-packer/toolchain.lock.json)"
     if [[ "${runtime}" != podman ]] || ! podman image inspect "${image}" >/dev/null 2>&1; then
       toolchain_tag="localhost/nkd-packer-toolchain:laptop-${attempt}"
-      CONTAINER_RUNTIME="${runtime}" bash toolchains/nkd-packer/build.sh --arch arm64 --diagnostic-local --tag "${toolchain_tag}"
-      image="$("${runtime}" image inspect --format '{{.Id}}' "${toolchain_tag}")"
-      image="sha256:${image#sha256:}"
+      image="$(CONTAINER_RUNTIME="${runtime}" bash toolchains/nkd-packer/build.sh \
+        --arch arm64 --diagnostic-local --print-validated-image-id --tag "${toolchain_tag}")"
+      if [[ ! "${image}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+        echo 'Toolchain build did not return one native-validated immutable image ID.' >&2
+        exit 1
+      fi
     fi
   fi
   # Freeze fresh local bytes through the existing overlay contract, not a tag

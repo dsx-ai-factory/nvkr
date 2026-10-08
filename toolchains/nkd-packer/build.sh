@@ -9,12 +9,15 @@ lock="${here}/toolchain.lock.json"
 
 usage() {
   cat <<'EOF'
-Usage: build.sh [--check] [--cross-build-only] [--diagnostic-local] [--arch amd64|arm64] [--tag IMAGE]
+Usage: build.sh [--check] [--cross-build-only] [--diagnostic-local] [--print-validated-image-id] [--arch amd64|arm64] [--tag IMAGE]
 
   --check             Validate the source lock without building an image.
   --cross-build-only  Build a non-native image without claiming runtime validation.
   --diagnostic-local  Validate fresh native bytes for an attempt-specific local pin,
                       not the older recorded local image ID. No maintained-pin update.
+  --print-validated-image-id
+                      Print only the native-validated immutable ID on stdout;
+                      send build and validation diagnostics to stderr.
   --arch              Build one host architecture. Defaults to the normalized host arch.
   --tag               Local image name. Defaults to localhost/nkd-packer-toolchain:dev-ARCH.
 
@@ -26,6 +29,7 @@ EOF
 check_only=0
 cross_build_only=0
 diagnostic_local=0
+print_validated_image_id=0
 arch=""
 tag=""
 while [[ $# -gt 0 ]]; do
@@ -40,6 +44,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --diagnostic-local)
       diagnostic_local=1
+      shift
+      ;;
+    --print-validated-image-id)
+      print_validated_image_id=1
       shift
       ;;
     --arch)
@@ -63,6 +71,16 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${print_validated_image_id}" -eq 1 ]]; then
+  if [[ "${check_only}" -eq 1 || "${cross_build_only}" -eq 1 ]]; then
+    echo '--print-validated-image-id requires native image validation, not --check or --cross-build-only' >&2
+    exit 2
+  fi
+  # Keep the result separate from build output. Emit nothing on this descriptor
+  # until the exact inspected image has passed the native smoke below.
+  exec 3>&1 1>&2
+fi
 
 command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
 
@@ -257,6 +275,7 @@ fi
 inspection="$("${runtime}" image inspect "${tag}")"
 if ! jq -e --arg arch "${arch}" '
   length == 1 and
+  (.[0].Id | type == "string" and test("^(sha256:)?[0-9a-f]{64}$")) and
   .[0].Os == "linux" and
   .[0].Architecture == $arch and
   (.[0].Config.Env // []) == ["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"] and
@@ -266,7 +285,9 @@ if ! jq -e --arg arch "${arch}" '
   exit 1
 fi
 
-image_id="$("${runtime}" image inspect --format '{{.Id}}' "${tag}")"
+# Structure and identity must describe the same inspection result. A second
+# tag lookup could select different bytes before the native validation.
+image_id="$(jq -er '.[0].Id' <<<"${inspection}")"
 if [[ "${image_id}" =~ ^[0-9a-f]{64}$ ]]; then
   image_id="sha256:${image_id}"
 fi
@@ -393,3 +414,6 @@ EOF
 
 printf 'validated local toolchain %s (%s)\n' "${tag}" "${image_id}"
 echo "publish through an approved registry workflow, then record the immutable repository digest before catalog use"
+if [[ "${print_validated_image_id}" -eq 1 ]]; then
+  printf '%s\n' "${image_id}" >&3
+fi

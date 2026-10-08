@@ -95,6 +95,13 @@ overlay before execution. This does not update maintained pins, establish
 reproducibility, authorize redistribution or change publication gates. Default
 builds retain the recorded-ID check. Never use a mutable tag as execution identity.
 
+For script callers, `--print-validated-image-id` prints only the exact image ID
+that passed native validation; build and validation diagnostics go to stderr.
+It emits no ID on failure and rejects `--check` and `--cross-build-only`.
+The developer launcher uses this returned ID directly, without resolving the
+build tag again. Image structure and identity also come from one inspection
+result before validation, so a retag cannot change the validated subject.
+
 After license approval and a vulnerability scan, the exact external publication
 sequence is:
 
