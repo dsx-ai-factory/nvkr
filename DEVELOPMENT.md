@@ -77,9 +77,9 @@ workflows, Dependabot configuration, and issue templates have separate ownership
 CI come from its selected catalog and lock, rather than edits to rendered YAML.
 
 Pull requests check generation. The maintained publication route admits default-branch manual dispatch;
-signing receives OIDC permission only in its isolated job. Generic hosted runners are the default, with
-ADR-18's explicitly admitted native ARC disk routes. Dated validation-branch exceptions and completed Runs
-are scoped in [reconciliation](docs/adr/reconciliation.md).
+only its isolated artifact-signing and SBOM-attestation jobs receive OIDC minting permission. Generic hosted
+runners are the default, with ADR-18's explicitly admitted native ARC disk routes. Dated validation-branch
+exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconciliation.md).
 
 ## Test timing and cache use
 

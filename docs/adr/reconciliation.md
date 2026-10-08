@@ -243,6 +243,7 @@ and exact output/Plan bindings; passing repository gates do not establish extern
 
 The references above identify exact Runs and archived observations with their source, lane, and limits.
 Raw records belong with CI or release artifacts; earlier investigations remain in Git history.
+Immutable source links intentionally pin different commits to preserve each observation's historical snapshot.
 Run `37533806963` at `625980e` records the 34-output candidate, including both disk outputs and aggregate
 finalization. Its branch exception and `build-provenance-v1` mode do not establish independent full-payload
 disk consumption, strict inspection, qualification, or organizational acceptance. Historical layout or

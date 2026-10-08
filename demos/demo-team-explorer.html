@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DSz4Rlw79iz8zs0yJErFmCAgwdn2LyqC0y4D86CTePE='; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H/wAZKENW6YlBLsTs6ypLO9pjhtKAihkwS/Mw2omlDE='; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
 <link rel="icon" href="data:,"><title>NKD · Plan and release explorer</title>
 <style>
 :root{color-scheme:dark;--bg:#0c111c;--panel:#121b2b;--panel2:#182437;--border:#2a3a52;--ink:#f0f5fc;--muted:#9facbf;--blue:#79b8ff;--green:#79d8b4;--amber:#edc587;--violet:#c1a4f0;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
@@ -70,6 +70,7 @@ SPDX-License-Identifier: Apache-2.0
   function planModel(data, label, note) {
     if (!data.graph || !Array.isArray(data.graph.nodes) || !Array.isArray(data.graph.artifacts) || !Array.isArray(data.lifecycleOutputs)) fail('Expected a Run Plan with graph.nodes, graph.artifacts and lifecycleOutputs.');
     if (!data.graph.nodes.length || data.graph.nodes.length > MAX_NODES) fail('This presentation helper supports between 1 and '+MAX_NODES+' Plan nodes.');
+    if (data.lifecycleOutputs.length > MAX_NODES) fail('This presentation helper supports at most '+MAX_NODES+' Plan outputs.');
     admitRelationships(data.graph.nodes,['inputs','outputs']); admitRelationships(data.graph.artifacts,[]);
     assertUnique(data.graph.nodes,'id','Plan node'); assertUnique(data.graph.artifacts,'id','Plan artifact'); assertUnique(data.lifecycleOutputs,'name','Output');
     const outputByArtifact = new Map(data.lifecycleOutputs.map(o=>[o.artifactId,o]));
@@ -256,9 +257,10 @@ SPDX-License-Identifier: Apache-2.0
   document.addEventListener('keydown',e=>{if(e.key==='Escape')select('');});
   function fromHash(){
     let malformed=false;const parts=location.hash.slice(1).split('/'),[view,output]=parts.map(v=>{try{return decodeURIComponent(v);}catch{malformed=true;return '';}});
-    if(view==='publication')loadPublication(output);else if(view==='release'){$('sample-release').click();if(output&&model.outputs.some(o=>o.name===output)){$('output-filter').value=output;render();}}else loadPlan(output);
-    const unknown=!!view&&!['plan','publication','release'].includes(view),missing=!!output&&!model.outputs.some(o=>o.name===output);
-    if(malformed||parts.length>2||unknown||missing){$('route-notice').textContent='This saved link is malformed or names an unavailable view/output. Showing '+model.label+' with its default focus; choose an output from the list.';$('route-notice').hidden=false;}
+    const unknown=!!view&&!['plan','publication','release'].includes(view),invalid=malformed||parts.length>2||unknown||(!view&&parts.length>1),focus=invalid?'':output;
+    if(view==='publication')loadPublication(focus);else if(view==='release'){$('sample-release').click();if(focus&&model.outputs.some(o=>o.name===focus)){$('output-filter').value=focus;render();}}else loadPlan(focus);
+    const missing=!!output&&!model.outputs.some(o=>o.name===output);
+    if(invalid||missing){$('route-notice').textContent='This saved link is malformed or names an unavailable view/output. Showing '+model.label+' with its default focus; choose an output from the list.';$('route-notice').hidden=false;}
   }
   window.addEventListener('hashchange',fromHash);fromHash();
 })();
