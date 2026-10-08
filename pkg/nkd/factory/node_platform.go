@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -61,7 +64,7 @@ func admitExecutionNode(ctx context.Context, plan *Plan, nodeID string) (Node, e
 	if err := rejectUnsupportedRuntimeStorage(plan, "factory execute-node"); err != nil {
 		return Node{}, err
 	}
-	if err := rejectUnsupportedPlanRequirements(plan, "factory execute-node"); err != nil {
+	if err := admitGitHubRequirements(plan, "factory execute-node"); err != nil {
 		return Node{}, err
 	}
 	for _, node := range plan.Graph.Nodes {

@@ -115,7 +115,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		actions.writeSetupGoStep(&body)
 		helperEnvironment := "CGO_ENABLED=0"
 		if len(plan.Environment.GitHubRunners) > 0 {
-			platform, _ := authored.GitHubRunnerPlatform(runner) // admitted before rendering
+			platform, _ := authored.GitHubRunnerPlatform(githubBootstrapRunner(runner)) // admitted before rendering
 			helperEnvironment += " GOOS=linux GOARCH=" + strings.TrimPrefix(platform, "linux/")
 		}
 		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: %s go build -trimpath -ldflags %s -o nkd-exec ./cmd/nkdctl\n", helperEnvironment, shellQuote(linkerFlags))

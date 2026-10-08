@@ -219,8 +219,7 @@ or prove compatibility with previously recorded qualification profiles.
 For native multi-architecture pipeline-attested Runs, `Environment.githubRunners` maps each explicit
 `linux/amd64` or `linux/arm64` execution platform to a supported generic hosted Ubuntu runner. It cannot
 be combined with `runsOn`; unknown platforms, unrecognized labels, mismatched labels and missing output or
-utility routes fail before catalog loading or emitted output. Omission retains `runsOn` for a single
-matching native platform. The hosted adapter rejects unrecognized legacy labels and foreign-platform
+utility routes fail before catalog loading or emitted output. Omission retains the default native ARM64 producer routing and any explicit `runsOn` selection. The hosted adapter rejects unrecognized legacy labels and foreign-platform
 execution rather than assuming emulation. The initial supported routes are `ubuntu-latest`, `ubuntu-22.04`
 and `ubuntu-24.04` for AMD64, and `ubuntu-22.04-arm` and `ubuntu-24.04-arm` for ARM64, as listed in the
 [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
@@ -241,8 +240,9 @@ preflight. The shared hosted execution projection also supplies readable Plan vi
 routes; presentation does not reconstruct the map. These are capability checks, not qualified runtime
 receipts or provider-allocation proof.
 
-This native routing option does not admit resource requirements, VM execution, arbitrary host labels or
-foreign-platform emulation. Local Runs reject this GitHub-only field and continue using a separate local
+The map does not itself admit resource requirements, VM execution, arbitrary host labels or
+foreign-platform emulation. With `githubARC: native-kvm-v1`, the separately admitted disk group retains
+its exact ARC route and raw-disk carrier suppression; the map routes ordinary hosted work. Local Runs reject this GitHub-only field and continue using a separate local
 Environment and their existing explicit container-platform path.
 
 The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not

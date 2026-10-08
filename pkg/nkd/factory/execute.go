@@ -64,6 +64,9 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 	if err != nil {
 		return err
 	}
+	if githubDiskOutput(plan, node) != "" {
+		return e.New(e.CodeEngineCapability, "ARC disk operations require the original grouped executor")
+	}
 	if err := rejectUnsupportedRuntimeStorage(plan, "factory execute-node"); err != nil {
 		return err
 	}
@@ -80,9 +83,6 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 				return err
 			}
 		}
-	}
-	if githubDiskOutput(plan, node) != "" {
-		return e.New(e.CodeEngineCapability, "ARC disk operations require the original grouped executor")
 	}
 	if stdout == nil {
 		stdout = io.Discard

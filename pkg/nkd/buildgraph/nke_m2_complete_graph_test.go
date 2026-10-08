@@ -15,16 +15,16 @@ import (
 
 // This opt-in integration authenticates the source-owned chart pin set through
 // actual Git acquisition. Static completeness is not runtime admission or a
-// successful runtime build. Ordinary tests still require 34 declared outputs and
+// successful runtime build. Ordinary tests still require 35 declared outputs and
 // independently load/resolve/compile all 24 native image rows.
-func TestMaintainedM2All34OutputGraphs(t *testing.T) {
+func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	t.Chdir("../../..")
 	const root = "definitions/nke-m2"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authored.Outputs) != 34 {
+	if len(authored.Outputs) != 35 {
 		t.Fatal("required output membership changed")
 	}
 	declaredImages := 0

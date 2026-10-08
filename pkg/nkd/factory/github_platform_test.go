@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -107,11 +110,29 @@ func TestGitHubNativePlatformAdmissionFailsBeforeOutput(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		routes map[string]string
-	}{{"missing ARM64", map[string]string{"linux/amd64": "ubuntu-24.04"}}, {"implicit foreign runner", nil}} {
+	}{{"missing ARM64", map[string]string{"linux/amd64": "ubuntu-24.04"}}, {"explicit foreign runner", nil}} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
 			plan.Environment.GitHubRunners = tc.routes
-			plan.EnvironmentDigest, _ = plan.Environment.Digest()
+			if tc.routes == nil {
+				plan.Environment.RunsOn = "ubuntu-24.04"
+			}
+			stack, stackErr := catalog.ApplyStack(plan.CatalogSnapshot)
+			if stackErr != nil {
+				t.Fatal(stackErr)
+			}
+			plan, stackErr = Compile(t.Context(), plan.Definition, plan.Environment, stack, plan.GeneratorVersion)
+			if tc.routes != nil {
+				assertFactoryErrorCode(t, stackErr, e.CodeEngineCapability)
+				if plan != nil {
+					t.Fatal("unsupported route emitted a partial Plan")
+				}
+				return
+			}
+			if stackErr != nil {
+				t.Fatal(stackErr)
+			}
+			plan.DefinitionPath, plan.EnvironmentPath = "definitions/fixture.yaml", "definitions/environment.yaml"
 			bundle, err := RenderGitHub(t.Context(), plan)
 			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 			if bundle != nil {
@@ -273,5 +294,81 @@ func TestGitHubFinalizerUsesUtilityPlatform(t *testing.T) {
 	job := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nkd-lifecycle-run"]
 	if job.RunsOn != "ubuntu-24.04" || !stepDownloadsArtifact(plan, job.Steps, "nkd-exec-"+shortStableName("ubuntu-24.04")) {
 		t.Fatal("finalizer did not use the exact utility runner/helper")
+	}
+}
+
+func TestNativeRoutesPreserveARCDiskGrouping(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			plan := arcTestPlan(t, platform)
+			env := plan.Environment.Clone()
+			env.GitHubRunners = map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"}
+			stack, err := catalog.ApplyStack(plan.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err = Compile(t.Context(), plan.Definition, env, stack, plan.GeneratorVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.DefinitionPath, plan.EnvironmentPath = "definitions/test.yaml", "definitions/environment.yaml"
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateGitHubBundle(t.Context(), plan, bundle); err != nil {
+				t.Fatal(err)
+			}
+			stages, _, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, stage := range stages {
+				if stage.DiskOutput != "" {
+					found = true
+					for _, node := range stage.Nodes {
+						if node.RunsOn != githubARCRunner(platform) {
+							t.Fatal("native map replaced disk route")
+						}
+					}
+				}
+			}
+			if !found {
+				t.Fatal("missing grouped disk execution")
+			}
+		})
+	}
+}
+
+func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !PerOutputPublication(plan) {
+		t.Fatal("M2 lost per-output publication")
+	}
+	found := map[string]bool{}
+	for _, node := range plan.Graph.Nodes {
+		execution, err := plan.GitHubExecutionFor(node)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if output := githubDiskOutput(plan, node); output != "" && node.Kind == NodeBuild {
+			if execution.RunsOn != "arc-"+strings.TrimPrefix(execution.Platform, "linux/")+"-kvm" {
+				t.Fatalf("disk left native ARC group: %+v", execution)
+			}
+		}
+		if (node.BuildTarget != "nkectl" && node.BuildTarget != "nkectl-linux-arm64") || node.Kind != NodeBuild {
+			continue
+		}
+		if execution.RunsOn != plan.Environment.GitHubRunners[execution.Platform] {
+			t.Fatalf("CLI native route differs: %+v", execution)
+		}
+		found[execution.Platform] = true
+	}
+	if !found["linux/amd64"] || !found["linux/arm64"] {
+		t.Fatalf("missing native CLI builds: %v", found)
 	}
 }

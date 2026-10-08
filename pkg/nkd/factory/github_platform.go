@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -20,7 +23,7 @@ func (plan *Plan) GitHubExecutionFor(node Node) (Node, error) {
 	if err != nil {
 		return Node{}, err
 	}
-	if len(plan.Environment.GitHubRunners) == 0 {
+	if len(plan.Environment.GitHubRunners) == 0 || githubDiskOutput(plan, node) != "" {
 		return node, nil
 	}
 	platform := node.Platform
@@ -39,12 +42,16 @@ func (plan *Plan) GitHubExecutionFor(node Node) (Node, error) {
 }
 
 func admitGitHubPlatforms(plan *Plan) error {
+	// Existing ARC plans retain their independently admitted execution projection.
+	if plan.Environment.GitHubARC != "" && len(plan.Environment.GitHubRunners) == 0 {
+		return nil
+	}
 	for _, node := range plan.Graph.Nodes {
 		execution, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return err
 		}
-		platform, err := authored.GitHubRunnerPlatform(execution.RunsOn)
+		platform, err := authored.GitHubRunnerPlatform(githubBootstrapRunner(execution.RunsOn))
 		if err != nil {
 			return err
 		}
@@ -64,7 +71,7 @@ func admitGitHubNodePlatform(plan *Plan, node Node, observed string) error {
 	if err != nil {
 		return err
 	}
-	want, err := authored.GitHubRunnerPlatform(execution.RunsOn)
+	want, err := authored.GitHubRunnerPlatform(githubBootstrapRunner(execution.RunsOn))
 	if err != nil {
 		return err
 	}
@@ -80,7 +87,7 @@ func githubPlatformCheck(plan *Plan, runner string) string {
 	if len(plan.Environment.GitHubRunners) == 0 {
 		return ""
 	}
-	platform, err := authored.GitHubRunnerPlatform(runner)
+	platform, err := authored.GitHubRunnerPlatform(githubBootstrapRunner(runner))
 	if err != nil {
 		return ""
 	}

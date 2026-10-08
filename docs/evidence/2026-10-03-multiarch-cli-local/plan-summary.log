@@ -1,6 +1,0 @@
-definition: nkectl-dual-evidence
-definitionDigest: sha256:29d68ea65301aa479a991374e400885c373f86baca621b3fbaa46d502d2bb806
-environmentDigest: sha256:465c7b635ba7fdb9d2cd8a42f77142fc39ec512ec24e23787bca38a472287f5e
-run plan: sha256:54bca67bafa014f782f35c8fccdf98bfa4be8157009a4eb41c90b6597c3d1f6e
-expected outputs: 2
-lane: static-unqualified

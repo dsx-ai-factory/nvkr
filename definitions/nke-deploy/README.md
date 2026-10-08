@@ -1,11 +1,13 @@
 # NKE deploy example
 
-This six-output Definition builds CWE and its controller chart and acquires the four external charts
+This eight-output Definition builds CWE and its controller chart and acquires the four external charts
 selected by NKE `v0.21.0`. It remains available for local execution. The committed GitHub workflow uses
 [the combined M2 Definition](../nke-m2/README.md), which includes these outputs and additional artifacts.
 
 | Output | Selected input |
 |---|---|
+| `nkectl-linux-amd64` | Native AMD64 CLI binary bundle |
+| `nkectl-linux-arm64` | Native ARM64 CLI binary bundle |
 | `cwe` | Source-built controller image |
 | `controller-chart` | Source controller chart, with its `controller` slot bound to the exact `cwe` image |
 | `postgresql` | Acquired chart `18.5.15` |
@@ -32,7 +34,7 @@ Installation order, deployment values and topology remain with NKE.
 
 ## Execute locally
 
-Use native Linux AMD64 with Docker, the pinned Go toolchain and source access. Run from the repository root.
+Use Docker with support for both selected Linux platforms, the pinned Go toolchain and source access. Run from the repository root.
 To use an existing NKE clone, scope a Git transport override to this shell; the canonical catalog stays unchanged:
 
 ```sh
@@ -46,7 +48,7 @@ go run ./cmd/nkdctl run local \
   --environment definitions/nke-deploy/environment-local.yaml \
   --attempt nke-deploy-preview --dry-run
 
-# Execute all six outputs; use a new attempt name for every Run.
+# Execute all eight outputs; use a new attempt name for every Run.
 go run ./cmd/nkdctl run local \
   --definition definitions/nke-deploy/definition.yaml \
   --environment definitions/nke-deploy/environment-local.yaml \
@@ -64,9 +66,9 @@ root would replace that bundle and fail the M2 drift check. A dispatch of the co
 This is the checked-in candidate configuration, not a ratified canonical-product/path or namespace decision.
 No parallel generated deploy workflow is maintained at that fixed path.
 
-Historical static validation checked this six-output Definition and both controller Definitions with the
+Historical static validation checked this eight-output Definition and both controller Definitions with the
 repository gate, workflow lint and dry-runs. Those dry-runs observed zero artifacts and remained
-`static-unqualified`; no complete six-output build or hosted publication was exercised at that revision.
+`static-unqualified`; no complete eight-output build or hosted publication was exercised at that revision.
 Current M2 candidate publication is separate evidence with its own exact inputs and limits.
 
 This example does not package an installer/deploy bundle, build NKTP or the provider image, mirror all

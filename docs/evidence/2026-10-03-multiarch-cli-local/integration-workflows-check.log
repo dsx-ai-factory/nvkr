@@ -1,8 +1,0 @@
-CGO_ENABLED=0 go build -trimpath \
-		-ldflags '-X main.version=dev -X main.commit=unknown' \
-		-o bin/nkd-exec ./cmd/nkdctl
-bin/nkd-exec run generate --engine github \
-		--definition definitions/nke-deploy/definition.yaml \
-		--environment definitions/nke-deploy/environment-github.yaml \
-		--root . --check
-generated run is current: sha256:75096a3da7e54c373e1fa1215d2fb0de11896b9e6c8260e151f57599adf778b7
