@@ -26,7 +26,9 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 	}{
 		{"server", "linux/arm64", []string{"nico-sim"}, ""},
 		{"CLI", "linux/arm64", []string{"nico-simctl"}, ""},
+		{"runtime assets", "linux/arm64", []string{"nico-sim-runtime-assets"}, ""},
 		{"both share one prepared source", "linux/arm64", []string{"nico-sim", "nico-simctl"}, ""},
+		{"self-contained simulator selection", "linux/arm64", []string{"nico-sim", "nico-sim-runtime-assets", "nico-simctl"}, ""},
 		{"foreign platform fails closed", "linux/amd64", []string{"nico-sim"}, e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -64,7 +66,7 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 							cgo = true
 						}
 					}
-					if !cgo {
+					if node.Component != "nico-sim-runtime-assets" && !cgo {
 						t.Fatal("SQLite simulator requires a CGO-capable build")
 					}
 					command := strings.Join(node.Command, " ")
@@ -73,6 +75,16 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 					}
 					if node.Component == "nico-simctl" && !strings.Contains(command, "-extldflags -static") {
 						t.Fatal("CLI must be portable to the Linux demo runtime")
+					}
+					if node.Component == "nico-sim-runtime-assets" {
+						if cgo || node.OutputType != "tarball" {
+							t.Fatal("runtime data is an archive, not another CGO executable")
+						}
+						for _, required := range []string{"set -o pipefail", "--sort=name", "--format=ustar", "SOURCE_DATE_EPOCH", "--owner=0 --group=0", "internal/seed/default-seed.yaml ui", "gzip -n"} {
+							if !strings.Contains(command, required) {
+								t.Fatalf("asset producer lacks deterministic pinned-source input %q: %s", required, command)
+							}
+						}
 					}
 				}
 			}

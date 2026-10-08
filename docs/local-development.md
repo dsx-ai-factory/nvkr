@@ -398,7 +398,7 @@ if some payloads exist.
 ## Build the NICo simulator separately
 
 The simulator is an additional one-output Definition, not part of `all` or
-`components`. It builds the Linux ARM64 server and CLI from one pinned NKE source
+`components`. It builds the Linux ARM64 server, CLI and runtime-assets archive from one pinned NKE source
 snapshot. On the chosen Linux execution host, using a fresh attempt name:
 
 ```sh
@@ -413,17 +413,28 @@ remote Git. The Podman route uses the same commands with `CONTAINER_RUNTIME=podm
 No host Go/GCC is required. If the recorded Podman toolchain is absent, or Docker
 is selected, the launcher builds and natively probes the pinned toolchain sources.
 It freezes the measured image ID into an attempt-local overlay for exactly
-`nico-sim` and `nico-simctl`; it neither rewrites maintained pins nor changes the
+`nico-sim`, `nico-simctl` and `nico-sim-runtime-assets`; it neither rewrites maintained pins nor changes the
 simulator's source revision. Docker bootstrap requires Buildx. `--check` does not
 require a previously cached toolchain and performs no pull/build.
 
 Require a complete 1/1 Run before consuming
-`packages/nicosim-tools-arm64`. This executable bundle does not yet deliver the
-seed/UI assets. Its build is not proof of real VM provisioning or tenant readiness;
+`packages/nicosim-tools-arm64`. The selected bundle includes the two executables
+and the `nico-sim-runtime-assets` member, containing the pinned diagnostic seed,
+UI and vendor notices as a tar+gzip archive. Its producer-local filename is
+`nicosim-runtime-assets.tar.gz`; the packaged/extracted member uses the component
+name, not that filename. This member is data, not an executable, regardless of the
+generic bundle's executable-mode/install hint. The data producer uses sorted archive entries, fixed
+source timestamps/ownership/modes and a timestamp-free gzip header. It does not
+add credentials, production fleet profiles or VM state. The archive retains
+source-owned paths (`internal/seed/default-seed.yaml` and `ui/`) for the deployment
+consumer. Its selection and Plan are contract-tested; a new real Run and an
+artifact-only startup probe are still required to establish that handoff.
+Its build is not proof of real VM provisioning or tenant readiness;
 the earlier [Podman smoke](evidence/2026-10-07-local-nicosim-build.md) selected a mock
 VM backend. The later [committed Colima Docker Run](evidence/2026-10-08-colima-nicosim-build.md)
-completed 1/1 and passed the same limited startup probe; it still does not prove
-real VM provisioning, seed/UI artifact delivery or the complete demo.
+completed 1/1 with the earlier two-component selection and passed the same limited
+startup probe using seed/UI from the source snapshot. It does not prove the new
+archive producer, real VM provisioning or the complete demo.
 
 ## Find outputs and interpret the result
 

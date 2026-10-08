@@ -10,7 +10,7 @@ For first-time ARM64 NKE development, use the [local build guide](../docs/local-
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
 OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
 `providers` selects only the source-built CAPNICo and provisioned-provider images.
-`simulator` separately builds a Linux ARM64 NICoSim server/CLI bundle from pinned
+`simulator` separately builds a Linux ARM64 NICoSim server/CLI and seed/UI archive bundle from pinned
 source; it is not part of `all` yet and does not start a simulator or deploy a site.
 This incremental lane bootstraps pinned Go/GCC toolchain sources on Docker or
 when the recorded Podman image is missing, then binds the measured native ID

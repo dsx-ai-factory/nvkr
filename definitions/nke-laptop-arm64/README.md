@@ -12,7 +12,7 @@ not a full source-built NKE distribution. See the
 | Faster component loop | `definition-components.json` | 22: everything above except the disk |
 | OS-only loop | `definition-os.json` | One disk with its complete material closure |
 | Source-built provider loop | `definition-providers.json` | Two native provider images, no disk |
-| NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server and CLI, not included in the 23-output set |
+| NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive, not included in the 23-output set |
 
 Use `environment-local.json` for rootless Podman, or `environment-local-docker.json`
 with `CONTAINER_RUNTIME=docker` on native Linux ARM64, including execution inside
@@ -62,5 +62,12 @@ producer work; Docker bootstrap requires Buildx. The later committed
 passed separately; neither it nor the earlier Podman Run proves VM provisioning.
 Module downloads and verification precede offline CGO compilation;
 the server invokes NKE's `build-static` target. These Linux tools do not run directly
-on macOS. Seed/UI assets, the existing QCOW2-to-tenant handoff, profiles and the deploy-only adapter
-still need integration. This separate build is not a complete Colima/NICoSim demo.
+on macOS. The additional `nico-sim-runtime-assets` producer packages the pinned
+diagnostic seed, UI and vendor notices in a tar+gzip archive, using deterministic
+metadata. The producer writes `nicosim-runtime-assets.tar.gz`; the final bundle
+member and verified extraction use `nico-sim-runtime-assets`, the component name.
+Treat that member as archive data, not an executable/install target.
+Its three-component Plan is contract-tested;
+the earlier recorded Runs built only the server/CLI. Artifact-only runtime
+consumption, the QCOW2-to-tenant handoff, profiles and the deploy-only adapter
+still need validation/integration. This separate build is not a complete Colima/NICoSim demo.

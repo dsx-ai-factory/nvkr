@@ -5,7 +5,7 @@ apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: nke-local-nicosim-arm64
-  description: Source-built Linux ARM64 NICoSim tools for a local NICo demo; not a complete demo or OS boot acceptance.
+  description: Source-built Linux ARM64 NICoSim tools and pinned runtime assets for a local NICo demo; not complete demo or OS boot acceptance.
 sources:
   nke-nicosim:
     repo: https://github.com/dsx-ai-factory/nke.git
@@ -58,3 +58,22 @@ components:
         CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
           -ldflags '-linkmode external -extldflags -static' \
           -o bin/nico-simctl ./cmd/nico-simctl
+  nico-sim-runtime-assets:
+    fromSource: true
+    source: nke-nicosim
+    platforms: [linux/arm64]
+    outputType: tarball
+    artifactPath: controller/nico-sim/bin/nicosim-runtime-assets.tar.gz
+    writeDir: controller/nico-sim/bin
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        set -o pipefail
+        cd controller/nico-sim
+        # The source pin owns this diagnostic seed, UI and vendor notices.
+        # No production profiles, private credentials or VM state are included.
+        tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
+          --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
+          -cf - internal/seed/default-seed.yaml ui | \
+          gzip -n > bin/nicosim-runtime-assets.tar.gz

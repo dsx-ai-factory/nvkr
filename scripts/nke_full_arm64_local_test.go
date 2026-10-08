@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -193,6 +194,7 @@ func TestSimulatorToolchainScope(t *testing.T) {
 		fail                                    bool
 	}{
 		{"sorted selected producers only", `["nico-simctl","nico-sim"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"unrelated":{"fromSource":true,"toolchainImages":{"arm64":"other"}}`, "", "old", false},
+		{"runtime assets share the selected toolchain", `["nico-simctl","nico-sim-runtime-assets","nico-sim"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-sim-runtime-assets":{"fromSource":true,"toolchainImages":{"arm64":"old"}}`, "", "old", false},
 		{"empty selection", `[]`, ``, "", "expected one simulator source toolchain", true},
 		{"missing producer", `["nico-sim"]`, ``, "", "lacks a source toolchain", true},
 		{"acquired producer", `["nico-sim"]`, `"nico-sim":{"fromSource":false,"toolchainImages":{"arm64":"old"}}`, "", "lacks a source toolchain", true},
@@ -227,7 +229,12 @@ func TestSimulatorToolchainScope(t *testing.T) {
 			if err := json.Unmarshal(out, &overlay); err != nil {
 				t.Fatal(err)
 			}
-			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || strings.Join(overlay.Subs[0].Components, ",") != "nico-sim,nico-simctl" {
+			var selected []string
+			if err := json.Unmarshal([]byte(tc.components), &selected); err != nil {
+				t.Fatal(err)
+			}
+			slices.Sort(selected)
+			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || !slices.Equal(overlay.Subs[0].Components, selected) {
 				t.Fatalf("unexpected substitution: %+v", overlay)
 			}
 		})
