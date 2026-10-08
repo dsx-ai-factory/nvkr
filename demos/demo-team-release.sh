@@ -142,7 +142,7 @@ disk = output.get('disk')
 if disk:
     print(f"  Payload:  {safe(disk['payloadDigest'])}")
     print(f"  Disk: {safe(disk['format'])} | {disk['size'] / 1024**3:.2f} GiB")
-    mode = disk['evidenceMode']
+    mode = disk.get('evidenceMode') or 'inspected'
     label = 'build provenance (no full disk filesystem inventory)' if mode == 'build-provenance-v1' else safe(mode)
     print(f"  Disk evidence: {label}")
 print(f"    {'Component':<34} Evidence records")

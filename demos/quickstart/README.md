@@ -38,7 +38,7 @@ Hello, team! This is hello v1.0.0, built by NVKE Recipes.
 | [Source](source/hello.sh) | Print a greeting with a version placeholder. |
 
 The script creates a small local Git repository with two tags, then runs `catalog pin` to generate
-`catalog/pins.lock.yaml`. Its `example.invalid` source URL is redirected to that local repository
+`catalog/pins.lock.yaml`. Its `demo.example.invalid` source URL is redirected to that local repository
 for this process only. No GitHub account, registry credentials, or NKE checkout is needed.
 
 The target is `linux/amd64`; Docker Desktop on Apple Silicon uses its Linux emulation support.
