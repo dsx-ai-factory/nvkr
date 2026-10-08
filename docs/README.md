@@ -54,9 +54,9 @@ superseded plans, and completed progress reports remain in Git history.
 
 ## Demos
 
-The [demos directory](../demos/README.md) retains the original 13-slide deck, concept examples,
+The [demos directory](../demos/README.md) contains the 14-slide deck, 34 concept examples,
 HTML walkthrough, offline graph explorer, facilitator guide, and self-guided scripts. The presentation
-uses the recorded October 6 candidate and dated teaching fixtures; the task guides above own current
-user instructions.
+includes a fast real local build and the v4 publication from Run 37736529644; the task guides above
+own current user instructions.
 
 [NKE M2 customer choices](nke-m2-customer-choices.md) explains supplier replacement and its current validation scope.

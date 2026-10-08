@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nkd.dev/definition/v4
+kind: Definition
+metadata:
+  name: hello-nkd
+catalog:
+  base: ./catalog
+outputs:
+  - name: hello
+    components: [hello]
+    platform: linux/amd64
+    format: executable
