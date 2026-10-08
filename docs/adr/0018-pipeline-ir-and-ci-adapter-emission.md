@@ -538,6 +538,13 @@ relocate the validated Plan and descriptive paths together,
 preserving compiled identity and exact acquired-payload/result comparisons. Other ordinary
 formats retain their existing descriptive workspace-path support. Relocation is not authority.
 
+For the unqualified local diagnostic lane only, the maintained developer launcher
+may bind a freshly measured Packer toolchain image ID through an attempt-scoped
+catalog substitution after native tool/binary/platform validation. The substitution
+is not a maintained pin, publication input or qualified execution claim. Native
+Docker TCG is an explicit local diagnostic execution class; contract tests do not
+establish a successful complete OS smoke or tenant deployment.
+
 The hosted source owner admits the complete Plan and exact selected Git helper/environment, then requests a
 pipeline-issued source-workspace capability. Linux admission precedes opening the workspace; zero or closed
 handles cannot launch work. Close cancels and joins registered fetch calls before releasing the directory.

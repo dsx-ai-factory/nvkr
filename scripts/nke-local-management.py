@@ -9,6 +9,7 @@ Run inside the dedicated Linux ARM64 Colima host, not directly on macOS.
 """
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import importlib.util
 import json
@@ -45,6 +46,24 @@ SOURCE_FILES = ["deploy/stages/04-install-cluster-api.sh", "deploy/lib.sh", "mak
 
 class UnjoinedProcess(VM.SmokeError, CHART.UnjoinedCommand):
     """Cleanup cannot race a producer whose process group may still run."""
+
+
+class RetainedControls(VM.SmokeError):
+    """Joined work needs its exact resources retained, not live daemons."""
+
+
+@contextmanager
+def cleanup_diagnostics():
+    primary = sys.exception()
+    try:
+        yield
+    except Exception:
+        if primary is not None:
+            try:
+                print("Original failure before cleanup: " + str(primary), file=sys.stderr)
+            except (OSError, ValueError):
+                pass  # A diagnostic sink must not replace retention/join errors.
+        raise
 
 
 def native_environment():
@@ -343,22 +362,21 @@ def probe(args, consumer=None):
             # Trusted downstream adapter, not a caller-selected shell command.
             # Keep node ownership/process failure handling around the consumer.
             consumer(name, tools, work, env)
-    except UnjoinedProcess:
+    except (UnjoinedProcess, RetainedControls):
         cleanup_allowed = False
         raise
     finally:
         previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
         try:
             if cleanup_allowed:
-                cleanup(name, env, work, existing_volumes)
+                with cleanup_diagnostics():
+                    cleanup(name, env, work, existing_volumes)
         finally:
             for number, handler in previous.items():
                 signal.signal(number, handler)
     if consumer is None:
         print("PASS: NKD-built tools, real management Kind/CAPI and owned-node cleanup.")
         print("NOT full demo: NKE site, CAPNICo/QCOW2 tenant and workload remain separate acceptance.")
-    else:
-        print("PASS: downstream consumer returned and exact management cleanup completed; no full-demo claim.")
     print("Private diagnostic directory: " + str(work))
 
 

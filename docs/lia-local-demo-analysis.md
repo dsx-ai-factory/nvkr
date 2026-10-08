@@ -1,4 +1,4 @@
-# Lia's local NKE demo and the NKD handoff
+# Local Colima/NICoSim demo and the NKD handoff
 
 The requested journey is **NKD builds the selected artifacts, a separate script
 deploys those exact outputs into the local Colima/NICoSim environment, then the
@@ -156,21 +156,20 @@ inspection-derived disk SBOM or proof of all installed runtime dependencies.
 | Controller image | Source-built `cwe` | Align source/build contract with the selected demo revision; import/copy without rebuilding and verify deployed identity |
 | Controller chart | Image-bound `controller-chart` | Feed the packaged chart to the source-owned installer rather than silently using a different source-tree chart |
 | CAPNICo | Source-built ARM64 provider image | PR #1160's staged installer accepts `CAPNICO_IMAGE=repository:tag` without rebuilding. Verify exact deployed identity; older Tilt/source helpers still build it |
-| NICoSim and simulator CLI | Separate `definition-simulator.json` selects source-built Linux ARM64 server/CLI and pinned seed/UI archive; a three-component Docker Run and verified artifact-only mock startup passed. The launcher supports fresh pinned-toolchain bootstrap | Integrate into the demo selection and real VM process/runtime handoff. The separate bundle is not part of the 23-output `all` set; real VM/site/tenant deployment remains unvalidated |
+| NICoSim and simulator CLI | Separate `definition-simulator.json` selects source-built Linux ARM64 server/CLI and pinned seed/UI archive; the launcher supports pinned-toolchain bootstrap | The integrated consumer verifies/extracts this bundle and owns a real libvirt backend. It is not part of `all`; full tenant acceptance remains unestablished |
 | Tenant node disk | Existing `nke-node-image-arm64` output with its OS material graph | Make the existing ARM64 TCG build complete on the Mac, then bind the exact QCOW2 to the NICoSim VM profile; do not add a substitute tenant-node container build |
-| Profiles/runbooks image | No selected output | Build the explicitly selected local demo fixture, label it diagnostic, bind the exact tenant QCOW2/OS choices; do not call it production fleet profiles |
-| NKTP chart and runtime closure | Separate `definition-site.json` declares source chart and locked dependency preparation; compiler and isolated Helm probes pass, complete site Run unexercised | Integrate the successful produced package and enumerate its selected runtime images; source-tree inventory rendering still prepares dependencies |
+| Profiles/runbooks image | Separate `definition-profiles.json` builds the diagnostic source fixture; the consumer binds its produced image | Plain ARM64/26.04 laptop configuration is not production fleet profiles or a proven complete tenant boot contract |
+| NKTP chart and runtime closure | Separate `definition-site.json` declares source chart and locked dependency preparation; the consumer extracts its held chart | Dependency charts/runtime images are acquisitions, not additional source builds; full runtime closure and upstream signature verification remain distinct requirements |
 | External charts and runtime images | Four acquired charts and twelve acquired runtime images | Demonstrate that every deployed reference resolves to the selected bytes. This is not all-public-components-from-Git support |
-| CLI and operator tools | Linux ARM64 `nkectl`, acquired Helm/kubectl bundle; separate `tools` candidate declares five source-built matching installer tools | Linux binaries cannot run directly on macOS. The new tools Plan/preflight pass, but a complete five-component Run, verified extraction and combined demo integration remain unexercised; Python/curl remain host prerequisites |
+| CLI and operator tools | Linux ARM64 `nkectl`; separate `tools` selection builds five installer-matched tools. The consumer verifies/extracts these and checks their versions | Linux binaries cannot run directly on macOS. Python/curl remain host prerequisites; implemented handoff is not full tenant acceptance |
 | BGP and any selected identity-exchange helpers | Not a complete selected set | Model required helper images/configuration from the chosen scenario. Do not silently enable or omit them |
 | Installer/templates/configuration contract | No complete delivered deploy bundle | Preserve NKE's exact source revision and installation format; map Run outputs to it, not arbitrary hand-entered refs |
-| QCOW2 boot evidence | Disk output declared; the 16 GiB native trial reached QEMU kernel installation but failed after global host OOM killed QEMU. A fresh 24 GiB, non-overlapping attempt began | Complete the bake, boot the newly produced disk through the real VM backend and observe the tenant. The failed trial, component Run and a node container do not validate this disk |
+| QCOW2 boot acceptance | Disk output declared; the guest diagnostic and integrated consumer use an exact byte-identical copy and verify guest backing identity | No private acceptance outcome is shipped here. A component Run, diagnostic fixture or node container does not prove full OS smoke or a tenant workload |
 | E2E suite | No selected test executable | Produce the matching test binary before deployment, or explicitly separate an independently built test harness from the artifact Run |
 
-The current retained component Run is complete **22/22** in its declared
-`unqualified-local-execution` lane. It is not the complete membership above and
-does not establish any deployed site or tenant. See the
-recorded evidence.
+The components selection declares 22 outputs in the `unqualified-local-execution`
+lane. Check your own Run's exact expected/observed membership; no private Run
+acceptance record is shipped here. Components alone do not establish a site or tenant.
 
 ## Existing reuse hooks and their limits
 
@@ -202,11 +201,10 @@ test suite. Calling those scripts as-is cannot prove that NKD built everything.
    producer and admission requirements. October 8 failed-attempt cleanup recovered
    sufficient workspace and the real Colima preflight passed. The shared-mount OS
    build failed during SPIRE preparation; the native-ext4 retry reached autoinstall
-   but then lost QEMU to global OOM in the 16 GiB VM. A fresh attempt on the
-   preserved 24 GiB profile is running without concurrent builds; see the
-   execution evidence
-   and storage evidence.
-   Complete the bake rather than treating preflight or materials as acceptance.
+   but then lost QEMU to global OOM in the 16 GiB VM. No private execution or
+   storage report is shipped here. Use the current
+   [integrated command and acceptance limits](local-nke-demo.md); do not treat
+   preflight or material preparation as full tenant acceptance.
    Use the real NICoSim VM backend for tenant nodes,
    not CAPD or the default container backend. Record matching architecture,
    attestation/CNI choices and exact install source.

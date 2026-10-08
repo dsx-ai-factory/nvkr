@@ -182,6 +182,11 @@ Full publication inspection verifies structural and content closure but does not
 root. Qualified consumption requires an implemented clearance verifier and the operator's trust policy;
 no current diagnostic operation grants that authority.
 
+The diagnostic `publish chart` command verifies a pinned local Helm OCI layout
+and extracts its unchanged archive to a new local path. Its descriptive result
+grants no Release authority; it uploads nothing and is not remote publication or
+a production signing/verification gate.
+
 ### 5. Credentials by reference, never embedded
 
 The target config names a registry or repository plus a **credential reference** resolved from the CI engine's

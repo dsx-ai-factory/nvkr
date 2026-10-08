@@ -108,15 +108,15 @@ node/anonymous volume are also removed. Shared Kind network/image caches and
 private logs/source/chart extracts remain. It does not prune Docker or delete
 accepted Runs. An unjoined producer prevents concurrent cleanup and fails closed.
 
-## Tested result and remaining acceptance
+## Acceptance boundary
 
-The real Colima replay passed all
-site stages/checks, six Helm releases, controller database/Temporal health,
-CAPNICo readiness, registration, API access, exact runtime image IDs and owned
-cleanup. No artifact build ran in the consumer. Development failures and fixture
-tests are recorded separately.
+The command requires all site stages/checks, six Helm releases, controller
+database/Temporal health, CAPNICo readiness, registration, API access, exact
+runtime image IDs and owned cleanup. It runs no artifact build. No private replay
+acceptance record is shipped here; contract tests are not a live deployment result.
 
-The final full-demo command must still integrate exact disk serving,
+The [integrated command](local-nke-demo.md) connects exact disk serving,
 NICoSim ownership/networking, guest bootstrap trust, tenant
 creation, a real Kubernetes workload, produced-to-deployed identity checks and
-complete teardown. None is inferred from chart rendering or a management node.
+complete teardown. Its full acceptance remains unestablished. None is inferred
+from chart rendering or a management node.

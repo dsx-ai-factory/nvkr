@@ -302,11 +302,16 @@ class OwnedNetwork:
             raise VM.SmokeError("bridge identity/owner changed; refusing restoration")
         return str(rows[0]["ifindex"])
 
+    def stop_dns(self):
+        # Process ownership is independent of permission to restore host state.
+        if self.dns is not None:
+            MGMT.stop_group(self.dns)
+            self.dns = None
+
     def close(self):
         self.cleaning = True
         try:
-            if self.dns is not None:
-                MGMT.stop_group(self.dns)
+            self.stop_dns()
             if "nico-sim" in self.command(["ps", "-eo", "comm="]).split() or self.command(
                     ["virsh", "-c", "qemu:///session", "list", "--all", "--name"]).strip():
                 raise VM.SmokeError("active/unknown simulator or guest; refusing network restoration")

@@ -5,6 +5,9 @@
 
 import importlib.util
 import io
+import copy
+import ast
+import inspect
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
@@ -44,6 +47,27 @@ class DemoTest(unittest.TestCase):
     def test_all_owners_share_unjoined_failure_identity(self):
         self.assertIs(DEMO.NET.MGMT.UnjoinedProcess, DEMO.MGMT.UnjoinedProcess)
         self.assertIs(DEMO.NET.VM, DEMO.VM)
+
+    def test_only_final_demo_pass_follows_cleanup_and_subject_recheck(self):
+        # Source-order contract complements the executable cleanup matrix below;
+        # it is not a substitute for real tenant/workload acceptance.
+        body = ast.parse(inspect.getsource(DEMO.probe)).body[0].body
+        passes = [node for statement in body for node in ast.walk(statement)
+                  if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "print"
+                  and node.args and isinstance(node.args[0], ast.Constant)
+                  and str(node.args[0].value).startswith("PASS:")]
+        self.assertEqual(len(passes), 1)
+        positions = [index for index, statement in enumerate(body)
+                     if isinstance(statement, ast.Expr) and statement.value is passes[0]]
+        self.assertEqual(len(positions), 1)
+        cleanup = [node for statement in body for node in ast.walk(statement)
+                   if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "cleanup_runtime"]
+        self.assertEqual(len(cleanup), 1)
+        self.assertLess(cleanup[0].lineno, passes[0].lineno)
+        recheck = body[positions[0] - 1]
+        self.assertIsInstance(recheck, ast.If)
+        self.assertTrue(any(isinstance(node, ast.Raise) for node in ast.walk(recheck)))
+        self.assertLess(cleanup[0].lineno, recheck.lineno)
 
     def test_seed_projection_preserves_source_and_changes_only_selected_memory(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -131,7 +155,8 @@ class DemoTest(unittest.TestCase):
                     if phase == "success":
                         DEMO.consume_tenant(guard, "owned", None, None, {}, 300, None, {}, None)
                     else:
-                        expected = DEMO.MGMT.UnjoinedProcess if phase in ("unjoined", "unjoined-close", "revoke") else DEMO.VM.SmokeError
+                        expected = (DEMO.MGMT.UnjoinedProcess if phase in ("unjoined", "unjoined-close") else
+                                    DEMO.MGMT.RetainedControls if phase == "revoke" else DEMO.VM.SmokeError)
                         with self.assertRaises(expected):
                             DEMO.consume_tenant(guard, "owned", None, None, {}, 300, None, {}, None)
                 if phase == "unjoined":
@@ -141,6 +166,52 @@ class DemoTest(unittest.TestCase):
                 else:
                     self.assertEqual(events[-2:], ["close", "revoke"])
 
+    def test_daemons_are_joined_before_any_host_restoration_even_when_refused(self):
+        for phase in ("success", "retained", "foreign-domain", "bgp", "server", "http", "dns"):
+            with self.subTest(phase=phase):
+                events = []
+                server, http, guard = Mock(), Mock(), Mock()
+                def step(name):
+                    events.append(name)
+                    if phase == name:
+                        raise DEMO.MGMT.UnjoinedProcess(name) if name in ("server", "http", "dns") else DEMO.VM.SmokeError(name)
+                guard.stop_dns.side_effect = lambda: step("dns")
+                guard.close.side_effect = lambda: step("close")
+                with patch.object(DEMO.MGMT, "stop_group", side_effect=lambda process: step("server" if process is server else "http")), \
+                     patch.object(DEMO.VM, "sweep_owned_domains", side_effect=lambda *_args: step("sweep")), \
+                     patch.object(DEMO.VM, "domain_inventory", return_value=["foreign"] if phase == "foreign-domain" else []), \
+                     patch.object(DEMO, "restore_bgp", side_effect=lambda *_args: step("bgp")):
+                    if phase in ("success", "retained"):
+                        DEMO.cleanup_runtime(server, http, guard, Path("owned"), Mock(), True, phase != "retained")
+                    else:
+                        with self.assertRaises(DEMO.MGMT.UnjoinedProcess if phase in ("server", "http", "dns") else DEMO.VM.SmokeError):
+                            DEMO.cleanup_runtime(server, http, guard, Path("owned"), Mock(), True, True)
+                self.assertEqual(events[:3], ["server", "http", "dns"])
+                if phase in ("retained", "server", "http", "dns"):
+                    self.assertEqual(events, ["server", "http", "dns"])
+                elif phase == "success":
+                    self.assertEqual(events, ["server", "http", "dns", "sweep", "bgp", "close"])
+                else:
+                    self.assertNotIn("close", events)
+
+    def test_refused_host_restoration_still_joins_real_daemon_groups(self):
+        processes = []
+        for _ in range(3):
+            process = DEMO.subprocess.Popen([DEMO.sys.executable, "-c", "import time; time.sleep(60)"],
+                                           start_new_session=True)
+            processes.append(process)
+            self.addCleanup(DEMO.MGMT.stop_group, process)
+        guard = Mock()
+        guard.stop_dns.side_effect = lambda: DEMO.MGMT.stop_group(processes[2])
+        with patch.object(DEMO.VM, "sweep_owned_domains"), patch.object(DEMO.VM, "domain_inventory", return_value=[]), \
+             patch.object(DEMO, "restore_bgp", side_effect=DEMO.VM.SmokeError("foreign route")):
+            with self.assertRaisesRegex(DEMO.VM.SmokeError, "foreign route"):
+                DEMO.cleanup_runtime(processes[0], processes[1], guard, Path("owned"), Mock(), True, True)
+        guard.close.assert_not_called()
+        for process in processes:
+            self.assertIsNotNone(process.returncode)
+            self.assertFalse(DEMO.MGMT.group_alive(process.pid))
+
     def test_request_uses_current_control_plane_contract_and_real_vm_seed(self):
         request = DEMO.tenant_request("nkd-tenant-owned")
         self.assertEqual(request["nico"]["siteID"], DEMO.VM.SITE)
@@ -149,6 +220,106 @@ class DemoTest(unittest.TestCase):
         self.assertEqual(len(request["nodePools"]), 1)
         self.assertFalse(request["nodePools"][0]["controlPlane"])
         self.assertEqual(request["nodePools"][0]["nico"]["osProfile"], DEMO.PROFILE)
+
+    def test_tenant_success_gates_reject_wrong_nodes_vip_and_workload(self):
+        identifier = "00000000-0000-4000-8000-000000000001"
+        cases = ("success", "extra-node", "missing-node", "not-ready", "arch", "version",
+                 "no-control-plane", "two-control-planes", "vip", "workload-log", "image-id", "extra-container")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary)
+                simulator = Mock()
+                simulator.poll.return_value = None
+                tenant = DEMO.Tenant("owned", Path("tools"), work, {"SITE_KUBECONFIG": "site"}, 300, simulator, {})
+                row = {"id": identifier, "name": "owned", "nico": DEMO.tenant_request("owned")["nico"]}
+                node = {"metadata": {"labels": {}}, "status": {"nodeInfo": {
+                    "architecture": "arm64", "kubeletVersion": "v1.34.2"},
+                    "conditions": [{"type": "Ready", "status": "True"}]}}
+                nodes = [copy.deepcopy(node), copy.deepcopy(node)]
+                nodes[0]["metadata"]["labels"]["node-role.kubernetes.io/control-plane"] = ""
+                if case == "extra-node":
+                    nodes.append(copy.deepcopy(node))
+                elif case == "missing-node":
+                    nodes.pop()
+                elif case == "not-ready":
+                    nodes[1]["status"]["conditions"][0]["status"] = "False"
+                elif case in ("arch", "version"):
+                    nodes[1]["status"]["nodeInfo"]["architecture" if case == "arch" else "kubeletVersion"] = "wrong"
+                elif case == "no-control-plane":
+                    nodes[0]["metadata"]["labels"] = {}
+                elif case == "two-control-planes":
+                    nodes[1]["metadata"]["labels"] = dict(nodes[0]["metadata"]["labels"])
+                config = {"clusters": [{"cluster": {"server": "https://" + DEMO.VIP + ":6443"}}]}
+                if case == "vip":
+                    config["clusters"][0]["cluster"]["server"] = "https://foreign:6443"
+                states = [{"imageID": DEMO.WORKLOAD_IMAGE if case != "image-id" else "wrong"}]
+                if case == "extra-container":
+                    states *= 2
+                pods = {"items": [{"status": {"containerStatuses": states}}]}
+                inventory_calls = 0
+                def capture(_argv, phase, *_args):
+                    nonlocal inventory_calls
+                    if phase == "inventory":
+                        inventory_calls += 1
+                        return json.dumps([] if inventory_calls == 1 else [row])
+                    if phase == "kubeconfig-secret":
+                        return '{"metadata": {"name": "held"}}'
+                    if phase == "tenant-config":
+                        return json.dumps(config)
+                    if phase == "nodes":
+                        return json.dumps({"items": nodes})
+                    if phase == "workload-log":
+                        return "wrong" if case == "workload-log" else "NKE_LOCAL_WORKLOAD_PASS\n"
+                    if phase == "workload-pod":
+                        return json.dumps(pods)
+                    return ""
+                with patch.object(tenant, "capture", side_effect=capture), \
+                     patch.object(DEMO.time, "monotonic", side_effect=[0, 1, 2, 1000]), \
+                     patch.object(DEMO.time, "sleep"), patch.object(DEMO, "vm_evidence", return_value=["two held domains"]):
+                    if case == "success":
+                        tenant.run()
+                        result = json.loads((work / "tenant-result.json").read_text())
+                        self.assertEqual(result["tenantID"], identifier)
+                        self.assertEqual(result["nodes"], nodes)
+                        self.assertEqual(result["workload"], pods)
+                    else:
+                        with self.assertRaises(DEMO.VM.SmokeError):
+                            tenant.run()
+                        self.assertFalse((work / "tenant-result.json").exists())
+
+    def test_vm_evidence_rejects_unowned_or_substituted_backing_disk(self):
+        names = ["nico-vm-00000000-0000-4000-8000-000000000001", "nico-vm-00000000-0000-4000-8000-000000000002"]
+        for case in ("success", "count", "foreign", "tpm", "os", "path", "symlink", "size", "digest"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary).resolve()
+                cache = work / "cache"
+                cache.mkdir()
+                base = cache / "base.qcow2"
+                base.write_bytes(b"held")
+                image = {"digest": DEMO.VM.digest(base), "disk": {"size": 4}}
+                original = base
+                if case == "path":
+                    original = work / "foreign.qcow2"
+                    original.write_bytes(b"held")
+                elif case == "symlink":
+                    original = cache / "link"
+                    original.symlink_to(base)
+                elif case == "size":
+                    image["disk"]["size"] = 5
+                elif case == "digest":
+                    image["digest"] = "sha256:" + "0" * 64
+                xml = "<domain><os>" + ("" if case == "os" else "<type>hvm</type>") + "</os><devices>" + (
+                    "" if case == "tpm" else "<tpm/>") + "</devices></domain>"
+                runner = Mock(return_value=json.dumps({"full-backing-filename": str(original)}))
+                with patch.object(DEMO.VM, "domain_inventory", return_value=names[:1] if case == "count" else names), \
+                     patch.object(DEMO.VM, "owned_domain", return_value=None if case == "foreign" else ("id", xml)):
+                    if case == "success":
+                        result = DEMO.vm_evidence(work, image, runner)
+                        self.assertEqual(len(result), 2)
+                        self.assertTrue(all(row["backingDigest"] == image["digest"] for row in result))
+                    else:
+                        with self.assertRaises(DEMO.VM.SmokeError):
+                            DEMO.vm_evidence(work, image, runner)
 
     def test_tenant_inventory_rejects_foreign_duplicate_and_changed_identity(self):
         identifier = "00000000-0000-4000-8000-000000000001"

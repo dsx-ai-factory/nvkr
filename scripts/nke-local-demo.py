@@ -156,7 +156,7 @@ def consume_tenant(guard, name, tools, work, env, timeout, server, image, domain
         raise
     finally:
         if joined:
-            with cleanup_signals():
+            with cleanup_signals(), MGMT.cleanup_diagnostics():
                 try:
                     tenant.close()
                 except MGMT.UnjoinedProcess:
@@ -170,7 +170,7 @@ def consume_tenant(guard, name, tools, work, env, timeout, server, image, domain
                             # A guest producer may still run after failed deletion.
                             # Preserve the node/IP and outer controls until the
                             # exact exception can be withdrawn, never recycle it.
-                            raise MGMT.UnjoinedProcess("guest route could not be withdrawn; retaining node and producer controls") from err
+                            raise MGMT.RetainedControls("guest route could not be withdrawn; retaining node and host controls") from err
 
 
 class Tenant:
@@ -479,6 +479,35 @@ def simulator_environment(work, disk, guard_work, gateway, binding):
     return env
 
 
+def cleanup_runtime(server, http, guard, work, domain_runner, bgp_intent, restore_controls):
+    failures = []
+    # Join each independent daemon even when another join or host restoration
+    # fails. Never remove shared controls underneath an unjoined producer.
+    for process in (server, http):
+        if process is not None:
+            try:
+                MGMT.stop_group(process)
+            except (VM.SmokeError, OSError, subprocess.TimeoutExpired) as err:
+                failures.append(err)
+    try:
+        guard.stop_dns()
+    except (VM.SmokeError, OSError, subprocess.TimeoutExpired) as err:
+        failures.append(err)
+    if failures:
+        error = MGMT.UnjoinedProcess if any(isinstance(err, (MGMT.UnjoinedProcess, subprocess.TimeoutExpired))
+                                          for err in failures) else VM.SmokeError
+        raise error("daemon cleanup failed; host controls retained: " + "; ".join(str(err) for err in failures))
+    if not restore_controls:
+        return
+    if server is not None:
+        VM.sweep_owned_domains(work / "simulator", domain_runner)
+    if VM.domain_inventory(domain_runner):
+        raise VM.SmokeError("unknown/remaining domain; network retained")
+    if bgp_intent:
+        restore_bgp(guard)
+    guard.close()
+
+
 def probe(args):
     outputs, gateway, registry = SITE.admit_materials(args)
     layout, disk, work, sim, image = VM.inputs(args.simulator_run, args.os_run, args.out)
@@ -598,23 +627,14 @@ def probe(args):
             consume_tenant(guard, name, tools, site_work, site_env, args.timeout, server, image, domain_runner, nico)
         MGMT.probe(args, lambda name, tools, site_work, site_env: SITE.consume(args, outputs, token, nico, gateway,
             registry, name, tools, site_work, site_env, continuation))
-    except MGMT.UnjoinedProcess:
+    except (MGMT.UnjoinedProcess, MGMT.RetainedControls):
         cleanup_allowed = False
         raise
     finally:
         previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
         try:
-            if cleanup_allowed:
-                for process in (server, http):
-                    if process is not None:
-                        MGMT.stop_group(process)
-                if server is not None:
-                    VM.sweep_owned_domains(work / "simulator", domain_runner)
-                if VM.domain_inventory(domain_runner):
-                    raise VM.SmokeError("unknown/remaining domain; network retained")
-                if bgp_intent:
-                    restore_bgp(guard)
-                guard.close()
+            with MGMT.cleanup_diagnostics():
+                cleanup_runtime(server, http, guard, work, domain_runner, bgp_intent, cleanup_allowed)
         finally:
             for log in logs:
                 log.close()

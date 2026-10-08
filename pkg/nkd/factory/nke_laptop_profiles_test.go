@@ -4,14 +4,127 @@
 package factory
 
 import (
+	"context"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"go.yaml.in/yaml/v3"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
+
+// Exercise the emitted shell, not a duplicate of its GRUB mutation. This models
+// the loader's main-file/drop-in order; the real guest reboot remains acceptance.
+func TestLaptopProfilesGRUBDropIn(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-laptop-arm64", "profiles-catalog", "registry.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registry struct {
+		Components map[string]struct {
+			BuildCommand []string `yaml:"buildCommand"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(raw, &registry); err != nil {
+		t.Fatal(err)
+	}
+	command := registry.Components["nke-local-profiles"].BuildCommand
+	if len(command) != 3 {
+		t.Fatal("unexpected profiles producer")
+	}
+	_, stanza, found := strings.Cut(command[2], "printf '%s\\n' '#cloud-config' 'bootcmd:'")
+	if !found {
+		t.Fatal("missing cloud-init producer stanza")
+	}
+	stanza, _, found = strings.Cut(stanza, "\nsed '1d;98d'")
+	if !found {
+		t.Fatal("missing source-template append boundary")
+	}
+	stanza = "printf '%s\\n' '#cloud-config' 'bootcmd:'" + stanza
+	for _, scenario := range []string{"new-and-repeat", "different", "symlink", "directory"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			destination := filepath.Join(root, "bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain")
+			if err := os.MkdirAll(destination, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			run := func(script string) ([]byte, error) {
+				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, "bash", "-euc", script)
+				cmd.Dir = root
+				cmd.Env = append(os.Environ(), "GRUB_CMDLINE_LINUX=build-time-poison", "NKD_GRUB_FIXTURE="+root,
+					"PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
+				cmd.WaitDelay = time.Second
+				return cmd.CombinedOutput()
+			}
+			if out, err := run(stanza); err != nil {
+				t.Fatalf("emit bootcmd: %v\n%s", err, out)
+			}
+			data, err := os.ReadFile(filepath.Join(destination, "userData.tmpl"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var config struct {
+				Bootcmd []string `yaml:"bootcmd"`
+			}
+			if err := yaml.Unmarshal(data, &config); err != nil || len(config.Bootcmd) != 1 {
+				t.Fatalf("emitted bootcmd differs: %v", err)
+			}
+			if err := os.Mkdir(filepath.Join(root, "grub.d"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			files := map[string]string{
+				"grub":                  "GRUB_CMDLINE_LINUX=old-main-value\n",
+				"grub.d/99-console.cfg": "GRUB_CMDLINE_LINUX=\"console=tty0 console=ttyAMA0,115200\"\n",
+				"update-grub":           "#!/bin/sh\nset -eu\nprintf 'invoked' > \"$NKD_GRUB_FIXTURE/invoked\"\n. \"$NKD_GRUB_FIXTURE/grub\"\nfor file in \"$NKD_GRUB_FIXTURE\"/grub.d/*.cfg; do . \"$file\"; done\nprintf '%s\\n' \"$GRUB_CMDLINE_LINUX\" > \"$NKD_GRUB_FIXTURE/observed\"\n",
+			}
+			for path, value := range files {
+				if err := os.WriteFile(filepath.Join(root, path), []byte(value), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			dropIn := filepath.Join(root, "grub.d/zz-nkd-local-network.cfg")
+			switch scenario {
+			case "different":
+				err = os.WriteFile(dropIn, []byte("foreign\n"), 0o600)
+			case "symlink":
+				err = os.Symlink(filepath.Join(root, "grub"), dropIn)
+			case "directory":
+				err = os.Mkdir(dropIn, 0o700)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			projected := strings.ReplaceAll(config.Bootcmd[0], "/etc/default/grub.d", filepath.Join(root, "grub.d"))
+			for iteration := range 2 {
+				out, err := run(projected)
+				if scenario != "new-and-repeat" {
+					if err == nil {
+						t.Fatal("foreign drop-in accepted")
+					}
+					if _, err := os.Stat(filepath.Join(root, "invoked")); !os.IsNotExist(err) {
+						t.Fatal("refusal reached update-grub")
+					}
+					break
+				}
+				if err != nil {
+					t.Fatalf("bootcmd iteration %d: %v\n%s", iteration, err, out)
+				}
+				observed, err := os.ReadFile(filepath.Join(root, "observed"))
+				if err != nil || string(observed) != "console=tty0 console=ttyAMA0,115200 net.ifnames=0\n" {
+					t.Fatalf("console/naming lost or duplicated: %q, %v", observed, err)
+				}
+			}
+		})
+	}
+}
 
 // This admits one diagnostic artifact, not image/profile runtime compatibility.
 func TestLaptopProfilesArtifactContract(t *testing.T) {
@@ -79,7 +192,10 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					for _, required := range []string{
 						"sha256sum -c -", "231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a",
 						"861964b7d4bbc6d4c82c8e77891cf1cd3ceb344666d344708b54e4492f910d09",
-						"sed '98d'", "FROM alpine@sha256:", "nico-vms-cp.yaml", "nico-vms-worker.yaml",
+						"sed '1d;98d'", "net.ifnames=0", "update-grub", "bootcmd:",
+						"/etc/default/grub.d/zz-nkd-local-network.cfg", "${GRUB_CMDLINE_LINUX} net.ifnames=0",
+						"set -eu", "test ! -L", "test -f", "= \"$expected\"",
+						"FROM alpine@sha256:", "nico-vms-cp.yaml", "nico-vms-worker.yaml",
 						"nke-local-26-04-arm64-plain", "ubuntu_version: \"26.04\"", "variant: local-plain-tpm",
 						"http://172.30.0.1:18080/nke-node-image-arm64.qcow2", "console=ttyAMA0,115200",
 						"--opt platform=linux/arm64", "--opt force-network-mode=none", "nke-local-profiles-arm64.oci.tar",

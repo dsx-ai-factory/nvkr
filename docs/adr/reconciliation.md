@@ -213,16 +213,19 @@ and requires two ready nodes plus a workload before PASS. It does not build
 artifacts or establish a Release. Its scoped networking permits only the owned
 guest bridge to the exact owned management endpoint's SPIRE ports and withdraws
 those rules before address release. Unjoined children retain dependent controls.
+Joined restoration refusals retain exact resources without retaining live
+simulator, disk-server or DNS daemons; their independent process groups are
+stopped/joined before host restoration checks. Contract negatives cover foreign
+domains, refused BGP restoration and individual daemon join failures. Downstream
+consumers emit success only after their outermost cleanup completes.
 
-Full end-to-end acceptance remains unestablished. The latest private integrated
-attempt reached its tenant VIP/API and obtained a kubeconfig but exposed
-insufficient control-plane allocatable memory for OVN and missing worker IPv4
-after reboot. No tenant/workload/final-cleanup acceptance is claimed.
+Full end-to-end acceptance remains unestablished. Private integrated attempts
+have not passed; no private runtime acceptance outcome is recorded in-tree.
+No tenant/workload/final-cleanup acceptance is claimed.
 The adapter uses NICoSim's guest diagnostics with per-attempt credentials,
 private-file Bearer headers, disabled ambient curl configuration and bounded
 private log retention before deletion. The HTTP contract is exercised with a
-real loopback server; a separate live probe retained the control-plane's three
-log sets while worker requests returned SSH connection-refused/no-route errors.
+real loopback server; it is not a recorded full guest/tenant acceptance run.
 A private runtime seed projection raises the selected instance to eight GiB
 without changing accepted asset bytes. The local profiles producer adds a guest
 boot command matching NICoSim's `eth0` seed across reboot. Complete tenant
@@ -232,6 +235,14 @@ are intentionally not shipped in this PR. Private diagnostic logs and Run record
 are not authenticated external acceptance or qualified reproduction. The retained
 older disk's SPIRE/DSX exception, failed full boot smoke and direct-source OS
 integration remain open. No complete combined 23-output Run is claimed.
+
+The diagnostic local launcher can compile an attempt-scoped substitution from a
+freshly measured, native-validated Packer toolchain image ID; this does not update
+maintained pins. The native Docker TCG route is contract-tested; no successful
+full OS-smoke/tenant acceptance record is shipped here. Neither route grants
+publication, signing or qualification authority (ADR-18).
+`publish chart` is local verification/extraction of a pinned Helm archive, not
+remote publication, Release authorization or a signing gate (ADR-20).
 
 ## Output-local publication and metadata assembly
 

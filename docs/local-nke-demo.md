@@ -218,6 +218,12 @@ The finalizer deletes only the exact NKE tenant, stops/joins producers, sweeps
 only libvirt domains bound to this private simulator directory, restores exact
 known BGP routes and the network guard's controls. Changed/foreign ownership or
 an unjoined process fails closed and retains setup for investigation. Do not
+interpret retained host controls as permission to leave independent daemons
+running: the consumer attempts stop/join of simulator, HTTP and DNS even when
+resource restoration is refused. A real join failure still retains dependent
+host state and fails the command. Cleanup diagnostics cannot replace its error
+identity, and a cleanup failure reports the original phase failure too.
+Do not
 prune Docker or delete unknown domains to force another attempt. After SIGKILL
 or a host crash, inspect retained privileged state before retrying.
 

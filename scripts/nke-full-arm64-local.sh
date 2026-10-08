@@ -20,6 +20,7 @@ usage() {
     'No host Go/Make or installed nkdctl needed: bootstrap uses the pinned utility image.' \
     'CONTAINER_RUNTIME=podman (default) or docker (native Linux ARM64 / explicitly selected Colima).' \
     'On Apple Silicon: Podman uses podman-machine-default; Docker requires COLIMA_PROFILE.' \
+    'Colima os/all: export committed source to native ext4 and run inside Linux; Mac forwarding is rejected.' \
     'No VM is created, started, reset or resized automatically; Docker Desktop is not admitted.' \
     '--check performs prerequisite diagnostics only: no pull, build or attempt creation.' \
     'NKE_LOCAL_CLONE supplies pinned Git objects, not uncommitted changes.' \
@@ -68,6 +69,10 @@ if [[ "${host_system}" == Darwin ]]; then
     fi
     if ! colima status --profile "${profile}" >/dev/null 2>&1; then
       echo "Colima profile ${profile} is absent or stopped. Start that profile explicitly; no VM was created or started." >&2; exit 1
+    fi
+    if [[ "${lane}" == os || "${lane}" == all ]]; then
+      echo 'Colima os/all cannot run from the Mac shared mount. Export committed source to native ext4 and run inside Linux; see docs/local-development.md#apple-silicon-mac-with-colima. No downloads or attempt creation.' >&2
+      exit 1
     fi
     # Execute beside the daemon: host-side Docker socket forwarding does not
     # give NKD access to the Linux workspace/kernel used by nested producers.

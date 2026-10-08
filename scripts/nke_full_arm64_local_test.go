@@ -22,8 +22,10 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 	}{
 		{"no runtime", "Linux", "aarch64", "missing", "providers", "running", "100000", "ok", "CONTAINER_RUNTIME must", true},
 		{"Docker Desktop is explicit", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "Docker Desktop on macOS", true},
-		{"Colima Mac forwards check only", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "--check os", false},
-		{"Colima without Mac Docker CLI", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "--check os", false},
+		{"Colima Mac forwards check only", "Darwin", "arm64", "docker", "providers", "running", "100000", "ok", "--check providers", false},
+		{"Colima without Mac Docker CLI", "Darwin", "arm64", "docker", "providers", "running", "100000", "ok", "--check providers", false},
+		{"Colima OS rejects shared workspace", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "native ext4", true},
+		{"Colima all rejects shared workspace", "Darwin", "arm64", "docker", "all", "running", "100000", "ok", "native ext4", true},
 		{"Colima missing CLI", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "Missing Colima", true},
 		{"Colima stopped profile", "Darwin", "arm64", "docker", "os", "stopped", "100000", "ok", "absent or stopped", true},
 		{"Colima absent profile", "Darwin", "arm64", "docker", "os", "absent", "100000", "ok", "absent or stopped", true},
@@ -189,11 +191,14 @@ esac`,
 				}
 			}
 			if tc.name == "Colima Mac forwards check only" {
-				for _, required := range []string{"ssh --profile nkd-demo -- bash -c", "env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker", "--check os"} {
+				for _, required := range []string{"ssh --profile nkd-demo -- bash -c", "env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker", "--check providers"} {
 					if !strings.Contains(string(calls), required) {
 						t.Fatalf("missing explicit VM forwarding %q: %s", required, calls)
 					}
 				}
+			}
+			if strings.Contains(tc.name, "rejects shared workspace") && strings.Contains(string(calls), "ssh --profile") {
+				t.Fatalf("unsupported shared workspace forwarded execution: %s", calls)
 			}
 			if strings.Contains(string(calls), "image inspect") {
 				t.Fatalf("diagnostic preflight inspected a cached toolchain: %s", calls)

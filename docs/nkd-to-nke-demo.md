@@ -9,39 +9,32 @@ The intended developer journey is: build the ARM64 artifacts with NKD, make the
 exact produced images and charts reachable by NKE, run the NKE site installer,
 create a tenant and verify it, then rebuild and retest a source change.
 
-The exact packaged simulator also passed a later
-native libvirt-backed startup probe
-after explicit VM prerequisite installation. That probe created no guests and
-does not establish tenant provisioning, networking or workload acceptance.
-
-The later real QCOW2 guest probe
-passed NICoSim VM creation/readiness, authenticated SSH, cloud-init, software TPM,
-agent and staged Kubernetes-package checks, then deleted the owned guest and
-stopped/joined the simulator. Its [runnable command](local-qcow2-guest-probe.md)
-consumes completed Runs without rebuilding. This is not a site/tenant install
-and does not supersede the failed complete OS smoke or missing DSX input.
+The [guest diagnostic](local-qcow2-guest-probe.md) consumes completed Runs without
+rebuilding and requires NICoSim VM readiness, SSH, cloud-init, TPM, agent and
+staged Kubernetes-package checks followed by owned cleanup. No private guest
+acceptance record is shipped here. This is not a site/tenant install and does not
+supersede the failed complete OS smoke or missing DSX input.
 
 The separate [management diagnostic](local-management-cluster.md) now consumes
 the completed five-tool Run for real Kind management/CAPI installation and
 owned node/volume cleanup. It uses pinned NKE stage bytes without rebuilding
 artifacts. It does not deploy the NKE site or create a CAPD/container tenant;
-the full CAPNICo/QCOW2 path still needs integration.
+the integrated CAPNICo/QCOW2 consumer remains unvalidated end to end.
 
-The later [deploy-only site consumer](local-site-integration.md) passed a
-real Colima replay: six prepared
+The [deploy-only site consumer](local-site-integration.md) requires six prepared
 charts, exact controller/profiles/CAPNICo image handoff and runtime image-ID
-checks, site health, registration and API access, then owned cleanup. This
-supersedes the earlier site-installation gap, not the tenant/workload gap.
+checks, site health, registration and API access, then owned cleanup. Site-only
+assertions do not establish tenant/workload acceptance.
 
-The internal downstream network guard
-also passed native setup/restoration and a deliberate consumer-failure replay.
+The internal downstream network guard has setup/restoration and failure contracts.
 The new [integrated consumer](local-nke-demo.md) connects the guard to exact
-disk serving and simulator/guest ownership. Its full runtime validation is in
-progress. The earlier isolated guard replay does not establish guest delivery,
-BGP routes or tenant/workload acceptance.
+disk serving and simulator/guest ownership. Private attempts have not passed;
+no private acceptance outcome is recorded in-tree. See that guide for current
+runtime limits. Isolated guard tests do not establish guest delivery, BGP routes
+or tenant/workload acceptance.
 
-**The artifact-build part is tested; the complete NKD-to-demo E2E is not yet
-validated.** Do not use the completed 22-output local Run as proof that a site or
+**The build and consumer contracts are tested; the complete NKD-to-demo E2E is not yet
+validated.** Do not use a completed 22-output local Run as proof that a site or
 tenant was installed. The [first-time build guide](local-development.md) is the
 working build entry point; this document records the exact downstream handoff
 and blockers rather than inventing a completed installation recipe.
@@ -50,8 +43,7 @@ and blockers rather than inventing a completed installation recipe.
 
 This targets the staged NICo site-controller installer introduced in
 [NKE PR #1160](https://github.com/dsx-ai-factory/nke/pull/1160), inspected at
-`8fb2d53368823bd386b4fbd55b4ab6d3c0931345` on October 7, 2026. The PR is open,
-based on `deploy/nico-layout`; its install scripts must not be assumed present on
+`8fb2d53368823bd386b4fbd55b4ab6d3c0931345` on October 7, 2026. Its install scripts must not be assumed present on
 NKE `main` or on the older artifact pins. Its authoritative instructions are
 [deploy/README.md](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/deploy/README.md)
 and the [site-controller guide](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/docs/site-bootstrap/install-site-controller.md).
@@ -79,11 +71,11 @@ values, infrastructure provisioning and tenant lifecycle.
 | Controller chart/templates | `controller-chart` is image-bound; the separate `site` selection matches the installer source | Prepared local chart inputs now cover inventory rendering and the executor's local-path branch; complete staged installation and image override still need validation |
 | CAPNICo provider | `capnico-controller-arm64`, built from pinned public Git | Reachable development image plus NKE's `CAPNICO_IMAGE=repository:tag` override. The current override is tag-shaped; do not silently turn it into a digest contract |
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
-| Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` | Five-tool Run, verified extraction and native version probes passed; integration into the complete journey and `all` remains. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
+| Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` | The integrated consumer selects the separate tools Run and verifies extraction and native versions. It is not included in `all`. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
 | Dependency images | Twelve acquired ARM64 image outputs | Align chart values or node mirrors with the reachable image locations; stage 4 and NKTP also need inputs outside this set |
-| NKTP | Separate four-output `site` Run completed the source chart and locked dependency preparation | Packaged chart handoff has real rendering/dry-run evidence, but runtime images are not a complete mirrored NKD set and staged installation remains unexercised |
-| Profiles content image | Separate `profiles` Run builds `controller-profiles` from the staged-installer source | Real Docker build/content tests passed. The diagnostic ARM64/26.04 plain profile still needs exact held-disk serving, reachable registry, and real provisioning; it is not included in `all` |
-| Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection; Run 04's bake completed and a copied disk reached SSH/cloud-init | Full smoke failed in SPIRE checks; retained material lacks DSX IMDS. The new diagnostic plain 26.04 profile has content tests only. Its exact disk handoff/provisioning and the complete OS contract remain unvalidated |
+| NKTP | Separate four-output `site` selection includes the source chart and locked dependency preparation | The consumer uses the packaged chart; runtime images are not a complete mirrored NKD set. The combined site/tenant acceptance is unvalidated |
+| Profiles content image | Separate `profiles` Run builds `controller-profiles` from the staged-installer source | The diagnostic ARM64/26.04 plain profile is wired to held-disk serving and the consumer's registry. It is not included in `all`; real tenant acceptance is unvalidated |
+| Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | The integrated consumer verifies and serves the selected disk. Missing DSX IMDS prevents claiming the complete OS smoke contract; tenant/workload acceptance is unvalidated |
 | Site cluster, NICo access, SPIRE bootstrap CA, tenant login | Operator's authorized test configuration | Not build artifacts. Keep secrets and kubeconfig outside Git; do not invent credentials, site identity or trust roots |
 
 The artifact catalog currently builds the controller from NKE `v0.21.0`, commit
@@ -96,10 +88,9 @@ compiler, pin-set mapping and installer inputs must be tested together.
 The additional `site` Definition aligns four candidate producers to PR #1160's
 exact commit: CLI, controller image, image-bound controller chart and NKTP chart.
 It uses the source-owned CLI Make build and controller Dockerfile, rather than
-assuming the older linker/module contracts still work. Compiler contracts and
-an isolated NKTP dependency/package probe pass. The later Colima
-four-output site Run completed;
-no installation is recorded. This separate selection does not replace the retained
+assuming the older linker/module contracts still work. Compiler contracts cover
+this selection; no complete demo acceptance record is shipped here.
+This separate selection does not replace the
 22-output Run or become part of `all` automatically.
 
 At the same installer source, `deploy/nke-deploy.sh` already supports packaged
@@ -113,7 +104,7 @@ With the default deploy path, `deploy/lib/describe_site.py` still renders
 source-tree charts and builds their dependencies during inventory preparation.
 The prepared-input adapter below gives both rendering and the executor's
 local-path branch the same exact archives, without changing the NKE checkout.
-This has real render and executor dry-run evidence, not a completed staged install.
+The adapter has rendering and executor contracts, not complete demo acceptance.
 
 Tool versions need alignment too: the acquired operator bundle contains Helm
 `v4.1.4`, while the installer pins `v4.2.4`, ORAS `1.3.3` and
@@ -121,9 +112,8 @@ Tool versions need alignment too: the acquired operator bundle contains Helm
 that is not a hard version gate, but neither is it a matched tool pin.
 The site build wrapper uses pinned Helm 4.3.0. The separate
 [source-tool selection](local-development.md#build-the-installer-tools-from-source)
-declares all five matching tools. Its later Run, verified extraction and native
-version probes passed; it still needs integration into the deploy-only
-journey; it does not replace the build wrapper automatically.
+declares all five matching tools. The integrated consumer selects and verifies
+that Run; it does not replace the build wrapper automatically.
 
 ## Build and inspect today
 
@@ -167,7 +157,7 @@ must execute inside Colima, not directly on macOS. For a host-side handoff,
 `make build` creates the native `bin/nkdctl` using the repository's pinned Go.
 
 The following prepares inputs after the separate `site` and `components` Runs
-complete. Two separate Runs are recorded; this is not a combined Run or a
+complete. Two separate Runs are selected; this is not a combined Run or a
 completed deployment:
 
 ```sh
@@ -223,12 +213,9 @@ Preserve the wrapper's source/readiness checks; do not disable them to make the
 demo pass. Registry transport, a consistent manifest/override selection and the
 real installation remain separate handoff work.
 
-The real six-chart handoff probe
-passed native NKE rendering and executor dry-run without fetching or rebuilding
-chart dependencies. It deliberately records four completed-Run charts separately
-from two manual packaging probes. A later
-completed-Run handoff repeated
-both probes with all six charts from completed NKD Runs. Neither is deployment.
+The six-chart handoff requires all archives from completed NKD Runs and delegates
+rendering and deploy-item validation to NKE. It does not fetch or rebuild chart
+dependencies. Passing those checks alone is not deployment acceptance.
 
 ## Registry and release-manifest handoff
 
@@ -251,10 +238,8 @@ oras cp --from-oci-layout "$NKE_DEV_LAYOUT@$NKE_DEV_DIGEST" \
 ```
 
 The destination must serve the same manifest digest before it becomes an
-installer input. A later real loopback registry probe
-copied the completed site Run's controller and bound chart and matched both
-manifest digests on registry read-back. That two-output test does not prove a
-complete dependency mirror, node access or installation. Repeat the same transport for each required image/chart,
+installer input. A two-output transport check alone would not prove a
+complete dependency mirror, node access or installation. Repeat the transport for each required image/chart,
 verify read-back digests, configure node authentication/mirrors and use new
 attempt-specific tags. Do not call this diagnostic transport NKD release
 publication, signing, qualification or release verification.
@@ -324,9 +309,9 @@ tested site adapter already joins six chart inputs with source-owned stage
 selection and reachable controller/profiles/provider registry transport. The requested
 scenario is already selected: local Colima plus
 CAPNICo/NICoSim with QCOW2-backed tenant VMs, not a production NICo site or CAPD
-substitute. The full wrapper still needs owned NICoSim routing/DHCP/BGP and
-exact disk serving, guest/bootstrap trust compatibility, tenant creation and
-workload checks, plus verify source access and OS capacity. The current site
-CA and successful standalone guest do not prove that joint trust/bootstrap path.
-Until that implementation and real acceptance run
+substitute. The integrated wrapper implements owned NICoSim routing/DHCP/BGP,
+exact disk serving, tenant creation and workload checks. Their joint runtime
+acceptance, guest/bootstrap trust compatibility, source access and OS capacity
+remain gates, not facts established by isolated contracts.
+Until the combined source inputs and real acceptance run
 are complete, this is not a working copy-paste full-E2E tutorial.

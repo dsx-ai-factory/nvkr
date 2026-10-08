@@ -4,6 +4,7 @@
 """Management consumer contracts, not external Kind/NKE acceptance."""
 
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -50,7 +51,7 @@ class ManagementTest(unittest.TestCase):
                     ADAPTER.capture(["unused"], "oversized", work, {})
 
     def test_consumer_outcome_preserves_cleanup_order(self):
-        for outcome in ("success", "failure", "unjoined"):
+        for outcome in ("success", "failure", "unjoined", "retained"):
             with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as temporary:
                 work = Path(temporary) / "fresh"
                 admitted = (Path("checkout"), Path("nkdctl"), Path("run"), Path("layout"), work, "config", {}, {})
@@ -64,21 +65,49 @@ class ManagementTest(unittest.TestCase):
                             file.chmod(0o700)
                 consumer = Mock()
                 if outcome != "success":
-                    consumer.side_effect = ADAPTER.UnjoinedProcess("not joined") if outcome == "unjoined" else ADAPTER.VM.SmokeError("failed")
+                    consumer.side_effect = (ADAPTER.UnjoinedProcess("not joined") if outcome == "unjoined" else
+                                            ADAPTER.RetainedControls("route retained") if outcome == "retained" else ADAPTER.VM.SmokeError("failed"))
                 with patch.object(ADAPTER, "admit", return_value=admitted), \
                      patch.object(ADAPTER, "owned_nodes", side_effect=[[], ["exact-id"]]), \
                      patch.object(ADAPTER, "execute", side_effect=execute), patch.object(ADAPTER, "cleanup") as cleanup, \
-                     patch.object(ADAPTER, "verify_versions"), patch.object(ADAPTER, "inspect", return_value=""):
+                     patch.object(ADAPTER, "verify_versions"), patch.object(ADAPTER, "inspect", return_value=""), \
+                     patch("sys.stdout", new_callable=io.StringIO) as output:
                     if outcome == "success":
                         ADAPTER.probe(Mock(), consumer)
                     else:
                         with self.assertRaises(ADAPTER.UnjoinedProcess if outcome == "unjoined" else ADAPTER.VM.SmokeError):
                             ADAPTER.probe(Mock(), consumer)
                     consumer.assert_called_once()
-                    if outcome == "unjoined":
+                    self.assertNotIn("PASS:", output.getvalue())
+                    if outcome in ("unjoined", "retained"):
                         cleanup.assert_not_called()
                     else:
                         cleanup.assert_called_once()
+
+    def test_cleanup_failure_retains_primary_diagnostic_and_original_error_identity(self):
+        with patch("sys.stderr", new_callable=io.StringIO) as output:
+            with self.assertRaisesRegex(ADAPTER.UnjoinedProcess, "cleanup child"):
+                try:
+                    raise ADAPTER.VM.SmokeError("original install phase")
+                finally:
+                    with ADAPTER.cleanup_diagnostics():
+                        raise ADAPTER.UnjoinedProcess("cleanup child")
+        self.assertIn("original install phase", output.getvalue())
+
+    def test_primary_log_failure_preserves_cleanup_retention_identity(self):
+        for error in (ADAPTER.UnjoinedProcess, ADAPTER.RetainedControls):
+            for sink_error in (BrokenPipeError, ValueError):
+                with self.subTest(error=error, sink=sink_error):
+                    cleanup = error("retain exact controls")
+                    sink = Mock()
+                    sink.write.side_effect = sink_error("diagnostics unavailable")
+                    with patch("sys.stderr", sink), self.assertRaises(error) as raised:
+                        try:
+                            raise ADAPTER.VM.SmokeError("original phase")
+                        finally:
+                            with ADAPTER.cleanup_diagnostics():
+                                raise cleanup
+                    self.assertIs(raised.exception, cleanup)
 
     def test_native_environment_does_not_adopt_other_targets(self):
         foreign = {"PATH": "/usr/bin", "DOCKER_CONTEXT": "shared", "DOCKER_HOST": "tcp://remote",

@@ -4,6 +4,7 @@
 """Site adapter contracts, not tenant/workload acceptance."""
 
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -17,6 +18,48 @@ SPEC.loader.exec_module(SITE)
 
 
 class SiteTest(unittest.TestCase):
+    def test_site_consume_emits_no_pass_before_failed_registry_cleanup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            cli = work / "cli/nkectl"
+            cli.parent.mkdir()
+            cli.write_text("fixture")
+            cli.chmod(0o700)
+            digest = "sha256:" + "a" * 64
+            outputs = {key: (work / key, {"digest": digest}) for key in
+                       [*SITE.CHART_OUTPUTS, "cwe", "profiles", "provider", "nkectl"]}
+            def inspect(_argv, label, *_args):
+                if label == "site node address":
+                    return json.dumps([{"NetworkSettings": {"Networks": {"kind": {"IPAddress": "172.18.0.2"}}}}])
+                return "" if label == "fresh private registry identity" else json.dumps({"digest": digest})
+            with patch.object(SITE.MGMT, "owned_nodes", return_value=["owned"]), \
+                 patch.object(SITE.MGMT, "inspect", side_effect=inspect), patch.object(SITE.MGMT, "execute"), \
+                 patch.object(SITE.CHART, "prepare", return_value=work / "deploy"), \
+                 patch.object(SITE, "wait_registry"), patch.object(SITE, "bootstrap_ca"), \
+                 patch.object(SITE, "kind_nktp_values", return_value="enabled: false"), \
+                 patch.object(SITE, "deployed_images", return_value={}), patch.object(SITE.VM, "digest", return_value=digest), \
+                 patch.object(SITE, "registry_cleanup", side_effect=SITE.VM.SmokeError("registry cleanup failed")) as cleanup, \
+                 patch("sys.stdout", new_callable=io.StringIO) as output:
+                with self.assertRaisesRegex(SITE.VM.SmokeError, "registry cleanup failed"):
+                    SITE.consume(Mock(nkdctl="/unused", nke_checkout="/unused", nico_org="fixture"), outputs,
+                                 "fixture", "http://172.18.0.1:18089", "172.18.0.1", "id", "owned", work, work,
+                                 {"PATH": "/usr/bin"})
+            cleanup.assert_called_once()
+            self.assertNotIn("PASS:", output.getvalue())
+
+    def test_site_success_is_emitted_only_after_management_returns_with_cleanup(self):
+        arguments = ["site"]
+        for name in ("nke-checkout", "nkdctl", "tools-run", "site-run", "components-run", "profiles-run",
+                     "provider-run", "nico-endpoint", "nico-token-file", "out"):
+            arguments.extend(["--" + name, "/unused"])
+        for failure in (False, True):
+            with self.subTest(failure=failure), patch.object(SITE.sys, "argv", arguments), \
+                 patch.object(SITE.signal, "signal"), patch.object(SITE, "admit", return_value=({}, "token", "url", "gateway", "id")), \
+                 patch("sys.stdout", new_callable=io.StringIO) as output, patch("sys.stderr", new_callable=io.StringIO), \
+                 patch.object(SITE.MGMT, "probe", side_effect=SITE.VM.SmokeError("cleanup failed") if failure else None):
+                self.assertEqual(SITE.main(), 17 if failure else 0)
+                self.assertEqual("PASS:" in output.getvalue(), not failure)
+
     def test_bootstrap_ca_requires_ca_signing_usage_and_strict_validation(self):
         with patch.object(SITE.MGMT, "execute") as execute:
             SITE.bootstrap_ca(Path("private"), {"HOME": "private"})

@@ -28,8 +28,8 @@ See the [site command and prerequisites](../docs/local-site-integration.md) and
 current validation limits in that guide.
 It requires an existing private NICoSim endpoint and is not tenant/workload E2E.
 
-The internal `nke-local-network.py` guard has real native setup/restoration
-evidence, including a deliberate consumer failure. The new integrated command
+The internal `nke-local-network.py` guard has setup/restoration and deliberate
+consumer-failure contract tests. No private acceptance record is shipped here. The integrated command
 wires it into simulator/guest ownership, but complete tenant/workload acceptance
 is still required. See the [integrated consumer guide](../docs/local-nke-demo.md)
 for its network scope, cleanup and current runtime limits.
@@ -37,6 +37,8 @@ for its network scope, cleanup and current runtime limits.
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
 OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
+On macOS the forwarded Colima route rejects `os`/`all`: export committed source
+to native ext4 and invoke the launcher inside Linux, as the build guide shows.
 `providers` selects only the source-built CAPNICo and provisioned-provider images.
 `simulator` separately builds a Linux ARM64 NICoSim server/CLI and seed/UI archive bundle from pinned
 source; it is not part of `all` yet and does not start a simulator or deploy a site.
@@ -46,17 +48,18 @@ through an exact attempt overlay. `--check simulator` performs no pull/build and
 does not require a previously cached toolchain; Docker bootstrap requires Buildx.
 `site` separately selects the installer-aligned CLI/controller and two chart
 outputs. Its local pinned Helm wrapper prepares NKTP's locked dependencies before
-offline packaging. Its separate four-output Run completed,
-not a deployment; see the [site handoff](../docs/nkd-to-nke-demo.md).
+offline packaging. Its separate four-output selection is not a deployment;
+see the [site handoff](../docs/nkd-to-nke-demo.md).
 `tools` separately selects source-built Linux ARM64 Helm, kubectl, clusterctl,
 ORAS and Kind at the staged installer's pinned versions. Compiler/preflight
-contracts, complete build, verified extraction and native version probes passed;
-site-only deployment passed; complete tenant/workload E2E remains unexercised. Helm's
+contracts cover this selection; consumers verify extraction and native versions.
+No private deployment acceptance record is shipped here; full tenant/workload
+acceptance remains unestablished. Helm's
 exact fixture preparation is diagnostic Local-only, not a supported held hosted
 fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
 `profiles` separately builds the diagnostic plain ARM64/Ubuntu 26.04 controller
-profiles image from pinned NKE fixtures. Its Docker Run/content probe
-passed; the later site consumer deployed it and checked its exact init-container
+profiles image from pinned NKE fixtures. Its content tests use NKE's metadata
+loader/template helpers; the site consumer requires its exact init-container
 image ID. It is not included in `all` or tenant boot-compatibility proof.
 See the [profiles guide](../docs/local-controller-profiles.md).
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).

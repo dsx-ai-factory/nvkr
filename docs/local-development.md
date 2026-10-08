@@ -22,7 +22,7 @@ NKD is the project; `nkdctl` is its command-line tool. You provide three inputs:
 
 `run plan` describes the work. `run local` executes it as a new immutable attempt.
 Local builds are unqualified diagnostics, not signed releases or cluster deployment.
-For the next step, see [NKD artifacts for Lia's site demo](nkd-to-nke-demo.md).
+For the next step, see [NKD artifacts for the NICo site installer](nkd-to-nke-demo.md).
 That guide distinguishes the tested artifact build from the still-unvalidated
 installation and tenant-provisioning handoff.
 
@@ -36,6 +36,18 @@ a generic Environment validator; complete document validation remains NKD-owned.
 Component tooling runs in catalog-pinned containers; Packer creates the node OS
 inside QEMU. Git, Bash, a working native container runtime, `jq` and GNU `timeout`
 are still required on the Linux execution host.
+
+The clone commands below target `main` after this example merges. While PR #118
+is still unmerged, select its implementation checkout before running the launcher:
+
+```sh
+# Pre-merge testing only; omit after the example is present on main.
+git switch --track origin/codex/full-nke-arm64-local
+```
+
+Run that command immediately after `cd nke-recipes` in either clone block below.
+It is not a permanent installation prerequisite; a deleted PR branch is not
+required after merge.
 
 | Starting point | Route |
 | --- | --- |
@@ -58,8 +70,6 @@ docker version
 docker buildx version
 git clone https://github.com/dsx-ai-factory/nke-recipes.git
 cd nke-recipes
-# Before PR #118 merges, check out its implementation branch:
-git switch --track origin/codex/full-nke-arm64-local
 CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh --check providers
 CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh first-providers 1 providers
 ```
@@ -83,8 +93,6 @@ podman machine ssh --username core podman-machine-default \
   'for tool in git jq timeout; do command -v "$tool" || exit 1; done'
 git clone https://github.com/dsx-ai-factory/nke-recipes.git
 cd nke-recipes
-# Before PR #118 merges, check out its implementation branch:
-git switch --track origin/codex/full-nke-arm64-local
 bash scripts/nke-full-arm64-local.sh --check providers
 bash scripts/nke-full-arm64-local.sh first-providers 1 providers
 ```
@@ -177,7 +185,9 @@ for the NKD checkout itself.
 
 Use native ext4 for the source export and Run workspace. Shared-mount source
 snapshotting has failed with file-handle exhaustion. The launcher does not flush
-global caches or raise Mac limits to work around it.
+global caches or raise Mac limits to work around it. Its Mac-forwarded Colima
+route rejects `os` and `all` before downloads or attempt creation; enter the
+native source export and invoke the Linux launcher there instead.
 
 Colima's configured 150 GiB disk does not provide 150 GiB of physical host free
 space. Allow about 90 GiB free on both the host and the selected Run filesystem
@@ -375,6 +385,10 @@ SHA-256 inside the pinned utility container and uses it to compile a static Linu
 `nkdctl`, then runs it inside Linux, previews the selection and executes the 22-output
 Run. Producer and utility containers still use their pinned images. One job is the conservative
 starting point. The tested path uses the exact local Git clone shown above.
+The bootstrap Go version/archive are maintained in
+`toolchains/nkd-packer/toolchain.lock.json`; that version must match `.go-version`,
+which `make build` checks. Bootstrap module/build caches are private per attempt,
+so a fresh attempt downloads modules again; no shared-cache integrity is claimed.
 Canonical remote fetch is available when `NKE_LOCAL_CLONE` is absent, but is not
 a validated first-time-developer quickstart here. Private-source Git authentication
 must work inside the VM, not just in the Mac's `gh` session. A remote-only setup
@@ -463,10 +477,10 @@ startup probe using seed/UI from the source snapshot. It does not prove the new
 archive producer, real VM provisioning or the complete demo.
 
 The later [artifact-only guest command](local-qcow2-guest-probe.md) consumes the
-completed simulator/OS Runs inside Linux, without rebuilding. Its
-recorded native libvirt probe
-passed real QCOW2 VM readiness, SSH, cloud-init, TPM, agent and staged Kubernetes
-package checks with owned cleanup. It is still not the complete image smoke,
+completed simulator/OS Runs inside Linux, without rebuilding. It requires
+real QCOW2 VM readiness, SSH, cloud-init, TPM, agent and staged Kubernetes
+package checks with owned cleanup. No acceptance record for that probe is
+shipped here. It is still not the complete image smoke,
 management-plane install or tenant/workload acceptance.
 
 To inspect/consume a completed simulator bundle inside the same Linux source
@@ -746,8 +760,10 @@ podman machine ssh --username core podman-machine-default \
 ```
 
 This uses the acquired native Helm executable and the final packaged chart, not
-the earlier source archive. `show chart` should identify `nke-controller` version
-`0.1.1` for this pin. `show values` can inspect its bound image values instead.
+the earlier source archive. Compare `show chart` with the selected Plan: the
+`components` selection uses `definitions/nke-controller/catalog/registry.yaml`,
+which explicitly packages `nke-controller` version `0.1.1`; the separate `site`
+selection packages version `0.0.0`. `show values` can inspect its bound image values instead.
 These are read-only development views, not signed artifact verification or a
 deployment. Loading an image into Podman does not provide a registry endpoint
 from which a Kubernetes cluster can pull it. The chart retains its source-owned

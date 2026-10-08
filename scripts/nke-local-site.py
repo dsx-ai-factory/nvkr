@@ -300,16 +300,15 @@ def consume(args, outputs, token, nico, gateway, registry_id, name, tools, work,
             # Trusted deploy-only continuation, not a caller-selected command.
             # Keep the registry and management node alive through tenant work.
             continuation(name, tools, work, env)
-        else:
-            print("PASS: local NKE site install/check and registration; tenant/workload is not yet exercised.")
-    except MGMT.UnjoinedProcess:
+    except (MGMT.UnjoinedProcess, MGMT.RetainedControls):
         cleanup_allowed = False
         raise
     finally:
         previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
         try:
             if cleanup_allowed:
-                registry_cleanup(registry_name, name, registry_id, work, env)
+                with MGMT.cleanup_diagnostics():
+                    registry_cleanup(registry_name, name, registry_id, work, env)
         finally:
             for number, handler in previous.items():
                 signal.signal(number, handler)
@@ -329,6 +328,7 @@ def main():
     try:
         outputs, token, nico, gateway, registry_id = admit(args)
         MGMT.probe(args, lambda name, tools, work, env: consume(args, outputs, token, nico, gateway, registry_id, name, tools, work, env))
+        print("PASS: local NKE site install/check, registration and owned cleanup; tenant/workload not exercised.")
     except (VM.SmokeError, CHART.HandoffError, OSError, ValueError, KeyError, TypeError) as err:
         print("NKD-E-PREFLIGHT-FAILED: site integration: " + str(err), file=sys.stderr)
         return 17

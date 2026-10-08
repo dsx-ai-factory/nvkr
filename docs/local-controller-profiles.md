@@ -17,8 +17,8 @@ CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
 Use a fresh attempt name. Omit `NKE_LOCAL_CLONE` for canonical remote Git;
 private-source access must then work inside the VM. Native Linux ARM64 runs the
 same commands without `COLIMA_PROFILE`. Podman uses `CONTAINER_RUNTIME=podman`.
-Only Docker execution is recorded for this lane; Podman has compiler/preflight
-contracts, not a recorded profiles build.
+Docker and Podman have compiler/preflight contracts. No private profiles-build
+acceptance report is shipped here; check your own completed Run and image content.
 
 The [Definition](../definitions/nke-laptop-arm64/definition-profiles.json)
 selects `controller-profiles` from its own
@@ -32,7 +32,7 @@ the four-output `site` lane. This is not an approved release pin.
 | Input | Produced content |
 | --- | --- |
 | NKE fixture Dockerfile | Same copy/materialization layout; base changed from its `alpine:3.24.1` tag to the already maintained exact Alpine digest, observed as Alpine 3.24.2 |
-| ARM64 VM cloud-init fixture | Source template retained except its exact, SHA-guarded line 98 HTTP agent-download override is removed; the source APT install remains |
+| ARM64 VM cloud-init fixture | Source template retained except its exact, SHA-guarded line 98 HTTP agent-download override is removed; the source APT install remains. An idempotent boot command adds `net.ifnames=0` through an exact `zz-nkd-local-network.cfg` snippet after the installer's `99-console.cfg` override, matching NICoSim's single-NIC `eth0` seed across reboot. An existing different snippet or symlink fails |
 | NKE VM config profiles | Source `nico-vms-cp` and `nico-vms-worker`, unchanged |
 | NKE fixture runbooks | All nine source runbooks, unchanged |
 | Local OS metadata | One `nke-local-26-04-arm64-plain` entry: ARM64, Ubuntu 26.04, injected Kubernetes version, diagnostic `local-plain-tpm` variant |
@@ -85,18 +85,17 @@ adapter must explicitly choose distinct ports and own both services.
 
 ## Validation scope
 
-The recorded Docker Run completed
-1/1. An offline container inspected the produced image, and a diagnostic test
-used NKE's actual metadata loader and template helpers to validate its profile
+The separate selection requires one observed output. The diagnostic content test
+uses NKE's actual metadata loader and template helpers to validate its profile
 selection and render both CNI branches as YAML. This is neither a complete OS
-smoke nor deployment acceptance.
+smoke nor deployment acceptance; no private Run acceptance report is shipped here.
 
 The diagnostic test source is
 [`contract_test.go`](../scripts/testdata/nke-local-profile/contract_test.go).
 It belongs in a disposable copy of the pinned NKE `controller/internal/utils`
 package, with `NKD_PROFILES_DIR` pointing to content extracted from the produced
 image. Never add it to an accepted Run's source closure or your NKE checkout.
-The recorded probe invoked `go test ./internal/utils -run TestNKDLocalProfile
+The diagnostic command is `go test ./internal/utils -run TestNKDLocalProfile
 -count=1 -v` with the source's existing module pins. It is not a new YAML/iPXE
 parser and does not validate the source's entire provisioning protocol.
 

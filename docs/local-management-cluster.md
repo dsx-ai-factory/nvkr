@@ -61,8 +61,7 @@ python3 -B scripts/nke-local-management.py \
 
 Use a fresh output directory for every execution. Separate source exports may
 require absolute paths to the completed Run/bootstrap and the current script;
-the recorded replay identifies
-the actual split-source paths used. Do not rerun a tool build merely to move its
+use the actual split-source paths for your completed Runs. Do not rerun a tool build merely to move its
 accepted outputs beside this script.
 
 The consumer deliberately uses the native Unix Docker socket and private
@@ -78,8 +77,8 @@ not a shared or untrusted Docker daemon.
 Success requires a Ready management node and all of NKE stage 04's checks:
 cert-manager, CAPI core, kubeadm bootstrap/control-plane Deployments Available,
 the Cluster CRD Established and matching CAPI version. NKE's source check treats
-a cert-manager version mismatch as a warning, not an additional hard failure;
-the recorded replay reported its intended 1.19.3 version. The source
+a cert-manager version mismatch as a warning, not an additional hard failure.
+No private replay acceptance record is shipped here. The source
 stage fetches public provider manifests and runtime images. Those are acquired
 dependencies, not additional NKD source builds or a hermetic deployment.
 

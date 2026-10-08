@@ -42,11 +42,20 @@ components:
         # NICoSim's source network-config selects eth0. Preserve that name
         # across reboots instead of racing an already-up enp1s0 rename. NICoSim
         # prepends its own GRUB bootcmd to this list; this item runs afterward.
+        # The installer writes 99-console.cfg, which overrides /etc/default/grub.
+        # Source this exact local snippet after it, preserving the console value.
         printf '%s\n' '#cloud-config' 'bootcmd:' '  - |' \
-          '    if ! grep -q "net.ifnames=0" /etc/default/grub; then' \
-          '      sed -i '\''s|^GRUB_CMDLINE_LINUX="|GRUB_CMDLINE_LINUX="net.ifnames=0 |'\'' /etc/default/grub' \
-          '      update-grub' \
-          '    fi' > bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
+          '    set -eu' \
+          '    file=/etc/default/grub.d/zz-nkd-local-network.cfg' \
+          '    expected='\''GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} net.ifnames=0"'\''' \
+          '    test ! -L "$file"' \
+          '    if [ -e "$file" ]; then' \
+          '      test -f "$file"' \
+          '      test "$(cat "$file")" = "$expected"' \
+          '    else' \
+          '      printf "%s\n" "$expected" > "$file"' \
+          '    fi' \
+          '    update-grub' > bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
         sed '1d;98d' controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl >> bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
         # Downstream owns this local endpoint and must bind/read back the actual
         # disk bytes. This URL is not a digest, receipt or production location.

@@ -191,6 +191,16 @@ class NetworkTest(unittest.TestCase):
                     guard.close()
                 command.assert_not_called()
 
+    def test_joined_dns_stop_is_idempotent_without_host_mutations(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(NET.MGMT, "stop_group") as stop:
+            guard = NET.OwnedNetwork(temporary, {}, "172.18.0.0/16")
+            daemon = guard.dns = Mock()
+            with patch.object(guard, "command") as command:
+                guard.stop_dns()
+                guard.stop_dns()
+            stop.assert_called_once_with(daemon)
+            command.assert_not_called()
+
     def test_capability_target_must_be_private_regular_non_symlink(self):
         with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as foreign:
             root = Path(temporary).resolve()

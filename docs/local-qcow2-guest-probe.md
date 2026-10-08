@@ -17,8 +17,8 @@ These observations are unqualified local diagnostics. They do not authenticate
 a Release, pass NKE's complete OS smoke, attest a tenant, install a management
 plane or prove a Kubernetes workload. The missing DSX input still blocks the
 complete image contract. See the [build guide](local-development.md) and
-[downstream handoff](nkd-to-nke-demo.md). The real guest evidence
-records the passed probe separately from the failed full image smoke.
+[downstream handoff](nkd-to-nke-demo.md). No private guest acceptance record is
+shipped here; run the command's assertions against your own completed Runs.
 
 ## Prepare the dedicated Linux VM once
 
@@ -56,8 +56,7 @@ toolchain or hermetic artifact build. Python 3.12+, OpenSSH, `ip`, and a previou
 built Linux ARM64 `nkdctl` must also be available. `gnutls-bin` supplies TPM
 certificate tooling; `ipxe-qemu` supplies the virtio EFI ROM required by the
 tested libvirt-generated domain. Package scripts can enable libvirtd and its
-default network. The startup evidence
-records those effects separately from guest acceptance.
+default network. Inspect those host effects separately from guest acceptance.
 
 The session backend needs a pre-created bridge and QEMU's package-owned bridge
 helper. The guarded workflow below makes an explicit temporary privilege grant
@@ -157,7 +156,7 @@ python3 scripts/nke-nicosim-vm-smoke.py \
 )
 ```
 
-These are the recorded attempt names; substitute your own completed attempts.
+These are example attempt names; substitute your own completed attempts.
 If they are in different source exports, supply their absolute paths instead.
 Choose a new output directory for every trial. The script does not rebuild a
 missing prerequisite or retry a producer automatically. It requires space for
