@@ -43,6 +43,10 @@ Reusing an existing attempt is an error. The separate consume directory is dispo
 `--stop-registry` runs the demo and removes its registry at successful completion; it is not a standalone
 cleanup command. See `--help` for the path options.
 
+The hosted bundle is intentionally retained in the fresh `nkd-m1-hosted.*` temporary directory printed
+by the script, so you can inspect its workflow and manifest afterward. Delete that directory when
+you finish reviewing it; the script does not remove it automatically.
+
 ## Walkthrough
 
 | Step | Inspect | What it establishes |
