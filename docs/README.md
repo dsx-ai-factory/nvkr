@@ -2,7 +2,7 @@
 
 | Need | Read |
 |---|---|
-| Build/package the pinned DSX OVN fork and declare native image/Helm OCI outputs | [OVN source-build option](../definitions/nke-ovn-source/README.md), [native ARM64 and chart OCI evidence](evidence/2026-10-07-ovn-release-outputs.md) |
+| Build/package the pinned DSX OVN fork and declare native image/Helm OCI outputs | [OVN source-build option](../definitions/nke-ovn-source/README.md) |
 | Build the NKE v0.21.0 deploy release | [NKE deploy pipeline](nke-deploy-pipeline.md) |
 | Automate reviewable pin updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
 | Manage shared catalogs and understand replacement identity | [Authoring analysis](catalog-definition-authoring.md), [local replacement lab](examples/authoring-lab/README.md) |
@@ -20,7 +20,7 @@
 | Plan v1 delivery | [Milestones](milestones.md), [acceptance specification](epics-v1-spec.md) |
 | Build and verify the combined CLI, CWE image and Helm outputs | [Combined pipeline](combined-nke-pipeline.md), [hosted acceptance](evidence/2026-09-10-combined-run.md) |
 | Build or validate the NKE node image | [OS-image Definition](../definitions/nke-os/README.md), [validation plan](nke-os-validation-plan.md), [ARM64 execution evidence](evidence/2026-09-23-nke-arm64-local-os-build.md), [ARC ARM64/AMD64 evidence](evidence/2026-10-01-nke-arc-os-builds.md) |
-| Build public OS binaries directly from pinned upstream Git (experimental, not the full image) | [Source-build catalog and tests](../definitions/nke-os-source/README.md), [v0.21.0 dependency inventory](nke-v0.21.0-os-dependency-inventory.md), [ARM64 source-build evidence](evidence/2026-10-07-direct-os-source-builds.md) |
+| Build public OS binaries directly from pinned upstream Git (experimental, not the full image) | [Source-build catalog and tests](../definitions/nke-os-source/README.md), [v0.21.0 dependency inventory](nke-v0.21.0-os-dependency-inventory.md) |
 | Bind controller charts to image outputs without registry-specific bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Pin and package NKE's external charts locally | [Acquired chart guide](nke-pin-set-usage.md) |
 | Reproduce the local NKE demonstration | [NKE demo](demo-m1.md) |

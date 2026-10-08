@@ -405,9 +405,14 @@ fork still requires separately established source access. Generic authenticated
 cross-output image/final-chart handoff into OS material composition is absent and
 tracked in [issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116).
 Independent selections may rebuild equal pinned sources; they do not establish
-same-byte correspondence. The [updated native ARM64 producer test and real Helm
-OCI push/pull interoperability](../evidence/2026-10-07-ovn-release-outputs.md) passed;
-they do not establish hosted publication, OS integration or signed Release acceptance.
+same-byte correspondence. Opt-in native producer and Helm OCI interoperability
+tests do not establish hosted publication, OS integration or signed Release acceptance.
+
+The separate read-only `nke-os-source-build.yaml` workflow runs the public-source
+`pipeline.Local` diagnostic on generic native AMD64/ARM64 hosted runners without
+internal-source credentials. It is not a generated Run/Release or a package/image
+migration. Helm's held `ExecNode` preparation remains blocked by its pristine
+external fixture links; local diagnostic preparation does not admit that production route.
 
 ## Output-local publication and metadata assembly
 
@@ -672,8 +677,6 @@ Earlier verification does not transfer by renaming or reinterpreting records.
 
 | Record | What actually ran | Limit |
 |---|---|---|
-| [Direct OS public-source builds, 2026-10-07](../evidence/2026-10-07-direct-os-source-builds.md) | Separate read-only hand-authored `nke-os-source-build.yaml` diagnostic; generic hosted AMD64/ARM64 Docker runs `37676134544` and `37690165034` passed all 14 source producers; final review-fix ARM64 Podman run passed all 14 builds and native version/capability probes in 367.41s | Unqualified `pipeline.Local` route, not generated Run/Release or package/image migration; Helm held `ExecNode` preparation remains blocked; fresh AMD64 evidence for review-fix stamps/probes pending |
-| [DSX OVN fork packages, 2026-10-07](../evidence/2026-10-07-ovn-fork-source-build.md) | Native ARM64 factory producer operations, held image material, offline Debian packaging and independent Helm render passed | Candidate internal source; no ordinary CI source credentials, maintained Definition/OS bake, AMD64 live fork build, cluster acceptance or Release proof |
 | [Guest package capture byte correspondence, 2026-10-03](../evidence/2026-10-03-apt-capture-correspondence.md) | Held ARM64/native and AMD64/emulated APT capture archives rechecked with the recorded verifier blob; exact archive and manifest-blob SHA-256 values plus one annotated follow-up log retained | Local byte correspondence only; original capture logs and archive files unretained in Git, AMD64 emulated, no NKE installer bake, live Run or complete disk SBOM |
 | [Concrete local inspection runtime, 2026-10-02](../evidence/2026-10-02-nke-os-inspector-runtime.md) | Exact local OCI closure, held Podman/runtime/tool identities, non-root networkless inspection of one retained ARM64 QCOW2, 730 installed packages, timeout/no-retained-container assertion and native Linux race suites | Historical cancellation test did not observe the running phase; native AMD64 runtime and original live-Run integration are unexercised; no registry publication, NVIDIA license/security clearance, full-disk SBOM or qualified claim |
 | [Inspector review-fix replay, 2026-10-03](../evidence/2026-10-03-nke-os-inspector-review-fixes.md) | New host-side pipeline test binary used the unchanged Oct 2 ARM64 inspector image; retained-disk scan and observed-running cancellation/cleanup passed | No rebuilt helper or runtime exercise of later in-image XML/package validation and timeout classification; one historical host-side source blob is unavailable for independent recovery; no full-disk SBOM or production acceptance |

@@ -373,3 +373,104 @@ func TestNKEOVNForkRenderedImages(t *testing.T) {
 		})
 	}
 }
+
+func TestNKEOVNPostinstImportDiagnostics(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			resolved, err := buildgraph.Resolve(loadOVNForkCatalog(t), buildgraph.Selection{
+				Components: []string{"nke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"}, Platform: "linux/" + arch,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			graph, err := buildgraph.Compile(resolved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var hook string
+			for _, node := range graph.Nodes {
+				if node.Kind != ir.KindBuild || node.Component != "nke-cni-ovn" {
+					continue
+				}
+				if len(node.Command) != 3 {
+					t.Fatal("unexpected OVN packaging command")
+				}
+				// Exercise the compiled catalog's fixed hook heredoc; Bash owns its syntax.
+				_, rest, found := strings.Cut(node.Command[2], "cat >\"$images/DEBIAN/postinst\" <<'EOF'\n")
+				if !found {
+					t.Fatal("missing OVN postinst heredoc")
+				}
+				hook, _, found = strings.Cut(rest, "\nEOF\n")
+				if !found || !strings.Contains(hook, "ovn-images_1.5.18_linux_"+arch+".tgz") {
+					t.Fatal("missing native OVN postinst hook")
+				}
+			}
+			if hook == "" {
+				t.Fatal("missing OVN package producer")
+			}
+			for _, tc := range []struct {
+				name, argument, importStatus, gzipStatus string
+				wantFailure                              bool
+			}{
+				{name: "success", argument: "configure", importStatus: "0", gzipStatus: "0"},
+				{name: "import failure", argument: "configure", importStatus: "42", gzipStatus: "0", wantFailure: true},
+				{name: "gzip failure", argument: "configure", importStatus: "0", gzipStatus: "43", wantFailure: true},
+				{name: "other package action", argument: "abort-upgrade", importStatus: "42", gzipStatus: "43"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					root := t.TempDir()
+					logPath := filepath.Join(root, "import.log")
+					for name, script := range map[string]string{
+						"sha256sum": "#!/bin/sh\nexit 0\n",
+						"gzip":      "#!/bin/sh\nprintf image\nexit \"$TEST_GZIP_STATUS\"\n",
+						"timeout":   "#!/bin/sh\nshift 2\nexec \"$@\"\n",
+						"ctr": "#!/bin/sh\n[ \"$1\" = version ] && exit 0\n" +
+							"[ \"$*\" = '-n k8s.io images import -' ] || exit 99\n" +
+							"cat >/dev/null\nprintf 'private import details\\n' >&2\nexit \"$TEST_IMPORT_STATUS\"\n",
+					} {
+						if err := os.WriteFile(filepath.Join(root, name), []byte(script), 0o755); err != nil {
+							t.Fatal(err)
+						}
+					}
+					// Relocate only host paths into test-owned scratch. External commands
+					// are controlled fixtures; the actual pipeline and failure handler run.
+					script := strings.ReplaceAll(hook, "/usr/lib/nke/cni-ovn/1.5.18", root)
+					script = strings.ReplaceAll(script, "/var/log/nke-cni-ovn-postinst.log", logPath)
+					ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+					defer cancel()
+					cmd := exec.CommandContext(ctx, bash, "--noprofile", "--norc", "-c", script, "postinst", tc.argument)
+					cmd.Env = []string{"PATH=" + root + string(os.PathListSeparator) + os.Getenv("PATH"),
+						"NKE_CTR_BIN=" + filepath.Join(root, "ctr"), "TEST_IMPORT_STATUS=" + tc.importStatus, "TEST_GZIP_STATUS=" + tc.gzipStatus}
+					cmd.WaitDelay = time.Second
+					output, err := cmd.CombinedOutput()
+					if ctx.Err() != nil {
+						t.Fatalf("hook did not finish: %v", ctx.Err())
+					}
+					if tc.wantFailure {
+						var exit *exec.ExitError
+						if !errors.As(err, &exit) || exit.ExitCode() != 1 || !strings.Contains(string(output), "OVN import failed; see "+logPath) {
+							t.Fatalf("missing import failure status/diagnostic: %v: %s", err, output)
+						}
+					} else if err != nil || len(output) != 0 {
+						t.Fatalf("successful package action changed: %v: %s", err, output)
+					}
+					if strings.Contains(string(output), "private import details") {
+						t.Fatal("hook dumped import log contents")
+					}
+					log, readErr := os.ReadFile(logPath)
+					if tc.argument == "configure" {
+						if readErr != nil || string(log) != "private import details\n" {
+							t.Fatalf("import output was not retained in its log: %v: %q", readErr, log)
+						}
+					} else if !errors.Is(readErr, os.ErrNotExist) {
+						t.Fatalf("other package action ran import: %v", readErr)
+					}
+				})
+			}
+		})
+	}
+}

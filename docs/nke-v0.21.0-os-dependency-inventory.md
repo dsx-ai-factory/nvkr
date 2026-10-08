@@ -3,7 +3,7 @@
 Reviewed 2026-10-07 against the exact published release asset, not NKE main.
 This document inventories the release and the remaining source-build migration.
 The experimental [public-source catalog](../definitions/nke-os-source/README.md) adds 14 binary producers from 13 pinned Git sources, separate from the maintained M2 inputs.
-The [recorded ARM64 integration test](evidence/2026-10-07-direct-os-source-builds.md) passed all 14 declared producers, not a complete OS-image migration or release qualification.
+The experimental catalog does not establish a complete OS-image migration or release qualification.
 
 ## Authoritative inputs
 
@@ -12,7 +12,7 @@ The [recorded ARM64 integration test](evidence/2026-10-07-direct-os-source-build
 - Downloaded asset SHA-256: `546477fbb07f5915aa425a0b633a279de7c62dd884da7aeb9d7f6270551ac626`. This is measured download integrity, not signature authentication.
 - SBOM metadata release source: `33fb71b2f4224b470ebc628a9165fc4b92870406`.
 - NKD comparison: `d6cdf8dabb6bbda3af925ddb49eb16cde3eae8d9`, current main at read-back.
-- Reproduce the [machine-readable inventory](nke-v0.21.0-dependency-inventory.json) as a pure projection of the authenticated-by-hash downloaded asset:
+- Reproduce a machine-readable inventory as a pure projection of the hash-checked downloaded asset:
 
   ```sh
   gh release download v0.21.0 --repo dsx-ai-factory/nke --pattern SBOM.cdx.json
@@ -22,7 +22,7 @@ The [recorded ARM64 integration test](evidence/2026-10-07-direct-os-source-build
 
   This projection intentionally omits the CycloneDX document envelope; it is not a complete standalone SBOM. Policy is in ADR-13; source URL/digest are above, not synthetic SBOM fields.
 
-- [Machine-readable inventory](nke-v0.21.0-dependency-inventory.json) preserves every component record and all dependency edges from the asset, including evidence labels and source/distribution references. This file is descriptive evidence, not a replacement lock or authored lifecycle object.
+- The upstream [SBOM.cdx.json asset](https://github.com/dsx-ai-factory/nke/releases/download/v0.21.0/SBOM.cdx.json) preserves every component record and all dependency edges, including evidence labels and source/distribution references. The projection above is descriptive evidence, not a replacement lock or authored lifecycle object.
 
 ## What the asset does and does not establish
 
@@ -117,12 +117,12 @@ NKE's development code names a neighboring `dsx-identity` checkout. GitHub searc
 - Ubuntu: package versions/digests and transitive APT dependencies are absent. For this package-folder migration, retain and capture the source-owned installer/APT behavior. A fully source-rebuilt Ubuntu distribution is a separate scope.
 - Image release sources: pause tags and etcd image packaging suffixes cannot be converted to source commits by string substitution.
 
-Beyond the experimental public-source catalog and separately tested OVN fork packages, no completed package/image migration, regenerated maintained bundle or new full OS bake is claimed.
+Beyond the experimental public-source catalog and candidate OVN fork packages, no completed package/image migration, regenerated maintained bundle or new full OS bake is claimed.
 
 ## Complete OS-material name/version inventory
 
 Repeated rows from both architectures and Kubernetes matrix rows are grouped only for display.
-The JSON preserves the original records and exact dependency relationships.
+The upstream SBOM preserves the original records and exact dependency relationships.
 A hash column means the SBOM declares a hash; it does not assert upstream signature verification.
 
 | Name | Version | Architecture labels | Records | Hashes on every record |

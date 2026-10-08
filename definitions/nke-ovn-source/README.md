@@ -145,7 +145,7 @@ existing maintained producer names in `definitions/nke-m2/os-catalog/registry.ya
 
 ```text
 For each native platform: linux/arm64 and linux/amd64
-  DSX fork → ovn-kube-ubuntu → nke-cni-ovn.tar  [tested candidate producer]
+  DSX fork → ovn-kube-ubuntu → nke-cni-ovn.tar  [candidate producer]
                                   │ bind as material "ovn"
   nke-agent ───────────────────────┤
   nke-kubeadm-distro ──────────────┤
@@ -214,11 +214,10 @@ authenticated material handoff, then independently extracts the Debian packages
 with `dpkg-deb` and checks metadata, layout, hook syntax and gzip/sidecar integrity.
 It also builds Helm from the existing pinned public-source producer, renders the
 packaged chart, rejects old/default image references and compares decompressed
-image bytes with the exact source-built OCI export. The
-[original native ARM64 run](../../docs/evidence/2026-10-07-ovn-fork-source-build.md) passed.
-The [updated three-producer ARM64 run and chart OCI interoperability](../../docs/evidence/2026-10-07-ovn-release-outputs.md)
-also passed; that record separates measured local results from missing production acceptance.
-It stops before SBOM, signing and publication operations. Rootful Docker test
+image bytes with the exact source-built OCI export.
+It stops before SBOM, signing and publication operations. These opt-in checks
+do not establish production publication, OS integration or Release acceptance.
+Rootful Docker test
 ownership and SELinux workspace labeling follow the
 [existing diagnostic setup](../nke-os-source/README.md#tests).
 

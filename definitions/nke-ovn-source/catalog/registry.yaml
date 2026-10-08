@@ -174,7 +174,8 @@ components:
           sleep 0.2
         done
         "$ready" || { echo 'OVN import: containerd readiness timed out' >&2; exit 1; }
-        gzip -dc "$image_name" | timeout --kill-after=5s 300s "$ctr" -n k8s.io images import - >>"$log" 2>&1
+        gzip -dc "$image_name" | timeout --kill-after=5s 300s "$ctr" -n k8s.io images import - >>"$log" 2>&1 \
+          || { echo "OVN import failed; see $log" >&2; exit 1; }
         EOF
         chmod 0755 "$images/DEBIAN/postinst"
         for kind in charts images; do
