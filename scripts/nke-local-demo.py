@@ -505,6 +505,8 @@ def cleanup_runtime(server, http, guard, work, domain_runner, bgp_intent, restor
         raise VM.SmokeError("unknown/remaining domain; network retained")
     if bgp_intent:
         restore_bgp(guard)
+        guard.bgp_intent = False
+        guard.cleanup_checkpoint()
     guard.close()
 
 
@@ -603,6 +605,8 @@ def probe(args):
         server_env = simulator_environment(simulator, private_disk, work, gateway, libvirt_binding)
         logs.append((work / "simulator.log").open("xb"))
         bgp_intent = True
+        guard.bgp_intent = True
+        guard.checkpoint()
         server = subprocess.Popen([str(binary)], cwd=simulator, env=server_env, stdout=logs[-1],
                                   stderr=subprocess.STDOUT, start_new_session=True)
         nico = "http://" + gateway + ":18089"
@@ -647,6 +651,30 @@ def probe(args):
 
 
 def main():
+    if sys.argv[1:2] == ["restore"]:
+        parser = argparse.ArgumentParser(description="Restore recorded local network controls after producers have stopped.")
+        parser.add_argument("--work", required=True)
+        args = parser.parse_args(sys.argv[2:])
+        guard = None
+        try:
+            env = MGMT.native_environment()
+            env.update(admit_libvirt_environment(env))
+            guard = NET.OwnedNetwork.recover(args.work, env)
+            if not guard.finished:
+                guard.require_idle()
+                if guard.bgp_intent:
+                    restore_bgp(guard)
+                    guard.bgp_intent = False
+                    guard.cleanup_checkpoint()
+                guard.close()
+            print("PASS: recorded local network controls restored; no tenant, VM or management deletion was attempted.")
+            return 0
+        except (VM.SmokeError, OSError, ValueError, KeyError, TypeError) as err:
+            print("NKD-E-PREFLIGHT-FAILED: local network recovery: " + str(err), file=sys.stderr)
+            return 17
+        finally:
+            if guard is not None and guard.lock is not None:
+                guard.lock.close()
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("nke-checkout", "nkdctl", "tools-run", "site-run", "components-run", "profiles-run", "provider-run",
                  "simulator-run", "os-run", "out"):

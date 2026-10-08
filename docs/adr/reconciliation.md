@@ -218,6 +218,11 @@ simulator, disk-server or DNS daemons; their independent process groups are
 stopped/joined before host restoration checks. Contract negatives cover foreign
 domains, refused BGP restoration and individual daemon join failures. Downstream
 consumers emit success only after their outermost cleanup completes.
+Network-only crash recovery now uses a private synced intent journal and the
+same kernel-released lock. Exact executable/file/bridge bindings gate restoration;
+recovery never kills journal PIDs. Contract negatives cover changed journals,
+live owners, protected executable metadata, substituted root staging and full
+diagnostic volumes. This does not establish a full tenant crash/restart matrix.
 
 Full end-to-end acceptance remains unestablished. Private integrated attempts
 have not passed; no private runtime acceptance outcome is recorded in-tree.
@@ -228,7 +233,8 @@ private log retention before deletion. The HTTP contract is exercised with a
 real loopback server; it is not a recorded full guest/tenant acceptance run.
 A private runtime seed projection raises the selected instance to eight GiB
 without changing accepted asset bytes. The local profiles producer adds a guest
-boot command matching NICoSim's `eth0` seed across reboot. Complete tenant
+boot command retaining predictable physical NIC names across reboot, rather
+than renaming the uplink after OVN has persisted its first-boot name. Complete tenant
 acceptance with both corrections remains unexercised. None of these probes proves the full
 tenant/workload path. Local evidence reports
 are intentionally not shipped in this PR. Private diagnostic logs and Run records

@@ -24,6 +24,36 @@ SPEC.loader.exec_module(DEMO)
 
 
 class DemoTest(unittest.TestCase):
+    def test_restore_cli_only_restores_recorded_bgp_intent_and_never_deploys(self):
+        for bgp, finished in ((False, False), (True, False), (False, True)):
+            with self.subTest(bgp=bgp, finished=finished):
+                guard = Mock(finished=finished, bgp_intent=bgp)
+                with patch.object(DEMO.sys, "argv", ["demo", "restore", "--work", "/original-work"]), \
+                     patch.object(DEMO.MGMT, "native_environment", return_value={}), \
+                     patch.object(DEMO, "admit_libvirt_environment", return_value={"HOME": "/native-home"}), \
+                     patch.object(DEMO.NET.OwnedNetwork, "recover", return_value=guard) as recover, \
+                     patch.object(DEMO, "restore_bgp") as routes, patch.object(DEMO, "probe") as deploy, \
+                     patch.object(DEMO.sys, "stdout", io.StringIO()):
+                    self.assertEqual(DEMO.main(), 0)
+                recover.assert_called_once_with("/original-work", {"HOME": "/native-home"})
+                deploy.assert_not_called()
+                self.assertEqual(routes.call_count, int(bgp and not finished))
+                self.assertEqual(guard.close.call_count, int(not finished))
+                guard.lock.close.assert_called_once_with()
+
+    def test_restore_cli_active_guest_prevents_route_and_control_mutation(self):
+        guard = Mock(finished=False, bgp_intent=True)
+        guard.require_idle.side_effect = DEMO.VM.SmokeError("unknown live guest")
+        with patch.object(DEMO.sys, "argv", ["demo", "restore", "--work", "/original-work"]), \
+             patch.object(DEMO.MGMT, "native_environment", return_value={}), \
+             patch.object(DEMO, "admit_libvirt_environment", return_value={}), \
+             patch.object(DEMO.NET.OwnedNetwork, "recover", return_value=guard), \
+             patch.object(DEMO, "restore_bgp") as routes, patch.object(DEMO.sys, "stderr", io.StringIO()):
+            self.assertEqual(DEMO.main(), 17)
+        routes.assert_not_called()
+        guard.close.assert_not_called()
+        guard.lock.close.assert_called_once_with()
+
     def test_cli_default_allows_measured_native_tcg_provisioning_budget(self):
         arguments = ["demo"]
         for name in ("nke-checkout", "nkdctl", "tools-run", "site-run", "components-run", "profiles-run",

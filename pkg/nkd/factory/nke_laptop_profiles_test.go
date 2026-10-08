@@ -118,7 +118,7 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 					t.Fatalf("bootcmd iteration %d: %v\n%s", iteration, err, out)
 				}
 				observed, err := os.ReadFile(filepath.Join(root, "observed"))
-				if err != nil || string(observed) != "console=tty0 console=ttyAMA0,115200 net.ifnames=0\n" {
+				if err != nil || string(observed) != "console=tty0 console=ttyAMA0,115200 net.ifnames=1\n" {
 					t.Fatalf("console/naming lost or duplicated: %q, %v", observed, err)
 				}
 			}
@@ -192,8 +192,8 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					for _, required := range []string{
 						"sha256sum -c -", "231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a",
 						"861964b7d4bbc6d4c82c8e77891cf1cd3ceb344666d344708b54e4492f910d09",
-						"sed '1d;98d'", "net.ifnames=0", "update-grub", "bootcmd:",
-						"/etc/default/grub.d/zz-nkd-local-network.cfg", "${GRUB_CMDLINE_LINUX} net.ifnames=0",
+						"sed '1d;98d'", "net.ifnames=1", "update-grub", "bootcmd:",
+						"/etc/default/grub.d/zz-nkd-local-network.cfg", "${GRUB_CMDLINE_LINUX} net.ifnames=1",
 						"set -eu", "test ! -L", "test -f", "= \"$expected\"",
 						"FROM alpine@sha256:", "nico-vms-cp.yaml", "nico-vms-worker.yaml",
 						"nke-local-26-04-arm64-plain", "ubuntu_version: \"26.04\"", "variant: local-plain-tpm",

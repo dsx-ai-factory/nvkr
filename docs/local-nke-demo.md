@@ -12,13 +12,31 @@ probe as a completed tenant/workload result. This is a disposable trusted-user
 diagnostic, not M2, a signed Release, qualified execution or a complete
 source-built distribution. The older retained disk's failed full OS smoke and
 missing DSX source material remain disclosed.
-The latest real attempt reached the tenant API and generated its kubeconfig,
-but OVN could not schedule on the six-GiB control plane, and the worker lost
-IPv4 after reboot with a failed `enp1s0` to `eth0` rename. The candidate now
-projects eight-GiB guests and builds a profile boot command that retains `eth0`
-across reboot. Both corrections still require a complete real rerun; tenant,
-workload and final cleanup acceptance have not passed together.
+An earlier completed integrated attempt booted both guests but failed
+`kubeadm init`: containerd could not pull the source-pinned kube-vip image from
+GHCR, and the tenant API virtual IP remained unreachable. A raw registry `401`
+is only an authentication challenge, not proof that a public image pull is
+denied. In the subsequent live attempt, the control-plane node became Ready
+and kube-vip was Running and Ready with its exact pinned GHCR image digest.
+The worker had not joined: after reboot its console reported `eth0` without an
+IPv4 address, and NICoSim's diagnostic SSH request to its assigned address
+failed with `no route to host`. These observations do not establish a complete
+tenant/workload result. An earlier attempt
+also exposed insufficient control-plane memory for OVN and a network-name
+failure after reboot. The candidate projects eight-GiB guests and includes a
+profile boot command to retain predictable physical NIC names on subsequent boots, but that boot
+command does not establish first-boot network readiness or preserve the
+first boot's generated network configuration after an interface-name change.
+Tenant, workload and
+final cleanup acceptance have not passed together.
 This guide is not yet a validated full-demo result.
+
+The selected controller hardcodes `ghcr.io/kube-vip/kube-vip` and renders a
+digest-pinned static Pod with `IfNotPresent`. The retained OS materials do not
+include that image. Preloading the exact runtime reference into containerd's
+`k8s.io` namespace is still an OS-material integration task; rebuilding it from
+source also requires the NKE runtime to consume the resulting image reference
+and digest. Do not silently substitute an upstream digest for rebuilt bytes.
 
 ## Start on an Apple Silicon Mac
 
@@ -74,10 +92,14 @@ unchanged; the consumer projects its tracked bytes privately. Source-owned NKE
 scripts render/check chart values and the built `nkectl` validates the tenant
 request. No approximate YAML or iPXE parser is added in NKD.
 The local profiles image adds an idempotent guest boot command for
-[`net.ifnames=0`](https://github.com/systemd/systemd/blob/main/docs/PREDICTABLE_INTERFACE_NAMES.md),
-after NICoSim's source-owned GRUB setup, to match its single-NIC `eth0` seed.
+[`net.ifnames=1`](https://github.com/systemd/systemd/blob/main/docs/PREDICTABLE_INTERFACE_NAMES.md),
+after NICoSim's source-owned GRUB setup, to preserve the first boot's physical
+uplink name used by OVN's generated network configuration. A previous profile
+set `net.ifnames=0` only for reboot: that renamed the physical NIC after OVN
+had persisted its first-boot name, leaving the worker without IPv4.
 This is laptop deployment configuration, not a change to the accepted QCOW2.
-An older completed profiles Run does not contain this fix; rebuild the profiles
+An older completed profiles Run may contain the incorrect reboot-only naming
+change; rebuild the profiles
 lane with a fresh attempt and pass that exact Run to the consumer.
 
 Cache the pinned service images using the existing build/management setup.
@@ -223,9 +245,48 @@ running: the consumer attempts stop/join of simulator, HTTP and DNS even when
 resource restoration is refused. A real join failure still retains dependent
 host state and fails the command. Cleanup diagnostics cannot replace its error
 identity, and a cleanup failure reports the original phase failure too.
-Do not
-prune Docker or delete unknown domains to force another attempt. After SIGKILL
-or a host crash, inspect retained privileged state before retrying.
+Do not prune Docker or delete unknown domains to force another attempt.
+
+### Recover network controls after a crash
+
+New attempts persist `network-state.json` privately before granting host
+privileges. It records the owner, exact permitted intents, original file
+identities and bytes, original sysctl values and attempt-bound root staging
+path. File and directory sync precede new privileged work. This is a
+trusted-user recovery journal, not an authenticated NKD receipt or a Release.
+Keep the original output directory; older attempts without this journal need
+manual operator inspection and cannot use this recovery command.
+
+After SIGKILL, OOM or a Colima restart:
+
+1. Confirm you are in the same dedicated native VM and account. Preserve the
+   output directory and accepted Runs; do not reset Colima or prune Docker.
+2. Inspect the exact attempt's simulator, disk-HTTP and DNS producers. Stop and
+   join any surviving owned producers using fresh runtime ownership checks,
+   not PIDs copied from the journal. Inspect the explicit native libvirt session
+   and remove only independently verified attempt-owned domains. Do not remove
+   an unknown guest to make recovery pass. Tenant/Kind/registry cleanup remains
+   a separate operator task after a hard crash.
+3. Run the network-only restore command inside the native VM:
+
+   ```sh
+   python3 -B scripts/nke-local-demo.py restore --work "$NKD_DEMO_OUT"
+   ```
+
+4. Confirm it exits successfully before starting a new attempt. An active
+   guard, present original PID, live private capability-bearing executable,
+   disk-HTTP listener, simulator or libvirt domain prevents restoration.
+   Changed bridge/file identities, capabilities or routes retain controls and
+   return an error; inspect the exact discrepancy rather than forcing removal.
+
+Recovery takes the same kernel-released lock, never kills serialized PIDs and,
+on the same boot, waits 40 seconds for any in-flight bounded sudo command to
+terminate. It restores only the recorded supported controls, reads back their
+removal and can replay an interrupted rollback. VIP route restoration requires
+recorded simulator/BGP intent. A full diagnostic volume does not prevent
+withdrawing known privileges after producers have joined, but failed journal
+persistence still makes the command fail. Recovery does not create tenant,
+workload, signed-release or end-to-end acceptance evidence.
 
 Private phase logs, kubeconfigs, credentials, simulator database and VM consoles
 stay under the new output directory; keep it out of Git and shared logs.

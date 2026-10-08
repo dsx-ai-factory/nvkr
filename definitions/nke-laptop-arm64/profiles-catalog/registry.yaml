@@ -39,15 +39,17 @@ components:
         # At the authenticated fixture revision, line 98 downloads a different
         # agent over HTTP. Remove only that override; source APT commands remain
         # and their installed bytes still need downstream runtime verification.
-        # NICoSim's source network-config selects eth0. Preserve that name
-        # across reboots instead of racing an already-up enp1s0 rename. NICoSim
+        # The tested image first boots with predictable physical NIC names.
+        # OVN's source-owned reconciliation persists that uplink in netplan.
+        # Keep the same naming policy on reboot; switching to eth0 afterward
+        # strands that configuration and leaves the worker without IPv4. NICoSim
         # prepends its own GRUB bootcmd to this list; this item runs afterward.
         # The installer writes 99-console.cfg, which overrides /etc/default/grub.
         # Source this exact local snippet after it, preserving the console value.
         printf '%s\n' '#cloud-config' 'bootcmd:' '  - |' \
           '    set -eu' \
           '    file=/etc/default/grub.d/zz-nkd-local-network.cfg' \
-          '    expected='\''GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} net.ifnames=0"'\''' \
+          '    expected='\''GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} net.ifnames=1"'\''' \
           '    test ! -L "$file"' \
           '    if [ -e "$file" ]; then' \
           '      test -f "$file"' \
