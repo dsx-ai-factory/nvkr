@@ -79,7 +79,7 @@ Save the previous exact Plan before regeneration, then compare it to the regener
 
 ```sh
 git show HEAD:.github/nkd-run/plan.json > /tmp/nkd-plan-before.json
-nkdctl run generate \
+GOTOOLCHAIN=local go run ./cmd/nkdctl run generate \
   --definition definitions/nke-m2/definition.yaml \
   --environment definitions/nke-m2/environment-github.yaml --engine github --root .
 nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.json

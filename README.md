@@ -29,7 +29,9 @@ The public lifecycle is **Definition → Run → Release**:
 
 An **attestation** is a statement about a specific artifact, bound to its digest: a fingerprint of its
 content. For signed GitHub releases, NKD signs production provenance recording the Run, selected inputs,
-and producing workflow, and SBOMs recording the components observed during inspection. It also signs
+and producing workflow. Signed SBOMs state their evidence scope: inspected composition where supported,
+or, for M2 disks, exact producer/material subjects with disk inspection explicitly marked `not-performed`.
+Uninspected producer evidence does not establish installed disk contents. NKD also signs
 the published artifacts and release root. These signatures let a verifier authenticate the signer and
 detect changes to the signed statements; the digest binds each claim to its intended artifact.
 

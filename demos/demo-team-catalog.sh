@@ -40,6 +40,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -x "$NKD" ] || die "build nkdctl first (make build), or set NKDCTL_BIN to an executable: $NKD"
+NKD=$(cd "$(dirname "$NKD")" && printf '%s/%s\n' "$PWD" "$(basename "$NKD")")
 if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive when stdin is not a terminal'; fi
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-team-catalog.XXXXXX"); fi
 printf 'Exports: %s\n' "$OUT"

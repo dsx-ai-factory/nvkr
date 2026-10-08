@@ -48,8 +48,9 @@ bash demos/demo-team-os.sh --help
 bash demos/demo-team-release.sh --help
 ```
 
-The scripts accept `NKDCTL_BIN=/absolute/path/to/nkdctl` to reuse a binary built from this PR head.
-The same CLI supports all three stops, including the featured candidate's release metadata. The scripts install
+The scripts accept `NKDCTL_BIN=/absolute/path/to/nkdctl` to reuse a compatible binary.
+The current CLI supports catalog/OS planning and current v4 release browsing. Replaying the featured
+v3 release requires a separately built CLI from historical PR #108, as explained in Stop 3. The scripts install
 nothing and leave exported files in a new temporary directory printed at startup. `--out` selects a new
 directory beneath an existing parent. Existing directories are rejected. `--non-interactive` skips pauses.
 They never modify checked-in catalog pins or generated CI files, dispatch CI or publish artifacts.

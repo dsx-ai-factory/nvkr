@@ -49,3 +49,16 @@ remain unverified. The [facilitator guide](team-guide.md) explains the separate 
 Operational scripts stay in `scripts/`. Their [usage guide](../scripts/README.md) explains runtime,
 credentials, storage ownership, and cleanup. The [facilitator guide](team-guide.md) and
 [reconciliation](../docs/adr/reconciliation.md) describe the subjects and limits of recorded demonstrations.
+
+## Before sharing an updated tour
+
+Check local links and heading anchors in the deck, sibling HTML pages and Markdown guides. Open each
+linked page and confirm its referenced section exists; exercise query/fragment routes separately. Check
+remote historical references separately from local links, and retain their exact source/schema limits.
+Run `make license-header-check`, `make shellcheck` and `git diff --check`. Syntax-check inline JavaScript
+with `node --check` after extracting each executable script. These static checks do not establish browser
+rendering, registry availability or NKD execution.
+
+After editing the explorer’s executable inline script, recompute the base64-encoded SHA-256 of its
+exact text between `<script>` and `</script>` (including whitespace), and replace the `script-src` hash
+in its Content Security Policy. The hash permits only those exact offline script bytes.

@@ -83,8 +83,8 @@ are scoped in [reconciliation](docs/adr/reconciliation.md).
 
 ## Test timing and cache use
 
-Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached race/coverage events. CI retains the
-event stream and coverage for seven days and summarizes slow packages/tests, including failures. Its check
+Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached ordinary test events. CI retains the
+event stream for seven days and summarizes slow packages/tests, including failures. Its check
 cache is scoped by platform, exact Go version, dependencies, and commit; a compatible prior check cache is
 restored and an updated cache saved only after successful checks. Other jobs cannot populate that key.
 
