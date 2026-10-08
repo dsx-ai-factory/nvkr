@@ -57,8 +57,9 @@ host-local Go/GCC image ID. The launcher supports Podman and native ARM64 Docker
 building and natively probing pinned toolchain sources when required. It binds
 the measured image ID to exactly the selected simulator producers through an
 attempt overlay. `--check simulator` requires no cached toolchain and does no
-producer work; Docker bootstrap requires Buildx. Live Docker execution needs
-separate evidence; the earlier Podman Run does not prove it.
+producer work; Docker bootstrap requires Buildx. The later committed
+[Docker Run and startup probe](../../docs/evidence/2026-10-08-colima-nicosim-build.md)
+passed separately; neither it nor the earlier Podman Run proves VM provisioning.
 Module downloads and verification precede offline CGO compilation;
 the server invokes NKE's `build-static` target. These Linux tools do not run directly
 on macOS. Seed/UI assets, the existing QCOW2-to-tenant handoff, profiles and the deploy-only adapter

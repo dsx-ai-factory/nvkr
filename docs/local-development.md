@@ -421,7 +421,9 @@ Require a complete 1/1 Run before consuming
 `packages/nicosim-tools-arm64`. This executable bundle does not yet deliver the
 seed/UI assets. Its build is not proof of real VM provisioning or tenant readiness;
 the earlier [Podman smoke](evidence/2026-10-07-local-nicosim-build.md) selected a mock
-VM backend. The new bootstrap route needs separate live Docker execution evidence.
+VM backend. The later [committed Colima Docker Run](evidence/2026-10-08-colima-nicosim-build.md)
+completed 1/1 and passed the same limited startup probe; it still does not prove
+real VM provisioning, seed/UI artifact delivery or the complete demo.
 
 ## Find outputs and interpret the result
 

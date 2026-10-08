@@ -208,8 +208,10 @@ SQLite and served the prepared source's UI; see the
 already-cached host-local Go/GCC image. The launcher now permits Podman or Docker,
 bootstraps and natively probes pinned toolchain sources when required, and freezes
 an exact attempt-local substitution for the selected simulator producers. Contracts
-cover preflight without a cached image and reject ambiguous/mixed projection inputs;
-live Docker simulator execution remains unestablished. Seed/UI artifact delivery,
+cover preflight without a cached image and reject ambiguous/mixed projection inputs
+before replacement toolchain work. The committed-head [Colima Docker Run](../evidence/2026-10-08-colima-nicosim-build.md)
+completed 1/1 and its bounded offline non-root mock-runtime SQLite/UI probe passed.
+This does not establish real VM provisioning. Seed/UI artifact delivery,
 integration into the combined set and the complete
 Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
 qualification authority.
