@@ -22,9 +22,9 @@
 #
 # The artifact is produced by PR-controlled code, so its metadata is untrusted:
 # the PR number must be numeric and must name the PR whose head commit is the one
-# that triggered the build, and the preview ID comes from the workflow_run event
-# rather than from the artifact. Otherwise a fork PR could aim the comment at an
-# unrelated PR.
+# that triggered the build. Otherwise a fork PR could aim the comment at an
+# unrelated PR. The preview ID is derived from that verified number rather than
+# from the branch name, which two fork PRs can share.
 #
 # workflow_run workflows only run from the default branch, so this does nothing
 # until it is merged to main.
@@ -83,6 +83,7 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '20'
+          package-manager-cache: false
 
       - name: Install Fern CLI
         run: npm install -g fern-api@latest
@@ -91,11 +92,11 @@ jobs:
         id: generate-docs
         env:
           FERN_TOKEN: ${{ secrets.DOCS_FERN_TOKEN }}
-          HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+          PREVIEW_ID: pr-${{ steps.metadata.outputs.pr_number }}
         working-directory: ./fern
         run: |
           set -o pipefail
-          fern generate --docs --preview --id "$HEAD_REF" 2>&1 | tee /tmp/fern-output.log
+          fern generate --docs --preview --id "$PREVIEW_ID" 2>&1 | tee /tmp/fern-output.log
           URL=$(grep -oP 'Published docs to \K.*(?= \()' /tmp/fern-output.log || true)
           if [ -z "$URL" ]; then
             echo "::error::Failed to generate preview URL. See fern output above."
@@ -154,7 +155,7 @@ jobs:
 
           ${MARKER}"
 
-          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+          COMMENT_ID=$(gh api --paginate "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" | tr -d '\r' | head -1)
 
           if [ -n "$COMMENT_ID" ]; then
