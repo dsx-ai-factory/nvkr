@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nkd.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: hello-nkd
+sources:
+  hello:
+    repo: https://demo.example.invalid/hello
+    constraint: 1.x
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+components:
+  hello:
+    source: hello
+    fromSource: true
+    platforms: [linux/amd64]
+    outputType: host-package
+    artifactPath: bin/hello
+    writeDir: bin
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+    buildCommand:
+      - sh
+      - -ec
+      - sed "s/@VERSION@/$BUILD_VERSION/g" hello.sh > bin/hello; chmod +x bin/hello

@@ -1,11 +1,11 @@
-# NKE Recipes
+# NVKE Recipes
 
-NKE Recipes turns pinned NKE components into traceable, signed software releases. Its goal is to bring
+NVKE Recipes turns pinned NKE components into traceable, signed software releases. Its goal is to bring
 NKE's CLI, container images, Helm charts, operator tools, and node images into one declarative build and
 delivery workflow, connecting the delivered bytes to their inputs and evidence.
 
-This repository contains **NKD**, the build and release engine exposed through **`nkdctl`**, alongside
-reusable NKE catalogs and product Definitions. Release engineers declare what to ship; NKD derives the
+The **`nkdctl`** CLI exposes the build and release engine, alongside reusable NKE catalogs and product
+Definitions. Release engineers declare what to ship; NVKE Recipes derives the
 dependency graphs and generates the pipelines that build or acquire, package, sign, and publish it.
 Consumers can navigate a release's artifacts and evidence, then verify a supported claim against their
 own policy. NKE and downstream systems own installation and deployment.
@@ -28,10 +28,10 @@ The public lifecycle is **Definition → Run → Release**:
 ## What signed attestations do
 
 An **attestation** is a statement about a specific artifact, bound to its digest: a fingerprint of its
-content. For signed GitHub releases, NKD signs production provenance recording the Run, selected inputs,
+content. For signed GitHub releases, NVKE Recipes signs production provenance recording the Run, selected inputs,
 and producing workflow. Signed SBOMs state their evidence scope: inspected composition where supported,
 or, for M2 disks, exact producer/material subjects with disk inspection explicitly marked `not-performed`.
-Uninspected producer evidence does not establish installed disk contents. NKD also signs
+Uninspected producer evidence does not establish installed disk contents. NVKE Recipes also signs
 the published artifacts and release root. These signatures let a verifier authenticate the signer and
 detect changes to the signed statements; the digest binds each claim to its intended artifact.
 
@@ -40,7 +40,7 @@ components. It identifies the signer making the recorded production or publicati
 
 The consumer still chooses whom to trust. A Verification Policy supplies the accepted workflow identity
 and **issuer**, the service that issued that identity; verification also requires a pinned verifier.
-NKD checks the required signatures and production attestations against that policy, then checks the
+NVKE Recipes checks the required signatures and production attestations against that policy, then checks the
 referenced artifact and evidence bytes. Missing evidence, mismatched digests, or an unaccepted signer
 fail verification. A valid signature authenticates a claim; it does not establish complete inspection,
 freedom from vulnerabilities, independent reproduction, qualification, or deployment readiness.
@@ -107,5 +107,5 @@ security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-NKE Recipes is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
+NVKE Recipes is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

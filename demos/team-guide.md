@@ -1,247 +1,196 @@
-# NKD team walkthrough
+# Presenting NVKE Recipes
 
-For the browser experience, open the [HTML walkthrough](demo-team-walkthrough.html) and
-[concept gallery](demo-team-concepts.html). The 13-slide deck links directly to these HTML examples.
+Use the [14-slide deck](nkd-team-tour.html) for the story, the [concept gallery](demo-team-concepts.html)
+for questions, and the [HTML walkthrough](demo-team-walkthrough.html) for copyable commands.
+The [graph explorer](demo-team-explorer.html) displays saved Plans and release metadata offline.
+Keep all four HTML files together; they need no server or runtime downloads.
 
-**One takeaway:** declare the artifacts you want, inspect how they will be produced, then navigate exactly
-what was published and the evidence attached to it. NKD's public journey is **Definition → Run → Release**.
-Catalogs supply reusable, pinned producers; Environments supply execution and publication settings.
+NVKE Recipes turns declared build inputs into generated pipelines and traceable releases. The deck
+explains the concepts without requiring knowledge of a demo script. Use the linked examples when the
+audience wants to see a concept in action.
 
-For the catalog examples, keep three nouns distinct: a **component** is a named piece with a recipe;
-an **output** is a deliverable the Definition promises; an **artifact** is the actual result produced.
-The [replacement comparison](demo-team-concepts.html#overlays) uses `diagnostics = doctor` and
-`tools = doctor + status` to show a default overlay, an output-specific overlay and alternate-component
-selection. Each starts from the same baseline. Its [runnable lab](demo-team-walkthrough.html#composition)
-checks which Build Digests change without executing a build.
+## Present the concepts in 12–15 minutes
 
-Use the [slide deck](nkd-team-tour.html) for the story and the [offline graph explorer](demo-team-explorer.html)
-for the hands-on stops. The explorer is a presentation companion built for this walkthrough. NKD itself
-provides native Plan inspection, linked graphs in Mermaid/DOT/JSON, semantic Plan comparisons, and release
-text/JSON/Mermaid. The HTML explorer supplements those native commands.
+The 14 slides give the high-level story. Follow the diagrams and short CLI snippets; open a gallery
+example when a question needs more detail. The snippets illustrate operations using your Definition,
+Environment and artifact paths. Use the walkthrough for complete setup and runnable examples.
 
-The walkthrough is based on [PR #108](https://github.com/dsx-ai-factory/nke-recipes/pull/108), exact head
-`00c71385580e798eb3d7f74b88fc694225cfe175`. Its release browser validates bounded metadata and evidence
-without downloading artifact payload layers. The featured pipeline ran at its separately recorded source
-commit below; the demo CLI comes from this PR head.
-
-## Present the core story in 25 minutes
-
-| Time | Show | Invite the team to discover |
+| Time | Slides | Explain |
 |---|---|---|
-| 0–3 min | Opening slides and lifecycle | Which decisions belong to the product author, execution owner and consumer? |
-| 3–12 min | Catalog → Definition → Plan → generated pipeline | Where is one producer pinned? Which graph edges make the chart depend on the image? |
-| 12–17 min | OS-image material graph | Which exact materials flow into the disk root? Which host requirements must execution satisfy? |
-| 17–23 min | Candidate release graph, including both OS architectures | Which output, payload identity and evidence subject are we looking at? |
-| 23–25 min | Verification and next steps | What did inspection establish, and what remains a consumer-policy decision? |
+| 0–3 min | 1–3 | Purpose, lifecycle and authored inputs. |
+| 3–6 min | 4–6 | Exact pins, scoped changes and the generated Plan. |
+| 6–9 min | 7–9 | Generated CI, Run completeness and OS-image materials. |
+| 9–12 min | 10–12 | Release structure, browsing and signed evidence. |
+| 12–15 min | 13–14 | Consumer policy, questions and next steps. |
 
-Scripts pause at each checkpoint. You can shorten the session by preparing the exports beforehand and
-using the browser during the meeting. Offline rendering needs no server or package installation.
+Use `←` / `→` or Space to advance, Home / End to jump, and F for fullscreen. The slides and companion
+pages adapt to the browser size. In the explorer, select a node and choose **Focus node** to see its
+direct relationships. **Show output path** restores the broader graph; **Fit** follows window resizing.
+
+The gallery covers all 34 concepts. The optional live stops below add about 10 minutes: build a small
+artifact at slide 8, then browse the hosted release at slide 11. They illustrate the concepts without
+being prerequisites for understanding the deck.
 
 ## Prepare once
 
-From the repository root, use the Go patch specified in `.go-version` and build the current CLI:
+Use the exact Go version in `.go-version`, Git, Python 3 and a running Docker daemon. Build the CLI
+from the repository root, then rehearse the local demo to warm its helper and small Alpine image:
 
 ```sh
 GOTOOLCHAIN=local make build
-bash demos/demo-team-catalog.sh --help
-bash demos/demo-team-os.sh --help
-bash demos/demo-team-release.sh --help
+bash demos/demo-local.sh
 ```
 
-The scripts accept `NKDCTL_BIN=/absolute/path/to/nkdctl` to reuse a compatible binary.
-The current CLI supports catalog/OS planning and current v4 release browsing. Replaying the featured
-v3 release requires a separately built CLI from historical PR #108, as explained in Stop 3. The scripts install
-nothing and leave exported files in a new temporary directory printed at startup. `--out` selects a new
-directory beneath an existing parent. Existing directories are rejected. `--non-interactive` skips pauses.
-They never modify checked-in catalog pins or generated CI files, dispatch CI or publish artifacts.
+The local build needs no NKE checkout or registry credentials. `GO_BIN` and `NKDCTL_BIN` can select
+installed executables. The resulting script runs on the host; its build executes in a Linux container.
+First use can take longer while downloading the toolchain image and compiling the helper.
 
-The default catalog/OS tour needs neither Docker nor a source checkout after the CLI is built. The live
-release tour needs Python 3, registry access and existing credentials unless `--anonymous` is appropriate.
-Keep the deck and explorer available together with the recorded snapshot for a network-independent session.
-
-## Stop 1: turn inputs into a pipeline
+Prepare the catalog and OS exports before presenting:
 
 ```sh
-bash demos/demo-team-catalog.sh
+bash demos/demo-team-catalog.sh --non-interactive
+bash demos/demo-team-os.sh --non-interactive
+bash demos/demo-team-os.sh --arch amd64 --non-interactive
 ```
 
-This uses the small maintained `nke-v1` example: the CLI, CWE image and controller chart. Read a catalog
-source and its machine-managed lock side by side. Find that component in the Definition, then follow it
-through the exported `plan.json` in the explorer. The Environment supplies the registry namespace, runtime
-and signing policy; those are separate from the producer's logical Build identity.
+Each script prints a new export directory. Load its canonical `plan.json` or `os-plan-*.json` through
+**Open JSON** in the explorer. These planning demos need no Docker after the CLI is built.
+The catalog script generates and checks a GitHub bundle in scratch space; it does not dispatch CI.
 
-The script also exports native text/pretty Plan views and complete linked graphs. These are first-class
-NKD inspection commands; use the printed export directory as `DEMO_DIR`:
+The catalog, OS and release scripts pause by default; `--non-interactive` skips pauses.
+The tiny local demo runs straight through by default; `--pause` pauses before each step.
+All support `--out NEW_DIR`; its parent must exist and the directory must be new.
+
+## Explain catalogs and changes
+
+Keep three nouns separate: a **component** is a catalog entry with a producer; an **output** is a named
+deliverable the Definition requires; an **artifact** is the actual result.
+
+The gallery uses two bundles: `client-bundle` selects `app-cli`; `admin-bundle` selects `app-cli` and
+`config-cli`. Compare three independent edits from that same baseline:
+
+- Replace the `app-cli` producer in the default catalog: both bundles change.
+- Apply the overlay only to `admin-bundle`: only that bundle changes.
+- Make `client-bundle` select `app-cli-alt`: only the client selection changes.
+
+A toolchain substitution is narrower: it replaces the pinned build container for explicitly selected
+components while retaining their source and command declarations. A Plan diff shows the effect on
+build identities and execution settings. `run generate --check` checks the entire generated bundle.
+
+For an executable comparison of overlays and selection, run the
+[authoring lab](../docs/examples/authoring-lab/README.md). Its older fixture uses different component
+names; the three replacement operations are the same. It compiles Plans without executing producers.
+
+## Build a real artifact
+
+For the optional execution stop at slide 8, run:
 
 ```sh
-bin/nkdctl run plan --plan "$DEMO_DIR/plan.json"
-bin/nkdctl run plan --plan "$DEMO_DIR/plan.json" --pretty
-bin/nkdctl run graph --plan "$DEMO_DIR/plan.json" --format mermaid
-bin/nkdctl run graph --plan "$DEMO_DIR/plan.json" --view artifacts --format dot
+bash demos/demo-local.sh --pause
 ```
 
-The complete graph joins producer instructions, operation inputs/outputs, required slots and publication
-routes. Choose `--view producers` or `--view artifacts` to focus on one layer. Mermaid needs a compatible
-diagram viewer; DOT uses Graphviz. No renderer is installed by the scripts. The HTML explorer works offline
-from the canonical `plan.json`. Pretty JSON and graph JSON are display projections, not executable Plans.
+Show the Definition's one `hello` output. Follow the four printed steps: pin source, compile the Plan,
+execute, then check and use the artifact. Point out the completed Run and artifact digest before the greeting.
+The script retains all inputs, logs and artifacts in the printed directory.
 
-Show the chart's dependency on the image. A component pin changes the selected producer graph's Build
-Digest. The output name and transport location are not substitutes for that identity. Every named output
-still needs its own observations and evidence, even if two outputs share a Build Digest.
-
-The script generates a GitHub workflow in its scratch directory and immediately runs `--check` against
-that exact bundle. Open the generated workflow and ownership manifest. This proves repeatable generation
-for these inputs and this generator. It does not prove CI ran, a signature exists or an artifact is qualified.
-The Plan can request `pipeline-attested`; that label alone is not runtime evidence.
-The script finishes with `run diff` between the exported and generated Plans. Here it should report no
-change. For a reviewed input update, compare retained before/after Plans to explain changed outputs,
-Build Digests and execution settings. This semantic comparison complements the byte-exact drift gate.
-See [native Plan and graph inspection](../docs/plan-and-graph-inspection.md).
-
-For the checkout's six-output NKE deploy Definition, use:
+Run a different version to show why pins matter:
 
 ```sh
-bash demos/demo-team-catalog.sh --deploy
+bash demos/demo-local.sh --version 1.1.0
 ```
 
-This route needs access to the private upstream Git objects: its catalog re-derives external chart versions
-from the pinned upstream deploy file. It selects CWE, the controller chart, PostgreSQL, SPIRE, SPIRE CRDs
-and Temporal. See [the deploy Definition](../definitions/nke-deploy/README.md). This maintained example is distinct from
-the larger candidate Run used in the release stop below.
+The greeting becomes `Welcome` and the version becomes `v1.1.0`. Both the Build Digest and the artifact
+bytes change. See the [local demo guide](quickstart/README.md) for each exported file.
+This is real, unqualified local execution with a composition SBOM. It does not sign, publish, or scan dependencies.
 
-## Stop 2: follow the OS-image material graph
+## Follow the OS-image materials
 
-```sh
-bash demos/demo-team-os.sh
-# Optional second architecture:
-bash demos/demo-team-os.sh --arch amd64
-```
+At slide 9, open the ARM64 Plan. The consuming producer declares exact mappings such as
+`agent: nke-agent`: an input label on the left, a component key on the right.
+The disk output's `components` list explicitly includes the root and every transitive material.
+NVKE Recipes validates that selection against the catalog graph; the list is not positional wiring.
 
-Load `os-plan-arm64.json` or `os-plan-amd64.json` into the explorer. Start at the disk root and trace the
-agent, networking, packages and installer ISO into the source-owned Packer build. This is a real compiled
-Plan from the current checkout, not a hand-drawn set of dependencies. Find the native platform, KVM and
-resource requirements in the Environment. Runtime admission is separate from those declarations.
-The script also emits the native `run graph --view producers --format mermaid` view and a complete
-graph JSON projection. In the producer view, follow the `requires` edges into the disk-producing instruction.
+NVKE Recipes checks and stages the input bytes. NKE's source-owned commands understand the packages and
+archives, and Packer assembles the disk. Use the [Materials concept](demo-team-concepts.html#materials)
+for the full explanation. The separate OS script compiles and dry-runs the Plan; it does not bake a disk.
+Actual disk execution requires the matching host capabilities in the [OS-image guide](../definitions/nke-os/README.md).
 
-The final dry-run is `pending`, `static-unqualified`, with zero observed outputs. For a completed local
-execution, the retained QCOW2 and Run record live under the immutable attempt. The actual build is a
-separate exercise after following the prerequisites in the [OS-image guide](../definitions/nke-os/README.md):
+## Browse the hosted release
 
-```sh
-# On a prepared native Linux ARM64 Docker/KVM host; choose a fresh attempt name.
-CONTAINER_RUNTIME=docker NKE_OS_ARCH=arm64 scripts/nke-os-local.sh team-os-arm64-001 1
-```
+The featured [Run 37736529644](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37736529644)
+uses commit `105bb738521c9dbd7f1326ab15e78a699200f4f1` and publication-root v4.
+Here **v4 names the publication metadata schema**, not an NVKE Recipes product version. The root binds its Plan
+Digest along with the Definition and Environment identities. Earlier team-demo runs emitted v3 metadata;
+current NVKE Recipes rejects those roots. Their historical captures remain available in Git history.
+The successful consumer command can still emit `nkd.dev/release/v3`: that is the separately versioned
+consumer Release description, not the stored publication-root schema.
 
-This takes substantially longer than the presentation and produces local unqualified execution evidence.
-The maintained Docker wrapper freezes the observed toolchain image ID per attempt. The [recorded ARM64
-and AMD64 builds and boot smoke](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) describe exact historical Runs.
-They do not establish qualification, FDE support or production acceptance for a different checkout.
-
-## Stop 3: navigate the candidate release
-
-The selected [GitHub Run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963)
-uses the `nke-m2` Definition on candidate branch `codex/m2-arc-validation` at
-`625980e30b1a9f5ef27a9b46534de65eefff385a`. Its workflow display name still says `nke-deploy`.
-Its 34 outputs comprise 25 OCI images, five Helm charts, two executable bundles and two OS-image outputs
-(ARM64 and AMD64). The disk outputs use `build-provenance-v1` evidence, not a full native disk SBOM. Keep that candidate's results separate from the current
-checkout's supported paths and from the small examples in Stops 1 and 2.
-
-Use the explorer's **Pipeline Release** button during the presentation, or open
-[the ARM64 disk directly](demo-team-explorer.html#publication/nke-node-image-arm64). See its
-[capture, status and exact identities](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md). The saved CLI browse view
-is a metadata description; opening it does not refetch metadata or verify published payloads, signatures or
-policy. The archived workflow result and final Run record report 34 expected outputs that
-match 34 observed outputs. Its successful finalization is distinct
-from the publication/signing jobs and from an independent consumer-policy decision.
-
-The saved release uses publication-root v3. Current NKD requires v4 and rejects it, including from
-a local layout. Use the embedded explorer for this historical snapshot. To replay the commands below,
-set `NKDCTL_BIN` to a separately built CLI from the exact historical PR #108 head above. For a current-CLI
-browse or verification exercise, replace `RELEASE_REF` with a current v4 publication root.
-
-Historical metadata replay:
+Use the explorer's **Pipeline Release** view for a repeatable offline presentation.
+The saved view contains 34 outputs and 60 evidence records, including both QCOW2 disks.
+For a live browse, run:
 
 ```sh
-export RELEASE_REF='ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e'
-bash demos/demo-team-release.sh --reference "$RELEASE_REF"
-```
-
-Browsing fetches the release index, manifests, configs and bounded evidence documents. It checks their
-digests, sizes, schemas and memberships, without fetching image layers, executable archives or QCOW2 bytes.
-All metadata and evidence memberships are validated before an output filter is applied. Private GHCR
-access uses the existing local credential keychain; add `--anonymous` only when appropriate. Preflight
-registry access before the meeting, or use a saved metadata-only layout for the offline route.
-
-Load the exported `release-view.json` into the explorer. Start at the release root, choose an OS image,
-inspect its config-declared platform and exact identities, then follow its evidence subjects. Contrast the OCI manifest
-identity with the declared disk payload identity. Browsing does not measure the disk bytes. Compare a chart or executable to see the same output/evidence
-model across artifact types. Search for exact output names rather than inferring platform from a label.
-
-Native CLI navigation and graph export are also available:
-
-```sh
-# Native text focus and Mermaid export; each validates the complete metadata closure.
+export RELEASE_REF='ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:2fef87f426734a4427f7694aaf5ac181ba11352ea37522349bbb9cda7d84dc42'
 bash demos/demo-team-release.sh --reference "$RELEASE_REF" \
   --output nke-node-image-arm64 --mermaid
-
-# A saved full or metadata-only OCI layout avoids repeated network access.
-bash demos/demo-team-release.sh --reference "$RELEASE_REF" \
-  --layout /path/to/release-metadata-layout --output nke-node-image-arm64 --mermaid
 ```
 
-Mermaid output is a diagram source file; it needs a Mermaid-capable renderer. The HTML explorer renders
-the JSON offline with its own inline SVG. A local-layout view derives registry locators from the supplied
-reference and does not establish that those locations are available online.
-
-## Optional stop: apply a consumer policy
-
-`release browse` checks metadata integrity and evidence membership; payload bytes, signatures and policy
-remain unverified. The separate `release verify` command accepts a reference plus the
-consumer's trusted identity, issuer and evidence scope. Run this on Linux with an existing, digest-pinned,
-statically linked cosign binary and a signed publication compatible with the reader:
+Live browsing needs existing registry credentials for this release. Preflight access before the session.
+For offline browsing, use an authenticated GitHub CLI to download the small metadata carrier once:
 
 ```sh
-"${NKDCTL_BIN:-bin/nkdctl}" release verify --reference "$RELEASE_REF" \
-  --lane pipeline-attested --scope artifact-publication \
-  --identity "$ACCEPTED_BUILD_IDENTITY_REGEXP" --issuer "$ACCEPTED_OIDC_ISSUER" \
-  --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST"
+DEMO_METADATA=$(mktemp -d)
+gh run download 37736529644 --repo dsx-ai-factory/nke-recipes \
+  --name nkd-package-release --dir "$DEMO_METADATA/download"
+bin/nkdctl transport-unpack \
+  --archive "$DEMO_METADATA/download/package-release.tar" \
+  --root "$DEMO_METADATA" --path .nkd/factory/packages/release
+bash demos/demo-team-release.sh --reference "$RELEASE_REF" \
+  --layout "$DEMO_METADATA/.nkd/factory/packages/release" \
+  --output nke-node-image-arm64 --mermaid
 ```
 
-Supply policy values your team has accepted. Do not broaden a default-branch policy merely to make a
-candidate pass. The candidate Run above used a branch identity; it is not the maintained `main` identity.
-CI verification is evidence of that pipeline's checks, distinct from an independent consumer invocation.
+The Run artifact contains `package-release.tar`. The unpacker admits only its declared
+`.nkd/factory/packages/release` subtree; the resulting OCI layout includes metadata and evidence, with no
+image layers, executable archives or QCOW2 payloads. Reuse `$DEMO_METADATA/.nkd/factory/packages/release` for subsequent `--layout` calls. Archive extraction alone is not signature or payload verification.
 
-The supported `pipeline-attested` / `artifact-publication` scope checks signed production evidence and
-exact published contents. It does not establish qualified reproduction, release qualification/revocation
-acceptance or deployment readiness. The stronger unavailable scopes fail closed. Details and SDK examples
-are in [the lifecycle guide](../docs/lifecycle.md#run-and-verify).
+Choose ARM64, select the artifact, then follow an evidence membership to its component, stage and exact
+subject. Compare AMD64, a chart and a CLI. Distinguish the OCI manifest digest from the disk's declared
+QCOW2 payload digest. Load the script's `release-view.json` into the explorer to inspect your own export.
 
-## Explore the rest at your own pace
+Native browsing validates bounded metadata and evidence memberships. It does not download payload
+layers, verify signatures or apply consumer policy. Opening saved JSON in HTML is a descriptive view;
+it does not repeat the CLI's checks. Disk `build-provenance-v1` evidence is not a full installed-software inventory.
 
-| Capability | Follow-up | Boundary to keep visible |
-|---|---|---|
-| Native producer/artifact graphs and Plan comparisons | [Plan inspection](../docs/plan-and-graph-inspection.md) | Descriptive graph/diff views cannot authorize execution |
-| Pin previews, source/tool/action updates and deterministic maintenance | [Catalog maintenance](../docs/catalog-maintenance.md), `scripts/demo-catalog-change.sh --help` | Preview and data maintenance do not publish an accepted Release |
-| Catalog reuse, whole-producer overlays and output-specific selection | [Authoring lab](../docs/examples/authoring-lab/README.md), [toolchain substitution example](demo-team-concepts.html#toolchain-substitutions) | The lab exercises producer replacement and selection; toolchain substitution is a separate example |
-| Pin sets and acquired Helm charts | [Pin-set usage](../docs/nke-pin-set-usage.md), [generic example](../docs/generic-pin-set-example.md) | Pinned-tree access is required; referenced container images are not implicitly acquired |
-| Local CLI/image/chart execution and pull-back | [Local walkthrough](m1-local.md) | Docker/source access required; local and dry-run signing are unqualified |
-| Image-bound chart packaging | [Declarative Helm bindings](../docs/declarative-helm-bindings.md) | Consumer chooses deployment topology and repository overrides |
-| SBOMs and production provenance | [Dependency SBOMs](../docs/dependency-sboms.md), [publication architecture](../docs/publication-architecture.md) | Evidence names exact outputs/subjects; a chart SBOM is not a scan of its runtime images |
-| Integrity failures and malformed inputs | `scripts/demo-tamper-detection.sh --help` | Negative demonstrations establish their exact checked contract |
-| CI logs, transfer and failure diagnosis | [CI log guide](../docs/ci-step-and-log-readability.md) | A missing finalizer record is never success |
-| Programmatic integration | [Lifecycle SDK example](../docs/lifecycle.md#use-the-sdk) | Exported JSON cannot recreate an opaque verified capability |
-| OS inventory and installed package inspection | [Live disk inspection](../docs/nke-os-live-inspection.md) and candidate Run evidence | Keep metadata inspection, full disk evidence and operational qualification distinct |
+## Explain signing without overclaiming
 
-This is the feature map for a new team, not a promise that every internal diagnostic is production-enabled.
-The current [implementation/evidence record](../docs/adr/reconciliation.md) owns deferred capabilities: full qualified
-release acceptance, FDE, additional CI renderers, air-gap lifecycle and deployment orchestration are not part
-of the supported end-to-end demo. The candidate Run's exact evidence can demonstrate more than this
-checkout's maintained paths without retroactively changing those support claims.
+An SBOM describes software for a subject. Production provenance describes its build inputs and workflow.
+A signature authenticates the workflow identity making a statement about exact bytes.
+**It does not claim ownership of the software.**
 
-## Walkthrough validation
+Consumer verification is a separate operation against an explicitly accepted identity, issuer, evidence
+lane and scope. The supported `pipeline-attested` / `artifact-publication` scope checks signed production
+evidence and exact published contents. It does not establish qualified reproduction, full qualified
+release acceptance, revocation acceptance or deployment readiness.
 
-[Recorded October 6–7 checks](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-07-team-presentation-validation.md) cover the
-PR #108 CLI, catalog/OS scripts, embedded release snapshot, original browser pages and clarity pass.
-They distinguish presentation and metadata inspection from production execution and independent
-consumer verification. Later document edits do not inherit those earlier results.
+The [consumer script](../scripts/demo-release-consumer.sh) runs natively on Linux and uses its pinned
+Linux Docker runtime automatically on macOS. Supply a pinned static Linux amd64 cosign executable and
+an accepted policy; private access can use an inline-auth Docker config via `--registry-config`.
+See the [release quickstart](../docs/release-quickstart.md#verify-against-an-accepted-policy) for exact flags.
+Keep this optional operation separate from the short metadata-browsing stop.
+
+The macOS Docker route was exercised successfully against this run’s single-output `nkectl` publication:
+`ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases-nkectl@sha256:768b0ef67a09649465a66ff360eb44e74237a22c66da34bcee961247f06bd4d9`.
+It accepted the exact `main` workflow identity and GitHub OIDC issuer under the scope above. This check
+covers that CLI publication; it does not extend to the combined release or disk payloads.
+
+## Follow-up routes
+
+The [concept gallery](demo-team-concepts.html) includes pin sets, version stamps, overlays, toolchain
+substitutions, builder types, generator adapters, graph views, Helm bindings, completeness, SBOMs,
+publication identities, verification policy, maintenance and the Go SDK.
+
+Use the [Markdown quickstart](../docs/quickstart.md) for first-time planning, the
+[full local NKE demo](m1-local.md) for CLI/image/chart execution and pull-back, and the
+[documentation index](../docs/README.md) for task guides. The
+[reconciliation record](../docs/adr/reconciliation.md) owns current support and evidence limits.

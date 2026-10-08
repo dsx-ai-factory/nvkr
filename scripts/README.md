@@ -70,9 +70,16 @@ scripts/demo-release-consumer.sh --help
 
 The consumer takes one digest-pinned reference and one explicit Verification
 Policy with `artifact-publication` scope. This does not establish M3 qualification or M4 Release-manifest
-acceptance. Run it on Linux: it requires a real statically linked, digest-pinned Linux
-cosign executable and a signed GitHub publication; local dry-run output is
-deliberately insufficient.
+acceptance. It requires a real statically linked, digest-pinned Linux cosign executable
+and a signed current v4 GitHub publication; local dry-run output is insufficient.
+On macOS the script automatically builds a Linux amd64 NKD helper and verifies inside
+the pinned Docker toolchain image. Linux defaults to native execution; `--runtime docker`
+selects the container route explicitly, and `--runtime native` selects the host CLI.
+Docker mode needs the pinned Go toolchain and a Linux amd64 cosign executable.
+Use `--anonymous` for public registry access, or `--registry-config /path/to/auth-dir`
+with inline credentials in `config.json` for private access. Host credential helpers
+are rejected in container mode. Neither route relaxes executable pins, signer policy,
+release membership, or payload verification.
 Supplying `--definition`, `--environment`, and `--plan` together additionally
 requires the verified publication to bind those exact authored and compiled
 identities and realize their complete output set. Partial or empty exact-input

@@ -497,8 +497,10 @@ a failed refresh never produces a publishable candidate.
 
 Execution consumes this closed plan through shared producer operations and the same launcher for local and
 hosted Runs. Local scheduling retains a source session; hosted jobs use the Plan dispatcher. Component
-producers create bytes and run records; utility operations add packaging and evidence dependencies. Producer
-instructions are read from the embedded IR, never reconstructed from duplicated scheduler fields. Publication is followed by signature/attestation and pull-back
+producers create bytes and run records; utility operations add packaging and evidence dependencies. Ordinary
+local non-disk terminal observation uses the host's collection filesystem view; it executes no producer code
+or signature verifier and grants no qualification (ADR-18 §8). Producer instructions are read from the embedded
+IR, never reconstructed from duplicated scheduler fields. Publication is followed by signature/attestation and pull-back
 verification in v1. The qualified path performs its independent gates before constructing a cleared publication.
 The following flows describe intended contracts; the support table identifies what has been implemented.
 

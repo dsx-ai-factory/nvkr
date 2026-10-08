@@ -27,7 +27,7 @@ No publication, artifact execution, signing or installation occurs.
 Options:
   --layout DIR        inspect a local full or metadata-only OCI layout (offline)
   --anonymous         public registry access without ambient credentials
-  --output NAME       also show native text focused on one exact output
+  --output NAME       focus an exact output (default: ARM64 disk, then first output)
   --mermaid           also export the native Mermaid graph
   --timeout DURATION  deadline for each complete inspection (default: 20m)
   --out NEW_DIR       retain exports here (default: new temporary directory)
@@ -40,14 +40,30 @@ its parent must exist. Registry browsing downloads bounded metadata and evidence
 documents, never artifact payload layers. --output and --mermaid each repeat the
 metadata read; use --layout with a saved metadata carrier for repeated offline
 views. --layout cannot use --anonymous.
-Current NKD requires publication-root v4. The recorded Run 37533806963 uses v3;
-use the embedded explorer, or set NKDCTL_BIN to the historical PR #108 CLI for
-that replay. For current browsing/verification, supply a current v4 publication.
-For Linux signature/policy verification, see demos/team-guide.md.
+Current NVKE Recipes requires publication-root v4. Historical v3 roots require their
+matching historical CLI; changing a metadata file cannot upgrade a release.
+For signature and policy verification, see demos/team-guide.md.
 EOF
 }
 die() { printf 'demo: %s\n' "$*" >&2; exit 2; }
 pause() { if [ "$NON_INTERACTIVE" -eq 0 ]; then read -r -p 'Press Enter to continue... ' _; fi; }
+heading() {
+  if [ -t 1 ] && [ -z "${NO_COLOR+x}" ] && [ "${TERM:-dumb}" != dumb ]; then
+    printf '\n\033[1;32m%s\033[0m\n' "$*"
+  else
+    printf '\n%s\n' "$*"
+  fi
+}
+show_command() {
+  # Display short variable names; ARGS below always uses the complete values.
+  # shellcheck disable=SC2016
+  printf '$ nkdctl release browse --reference "$RELEASE_REF"'
+  # shellcheck disable=SC2016
+  if [ -n "$LAYOUT" ]; then printf ' --layout "$LAYOUT"'; fi
+  if [ "$ANONYMOUS" -eq 1 ]; then printf ' --anonymous'; fi
+  printf ' %q' "$@"
+  printf '\n'
+}
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --reference) [ "$#" -ge 2 ] || die 'missing --reference value'; REFERENCE=$2; shift 2 ;;
@@ -68,45 +84,83 @@ if [ -n "$LAYOUT" ] && [ "$ANONYMOUS" -eq 1 ]; then die '--layout cannot be comb
 command -v python3 >/dev/null || die 'Python 3 is required for the readable summary'
 if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive when stdin is not a terminal'; fi
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-team-release.XXXXXX"); fi
+heading 'NVKE Recipes / Explore a release'
+printf 'Follow one immutable release from outputs to supporting evidence.\n'
 printf 'Exports: %s\n' "$OUT"
 ARGS=(release browse --reference "$REFERENCE" --timeout "$TIMEOUT")
 if [ -n "$LAYOUT" ]; then ARGS+=(--layout "$LAYOUT"); fi
 if [ "$ANONYMOUS" -eq 1 ]; then ARGS+=(--anonymous); fi
 
-printf '\n1 / 3  Read the exact release metadata (2 minutes plus metadata fetch time)\n'
-printf '$'; printf ' %q' "$NKD" "${ARGS[@]}" --format json; printf '\n'
+heading '1 / 3  What is in this release?'
+printf 'Reading metadata and evidence; payload layers are not read.\n'
+show_command --format json
 "$NKD" "${ARGS[@]}" --format json > "$OUT/release-view.json"
 python3 - "$OUT/release-view.json" <<'PY'
+from collections import Counter
 import json
 import sys
 from pathlib import Path
 view = json.loads(Path(sys.argv[1]).read_text())
-print("Inspection:", json.dumps(view["inspection"]))
-print("Release:", json.dumps(view["reference"]))
-print("Outputs:", view["totalOutputs"])
-for output in view["outputs"]:
-    print(" ", json.dumps(output["name"]), "|", json.dumps(output["kind"]), "|", json.dumps(output["digest"]))
-print("Evidence entries:", len(view.get("evidence", [])))
+safe = lambda value: json.dumps(value, ensure_ascii=True)[1:-1]
+print(f"  Outputs: {view['totalOutputs']} | Evidence records: {len(view.get('evidence', []))}")
+for kind, count in sorted(Counter(o['kind'] for o in view['outputs']).items()):
+    print(f"  {count:>3}  {safe(kind)}")
+print(f"  Root: {safe(view['rootDigest'])}")
+run = view.get('metadata', {}).get('invocationId')
+if run:
+    print(f"  Run:  {safe(run)}")
 PY
-printf 'Checkpoint: use the actual output names above; a tag or a successful job label is not the release identity.\n'
+printf 'The root digest identifies this exact collection of artifacts and evidence.\n'
 pause
 
-printf '\n2 / 3  Navigate outputs and evidence (4 minutes)\n'
-printf 'Open %s/demo-team-explorer.html and load %s/release-view.json.\n' "$DEMO_DIR" "$OUT"
-printf 'Select an output. Follow its component and evidence relationships, then inspect the full digest/subject details.\n'
-printf 'If OS disk outputs are present, inspect config-declared platforms and distinguish OCI manifest from declared QCOW2 payload identity.\n'
-if [ -n "$OUTPUT" ]; then
-  "$NKD" "${ARGS[@]}" --output "$OUTPUT" > "$OUT/selected-output.txt"
-  cat "$OUT/selected-output.txt"
+heading '2 / 3  Follow one output'
+if [ -z "$OUTPUT" ]; then
+  OUTPUT=$(python3 - "$OUT/release-view.json" <<'PY'
+import json
+import sys
+view = json.load(open(sys.argv[1]))
+names = [o['name'] for o in view['outputs']]
+print('nke-node-image-arm64' if 'nke-node-image-arm64' in names else names[0])
+PY
+  )
 fi
+show_command --output "$OUTPUT"
+"$NKD" "${ARGS[@]}" --output "$OUTPUT" > "$OUT/selected-output.txt"
+python3 - "$OUT/release-view.json" "$OUTPUT" <<'PY'
+import json
+import sys
+view = json.load(open(sys.argv[1]))
+output = next(o for o in view['outputs'] if o['name'] == sys.argv[2])
+safe = lambda value: json.dumps(value, ensure_ascii=True)[1:-1]
+evidence = [e for e in view.get('evidence', [])
+            if output['name'] in e.get('binding', {}).get('outputs', [])]
+platform = '/'.join(output[k] for k in ('os', 'arch') if output.get(k))
+print(f"  {safe(output['name'])} | {safe(output['kind'])}" + (f" | {safe(platform)}" if platform else ''))
+print(f"  Contributing components: {len(output['components'])} | Evidence records: {len(evidence)}")
+print(f"  Manifest: {safe(output['digest'])}")
+disk = output.get('disk')
+if disk:
+    print(f"  Payload:  {safe(disk['payloadDigest'])}")
+    print(f"  Disk: {safe(disk['format'])} | {disk['size'] / 1024**3:.2f} GiB")
+    mode = disk.get('evidenceMode') or 'inspected'
+    label = 'build provenance (no full disk filesystem inventory)' if mode == 'build-provenance-v1' else safe(mode)
+    print(f"  Disk evidence: {label}")
+print(f"    {'Component':<34} Evidence records")
+for component in output['components']:
+    count = sum(e.get('binding', {}).get('component') == component for e in evidence)
+    print(f"    {safe(component):<34} {count}")
+PY
+printf 'Components identify contributors; evidence records bind their recorded subjects to this output.\n'
+printf '\nOpen demos/demo-team-explorer.html and load:\n  %s/release-view.json\n' "$OUT"
 if [ "$MERMAID" -eq 1 ]; then
   "$NKD" "${ARGS[@]}" --format mermaid > "$OUT/release-graph.mmd"
   printf 'Native Mermaid export: %s/release-graph.mmd\n' "$OUT"
 fi
-printf 'Checkpoint: selecting one output changes the view after all metadata and evidence memberships are checked.\n'
+printf 'Native text with full details: %s/selected-output.txt\n' "$OUT"
 pause
 
-printf '\n3 / 3  Name the trust decision (1 minute)\n'
-printf 'Browse checked metadata integrity and membership. Payload bytes, signatures and policy remain unverified.\n'
-printf 'The declared qualification is descriptive; an exported JSON file is not a verification receipt.\n'
-printf 'Use the separate Linux verification exercise in demos/team-guide.md for pipeline-attested/artifact-publication.\n'
+heading '3 / 3  What has been checked?'
+printf 'Browse checked metadata integrity and evidence membership.\n'
+printf 'Release verify checks payloads, signatures and your accepted workflow identity.\n'
+printf 'Signed attestations bind claims to exact subjects; they do not claim ownership.\n'
+printf 'Verification walkthrough: demos/team-guide.md\n'

@@ -114,6 +114,7 @@ func TestReleaseConsumerForwardsExactInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.Command("bash", script,
+		"--runtime", "native",
 		"--reference", "registry.test/release@"+digest,
 		"--identity", "identity",
 		"--issuer", "issuer",
@@ -160,6 +161,7 @@ func TestReleaseConsumerIgnoresGenericInheritedExactInputNames(t *testing.T) {
 	})
 	digest := "sha256:" + strings.Repeat("a", 64)
 	cmd := exec.Command("bash", script,
+		"--runtime", "native",
 		"--reference", "registry.test/release@"+digest,
 		"--identity", "identity", "--issuer", "issuer",
 		"--cosign", "/bin/true", "--cosign-digest", digest, "--work", work)
