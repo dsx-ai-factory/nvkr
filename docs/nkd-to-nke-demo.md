@@ -14,6 +14,13 @@ The exact packaged simulator also passed a later
 after explicit VM prerequisite installation. That probe created no guests and
 does not establish tenant provisioning, networking or workload acceptance.
 
+The later [real QCOW2 guest probe](evidence/2026-10-08-native-nicosim-qcow2-guest.md)
+passed NICoSim VM creation/readiness, authenticated SSH, cloud-init, software TPM,
+agent and staged Kubernetes-package checks, then deleted the owned guest and
+stopped/joined the simulator. Its [runnable command](local-qcow2-guest-probe.md)
+consumes completed Runs without rebuilding. This is not a site/tenant install
+and does not supersede the failed complete OS smoke or missing DSX input.
+
 **The artifact-build part is tested; the complete NKD-to-demo E2E is not yet
 validated.** Do not use the completed 22-output local Run as proof that a site or
 tenant was installed. The [first-time build guide](local-development.md) is the
@@ -236,7 +243,10 @@ oras cp --from-oci-layout "$NKE_DEV_LAYOUT@$NKE_DEV_DIGEST" \
 ```
 
 The destination must serve the same manifest digest before it becomes an
-installer input. Repeat the same transport for each required image/chart,
+installer input. A later [real loopback registry probe](evidence/2026-10-08-local-registry-handoff.md)
+copied the completed site Run's controller and bound chart and matched both
+manifest digests on registry read-back. That two-output test does not prove a
+complete dependency mirror, node access or installation. Repeat the same transport for each required image/chart,
 verify read-back digests, configure node authentication/mirrors and use new
 attempt-specific tags. Do not call this diagnostic transport NKD release
 publication, signing, qualification or release verification.

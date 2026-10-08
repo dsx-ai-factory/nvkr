@@ -453,6 +453,13 @@ completed 1/1 with the earlier two-component selection and passed the same limit
 startup probe using seed/UI from the source snapshot. It does not prove the new
 archive producer, real VM provisioning or the complete demo.
 
+The later [artifact-only guest command](local-qcow2-guest-probe.md) consumes the
+completed simulator/OS Runs inside Linux, without rebuilding. Its
+[recorded native libvirt probe](evidence/2026-10-08-native-nicosim-qcow2-guest.md)
+passed real QCOW2 VM readiness, SSH, cloud-init, TPM, agent and staged Kubernetes
+package checks with owned cleanup. It is still not the complete image smoke,
+management-plane install or tenant/workload acceptance.
+
 To inspect/consume a completed simulator bundle inside the same Linux source
 export, use NKD's delivery commands rather than unpacking guessed OCI blobs:
 

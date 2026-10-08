@@ -225,8 +225,15 @@ The later [native libvirt startup probe](../evidence/2026-10-08-native-nicosim-l
 used the exact delivery-verified bundle after scoped VM prerequisite installation:
 non-root session-hypervisor/SQLite initialization, one metadata gateway and exact
 packaged UI passed; the owned server stopped/joined. No guest was created, the
-link-local bind failed and BGP was disabled; full networking/TPM/guest acceptance
-is still absent. Integration
+link-local bind failed and BGP was disabled. The later
+[real QCOW2 guest diagnostic](../evidence/2026-10-08-native-nicosim-qcow2-guest.md)
+used the same completed simulator/disk outputs: native libvirt/TCG VM creation,
+TCP readiness, key-only SSH, cloud-init, software TPM, agent and staged Kubernetes
+package checks passed. Owned deletion and server stop/join passed; temporary host
+bridge/helper privileges were restored. The reusable command and failure-path
+contracts remain diagnostic, not authenticated Release or complete OS-smoke
+acceptance. Full guest attestation, networking and site/tenant/workload acceptance
+remain absent; the full image smoke still fails on the missing DSX material. Integration
 into the combined set and the complete
 Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
 qualification authority.
@@ -240,7 +247,10 @@ attempt substitutions do not override a pinned runtime entrypoint. A
 [bounded real Helm preparation/package probe](../evidence/2026-10-08-local-site-chart-preparation.md)
 passed. The later [four-output Colima Run](../evidence/2026-10-08-colima-site-and-tools-build.md)
 completed with no failure, and its exact controller image passed offline native
-help. Deployment remains unexercised; the
+help. A later [loopback registry transport probe](../evidence/2026-10-08-local-registry-handoff.md)
+copied that controller and bound chart with the built ORAS, matching both remote
+manifest digests. It establishes neither complete mirroring nor node/consumer
+reachability. Deployment remains unexercised; the
 site set is separate from `all`. Dependency charts remain acquisitions and the
 wrapper's Helm 4.3.0 does not match the installer's preferred 4.2.4; its readiness
 script warns rather than failing solely on that mismatch. Default source-tree

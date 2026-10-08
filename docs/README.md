@@ -9,6 +9,7 @@ each concept to a worked example.
 | I want to… | Read |
 |---|---|
 | Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-laptop-arm64/README.md) |
+| Boot an existing NKD disk through the real local NICoSim VM backend | [Artifact-only QCOW2 guest probe](local-qcow2-guest-probe.md) |
 | Understand Lia's local Colima/NICoSim demo and the missing NKD-to-deployment handoff | [Whole-demo analysis](lia-local-demo-analysis.md), [staged-installer handoff](nkd-to-nke-demo.md), [tested container bootstrap](evidence/2026-10-07-local-container-bootstrap.md), [source-built simulator evidence](evidence/2026-10-07-local-nicosim-build.md) |
 | Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md), [provider build evidence](evidence/2026-10-07-laptop-provider-builds.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |

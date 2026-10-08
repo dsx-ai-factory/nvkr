@@ -18,11 +18,12 @@ through an exact attempt overlay. `--check simulator` performs no pull/build and
 does not require a previously cached toolchain; Docker bootstrap requires Buildx.
 `site` separately selects the installer-aligned CLI/controller and two chart
 outputs. Its local pinned Helm wrapper prepares NKTP's locked dependencies before
-offline packaging. It is a compiler-tested candidate, not a completed four-output
-Run or deployment; see the [site handoff](../docs/nkd-to-nke-demo.md).
+offline packaging. Its separate [four-output Run completed](../docs/evidence/2026-10-08-colima-site-and-tools-build.md),
+not a deployment; see the [site handoff](../docs/nkd-to-nke-demo.md).
 `tools` separately selects source-built Linux ARM64 Helm, kubectl, clusterctl,
 ORAS and Kind at the staged installer's pinned versions. Compiler/preflight
-contracts pass; its complete build and deployment remain unexercised. Helm's
+contracts, complete build, verified extraction and native version probes passed;
+complete deployment remains unexercised. Helm's
 exact fixture preparation is diagnostic Local-only, not a supported held hosted
 fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
@@ -37,6 +38,12 @@ source trees on the Mac shared mount. Run storage remains below that checkout's
 Native guest capacity does not provide extra physical Mac space.
 Despite its historical filename, this launcher does not yet build a full
 source-built NKE distribution; see the [remaining work](../docs/full-nke-source-build.md).
+
+`python3 scripts/nke-nicosim-vm-smoke.py` consumes completed simulator and OS
+Runs without rebuilding. It uses a real libvirt session/QCOW2 guest, not the
+mock or container backend. Read the [guest-probe setup](../docs/local-qcow2-guest-probe.md)
+first: native VM packages, an explicitly admitted bridge/helper and Python 3.12+
+are required inside Linux/Colima. It is not the full OS contract or NKE tenant demo.
 
 ```sh
 # Plan only: validates and creates no attempt storage.
