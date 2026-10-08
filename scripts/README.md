@@ -6,6 +6,10 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
+For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
+and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
+OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
+
 ```sh
 # Plan only: validates and creates no attempt storage.
 nkdctl run plan --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-local.yaml

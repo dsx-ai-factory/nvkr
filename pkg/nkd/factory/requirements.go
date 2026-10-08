@@ -16,6 +16,44 @@ func rejectUnsupportedNodeRequirements(node Node, adapter string) error {
 		"%s cannot enforce execution requirements for node %q", adapter, node.ID)
 }
 
+// Offline non-disk utilities need no VM capability. A local mixed Plan retains
+// its VM request, but only the original Run owner may consume its admission and
+// held disk. Admit the complete local description without granting that child
+// helper a producer, disk observation, publication or signing route.
+func admitExecuteNodeRequirements(plan *Plan, nodeID string) error {
+	const adapter = "factory execute-node"
+	if plan.Qualification != TierStaticUnqualified || plan.Environment.GitHubARC != "" ||
+		plan.Environment.Publication != nil || plan.Environment.Signing != nil || !hasLocalVMBuild(plan) {
+		return admitGitHubRequirements(plan, adapter)
+	}
+	nodes, artifacts := planIndex(plan)
+	node, ok := nodes[nodeID]
+	if !ok {
+		return e.New(e.CodeInvalidCatalog, "factory plan has no node %q", nodeID)
+	}
+	if node.IRNode != "" || node.Network != ir.NetworkNone || node.Requirements != nil ||
+		node.ExecutionBinding != nil || plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
+		return e.New(e.CodeEngineCapability, "%s requires the original Run owner for node %q", adapter, nodeID)
+	}
+	switch node.Kind {
+	case NodeVerify, NodeSBOM:
+	case NodePackage:
+		if node.PackageKind != PackageBinaryBundle && node.PackageKind != PackageImage &&
+			node.PackageKind != PackageHelm && node.PackageKind != PackageAPT {
+			return e.New(e.CodeEngineCapability, "%s cannot package disk or release output %q", adapter, nodeID)
+		}
+	default:
+		return e.New(e.CodeEngineCapability, "%s cannot execute mixed-Plan operation %q", adapter, nodeID)
+	}
+	if len(plan.Environment.SourceAccess) != 0 || len(plan.Environment.GitHubDispatchBranches) != 0 {
+		return e.New(e.CodeEngineCapability, "%s local utilities cannot admit hosted credentials or dispatch policy", adapter)
+	}
+	if err := rejectUnsupportedLocalPlanRequirements(plan, adapter); err != nil {
+		return err
+	}
+	return validateVMDriverPlan(plan)
+}
+
 func rejectUnsupportedPlanRequirements(plan *Plan, adapter string) error {
 	selected := make(map[string]map[string]struct{})
 	for _, node := range plan.Graph.Nodes {

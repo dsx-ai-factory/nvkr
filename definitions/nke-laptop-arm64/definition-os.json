@@ -1,0 +1,37 @@
+{
+  "apiVersion": "nkd.dev/definition/v4",
+  "catalog": {
+    "base": "./cli-catalog"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nke-laptop-arm64-os",
+    "description": "Local ARM64 non-FDE TCG disk and its material closure; no publication or signing; retains mixed SPIRE exception."
+  },
+  "outputs": [
+    {
+      "catalog": {
+        "base": "../nke-m2/os-catalog",
+        "overlays": [
+          "./os-tcg.json"
+        ]
+      },
+      "components": [
+        "nke-agent",
+        "nke-cni-calico",
+        "nke-cni-ovn",
+        "nke-image-inputs",
+        "nke-kubeadm-distro",
+        "nke-node-image",
+        "nke-patched-installer-iso",
+        "nke-spire-agent",
+        "ovn-kube-ubuntu",
+        "ovn-kubernetes-chart",
+        "ubuntu-installer-iso"
+      ],
+      "format": "disk-image",
+      "name": "nke-node-image-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

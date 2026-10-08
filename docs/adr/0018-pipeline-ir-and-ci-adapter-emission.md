@@ -526,6 +526,15 @@ report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
 The generated Plan is the single executable input document; separate per-build graph files are retired.
 
+An unqualified local Plan may select both direct-Packer disks and ordinary outputs.
+Its offline utility child admits only non-disk observation, SBOM and ordinary packaging;
+the complete Plan and original Plan digest remain checked. It cannot execute a producer,
+consume a held disk, publish or sign. Ordinary requirement-bearing producers and unsupported
+VM drivers remain rejected before work; the original Run owner retains VM admission.
+Local lifecycle image observation relocates the validated Plan and descriptive paths together,
+preserving compiled identity and exact acquired-payload/result comparisons. Other ordinary
+formats retain their existing descriptive workspace-path support. Relocation is not authority.
+
 The hosted source owner admits the complete Plan and exact selected Git helper/environment, then requests a
 pipeline-issued source-workspace capability. Linux admission precedes opening the workspace; zero or closed
 handles cannot launch work. Close cancels and joins registered fetch calls before releasing the directory.

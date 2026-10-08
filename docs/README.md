@@ -8,6 +8,7 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
+| Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-laptop-arm64/README.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |

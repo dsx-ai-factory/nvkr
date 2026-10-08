@@ -1,0 +1,88 @@
+{
+  "apiVersion": "nkd.dev/catalog-overlay/v3",
+  "kind": "CatalogOverlay",
+  "name": "nke-os-arm64-tcg-local",
+  "requiresCatalogDigest": "sha256:be089debd30cbfeaf36ca81f77c644a8b914b9c0a7f4edb96e7f03721b0619e4",
+  "components": {
+    "nke-node-image": {
+      "component": {
+        "artifactPath": "non-fde/nke-node.qcow2",
+        "buildNetwork": "default",
+        "buildRequirements": {
+          "allowedHostPlatforms": [
+            "linux/arm64"
+          ],
+          "capabilities": [
+            {
+              "name": "kvm",
+              "policy": "forbidden"
+            }
+          ],
+          "resources": {
+            "cpuMillis": 8000,
+            "ephemeralStorageMiB": 65536,
+            "memoryMiB": 10240
+          },
+          "timeoutSeconds": 21600
+        },
+        "builderType": "vm-image",
+        "commit": "ff21ba8c07cafff74b68e238a8876af11e5beded",
+        "disk": {
+          "encryption": "none",
+          "format": "qcow2"
+        },
+        "fromSource": true,
+        "materials": {
+          "image-inputs": "nke-image-inputs",
+          "installer-iso": "nke-patched-installer-iso"
+        },
+        "outputType": "disk-image",
+        "packer": {
+          "acceleratorVariable": "accelerator",
+          "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+          "architectureVariable": "architecture",
+          "buildLogDirectoryVariable": "build_log_directory",
+          "buildName": "nke-node-non-fde.qemu.nke-non-fde",
+          "materialManifest": {
+            "kinds": {
+              "image-inputs": "archive",
+              "installer-iso": "disk-image"
+            },
+            "schemaVersion": "nke.dev/os-image-materials/v1"
+          },
+          "materialManifestVariable": "material_manifest",
+          "outputDirectoryVariable": "output_directory",
+          "packerVersion": "1.15.4",
+          "projectPath": "os-image/packer",
+          "sshPrivateKeyVariable": "ssh_private_key_file",
+          "sshPublicKeyVariable": "ssh_public_key_file",
+          "variables": {
+            "capture_apt_acquisitions": "true",
+            "efi_firmware_code": "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
+            "efi_firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
+            "guest_memory_mib": "4096",
+            "ssh_timeout": "180m",
+            "cpu_model": "cortex-a57",
+            "boot_wait": "30s"
+          }
+        },
+        "platforms": [
+          "linux/arm64"
+        ],
+        "repo": "https://github.com/dsx-ai-factory/nke.git",
+        "sourceDateEpoch": 1791257393,
+        "tag": "ff21ba8c07cafff74b68e238a8876af11e5beded",
+        "toolchainImages": {
+          "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
+          "arm64": "sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51"
+        },
+        "treeHash": "b915345debd33ccd63dfbf8146415bf20e94c4ea",
+        "vendorCommand": [
+          "bash",
+          "-ec",
+          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+        ]
+      }
+    }
+  }
+}

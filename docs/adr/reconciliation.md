@@ -187,6 +187,19 @@ and Helm OCI interoperability tests do not establish hosted or release acceptanc
 
 ## Output-local publication and metadata assembly
 
+Local ARM64 development inputs in `definitions/nke-laptop-arm64` select 21 outputs
+(or the 20 non-disk subset), without publication/signing. Mixed local offline utility
+admission is restricted to non-disk observation/SBOM/ordinary packaging and retains
+complete-Plan validation plus the original helper Plan digest. Workspace image
+observation uses factory-owned relocation without weakening exact acquired producer
+bindings; absolute binary observation remains supported. Contract tests cover these
+boundaries. The initial laptop component attempt produced its payloads but failed
+final observation; a corrected full-set runtime result is not yet established.
+The OS trial prepared materials and the patched ISO but failed capacity re-admission
+before Packer. Fresh native Podman toolchain reconstruction still mismatches the
+older local pin. Neither this example nor its previews establish M2 or release acceptance.
+
+
 The GitHub `per-output-v1` mode retains full payload/producer/evidence checks for each exact named output.
 Each output publishes and verifies its artifact and signed metadata root. Aggregate assembly authenticates
 those roots, production predicates and SBOM bundles against the complete Plan, same workflow run and frozen
