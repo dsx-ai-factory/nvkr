@@ -9,6 +9,7 @@ installed or permission-modified by this command. Run inside Linux/Colima.
 """
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import ipaddress
 import json
@@ -40,6 +41,17 @@ class SmokeError(Exception):
     def __init__(self, message, returncode=None):
         super().__init__(message)
         self.returncode = returncode
+
+
+@contextmanager
+def cleanup_signals():
+    """Keep repeated interrupts from abandoning cleanup; restore every handler."""
+    previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
+    try:
+        yield
+    finally:
+        for number, handler in previous.items():
+            signal.signal(number, handler)
 
 
 def run(argv, label, timeout=30, diagnostic=None):
@@ -283,17 +295,13 @@ def environment(work, disk, bridge, network):
 
 def finish(process, cli, instance_id, work):
     # Repeated interrupts must not abort cleanup halfway through.
-    previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
-    try:
+    with cleanup_signals():
         try:
             if instance_id is not None:
                 cleanup_vm(cli, instance_id, work)
         finally:
             stop(process)
             sweep_owned_domains(work)
-    finally:
-        for number, handler in previous.items():
-            signal.signal(number, handler)
 
 
 def probe(args):

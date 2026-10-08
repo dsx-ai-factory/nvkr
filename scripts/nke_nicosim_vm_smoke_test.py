@@ -25,6 +25,30 @@ def record(name, kind, digest):
 
 
 class VMSmokeTest(unittest.TestCase):
+    def test_cleanup_signals_restore_handlers_after_nested_cleanup_and_failure(self):
+        for fail in (False, True):
+            with self.subTest(fail=fail):
+                original = {signal.SIGINT: object(), signal.SIGTERM: object()}
+                handlers = dict(original)
+                def replace(number, handler):
+                    previous = handlers[number]
+                    handlers[number] = handler
+                    return previous
+                with patch.object(ADAPTER.signal, "signal", side_effect=replace):
+                    try:
+                        with ADAPTER.cleanup_signals():
+                            self.assertTrue(all(value == signal.SIG_IGN for value in handlers.values()))
+                            with ADAPTER.cleanup_signals():
+                                self.assertTrue(all(value == signal.SIG_IGN for value in handlers.values()))
+                            self.assertTrue(all(value == signal.SIG_IGN for value in handlers.values()))
+                            if fail:
+                                raise ADAPTER.SmokeError("cleanup failed")
+                    except ADAPTER.SmokeError:
+                        self.assertTrue(fail)
+                    else:
+                        self.assertFalse(fail)
+                self.assertEqual(handlers, original)
+
     def test_timeout_retains_partial_private_diagnostics(self):
         for stdout, stderr in ((b"architecture\ncloud-init\n", b"waiting\n"),
                                ("architecture\ncloud-init\n", "waiting\n"), (None, None)):

@@ -9,7 +9,6 @@ NKD modules verify/extract materials; NKE owns installation and tenant requests.
 """
 
 import argparse
-from contextlib import contextmanager
 import hashlib
 import ipaddress
 import json
@@ -55,16 +54,6 @@ WORKLOAD_INDEX = "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4ca
 # Exact linux/arm64/v8 manifest read from that OCI index using Docker's
 # descriptor interface; never compare a runtime image ID with its parent index.
 WORKLOAD_IMAGE = "docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d"
-
-
-@contextmanager
-def cleanup_signals():
-    previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
-    try:
-        yield
-    finally:
-        for number, handler in previous.items():
-            signal.signal(number, handler)
 
 
 def tenant_request(name):
@@ -156,7 +145,7 @@ def consume_tenant(guard, name, tools, work, env, timeout, server, image, domain
         raise
     finally:
         if joined:
-            with cleanup_signals(), MGMT.cleanup_diagnostics():
+            with VM.cleanup_signals(), MGMT.cleanup_diagnostics():
                 try:
                     tenant.close()
                 except MGMT.UnjoinedProcess:
@@ -273,7 +262,7 @@ class Tenant:
             "name": self.name, "nodes": nodes, "domains": domains, "workload": pods}, indent=2, sort_keys=True))
 
     def close(self):
-        with cleanup_signals():
+        with VM.cleanup_signals():
             self.preserve_consoles()
             self.preserve_guest_diagnostics()
             self.restore()
@@ -635,15 +624,13 @@ def probe(args):
         cleanup_allowed = False
         raise
     finally:
-        previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
-        try:
-            with MGMT.cleanup_diagnostics():
-                cleanup_runtime(server, http, guard, work, domain_runner, bgp_intent, cleanup_allowed)
-        finally:
-            for log in logs:
-                log.close()
-            for number, handler in previous.items():
-                signal.signal(number, handler)
+        with VM.cleanup_signals():
+            try:
+                with MGMT.cleanup_diagnostics():
+                    cleanup_runtime(server, http, guard, work, domain_runner, bgp_intent, cleanup_allowed)
+            finally:
+                for log in logs:
+                    log.close()
     if VM.digest(disk) != image["digest"] or VM.digest(private_disk) != image["digest"]:
         raise VM.SmokeError("accepted/served disk changed during demo")
     print("PASS: real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.")

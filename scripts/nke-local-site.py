@@ -304,14 +304,10 @@ def consume(args, outputs, token, nico, gateway, registry_id, name, tools, work,
         cleanup_allowed = False
         raise
     finally:
-        previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
-        try:
+        with VM.cleanup_signals():
             if cleanup_allowed:
                 with MGMT.cleanup_diagnostics():
                     registry_cleanup(registry_name, name, registry_id, work, env)
-        finally:
-            for number, handler in previous.items():
-                signal.signal(number, handler)
 
 
 def main():

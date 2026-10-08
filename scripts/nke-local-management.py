@@ -366,14 +366,10 @@ def probe(args, consumer=None):
         cleanup_allowed = False
         raise
     finally:
-        previous = {number: signal.signal(number, signal.SIG_IGN) for number in (signal.SIGINT, signal.SIGTERM)}
-        try:
+        with VM.cleanup_signals():
             if cleanup_allowed:
                 with cleanup_diagnostics():
                     cleanup(name, env, work, existing_volumes)
-        finally:
-            for number, handler in previous.items():
-                signal.signal(number, handler)
     if consumer is None:
         print("PASS: NKD-built tools, real management Kind/CAPI and owned-node cleanup.")
         print("NOT full demo: NKE site, CAPNICo/QCOW2 tenant and workload remain separate acceptance.")
