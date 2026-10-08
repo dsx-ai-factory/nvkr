@@ -21,6 +21,12 @@ stopped/joined the simulator. Its [runnable command](local-qcow2-guest-probe.md)
 consumes completed Runs without rebuilding. This is not a site/tenant install
 and does not supersede the failed complete OS smoke or missing DSX input.
 
+The separate [management diagnostic](local-management-cluster.md) now consumes
+the completed five-tool Run for real Kind management/CAPI installation and
+owned node/volume cleanup. It uses pinned NKE stage bytes without rebuilding
+artifacts. It does not deploy the NKE site or create a CAPD/container tenant;
+the full CAPNICo/QCOW2 path still needs integration.
+
 **The artifact-build part is tested; the complete NKD-to-demo E2E is not yet
 validated.** Do not use the completed 22-output local Run as proof that a site or
 tenant was installed. The [first-time build guide](local-development.md) is the
@@ -310,12 +316,13 @@ A full result requires all of the following recorded against one explicit input 
 5. A committed source change is repinned, rebuilt, deployed and observed with the
    new identity. Test resources are cleaned up through the authorized NKE workflow.
 
-Remaining implementation: exercise the aligned site/tools selections, combine
-the required membership and add profiles; integrate the tested chart adapter
+Remaining implementation: combine the completed site/tools/profiles selections
+with the required membership; integrate the tested chart adapter
 with the staged manifest/override selection and registry transport. The requested
 scenario is already selected: local Colima plus
 CAPNICo/NICoSim with QCOW2-backed tenant VMs, not a production NICo site or CAPD
-substitute. The wrapper still needs to create/admit its owned local management
-cluster, NICo endpoint, registry and bootstrap trust configuration, plus verify
+substitute. The management-only Kind/CAPI consumer now passes separately; the
+full wrapper still needs to integrate it with the owned NICo endpoint,
+reachable artifact registry and bootstrap trust configuration, plus verify
 source access and OS capacity. Until that implementation and real acceptance run
 are complete, this is not a working copy-paste full-E2E tutorial.

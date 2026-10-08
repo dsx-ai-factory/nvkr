@@ -283,7 +283,18 @@ bundle of Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3, ORAS 1.3.3 and Kind 0.3
 matching the selected installer's source-owned tool pins. Native Docker/Podman
 compiler and no-work preflight contracts pass. The later Colima Docker Run completed
 all five source components into one observed bundle; verified extraction, independent
-hashing and all five native version commands passed. No installation is recorded.
+hashing and all five native version commands passed. No NKE site installation is recorded.
+The later [management consumer](../local-management-cluster.md) uses that
+completed bundle for a real private Kind management node and pinned NKE CAPI
+stage. It verifies client versions, executes a private tracked-Git projection,
+checks the native node/providers and removes only its owned node and newly
+created anonymous volume. The [runtime evidence](../evidence/2026-10-08-local-management-cluster.md)
+records acquired management/provider runtime inputs separately from the
+source-built tools. This is not an NKE site installation, CAPD tenant, real
+CAPNICo/QCOW2 tenant acceptance, authenticated Release or full demo. Negative
+contracts cover foreign resource ownership, hidden working-tree stage changes,
+wrong tool versions/platforms, descendant teardown and failed diagnostic
+writes during cleanup.
 Four sources use bounded module preparation with unchanged manifest
 checks; Kubernetes uses its committed vendor/staging workspace. All five compile
 offline. Helm reuses PR #113's exact target-checked removal of four upstream

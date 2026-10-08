@@ -6,6 +6,12 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
+`python3 scripts/nke-local-management.py` uses a completed source-built tools Run
+for a real private Kind management cluster and NKE's pinned CAPI stage, then
+cleans up its exact node and anonymous volume. See the
+[management diagnostic](../docs/local-management-cluster.md). It rebuilds no
+artifacts and is not the complete NKE/CAPNICo/QCOW2 tenant demo.
+
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
 OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
