@@ -1,7 +1,11 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
@@ -16,6 +20,17 @@ func imageIndexTestPlan(t *testing.T) *Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
+	selected := map[string]bool{"controller-chart": true, "cwe": true, "nkectl": true, "nkectl-linux-arm64": true, "postgresql": true, "spire": true, "spire-crds": true, "temporal": true}
+	var outputs []authored.DefinitionOutput
+	for _, output := range plan.Definition.Outputs {
+		if selected[output.Name] {
+			outputs = append(outputs, output)
+		}
+	}
+	plan.Definition.Outputs = outputs
+	plan.Environment.GitHubARC, plan.Environment.DiskEvidence = "", ""
+	plan.Environment.ExecutionClasses, plan.Environment.DiskInspectionProfiles = nil, nil
+	plan.Environment.SourceAccess = nil // This offline subset does not select the OS-only fetch routes.
 	return compileImageIndexFixture(t, plan, plan.Environment)
 }
 
@@ -32,7 +47,7 @@ func compileImageIndexFixture(t *testing.T, original *Plan, environment authored
 			continue
 		}
 		for _, build := range original.Builds {
-			if build.Name == output.Name {
+			if build.Name == output.Name || strings.HasPrefix(build.Name, output.Name+"/") {
 				targetStacks[output.Name], err = catalog.ApplyStack(build.CatalogSnapshot)
 				if err != nil {
 					t.Fatal(err)

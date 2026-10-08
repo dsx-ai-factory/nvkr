@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package discoverytags owns the pure syntax shared by authored image discovery
 // selections and registry publication admission. It does not admit membership,
 // perform I/O, or establish authority for a mutable tag.

@@ -65,3 +65,5 @@ includes a fast real local build and the v4 publication from Run 37736529644; th
 own current user instructions.
 
 [NKE M2 customer choices](nke-m2-customer-choices.md) explains supplier replacement and its current validation scope.
+
+[Multiarch CWE delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.

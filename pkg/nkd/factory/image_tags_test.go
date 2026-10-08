@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -58,12 +61,17 @@ func TestImageTagsRemainTransportOnlyAndIndependentlyOwned(t *testing.T) {
 		}
 	}
 	environment.Publication.ImageTags["cwe"] = "caller-changed"
-	if changed.Environment.Publication.ImageTags["cwe"] != "candidate-two" || changed.Targets["release"].ImageTags["cwe"] != "candidate-two" {
+	if changed.Environment.Publication.ImageTags["cwe"] != "candidate-two" || changed.Targets[outputPublicationRoute("cwe")].ImageTags["cwe"] != "candidate-two" {
 		t.Fatal("compiler retained caller map")
 	}
-	changed.Targets["release"].ImageTags["cwe"] = "target-changed"
+	changed.Targets[outputPublicationRoute("cwe")].ImageTags["cwe"] = "target-changed"
 	if changed.Environment.Publication.ImageTags["cwe"] != "candidate-two" {
 		t.Fatal("target shares Environment map")
+	}
+	for name, target := range changed.Targets {
+		if name != outputPublicationRoute("cwe") && len(target.ImageTags) != 0 {
+			t.Fatalf("unrelated publication inherited aliases: %s", name)
+		}
 	}
 	assertFactoryErrorCode(t, changed.Validate(), e.CodeUnverifiedRef)
 }

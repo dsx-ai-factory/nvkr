@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -84,7 +87,7 @@ func registryImageIndexFixture(t *testing.T) (string, Result, ImageIndexDescript
 	}
 	out := filepath.Join(t.TempDir(), "publication")
 	result, err := BuildPublicationRoot(t.Context(), out, PublicationRequest{
-		Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: objects,
+		Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build, ContentSubject: content}, Objects: objects,
 	})
 	if err != nil {
 		t.Fatal(err)

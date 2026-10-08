@@ -36,7 +36,7 @@ outputs:
     components:
       - csi-node-driver-registrar-image
   - name: cwe
-    platform: linux/amd64
+    platforms: [linux/amd64, linux/arm64]
     catalog:
       base: ../nke-controller/catalog
     format: oci

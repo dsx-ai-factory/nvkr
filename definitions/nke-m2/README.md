@@ -10,7 +10,7 @@ full product acceptance are separate facts.
 | Output group | Owning inputs | Selection |
 |---|---|---|
 | CLI | `../nke-v1/catalog` | AMD64 `nkectl` and ARM64 `nkectl-linux-arm64`, from their shared independent CLI module pin |
-| Controller and charts | `../nke-controller/catalog` | `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
+| Controller and charts | `../nke-controller/catalog` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `catalog` | AMD64 Helm and kubectl executables, selected from the NKE distribution lock |
 | Node images | `os-catalog`, `native-toolchains.yaml` | Separate native AMD64 and ARM64 non-FDE QCOW2s, with explicit material producers |
 | Deployment images | `image-catalog` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |

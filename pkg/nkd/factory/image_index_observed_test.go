@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -13,9 +16,9 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
@@ -26,14 +29,28 @@ func indexObservationFixture(t *testing.T) (*Plan, Node, map[string]Artifact) {
 	t.Helper()
 	ctx := t.Context()
 	root := t.TempDir()
-	plan := &Plan{}
-	artifacts := map[string]Artifact{}
-	required := &ImageIndexPlan{RequiredPlatforms: []string{"linux/amd64", "linux/arm64"}}
-	node := Node{ID: "package/cwe", Kind: NodePackage, PackageKind: PackageImage, Outputs: []string{"package/cwe"}, ImageIndex: required}
-	for i, platform := range required.RequiredPlatforms {
+	plan := imageIndexTestPlan(t)
+	var selected []authored.DefinitionOutput
+	for _, output := range plan.Definition.Outputs {
+		if output.Name == "cwe" {
+			selected = append(selected, output)
+		}
+	}
+	plan.Definition.Outputs = selected
+	environment := plan.Environment.Clone()
+	environment.Publication.Mode = ""
+	plan = compileImageIndexFixture(t, plan, environment)
+	_, artifacts := planIndex(plan)
+	for id, a := range artifacts {
+		a.Path = filepath.Join(root, a.Path)
+		artifacts[id] = a
+	}
+	node := planNode(plan, "package/cwe")
+	required := node.ImageIndex
+	for _, child := range required.Children {
+		platform := child.Platform
 		arch := strings.TrimPrefix(platform, "linux/")
-		target := "cwe/" + platform
-		component := "controller"
+		component, buildDigest := child.Component, child.BuildDigest
 		inputDir := filepath.Join(root, "input-"+arch)
 		if err := os.MkdirAll(inputDir, 0o755); err != nil {
 			t.Fatal(err)
@@ -58,11 +75,18 @@ func indexObservationFixture(t *testing.T) (*Plan, Node, map[string]Artifact) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		buildDigest := "sha256:" + strings.Repeat(string(rune('a'+i)), 64)
-		child := ImageIndexChildPlan{Platform: platform, BuildTarget: target, BuildDigest: buildDigest, Component: component, ArtifactID: "artifact/" + target + "/" + component, ResultArtifactID: "result/" + target + "/" + component, SBOMArtifactID: "sbom/" + target}
-		producer := target + "/build-controller"
 		resultPath := filepath.Join(inputDir, "result.json")
 		record := pipeline.ArtifactResult{Component: component, OutputType: "oci-image", SHA256: digest, Size: stat.Size()}
+		for _, build := range plan.Builds {
+			if build.Name != child.BuildTarget {
+				continue
+			}
+			for _, producer := range build.Graph.Nodes {
+				if producer.Component == component && producer.ID == planNode(plan, artifacts[child.ArtifactID].Producer).IRNode {
+					record.Toolchain, record.BuilderType, record.Path = producer.Toolchain, producer.BuilderType, producer.ArtifactPath
+				}
+			}
+		}
 		raw, err := canonical.Marshal(record)
 		if err != nil {
 			t.Fatal(err)
@@ -70,10 +94,16 @@ func indexObservationFixture(t *testing.T) (*Plan, Node, map[string]Artifact) {
 		if err := os.WriteFile(resultPath, raw, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		artifacts[child.ArtifactID] = Artifact{ID: child.ArtifactID, Name: component, Kind: "oci-image", BuildTarget: target, Component: component, Producer: producer, Path: archive}
-		artifacts[child.ResultArtifactID] = Artifact{ID: child.ResultArtifactID, Name: component + "-result", Kind: "producer-result", BuildTarget: target, Component: component, Producer: producer, Path: resultPath}
-		artifacts[child.SBOMArtifactID] = Artifact{ID: child.SBOMArtifactID, Name: arch + "-sbom", Kind: "sbom-set", BuildTarget: target, Producer: target + "/sbom", Path: filepath.Join(inputDir, "sbom")}
+		for id, path := range map[string]string{child.ArtifactID: archive, child.ResultArtifactID: resultPath, child.SBOMArtifactID: filepath.Join(inputDir, "sbom")} {
+			a := artifacts[id]
+			a.Path = path
+			artifacts[id] = a
+		}
 		bom, err := sbom.NewSubject(buildDigest, component, digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "synthetic-image-library", Version: "1"}}, "syft-cyclonedx/v1", toolExecutableDigest(plan, plan.Definition.SBOMTool))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,22 +126,7 @@ func indexObservationFixture(t *testing.T) (*Plan, Node, map[string]Artifact) {
 		if err := writeFactoryFile(ctx, filepath.Join(artifacts[child.SBOMArtifactID].Path, component+".cdx.json"), bomRaw, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		plan.Builds = append(plan.Builds, BuildPlan{Name: target, Platform: platform, BuildDigest: buildDigest, Components: []string{component}, Graph: &ir.Graph{Nodes: []ir.Node{{ID: "build-controller", Kind: ir.KindBuild, Component: component, OutputType: "oci-image"}}}})
-		plan.Graph.Nodes = append(plan.Graph.Nodes, Node{ID: target + "/sbom", Kind: NodeSBOM, BuildTarget: target, Inputs: []string{child.ResultArtifactID}, Outputs: []string{child.SBOMArtifactID}})
-		required.Children = append(required.Children, child)
-		node.Inputs = append(node.Inputs, child.ArtifactID, child.ResultArtifactID, child.SBOMArtifactID)
 	}
-	slices.Sort(node.Inputs)
-	artifacts[node.Outputs[0]] = Artifact{ID: node.Outputs[0], Name: "cwe", Kind: PackageImage, MediaType: delivery.MediaOCIIndex, Producer: node.ID, Path: filepath.Join(root, "packaged")}
-	plan.Graph.Nodes = append(plan.Graph.Nodes, node)
-	for _, a := range artifacts {
-		plan.Graph.Artifacts = append(plan.Graph.Artifacts, a)
-	}
-	digest, err := required.buildDigest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan.LifecycleOutputs = []LifecycleOutputPlan{{Name: "cwe", Kind: "oci", ArtifactID: node.Outputs[0], BuildDigest: digest, Components: []string{"controller"}, ImageIndex: required.Clone()}}
 	return plan, node, artifacts
 }
 
@@ -155,14 +170,8 @@ func TestImageIndexPackagingObservesEveryExactChild(t *testing.T) {
 		}
 	}
 
-	p.DefinitionDigest = "sha256:" + strings.Repeat("1", 64)
-	p.EnvironmentDigest = "sha256:" + strings.Repeat("2", 64)
-	publication.ID, publication.Kind, publication.PackageKind = "package/release", NodePackage, PackageOCI
-	publication.Outputs = []string{"package/release"}
-	rootArtifact := Artifact{ID: "package/release", Name: "release", Kind: PackageOCI, Producer: publication.ID, Path: filepath.Join(t.TempDir(), "release")}
-	artifacts[rootArtifact.ID] = rootArtifact
-	p.Graph.Nodes = append(p.Graph.Nodes, publication)
-	p.Graph.Artifacts = append(p.Graph.Artifacts, rootArtifact)
+	publication = planNode(p, "package/release")
+	rootArtifact := artifacts[publication.Outputs[0]]
 	if err := executePackage(t.Context(), p, publication, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}

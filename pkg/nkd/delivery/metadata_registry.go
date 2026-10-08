@@ -141,6 +141,21 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		if err != nil {
 			return Inspection{}, err
 		}
+		if o.Output != nil && o.Output.ImageIndex != nil {
+			// Fetch only the bounded children named by the release binding.
+			// InspectMetadata subsequently matches them to the exact index bytes.
+			for _, native := range o.Output.ImageIndex.Children {
+				descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: native.ManifestDigest, Size: native.Size}
+				image, err := manifest(child.Context(), descriptor)
+				if err != nil {
+					return Inspection{}, err
+				}
+				if err := blob(child.Context(), image.Config, 8<<20); err != nil {
+					return Inspection{}, err
+				}
+			}
+			continue
+		}
 		if err := blob(child.Context(), m.Config, 8<<20); err != nil {
 			return Inspection{}, err
 		}

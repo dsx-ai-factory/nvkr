@@ -338,7 +338,9 @@ schemas and memberships across the complete release metadata and evidence closur
 reading artifact payload layers. Its detached description joins exact sibling output and evidence references,
 all output memberships, Build/component subjects and evidence stage/subject bindings. Locators are explicitly
 labeled as derived from the supplied root reference; the detached view does not establish registry availability.
-Registry acquisition fetches each sibling manifest, config and bounded evidence document. Local inspection
+Registry acquisition fetches each sibling manifest, config and bounded evidence document. For aggregate
+images it also fetches the exact finite native child manifests/configs bound by the index and release metadata,
+never their layers. Child platform, digest and size substitutions fail before a metadata view is returned. Local inspection
 accepts complete or metadata-only layouts and does not probe the supplied registry namespace. Executable,
 image and disk platform labels describe checked config metadata; contradictory metadata labels are rejected.
 Text, readable JSON and Mermaid explicitly label metadata inspection, leave payloads, signatures and consumer
