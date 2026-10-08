@@ -61,7 +61,7 @@ building and natively probing pinned toolchain sources when required. It binds
 the measured image ID to exactly the selected simulator producers through an
 attempt overlay. `--check simulator` requires no cached toolchain and does no
 producer work; Docker bootstrap requires Buildx. The later committed
-[Docker Run and startup probe](../../docs/evidence/2026-10-08-colima-nicosim-build.md)
+Docker Run and startup probe
 passed separately; neither it nor the earlier Podman Run proves VM provisioning.
 Module downloads and verification precede offline CGO compilation;
 the server invokes NKE's `build-static` target. These Linux tools do not run directly
@@ -71,7 +71,7 @@ metadata. The producer writes `nicosim-runtime-assets.tar.gz`; the final bundle
 member and verified extraction use `nico-sim-runtime-assets`, the component name.
 Treat that member as archive data, not an executable/install target.
 Its three-component Plan is contract-tested; the earlier recorded Runs built
-only the server/CLI. A [new Docker Run and artifact-only startup probe](../../docs/evidence/2026-10-08-colima-nicosim-assets.md)
+only the server/CLI. A new Docker Run and artifact-only startup probe
 completed and consumed verified extracted seed/UI without NKE source mounted.
 It still uses the mock backend. The QCOW2-to-tenant handoff, profiles and the
 deploy-only adapter need validation/integration. This separate build is not a
@@ -94,9 +94,9 @@ CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
   bash scripts/nke-full-arm64-local.sh arm64-site-01 1 site
 ```
 
-Docker/Podman compiler contracts and an [isolated Helm preparation/package
-probe](../../docs/evidence/2026-10-08-local-site-chart-preparation.md) pass.
-A [complete four-output Colima Run](../../docs/evidence/2026-10-08-colima-site-and-tools-build.md)
+Docker/Podman compiler contracts and an isolated Helm preparation/package
+probe pass.
+A complete four-output Colima Run
 passed, including native controller help and unchanged chart handoff/rendering.
 It did not install NKE. The wrapper uses the existing
 pinned Helm 4.3.0, not the installer's preferred 4.2.4. Its readiness script warns

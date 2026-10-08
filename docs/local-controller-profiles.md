@@ -84,7 +84,7 @@ adapter must explicitly choose distinct ports and own both services.
 
 ## Validation scope
 
-The [recorded Docker Run](evidence/2026-10-08-colima-local-profiles.md) completed
+The recorded Docker Run completed
 1/1. An offline container inspected the produced image, and a diagnostic test
 used NKE's actual metadata loader and template helpers to validate its profile
 selection and render both CNI branches as YAML. This is neither a complete OS

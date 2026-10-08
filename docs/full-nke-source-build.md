@@ -33,14 +33,14 @@ source-owned workflows. PR #113 is a separate draft, not merged support on main.
 | DSX IMDS | Release inventory retains payload digests but no established source revision | Accessible source with an approved pin, or a declared unavailable-source exception and accessible digest-matching payload. An older plugin-free SPIRE package is not completion |
 | OS material assembly | Existing OS graph produces image-inputs and stages them for source-owned Packer | Connect direct-source binary/image packages, remove package-folder calls including indirect agent packaging, and preserve the source-owned material contract |
 | Shared published/embedded image/chart bytes | [Issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116) records the missing generic handoff | An authenticated original-owner cross-output reuse contract. Independent rebuilds cannot be relabeled as identical published bytes |
-| Local OS runtime | Native Colima Docker/TCG Run 04 completed the bake and terminal observation, exporting one independently hash/size-checked non-FDE QCOW2; prior failed attempts remain recorded | Complete boot smoke and exact disk/profile integration. This uses the older material graph, not PR #113's complete direct-source graph, and is not a full combined Run or tenant. See the [Docker evidence](evidence/2026-10-08-colima-local-os-build.md). Docker Desktop on macOS is not supported by this launcher |
+| Local OS runtime | Native Colima Docker/TCG Run 04 completed the bake and terminal observation, exporting one independently hash/size-checked non-FDE QCOW2; prior failed attempts remain recorded | Complete boot smoke and exact disk/profile integration. This uses the older material graph, not PR #113's complete direct-source graph, and is not a full combined Run or tenant. See the Docker evidence. Docker Desktop on macOS is not supported by this launcher |
 
 Do not use an upstream release SBOM hash as the expected hash of a new source
 build. New bytes receive new identities. The release inventory guides membership
 and versions; it does not prove the source-to-binary relationship or qualification.
-The [two-provider Run evidence](evidence/2026-10-07-laptop-provider-builds.md)
+The two-provider Run evidence
 records exact inputs, image subjects, archive hashes and the limited help probes.
-The [container-bootstrap evidence](evidence/2026-10-07-local-container-bootstrap.md)
+The container-bootstrap evidence
 records a later complete 22-output component Run, not the disk or a deployed site.
 See the [Lia demo handoff](nkd-to-nke-demo.md) for installer alignment and E2E blockers.
 
@@ -50,11 +50,11 @@ Two source/access inputs cannot be invented: the fleet-profile repository/revisi
 and the DSX IMDS source or accepted retained payload. The local OS also needs
 workspace headroom. User-authorized removal of eleven old failed attempts on
 October 8 increased free host storage to 141 GiB and the real Colima OS preflight
-passed; see the [storage evidence](evidence/2026-10-08-local-storage-cleanup.md).
+passed; see the storage evidence.
 The first Colima bake attempt subsequently failed before Packer with a SPIRE
 snapshot file-handle error. The next approach runs the same committed launcher
 from a native ext4 source export, preserving `.nkd` containment; see the
-[execution evidence](evidence/2026-10-08-colima-local-os-build.md).
+execution evidence.
 The later native Run 04 completed one disk bake and exported its observed bytes;
 its copied disk reached SSH/cloud-init and passed growth/agent checks, but the
 full source smoke failed in SPIRE checks. The retained package lacks DSX IMDS;

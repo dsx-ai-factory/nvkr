@@ -10,11 +10,11 @@ exact produced images and charts reachable by NKE, run the NKE site installer,
 create a tenant and verify it, then rebuild and retest a source change.
 
 The exact packaged simulator also passed a later
-[native libvirt-backed startup probe](evidence/2026-10-08-native-nicosim-libvirt-startup.md)
+native libvirt-backed startup probe
 after explicit VM prerequisite installation. That probe created no guests and
 does not establish tenant provisioning, networking or workload acceptance.
 
-The later [real QCOW2 guest probe](evidence/2026-10-08-native-nicosim-qcow2-guest.md)
+The later real QCOW2 guest probe
 passed NICoSim VM creation/readiness, authenticated SSH, cloud-init, software TPM,
 agent and staged Kubernetes-package checks, then deleted the owned guest and
 stopped/joined the simulator. Its [runnable command](local-qcow2-guest-probe.md)
@@ -28,12 +28,12 @@ artifacts. It does not deploy the NKE site or create a CAPD/container tenant;
 the full CAPNICo/QCOW2 path still needs integration.
 
 The later [deploy-only site consumer](local-site-integration.md) passed a
-[real Colima replay](evidence/2026-10-08-local-site-integration.md): six prepared
+real Colima replay: six prepared
 charts, exact controller/profiles/CAPNICo image handoff and runtime image-ID
 checks, site health, registration and API access, then owned cleanup. This
 supersedes the earlier site-installation gap, not the tenant/workload gap.
 
-The internal downstream [network guard](evidence/2026-10-08-local-network-guard.md)
+The internal downstream network guard
 also passed native setup/restoration and a deliberate consumer-failure replay.
 It is not yet connected to the site entrypoint, simulator/guest lifetime or
 disk serving. Its running DHCP/DNS process does not establish guest delivery,
@@ -97,7 +97,7 @@ exact commit: CLI, controller image, image-bound controller chart and NKTP chart
 It uses the source-owned CLI Make build and controller Dockerfile, rather than
 assuming the older linker/module contracts still work. Compiler contracts and
 an isolated NKTP dependency/package probe pass. The later Colima
-[four-output site Run](evidence/2026-10-08-colima-site-and-tools-build.md) completed;
+four-output site Run completed;
 no installation is recorded. This separate selection does not replace the retained
 22-output Run or become part of `all` automatically.
 
@@ -143,11 +143,11 @@ private-source authorization works inside the execution host. Require `complete`
 22/22 and no failure before reusing any output. This selection still acquires
 third-party images/charts; it is not a full source-built distribution.
 
-The [recorded container-bootstrap Run](evidence/2026-10-07-local-container-bootstrap.md)
+The recorded container-bootstrap Run
 passed these artifact gates. The OS requires its separate capacity gate and real
 bake/boot. On October 8, user-authorized failed-attempt cleanup recovered enough
 workspace for the real Colima prerequisite check to pass; see the
-[storage and preflight evidence](evidence/2026-10-08-local-storage-cleanup.md).
+storage and preflight evidence.
 The first fresh Docker disk attempt failed before Packer during SPIRE snapshot
 preparation. The native-filesystem retry reached kernel installation but failed
 after Colima's global OOM killer terminated QEMU. It was canceled and recorded failed
@@ -155,7 +155,7 @@ with zero accepted disks. Its run-owned build container was cleaned up; the fail
 Run was retained. The fresh non-overlapping attempt on the preserved 24 GiB
 profile completed one disk build and exported the independently hash-checked
 2,851,733,504-byte non-FDE QCOW2; boot smoke remains a separate check. See the
-[execution evidence](evidence/2026-10-08-colima-local-os-build.md).
+execution evidence.
 The observed installer is Ubuntu 26.04.1, not the fixture profile's Ubuntu
 24.04 FDE choice. The exact disk/profile handoff still needs to honor that
 distinction. Passing preflight or building materials is not bake/boot evidence.
@@ -233,11 +233,11 @@ Preserve the wrapper's source/readiness checks; do not disable them to make the
 demo pass. Registry transport, a consistent manifest/override selection and the
 real installation remain separate handoff work.
 
-The [real six-chart handoff probe](evidence/2026-10-08-local-chart-handoff.md)
+The real six-chart handoff probe
 passed native NKE rendering and executor dry-run without fetching or rebuilding
 chart dependencies. It deliberately records four completed-Run charts separately
 from two manual packaging probes. A later
-[completed-Run handoff](evidence/2026-10-08-colima-site-and-tools-build.md) repeated
+completed-Run handoff repeated
 both probes with all six charts from completed NKD Runs. Neither is deployment.
 
 ## Registry and release-manifest handoff
@@ -261,7 +261,7 @@ oras cp --from-oci-layout "$NKE_DEV_LAYOUT@$NKE_DEV_DIGEST" \
 ```
 
 The destination must serve the same manifest digest before it becomes an
-installer input. A later [real loopback registry probe](evidence/2026-10-08-local-registry-handoff.md)
+installer input. A later real loopback registry probe
 copied the completed site Run's controller and bound chart and matched both
 manifest digests on registry read-back. That two-output test does not prove a
 complete dependency mirror, node access or installation. Repeat the same transport for each required image/chart,

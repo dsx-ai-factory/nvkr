@@ -110,7 +110,7 @@ accepted Runs. An unjoined producer prevents concurrent cleanup and fails closed
 
 ## Tested result and remaining acceptance
 
-The [real Colima replay](evidence/2026-10-08-local-site-integration.md) passed all
+The real Colima replay passed all
 site stages/checks, six Helm releases, controller database/Temporal health,
 CAPNICo readiness, registration, API access, exact runtime image IDs and owned
 cleanup. No artifact build ran in the consumer. Development failures and fixture

@@ -61,7 +61,7 @@ python3 -B scripts/nke-local-management.py \
 
 Use a fresh output directory for every execution. Separate source exports may
 require absolute paths to the completed Run/bootstrap and the current script;
-the [recorded replay](evidence/2026-10-08-local-management-cluster.md) identifies
+the recorded replay identifies
 the actual split-source paths used. Do not rerun a tool build merely to move its
 accepted outputs beside this script.
 

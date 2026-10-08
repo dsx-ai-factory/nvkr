@@ -15,8 +15,8 @@ This is an analysis, not a completed executable tutorial. No local site or tenan
 was deployed during this analysis.
 
 Subsequent implementation added a separate source-built Linux ARM64 NICoSim
-server/CLI and pinned seed/UI archive bundle. The [three-component Colima Docker
-Run](evidence/2026-10-08-colima-nicosim-assets.md) completed 1/1, and NKD delivery
+server/CLI and pinned seed/UI archive bundle. The three-component Colima Docker
+Run completed 1/1, and NKD delivery
 verified/extracted its final members. An offline mock-runtime probe served exact
 packaged UI bytes without NKE source mounted. This closes the simulator's asset
 delivery/startup gap, not real VM provisioning, the missing combined artifact set
@@ -170,7 +170,7 @@ inspection-derived disk SBOM or proof of all installed runtime dependencies.
 The current retained component Run is complete **22/22** in its declared
 `unqualified-local-execution` lane. It is not the complete membership above and
 does not establish any deployed site or tenant. See the
-[recorded evidence](evidence/2026-10-07-local-container-bootstrap.md).
+recorded evidence.
 
 ## Existing reuse hooks and their limits
 
@@ -204,8 +204,8 @@ test suite. Calling those scripts as-is cannot prove that NKD built everything.
    build failed during SPIRE preparation; the native-ext4 retry reached autoinstall
    but then lost QEMU to global OOM in the 16 GiB VM. A fresh attempt on the
    preserved 24 GiB profile is running without concurrent builds; see the
-   [execution evidence](evidence/2026-10-08-colima-local-os-build.md)
-   and [storage evidence](evidence/2026-10-08-local-storage-cleanup.md).
+   execution evidence
+   and storage evidence.
    Complete the bake rather than treating preflight or materials as acceptance.
    Use the real NICoSim VM backend for tenant nodes,
    not CAPD or the default container backend. Record matching architecture,

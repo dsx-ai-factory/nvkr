@@ -185,193 +185,21 @@ into OS material composition remains absent ([issue #116](https://github.com/dsx
 Rebuilding equal pins does not establish same-byte correspondence; opt-in producer
 and Helm OCI interoperability tests do not establish hosted or release acceptance.
 
-## Output-local publication and metadata assembly
+## Local ARM64 development inputs
 
-Local ARM64 development inputs in `definitions/nke-laptop-arm64` select 23 outputs
-(or the 22 non-disk subset), without publication/signing. The two added provider
-images compile from Git through source-owned Dockerfiles: public CAPNICo v0.0.45
-and the existing provisioned-provider producer. Their separate rootless Podman
-Run `laptop-providers-arm64-20261007-01` completed with 2/2 observed outputs and
-both native images passed networkless help probes; see the
-[provider evidence](../evidence/2026-10-07-laptop-provider-builds.md).
-Contract tests admit the actual TCG OS Plan only with a sufficient execution-class
-declaration and reject missing classes, foreign hosts, insufficient workspace and
-short timeouts. They do not establish runtime capacity.
-The [full source-built distribution remains incomplete](../full-nke-source-build.md);
-fleet profiles and separately published OVN outputs are not selected, and the
-dependency-image/chart/tool acquisitions have not become source builds.
-A separate local `definition-simulator.json` now selects one executable bundle
-with source-built Linux ARM64 NICoSim server/CLI components and a pinned runtime-assets
-archive producer. That additional producer packages the diagnostic seed, UI and
-vendor notices with fixed source timestamps/ownership/modes and sorted paths.
-The three-component Plan and exact toolchain substitution are contract-tested;
-the earlier two-component Runs below predate the archive producer. The exact-commit
-Podman Run completed 1/1 and an offline non-root mock-runtime probe initialized
-SQLite and served the prepared source's UI; see the
-[simulator evidence](../evidence/2026-10-07-local-nicosim-build.md). It uses an
-already-cached host-local Go/GCC image. The launcher now permits Podman or Docker,
-bootstraps and natively probes pinned toolchain sources when required, and freezes
-an exact attempt-local substitution for the selected simulator producers. Contracts
-cover preflight without a cached image and reject ambiguous/mixed projection inputs
-before replacement toolchain work. The committed-head [Colima Docker Run](../evidence/2026-10-08-colima-nicosim-build.md)
-completed 1/1 and its bounded offline non-root mock-runtime SQLite/UI probe passed.
-The subsequent [three-component Docker Run](../evidence/2026-10-08-colima-nicosim-assets.md)
-completed 1/1, and existing delivery commands verified/extracted its final bundle.
-An offline non-root mock-runtime probe initialized SQLite and served the exact
-packaged UI without NKE source mounted; a bounded repack probe matched archive
-bytes despite changed temporary filesystem timestamps/permissions.
-Neither probe establishes real VM provisioning or qualification.
-The later [native libvirt startup probe](../evidence/2026-10-08-native-nicosim-libvirt-startup.md)
-used the exact delivery-verified bundle after scoped VM prerequisite installation:
-non-root session-hypervisor/SQLite initialization, one metadata gateway and exact
-packaged UI passed; the owned server stopped/joined. No guest was created, the
-link-local bind failed and BGP was disabled. The later
-[real QCOW2 guest diagnostic](../evidence/2026-10-08-native-nicosim-qcow2-guest.md)
-used the same completed simulator/disk outputs: native libvirt/TCG VM creation,
-TCP readiness, key-only SSH, cloud-init, software TPM, agent and staged Kubernetes
-package checks passed. Owned deletion and server stop/join passed; temporary host
-bridge/helper privileges were restored. The reusable command and failure-path
-contracts remain diagnostic, not authenticated Release or complete OS-smoke
-acceptance. Full guest attestation, networking and site/tenant/workload acceptance
-remain absent; the full image smoke still fails on the missing DSX material. Integration
-into the combined set and the complete
-Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
-qualification authority.
-The separate local `definition-profiles.json` now produces one diagnostic
-ARM64/Ubuntu 26.04 plain profiles OCI image from the staged-installer's pinned
-NKE fixtures, with exact source-file guards, unchanged config/runbooks, a
-maintained digest-pinned Alpine base and no HTTP agent-download override.
-Docker/Podman compiler and preflight contracts cover the separate selection.
-The [real Docker Run and NKE-owned content probe](../evidence/2026-10-08-colima-local-profiles.md)
-passed 1/1, offline image checks, metadata selection and Calico/OVN template
-rendering. Podman execution, NICoSim boot-script execution, exact served-QCOW2
-binding, registry/node reachability, TPM attestation and site/tenant acceptance
-remain unexercised. The profile's APT operations and local endpoint are
-descriptions, not authenticated dependency/disk compatibility. It is not fleet
-configuration, an EFI artifact, part of `all`, or a new deployment authority.
-The additional local `definition-site.json` declares four producers aligned to
-the exact PR #1160 staged-installer candidate: CLI, controller image, image-bound
-controller chart and NKTP chart. Docker/Podman compiler contracts cover the
-selection. The CLI uses source-owned Make; NKTP prepares locked dependencies in
-isolated Helm configuration before offline packaging. The tiny local wrapper
-retains the existing pinned Helm bytes and owns a shell-capable entrypoint;
-attempt substitutions do not override a pinned runtime entrypoint. A
-[bounded real Helm preparation/package probe](../evidence/2026-10-08-local-site-chart-preparation.md)
-passed. The later [four-output Colima Run](../evidence/2026-10-08-colima-site-and-tools-build.md)
-completed with no failure, and its exact controller image passed offline native
-help. A later [loopback registry transport probe](../evidence/2026-10-08-local-registry-handoff.md)
-copied that controller and bound chart with the built ORAS, matching both remote
-manifest digests. It establishes neither complete mirroring nor node/consumer
-reachability in that earlier probe. The later real site replay is recorded below; the
-site set is separate from `all`. Dependency charts remain acquisitions and the
-wrapper's Helm 4.3.0 does not match the installer's preferred 4.2.4; its readiness
-script warns rather than failing solely on that mismatch. Default source-tree
-inventory rendering still prepares chart dependencies. A diagnostic prepared-input
-adapter now uses NKE's strict item reader and NKD-owned manifest/blob/archive
-verification to give rendering and the executor's local-path branch the same six
-unchanged chart archives, without NKE checkout edits or dependency builds.
-Contract tests reject wrong/missing pins, unsafe archives, destination replacement
-and destinations inside source/producer paths. A
-[real chart handoff probe](../evidence/2026-10-08-local-chart-handoff.md) passed
-native Helm rendering and executor dry-run. Four inputs came from a completed
-NKD Run; controller/NKTP came from manual packaging probes. It is not a complete
-site Run, signed Release or deployment. The later handoff replay used all six
-charts from completed Runs and again passed rendering/executor dry-run. Staged release-manifest chart refs can
-override local paths and still require consistent transport/selection integration.
-The separate local `definition-tools.json` declares one source-built Linux ARM64
-bundle of Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3, ORAS 1.3.3 and Kind 0.32.0,
-matching the selected installer's source-owned tool pins. Native Docker/Podman
-compiler and no-work preflight contracts pass. The later Colima Docker Run completed
-all five source components into one observed bundle; verified extraction, independent
-hashing and all five native version commands passed. The later site replay uses this bundle.
-The later [management consumer](../local-management-cluster.md) uses that
-completed bundle for a real private Kind management node and pinned NKE CAPI
-stage. It verifies client versions, executes a private tracked-Git projection,
-checks the native node/providers and removes only its owned node and newly
-created anonymous volume. The [runtime evidence](../evidence/2026-10-08-local-management-cluster.md)
-records acquired management/provider runtime inputs separately from the
-source-built tools. This is not an NKE site installation, CAPD tenant, real
-CAPNICo/QCOW2 tenant acceptance, authenticated Release or full demo. Negative
-contracts cover foreign resource ownership, hidden working-tree stage changes,
-wrong tool versions/platforms, descendant teardown and failed diagnostic
-writes during cleanup.
-The later [site consumer](../local-site-integration.md) joins completed
-site/components/profiles/provider Runs with that management lifetime. NKE owns
-rendering, installation and stage checks; NKD owns chart/CLI material verification.
-Source-built ORAS copies three exact manifests to a private node-reachable
-registry and read-back matches their Run observations. The
-[real Colima replay](../evidence/2026-10-08-local-site-integration.md) passed
-six Helm releases, controller database/Temporal health, CAPNICo readiness,
-stage-06 registration/API access and exact runtime image IDs before removing
-the owned registry, node and anonymous volume. The supplied real NICoSim server
-and temporary bridge were owned by the private replay harness, not this adapter.
-No tenant was created. Acquired dependency charts/runtime images, a fresh local
-bootstrap CA, Kind-only telemetry TLS settings and disabled reference API
-authentication remain explicit diagnostic exceptions. This establishes local
-site installation, not a full source-built distribution, QCOW2 tenant/workload
-acceptance, qualified execution or authenticated Release.
-The internal downstream network guard now has
-[native setup/restoration evidence](../evidence/2026-10-08-local-network-guard.md)
-for normal completion and a deliberate joined consumer failure. It binds
-created bridge identity, exact owner-comment rules, private file capabilities,
-temporary QEMU controls and original sysctls, with fail-closed ownership and
-unjoined-producer negatives. This primitive is not yet integrated into the
-site entrypoint or a complete tenant command. No guest DHCP/DNS delivery, BGP
-route, tenant or workload acceptance is established by its listeners.
-Four sources use bounded module preparation with unchanged manifest
-checks; Kubernetes uses its committed vendor/staging workspace. All five compile
-offline. Helm reuses PR #113's exact target-checked removal of four upstream
-negative-test symlinks in diagnostic Local preparation. Held hosted source fetch
-rejects these external links before the command; no containment or qualified
-admission is relaxed. The acquired `operator-tools`, `all`, OS source graph and
-combined-demo gaps remain unchanged. Tool/transitive organizational approval is
-not established by compiler tests or NKD's own vulnerability gate.
-The laptop launcher additionally enters an explicitly selected Colima ARM64
-Docker profile before invoking the existing Linux local runner. It does not
-select Docker Desktop, switch contexts, create/start/reset VMs, change OS
-requirements or introduce a new producer. The [real Colima preflight](../evidence/2026-10-08-colima-local-preflight.md)
-passed provider prerequisites and reached the OS capacity check, which failed
-before downloads. After [failed-attempt cleanup](../evidence/2026-10-08-local-storage-cleanup.md),
-the OS preflight passed and real Docker execution validated the fresh Packer
-toolchain and built material producers, but failed at SPIRE private snapshot
-preparation with a shared-filesystem file-handle error. A native ext4 export of
-the same committed NKD source passed material preparation and Packer validation;
-the QEMU guest reached Ubuntu autoinstall and system installation. An external absolute Run root
-was rejected before execution and is not a supported workaround. See the
-[execution evidence](../evidence/2026-10-08-colima-local-os-build.md).
-The 16 GiB native attempt subsequently lost QEMU to the Colima host's global
-OOM killer while a separate simulator build was active. Packer's continuing
-SSH wait did not establish guest liveness. Graceful cancellation recorded a failed
-Run with zero observed outputs and no accepted disk; its container was cleaned up.
-The dedicated profile was resized to 24 GiB. Fresh non-overlapping Run
-`laptop-colima-os-arm64-20261008-04` completed its real Packer bake and terminal
-observation: one expected/observed disk, launcher exit 0, no failure, unqualified
-local lane. The retained non-FDE QCOW2 is 2,851,733,504 bytes with SHA-256
-`38da250fa91eb5582067dcbf200a156f0fc71a085ce6a2b30c408a65059e129d`;
-independent hashing/size checks matched. The installer identified Ubuntu 26.04.1.
-Independent copied-disk probing reached SSH, completed cloud-init, passed root
-growth and agent probes with diagnostic CPU/UID harness projections, but the full
-source smoke exited 1 in its SPIRE checks. The retained older package lacks the
-required DSX IMDS plugin; its configured unauthenticated URL returned 403.
-A complete boot-smoke pass and tenant provisioning remain unestablished; the
-older SPIRE and acquired-input exceptions remain. No NKD runtime, identity or `.nkd` containment
-requirement was relaxed, and this is not full-disk evidence or qualification.
-Mixed local offline utility
-admission is restricted to non-disk observation/SBOM/ordinary packaging and retains
-complete-Plan validation plus the original helper Plan digest. Workspace image
-observation uses factory-owned relocation without weakening exact acquired producer
-bindings; absolute binary observation remains supported. Contract tests cover these
-boundaries. The initial laptop component attempt failed final observation. The
-corrected rootless Podman component Run `laptop-dev-arm64-20261007-05` completed
-with launcher exit 0 and 20 expected/observed outputs in the unqualified local
-lane; it exercised local Git transport and four jobs, before the two provider
-additions, not the current combined disk set. The later container-bootstrap Run
-`laptop-container-components-arm64-20261007-01` completed 22/22 with no failure;
-see the [bootstrap evidence](../evidence/2026-10-07-local-container-bootstrap.md).
-No complete combined 23-output Run is claimed.
-The OS trial prepared materials and the patched ISO but failed capacity re-admission
-before Packer. Fresh native Podman toolchain reconstruction still mismatches the
-older local pin. Neither this example nor its previews establish M2 or release acceptance.
+The authored `definitions/nke-laptop-arm64` examples select 23 combined outputs
+or the 22-output non-disk subset without publication/signing. Separate selections
+cover providers, simulator, site, tools and diagnostic profiles. They are not a
+complete source-built distribution or a full tenant/workload result. See the
+[development guide](../local-development.md) and [source-build gap map](../full-nke-source-build.md).
+
+Contract tests cover mixed offline utility admission, exact acquired-image
+subjects and typed OS execution-class admission. Local trial reports are not
+shipped in this PR; private attempts cannot establish public acceptance or
+qualification. No complete combined Run, full boot contract or real tenant/workload
+acceptance is claimed by these examples.
+
+## Output-local publication and metadata assembly
 
 
 The GitHub `per-output-v1` mode retains full payload/producer/evidence checks for each exact named output.

@@ -18,13 +18,13 @@ provider Runs. It copies exact controller/profiles/CAPNICo manifests to a privat
 node-reachable registry, installs six unchanged chart archives, checks health,
 registers the site and verifies actual runtime image IDs before owned cleanup.
 See the [site command and prerequisites](../docs/local-site-integration.md) and
-[real replay evidence](../docs/evidence/2026-10-08-local-site-integration.md).
+real replay evidence.
 It requires an existing private NICoSim endpoint and is not tenant/workload E2E.
 
 The internal `nke-local-network.py` guard has real native setup/restoration
 evidence, including a deliberate consumer failure. It is not yet wired into
 the site entrypoint or a complete tenant command; see the
-[scope and restoration readback](../docs/evidence/2026-10-08-local-network-guard.md).
+scope and restoration readback.
 
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
@@ -38,7 +38,7 @@ through an exact attempt overlay. `--check simulator` performs no pull/build and
 does not require a previously cached toolchain; Docker bootstrap requires Buildx.
 `site` separately selects the installer-aligned CLI/controller and two chart
 outputs. Its local pinned Helm wrapper prepares NKTP's locked dependencies before
-offline packaging. Its separate [four-output Run completed](../docs/evidence/2026-10-08-colima-site-and-tools-build.md),
+offline packaging. Its separate four-output Run completed,
 not a deployment; see the [site handoff](../docs/nkd-to-nke-demo.md).
 `tools` separately selects source-built Linux ARM64 Helm, kubectl, clusterctl,
 ORAS and Kind at the staged installer's pinned versions. Compiler/preflight
@@ -47,7 +47,7 @@ site-only deployment passed; complete tenant/workload E2E remains unexercised. H
 exact fixture preparation is diagnostic Local-only, not a supported held hosted
 fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
 `profiles` separately builds the diagnostic plain ARM64/Ubuntu 26.04 controller
-profiles image from pinned NKE fixtures. Its [Docker Run/content probe](../docs/evidence/2026-10-08-colima-local-profiles.md)
+profiles image from pinned NKE fixtures. Its Docker Run/content probe
 passed; the later site consumer deployed it and checked its exact init-container
 image ID. It is not included in `all` or tenant boot-compatibility proof.
 See the [profiles guide](../docs/local-controller-profiles.md).

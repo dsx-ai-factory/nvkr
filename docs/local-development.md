@@ -179,7 +179,7 @@ The October 8 shared-mount trial failed during the SPIRE source snapshot with
 `too many open files in system`, before Packer. An explicit clean-cache diagnostic
 reduced the Colima host VM process from 48,737 open file handles to 33; later
 trials used native ext4 rather than adding automatic cache flushes
-or raising Mac limits. See the [Docker execution evidence](evidence/2026-10-08-colima-local-os-build.md).
+or raising Mac limits. See the Docker execution evidence.
 That investigation alone did not prove the retry; the later completed bake and
 separate failed full smoke are recorded in that evidence document.
 
@@ -202,7 +202,7 @@ Ubuntu 26.04.1 QCOW2. This single-job result is not a capacity guarantee. A copi
 disk booted and reached SSH, but its complete source smoke failed in SPIRE checks;
 the retained older SPIRE package omits the required DSX IMDS plugin. Do not lower
 the authored execution requirement or remove smoke assertions to hide these
-failures. The [OS execution evidence](evidence/2026-10-08-colima-local-os-build.md)
+failures. The OS execution evidence
 records the kernel failure and recovery separately from earlier progress.
 
 ### Check before the expensive build
@@ -442,20 +442,20 @@ generic bundle's executable-mode/install hint. The data producer uses sorted arc
 source timestamps/ownership/modes and a timestamp-free gzip header. It does not
 add credentials, production fleet profiles or VM state. The archive retains
 source-owned paths (`internal/seed/default-seed.yaml` and `ui/`) for the deployment
-consumer. The [three-component Colima Docker Run and artifact-only startup](evidence/2026-10-08-colima-nicosim-assets.md)
+consumer. The three-component Colima Docker Run and artifact-only startup
 completed separately: delivery verified/extracted the final bundle, and the
 mock-runtime probe initialized SQLite and served exact packaged UI bytes without
 mounting NKE source. Deployment/tenant acceptance remains separate.
 Its build is not proof of real VM provisioning or tenant readiness;
-the earlier [Podman smoke](evidence/2026-10-07-local-nicosim-build.md) selected a mock
-VM backend. The later [committed Colima Docker Run](evidence/2026-10-08-colima-nicosim-build.md)
+the earlier Podman smoke selected a mock
+VM backend. The later committed Colima Docker Run
 completed 1/1 with the earlier two-component selection and passed the same limited
 startup probe using seed/UI from the source snapshot. It does not prove the new
 archive producer, real VM provisioning or the complete demo.
 
 The later [artifact-only guest command](local-qcow2-guest-probe.md) consumes the
 completed simulator/OS Runs inside Linux, without rebuilding. Its
-[recorded native libvirt probe](evidence/2026-10-08-native-nicosim-qcow2-guest.md)
+recorded native libvirt probe
 passed real QCOW2 VM readiness, SSH, cloud-init, TPM, agent and staged Kubernetes
 package checks with owned cleanup. It is still not the complete image smoke,
 management-plane install or tenant/workload acceptance.
@@ -516,7 +516,7 @@ NKTP's three repositories are registered in temporary Helm configuration, Helm
 validates its source-owned lock, and subsequent chart packaging is offline.
 These dependency archives remain acquisitions, not independent source builds.
 
-The [completed Colima site Run](evidence/2026-10-08-colima-site-and-tools-build.md)
+The completed Colima site Run
 observed all four outputs with no failure. Require your own Run status
 `complete`, exactly four expected/observed outputs and no failure before using
 them. Helm 4.3.0 in this build wrapper does not match the installer's preferred
@@ -587,9 +587,9 @@ tree rather than downloading a substitute workspace.
 
 **Current evidence: the complete five-component Colima Run passed, its one bundle
 was verified/extracted, and all five native version probes passed.** The
-[completed Run evidence](evidence/2026-10-08-colima-site-and-tools-build.md) records
+completed Run evidence records
 exact subjects, executable hashes and limitations; the
-[earlier contract evidence](evidence/2026-10-08-local-installer-tools-plan.md) records
+earlier contract evidence records
 source pins, independent review and preflight. Require your own terminal
 Run status `complete`, exactly one required/observed output, no failure and verified
 bundle extraction before putting these executables on the installer's Linux PATH.
@@ -805,40 +805,9 @@ a hermetic or byte-reproducible OS claim.
 
 ## Validation status
 
-The new container-bootstrap Run `laptop-container-components-arm64-20261007-01`
-completed with exit zero, 22 expected and 22 observed outputs, and no failure.
-It built the runner inside the pinned utility container using the verified Go
-archive, then executed the Linux ARM64 Run in the existing rootless Podman VM.
-The produced CLI executed `version`; the packaged controller chart's digest
-binding matched the observed controller image. See the
-[container-bootstrap evidence](evidence/2026-10-07-local-container-bootstrap.md).
-This trial used an existing development VM and a local NKE Git transport override;
-it is not a clean-machine or remote-only authentication test.
-
-The separate source-built provider Run `laptop-providers-arm64-20261007-01`
-completed with 2/2 observed outputs and both produced images passed offline help
-probes. See the [exact provider evidence](evidence/2026-10-07-laptop-provider-builds.md).
-That older provider trial is not the complete 22-output component Run above.
-
-The laptop component Run `laptop-dev-arm64-20261007-05` completed with launcher
-exit 0, `status: complete`, 20 expected and 20 observed outputs, no failure, and
-lane `unqualified-local-execution`. It used rootless Podman, four jobs and the
-local Git transport override. The produced ARM64 CLI executed help/version, its
-controller OCI archive imported into Podman, and the final packaged chart opened
-with the acquired Helm executable. Its bound image digest matched the observed
-controller image. The launcher remained unchanged throughout this Run.
-
-Comparing this Run with the preceding completed component Run found matching
-build identities for all 20 outputs and matching payload digests for 18. The
-controller image and its image-bound chart differed. This trial therefore does
-not establish exact-byte reproducibility; neither Run is qualified.
-
-The earlier acquired-image final-observation failure is covered by regression
-tests, alongside mixed disk/non-disk utility admission and native Linux ARM64
-race checks. The OS trial built its materials and patched ISO, then failed
-capacity re-admission before Packer. That historical Run predates the two provider
-additions. A complete 22-output component Run or combined 23-output Run is not
-established by that historical trial. Raw attempts remain in `.nkd`; repository tests do not prove a disk bake,
-remote-only Git access or registry publication. These historical Runs used the
-earlier launcher; they do not prove the new container bootstrap, fresh Packer
-assembly or a clean-machine Docker run. Record those separately.
+Repository contract tests cover the local runner, mixed utility admission,
+workspace observation and example inputs. Historical private component/provider
+trials are not shipped as evidence reports and are not public acceptance.
+The full local QCOW2 tenant/workload path, clean-machine setup, remote-only
+authentication and complete source-built selection require separate runtime
+validation. A partial completed Run does not establish any of those results.
