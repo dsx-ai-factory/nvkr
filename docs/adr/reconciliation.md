@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-10-07. ADR-01–22 own the lane-specific engineering contracts pending named-decider
+Reviewed 2026-10-08. ADR-01–22 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -110,6 +110,13 @@ databases remain unsupported. Mounted-tree export does not prove coverage of unm
 Nested carrier file identities are not invented installed paths; only top-level material hashes participate
 in material/file correspondence. Private-volume capacity admission is not quota/mount-policy proof.
 
+Top-level OCI image materials admit only bounded, uncompressed OCI layouts. Complete closure and every
+descriptor/configuration must match the consumer platform before each unique image is scanned through a
+private Docker-archive projection; observations remain bound to the original held carrier and closure is
+revalidated afterward. Docker/gzip, prefixed members, unsupported attestations and malformed carriers fail
+without partial inventory. Shared member/image and pre-deduplication component limits still apply. Real
+NKE material complexity, cold-cache timing and full-matrix inspection remain unverified.
+
 ADR-13 owns the exact evidence vocabulary and bounds: 32 MiB documents, 64 MiB signed bundles and 16 MiB
 composition reports; provenance retains its independent 4 MiB bound. Oversize evidence fails without
 truncation. A structural file ceiling does not guarantee byte fit. Shared disk codecs reject external backing
@@ -120,10 +127,19 @@ The native ARC disk adapter contract now derives execution/job budgets from real
 class and the strict inspection join, leaving separate cleanup headroom. The shared terminal hour also covers
 public image pulls and per-output offline publication preparation; the fifteen-minute provider reserve is
 shared by pre-steps and successful carrier packing/uploads. No per-step transfer/max-byte or remaining-provider-time
-proof is implemented, so near-ceiling transfer headroom remains an operational risk (ADR-18 §3). Failure-only diagnostic transport
+proof is implemented, so near-ceiling transfer headroom remains an operational risk (ADR-18 §3). Failure-only Packer diagnostic transport
 selects only one successfully sealed sink-issued route with bounded retention; early admission failures cannot
 select workspace content. Both-native generation and tampering tests cover this projection, not a fresh
 ephemeral-runner timeout or diagnostic-upload exercise.
+
+Strict inspection separately retains bounded, sanitized phase/timing diagnostics with original held-subject
+coordinates and timeout summaries. A separate parsing ceiling rejects excessive diagnostic input while
+draining the child; truncation preserves the last accepted phase. Diagnostics grant no receipt and timing
+does not enter evidence identity. Hosted retention uses one atomically published, no-replace file and an
+optional, failure-tolerant, always-run upload with one-day retention and a separate five-minute allowance.
+Required evidence uploads remain mandatory. M2 build-provenance mode emits neither inspection nor this
+upload. Rebuilt-helper deployment, full native inspection and corrected production timeout behavior remain
+unexercised.
 
 The [October 7 PR #97 contract record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-07-pr97-review-fix-contracts.md)
 records native Linux ARM64 race execution of the sealed diagnostic coordinator and

@@ -29,7 +29,7 @@ func TestARCCompletesPreparedDiskPublication(t *testing.T) {
 			if err := executeHeldDiskObservation(t.Context(), plan, nodes["node-image/terminal-observe"], artifacts, owner); err != nil {
 				t.Fatal(err)
 			}
-			if err := completeGitHubDiskPublication(t.Context(), plan, plan.LifecycleOutputs[0], owner, nil, GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
+			if err := completeGitHubDiskPublication(t.Context(), plan, plan.LifecycleOutputs[0], owner, nil, nil, GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
 				t.Fatal(err)
 			}
 			node := nodes["package/"+outputPublicationPackage("node-image")]

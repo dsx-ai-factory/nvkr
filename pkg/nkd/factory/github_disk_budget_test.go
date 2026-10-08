@@ -62,7 +62,7 @@ func TestGitHubDiskBudgetUsesClassAndLiveCompletion(t *testing.T) {
 			wantCode    e.Code
 		}{
 			{"producer provenance", nil, 505, ""},
-			{"strict scans each member plus acquisitions once", func(p *Plan, _ *githubStage) { p.Environment.DiskEvidence = "" }, 535, ""},
+			{"strict scans each member plus acquisitions once", func(p *Plan, _ *githubStage) { p.Environment.DiskEvidence = "" }, 540, ""},
 			// This is a scheduling projection only. The owning VM runtime
 			// admission still requires a positive authored producer timeout.
 			{"scheduling-only zero timeout uses class ceiling", func(_ *Plan, s *githubStage) { s.Nodes[0].Requirements.TimeoutSeconds = 0 }, 505, ""},
@@ -83,6 +83,20 @@ func TestGitHubDiskBudgetUsesClassAndLiveCompletion(t *testing.T) {
 			{"provider lacks cleanup headroom", func(_ *Plan, s *githubStage) {
 				s.Nodes = s.Nodes[:1]
 				s.Nodes[0].Requirements.TimeoutSeconds = (githubMaximumDiskJobTimeoutMinutes-githubDefaultStageTimeoutMinutes-githubDiskProviderOverheadMinutes-githubDiskCleanupHeadroomMinutes-githubDiskDiagnosticUploadMinutes)*60 + 1
+				s.Nodes[0].ExecutionBinding.Class.MaxTimeoutSeconds = s.Nodes[0].Requirements.TimeoutSeconds
+			}, 0, e.CodeEngineCapability},
+			// One root and its acquisition carrier each receive ten minutes of
+			// inspection; both optional diagnostic uploads need separate bounds.
+			{"strict provider exact maximum", func(p *Plan, s *githubStage) {
+				p.Environment.DiskEvidence = ""
+				s.Nodes = s.Nodes[:1]
+				s.Nodes[0].Requirements.TimeoutSeconds = 1330 * 60
+				s.Nodes[0].ExecutionBinding.Class.MaxTimeoutSeconds = s.Nodes[0].Requirements.TimeoutSeconds
+			}, 1440, ""},
+			{"strict provider lacks upload headroom", func(p *Plan, s *githubStage) {
+				p.Environment.DiskEvidence = ""
+				s.Nodes = s.Nodes[:1]
+				s.Nodes[0].Requirements.TimeoutSeconds = 1330*60 + 1
 				s.Nodes[0].ExecutionBinding.Class.MaxTimeoutSeconds = s.Nodes[0].Requirements.TimeoutSeconds
 			}, 0, e.CodeEngineCapability},
 			{"overflow", func(_ *Plan, s *githubStage) {
@@ -115,6 +129,9 @@ func TestGitHubDiskBudgetUsesClassAndLiveCompletion(t *testing.T) {
 					t.Fatal("helper deadline leaves no cleanup headroom")
 				}
 				boundedSteps := int((budget+time.Minute-1)/time.Minute) + githubDiskProviderOverheadMinutes + githubDiskCleanupHeadroomMinutes + githubDiskDiagnosticUploadMinutes
+				if !diskBuildProvenance(plan) {
+					boundedSteps += githubDiskDiagnosticUploadMinutes
+				}
 				if boundedSteps > minutes {
 					t.Fatalf("bounded preparation/run/upload steps %d exceed job timeout %d", boundedSteps, minutes)
 				}

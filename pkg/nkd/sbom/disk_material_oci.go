@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -23,13 +24,18 @@ import (
 // The scanner's Docker archive is only a private projection; the observation
 // remains bound to the original held material, not a rewritten image identity.
 func inspectNestedOCILayout(ctx context.Context, subject inspectionArchive, archive *generatedInspectionFile, platform string, scanner Scanner, maxBytes int64, budget *materialInspectionBudget) (*FilesystemInspection, error) {
+	ordinal := 0
 	return inspectNestedOCILayoutScan(ctx, subject, archive, platform, scanner, budget, func(ctx context.Context, _ string, image v1.Image) (DependencyInventory, error) {
+		ordinal++
+		depth, _ := ctx.Value(diskScanDepthKey{}).(int)
+		diskdiagnostic.Emit(ctx, "scanner-transport", "start", depth, ordinal)
 		held, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
 			return tarball.Write(name.MustParseReference("nkd.invalid/material:scan"), image, destination)
 		})
 		if err != nil {
-			return DependencyInventory{}, e.Wrap(e.CodeVerifyFailed, err, "sealing nested OCI scan transport")
+			return DependencyInventory{}, nestedOCIValidationError(ctx, err, "sealing nested OCI scan transport")
 		}
+		diskdiagnostic.Emit(ctx, "scanner-transport", "complete", depth, ordinal)
 		inventory, scanErr := inspectGeneratedDependencies(ctx, held, scanner)
 		return inventory, errors.Join(scanErr, held.Close())
 	})
@@ -45,9 +51,13 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 		return nil, e.Wrap(e.CodeInternal, err, "creating private OCI material workspace")
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
+	depth, _ := ctx.Value(diskScanDepthKey{}).(int)
+	diskdiagnostic.Emit(ctx, "filesystem-extraction", "start", depth, 0)
 	if err := transportarchive.UnpackOpen(ctx, archive.file, workspace, []string{"oci-layout", "index.json", "blobs"}); err != nil {
 		return nil, nestedOCIValidationError(ctx, err, "extracting nested OCI layout")
 	}
+	diskdiagnostic.Emit(ctx, "filesystem-extraction", "complete", depth, 0)
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "start", depth, 0)
 	index, err := layout.ImageIndexFromPath(workspace)
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening nested OCI index")
@@ -77,14 +87,20 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 	if len(images) == 0 {
 		return nil, e.New(e.CodeEngineCapability, "nested OCI layout has no inspectable image")
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "complete", depth, 0)
 	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest}
 	for _, image := range images {
 		inventory, err := scan(ctx, workspace, image)
 		if err != nil {
+			var coded *e.Error
+			if ctx.Err() != nil && (!errors.As(err, &coded) || coded.Code != e.CodeTimeout) {
+				return nil, nestedOCIValidationError(ctx, err, "scanning nested OCI image")
+			}
 			return nil, err
 		}
 		result.components = append(result.components, withDiskContentClass(inventory.Components, diskClassContainer)...)
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "start", depth, 0)
 	if err := pipeline.VerifyOfflineOCILayout(ctx, workspace, want); err != nil {
 		return nil, nestedOCIValidationError(ctx, err, "revalidating scanned OCI closure")
 	}
@@ -94,6 +110,7 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 	if err := subject.AssertUnchangedContext(ctx); err != nil {
 		return nil, err
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "complete", depth, 0)
 	return result, nil
 }
 
@@ -102,7 +119,7 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 func nestedOCIValidationError(ctx context.Context, err error, operation string) error {
 	var coded *e.Error
 	if ctx.Err() != nil {
-		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s canceled", operation)
+		return e.Wrap(e.CodeTimeout, errors.Join(ctx.Err(), err), "%s canceled", operation)
 	}
 	if errors.As(err, &coded) && coded.Code == e.CodeTimeout {
 		return err
@@ -155,7 +172,7 @@ func nestedOCIImagesSeen(ctx context.Context, index v1.ImageIndex, platform stri
 			}
 			seen[descriptor.Digest] = true
 			budget.images++
-			if budget.images > 256 {
+			if budget.images > maxDiskNestedImages {
 				return nil, e.New(e.CodeEngineCapability, "nested material exceeds its cumulative image budget")
 			}
 			image, err := index.Image(descriptor.Digest)

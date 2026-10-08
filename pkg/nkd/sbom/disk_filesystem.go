@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -85,6 +86,8 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	if err := validateSBOMContext(ctx); err != nil {
 		return nil, err
 	}
+	depth, _ := ctx.Value(diskScanDepthKey{}).(int)
+	ordinal, _ := ctx.Value(diskFilesystemOrdinalKey{}).(int)
 	if subject == nil || subject.Size() <= 0 || maxBytes <= 0 || maxBytes > 16<<30 ||
 		(platform != "linux/amd64" && platform != "linux/arm64") || !canonical.IsDigest(guestfishDigest) || !canonical.IsDigest(scanner.Digest) {
 		return nil, e.New(e.CodeEngineCapability, "filesystem inspection requires a bounded exact subject and complete native tool pins")
@@ -118,6 +121,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	// libguestfs reopens the supplied path. This private read-only copy is made
 	// only inside the admitted container and is rehashed before accepting output.
 	snapshot := filepath.Join(workspace, "subject")
+	diskdiagnostic.Emit(ctx, "filesystem-staging", "start", depth, ordinal)
 	file, err := os.OpenFile(snapshot, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o400)
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "staging filesystem subject")
@@ -126,6 +130,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	if err := errors.Join(copyErr, file.Close()); err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "copying filesystem subject")
 	}
+	diskdiagnostic.Emit(ctx, "filesystem-staging", "complete", depth, ordinal)
 	exported := filepath.Join(workspace, "root.tar")
 	output, err := os.OpenFile(exported, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o400)
 	if err != nil {
@@ -147,6 +152,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 		// The pinned filesystem owner must identify the supported ISO filesystem
 		// before an exported SquashFS member can count as installer evidence.
 		var filesystem, diagnostic boundedScanBuffer
+		diskdiagnostic.Emit(ctx, "filesystem-probe", "start", depth, ordinal)
 		probe := append(slices.Clone(args), "vfs-type", "/dev/sda")
 		if err := heldfile.RunContext(ctx, guestfish, probe, heldfile.RunOptions{Stdout: &filesystem, Stderr: &diagnostic,
 			Dir: workspace, Env: diskInspectorEnvironment(workspace), TerminationGrace: time.Second}); err != nil {
@@ -155,16 +161,24 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 		if err := validateInstallerFilesystemType(filesystem.String(), diagnostic.String()); err != nil {
 			return nil, err
 		}
+		diskdiagnostic.Emit(ctx, "filesystem-probe", "complete", depth, ordinal)
 	}
 	args = append(args, "tar-out", "/", "-")
 	var diagnostic boundedScanBuffer
+	// guestfish 1.52 auto-launches and mounts -i/-m before executing an event
+	// command. Keep its read-only mounting semantics; first exported bytes mark
+	// extraction, not an invented launch_done callback or an appliance probe.
+	diskdiagnostic.Emit(ctx, "export-startup", "start", depth, ordinal)
+	extraction := &diskExtractionWriter{ctx: ctx, writer: output, depth: depth, ordinal: ordinal}
 	if err := runBoundedExport(ctx, guestfish, args, heldfile.RunOptions{Stderr: &diagnostic,
-		Dir: workspace, Env: diskInspectorEnvironment(workspace), TerminationGrace: time.Second}, output, maxBytes); err != nil {
+		Dir: workspace, Env: diskInspectorEnvironment(workspace), TerminationGrace: time.Second}, extraction, maxBytes); err != nil {
 		return nil, err
 	}
+	diskdiagnostic.Emit(ctx, "filesystem-extraction", "complete", depth, ordinal)
 	if diagnostic.Len() != 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "filesystem export returned diagnostics")
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "start", depth, ordinal)
 	if err := recheckFilesystemSnapshot(ctx, snapshot, subject); err != nil {
 		return nil, err
 	}
@@ -172,6 +186,8 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	if err != nil {
 		return nil, err
 	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "complete", depth, ordinal)
+	diskdiagnostic.Emit(ctx, "scanner-transport", "start", depth, ordinal)
 	held, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
 		_, err := io.Copy(destination, filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(output, 0, maxBytes))})
 		return err
@@ -183,6 +199,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	if held.Digest() != rootDigest {
 		return nil, e.New(e.CodeVerifyFailed, "filesystem export changed while staging scan")
 	}
+	diskdiagnostic.Emit(ctx, "scanner-transport", "complete", depth, ordinal)
 	inventory, err := inspectMaterialArchive(ctx, held, platform, scanner, packageReaderDigest, maxBytes)
 	if err != nil {
 		return nil, err
@@ -203,6 +220,24 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	}
 	return &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), guestfish: guestfishDigest,
 		scanner: scanner.Digest, exported: held.Digest(), components: inventory.components, files: inventory.files}, nil
+}
+
+// The export owner, not debug-log text, identifies the first filesystem bytes.
+// Before that boundary export-startup includes appliance startup and auto-mount.
+type diskExtractionWriter struct {
+	ctx            context.Context
+	writer         io.Writer
+	started        bool
+	depth, ordinal int
+}
+
+func (writer *diskExtractionWriter) Write(raw []byte) (int, error) {
+	if len(raw) > 0 && !writer.started {
+		writer.started = true
+		diskdiagnostic.Emit(writer.ctx, "export-startup", "complete", writer.depth, writer.ordinal)
+		diskdiagnostic.Emit(writer.ctx, "filesystem-extraction", "start", writer.depth, writer.ordinal)
+	}
+	return writer.writer.Write(raw)
 }
 
 // runBoundedExport uses the standard library pipe and CopyN to enforce the
@@ -265,10 +300,21 @@ func validateInstallerFilesystemType(filesystem, diagnostic string) error {
 // Their compression/filesystem grammar is decoded by libguestfs, not by Go.
 // Every member is scanned; an absent or unreadable base filesystem fails closed.
 func inspectInstallerMembers(ctx context.Context, archive *os.File, platform, guestfishDigest, packageReaderDigest string, scanner Scanner, codec *assemble.QemuImgCodec, maxBytes int64) (*FilesystemInspection, error) {
+	depth, _ := ctx.Value(diskScanDepthKey{}).(int)
+	ordinal := 0
 	return inspectInstallerMembersWith(ctx, archive, func(member inspectionArchive) (*FilesystemInspection, error) {
-		return inspectFilesystem(ctx, member, "raw", platform, guestfishDigest, packageReaderDigest, scanner, codec, maxBytes)
+		ordinal++
+		memberCtx := context.WithValue(ctx, diskScanDepthKey{}, depth+1)
+		memberCtx = context.WithValue(memberCtx, diskFilesystemDepthKey{}, depth+1)
+		memberCtx = context.WithValue(memberCtx, diskFilesystemOrdinalKey{}, ordinal)
+		return inspectFilesystem(memberCtx, member, "raw", platform, guestfishDigest, packageReaderDigest, scanner, codec, maxBytes)
 	})
 }
+
+type diskFilesystemOrdinalKey struct{}
+type diskFilesystemDepthKey struct{}
+
+const maxDiskInstallerMembers = 32
 
 // The production caller supplies the concrete filesystem owner. This private
 // seam tests held SquashFS member/correspondence projection, not native decoding.
@@ -292,7 +338,7 @@ func inspectInstallerMembersWith(ctx context.Context, archive *os.File, inspect 
 			continue
 		}
 		count++
-		if count > 32 || header.Size <= 0 || header.Size > MaxDiagnosticDiskBytes {
+		if count > maxDiskInstallerMembers || header.Size <= 0 || header.Size > MaxDiagnosticDiskBytes {
 			return nil, e.New(e.CodeEngineCapability, "installer base filesystem exceeds its supported budget")
 		}
 		member, err := createGeneratedInspectionFile(ctx, header.Size, func(destination io.Writer) error { _, err := io.Copy(destination, reader); return err })
@@ -320,6 +366,9 @@ func filesystemArchiveDigest(ctx context.Context, file *os.File) (string, error)
 	}
 	hash := sha256.New()
 	if _, err := io.Copy(hash, filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(file, 0, info.Size()))}); err != nil {
+		if ctx.Err() != nil {
+			return "", e.Wrap(e.CodeTimeout, ctx.Err(), "hashing filesystem archive canceled")
+		}
 		return "", e.Wrap(e.CodeVerifyFailed, err, "hashing filesystem archive")
 	}
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil

@@ -6,9 +6,11 @@ package sbom
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -121,4 +123,33 @@ func TestGeneratedInspectionFileCancelled(t *testing.T) {
 		t.Fatalf("canceled creation: %v", err)
 	}
 	assertDependencyCode(t, err, e.CodeTimeout)
+}
+
+func TestGeneratedInspectionPostCopyHashCancellation(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "uncanceled", true: "canceled after final write"}[canceled], func(t *testing.T) {
+			file, err := os.CreateTemp(t.TempDir(), "completed-copy-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer file.Close()
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if _, err := io.WriteString(file, "complete transport bytes"); err != nil {
+				t.Fatal(err)
+			}
+			if canceled {
+				cancel()
+			}
+			digest, err := filesystemArchiveDigest(ctx, file)
+			if canceled {
+				assertDependencyCode(t, err, e.CodeTimeout)
+				if digest != "" || !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "hashing filesystem archive canceled") {
+					t.Fatalf("wrong post-copy hash cancellation: digest=%q error=%v", digest, err)
+				}
+			} else if err != nil || digest != rawDigest([]byte("complete transport bytes")) {
+				t.Fatalf("uncanceled complete copy changed: %q %v", digest, err)
+			}
+		})
+	}
 }

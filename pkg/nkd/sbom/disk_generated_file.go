@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
@@ -28,6 +29,8 @@ type inspectionArchive interface {
 	WriteToContext(context.Context, io.Writer) (int64, error)
 	AssertUnchangedContext(context.Context) error
 }
+
+type diskScanDepthKey struct{}
 
 type generatedInspectionFile struct {
 	file      *os.File
@@ -136,6 +139,12 @@ func inspectGeneratedDependencies(ctx context.Context, subject *generatedInspect
 		return DependencyInventory{}, e.Wrap(e.CodeInternal, err, "creating isolated generated transport scanner configuration")
 	}
 	var output, diagnostic boundedScanBuffer
+	depth, _ := ctx.Value(diskScanDepthKey{}).(int)
+	phase := "root-scan"
+	if depth > 0 {
+		phase = "nested-scan"
+	}
+	diskdiagnostic.Emit(ctx, phase, "start", depth, 0)
 	err = heldfile.RunContext(ctx, executable, []string{"scan", "docker-archive:" + filepath.Join(subject.workspace, "subject"), "--output", "syft-json", "--config", configuration, "--select-catalogers", "+deb-archive-cataloger"}, heldfile.RunOptions{
 		Stdout: &output, Stderr: &diagnostic, Dir: subject.workspace, TerminationGrace: time.Second,
 		Env: []string{"PATH=/usr/bin:/bin", "HOME=" + subject.workspace, "TMPDIR=" + subject.workspace, "LC_ALL=C", "TZ=UTC", "SYFT_CHECK_FOR_APP_UPDATE=false", "SYFT_GOLANG_SEARCH_REMOTE_LICENSES=false", "SYFT_JAVA_USE_NETWORK=false"},
@@ -158,5 +167,9 @@ func inspectGeneratedDependencies(ctx context.Context, subject *generatedInspect
 	if err := subject.AssertUnchangedContext(ctx); err != nil {
 		return DependencyInventory{}, err
 	}
-	return filesystemDependenciesFromJSON(output.Bytes(), scanner.Digest)
+	inventory, err := filesystemDependenciesFromJSON(output.Bytes(), scanner.Digest)
+	if err == nil {
+		diskdiagnostic.Emit(ctx, phase, "complete", depth, len(inventory.Components))
+	}
+	return inventory, err
 }

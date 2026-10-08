@@ -134,10 +134,6 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 }
 
 func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner) (DependencyInventory, error) {
-	return inspectHeldDependencyReport(ctx, subject, kind, scanner, false)
-}
-
-func inspectHeldDependencyReport(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, packageMetadata bool) (DependencyInventory, error) {
 	artifactDigest := subject.Digest()
 	if kind == "tarball" {
 		components, err := inspectHelmArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
@@ -158,9 +154,6 @@ func inspectHeldDependencyReport(ctx context.Context, subject *heldfile.File, ki
 	source := "file:" + childPath
 	if kind == "oci-image" {
 		source = "oci-archive:" + childPath
-	}
-	if kind == "docker-image" {
-		source = "docker-archive:" + childPath
 	}
 	var output, diagnostic boundedScanBuffer
 	workdir, err := os.MkdirTemp("", "nkd-sbom-scan-*")
@@ -193,10 +186,6 @@ func inspectHeldDependencyReport(ctx context.Context, subject *heldfile.File, ki
 		return DependencyInventory{}, e.Wrap(e.CodeInternal, err, "writing isolated scanner configuration")
 	}
 	args := []string{"scan", source, "--output", "cyclonedx-json@1.5", "--config", config}
-	if packageMetadata {
-		args[3] = "syft-json"
-		args = append(args, "--select-catalogers", "+deb-archive-cataloger")
-	}
 	err = heldfile.RunContext(ctx, executable, args, heldfile.RunOptions{
 		Stdout: &output, Stderr: &diagnostic, TerminationGrace: time.Second,
 		Dir: workdir,
@@ -214,9 +203,6 @@ func inspectHeldDependencyReport(ctx context.Context, subject *heldfile.File, ki
 			return DependencyInventory{}, e.Wrap(e.CodeVerifyFailed, err, "scanner subject changed during inspection")
 		}
 		_ = checked.Close()
-	}
-	if packageMetadata {
-		return filesystemDependenciesFromJSON(output.Bytes(), scanner.Digest)
 	}
 	var scanned struct {
 		BOMFormat   string `json:"bomFormat"`
