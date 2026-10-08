@@ -126,7 +126,7 @@ brew install colima
 colima list
 # Only if this dedicated profile does not already exist:
 colima start --profile nkd-demo --arch aarch64 --runtime docker --vm-type vz \
-  --cpus 8 --memory 16 --disk 150 --activate=false --ssh-config=false \
+  --cpus 8 --memory 24 --disk 150 --activate=false --ssh-config=false \
   --mount "$(pwd -P):w"
 colima ssh --profile nkd-demo -- bash -c \
   'sudo apt-get update && sudo apt-get install -y git jq coreutils'
@@ -189,6 +189,17 @@ at Packer admission. The launcher measures guest capacity; it does not reserve
 physical space for a sparse disk. A native guest filesystem addresses the shared
 filesystem boundary, not insufficient physical storage. A successful preflight
 alone does not prove an OS bake or tenant lifecycle.
+
+The October 8 native-ext4 trial with a 16 GiB Colima VM reached Ubuntu kernel
+installation, but the guest host's global OOM killer terminated QEMU while a
+separate simulator build was active. Packer continued waiting for SSH; that was
+not evidence of a live guest. The attempt was canceled and recorded failed with
+zero accepted disks. Run component/simulator builds before the OS, not concurrently
+on this laptop. The dedicated profile was subsequently resized to 24 GiB and a
+fresh OS attempt passed preflight; that larger configuration is not yet a completed
+bake guarantee. Do not lower the authored execution requirement to hide capacity
+failures. The [OS execution evidence](evidence/2026-10-08-colima-local-os-build.md)
+records the kernel failure and recovery separately from earlier progress.
 
 ### Check before the expensive build
 

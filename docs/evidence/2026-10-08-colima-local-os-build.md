@@ -104,11 +104,69 @@ colima ssh --profile nkd-demo -- bash -c \
 The retry passed SPIRE private snapshot preparation and the remaining material
 builds, verified/acquired and patched the installer ISO, then passed `packer validate`.
 The real QEMU ARM64 guest booted the ISO and reached Ubuntu autoinstall, APT
-configuration and Curtin system installation. Packer is waiting for guest SSH.
-These observations are live progress, not a completed disk or boot-smoke result.
+configuration and Curtin kernel installation. These were intermediate observations,
+not a completed disk or boot-smoke result. Host free capacity was approximately
+103 GiB before this retry; guest capacity did not reserve physical Mac storage.
 
-The retry has not yet been accepted as a complete disk Run. Its files
-reside inside the VM, not under the Mac checkout's `.nkd/runs`. Record its terminal
-status and exact exported QCOW2 digest/size separately after completion. Host free
-capacity was approximately 103 GiB before this retry; guest free capacity does
-not reserve physical space for the sparse VM disk.
+## Native retry failed: guest-host global OOM
+
+At `2026-10-08 05:48:44 UTC`, while a separate simulator build was active,
+Colima's Linux kernel killed the QEMU process. The authoritative kernel record
+reports a **global** OOM, not an authored container memory limit:
+
+```text
+oom-kill:constraint=CONSTRAINT_NONE ... global_oom ... task=qemu-system-aar,pid=78467,uid=502
+Out of memory: Killed process 78467 (qemu-system-aar) total-vm:7142560kB, anon-rss:5396348kB
+```
+
+The Packer container remained running and waited for SSH after QEMU was gone.
+Its Docker state reported `OOMKilled=true`; its cgroup `memory.events` recorded
+`oom_kill 1`, with `memory.max=max` and a peak of `6132101120` bytes.
+The installer log stopped at kernel installation; the private partial disk had
+reached `7166951424` bytes. That partial file was never a lifecycle-accepted disk.
+The record establishes aggregate host-memory exhaustion and its QEMU victim,
+not an isolated peak allocation attributable to a single concurrent build.
+
+After verifying the exact attempt-owned launcher, it received SIGTERM through
+NKD's existing signal/context cancellation path. The terminal record is:
+
+```text
+attempt: laptop-colima-os-arm64-20261008-03
+status: failed
+lane: static-unqualified
+required: 1
+observed: 0
+failure: NKD-E-TIMEOUT — local Run canceled: context canceled
+```
+
+This terminal code describes cancellation, not the kernel's original OOM cause.
+There is no accepted output directory or QCOW2. The run-owned build container
+was cleaned up, and held material memory was released. No retained installer
+console log was located afterward; the bounded pre-cancellation observations and
+kernel/cancellation evidence above must not be described as a complete retained
+Packer log. The failed Run remains in its native source export.
+
+## Scoped recovery and fresh attempt
+
+With the dedicated Docker profile idle, `fstrim` on its data filesystem released
+47.7 GiB of already-free blocks. Physical Mac free space increased from 44 to
+89 GiB. No source, successful Run, artifact or worktree was deleted.
+Only the existing `nkd-demo` profile was stopped/restarted, preserving its disk
+and mounts, with eight CPUs, **24 GiB RAM** and its existing 150 GiB data disk.
+Other Docker contexts/Podman VMs were not changed; default context remained
+`desktop-linux`. Docker 29.5.2 responded after restart.
+
+The fresh preflight reported CPU `8/8`, available memory `23502/10240 MiB` and
+workspace `117119/65536 MiB`. Those are measurements, not reservations. The new
+single-job attempt uses the committed asset-increment source export, without
+concurrent simulator/component builds:
+
+```sh
+colima ssh --profile nkd-demo -- bash -c \
+  'cd /mnt/lima-colima-nkd-demo/nkd-local/nke-recipes-55fe7478247762bf4136a5bfc0b70a1b4a302c34 && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=/Users/ikislenko/Workspace/github/nke bash scripts/nke-full-arm64-local.sh laptop-colima-os-arm64-20261008-04 1 os'
+```
+
+This is a fresh immutable attempt, not resume/reuse of failed Run 03. Its bootstrap
+has started. Completion, accepted QCOW2 digest/size and guest boot remain
+unestablished. The 24 GiB configuration is a recovery candidate, not a proven
+capacity guarantee or a qualified execution profile.

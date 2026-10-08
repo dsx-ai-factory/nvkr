@@ -234,11 +234,17 @@ the OS preflight passed and real Docker execution validated the fresh Packer
 toolchain and built material producers, but failed at SPIRE private snapshot
 preparation with a shared-filesystem file-handle error. A native ext4 export of
 the same committed NKD source passed material preparation and Packer validation;
-the live QEMU guest reached Ubuntu autoinstall and system installation. An external absolute Run root
+the QEMU guest reached Ubuntu autoinstall and system installation. An external absolute Run root
 was rejected before execution and is not a supported workaround. See the
 [execution evidence](../evidence/2026-10-08-colima-local-os-build.md).
-A completed Colima QCOW2 bake, guest boot and tenant provisioning remain
-unestablished. No runtime, identity or `.nkd` containment requirement was relaxed.
+The 16 GiB native attempt subsequently lost QEMU to the Colima host's global
+OOM killer while a separate simulator build was active. Packer's continuing
+SSH wait did not establish guest liveness. Graceful cancellation recorded a failed
+Run with zero observed outputs and no accepted disk; its container was cleaned up.
+The dedicated profile was resized to 24 GiB, and a fresh non-overlapping attempt
+passed preflight and began bootstrap. This is recovery progress, not successful
+bake evidence. A completed Colima QCOW2 bake, guest boot and tenant provisioning
+remain unestablished. No runtime, identity or `.nkd` containment requirement was relaxed.
 Mixed local offline utility
 admission is restricted to non-disk observation/SBOM/ordinary packaging and retains
 complete-Plan validation plus the original helper Plan digest. Workspace image
