@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package pipeline
 
 import (
@@ -40,6 +43,7 @@ func (container *DiskInspectionContainer) SelectionContext(ctx context.Context) 
 	}
 	selection := container.selection
 	selection.Workspace = nil
+	selection.Diagnostics = nil
 	selection.RuntimeExecutable = container.runtime.name
 	selection.compositionKind, selection.consumerPlatform, selection.scratchVolume = "", "", ""
 	return selection, nil

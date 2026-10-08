@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -229,55 +232,12 @@ func OpenDiskArtifact(ctx context.Context, root, expectedManifest, expectedPlatf
 // release import and consumer readback. It does not require an isolated layout.
 // An empty expected platform means validate the declared supported platform.
 func openDiskManifest(ctx context.Context, root string, descriptor Descriptor, expectedPlatform string, maxPayloadBytes int64) (*DiskArtifact, error) {
-	if descriptor.MediaType != MediaOCIManifest || !isDigest(descriptor.Digest) || maxPayloadBytes <= 0 || maxPayloadBytes > maxDeliveryFileBytes {
-		return nil, e.New(e.CodeVerifyFailed, "disk manifest requires exact bounded descriptors")
-	}
-	raw, err := readBlob(ctx, root, descriptor, 8<<20)
+	manifest, observed, err := inspectDiskMetadata(ctx, root, descriptor, expectedPlatform, maxPayloadBytes)
 	if err != nil {
 		return nil, err
-	}
-	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return nil, err
-	}
-	var manifest ocispec.Manifest
-	if err := json.Unmarshal(raw, &manifest); err != nil {
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding disk artifact manifest")
-	}
-	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || !validDiskArtifactType(manifest.ArtifactType) ||
-		(descriptor.ArtifactType != "" && descriptor.ArtifactType != manifest.ArtifactType) || manifest.Subject != nil ||
-		manifest.Config.MediaType != MediaImageConfig || len(manifest.Config.URLs) != 0 || len(manifest.Config.Data) != 0 ||
-		len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaQCOW2 || len(manifest.Layers[0].URLs) != 0 || len(manifest.Layers[0].Data) != 0 ||
-		manifest.Layers[0].Size <= 0 || manifest.Layers[0].Size > maxPayloadBytes || !isDigest(manifest.Layers[0].Digest.String()) {
-		return nil, e.New(e.CodeVerifyFailed, "disk artifact has an unsupported manifest, config or payload contract")
-	}
-	if format := manifest.Annotations[diskFormatAnnotation]; format != "" && format != "qcow2" {
-		return nil, e.New(e.CodeEngineCapability, "disk transport format %q is unsupported", format)
-	}
-	encryption := manifest.Annotations[diskEncryptionAnnotation]
-	if encryption != "" && encryption != "none" {
-		return nil, e.New(e.CodeEngineCapability, "disk transport encryption %q is unsupported", encryption)
-	}
-	config := Descriptor{MediaType: manifest.Config.MediaType, Digest: manifest.Config.Digest.String(), Size: manifest.Config.Size}
-	configRaw, err := readBlob(ctx, root, config, 8<<20)
-	if err != nil {
-		return nil, err
-	}
-	if err := canonical.ValidateJSONDocument(configRaw); err != nil {
-		return nil, err
-	}
-	var observed ocispec.Platform
-	decoder := json.NewDecoder(bytes.NewReader(configRaw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&observed); err != nil {
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding disk platform config")
 	}
 	observedPlatform := observed.OS + "/" + observed.Architecture
-	if _, err := diskPlatform(observedPlatform); err != nil {
-		return nil, err
-	}
-	if (expectedPlatform != "" && observedPlatform != expectedPlatform) || observed.Variant != "" || observed.OSVersion != "" || len(observed.OSFeatures) != 0 {
-		return nil, e.New(e.CodeVerifyFailed, "disk platform differs from the requested platform")
-	}
+	encryption := manifest.Annotations[diskEncryptionAnnotation]
 	layer := manifest.Layers[0]
 	payloadPin := layer.Digest.String()
 	source, info, err := securepath.OpenRegular(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(payloadPin, "sha256:")))
@@ -297,6 +257,61 @@ func openDiskManifest(ctx context.Context, root string, descriptor Descriptor, e
 	return &DiskArtifact{owner: &diskArtifactOwner{permit: permit, file: source}, inspection: DiskArtifactInspection{
 		ManifestDigest: descriptor.Digest, PayloadDigest: payloadPin, Size: layer.Size,
 		Platform: observedPlatform, ArtifactType: manifest.ArtifactType, Encryption: encryption}}, nil
+}
+
+// inspectDiskMetadata shares the disk profile with metadata-only browsing.
+// It checks bounded manifest/config bytes and never opens the QCOW2 layer.
+func inspectDiskMetadata(ctx context.Context, root string, descriptor Descriptor, expectedPlatform string, maxPayloadBytes int64) (ocispec.Manifest, ocispec.Platform, error) {
+	if descriptor.MediaType != MediaOCIManifest || !isDigest(descriptor.Digest) || maxPayloadBytes <= 0 || maxPayloadBytes > maxDeliveryFileBytes {
+		return ocispec.Manifest{}, ocispec.Platform{}, e.New(e.CodeVerifyFailed, "disk manifest requires exact bounded descriptors")
+	}
+	raw, err := readBlob(ctx, root, descriptor, 8<<20)
+	if err != nil {
+		return ocispec.Manifest{}, ocispec.Platform{}, err
+	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return ocispec.Manifest{}, ocispec.Platform{}, err
+	}
+	var manifest ocispec.Manifest
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return ocispec.Manifest{}, ocispec.Platform{}, e.Wrap(e.CodeVerifyFailed, err, "decoding disk artifact manifest")
+	}
+	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || !validDiskArtifactType(manifest.ArtifactType) ||
+		(descriptor.ArtifactType != "" && descriptor.ArtifactType != manifest.ArtifactType) || manifest.Subject != nil ||
+		manifest.Config.MediaType != MediaImageConfig || len(manifest.Config.URLs) != 0 || len(manifest.Config.Data) != 0 ||
+		len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaQCOW2 || len(manifest.Layers[0].URLs) != 0 || len(manifest.Layers[0].Data) != 0 ||
+		manifest.Layers[0].Size <= 0 || manifest.Layers[0].Size > maxPayloadBytes || !isDigest(manifest.Layers[0].Digest.String()) {
+		return ocispec.Manifest{}, ocispec.Platform{}, e.New(e.CodeVerifyFailed, "disk artifact has an unsupported manifest, config or payload contract")
+	}
+	if format := manifest.Annotations[diskFormatAnnotation]; format != "" && format != "qcow2" {
+		return ocispec.Manifest{}, ocispec.Platform{}, e.New(e.CodeEngineCapability, "disk transport format %q is unsupported", format)
+	}
+	encryption := manifest.Annotations[diskEncryptionAnnotation]
+	if encryption != "" && encryption != "none" {
+		return ocispec.Manifest{}, ocispec.Platform{}, e.New(e.CodeEngineCapability, "disk transport encryption %q is unsupported", encryption)
+	}
+	config := Descriptor{MediaType: manifest.Config.MediaType, Digest: manifest.Config.Digest.String(), Size: manifest.Config.Size}
+	configRaw, err := readBlob(ctx, root, config, 8<<20)
+	if err != nil {
+		return ocispec.Manifest{}, ocispec.Platform{}, err
+	}
+	if err := canonical.ValidateJSONDocument(configRaw); err != nil {
+		return ocispec.Manifest{}, ocispec.Platform{}, err
+	}
+	var observed ocispec.Platform
+	decoder := json.NewDecoder(bytes.NewReader(configRaw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&observed); err != nil {
+		return ocispec.Manifest{}, ocispec.Platform{}, e.Wrap(e.CodeVerifyFailed, err, "decoding disk platform config")
+	}
+	observedPlatform := observed.OS + "/" + observed.Architecture
+	if _, err := diskPlatform(observedPlatform); err != nil {
+		return ocispec.Manifest{}, ocispec.Platform{}, err
+	}
+	if (expectedPlatform != "" && observedPlatform != expectedPlatform) || observed.Variant != "" || observed.OSVersion != "" || len(observed.OSFeatures) != 0 {
+		return ocispec.Manifest{}, ocispec.Platform{}, e.New(e.CodeVerifyFailed, "disk platform differs from the requested platform")
+	}
+	return manifest, observed, nil
 }
 
 // Inspection returns immutable descriptive identities, not authority to publish.

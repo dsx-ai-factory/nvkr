@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # The base indexes and Ubuntu archive snapshot are exact inputs supplied from
 # toolchain.lock.json by build.sh. The final image intentionally inherits only
 # Ubuntu's PATH environment entry because NKD rejects ambient image settings.

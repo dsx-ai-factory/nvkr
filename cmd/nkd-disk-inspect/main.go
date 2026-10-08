@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // nkd-disk-inspect is the fixed entrypoint inside the inspection toolchain. All
 // subject authentication, inspection and result binding lives in pkg/nkd/sbom;
 // the execution owner authenticates kernel resource limits before subject reads.
@@ -12,6 +15,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
@@ -19,6 +23,7 @@ import (
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+	ctx = diskdiagnostic.WithWriter(ctx, os.Stderr)
 	status := run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
 	stop()
 	if status != 0 {

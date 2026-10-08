@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Native preparation produces measurements, not publication approval.
 set -euo pipefail
+trap 'printf "Native toolchain preparation failed at line %s\n" "${LINENO}" >&2' ERR
 
 arch="${1:-}"
 case "${arch}" in amd64|arm64) ;; *) echo 'usage: prepare-native-toolchains.sh amd64|arm64' >&2; exit 2 ;; esac
 [[ "$(uname -s)" == Linux ]] || { echo 'native Linux is required' >&2; exit 1; }
-case "$(uname -m)" in x86_64) host_arch=amd64 ;; aarch64|arm64) host_arch=arm64 ;; *) exit 1 ;; esac
+case "$(uname -m)" in x86_64) host_arch=amd64 ;; aarch64|arm64) host_arch=arm64 ;; *) echo 'unsupported native host architecture' >&2; exit 1 ;; esac
 [[ "${arch}" == "${host_arch}" ]] || { echo 'cross-architecture measurement is forbidden' >&2; exit 1; }
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${root}"
@@ -22,7 +23,9 @@ if [[ -n "${NKD_BUILD_ARCHIVES:-}" ]]; then
 fi
 export GOTOOLCHAIN=local
 [[ "$(go env GOVERSION)" == "go$(cat .go-version)" ]] || { echo 'the exact pinned Go compiler is required' >&2; exit 1; }
-for tool in docker jq sha256sum timeout gzip; do command -v "${tool}" >/dev/null; done
+for tool in docker jq sha256sum timeout gzip; do
+  command -v "${tool}" >/dev/null || { printf 'required preparation tool is missing: %s\n' "${tool}" >&2; exit 1; }
+done
 daemon_arch="$(docker info --format '{{.OSType}}/{{.Architecture}}')"
 case "${arch}:${daemon_arch}" in amd64:linux/x86_64|amd64:linux/amd64|arm64:linux/aarch64|arm64:linux/arm64) ;; *) echo 'Docker daemon must match the native host' >&2; exit 1 ;; esac
 
@@ -34,12 +37,15 @@ CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" timeout --signal=TERM --kill-after=30s
   go build -trimpath -buildvcs=false -o "bin/nkd-disk-inspect-${arch}" ./cmd/nkd-disk-inspect
 mkdir -p "${output}/context/bin"
 cp "bin/nkd-disk-inspect-${arch}" "${output}/context/bin/"
-timeout --signal=TERM --kill-after=30s 150m docker buildx build \
+# Serial ceilings total 330 minutes: Packer 150, helper 15, inspector 120,
+# five bounded probes 25, archive 20. The 360-minute job retains cleanup/upload
+# headroom; image export/load run together, not as additional serial budgets.
+timeout --signal=TERM --kill-after=30s 120m docker buildx build \
   "${build_tls[@]}" \
   --platform "linux/${arch}" --build-arg "TARGETARCH=${arch}" --build-arg SOURCE_DATE_EPOCH=0 \
   --output 'type=docker,dest=-,rewrite-timestamp=true' \
   -f toolchains/nkd-disk-inspect/Dockerfile -t "localhost/nkd-disk-inspect:local-${arch}" "${output}/context" \
-  2> >(tee "${output}/inspector-build.log" >&2) | timeout --signal=TERM --kill-after=30s 150m docker load
+  2>"${output}/inspector-build.log" | timeout --signal=TERM --kill-after=30s 120m docker load
 
 packer_id="$(docker image inspect --format '{{.Id}}' "localhost/nkd-packer-toolchain:dev-${arch}")"
 inspector_id="$(docker image inspect --format '{{.Id}}' "localhost/nkd-disk-inspect:local-${arch}")"

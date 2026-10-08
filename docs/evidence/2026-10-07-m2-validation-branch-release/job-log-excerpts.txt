@@ -1,0 +1,3 @@
+2026-10-06T22:38:27.0879798Z Published immutable reference: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e
+2026-10-06T22:54:21.8615437Z verified verify-publication/release (mode cosign, dryRun false): ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:292524ba607d5a45326ae4801e81867f5358921824df3e12c59d274360baaf0e
+2026-10-06T23:03:14.6951898Z hosted Run 37533806963-1: complete (34 observed outputs)

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package lifecycle owns the Definition-to-Run-to-Release workflow.
 // PrepareFiles freezes a Run attempt for ExecuteLocal; GenerateFiles prepares
 // hosted execution, and Consumer.Verify authenticates a published Release under
@@ -16,6 +19,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
 const (
@@ -38,6 +42,16 @@ const (
 	LaneUnqualified          = "static-unqualified"
 	ScopeArtifactPublication = "artifact-publication"
 	ScopeRelease             = "release"
+)
+
+// DiskEvidenceRequirement is the minimum disk evidence a consumer accepts.
+// Pipeline-attested verification defaults to producer-only evidence. Qualified
+// verification requires strict evidence and cannot select the weaker minimum.
+type DiskEvidenceRequirement string
+
+const (
+	DiskEvidenceStrict          DiskEvidenceRequirement = "strict"
+	DiskEvidenceBuildProvenance DiskEvidenceRequirement = sbom.DiskBuildProvenance
 )
 
 var namePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
@@ -108,17 +122,26 @@ type Release struct {
 // VerificationPolicy identifies the exact lane and trust requirements a
 // consumer accepts. Empty signer policy never authorizes pipeline evidence.
 type VerificationPolicy struct {
-	Lane           string `json:"lane"`
-	Scope          string `json:"scope"`
-	IdentityRegexp string `json:"identityRegexp,omitempty"`
-	Issuer         string `json:"issuer,omitempty"`
+	Lane                string                  `json:"lane"`
+	Scope               string                  `json:"scope"`
+	IdentityRegexp      string                  `json:"identityRegexp,omitempty"`
+	Issuer              string                  `json:"issuer,omitempty"`
+	MinimumDiskEvidence DiskEvidenceRequirement `json:"minimumDiskEvidence,omitempty"`
 }
 
 func (policy VerificationPolicy) Validate() error {
+	switch policy.MinimumDiskEvidence {
+	case "", DiskEvidenceStrict, DiskEvidenceBuildProvenance:
+	default:
+		return e.New(e.CodeTrustPolicyMissing, "minimum disk evidence %q is unsupported", policy.MinimumDiskEvidence)
+	}
 	switch policy.Lane {
 	case LaneQualified:
 		if policy.Scope != ScopeRelease {
 			return e.New(e.CodeTrustPolicyMissing, "qualified verification requires full release scope")
+		}
+		if policy.MinimumDiskEvidence == DiskEvidenceBuildProvenance {
+			return e.New(e.CodeTrustPolicyMissing, "qualified verification cannot accept producer-only disk evidence")
 		}
 		return nil
 	case LanePipeline:
@@ -141,5 +164,16 @@ func (policy VerificationPolicy) Digest() (string, error) {
 	if err := policy.Validate(); err != nil {
 		return "", err
 	}
+	policy.MinimumDiskEvidence = policy.diskEvidenceMinimum()
 	return canonical.Digest(canonical.KindVerificationPolicy, policy)
+}
+
+func (policy VerificationPolicy) diskEvidenceMinimum() DiskEvidenceRequirement {
+	if policy.MinimumDiskEvidence != "" {
+		return policy.MinimumDiskEvidence
+	}
+	if policy.Lane == LaneQualified {
+		return DiskEvidenceStrict
+	}
+	return DiskEvidenceBuildProvenance
 }

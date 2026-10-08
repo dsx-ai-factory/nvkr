@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package transportarchive creates and restores deterministic workspace carriers.
 // Pack and Unpack own bounded archive handling, held filesystem access and atomic
 // no-replace publication. Carriers confer no artifact or release authority.

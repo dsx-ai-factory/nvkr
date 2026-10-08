@@ -1,12 +1,18 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sort"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
@@ -31,7 +37,10 @@ func RestoreGitHubInputs(ctx context.Context, plan *Plan, stageID string, option
 	if selected == nil {
 		return e.New(e.CodeInvalidCatalog, "GitHub plan has no stage %q", stageID)
 	}
-	inputs := selected.inputs(artifacts, nodeJobs)
+	inputs, err := selected.carrierInputs(plan, artifacts, nodeJobs)
+	if err != nil {
+		return err
+	}
 	details := make([]string, 0, len(inputs))
 	for _, id := range inputs {
 		details = append(details, githubArtifactDetail(plan, "Input", id))
@@ -92,6 +101,16 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 // Ordinary carrier failures are recorded and recovery continues. Cancellation or
 // failure to persist an outcome stops recovery and returns a coded error.
 func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults string, options GitHubStepOptions) error {
+	return recoverGitHubArtifacts(ctx, plan, providerResults, options, recoverGitHubCarrier, writeGitHubRestoreOutcome)
+}
+
+// The public operation always supplies the concrete held-carrier restorer and
+// outcome writer. These private seams permit resource-failure tests without
+// exhausting the test host.
+func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults string, options GitHubStepOptions,
+	restore func(context.Context, Artifact) (string, error),
+	writeOutcome func(context.Context, string, string) error,
+) error {
 	if err := admitGitHubRecoveryPlatform(); err != nil {
 		return err
 	}
@@ -124,6 +143,16 @@ func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 	return githubProgress(ctx, options, "Recover artifacts for finalization", []string{
 		"Transport outcomes are diagnostic; the finalizer authenticates completeness.",
 	}, func(progress *githubStepProgress) error {
+		counts := map[string]int{}
+		visited, restoreNoSpace, outcomeWriteFailed, outcomeNoSpace := 0, 0, 0, 0
+		defer func() {
+			progress.detail(fmt.Sprintf("Recovery totals: visited=%d restored=%d restore-failed=%d (no-space=%d) missing=%d job-failed=%d; persistence: outcome-write-failed=%d (no-space=%d)",
+				visited, counts["restored:success"], counts["restore-failed"], restoreNoSpace, counts["missing"], counts["job-failed"], outcomeWriteFailed, outcomeNoSpace))
+			if restoreNoSpace+outcomeNoSpace > 0 {
+				// A fixed annotation cannot include archive-controlled paths or text.
+				_, _ = fmt.Fprintln(progress.options.Stderr, "::error::Artifact recovery exhausted storage; restoration or outcome persistence is incomplete.")
+			}
+		}()
 		for _, artifact := range carriers {
 			if !finalizerArtifact(plan, artifact) {
 				continue
@@ -135,14 +164,30 @@ func RecoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 			progress.log("Recover: " + artifact.ID + " (" + githubArtifactLabel(plan, artifact) + ")")
 			status := "job-failed"
 			if results[nodeJobs[artifact.Producer]] == "success" {
-				status = recoverGitHubCarrier(ctx, artifact)
+				var restoreErr error
+				status, restoreErr = restore(ctx, artifact)
+				if restoreErr != nil {
+					progress.detail("Recovery failure: " + artifact.ID + " — " + githubRecoveryErrorDetail(restoreErr))
+					if errors.Is(restoreErr, syscall.ENOSPC) || errors.Is(restoreErr, syscall.EDQUOT) {
+						restoreNoSpace++
+					}
+				}
 			}
+			// Restoration describes every visited carrier, independently of whether
+			// its diagnostic status can subsequently be persisted.
+			visited++
+			counts[status]++
 			// Cancellation must not become an ordinary restore failure or allow
 			// a partially visited carrier set to appear complete.
 			if err := githubCarrierContext(ctx); err != nil {
 				return err
 			}
-			if err := writeGitHubRestoreOutcome(ctx, artifact.ID, status); err != nil {
+			if err := writeOutcome(ctx, artifact.ID, status); err != nil {
+				outcomeWriteFailed++
+				progress.detail("Recovery outcome failure: " + artifact.ID + " — " + githubRecoveryErrorDetail(err))
+				if errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EDQUOT) {
+					outcomeNoSpace++
+				}
 				return err
 			}
 			progress.detail("Recovery: " + artifact.ID + " — " + status)
@@ -191,22 +236,43 @@ func githubFinalizerJobs(plan *Plan, nodeJobs map[string]string) ([]string, erro
 	return uniqueSorted(jobs), nil
 }
 
-func recoverGitHubCarrier(ctx context.Context, artifact Artifact) string {
+func recoverGitHubCarrier(ctx context.Context, artifact Artifact) (string, error) {
 	if ctx.Err() != nil {
-		return "restore-failed"
+		return "restore-failed", e.Wrap(e.CodeTimeout, ctx.Err(), "carrier recovery canceled")
 	}
 	archive, _, err := securepath.OpenRegular(carrierPath(artifact.ID))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "missing"
+			return "missing", nil
 		}
-		return "restore-failed"
+		return "restore-failed", e.Wrap(e.CodeVerifyFailed, err, "opening recovery carrier")
 	}
 	defer archive.Close()
 	if err := transportarchive.UnpackOpen(ctx, archive, ".", []string{artifact.Path}); err != nil {
-		return "restore-failed"
+		return "restore-failed", err
 	}
-	return "restored:success"
+	return "restored:success", nil
+}
+
+// Report the owning code and known resource failures without logging untrusted
+// archive entry names or arbitrary error text. Recovery status remains diagnostic;
+// the finalizer still rejects every missing or unsuccessfully restored carrier.
+func githubRecoveryErrorDetail(err error) string {
+	detail := string(e.CodeInternal)
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		detail = string(coded.Code)
+	}
+	switch {
+	case errors.Is(err, syscall.ENOSPC):
+		return detail + ": no space left on device"
+	case errors.Is(err, syscall.EDQUOT):
+		return detail + ": disk quota exceeded"
+	case errors.Is(err, os.ErrPermission):
+		return detail + ": permission denied"
+	default:
+		return detail
+	}
 }
 
 const (

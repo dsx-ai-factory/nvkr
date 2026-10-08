@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 import (
@@ -14,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -43,6 +47,7 @@ func TestAuthoringLabCLIProcess(t *testing.T) {
 }
 
 func TestAuthoringLabReplacementJourney(t *testing.T) {
+	testutil.RequireExtended(t)
 	for _, inherited := range []bool{false, true} {
 		name := "clean"
 		if inherited {

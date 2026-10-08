@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -16,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
@@ -48,7 +52,8 @@ func diskPublicationRequest(t *testing.T, arch string) (PublicationRequest, stri
 		t.Fatal(err)
 	}
 	agentPin := digestBytes([]byte("exact staged agent"))
-	request := PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, ContentSubject: content}, Objects: []ObjectInput{
+	request := PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build,
+		PlanDigest: disk.PlanDigest, ContentSubject: content}, Objects: []ObjectInput{
 		{Name: output.Name, Kind: "disk-image", Path: layout, Layout: true, ArtifactType: MediaDiskImage, SemanticDigest: rawPin,
 			BlobDigest: digestBytes(indexRaw), OS: "linux", Arch: arch, Output: &OutputBinding{Repository: "node-image", Format: "disk-image",
 				BuildDigest: build, Components: append([]string(nil), output.Components...), Disk: disk,
@@ -193,6 +198,7 @@ func TestDiskPublicationPreservesManifestAndPayloadSubjects(t *testing.T) {
 }
 
 func TestDiskPublicationLargeInventoryAttestationReadback(t *testing.T) {
+	testutil.RequireExtended(t)
 	request, _ := diskPublicationRequest(t, "amd64")
 	changeDiskFixtureBOM(&request, func(bom *sbom.BOM) {
 		bom.Metadata.Component.Properties = []sbom.Property{{Name: "fixture", Value: strings.Repeat("x", sbom.MaxDocumentBytes-4096)}}

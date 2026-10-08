@@ -1,17 +1,20 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package lifecycle
 
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-// InspectionOptions chooses a local closure or registry materialization.
-// Inspection establishes byte integrity and membership, not signature or policy
-// verification. Zero Timeout selects a bounded ten-minute inspection.
+// InspectionOptions chooses local or registry metadata inspection. Payloads,
+// signatures and policy are not verified. Zero Timeout selects ten minutes.
 type InspectionOptions struct {
 	LayoutPath    string
 	WorkspaceRoot string
@@ -19,9 +22,9 @@ type InspectionOptions struct {
 	Timeout       time.Duration
 }
 
-// InspectRelease checks the entire publication before returning a detached view.
-// Every named output and evidence binding is checked, even when a caller later
-// displays only one output. Temporary registry materialization is cleaned up.
+// InspectRelease checks all bounded release metadata and evidence before returning
+// a detached view, even when a caller later displays only one output. It never
+// retrieves output layers or issues a verified publication capability.
 func InspectRelease(ctx context.Context, reference string, options InspectionOptions) (delivery.PublicationDescription, error) {
 	if ctx == nil {
 		return delivery.PublicationDescription{}, e.New(e.CodeUsage, "release inspection requires a context")
@@ -47,27 +50,32 @@ func InspectRelease(ctx context.Context, reference string, options InspectionOpt
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	var publication *delivery.Publication
-	var err error
-	if options.LayoutPath != "" {
-		publication, err = delivery.OpenPublication(ctx, options.LayoutPath, referenceDigest(reference))
-	} else {
-		workspace := options.WorkspaceRoot
-		if workspace == "" {
-			workspace, err = os.MkdirTemp("", "nkd-release-inspection-*")
-			if err != nil {
+	layout := options.LayoutPath
+	if layout == "" {
+		if options.WorkspaceRoot != "" {
+			if err := os.MkdirAll(options.WorkspaceRoot, 0o700); err != nil {
 				return delivery.PublicationDescription{}, e.Wrap(e.CodeImmutableViolation, err, "creating release inspection workspace")
 			}
-			defer func() { _ = os.RemoveAll(workspace) }()
 		}
-		publication, err = delivery.PullPublication(ctx, reference, workspace, options.Registry)
+		workspace, err := os.MkdirTemp(options.WorkspaceRoot, "nkd-release-inspection-*")
+		if err != nil {
+			return delivery.PublicationDescription{}, e.Wrap(e.CodeImmutableViolation, err, "creating release inspection workspace")
+		}
+		defer func() { _ = os.RemoveAll(workspace) }()
+		layout = filepath.Join(workspace, "metadata")
+		if _, err := delivery.PullMetadata(ctx, reference, layout, options.Registry); err != nil {
+			if ctx.Err() != nil {
+				return delivery.PublicationDescription{}, e.Wrap(e.CodeTimeout, ctx.Err(), "release inspection canceled")
+			}
+			return delivery.PublicationDescription{}, err
+		}
 	}
+	description, err := delivery.InspectMetadataDescription(ctx, layout, reference)
 	if err != nil {
 		if ctx.Err() != nil {
 			return delivery.PublicationDescription{}, e.Wrap(e.CodeTimeout, ctx.Err(), "release inspection canceled")
 		}
 		return delivery.PublicationDescription{}, err
 	}
-	defer func() { _ = publication.Close() }()
-	return publication.Description(reference)
+	return description, nil
 }

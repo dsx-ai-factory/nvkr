@@ -1,11 +1,18 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 const maxMetadataBytes int64 = 512 << 20
@@ -14,6 +21,12 @@ const maxMetadataBytes int64 = 512 << 20
 // output payloads. It deliberately does not return a Publication or payload
 // capability. Callers must authenticate the publisher before trusting its claims.
 func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
+	return inspectMetadata(ctx, root, false)
+}
+
+// allowPayloads is used only for browsing an existing full layout. It permits
+// declared output blobs to be present, without opening or verifying their bytes.
+func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Inspection, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
 	}
@@ -21,7 +34,7 @@ func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
 	if err != nil {
 		return Inspection{}, err
 	}
-	if index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 || index.Manifests[0].ArtifactType != MediaPublicationRoot {
+	if index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 || index.Manifests[0].ArtifactType != MediaPublicationRoot || index.Manifests[0].MediaType != MediaOCIManifest {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata release requires one root manifest")
 	}
 	manifest, err := readPublicationManifest(ctx, root, index.Manifests[0])
@@ -50,11 +63,17 @@ func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "release metadata semantic identity differs")
 	}
 	visited := map[string]bool{index.Manifests[0].Digest: true, manifest.Config.Digest: true}
+	optionalPayloads := map[string]bool{}
 	total := index.Manifests[0].Size + manifest.Config.Size
 	for _, object := range publication.Objects {
-		m, err := flatManifest(ctx, root, object)
+		m, err := metadataManifest(ctx, root, object)
 		if err != nil {
 			return Inspection{}, err
+		}
+		if allowPayloads && object.Output != nil {
+			for _, layer := range m.Layers {
+				optionalPayloads[layer.Digest] = true
+			}
 		}
 		for _, d := range []Descriptor{{Digest: object.DescriptorDigest, Size: object.Size}, m.Config} {
 			if !visited[d.Digest] {
@@ -69,7 +88,15 @@ func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
 		if total < 0 || total > maxMetadataBytes {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "metadata exceeds total size bound")
 		}
-		if _, err := readBlob(ctx, root, m.Config, 8<<20); err != nil {
+		if object.Output != nil && object.Output.Format == "oci" {
+			if _, err := inspectImageMetadata(ctx, root, m); err != nil {
+				return Inspection{}, err
+			}
+		} else if object.Output != nil && object.Output.Format == "disk-image" {
+			if _, err := inspectDiskOutputMetadata(ctx, root, object, m); err != nil {
+				return Inspection{}, err
+			}
+		} else if _, err := readBlob(ctx, root, m.Config, 8<<20); err != nil {
 			return Inspection{}, err
 		}
 		if object.Evidence != nil {
@@ -78,8 +105,14 @@ func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
 			}
 		}
 	}
-	if err := verifyBlobInventory(root, visited); err != nil {
-		return Inspection{}, err
+	if allowPayloads {
+		if err := verifyMetadataInventory(ctx, root, visited, optionalPayloads); err != nil {
+			return Inspection{}, err
+		}
+	} else {
+		if err := verifyBlobInventory(root, visited); err != nil {
+			return Inspection{}, err
+		}
 	}
 	if err := verifyReleaseEvidence(ctx, root, publication); err != nil {
 		return Inspection{}, err
@@ -237,4 +270,47 @@ func ExportMetadata(ctx context.Context, source, out string) (Result, error) {
 		sources[o.Name] = source
 	}
 	return BuildMetadataRoot(ctx, out, inspection.Root, sources)
+}
+
+func metadataManifest(ctx context.Context, root string, object PublishedObject) (ociManifest, error) {
+	manifestBytes, err := readBlob(ctx, root, Descriptor{Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+	if err != nil {
+		return ociManifest{}, err
+	}
+	if err := canonical.ValidateJSONDocument(manifestBytes); err != nil {
+		return ociManifest{}, err
+	}
+	if types.MediaType(object.ArtifactType).IsImage() {
+		if err := validateImageSchemaNames(manifestBytes, reflect.TypeFor[v1.Manifest]()); err != nil {
+			return ociManifest{}, err
+		}
+	}
+	var m ociManifest
+	if err := json.Unmarshal(manifestBytes, &m); err != nil {
+		return ociManifest{}, e.Wrap(e.CodeVerifyFailed, err, "decoding metadata manifest")
+	}
+	if m.SchemaVersion != 2 || m.MediaType != publishedManifestMediaType(object) {
+		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member has an invalid manifest schema/media type")
+	}
+	if !types.MediaType(object.ArtifactType).IsImage() && m.ArtifactType != object.ArtifactType {
+		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member artifact type differs from its release binding")
+	}
+	return m, nil
+}
+
+// inspectDiskOutputMetadata binds the exact disk wrapper and config to the
+// release's output description without opening the QCOW2 payload.
+func inspectDiskOutputMetadata(ctx context.Context, root string, object PublishedObject, manifest ociManifest) (publicationPlatform, error) {
+	if object.Output == nil || object.Output.Disk == nil {
+		return publicationPlatform{}, e.New(e.CodeVerifyFailed, "disk metadata requires a release binding")
+	}
+	m, config, err := inspectDiskMetadata(ctx, root, Descriptor{MediaType: manifest.MediaType, Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}, object.OS+"/"+object.Arch, maxDeliveryFileBytes)
+	if err != nil {
+		return publicationPlatform{}, err
+	}
+	disk := object.Output.Disk
+	if m.Layers[0].Digest.String() != disk.PayloadDigest || m.Layers[0].Size != disk.Size || m.Annotations[diskEncryptionAnnotation] != disk.Encryption {
+		return publicationPlatform{}, e.New(e.CodeVerifyFailed, "disk metadata differs from its release binding")
+	}
+	return publicationPlatform{OS: config.OS, Arch: config.Architecture}, nil
 }

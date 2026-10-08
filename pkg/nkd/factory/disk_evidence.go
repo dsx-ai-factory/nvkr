@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -13,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
@@ -66,6 +70,12 @@ func (receipt *DiskEvidenceReceipt) ComponentDocuments() (map[string]*sbom.BOM, 
 // OpenDiskEvidenceRuntime selects observation infrastructure from the frozen
 // Environment. Native host tooling is independent of the image's consumer arch.
 func OpenDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable string, workspace *os.File) (*sbom.DiskInspectionRuntime, error) {
+	return openDiskEvidenceRuntime(ctx, plan, runtimeExecutable, workspace, nil)
+}
+
+// Diagnostics are optional descriptions, not part of the admitted inspection
+// profile or the authority represented by the returned runtime.
+func openDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable string, workspace *os.File, diagnostics *diskdiagnostic.Collector) (*sbom.DiskInspectionRuntime, error) {
 	if ctx == nil || plan == nil {
 		return nil, e.New(e.CodeUsage, "disk evidence admission requires context and Plan")
 	}
@@ -93,7 +103,8 @@ func OpenDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable 
 		PodmanStorageDriver: plan.Environment.Runtime.PodmanStorageDriver,
 		Image:               profile.Image, Platform: platform, InspectorDigest: profile.InspectorDigest, CodecDigest: profile.CodecDigest,
 		GuestfishDigest: profile.GuestfishDigest, ScannerDigest: profile.ScannerDigest, PackageReaderDigest: profile.PackageReaderDigest,
-		Resources: profile.Resources, TimeoutSeconds: profile.TimeoutSeconds, MaxFilesystemBytes: profile.MaxFilesystemBytes, ScratchStorage: profile.ScratchStorage})
+		Resources: profile.Resources, TimeoutSeconds: profile.TimeoutSeconds, MaxFilesystemBytes: profile.MaxFilesystemBytes, ScratchStorage: profile.ScratchStorage,
+		Diagnostics: diagnostics})
 }
 
 func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskInspectionRuntime) (definition.DiskInspectionProfile, error) {

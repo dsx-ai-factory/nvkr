@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package releaseview presents checked publication descriptions. These views
 // carry no authority and cannot authorize execution, publication or consumption.
 package releaseview
@@ -40,13 +43,13 @@ type view struct {
 	delivery.PublicationDescription
 }
 
-// Render selects a presentation only after the owner checked the full closure.
+// Render selects a presentation only after the owner checked all metadata.
 // JSON is readable presentation, not canonical identity input or a receipt.
 func Render(description delivery.PublicationDescription, options Options) ([]byte, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
-	selected := view{Inspection: "integrity-only; signatures and policy not verified", SelectedOutput: options.Output,
+	selected := view{Inspection: "metadata inspection; payloads, signatures and policy not verified", SelectedOutput: options.Output,
 		TotalOutputs: len(description.Outputs), PublicationDescription: description}
 	if options.Output != "" {
 		selected.Outputs = nil
@@ -83,7 +86,9 @@ func renderText(selected view) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "Release %s\nInspection: %s\nDeclared qualification: %s\n", terminal(selected.Reference), selected.Inspection, terminal(selected.DeclaredQualification))
 	fmt.Fprintf(&out, "References: %s\n", terminal(selected.ReferenceScope))
-	fmt.Fprintf(&out, "Content: %s\nDefinition: %s\nEnvironment: %s\n", terminal(selected.Metadata.ContentSubject), terminal(selected.Metadata.DefinitionDigest), terminal(selected.Metadata.EnvironmentDigest))
+	fmt.Fprintf(&out, "Content: %s\nDefinition: %s\nEnvironment: %s\nPlan: %s\n",
+		terminal(selected.Metadata.ContentSubject), terminal(selected.Metadata.DefinitionDigest),
+		terminal(selected.Metadata.EnvironmentDigest), terminal(selected.Metadata.PlanDigest))
 	fmt.Fprintf(&out, "Outputs: %d of %d\n", len(selected.Outputs), selected.TotalOutputs)
 	for _, output := range selected.Outputs {
 		platform := ""
@@ -91,6 +96,13 @@ func renderText(selected view) string {
 			platform = " " + output.OS + "/" + output.Arch
 		}
 		fmt.Fprintf(&out, "\n%s (%s%s)\n  Derived artifact reference: %s\n  Build: %s\n", terminal(output.Name), terminal(output.Kind), terminal(platform), terminal(output.Reference), terminal(output.BuildDigest))
+		if output.Disk != nil {
+			mode := output.Disk.EvidenceMode
+			if mode == "" {
+				mode = "inspected"
+			}
+			fmt.Fprintf(&out, "  Declared disk evidence: %s (metadata; consumer policy not applied)\n", terminal(mode))
+		}
 		for _, subject := range output.BuildSubjects {
 			fmt.Fprintf(&out, "  Component: %s @ %s\n", terminal(subject.Component), terminal(subject.Digest))
 		}
@@ -108,8 +120,8 @@ func renderText(selected view) string {
 
 func renderMermaid(selected view) string {
 	var out strings.Builder
-	out.WriteString("flowchart TD\n  %% Complete closure checked; signatures and policy not verified.\n")
-	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid("Release "+shortDigest(selected.RootDigest)+" | integrity only"))
+	fmt.Fprintf(&out, "flowchart TD\n  %%%% %s.\n", selected.Inspection)
+	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid("Release "+shortDigest(selected.RootDigest)+" | metadata inspection"))
 	outputs := make(map[string]string, len(selected.Outputs))
 	for i, output := range selected.Outputs {
 		id := fmt.Sprintf("o%d", i)
@@ -117,6 +129,13 @@ func renderMermaid(selected view) string {
 		label := output.Name + " | " + output.Kind
 		if output.OS != "" || output.Arch != "" {
 			label += " | " + output.OS + "/" + output.Arch
+		}
+		if output.Disk != nil {
+			mode := output.Disk.EvidenceMode
+			if mode == "" {
+				mode = "inspected"
+			}
+			label += " | declared disk evidence: " + mode
 		}
 		fmt.Fprintf(&out, "  %s[\"%s\"]\n  root --> %s\n", id, mermaid(label), id)
 		for j, subject := range output.BuildSubjects {

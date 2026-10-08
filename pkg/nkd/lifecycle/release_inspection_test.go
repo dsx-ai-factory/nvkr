@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package lifecycle
 
 import (
@@ -162,7 +165,7 @@ func TestInspectReleaseDefaultWorkspaceIsOwnedAndTemporary(t *testing.T) {
 		code e.Code
 	}{
 		{"success", 0, ""},
-		{"registry rejection", 1, e.CodeUnavailable},
+		{"registry rejection", 1, e.CodeFetchFailed},
 		{"timeout", 2, e.CodeTimeout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

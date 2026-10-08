@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -8,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -179,6 +183,7 @@ func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {
 }
 
 func TestPublicationGraphRequiresSBOMInputs(t *testing.T) {
+	testutil.RequireExtended(t)
 	plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
 	if err != nil {
 		t.Fatal(err)

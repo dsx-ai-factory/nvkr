@@ -48,7 +48,9 @@ wrap the QCOW2 as a binary bundle. Local unencrypted direct-Packer execution and
 supported as described below. The compiler can describe disk publication and its evidence graph, and dry-run
 can inspect that Plan. The ordinary local scheduler rejects disk publication with `engine-capability` before
 runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
-Hosted and qualified execution, generated VM jobs and FDE remain capability-gated before output work.
+General hosted VM execution, qualified execution and FDE remain capability-gated before output work.
+ADR-18 separately admits the pipeline-attested native ARC disk route and its generated grouped jobs;
+that operator-trusted exception does not establish qualified execution or complete release acceptance.
 The complete live full-disk evidence and publication path is implemented as guarded APIs, not an exercised
 production workflow.
 
@@ -74,8 +76,13 @@ failed Run. Its durable marker makes interruption
 distinct from completion on a reused attempt. Marker removal plus attempt-directory sync is the success commit
 point; handle cleanup after it is non-authoritative. Serialized descriptions cannot restore the held capability,
 and callers cannot select an export path. This local retention contract does not enable disk publication.
-`delivery` owns checked publication membership and canonical release-content identity;
-Release consumers do not reconstruct compiler bindings. Existing domain modules retain their
+`delivery` owns checked publication membership and canonical release-content identity. A consumer may optionally
+prepare an exact Definition, Environment and compiled Plan expectation before external work, then require the held
+verified publication to match its authenticated input identities and complete output binding. Lifecycle performs
+that compiler-owned join and issues an opaque receipt bound to the publication subject, consumer policy and matched
+identities. Its defensive description exposes those matches without serializing or restoring the receipt; neither
+the receipt nor its description grants a stronger lane or scope. Consumers
+do not reconstruct bindings from caller-provided digests or publication fields. Existing domain modules retain their
 canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
@@ -102,18 +109,27 @@ current lifecycle uses them. SDK callers obtain an opaque prepared Run and execu
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
 policy (ADR-04), returning inspectable views plus a closeable capability. The reference selects the sole
 ADR-20 release index: delivery owns its metadata/descriptor/evidence join, checked named outputs, exact sibling
-artifact references, and release content projection. Lifecycle applies consumer policy and assembles the Release
-view. Transport locators are excluded from
+artifact references, exact Definition, Environment, Plan and content identities, and release content projection.
+Lifecycle applies consumer policy and assembles the Release
+view. `VerificationPolicy.minimumDiskEvidence` is part of the policy digest. Pipeline-attested policy defaults
+to `build-provenance-v1`; explicitly selecting `strict` requires inspected evidence. Qualified policy defaults
+to strict and rejects the producer-only minimum. Inspected evidence satisfies either minimum; producer metadata
+cannot weaken the selected consumer policy. The signed mode remains
+descriptive and does not grant authority.
+Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
 
 `lifecycle.InspectRelease` is the bounded, context-first read-only entry point for registry or local release
-navigation. Delivery opens the complete held publication before projecting output and evidence membership;
-presentation may then focus on an exact output or render text, JSON, or Mermaid. Reference and transport
+navigation. Delivery validates the bounded metadata and evidence closure before projecting declared output
+and evidence membership, without downloading or reading artifact payload layers. Local inspection accepts a
+complete publication layout or a metadata-only layout. Presentation may then focus on an exact output or
+render text, JSON, or Mermaid; platform labels describe checked config metadata. Reference and transport
 admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
 by default; an explicit caller-owned workspace is retained while its private staging child is removed.
-These detached descriptions carry no signature or policy authority, and cannot restore a verified Release
-capability. The existing compact local `release inspect` view remains.
+Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
+signature or policy verification, and cannot restore a verified Release capability. Explicit Release
+verification retains its full payload and policy checks. The existing compact local `release inspect` view remains.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic

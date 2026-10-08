@@ -1,9 +1,18 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"io"
+	"net"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -12,6 +21,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
 
 // PullMetadata fetches bounded manifests, configs and evidence, never output
@@ -36,7 +46,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	remoteOptions := registryOptions(ctx, options)
 	fetched, err := remote.Get(ref, remoteOptions...)
 	if err != nil {
-		return Inspection{}, classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "fetch metadata index"))
+		return Inspection{}, metadataFetchError(ctx, err, "fetch metadata index")
 	}
 	if len(fetched.Manifest) > 8<<20 || digestBytes(fetched.Manifest) != ref.DigestStr() {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index identity/size differs")
@@ -63,7 +73,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	manifest := func(repo name.Repository, d Descriptor) (ociManifest, error) {
 		got, err := remote.Get(repo.Digest(d.Digest), remoteOptions...)
 		if err != nil {
-			return ociManifest{}, classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "fetch metadata manifest"))
+			return ociManifest{}, metadataFetchError(ctx, err, "fetch metadata manifest")
 		}
 		if err := put(got.Manifest, d, 8<<20); err != nil {
 			return ociManifest{}, err
@@ -80,16 +90,16 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		}
 		layer, err := remote.Layer(repo.Digest(d.Digest), remoteOptions...)
 		if err != nil {
-			return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "fetch metadata blob"))
+			return metadataFetchError(ctx, err, "fetch metadata blob")
 		}
 		reader, err := layer.Compressed()
 		if err != nil {
-			return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "open metadata blob"))
+			return metadataFetchError(ctx, err, "open metadata blob")
 		}
 		defer reader.Close()
 		raw, err := io.ReadAll(io.LimitReader(reader, max+1))
 		if err != nil {
-			return classifyContext(ctx, e.Wrap(e.CodeFetchFailed, err, "read metadata blob"))
+			return metadataFetchError(ctx, err, "read metadata blob")
 		}
 		return put(raw, d, max)
 	}
@@ -158,6 +168,56 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		return Inspection{}, err
 	}
 	return inspection, nil
+}
+
+// metadataFetchError preserves ADR-03 retryability without treating certificate
+// or checksum/size verification errors or definitive registry rejections as outages.
+func metadataFetchError(ctx context.Context, err error, operation string) error {
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s", operation)
+	}
+	// url.Error reports net.Error even for permanent protocol or request-policy
+	// failures. Classify its underlying network cause, retaining the full error
+	// chain for all other checks and for the returned diagnostic.
+	networkCause := err
+	var requestErr *url.Error
+	for errors.As(networkCause, &requestErr) {
+		networkCause = requestErr.Err
+	}
+	code := e.CodeFetchFailed
+	var coded *e.Error
+	var registryErr *transport.Error
+	var certificateErr *tls.CertificateVerificationError
+	var invalidCertificateErr x509.CertificateInvalidError
+	var hostnameErr x509.HostnameError
+	var unknownAuthorityErr x509.UnknownAuthorityError
+	var systemRootsErr x509.SystemRootsError
+	var networkErr net.Error
+	switch {
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		code = e.CodeTimeout
+	case errors.As(err, &coded):
+		code = coded.Code
+	case errors.As(err, &certificateErr), errors.As(err, &invalidCertificateErr),
+		errors.As(err, &hostnameErr), errors.As(err, &unknownAuthorityErr), errors.As(err, &systemRootsErr):
+		// HTTP's url.Error also implements net.Error for deterministic trust
+		// failures. Keep these nonretryable, including direct X.509 errors
+		// returned by TLS verification callbacks.
+		code = e.CodeFetchFailed
+	case errors.As(err, &registryErr):
+		if registryErr.StatusCode >= 500 && registryErr.StatusCode < 600 ||
+			registryErr.StatusCode == http.StatusRequestTimeout || registryErr.StatusCode == http.StatusTooManyRequests {
+			code = e.CodeUnavailable
+		}
+	case errors.As(networkCause, &networkErr):
+		code = e.CodeUnavailable
+		if networkErr.Timeout() {
+			code = e.CodeTimeout
+		}
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		code = e.CodeUnavailable
+	}
+	return e.Wrap(code, err, "%s", operation)
 }
 
 // PushMetadata publishes only the release index/config after checking every

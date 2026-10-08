@@ -92,7 +92,9 @@ retains its original scope; superseded requirements and plans are available only
 
 ```sh
 make check          # full local gate (run before pushing; prerequisites in DEVELOPMENT.md)
-make test           # unit tests with -race and coverage
+make test           # fast default tests; matches PR checks
+make test-race      # opt-in race + coverage for the default suite
+make test-full      # opt-in extended fixtures, race + coverage
 make test-ci-tools  # CI timing report parser tests (requires python3)
 make lint           # golangci-lint v2 (.golangci.yml)
 make build          # build bin/nkdctl
@@ -102,11 +104,8 @@ make tidy           # go mod tidy + gofmt
 # single package / single test
 go test ./pkg/nkd/factory/... -run TestName -count=1
 
-# generated-bundle drift check (byte-exact regeneration from public inputs)
-go run ./cmd/nkdctl run generate \
-  --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root . --check
+# generated-bundle drift check (current Makefile target: maintained M2 candidate inputs)
+make workflows-check
 
 # M1 local demo (needs Docker and a local NKE clone; see docs/demo-m1.md)
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
@@ -194,7 +193,8 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 ## Key files
 
 Use `docs/README.md` for the documentation map and `scripts/README.md` for runnable demos. `definitions/nke-v1/`
-contains current NKE product inputs. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
+contains the retained three-output NKE inputs; `definitions/nke-m2/` supplies the current checked-in candidate
+selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nkd-run.yml` and `.github/nkd-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
 ## Completion gate
@@ -204,8 +204,8 @@ completion:
 
 ```sh
 gofmt -l cmd client internal pkg
+make license-header-check
 go test ./... -count=1
-go test -race ./... -count=1
 go vet ./...
 golangci-lint run
 make shellcheck
@@ -214,11 +214,14 @@ make vulncheck
 git diff --check
 ```
 
-`make check` runs the repository gate, including shellcheck, Python report-tool tests and the Go vulnerability
-scan. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
+`make check` runs the repository gate, including the license header check, shellcheck, Python report-tool tests
+and the Go vulnerability scan. New source files need the two-line SPDX header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
 outside a restricted sandbox. `make vulncheck` needs access to the Go module proxy and vulnerability database;
-run it with network access or report it as unverified. The `-race` gate has historically differed between macOS
-and Linux; when a change touches `pkg/nkd/sign` or `pkg/nkd/pipeline`, run it on Linux too. Record external
+run it with network access or report it as unverified. Default tests omit expensive capacity and integration
+matrices. Do not routinely enable `NKD_TEST_EXTENDED`, whole-suite race detection, or coverage. For concurrency
+or process-lifetime changes, run targeted `go test -race` checks on the affected packages; use Linux for
+affected `pkg/nkd/sign` or `pkg/nkd/pipeline` paths. Enable the relevant extended tests when changing their
+capacity limits or integration contracts. Record external
 operational evidence separately from the contract suite.
 
 ## Troubleshooting

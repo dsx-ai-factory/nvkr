@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package sbom emits a deterministic CycloneDX SBOM for a resolved build: a single
 // document covering every component's source provenance (repo, pinned commit, tree
 // hash, toolchain digest, version) and, when a build has run, the produced artifact

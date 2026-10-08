@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package lifecycle
 
 import (
@@ -8,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
@@ -183,6 +187,7 @@ func TestObserveHelmReproducesPayloadAcrossWorkspaceRelocation(t *testing.T) {
 }
 
 func TestCompleteGPUPublicationClosureAcrossFormatsAndArchitectures(t *testing.T) {
+	testutil.RequireExtended(t)
 	ctx := context.Background()
 	repo, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {

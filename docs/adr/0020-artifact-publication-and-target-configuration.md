@@ -93,18 +93,21 @@ and evidence boundaries authenticate their own closures and share one exact-outp
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
-The explicit M2 `build-provenance-v1` mode instead consumes the original live held disk and authenticated
+The explicit narrower candidate `build-provenance-v1` mode instead consumes the original live held disk and authenticated
 transitive material trace. Both paths rehash the exported QCOW2, use the same atomic package/evidence
 transaction, preserve every producer evidence slot and bind raw payload separately from OCI identity.
-The M2 disk binding carries its evidence mode in signed release metadata; consumer verification requires
-matching source-bound documents and refuses inspection claims in that mode. Neither path accepts a
+The disk binding carries its descriptive evidence mode in signed release metadata. Document validators require
+matching source-bound documents and reject invented inspection claims. Consumer acceptance is independently
+bound by `VerificationPolicy.minimumDiskEvidence` in the policy digest: pipeline-attested policy defaults to
+`build-provenance-v1`, while explicit `strict` requires inspected evidence. Qualified policy defaults to strict
+and rejects producer-only acceptance. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
-the live inspection-and-packaging operation. M2 `build-provenance-v1` candidate delivery passed for both native
-architectures in generated run `37533806963` at validation commit `625980e`, including hosted publication,
-signing, verification and finalization under the explicit validation-branch dispatch/signing exception.
-Current main-only production execution, independent signed full-payload disk read-back and live mixed-attempt
-retry validation remain unexercised. The ordinary local scheduler still rejects disk publication.
+the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
+the original producer/material owners instead. Producer provenance is the M2 acceptance scope; full inspection
+and material reconciliation belong to M3 (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
+in [reconciliation: Native ARC disk route](reconciliation.md#native-arc-disk-route). The ordinary local scheduler
+still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
 composition or authorize release.
@@ -148,13 +151,14 @@ inputs.
 
 That non-circular root/discovery/signature protocol is mandatory for a qualified publication claim. The delivery
 module implements its transport representation as an OCI image index with artifact type
-`application/vnd.nkd.publication-root.v3`: every child is an exact OCI manifest or nested index, and the canonical
+`application/vnd.nkd.publication-root.v4`: every child is an exact OCI manifest or nested index, and the canonical
 root config binds each child's name, kind, artifact type, OCI descriptor digest, exact payload or root blob
 digest, semantic digest, size, and optional platform. The registry tag is only a discovery hint; the publisher
 returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
-The config uses `nkd.dev/publication-root/v3` and `application/vnd.nkd.publication-root.config.v3+json`.
+The config uses `nkd.dev/publication-root/v4` and `application/vnd.nkd.publication-root.config.v4+json`.
+Its release metadata binds the exact Definition, Environment, compiled Plan and release-content identities.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
 removed. Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
 remain implemented. The retired clearance and publication-manifest families remain reserved and nonminting;
@@ -174,7 +178,7 @@ not implemented. The unused qualified constructor, legacy filesystem publication
 release-only receipt implementation are removed. A future qualified publisher must consume
 authenticated clearance, match its exact ReleaseSet, Inventory, publication manifest, payloads, referrers and
 detached proof bytes, and implement the complete root commit protocol before it may emit a qualified root.
-Remote CLI inspection verifies structural and content closure but does not authenticate a claimed qualified
+Full publication inspection verifies structural and content closure but does not authenticate a claimed qualified
 root. Qualified consumption requires an implemented clearance verifier and the operator's trust policy;
 no current diagnostic operation grants that authority.
 
@@ -242,7 +246,8 @@ dry-run signing do not admit the new mode. Interrupted runs can leave independen
 cross-run reuse, rollback, retention protocol or atomic multi-repository transaction is added.
 
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
-output names, sibling repository locators, descriptor identities, output-to-Build-Digest/component mappings, content subject and
+the Definition, Environment and compiled Plan identities, output names, sibling repository locators, descriptor
+identities, output-to-Build-Digest/component mappings, content subject and
 required evidence membership. There is no separately published lifecycle-binding object. Output identity is
 the deliverable manifest digest (APT retains its typed repository identity); input layout-index hashes are not
 Artifact identities. The qualified representation in §4 remains a separate protocol, not a compatibility path
@@ -276,17 +281,23 @@ Payload export checks the exact held digest and size again, and the original pub
 snapshot lifetime. These transport capabilities cannot restore the live reconciliation receipt used by
 production packaging.
 
-Registry and local release navigation use that same held owner. Its detached description joins exact sibling
-output and evidence references, all output memberships, Build/component subjects and evidence stage/subject
-bindings. Locators are explicitly labeled as derived from the supplied root reference; the detached view does
-not establish registry availability. Registry acquisition fetches and checks each sibling manifest, while local
-layout inspection does not probe the supplied registry namespace. Executable, image and disk platform labels come
-from the inspected payload config; a contradictory executable metadata label is rejected. Text, readable JSON and Mermaid explicitly describe integrity-only
-inspection and report qualification as a declaration. JSON escapes nonprinting Unicode without changing
-decoded string values, and empty build-subject collections are arrays. Output filtering occurs only after full
-closure checking. The diagram presents published relationships, not an inferred build graph. Navigation adds no canonical
-identity, signature verification or new publication authority. Loopback-registry, held-copy, admission and
-cancellation contracts are implemented; production-registry navigation remains separately evidenced.
+Registry and local release navigation use the bounded metadata reader. It validates exact metadata digests,
+schemas and memberships across the complete release metadata and evidence closure, without downloading or
+reading artifact payload layers. Its detached description joins exact sibling output and evidence references,
+all output memberships, Build/component subjects and evidence stage/subject bindings. Locators are explicitly
+labeled as derived from the supplied root reference; the detached view does not establish registry availability.
+Registry acquisition fetches each sibling manifest, config and bounded evidence document. Local inspection
+accepts complete or metadata-only layouts and does not probe the supplied registry namespace. Executable,
+image and disk platform labels describe checked config metadata; contradictory metadata labels are rejected.
+Text, readable JSON and Mermaid explicitly label metadata inspection, leave payloads, signatures and consumer
+policy unverified, and report qualification as a declaration. JSON escapes nonprinting Unicode without
+changing decoded string values, and empty build-subject collections are arrays. Output filtering occurs only
+after the whole metadata closure is checked. The diagram presents published relationships, not an inferred
+build graph. Navigation adds no canonical identity or publication authority and leaves explicit release
+verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
+payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](../evidence/2026-10-06-release-browse-metadata.md)
+separately records the earlier external inspection scope. Current readers require publication-root v4 and
+reject that v3 release; current-schema external acceptance is not established by the dated record.
 
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
 Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;

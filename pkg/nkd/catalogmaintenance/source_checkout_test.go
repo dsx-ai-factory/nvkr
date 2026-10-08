@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package catalogmaintenance
 
 import (
@@ -10,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
@@ -150,6 +154,7 @@ func TestGitSourceCheckoutPrefixWouldRedirectSibling(t *testing.T) {
 }
 
 func TestSourceCheckoutWithOnlyAliasedRoots(t *testing.T) {
+	testutil.RequireExtended(t)
 	for _, suffix := range []string{".git", "/", ".git/"} {
 		for _, mode := range []string{"static", "local-run"} {
 			t.Run(suffix+"/"+mode, func(t *testing.T) {

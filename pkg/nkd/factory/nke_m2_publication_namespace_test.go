@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
@@ -23,8 +26,9 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 	if candidate.Publication.CredentialRef != production.Publication.CredentialRef || candidate.Signing.Mode != production.Signing.Mode || candidate.Signing.Issuer != production.Signing.Issuer {
 		t.Fatal("candidate changed registry credential or signing mode/issuer")
 	}
+	// The maintained Environment must not carry a candidate-test branch into main.
 	if len(candidate.GitHubDispatchBranches) != 0 {
-		t.Fatal("maintained M2 must execute only on the default branch")
+		t.Fatal("maintained candidate execution must remain default-branch-only")
 	}
 	identity := regexp.MustCompile(candidate.Signing.Identity)
 	for _, test := range []struct {
@@ -32,12 +36,16 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 		allowed bool
 	}{
 		{"refs/heads/main", true},
+		{"refs/heads/codex/m2-native-arc-foundation", false},
+		{"refs/heads/codex/m2-native-arc-foundation-other", false},
 		{"refs/heads/codex/m2-arc-validation", false},
 		{"refs/heads/codex/m2-arc-validation-other", false},
 		{"refs/heads/feat/m2-native-arc", false},
+		{"refs/heads/feat/nke-deploy-pipeline", false},
 		{"refs/heads/main-other", false},
 		{"refs/heads/other", false},
 		{"refs/tags/codex/m2-arc-validation", false},
+		{"refs/tags/codex/m2-native-arc-foundation", false},
 		{"refs/pull/1/merge", false},
 	} {
 		if got := identity.MatchString("https://github.com/dsx-ai-factory/nke-recipes/.github/workflows/nkd-run.yml@" + test.ref); got != test.allowed {

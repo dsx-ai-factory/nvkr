@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package definition owns authored Definition and Environment admission and identity.
 // Start with LoadDefinition and LoadEnvironment for strict, bounded document reads;
 // Validate and Digest apply the same schema and canonical identity to in-memory inputs.

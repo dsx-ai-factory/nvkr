@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package delivery
 
 import (
@@ -155,6 +158,22 @@ func InspectContainerImage(ctx context.Context, root, platform string) (ImageIns
 }
 
 func verifyImageManifest(ctx context.Context, root string, manifest ociManifest, visited map[string]bool) (imageConfig, error) {
+	config, err := inspectImageMetadata(ctx, root, manifest)
+	if err != nil {
+		return config, err
+	}
+	visited[manifest.Config.Digest] = true
+	for i, layer := range manifest.Layers {
+		if err := verifyImageLayer(ctx, root, layer, config.RootFS.DiffIDs[i]); err != nil {
+			return config, err
+		}
+		visited[layer.Digest] = true
+	}
+	return config, nil
+}
+
+// inspectImageMetadata checks the image profile without reading output layers.
+func inspectImageMetadata(ctx context.Context, root string, manifest ociManifest) (imageConfig, error) {
 	var config imageConfig
 	media := types.MediaType(manifest.MediaType)
 	configMedia := types.MediaType(manifest.Config.MediaType)
@@ -182,22 +201,19 @@ func verifyImageManifest(ctx context.Context, root string, manifest ociManifest,
 		(len(config.Config.Entrypoint) == 0 && len(config.Config.Cmd) == 0) {
 		return config, e.New(e.CodeVerifyFailed, "container image config has an invalid platform, rootfs or command")
 	}
-	visited[manifest.Config.Digest] = true
 	for i, layer := range manifest.Layers {
-		if err := verifyImageLayer(ctx, root, layer, config.RootFS.DiffIDs[i]); err != nil {
+		if err := validateImageLayerDescriptor(layer, config.RootFS.DiffIDs[i]); err != nil {
 			return config, err
 		}
-		visited[layer.Digest] = true
 	}
 	return config, nil
 }
 
 func verifyImageLayer(ctx context.Context, root string, layer Descriptor, diffID string) error {
-	if !isDigest(layer.Digest) || !isDigest(diffID) || layer.Size < 0 || layer.Size > maxDeliveryFileBytes ||
-		(layer.MediaType != MediaImageLayer && layer.MediaType != MediaImageLayerGzip &&
-			layer.MediaType != string(types.DockerLayer) && layer.MediaType != string(types.DockerUncompressedLayer)) {
-		return e.New(e.CodeVerifyFailed, "container image layer has an invalid identity, size or media type")
+	if err := validateImageLayerDescriptor(layer, diffID); err != nil {
+		return err
 	}
+
 	held, err := heldfile.OpenContext(ctx, filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(layer.Digest, "sha256:")),
 		heldfile.Options{Label: "container-image-layer", MaxBytes: maxDeliveryFileBytes})
 	if err != nil {
@@ -250,4 +266,13 @@ func publishedManifestMediaType(object PublishedObject) string {
 		return object.ArtifactType
 	}
 	return MediaOCIManifest
+}
+
+func validateImageLayerDescriptor(layer Descriptor, diffID string) error {
+	if !isDigest(layer.Digest) || !isDigest(diffID) || layer.Size < 0 || layer.Size > maxDeliveryFileBytes ||
+		(layer.MediaType != MediaImageLayer && layer.MediaType != MediaImageLayerGzip &&
+			layer.MediaType != string(types.DockerLayer) && layer.MediaType != string(types.DockerUncompressedLayer)) {
+		return e.New(e.CodeVerifyFailed, "container image layer has an invalid identity, size or media type")
+	}
+	return nil
 }

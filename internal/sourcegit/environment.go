@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package sourcegit owns the closed child environment used by hosted source Git.
 // It describes process configuration, not source, build or release authority.
 package sourcegit

@@ -1,0 +1,6 @@
+e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b  /usr/bin/virt-inspector
+f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e  /usr/bin/qemu-img
+db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb  /usr/bin/guestfish
+617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573  /usr/local/bin/syft
+3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6  /usr/bin/dpkg-deb
+ad893cba288eab4a7a12968c510c5f32dbf8d7febe53c6d794913104c6aa694a  /usr/local/bin/nkd-disk-inspect

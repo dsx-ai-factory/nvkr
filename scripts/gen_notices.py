@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Emit THIRD_PARTY_NOTICES.md for the modules linked into nkdctl."""
 import os, re, subprocess, sys
 

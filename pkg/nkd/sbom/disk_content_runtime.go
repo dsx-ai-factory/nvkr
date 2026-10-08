@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package sbom
 
 import (
@@ -12,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/diskdiagnostic"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -176,6 +180,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		return e.New(e.CodeUnpinnedInput, "disk content helper requires exact bounded subject, platform and filesystem budget")
 	}
 	var tools []*heldfile.File
+	diskdiagnostic.Emit(ctx, "tool-authentication", "start", 0, 0)
 	defer func() {
 		for _, tool := range tools {
 			_ = tool.Close()
@@ -203,11 +208,14 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		return err
 	}
 	defer func() { _ = codec.Close() }()
+	diskdiagnostic.Emit(ctx, "tool-authentication", "complete", 0, 0)
+	diskdiagnostic.Emit(ctx, "subject-copy", "start", 0, 0)
 	subject, err := holdDiskInspectionSubject(ctx, input, subjectDigest, size)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = subject.Close() }()
+	diskdiagnostic.Emit(ctx, "subject-copy", "complete", 0, 0)
 	scanner := Scanner{Path: "/usr/local/bin/syft", Digest: scannerDigest}
 	var components []Component
 	var files []DiskFile
@@ -249,7 +257,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 		}
 		components, files = inspection.Components(), inspection.Files()
 	case "oci-image":
-		components, err = inspectContainerMaterial(ctx, subject, scanner)
+		components, err = inspectContainerMaterial(ctx, subject, platform, scanner, int64(maxBytes))
 		if err != nil {
 			return err
 		}
@@ -258,6 +266,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 	}
 	report := diskContentReport{Subject: subject.Digest(), Size: subject.Size(), Kind: kind, Platform: platform, Inspector: inspectorDigest, Codec: codecDigest,
 		Guestfish: guestfishDigest, Scanner: scannerDigest, PackageReader: packageReaderDigest, MaxFilesystemBytes: maxBytes, Components: components, Files: files}
+	diskdiagnostic.Emit(ctx, "report-completion", "start", 0, 0)
 	if err := validateDiskContentReport(report); err != nil {
 		return err
 	}
@@ -279,17 +288,56 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "writing disk content report")
 	}
+	diskdiagnostic.Emit(ctx, "report-completion", "complete", 0, 0)
 	return nil
 }
 
 // The operation, not scanner-authored metadata, selects the observation class.
 // This descriptive scan cannot issue a sandbox result or a factory receipt.
-func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, scanner Scanner) ([]Component, error) {
-	inventory, err := inspectHeldDependencyReport(ctx, subject, "oci-image", scanner, true)
+func inspectContainerMaterial(ctx context.Context, subject *heldfile.File, platform string, scanner Scanner, maxBytes int64) ([]Component, error) {
+	if err := validateSBOMContext(ctx); err != nil {
+		return nil, err
+	}
+	if subject == nil || subject.Size() <= 0 || subject.Size() > maxBytes || maxBytes <= 0 || maxBytes > 16<<30 ||
+		(platform != "linux/amd64" && platform != "linux/arm64") {
+		return nil, e.New(e.CodeEngineCapability, "OCI material requires a bounded held subject and consumer platform")
+	}
+	// Syft may select an image from a multi-image layout. That selection is not
+	// complete membership or platform proof. Reuse the nested OCI owner before
+	// any scan; it authenticates every blob/descriptor, scans each unique image
+	// only after every descriptor/config matches the consumer platform,
+	// and revalidates the complete closure and original held carrier afterward.
+	diskdiagnostic.Emit(ctx, "subject-copy", "start", 0, 0)
+	archive, err := createGeneratedInspectionFile(ctx, maxBytes, func(destination io.Writer) error {
+		_, err := subject.WriteToContext(ctx, destination)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	return withDiskContentClass(inventory.Components, diskClassContainer), nil
+	defer func() { _ = archive.Close() }()
+	diskdiagnostic.Emit(ctx, "subject-copy", "complete", 0, 0)
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "start", 0, 0)
+	docker, oci, err := compressedImageMarkers(ctx, archive)
+	if err != nil {
+		return nil, err
+	}
+	if docker && oci {
+		return nil, e.New(e.CodeEngineCapability, "mixed OCI and Docker image archive is ambiguous")
+	}
+	if docker || !oci {
+		return nil, e.New(e.CodeVerifyFailed, "OCI material requires an unmixed OCI layout")
+	}
+	diskdiagnostic.Emit(ctx, "subject-revalidation", "complete", 0, 0)
+	// Direct OCI material is already uncompressed. Member/image counts share
+	// this budget; bytes are bounded per sequential copy/projection, not charged
+	// cumulatively. Components are capped before downstream public deduplication.
+	inventory, err := inspectNestedOCILayout(ctx, subject, archive, platform, scanner, maxBytes, &materialInspectionBudget{remaining: maxBytes})
+	if err != nil {
+		return nil, err
+	}
+	components := inventory.Components()
+	return components, nil
 }
 
 func checkCapturedPackageMetadata(capture *material.AcquisitionObservation, packages map[string]diskPackageKey, platform string) error {

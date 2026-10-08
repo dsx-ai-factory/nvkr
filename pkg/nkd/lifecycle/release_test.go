@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package lifecycle
 
 import (
@@ -5,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -69,6 +73,376 @@ func TestConsumerVerifiesExactSignedArtifactPublicationClosure(t *testing.T) {
 	} else {
 		assertCode(t, err, nkderr.CodeGateUnmet)
 	}
+}
+
+func TestConsumerRejectsNoncanonicalReferenceBeforeAdapters(t *testing.T) {
+	verifier := &releaseVerifier{}
+	materializeCalls := 0
+	consumer := &Consumer{verifier: verifier, materialize: func(context.Context, string) (*delivery.Publication, error) {
+		materializeCalls++
+		return nil, nkderr.New(nkderr.CodeInternal, "materializer must not run")
+	}}
+	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
+		IdentityRegexp: "^builder$", Issuer: "issuer"}
+	for _, reference := range []string{
+		"ubuntu@sha256:" + repeat("a", 64),
+		"docker.io/library/ubuntu@sha256:" + repeat("a", 64),
+		"ghcr.io/example/release:v1@sha256:" + repeat("a", 64),
+	} {
+		t.Run(reference, func(t *testing.T) {
+			_, err := consumer.Verify(t.Context(), reference, policy)
+			assertCode(t, err, nkderr.CodeUnverifiedRef)
+		})
+	}
+	if verifier.calls != 0 || materializeCalls != 0 {
+		t.Fatalf("noncanonical reference reached adapters: verifier=%d materializer=%d", verifier.calls, materializeCalls)
+	}
+}
+
+func TestExactInputCapabilitiesMustBePackageIssued(t *testing.T) {
+	verified := &VerifiedRelease{valid: true, publication: &delivery.Publication{}}
+	if _, err := verified.RequireExactInputs(&ExactInputExpectation{}); err == nil {
+		t.Fatal("caller-minted exact-input expectation was accepted")
+	} else {
+		assertCode(t, err, nkderr.CodeGateUnmet)
+	}
+	if _, err := (&ExactInputReceipt{}).Description(); err == nil {
+		t.Fatal("caller-minted exact-input receipt was accepted")
+	} else {
+		assertCode(t, err, nkderr.CodeGateUnmet)
+	}
+	consumer := &Consumer{verifier: &releaseVerifier{}, materialize: func(context.Context, string) (*delivery.Publication, error) {
+		t.Fatal("caller-minted expectation reached publication adapters")
+		return nil, nil
+	}}
+	_, _, err := consumer.VerifyExactInputs(t.Context(), verified.release.Subject, VerificationPolicy{
+		Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer",
+	}, &ExactInputExpectation{})
+	assertCode(t, err, nkderr.CodeGateUnmet)
+}
+
+func TestVerifiedReleaseRequiresExactDefinitionEnvironmentAndPlan(t *testing.T) {
+	fixture := newExactInputFixture(t)
+	for _, test := range []struct {
+		name           string
+		mutateInputs   func(*testing.T, *Definition, *Environment, **factory.Plan)
+		mutateVerified func(*testing.T, *VerifiedRelease)
+		prepareCode    nkderr.Code
+		verifyCode     nkderr.Code
+	}{
+		{name: "exact"},
+		{name: "different definition", mutateInputs: func(_ *testing.T, definition *Definition, _ *Environment, _ **factory.Plan) {
+			definition.Metadata.Name = "other-product"
+		}, prepareCode: nkderr.CodeUnverifiedRef},
+		{name: "different environment", mutateInputs: func(_ *testing.T, _ *Definition, environment *Environment, _ **factory.Plan) {
+			environment.Metadata.Name = "other-environment"
+		}, prepareCode: nkderr.CodeUnverifiedRef},
+		{name: "plan environment inconsistency", mutateInputs: func(_ *testing.T, _ *Definition, _ *Environment, plan **factory.Plan) {
+			copyPlan := **plan
+			copyPlan.EnvironmentDigest = "sha256:" + repeat("9", 64)
+			*plan = &copyPlan
+		}, prepareCode: nkderr.CodeUnverifiedRef},
+		{name: "different valid plan", mutateInputs: func(t *testing.T, definition *Definition, environment *Environment, plan **factory.Plan) {
+			other, err := Compile(t.Context(), "definition.yaml", *definition, "environment.yaml", *environment, "other-generator")
+			if err != nil {
+				t.Fatal(err)
+			}
+			*plan = other
+		}, verifyCode: nkderr.CodeVerifyFailed},
+		{name: "missing output", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts = verified.release.Artifacts[:1]
+		}, verifyCode: nkderr.CodeReleaseIncomplete},
+		{name: "unexpected output", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			unexpected := cloneArtifact(verified.release.Artifacts[0])
+			unexpected.Name = "unexpected"
+			verified.release.Artifacts = append(verified.release.Artifacts, unexpected)
+		}, verifyCode: nkderr.CodeReleaseIncomplete},
+		{name: "duplicate output", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts = append(verified.release.Artifacts, cloneArtifact(verified.release.Artifacts[0]))
+		}, verifyCode: nkderr.CodeReleaseIncomplete},
+		{name: "wrong build digest", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts[0].BuildDigest = "sha256:" + repeat("9", 64)
+		}, verifyCode: nkderr.CodeVerifyFailed},
+		{name: "wrong component", mutateVerified: func(_ *testing.T, verified *VerifiedRelease) {
+			verified.release.Artifacts[0].Components[0] = "substituted"
+		}, verifyCode: nkderr.CodeVerifyFailed},
+		{name: "closed capability", mutateVerified: func(t *testing.T, verified *VerifiedRelease) {
+			if err := verified.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}, verifyCode: nkderr.CodeGateUnmet},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			verified, definition, environment, plan := fixture.open(t)
+			defer func() { _ = verified.Close() }()
+			if test.mutateInputs != nil {
+				test.mutateInputs(t, &definition, &environment, &plan)
+			}
+			expectation, err := PrepareExactInputs(definition, environment, plan)
+			if test.prepareCode != "" {
+				assertCode(t, err, test.prepareCode)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.mutateVerified != nil {
+				test.mutateVerified(t, verified)
+			}
+			receipt, err := verified.RequireExactInputs(expectation)
+			if test.verifyCode != "" {
+				assertCode(t, err, test.verifyCode)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			description, err := receipt.Description()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if description.ReleaseSubject != verified.release.Subject ||
+				description.PolicyDigest != verified.release.PolicyDigest ||
+				description.PlanDigest != expectation.prepared.PlanDigest ||
+				description.ContentSubject != verified.release.ContentSubject {
+				t.Fatalf("incomplete exact-input receipt: %+v", description)
+			}
+		})
+	}
+}
+
+func TestConsumerVerifyExactInputsClosesPublicationOnMismatch(t *testing.T) {
+	fixture := newExactInputFixture(t)
+	otherPlan, err := Compile(t.Context(), "definition.yaml", fixture.definition, "environment.yaml", fixture.environment, "other-generator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, otherPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var held *delivery.Publication
+	verified, receipt, err := fixture.consumer(t, &held).VerifyExactInputs(t.Context(), fixture.reference, exactInputPolicy(), expectation)
+	assertCode(t, err, nkderr.CodeVerifyFailed)
+	if verified != nil || receipt != nil {
+		t.Fatalf("failed exact-input narrowing returned capabilities: verified=%v receipt=%v", verified != nil, receipt != nil)
+	}
+	if held == nil {
+		t.Fatal("failed exact-input narrowing did not materialize the publication")
+	}
+	if _, err := held.Description(fixture.reference); err == nil {
+		t.Fatal("failed exact-input narrowing left its publication open")
+	} else {
+		assertCode(t, err, nkderr.CodeGateUnmet)
+	}
+}
+
+func TestPrepareExactInputsFreezesLifecycleOutputs(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*factory.Plan)
+	}{
+		{name: "output", mutate: func(plan *factory.Plan) {
+			plan.LifecycleOutputs[0].Name = "mutated-output"
+		}},
+		{name: "nested components", mutate: func(plan *factory.Plan) {
+			plan.LifecycleOutputs[0].Components[0] = "mutated-component"
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newExactInputFixture(t)
+			expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			originalPlanDigest := expectation.prepared.PlanDigest
+			test.mutate(fixture.plan)
+
+			verified, err := fixture.consumer(t, nil).Verify(t.Context(), fixture.reference, exactInputPolicy())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = verified.Close() }()
+			receipt, err := verified.RequireExactInputs(expectation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			description, err := receipt.Description()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if description.PlanDigest != originalPlanDigest {
+				t.Fatalf("receipt plan digest = %s, want frozen %s", description.PlanDigest, originalPlanDigest)
+			}
+		})
+	}
+}
+
+func TestVerifiedReleaseRejectsPublicationInputMetadataMismatch(t *testing.T) {
+	fixture := newExactInputFixture(t)
+	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(*delivery.ReleaseMetadata)
+	}{
+		{name: "definition", mutate: func(metadata *delivery.ReleaseMetadata) {
+			metadata.DefinitionDigest = "sha256:" + repeat("9", 64)
+		}},
+		{name: "environment", mutate: func(metadata *delivery.ReleaseMetadata) {
+			metadata.EnvironmentDigest = "sha256:" + repeat("9", 64)
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			mismatched := fixture.withReleaseMetadata(t, test.mutate)
+			verified, err := mismatched.consumer(t, nil).Verify(t.Context(), mismatched.reference, exactInputPolicy())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = verified.Close() }()
+			if _, err := verified.RequireExactInputs(expectation); err == nil {
+				t.Fatal("publication with mismatched input metadata satisfied exact-input expectation")
+			} else {
+				assertCode(t, err, nkderr.CodeVerifyFailed)
+			}
+		})
+	}
+}
+
+type exactInputFixture struct {
+	definition  Definition
+	environment Environment
+	plan        *factory.Plan
+	request     delivery.PublicationRequest
+	layout      string
+	rootDigest  string
+	reference   string
+}
+
+func newExactInputFixture(t *testing.T) exactInputFixture {
+	t.Helper()
+	definition, environment := testDefinition(t), testEnvironment()
+	definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: "runtime", Platform: "linux/amd64",
+		Components: []string{"kubeadm"}, Format: OutputExecutable})
+	plan, err := Compile(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
+	for _, build := range plan.Builds {
+		builds[build.Name] = build
+	}
+	artifacts := make([]Artifact, 0, len(definition.Outputs))
+	objects := make([]delivery.ObjectInput, 0, len(definition.Outputs))
+	subjects := make(map[string]string, len(definition.Outputs))
+	for _, output := range definition.Outputs {
+		component := output.Components[0]
+		payload := []byte("exact " + component + " bytes")
+		source := filepath.Join(t.TempDir(), component)
+		if err := os.WriteFile(source, payload, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		bundlePath := filepath.Join(t.TempDir(), "bundle")
+		bundle, err := delivery.BuildBinaryBundle(t.Context(), bundlePath, delivery.BinaryBundleRequest{
+			OS: "linux", Arch: "amd64", Purpose: output.Name,
+			Files: []delivery.BinaryFileInput{{Name: component, Path: source, InstallPath: "/usr/local/bin/" + component, Mode: 0o755}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		descriptor, err := delivery.PayloadDescriptor(t.Context(), bundlePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		artifacts = append(artifacts, Artifact{Name: output.Name, Kind: OutputExecutable, Digest: descriptor.Digest,
+			BuildDigest: builds[output.Name].BuildDigest, Components: []string{component}})
+		objects = append(objects, delivery.ObjectInput{Name: output.Name, Kind: factory.PackageBinaryBundle,
+			Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle,
+			SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest})
+		subjects[component] = pipeline.FileDigest(payload)
+	}
+	request := testReleaseRequest(t, artifacts, objects, subjects)
+	request.Release.DefinitionDigest, err = definition.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Release.PlanDigest, err = plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Release.EnvironmentDigest, err = environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := filepath.Join(t.TempDir(), "publication")
+	publication, err := delivery.BuildPublicationRoot(t.Context(), layout, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout, publication = attestFixtureLayout(t, layout)
+	reference := "registry.example.test/product@" + publication.RootDigest
+	return exactInputFixture{definition: definition, environment: environment, plan: plan,
+		request: request, layout: layout, rootDigest: publication.RootDigest, reference: reference}
+}
+
+func (fixture exactInputFixture) open(t *testing.T) (*VerifiedRelease, Definition, Environment, *factory.Plan) {
+	t.Helper()
+	consumer := fixture.consumer(t, nil)
+	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified, receipt, err := consumer.VerifyExactInputs(t.Context(), fixture.reference, exactInputPolicy(), expectation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := receipt.Description(); err != nil {
+		t.Fatal(err)
+	}
+	return verified, fixture.definition, fixture.environment, fixture.plan
+}
+
+func (fixture exactInputFixture) consumer(t *testing.T, captured **delivery.Publication) *Consumer {
+	t.Helper()
+	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
+		Ref: fixture.reference, Digest: fixture.rootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
+		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
+	return &Consumer{verifier: verifier, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {
+		if reference != fixture.reference {
+			return nil, nkderr.New(nkderr.CodeUnverifiedRef, "fixture received an unexpected publication reference")
+		}
+		publication, err := delivery.OpenPublication(ctx, fixture.layout, fixture.rootDigest)
+		if err == nil && captured != nil {
+			*captured = publication
+		}
+		return publication, err
+	}}
+}
+
+func (fixture exactInputFixture) withReleaseMetadata(t *testing.T, mutate func(*delivery.ReleaseMetadata)) exactInputFixture {
+	t.Helper()
+	request := fixture.request
+	metadata := *request.Release
+	mutate(&metadata)
+	request.Release = &metadata
+	layout := filepath.Join(t.TempDir(), "publication")
+	publication, err := delivery.BuildPublicationRoot(t.Context(), layout, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout, publication = attestFixtureLayout(t, layout)
+	fixture.request = request
+	fixture.layout = layout
+	fixture.rootDigest = publication.RootDigest
+	fixture.reference = "registry.example.test/product@" + publication.RootDigest
+	return fixture
+}
+
+func exactInputPolicy() VerificationPolicy {
+	return VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer"}
 }
 
 func TestConsumerRejectsRecordForWrongObservedSigner(t *testing.T) {
@@ -141,6 +515,7 @@ func TestConsumerRejectsStrongerOrUnconfiguredPolicyBeforeAdapters(t *testing.T)
 	}{
 		{name: "full pipeline release", policy: VerificationPolicy{Lane: LanePipeline, Scope: ScopeRelease, IdentityRegexp: "builder", Issuer: "issuer"}, want: nkderr.CodeEngineCapability},
 		{name: "qualified", policy: VerificationPolicy{Lane: LaneQualified, Scope: ScopeRelease}, want: nkderr.CodeEngineCapability},
+		{name: "qualified producer-only minimum", policy: VerificationPolicy{Lane: LaneQualified, Scope: ScopeRelease, MinimumDiskEvidence: DiskEvidenceBuildProvenance}, want: nkderr.CodeTrustPolicyMissing},
 		{name: "missing explicit scope", policy: VerificationPolicy{Lane: LanePipeline, IdentityRegexp: "builder", Issuer: "issuer"}, want: nkderr.CodeTrustPolicyMissing},
 	}
 	for _, test := range tests {
@@ -356,7 +731,8 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := delivery.PublicationRequest{Release: &delivery.ReleaseMetadata{DefinitionDigest: "sha256:" + repeat("6", 64), EnvironmentDigest: "sha256:" + repeat("7", 64), ContentSubject: content}, Objects: objects}
+	request := delivery.PublicationRequest{Release: &delivery.ReleaseMetadata{DefinitionDigest: "sha256:" + repeat("6", 64),
+		EnvironmentDigest: "sha256:" + repeat("7", 64), PlanDigest: "sha256:" + repeat("8", 64), ContentSubject: content}, Objects: objects}
 	add := func(bom *sbom.BOM, output, component, stage, kind, subject, input string) {
 		bound, err := sbom.ForSubject(bom, subject, stage, input)
 		if err != nil {
@@ -455,4 +831,245 @@ func TestConsumerRejectsDifferentCheckedPublicationSubject(t *testing.T) {
 	}
 	_, _, err = held.Artifacts("registry.example.test/product@" + digest)
 	assertCode(t, err, nkderr.CodeGateUnmet)
+}
+
+func TestVerificationPolicyBindsLaneDiskEvidenceDefault(t *testing.T) {
+	for _, test := range []struct {
+		lane, scope string
+		minimum     DiskEvidenceRequirement
+	}{
+		{LanePipeline, ScopeArtifactPublication, DiskEvidenceBuildProvenance},
+		{LaneQualified, ScopeRelease, DiskEvidenceStrict},
+	} {
+		t.Run(test.lane, func(t *testing.T) {
+			base := VerificationPolicy{Lane: test.lane, Scope: test.scope,
+				IdentityRegexp: "^builder$", Issuer: "issuer"}
+			implicit, err := base.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			explicit := base
+			explicit.MinimumDiskEvidence = test.minimum
+			explicitDigest, err := explicit.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if explicitDigest != implicit {
+				t.Fatalf("omitted default digest %s differs from explicit %s digest %s", implicit, test.minimum, explicitDigest)
+			}
+			if test.lane == LaneQualified {
+				return
+			}
+			stricter := base
+			stricter.MinimumDiskEvidence = DiskEvidenceStrict
+			strictDigest, err := stricter.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strictDigest == implicit {
+				t.Fatal("strict minimum did not change policy identity")
+			}
+		})
+	}
+}
+
+func TestConsumerDiskEvidenceMinimumFailsClosed(t *testing.T) {
+	strict := VerificationPolicy{MinimumDiskEvidence: DiskEvidenceStrict}
+	producerAllowed := VerificationPolicy{MinimumDiskEvidence: DiskEvidenceBuildProvenance}
+	strictDisk := delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{}}
+	producerDisk := delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: "build-provenance-v1"}}
+	nonDisk := delivery.Output{Name: "tools", Kind: OutputExecutable}
+	tests := []struct {
+		name     string
+		policy   VerificationPolicy
+		artifact delivery.Output
+		want     nkderr.Code
+	}{
+		{name: "pipeline default admits producer evidence", artifact: producerDisk},
+		{name: "qualified default requires inspected disk", policy: VerificationPolicy{Lane: LaneQualified}, artifact: producerDisk, want: nkderr.CodeGateUnmet},
+		{name: "explicit strict requires inspected disk", policy: strict, artifact: producerDisk, want: nkderr.CodeGateUnmet},
+		{name: "strict inventory satisfies strict policy", policy: strict, artifact: strictDisk},
+		{name: "strict inventory satisfies producer minimum", policy: producerAllowed, artifact: strictDisk},
+		{name: "explicit producer minimum admits producer evidence", policy: producerAllowed, artifact: producerDisk},
+		{name: "non-disk output is unaffected", artifact: nonDisk},
+		{name: "missing disk metadata fails closed", artifact: delivery.Output{Name: "disk", Kind: OutputDiskImage}, want: nkderr.CodeVerifyFailed},
+		{name: "unknown evidence mode fails closed", policy: producerAllowed, artifact: delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: "unknown"}}, want: nkderr.CodeVerifyFailed},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := requireDiskEvidence(test.policy, []delivery.Output{test.artifact})
+			if test.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			assertCode(t, err, test.want)
+		})
+	}
+}
+
+func TestConsumerDiskEvidenceMinimumRejectsAnyWeakMember(t *testing.T) {
+	artifacts := []delivery.Output{
+		{Name: "node-amd64", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{}},
+		{Name: "node-arm64", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: string(DiskEvidenceBuildProvenance)}},
+	}
+	assertCode(t, requireDiskEvidence(VerificationPolicy{MinimumDiskEvidence: DiskEvidenceStrict}, artifacts), nkderr.CodeGateUnmet)
+}
+
+func TestVerificationPolicyRejectsUnknownDiskEvidenceMinimum(t *testing.T) {
+	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
+		IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: "skip-everything"}
+	assertCode(t, policy.Validate(), nkderr.CodeTrustPolicyMissing)
+}
+
+func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			for _, mode := range []struct {
+				name, value, inspection string
+			}{{name: "strict"}, {name: "producer-only", value: string(DiskEvidenceBuildProvenance)},
+				{name: "historical producer-only", value: string(DiskEvidenceBuildProvenance), inspection: "deferred-m3"}} {
+				t.Run(mode.name, func(t *testing.T) {
+					layout, digest := testDiskPublication(t, arch, mode.value, mode.inspection)
+					reference := "registry.example.test/product@" + digest
+					for _, minimum := range []DiskEvidenceRequirement{"", DiskEvidenceBuildProvenance, DiskEvidenceStrict} {
+						name := "default-producer-minimum"
+						if minimum != "" {
+							name = "explicit-" + string(minimum)
+						}
+						t.Run(name, func(t *testing.T) {
+							verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
+								Ref: reference, Digest: digest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
+								SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}
+							var held *delivery.Publication
+							consumer := &Consumer{verifier: verifier, materialize: func(ctx context.Context, got string) (*delivery.Publication, error) {
+								if got != reference {
+									t.Fatalf("materialized reference = %q, want %q", got, reference)
+								}
+								publication, err := delivery.OpenPublication(ctx, layout, digest)
+								held = publication
+								return publication, err
+							}}
+							policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: minimum}
+							verified, err := consumer.Verify(t.Context(), reference, policy)
+							accepted := mode.value == "" || minimum != DiskEvidenceStrict
+							if !accepted {
+								assertCode(t, err, nkderr.CodeGateUnmet)
+								if verified != nil || verifier.calls != 1 || held == nil {
+									t.Fatalf("rejected result=%v verifier calls=%d publication=%v", verified, verifier.calls, held)
+								}
+								if _, _, err := held.Artifacts(reference); err == nil {
+									t.Fatal("rejected publication remained open")
+								} else {
+									assertCode(t, err, nkderr.CodeGateUnmet)
+								}
+								return
+							}
+							if err != nil {
+								t.Fatal(err)
+							}
+							if verifier.calls != 1 || held == nil {
+								t.Fatalf("accepted verifier calls=%d publication=%v", verifier.calls, held)
+							}
+							if err := verified.Close(); err != nil {
+								t.Fatal(err)
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string) (string, string) {
+	t.Helper()
+	ctx := t.Context()
+	payload := []byte("synthetic qcow2 envelope for consumer policy")
+	payloadPath := filepath.Join(t.TempDir(), "node.qcow2")
+	if err := os.WriteFile(payloadPath, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	payloadDigest := pipeline.FileDigest(payload)
+	planDigest := "sha256:" + repeat("a", 64)
+	buildDigest := "sha256:" + repeat("b", 64)
+	layout := filepath.Join(t.TempDir(), "disk")
+	transport, err := delivery.BuildDiskArtifact(ctx, layout, delivery.DiskArtifactRequest{Path: payloadPath,
+		Digest: payloadDigest, Size: int64(len(payload)), Platform: "linux/" + arch, Format: "qcow2",
+		Encryption: "none", ArtifactType: delivery.MediaDiskImage})
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := delivery.OpenSingleDiskArtifact(ctx, layout, "linux/"+arch, int64(len(payload)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diskInspection := held.Inspection()
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	disk := &delivery.DiskOutput{EvidenceMode: evidenceMode, PayloadDigest: payloadDigest,
+		Producer: "packer", Component: "image", Format: "qcow2", Encryption: "none", Size: int64(len(payload)),
+		PlanDigest: planDigest, Outcome: "succeeded"}
+	artifact := Artifact{Name: "node-image", Kind: OutputDiskImage, Digest: diskInspection.ManifestDigest,
+		BuildDigest: buildDigest, Components: []string{"image"}, Disk: disk}
+	input := delivery.ObjectInput{Name: artifact.Name, Kind: OutputDiskImage, Path: layout, Layout: true,
+		ArtifactType: delivery.MediaDiskImage, SemanticDigest: payloadDigest, BlobDigest: transport.RootDigest,
+		OS: "linux", Arch: arch}
+	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{input}, map[string]string{"image": payloadDigest})
+	request.Objects[0].Output.Disk = disk
+	bom, err := sbom.NewSubject(buildDigest, "image", payloadDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evidenceMode == string(DiskEvidenceBuildProvenance) {
+		bom, err = sbom.ForDiskBuildProvenance(bom, payloadDigest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if inspection != "" {
+			for i := range bom.Metadata.Props {
+				if bom.Metadata.Props[i].Name == "nkd:diskInspection" {
+					bom.Metadata.Props[i].Value = inspection
+				}
+			}
+		}
+	} else {
+		bom.Metadata.Component.Type = "operating-system"
+		bom, err = sbom.ForSubject(bom, payloadDigest, "build-output", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "fixture-package", Version: "1"}}, "disk-reconciled/v1", buildDigest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bom.Metadata.Props = append(bom.Metadata.Props,
+			sbom.Property{Name: "nkd:diskInspectionRuntimeDigest", Value: buildDigest},
+			sbom.Property{Name: "nkd:diskInspectorDigest", Value: buildDigest},
+			sbom.Property{Name: "nkd:diskCodecDigest", Value: buildDigest})
+		sort.Slice(bom.Metadata.Props, func(i, j int) bool { return bom.Metadata.Props[i].Name < bom.Metadata.Props[j].Name })
+	}
+	raw, err := bom.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bomDigest, err := bom.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Objects[1].Name = "sbom-" + strings.TrimPrefix(bomDigest, "sha256:")
+	request.Objects[1].SemanticDigest = bomDigest
+	request.Objects[1].Bytes = raw
+	root := filepath.Join(t.TempDir(), "publication")
+	prepared, err := delivery.BuildPublicationRoot(ctx, root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attested, result := attestFixtureLayout(t, root)
+	if result.RootDigest == prepared.RootDigest {
+		t.Fatal("attested publication unexpectedly retained the unsigned root identity")
+	}
+	return attested, result.RootDigest
 }

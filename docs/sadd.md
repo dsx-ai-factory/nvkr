@@ -194,8 +194,10 @@ flowchart TB
 ```
 
 The graph describes logical dependencies; it does not require one job per logical node in every lane. Ordinary
-factory nodes exchange declared artifacts through provider transport. The proposed wrapped-build job keeps its
-large output in one job through publication and verification, avoiding repeated inter-job transfer (ADR-10).
+factory nodes exchange declared artifacts through provider transport. The native ARC disk group keeps the
+original producer and held disk open through disk-evidence packaging. Declared carriers then transport the
+package and evidence to separate generic hosted publication, signing and verification jobs, each with its own
+credential boundary (ADR-18/20). Fused large-output wrapped publication and verification remain deferred (ADR-10).
 
 | Boundary | Data and responsibility | Trust or persistence rule |
 |---|---|---|
@@ -258,10 +260,13 @@ cannot alter the authenticated material bytes, component, architecture, digest o
 NKE OS producer owns its embedded contents. IR/Plan lowering binds the exact source and material producers and
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
-verdict. Production VM execution and held-result population remain capability-gated; direct producer selection
-does not introduce independently built OS layers. M2 disk delivery uses exact live producer and material
-evidence with explicit deferred-inspection scope. ADR-13's strict mode and M3 qualification require a full
-inventory reconciling traced materials with read-only inspection of the exact disk. That composition claim does not establish NKE-owned runtime correctness.
+verdict. Production VM execution and held-result population use the separately admitted native ARC route;
+direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
+live producer/material evidence and reports inspection as not performed, satisfying the M2 disk-evidence floor.
+M2 still requires the remaining delivery and consumer gates. ADR-13's strict mode requires a full inventory
+reconciling traced materials with read-only inspection of each native AMD64 and ARM64 disk; these are M3
+qualification requirements under Ilya Kislenko's October 7 scope decision. That composition claim does not
+establish NKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
@@ -277,12 +282,15 @@ separate identity. Release content binds the exact named payload membership, and
 that content with its output and evidence bindings. Using the outer root as one of its own
 content members would create a circular identity and is forbidden.
 
-Release navigation opens the complete held publication closure and projects its derived output references,
-component subjects and evidence memberships into readable or diagram views. Locators derive from the supplied
-root namespace; the detached description makes no registry-availability claim. Selecting an output changes only
-the presentation. These views establish structural/content integrity, explicitly leave signatures and consumer
-policy unverified, and cannot restore a live verification capability. [Release navigation](release-navigation.md)
-documents the registry and local entry points and their validation scope.
+Release navigation validates the bounded metadata and evidence closure and projects derived output references,
+declared config platforms, component subjects and evidence memberships into readable or diagram views. It
+downloads no artifact payload layers and accepts complete or metadata-only local layouts without reading
+payload bytes. Locators derive from the supplied root namespace; the detached description makes no
+registry-availability claim. Selecting an output changes the presentation only after all metadata is checked.
+These views explicitly label metadata inspection, leave payloads, signatures and consumer policy unverified,
+and cannot restore a live verification capability. Explicit Release verification retains its full payload and
+policy checks. [Release navigation](release-navigation.md) documents the registry and local entry points and
+their validation scope.
 
 | Identity or record | Owner and purpose | Boundary |
 |---|---|---|
@@ -455,7 +463,7 @@ of Environment publication namespaces. Helm digest overrides remain possible; de
 
 `curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
 An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate
-deferred inspection and material-reconciliation contract; runtime correctness remains with NKE. Any deferred
+strict inspection and material-reconciliation contract in ADR-13; runtime correctness remains with NKE. Any deferred
 registration transport must consume accepted artifact references without adding a topology model.
 
 ### External Interface and Specification {#external-interface-and-specification}
@@ -805,9 +813,11 @@ Compilation is dominated by catalog size and graph cardinality. Execution is dom
 package construction and artifact transport. Reads and subprocesses must be bounded, but a bounded reader alone
 does not establish that a large-image workflow fits a hosted runner.
 
-For a wrapped job, capacity planning must include materialized sources, toolchains, build scratch, produced image,
-package representation and verification temporaries that coexist. Fusion removes repeated job transfer, not these
-storage requirements. No numeric capacity or duration target is invented here.
+For the live disk group, capacity planning must include materialized sources, toolchains, build scratch, produced
+image, package representation and, in strict mode, inspection temporaries that coexist. Keeping packaging with
+the producer preserves live ownership; it does not remove these storage requirements. Separate hosted jobs must
+also budget retained carriers, authenticated restoration snapshots, extracted inputs and publication or
+verification temporaries. No numeric capacity or duration target is invented here.
 
 Runner requirements are modeled with a generic per-step request, not as builder-specific metadata. Minimum CPU,
 memory and ephemeral storage, eligible host platforms, typed host capabilities, and an executor wall-time budget
@@ -869,8 +879,13 @@ For Docker's separate daemon namespace, a fixed device projection additionally c
 admitted character-device numbers before Packer runs. Committed-head Docker/Packer/NKE ARM64 and AMD64 bakes and
 source-owned boot smoke passed through the local adapter on ARC, as recorded in
 [the 2026-10-01 evidence](evidence/2026-10-01-nke-arc-os-builds.md). This diagnostic execution does not establish
-generated hosted VM admission or qualification. The native ARC grouped executor is separately contract-tested; a complete generated M2 production run remains
-unexercised. Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
+qualification. The generated native ARC route also completed both builds in run `37445475840`, but strict
+inspection timed out. Producer-provenance disk jobs passed in run `37486058412`; aggregate transport then failed
+before publication, as the [dated evidence](evidence/2026-10-06-m2-release-carrier-transport.md) records.
+Historical validation run `37533806963` at `625980e` subsequently passed all 34 candidate outputs and
+publication/signing/verification/finalization. This does not validate the updated head, current main execution,
+strict inspection or independent full-payload consumer acceptance; see
+[reconciliation](adr/reconciliation.md#native-arc-disk-route). Provider allocation proof and VM topology beyond the required-KVM same-architecture invariant remain deferred. Arbitrary devices, privilege beyond
 the scoped input-extraction and ownership stage, nested virtualization, NUMA, accelerators, and provider-specific lowering remain
 deferred.
 Produced-artifact size remains an artifact and transport budget.
@@ -895,8 +910,9 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance remains amd64-only;
-additional architectures require their own source and runner acceptance.
+rollback helpers are removed and those workflows remain deferred (ADR-16). M2 requires independent native
+AMD64 and ARM64 source, runner and producer-provenance delivery acceptance; M3 adds strict disk inspection
+and material reconciliation (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios
 

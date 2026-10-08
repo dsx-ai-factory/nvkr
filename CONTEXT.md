@@ -30,7 +30,8 @@ _Avoid_: Producer, expected output, release
 
 **Release**:
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
-Inspection can expose checked artifact/evidence membership without establishing signature or policy acceptance.
+Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
+signature or policy acceptance.
 _Avoid_: Bundle, mutable tag, clearance
 
 **Verification Policy**:
@@ -130,6 +131,13 @@ individually inspectable, but a wrapped or merely content-validated root keeps t
 pipeline-attested lane. Exact delivery identity, material equality, SBOM agreement, and content validation do
 not substitute for an independent exact-byte reproduction of the aggregate claim subject.
 _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
+
+**Disk inspection scope**:
+The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
+documents report `nkd:diskInspection: not-performed`; this supplies no installed inventory. M2 accepts producer
+provenance with its remaining delivery gates; M3 requires strict inspection and material reconciliation.
+Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
+_Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.

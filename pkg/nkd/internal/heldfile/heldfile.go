@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package heldfile owns the narrow OS boundary for qualified subprocess inputs.
 // It turns exact bytes into anonymous file capabilities and exposes them to a
 // child only through inherited descriptors. Callers never need to publish a

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package assemble owns canonical disk measurement and envelope verification. It
 // also owns deterministic OCI and Debian byte constructors used by pipeline and
 // factory packaging. These path-based constructors do not carry

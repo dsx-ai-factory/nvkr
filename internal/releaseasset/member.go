@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package releaseasset selects one regular executable from a bounded upstream
 // release archive. Selection does not authenticate the archive or issue a receipt;
 // callers must verify both its transport digest and the selected executable digest.

@@ -19,7 +19,10 @@ make check         # the full local gate, including the Go vulnerability check
 - [`.go-version`](.go-version) pins the exact Go patch used by CI. The local
   build and vulnerability gates require the same patch, while `GOTOOLCHAIN=local`
   prevents an implicit toolchain download.
-- **`make test`** runs pure logic with the race detector — no Docker needed.
+- **`make test`** runs the fast default suite without race/coverage instrumentation.
+  **`make test-race`** adds race detection and coverage; **`make test-full`** also
+  enables expensive capacity and full-product integration fixtures. Direct
+  `go test ./...` uses the fast default too.
 - Active local **development producer** paths such as `build` (and the build phase of an applicable `attest` or
   `bake-off`) need **Docker + git** and network for their fetch step. The ordinary `build` path is unqualified.
   The OS-image build owns the worker payload. Removed package/rootfs producer commands are not a development path.
@@ -28,11 +31,26 @@ make check         # the full local gate, including the Go vulnerability check
 
 ## Local development equals CI
 
-CI (`.github/workflows/merge-gate.yaml`) runs the same format, vet, lint,
-shellcheck, Python report-tool tests, race-test, and Go vulnerability checks as `make check`, then also
+CI (`.github/workflows/merge-gate.yaml`) runs the same format, license header, vet, lint,
+shellcheck, Python report-tool tests, fast tests, and Go vulnerability checks as `make check`, then also
 compiles the binary. Run `make check` and `make build` before opening a PR. The
 vulnerability check needs access to the Go vulnerability database; see the
 [maintainer procedure](docs/cve-management.md) for triage and scope.
+
+Expensive capacity and full-product integration fixtures require
+`NKD_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
+Enable them selectively when changing large-document limits, attestation or
+publication readback, catalog serialization limits, maintained workflow
+generation, or the authoring lab. Go's `-short` flag keeps them skipped even when
+the environment variable is set. Ordinary contract tests and fast byte-admission
+checks still run by default.
+
+For concurrency or process-lifetime changes, run targeted race tests for the
+affected packages. Whole-repository race and coverage runs are opt-in rather
+than a cost paid on every PR or agent turn.
+
+New source files carry the two-line SPDX header; run `make license` to add it. Generated files,
+`testdata/`, `docs/evidence/`, YAML under `docs/`, and `*.tmpl` files are exempt.
 
 ## The invariants your change must respect
 
@@ -93,6 +111,56 @@ requirement. Worker binaries belong to the NKE OS-image build; add product outpu
 Every commit needs two independent things: a **DCO sign-off** (`-s`, a text trailer asserting you have the
 right to contribute the code) and a **cryptographic signature** (`-S`, proving the commit came from you).
 They are not substitutes for each other.
+
+We require that all contributors "sign-off" on their commits. This certifies that
+the contribution is your original work, or you have rights to submit it under the
+same license, or a compatible license.
+
+Any contribution which contains commits that are not Signed-Off will not be
+accepted. This applies to every contributor, including NVIDIA organization
+members. There is no exemption.
+
+### Developer Certificate of Origin
+
+The sign-off is the [Developer Certificate of Origin](https://developercertificate.org/) (DCO).
+Its full text:
+
+```text
+Developer Certificate of Origin
+Version 1.1
+
+Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+
+Developer's Certificate of Origin 1.1
+
+By making a contribution to this project, I certify that:
+
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the open source license
+    indicated in the file; or
+
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open source
+    license and I have the right under that license to submit that
+    work with modifications, whether created in whole or in part
+    by me, under the same open source license (unless I am
+    permitted to submit under a different license), as indicated
+    in the file; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project or the open source license(s) involved.
+```
 
 ### One-time setup
 

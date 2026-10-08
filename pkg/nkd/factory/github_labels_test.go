@@ -1,8 +1,13 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 )
 
 func TestGitHubOperationLabels(t *testing.T) {
@@ -33,6 +38,7 @@ func TestGitHubOperationLabels(t *testing.T) {
 }
 
 func TestMaintainedWorkflowMakesImageBindingVisible(t *testing.T) {
+	testutil.RequireExtended(t)
 	plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
 	if err != nil {
 		t.Fatal(err)

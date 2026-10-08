@@ -4,10 +4,10 @@ This image supplies upstream `virt-inspector`, `guestfish`, libguestfs, a Linux
 appliance kernel, QEMU, `dpkg-deb` and the exact native Syft archive selected by
 the source lock for the full content helper. The build records package inventory
 and the inspector/codec/guestfish/package-reader/scanner executable hashes.
-The [native ARC preparation record](https://github.com/dsx-ai-factory/nke-recipes/pull/106) contains final-source native ARM64 and AMD64 assembly, executable measurements and appliance filesystem probes.
+The [native ARC preparation record](../../docs/evidence/2026-10-06-native-arc.md) contains final-source native ARM64 and AMD64 assembly, executable measurements and appliance filesystem probes.
 This source configuration is not a published or qualified NKD toolchain.
 Both native `images` slots and license/security approval gates remain unresolved.
-The [October 6 candidate exception](https://github.com/dsx-ai-factory/nke-recipes/pull/106)
+The [October 6 candidate exception](../../docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
 separately authorizes internal publication and M2 selection of the recorded native images;
 it does not claim completed organizational reviews.
 The Dockerfile

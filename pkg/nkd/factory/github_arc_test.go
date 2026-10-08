@@ -1,13 +1,18 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package factory
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 func arcTestPlan(t *testing.T, platform string) *Plan {
@@ -121,6 +126,96 @@ func TestARCGroupedNodesRejectIndividualDispatch(t *testing.T) {
 		err := ExecuteNode(t.Context(), plan, node.ID, nil, nil)
 		if factoryErrorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "grouped executor") {
 			t.Fatalf("%s: %v", node.ID, err)
+		}
+	}
+}
+
+func TestRunGitHubDiskRejectsAmbientCredentialsBeforeWork(t *testing.T) {
+	keys := []string{sourceTokenEnv, githubImageToken, "NKD_CREDENTIAL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"}
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		for _, key := range keys {
+			t.Run(platform+"/"+key, func(t *testing.T) {
+				plan := arcTestPlan(t, platform)
+				for _, name := range keys {
+					t.Setenv(name, "")
+				}
+				t.Setenv(key, "synthetic-credential")
+				t.Chdir(t.TempDir())
+				err := RunGitHubDisk(t.Context(), plan, plan.LifecycleOutputs[0].Name, GitHubStepOptions{})
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "unrelated credential") {
+					t.Fatalf("wrong admission failed: %v", err)
+				}
+				entries, err := os.ReadDir(".")
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("credential rejection performed filesystem work: %v / %v", entries, err)
+				}
+			})
+		}
+	}
+}
+
+// Exercise the adapter boundary directly: malformed instructions must be denied
+// here even when they have not passed through the separate Plan validator.
+func TestARCAdmissionDeniesEachExecutionBoundary(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		for _, test := range []struct {
+			name   string
+			change func(*Plan, *ir.Node)
+			want   e.Code
+		}{
+			{"unknown policy", func(p *Plan, _ *ir.Node) { p.Environment.GitHubARC = "unknown" }, e.CodeEngineCapability},
+			{"runner override", func(p *Plan, _ *ir.Node) { p.Environment.RunsOn = "self-hosted" }, e.CodeEngineCapability},
+			{"job container", func(p *Plan, _ *ir.Node) { p.Environment.Runtime.RuntimeImage = "image" }, e.CodeEngineCapability},
+			{"services", func(p *Plan, _ *ir.Node) { p.Environment.Runtime.Services = []string{"service"} }, e.CodeEngineCapability},
+			{"variables", func(p *Plan, _ *ir.Node) { p.Environment.Runtime.Variables = map[string]string{"MODE": "ambient"} }, e.CodeEngineCapability},
+			{"qualified", func(p *Plan, _ *ir.Node) { p.Qualification = "qualified" }, e.CodeEngineCapability},
+			{"kind", func(_ *Plan, n *ir.Node) { n.Kind = ir.KindFetch }, e.CodeEngineCapability},
+			{"builder", func(_ *Plan, n *ir.Node) { n.BuilderType = ir.BuilderOCIHermetic }, e.CodeEngineCapability},
+			{"missing Packer", func(_ *Plan, n *ir.Node) { n.Packer = nil }, e.CodeEngineCapability},
+			{"command", func(_ *Plan, n *ir.Node) { n.Command = []string{"make"} }, e.CodeEngineCapability},
+			{"missing disk", func(_ *Plan, n *ir.Node) { n.Disk = nil }, e.CodeEngineCapability},
+			{"disk format", func(_ *Plan, n *ir.Node) { n.Disk.Format = "raw" }, e.CodeEngineCapability},
+			{"encryption", func(_ *Plan, n *ir.Node) { n.Disk.Encryption = "luks2" }, e.CodeEngineCapability},
+			{"missing acquisitions", func(_ *Plan, n *ir.Node) { n.Packer.AcquisitionArchive = "" }, e.CodeEngineCapability},
+			{"missing requirements", func(_ *Plan, n *ir.Node) { n.Requirements = nil }, e.CodeEngineCapability},
+			{"missing binding", func(_ *Plan, n *ir.Node) { n.ExecutionBinding = nil }, e.CodeEngineCapability},
+			{"foreign host", func(_ *Plan, n *ir.Node) {
+				n.ExecutionBinding.Class.HostPlatform = execution.HostPlatformLinuxAMD64
+				n.ToolchainPlatform = "linux/arm64"
+			}, e.CodeEngineCapability},
+			{"wrong route", func(_ *Plan, n *ir.Node) { n.ExecutionBinding.Class.RunsOn = "ubuntu-latest" }, e.CodeEngineCapability},
+			{"unknown host", func(_ *Plan, n *ir.Node) { n.ExecutionBinding.Class.HostPlatform = "linux/unknown" }, e.CodeEngineCapability},
+			{"no KVM", func(_ *Plan, n *ir.Node) { n.Requirements.Capabilities = nil }, e.CodeEngineCapability},
+			{"duplicate KVM", func(_ *Plan, n *ir.Node) {
+				n.Requirements.Capabilities = append(n.Requirements.Capabilities, n.Requirements.Capabilities[0])
+			}, e.CodeEngineCapability},
+			{"optional KVM", func(_ *Plan, n *ir.Node) { n.Requirements.Capabilities[0].Policy = execution.CapabilityPreferred }, e.CodeEngineCapability},
+			{"local toolchain", func(_ *Plan, n *ir.Node) { n.Toolchain = "sha256:" + strings.Repeat("a", 64) }, e.CodeUnpinnedInput},
+			{"utility requirement", func(p *Plan, n *ir.Node) {
+				p.LifecycleOutputs = nil // isolate adapter admission from the separate lifecycle graph gate
+				p.Graph.Nodes[0].Requirements = execution.Clone(n.Requirements)
+			}, e.CodeEngineCapability},
+			{"ordinary component requirement", func(p *Plan, n *ir.Node) {
+				p.Builds[0].ResolvedComponents[0].BuilderType = ir.BuilderOCIHermetic
+				p.Builds[0].ResolvedComponents[0].BuildRequirements = execution.Clone(n.Requirements)
+			}, e.CodeEngineCapability},
+		} {
+			t.Run(platform+"/"+test.name, func(t *testing.T) {
+				plan := arcTestPlan(t, platform)
+				var root *ir.Node
+				for i := range plan.Builds[0].Graph.Nodes {
+					if plan.Builds[0].Graph.Nodes[i].BuilderType == ir.BuilderVMImage {
+						root = &plan.Builds[0].Graph.Nodes[i]
+						break
+					}
+				}
+				if root == nil {
+					t.Fatal("fixture has no VM producer")
+				}
+				test.change(plan, root)
+				assertFactoryErrorCode(t, admitGitHubRequirements(plan, "test"), test.want)
+			})
 		}
 	}
 }
