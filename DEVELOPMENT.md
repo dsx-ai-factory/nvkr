@@ -37,6 +37,11 @@ make vulncheck
 git diff --check
 ```
 
+The operator-facing site published with Fern is a separate gate. Pages are those listed in
+[docs/index.yml](docs/index.yml); other documents stay on GitHub. After changing a published page, its navigation
+or `fern/`, run `make docs-check`, which needs Node and the Fern CLI (`npm install -g fern-api@latest`; Fern is not
+pinned). CI runs the same target as the `docs` job of the merge gate.
+
 Changes to sign/pipeline authority also need Linux tests. Containerized tests require an init process to reap
 children; Linux signing fixtures build static helpers while retaining race instrumentation in the parent suite.
 Passing these checks proves contracts, not CI, signing-service or registry acceptance.

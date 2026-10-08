@@ -101,7 +101,7 @@ downloads including disk images, failed admission before filesystem/network work
 in a read-only current directory, rejection of evidence without output membership, empty Helm build-subject
 arrays, filtered shared membership, Unicode-safe JSON round trips and CLI option admission. Those fixtures
 establish contracts, not GHCR, signing-service or production acceptance. Current support and external evidence remain recorded in
-[reconciliation](adr/reconciliation.md).
+[reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md).
 
 The [recorded loopback replay](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI
 against a Docker registry carrying actual AMD64/ARM64 NKE CLI bundles and their dependency SBOMs. It is

@@ -20,7 +20,7 @@ outputs:
 Read `controller: cwe` as “use the `cwe` output for this chart's `controller` image.”
 To bind another image, add another slot-to-output entry. NKD derives the build dependencies.
 
-The [catalog producer](examples/nke-controller-bindings/registry.yaml) maps the slot to the existing value:
+The [catalog producer](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-controller-bindings/registry.yaml) maps the slot to the existing value:
 
 ```yaml
 helm:
@@ -62,8 +62,8 @@ Missing fields and ambiguous matches fail. Pin sets also reject unaccounted list
 
 ## Concrete NKE example
 
-[Definition](examples/nke-controller-bindings/definition.yaml) and
-[catalog](examples/nke-controller-bindings/registry.yaml) select six outputs: CWE, its source controller chart,
+[Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-controller-bindings/definition.yaml) and
+[catalog](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-controller-bindings/registry.yaml) select six outputs: CWE, its source controller chart,
 SPIRE, SPIRE CRDs, Temporal and PostgreSQL. They share the pinned NKE controller source; external charts
 remain acquired and byte-preserving. The controller source archive contains only its chart.
 
@@ -86,10 +86,10 @@ installation or qualification is claimed. Acquired raw-chart dependency scanning
 
 ## Validation and migration
 
-The [compiler contracts](../pkg/nkd/factory/compiler_contract_test.go) and
-[binding tests](../pkg/nkd/factory/helm_mapping_test.go) cover slot accounting, unchanged templates,
+The [compiler contracts](https://github.com/dsx-ai-factory/nke-recipes/blob/main/pkg/nkd/factory/compiler_contract_test.go) and
+[binding tests](https://github.com/dsx-ai-factory/nke-recipes/blob/main/pkg/nkd/factory/helm_mapping_test.go) cover slot accounting, unchanged templates,
 multiple images and registry-independent package bytes. Real Helm rendering is opt-in; see
-[Development](../DEVELOPMENT.md#opt-in-integration-checks) for prerequisites and commands.
+[Development](https://github.com/dsx-ai-factory/nke-recipes/blob/main/DEVELOPMENT.md#opt-in-integration-checks) for prerequisites and commands.
 These tests do not establish a full six-output build, installation or signed publication.
 
 Replace `helm.imageOutput` with `helm.images: {controller: cwe}`. Put the chart location and digest paths

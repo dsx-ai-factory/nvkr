@@ -107,6 +107,9 @@ go test ./pkg/nkd/factory/... -run TestName -count=1
 # generated-bundle drift check (current Makefile target: maintained M2 candidate inputs)
 make workflows-check
 
+# Fern operator docs (pages in docs/index.yml; needs node + `npm install -g fern-api@latest`)
+make docs-check
+
 # M1 local demo (needs Docker and a local NKE clone; see demos/m1-local.md)
 NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
 ```

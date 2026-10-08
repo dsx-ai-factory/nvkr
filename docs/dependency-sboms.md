@@ -35,7 +35,7 @@ covers all these exact bytes recursively. Source-archive evidence is never relab
 See [the registry graph](publication-architecture.md) for every remaining manifest and attachment.
 
 Current contract coverage and hosted publication evidence are recorded in
-[reconciliation](adr/reconciliation.md). Signed producer evidence in the M2 disk mode explicitly records
+[reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md). Signed producer evidence in the M2 disk mode explicitly records
 deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
 The strict disk inventory/reconciliation contract is separate and remains an M3 requirement.
 

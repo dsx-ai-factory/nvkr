@@ -8,7 +8,7 @@ unpack them.
 
 ## Select the root and every material
 
-This is the complete [ARM64 KVM Definition](../definitions/nke-os/definition-arm64-kvm.yaml):
+This is the complete [ARM64 KVM Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-os/definition-arm64-kvm.yaml):
 
 ```yaml
 apiVersion: nkd.dev/definition/v4
@@ -45,7 +45,7 @@ are errors. **Selecting only the root does not expand its dependencies.**
 
 ## Connect producers by exact names
 
-The [catalog](../definitions/nke-os/catalog/registry.yaml) declares these `materials` mappings:
+The [catalog](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-os/catalog/registry.yaml) declares these `materials` mappings:
 
 | Consuming component | Binding name → supplying component |
 |---|---|
@@ -96,10 +96,10 @@ The Mermaid file describes dependencies; see [user concepts](user-concepts.md) f
 Native Docker/KVM execution requires matching Linux architecture, a running Docker daemon and CLI, Git,
 `jq`, KVM access, 8 CPUs, 10 GiB memory,
 64 GiB free workspace storage, and access to pinned source/toolchain inputs. Follow the
-[maintained wrapper instructions](../definitions/nke-os/README.md) for source-locked toolchain bootstrap
+[maintained wrapper instructions](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-os/README.md) for source-locked toolchain bootstrap
 and a fresh immutable attempt. The separate macOS/Podman TCG route explicitly forbids KVM.
 
 A successful local Run retains its disk and record under `.nkd/runs/<attempt>/`; it remains unqualified.
 Material tracing and published `build-provenance-v1` evidence do not establish a complete installed-software
 inventory or exact-byte reproduction. [Release inspection and verification](release-quickstart.md) apply
-their own scopes; current evidence limits are recorded in [reconciliation](adr/reconciliation.md).
+their own scopes; current evidence limits are recorded in [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md).

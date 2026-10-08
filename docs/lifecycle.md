@@ -2,8 +2,8 @@
 
 This reference covers output completeness, immutable attempts, release verification and SDK use.
 Start with the [quickstart](quickstart.md) for CLI setup and the [concept reference](user-concepts.md)
-for the six public objects. [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
-lifecycle contract; [reconciliation](adr/reconciliation.md) owns current implementation and evidence.
+for the six public objects. [ADR-17](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
+lifecycle contract; [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md) owns current implementation and evidence.
 
 ## Declare outputs
 
@@ -16,7 +16,7 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NKE Definition](../definitions/nke-v1/definition.yaml) directly selects `nkectl`, `cwe`, and `nke-helm`
+The [NKE Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/definition.yaml) directly selects `nkectl`, `cwe`, and `nke-helm`
 for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
@@ -25,8 +25,8 @@ Definitions and Releases contain no cluster views, deployment roles or categorie
 
 ## Select an Environment
 
-The [local Environment](../definitions/nke-v1/environment-local.yaml) supplies execution settings and a local
-registry destination. The [GitHub Environment](../definitions/nke-v1/environment-github.yaml) supplies the
+The [local Environment](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/environment-local.yaml) supplies execution settings and a local
+registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/environment-github.yaml) supplies the
 corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
 host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
 binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
@@ -75,7 +75,7 @@ bin/nkdctl run generate \
   --engine github --root "$NKD_LIFECYCLE_ROOT" --check
 ```
 
-Use the [M2 instructions](../definitions/nke-m2/README.md) to regenerate the committed bundle.
+Use the [M2 instructions](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/README.md) to regenerate the committed bundle.
 Generated CI defaults to generic hosted runners; ADR-18 separately admits the explicit native ARC disk
 route. Publication and signing belong to the GitHub v1 lane. Generation does not prove provider execution.
 

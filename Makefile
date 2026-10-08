@@ -121,6 +121,19 @@ notices: ## Regenerate THIRD_PARTY_NOTICES.md from the linked module set.
 notices-check: ## Verify THIRD_PARTY_NOTICES.md matches the linked module set (drift gate).
 	./scripts/gen-notices.sh --check
 
+# Only the pages listed in docs/index.yml are published to the Fern site; contributor,
+# ADR and evidence documents stay on GitHub and are not checked here. Fern is
+# deliberately unpinned: install it with `npm install -g fern-api@latest`.
+.PHONY: docs-check
+docs-check: ## Validate the published Fern docs (needs node and fern-api).
+	@command -v fern >/dev/null 2>&1 || { echo "fern not installed — npm install -g fern-api@latest" >&2; exit 1; }
+	@pages="$$(sed -n 's|^ *path: \(.*\.md\)$$|docs/\1|p' docs/index.yml)"; \
+	 [ -n "$$pages" ] || { echo "no pages listed in docs/index.yml" >&2; exit 1; }; \
+	 python3 tools/check-docs-mdx $$pages
+	fern check
+	fern docs md check
+	fern docs broken-links
+
 ADDLICENSE_VERSION := v1.1.1
 LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # Not stamped: generated or machine-managed files, files tests compare byte for

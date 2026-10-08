@@ -164,8 +164,8 @@ be reissued as bundles before the updated consumer can accept them.
 
 ## Validation boundary
 
-Contract tests in [delivery](../pkg/nkd/delivery/), [signing](../pkg/nkd/sign/) and
-[factory](../pkg/nkd/factory/) cover missing, substituted, duplicate and unbound evidence, wrong subjects
+Contract tests in [delivery](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/delivery), [signing](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/sign) and
+[factory](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/factory) cover missing, substituted, duplicate and unbound evidence, wrong subjects
 and stages, failed signing/verification, raw-evidence rejection, isolated repositories and failed fetches.
 Legacy finalization compares restored raw SBOM handoffs and final Helm package inspection; per-output
 finalization authenticates exact document bindings through signed metadata and independently verifies bundles.
@@ -174,7 +174,7 @@ The [recorded M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a
 signing, verification and finalization for 34 outputs, including both native disks. It used an explicitly
 admitted validation branch and `build-provenance-v1` disk evidence. This does not establish main-only
 execution, independent full-payload disk consumption, strict disk inspection or qualification. Current
-support and remaining acceptance are owned by [reconciliation](adr/reconciliation.md).
+support and remaining acceptance are owned by [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md).
 
 Earlier [hosted release history](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/hosted-release-history.md#cosign-bundle-discovery) retains
 the mixed-attestation discovery incident and its exact cosign interoperability limits. Historical

@@ -4,7 +4,7 @@ NKD can derive external chart pins from NKE's `controller/deploy/nke-sbom/nke-de
 `release.yaml` of each Helm item. The `nke-deploy-v1` adapter reads those files from the exact pinned Git tree.
 It validates chart identity and acquires package digests. NKE retains installation order, values and execution.
 
-The [example catalog](examples/nke-pin-set/registry.yaml) declares four acquired chart producers and explicitly
+The [example catalog](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-pin-set/registry.yaml) declares four acquired chart producers and explicitly
 accounts for the other six deploy items. It does not modify the maintained NKE product Definition.
 
 ## Try the example
@@ -37,7 +37,7 @@ architectures record the same archive digest. OCI pins identify the chart layer 
 
 ## Package locally
 
-The [Definition](examples/nke-pin-set/definition.yaml) selects the four acquired charts as `helm-oci`
+The [Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-pin-set/definition.yaml) selects the four acquired charts as `helm-oci`
 outputs. Packaging verifies each locked digest and wraps the original `.tgz` bytes in an OCI layout.
 The chart layer retains its pinned digest; the enclosing OCI manifest has a separate digest.
 
@@ -88,4 +88,4 @@ The catalog still owns the source build instructions. Individual members cannot 
 - This adapter consumes the existing NKE deploy format. It does not generate a CycloneDX BOM, establish a
   qualified set, or add release qualification.
 
-The generic pin-set contract is [ADR-22 section 7](adr/0022-catalog-pinning-and-the-lock-contract.md#7-derived-pin-sets-one-source-may-curate-other-sources-pins).
+The generic pin-set contract is [ADR-22 section 7](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/0022-catalog-pinning-and-the-lock-contract.md#7-derived-pin-sets-one-source-may-curate-other-sources-pins).

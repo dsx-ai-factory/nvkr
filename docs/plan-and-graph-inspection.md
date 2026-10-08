@@ -88,7 +88,7 @@ nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.
 ```
 
 The root regeneration uses the committed M2 inputs and the generator identity described in the
-[M2 instructions](../definitions/nke-m2/README.md). Generate alternative Definitions into scratch roots
+[M2 instructions](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/README.md). Generate alternative Definitions into scratch roots
 as shown in the [pipeline guide](generate-pipeline.md).
 
 The default text report identifies changed, added or removed per-output Build Digests, counts every changed
@@ -131,5 +131,5 @@ Plans, bounded/no-follow file loading, complete graph vertices and edges includi
 chart/CWE relationship, diagram escaping, stable named comparisons, ordered argv/patches, large integers,
 absent-versus-null values, and transport/execution changes that preserve Build Digests. CLI tests cover
 file views, graph formats, concise/full differences, exit status and failure before output. These
-contracts live in [the Plan-view tests](../pkg/nkd/planview/) and the CLI inspection tests.
+contracts live in [the Plan-view tests](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/planview) and the CLI inspection tests.
 This is local inspection/contract evidence; it adds no registry, runner, signing or OS execution acceptance.

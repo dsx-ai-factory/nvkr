@@ -1,0 +1,28 @@
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+instances:
+  - url: nvidia-nke-recipes.docs.buildwithfern.com/nke-recipes
+    custom-domain: docs.nvidia.com/nke-recipes
+    multi-source: true
+
+redirects:
+  - source: /nke-recipes/index.html
+    destination: /nke-recipes
+
+title: NVIDIA NKE Recipes
+
+global-theme: nvidia
+
+logo:
+  href: /nke-recipes
+  right-text: NKE Recipes
+
+navbar-links:
+  - type: github
+    value: https://github.com/dsx-ai-factory/nke-recipes
+
+products:
+  - display-name: NKE Recipes
+    path: ../docs/index.yml
+    slug: /

@@ -6,7 +6,7 @@ The example declares three outputs: the `nkectl` executable bundle, the `cwe` co
 
 These steps work on macOS or Linux without Docker, a registry, or a private NKE source checkout.
 Run every command from the NKD repository root, keeping the same terminal open.
-The repository's committed workflow uses the larger [M2 candidate](../definitions/nke-m2/README.md).
+The repository's committed workflow uses the larger [M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/README.md).
 
 ## Open a checkout
 
@@ -20,7 +20,7 @@ cd nke-recipes
 ## Build the CLI
 
 You need Git, Make, and the exact Go version recorded in `.go-version`. Building may download Go modules.
-For toolchain setup, see [Development](../DEVELOPMENT.md).
+For toolchain setup, see [Development](https://github.com/dsx-ai-factory/nke-recipes/blob/main/DEVELOPMENT.md).
 
 ```sh
 cat .go-version
@@ -38,8 +38,8 @@ bin/nkdctl definition validate \
 ```
 
 Expect the name `nke-v1`, three outputs, and a Definition digest. The
-[Definition](../definitions/nke-v1/definition.yaml) chooses the outputs; its
-[catalog](../definitions/nke-v1/catalog/registry.yaml) supplies their producer instructions and pins.
+[Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/definition.yaml) chooses the outputs; its
+[catalog](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/catalog/registry.yaml) supplies their producer instructions and pins.
 
 ## Save and inspect a Plan
 

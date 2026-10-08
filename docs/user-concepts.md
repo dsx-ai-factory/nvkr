@@ -18,7 +18,7 @@ Users author Definitions, Environments, and catalogs. NKD generates Plans and gr
 | Verification Policy | Which identities and claims will the consumer accept? |
 
 Deployment topology, node placement, and operational acceptance belong to downstream systems.
-Choose a [task guide](README.md#user-tasks) for commands or use the concept list below to look up a term.
+Choose a [task guide](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/README.md#user-tasks) for commands or use the concept list below to look up a term.
 
 ## Understand the inputs
 
@@ -63,16 +63,16 @@ Choose a [task guide](README.md#user-tasks) for commands or use the concept list
 
 | Concept | Meaning | Read more |
 |---|---|---|
-| Evidence lanes | `static-unqualified` describes previews; `pipeline-attested` uses hosted production evidence; `qualified` has stronger reproduction and authentication requirements that remain unavailable in the public acceptance path. | [Implementation scope](adr/reconciliation.md) |
+| Evidence lanes | `static-unqualified` describes previews; `pipeline-attested` uses hosted production evidence; `qualified` has stronger reproduction and authentication requirements that remain unavailable in the public acceptance path. | [Implementation scope](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md) |
 | Software inventories and SBOMs | A software bill of materials describes software for an exact subject and stage. It is not a vulnerability verdict; disk build provenance is not a full disk inventory. | [Dependency SBOMs](dependency-sboms.md) |
 | Production provenance | A subject-bound statement describing the production process and inputs. It answers a different question from an inventory or a signature. | [Publication architecture](publication-architecture.md) |
 | Signing and attestations | Authenticate the signer of an exact artifact or statement. Keyless GitHub signing uses a workflow identity and OIDC issuer; consumer policy chooses which are accepted. | [Release quickstart](release-quickstart.md) |
 | Release publication | One digest-pinned entry point connects selected output artifacts to their evidence. Use the exact publication root emitted by the Run. | [Publication architecture](publication-architecture.md) |
 | Release browsing | Inspect metadata, identities, subjects, and evidence memberships without downloading artifact payload layers or verifying signatures and policy. | [Release quickstart](release-quickstart.md) |
 | Verification Policy | Consumer-owned identity, issuer, lane, and scope requirements. The supported `artifact-publication` claim does not establish deployment readiness or full release qualification. | [Release verification](lifecycle.md) |
-| Go SDK | `client/v1` exposes Definition, Run, and Release operations to applications. It preserves the CLI's platform, tool, and policy requirements. | [SDK lifecycle](../client/v1/lifecycle.go) |
-| Errors and failed requirements | Stable `NKD-E-*` codes identify invalid inputs, drift, missing capabilities, and failed verification. Unsupported requirements fail closed. | [Error contract](adr/0003-coded-error-and-exit-code-contract.md) |
-| Supported capabilities | Support depends on the chosen operation, producer, platform, runtime, and evidence scope. Contract tests and recorded external runs establish different facts. | [Implementation and evidence](adr/reconciliation.md) |
+| Go SDK | `client/v1` exposes Definition, Run, and Release operations to applications. It preserves the CLI's platform, tool, and policy requirements. | [SDK lifecycle](https://github.com/dsx-ai-factory/nke-recipes/blob/main/client/v1/lifecycle.go) |
+| Errors and failed requirements | Stable `NKD-E-*` codes identify invalid inputs, drift, missing capabilities, and failed verification. Unsupported requirements fail closed. | [Error contract](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/0003-coded-error-and-exit-code-contract.md) |
+| Supported capabilities | Support depends on the chosen operation, producer, platform, runtime, and evidence scope. Contract tests and recorded external runs establish different facts. | [Implementation and evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md) |
 
 For executable bundles, the component selection chooses which files are packaged together. For disk images,
 today's list explicitly repeats the root and dependency membership, and NKD checks that it agrees with the

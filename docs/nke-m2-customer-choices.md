@@ -1,6 +1,6 @@
 # NKE M2 inputs and customer choices
 
-The [M2 Definition](../definitions/nke-m2/definition.yaml) selects 34 named outputs, including independent
+The [M2 Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/definition.yaml) selects 34 named outputs, including independent
 `linux/amd64` and `linux/arm64` non-FDE disks. The catalog owns producer commands, material edges and
 component-exposed Packer variables. The Environment owns runner, runtime, registry and signing choices.
 There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriting.
@@ -16,7 +16,7 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 | Release-component pins | CLI/controller/operator catalogs and their own locks | Validate each source independently; one shared repository URL does not imply one release. |
 | Customer replacement | Ordered catalog overlay, bound to its exact predecessor snapshot | Preserve the logical component's output type and supported platforms; validate its new material closure. |
 
-The [M2 input guide](../definitions/nke-m2/README.md) records the detailed source paths and remaining
+The [M2 input guide](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/README.md) records the detailed source paths and remaining
 acceptance gaps. Catalog/graph validation authenticates selections, not installed containment, build
 compatibility or publication acceptance.
 
@@ -66,6 +66,6 @@ go test ./pkg/nkd/buildgraph -run '^TestMaintainedM2CustomerMaterialReplacement$
 The complete test invokes public `factory.CompileDocuments`, including production's ordered overlay
 loader, Environment admission and cross-output packaging relationships. A local Git `insteadOf` mapping
 may supply identical pinned source bytes without changing any catalog identity; the
-[deploy guide](../definitions/nke-deploy/README.md#execute-locally) shows invocation-scoped configuration.
+[deploy guide](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-deploy/README.md#execute-locally) shows invocation-scoped configuration.
 Regenerate the bundle from the same Definition and Environment and check drift.
 Neither graph compilation nor regeneration proves a successful hosted delivery.

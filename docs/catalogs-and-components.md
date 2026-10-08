@@ -127,15 +127,15 @@ The catalog also selects how source components are built:
 | `nix` | A locked flake build in a pinned container; qualified realized-input observation remains unavailable. |
 
 A builder type describes production, while an output format describes delivery. Runtime and evidence limits
-still apply; [ADR-10](adr/0010-pluggable-builder-types.md) and [reconciliation](adr/reconciliation.md) record them.
+still apply; [ADR-10](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/0010-pluggable-builder-types.md) and [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md) record them.
 
 A **toolchain substitution** changes the build container for explicitly named components and an architecture,
 checking the expected old digest. It keeps the existing source and command declarations. The
-[maintained OS overlay](../definitions/nke-m2/native-toolchains.yaml) shows the exact `from`, `to`, and
+[maintained OS overlay](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/native-toolchains.yaml) shows the exact `from`, `to`, and
 `components` fields. This differs from replacing the complete producer.
 
 **Version stamps** render source-pin values into build environment variables. This excerpt from the
-[NKE CLI producer](../definitions/nke-v1/catalog/registry.yaml) embeds its commit and module tag:
+[NKE CLI producer](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/catalog/registry.yaml) embeds its commit and module tag:
 
 ```yaml
 versionStamp:
