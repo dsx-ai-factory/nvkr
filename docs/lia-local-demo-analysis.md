@@ -155,11 +155,11 @@ inspection-derived disk SBOM or proof of all installed runtime dependencies.
 | --- | --- | --- |
 | Controller image | Source-built `cwe` | Align source/build contract with the selected demo revision; import/copy without rebuilding and verify deployed identity |
 | Controller chart | Image-bound `controller-chart` | Feed the packaged chart to the source-owned installer rather than silently using a different source-tree chart |
-| CAPNICo | Source-built ARM64 provider image | Chart/manifests and install override must consume that image; the current source install helper builds it again |
+| CAPNICo | Source-built ARM64 provider image | PR #1160's staged installer accepts `CAPNICO_IMAGE=repository:tag` without rebuilding. Verify exact deployed identity; older Tilt/source helpers still build it |
 | NICoSim and simulator CLI | Separate `definition-simulator.json` selects source-built Linux ARM64 server/CLI and pinned seed/UI archive; a three-component Docker Run and verified artifact-only mock startup passed. The launcher supports fresh pinned-toolchain bootstrap | Integrate into the demo selection and real VM process/runtime handoff. The separate bundle is not part of the 23-output `all` set; real VM/site/tenant deployment remains unvalidated |
 | Tenant node disk | Existing `nke-node-image-arm64` output with its OS material graph | Make the existing ARM64 TCG build complete on the Mac, then bind the exact QCOW2 to the NICoSim VM profile; do not add a substitute tenant-node container build |
 | Profiles/runbooks image | No selected output | Build the explicitly selected local demo fixture, label it diagnostic, bind the exact tenant QCOW2/OS choices; do not call it production fleet profiles |
-| NKTP chart and runtime closure | No NKTP chart output | Package its locked chart dependencies and enumerate its selected runtime images |
+| NKTP chart and runtime closure | Separate `definition-site.json` declares source chart and locked dependency preparation; compiler and isolated Helm probes pass, complete site Run unexercised | Integrate the successful produced package and enumerate its selected runtime images; source-tree inventory rendering still prepares dependencies |
 | External charts and runtime images | Four acquired charts and twelve acquired runtime images | Demonstrate that every deployed reference resolves to the selected bytes. This is not all-public-components-from-Git support |
 | CLI and operator tools | Linux ARM64 `nkectl`, Helm/kubectl bundle | Linux binaries cannot run directly on macOS. Run them in the chosen Linux environment or add native-host producers; add matching installer tools |
 | BGP and any selected identity-exchange helpers | Not a complete selected set | Model required helper images/configuration from the chosen scenario. Do not silently enable or omit them |
@@ -189,8 +189,10 @@ Current NKE sources already offer useful entry points:
 - The [simulator launcher](https://github.com/dsx-ai-factory/nke/blob/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4/controller/hack/nico-provider/run-nico-sim.sh)
   consumes a prebuilt Linux binary on the container-backed deploy route.
 
-These are not a complete deploy-only mode. The CAPNICo source installer still
-does `docker build`; Tilt independently fetches/builds charts; the backend E2E
+These are not a complete deploy-only mode. PR #1160's staged installation supports
+the prepared CAPNICo image and packaged charts, but its inventory renderer still
+builds source-tree chart dependencies. Older source/Tilt helpers independently
+build CAPNICo and fetch/build charts; the backend E2E
 entrypoint builds controller/profiles/node images and compiles the simulator and
 test suite. Calling those scripts as-is cannot prove that NKD built everything.
 
@@ -218,9 +220,10 @@ test suite. Calling those scripts as-is cannot prove that NKD built everything.
    registry/daemon, and create NKE's installer input. Never turn a local Run into
    a claimed signed Release. Use `local-assembly`/`none` for a handwritten local
    NKE release manifest, as NKE's guide specifies.
-4. **Add missing NKE-owned prebuilt handoffs.** CAPNICo installation must accept
-   the produced image/chart without another build. The staged installer must
-   consume the produced controller/NKTP charts and matching templates. Own
+4. **Complete NKE-owned prebuilt handoffs.** Use the staged installer's existing
+   CAPNICo image override and chart consumption hooks. Its inventory renderer
+   must also consume the produced controller/NKTP charts and matching templates
+   without rebuilding source dependencies. Own
    NICoSim process start/readiness/stop, attempt paths and local kubeconfig;
    never mutate an unrelated cluster or silently reset a VM.
 5. **Run the actual local E2E and document it.** Start/check Colima, create the

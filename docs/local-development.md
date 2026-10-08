@@ -479,6 +479,41 @@ user. A container consumer must use that observed UID/GID (for example,
 relative to the simulator's working directory. The guide does not yet provide a
 complete deploy-only site/tenant script.
 
+## Build the installer-aligned site subset
+
+This additional lane aligns CLI, controller and both locally produced charts to
+the exact staged-installer candidate from NKE PR #1160. It is **not** included in
+`all` or `components`, and it does not install NKE or supply the complete runtime
+image/tool/profile closure. Do not launch it alongside the expensive OS bake on
+this laptop.
+
+```sh
+# Apple Silicon with an already running, explicitly selected Colima profile:
+CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
+  bash scripts/nke-full-arm64-local.sh --check site
+CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
+  NKE_LOCAL_CLONE=/absolute/path/to/nke \
+  bash scripts/nke-full-arm64-local.sh first-site 1 site
+```
+
+The four required outputs are `nkectl`, `cwe`, `controller-chart` and `nktp`.
+The launcher builds a small wrapper around the existing pinned Helm image and
+probes it offline. No new packages or binaries are installed into that wrapper.
+Native image bytes are selected through an attempt-local catalog substitution
+when they differ from the recorded local candidate; tags are not authority.
+NKTP's three repositories are registered in temporary Helm configuration, Helm
+validates its source-owned lock, and subsequent chart packaging is offline.
+These dependency archives remain acquisitions, not independent source builds.
+
+Compiler/preflight tests and a bounded Helm dependency/package probe cover these
+inputs. **A complete four-output Run is not recorded yet.** Require Run status
+`complete`, exactly four expected/observed outputs and no failure before using
+them. Helm 4.3.0 in this build wrapper does not satisfy the installer's separate
+4.2.4 tool gate. The source installer can consume packaged charts and a prepared
+CAPNICo image, but its inventory rendering still prepares source-tree chart
+dependencies. See the [installer handoff analysis](nkd-to-nke-demo.md); this is
+not yet the promised deploy-only, QCOW2-backed site/tenant journey.
+
 ## Find outputs and interpret the result
 
 For `first-components`:

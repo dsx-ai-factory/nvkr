@@ -35,10 +35,13 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		{"capacity fails before pull", "Linux", "aarch64", "podman", "os", "running", "38000", "ok", "No downloads started", true},
 		{"Docker daemon unavailable", "Linux", "aarch64", "docker", "providers", "running", "100000", "failed", "daemon is unreachable", true},
 		{"Docker providers without Go", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
+		{"Docker site without OS capacity", "Linux", "aarch64", "docker", "site", "running", "32000", "ok", "Prerequisite diagnostics passed for site/docker", false},
+		{"Podman site without OS capacity", "Linux", "aarch64", "podman", "site", "running", "32000", "ok", "Prerequisite diagnostics passed for site/podman", false},
 		{"simulator without OS capacity", "Linux", "aarch64", "podman", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/podman", false},
 		{"simulator without cached toolchain", "Linux", "aarch64", "podman", "simulator", "running", "32000", "missing-toolchain", "Prerequisite diagnostics passed", false},
 		{"simulator Docker without OS capacity", "Linux", "aarch64", "docker", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/docker", false},
 		{"simulator Docker requires Buildx", "Linux", "aarch64", "docker", "simulator", "running", "32000", "missing-buildx", "Buildx plugin", true},
+		{"site Docker requires Buildx", "Linux", "aarch64", "docker", "site", "running", "32000", "missing-buildx", "Buildx plugin", true},
 		{"remote context overrides local host", "Linux", "aarch64", "docker", "providers", "running", "100000", "remote", "Remote Docker endpoints", true},
 		{"OS diagnostics without cached Packer", "Linux", "aarch64", "docker", "os", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
 		{"mutable bootstrap pin rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "admitted bootstrap image/platform/runtime", true},
@@ -236,6 +239,47 @@ func TestSimulatorToolchainScope(t *testing.T) {
 			slices.Sort(selected)
 			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || !slices.Equal(overlay.Subs[0].Components, selected) {
 				t.Fatalf("unexpected substitution: %+v", overlay)
+			}
+		})
+	}
+}
+
+func TestSiteHelmToolchainScope(t *testing.T) {
+	const plan = `{"builds":[{"name":"controller-chart","catalogDigest":"catalog","components":["nke-controller-chart"],"catalogSnapshot":{"Components":{"nke-controller-chart":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}},{"name":"nktp","catalogDigest":"catalog","components":["nktp-chart"],"catalogSnapshot":{"Components":{"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}},{"name":"cwe","catalogDigest":"other","components":["nke-controller"]}]}`
+	for _, tc := range []struct {
+		name, input, want string
+		fail              bool
+	}{
+		{"only the two charts", plan, "old", false},
+		{"missing charts", `{"builds":[]}`, "expected two site chart builds", true},
+		{"different catalogs", strings.Replace(plan, `"name":"nktp","catalogDigest":"catalog"`, `"name":"nktp","catalogDigest":"other"`, 1), "site charts must share one catalog", true},
+		{"different toolchains", strings.Replace(plan, `"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"old"}}`, `"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"different"}}`, 1), "expected one site Helm toolchain", true},
+		{"acquired chart", strings.Replace(plan, `"nktp-chart":{"fromSource":true`, `"nktp-chart":{"fromSource":false`, 1), "site chart lacks a source toolchain", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nke-os-plan"; site_helm_toolchain_scope | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
+			cmd.Stdin = strings.NewReader(tc.input)
+			out, err := cmd.CombinedOutput()
+			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
+				t.Fatalf("error=%v output=%s, want fail=%t message=%s", err, out, tc.fail, tc.want)
+			}
+			if tc.fail {
+				return
+			}
+			var overlay struct {
+				Catalog string `json:"requiresCatalogDigest"`
+				Subs    []struct {
+					Arch, From, To string
+					Components     []string
+				} `json:"toolchainSubstitutions"`
+			}
+			if err := json.Unmarshal(out, &overlay); err != nil {
+				t.Fatal(err)
+			}
+			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || !slices.Equal(overlay.Subs[0].Components, []string{"nke-controller-chart", "nktp-chart"}) {
+				t.Fatalf("unexpected site substitution: %+v", overlay)
 			}
 		})
 	}

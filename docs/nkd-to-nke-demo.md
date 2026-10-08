@@ -50,7 +50,7 @@ values, infrastructure provisioning and tenant lifecycle.
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
 | Operator CLI/tools | `nkectl`, `operator-tools` | CLI is Linux ARM64; run it on the Linux execution host. Installer also needs `clusterctl`, Python, curl and ORAS, which this output does not supply |
 | Dependency images | Twelve acquired ARM64 image outputs | Align chart values or node mirrors with the reachable image locations; stage 4 and NKTP also need inputs outside this set |
-| NKTP | NKE `nktp/deploy/charts/nktp` at the installer checkout | Not an output of the laptop Definition. Installer builds chart dependencies from its `Chart.lock`; its workload images are not a complete mirrored NKD set |
+| NKTP | Separate `definition-site.json` declares the source chart and locked dependency preparation | Four-output site Run still unexercised; runtime images are not a complete mirrored NKD set. Installer inventory rendering still prepares source-tree chart dependencies |
 | Profiles content image | Operator-supplied `images.profiles` | Accessible repository/revision, producer/output or an explicit existing image. The current laptop Definition does not build it |
 | Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | Complete the bake/boot and connect the exact disk to the infrastructure's OS profile. No automatic QCOW2-to-NICo-profile handoff is implemented here |
 | Site cluster, NICo access, SPIRE bootstrap CA, tenant login | Operator's authorized test configuration | Not build artifacts. Keep secrets and kubeconfig outside Git; do not invent credentials, site identity or trust roots |
@@ -62,9 +62,30 @@ source revision. Its readiness gate checks the installer checkout against the
 manifest's source pin. Merely repinning an older catalog can also fail when the
 source-owned build or pin-set paths have changed. Matching build instructions,
 compiler, pin-set mapping and installer inputs must be tested together.
+The additional `site` Definition aligns four candidate producers to PR #1160's
+exact commit: CLI, controller image, image-bound controller chart and NKTP chart.
+It uses the source-owned CLI Make build and controller Dockerfile, rather than
+assuming the older linker/module contracts still work. Compiler contracts and
+an isolated NKTP dependency/package probe pass; no complete four-output Run or
+installation is recorded. This separate selection does not replace the retained
+22-output Run or become part of `all` automatically.
+
+At the same installer source, `deploy/nke-deploy.sh` already supports packaged
+chart items/overrides. The separate wrapper
+`deploy/stages/05-install-site-controller.sh` consumes
+`CAPNICO_IMAGE=repository:tag` and turns it into a CAPNICo manifest override
+without building the image. Setting that variable on the executor directly
+does not select a different CAPNICo image.
+These installation hooks must not be confused with the older Tilt/source helper.
+However, `deploy/lib/describe_site.py` still renders source-tree charts and builds
+their dependencies during inventory preparation. Passing a packaged chart to
+installation alone does not establish a rebuild-free complete journey.
+
 Tool versions need alignment too: the local operator bundle contains Helm
 `v4.1.4`, while this installer guide requires `v4.2.4`, ORAS `1.3.3` and
 `clusterctl v1.12.3`. Do not treat a present executable as a matching tool pin.
+The site build wrapper uses pinned Helm 4.3.0; it does not claim to pass that
+separate installer's 4.2.4 tool gate.
 
 ## Build and inspect today
 

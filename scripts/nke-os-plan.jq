@@ -26,6 +26,22 @@ def simulator_toolchain_scope:
   if length != 1 then error("expected one simulator source toolchain") else .[0] end |
   {pin:., catalogDigest:$build.catalogDigest, components:([$selected[].name] | sort)};
 
+# Only the two source-built site charts share the local Helm wrapper. The
+# ordinary catalog overlay authenticates every selected predecessor digest.
+def site_helm_toolchain_scope:
+  [.builds[] | select(.name == "controller-chart" or .name == "nktp")] as $builds |
+  if ($builds | length) != 2 then error("expected two site chart builds") else . end |
+  ([$builds[].catalogDigest] | unique |
+    if length != 1 then error("site charts must share one catalog") else .[0] end) as $digest |
+  [$builds[] | . as $build | .components[] as $name |
+    $build.catalogSnapshot.Components[$name] |
+    if .fromSource != true or (.toolchainImages.arm64 | type) != "string" then
+      error("site chart lacks a source toolchain")
+    else {name:$name, pin:.toolchainImages.arm64} end] as $selected |
+  [$selected[].pin] | unique |
+  if length != 1 then error("expected one site Helm toolchain") else .[0] end |
+  {pin:., catalogDigest:$digest, components:([$selected[].name] | sort)};
+
 # Conservatively recognize the NKE project path before enforcing the one exact
 # transport URL served by the private-source handoff. This lexical diagnostic
 # also rejects that project path on other hosts; it does not parse or authenticate

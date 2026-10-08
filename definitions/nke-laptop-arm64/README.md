@@ -13,6 +13,7 @@ not a full source-built NKE distribution. See the
 | OS-only loop | `definition-os.json` | One disk with its complete material closure |
 | Source-built provider loop | `definition-providers.json` | Two native provider images, no disk |
 | NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive, not included in the 23-output set |
+| Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart; not included in the 23-output set |
 
 Use `environment-local.json` for rootless Podman, or `environment-local-docker.json`
 with `CONTAINER_RUNTIME=docker` on native Linux ARM64, including execution inside
@@ -73,3 +74,27 @@ completed and consumed verified extracted seed/UI without NKE source mounted.
 It still uses the mock backend. The QCOW2-to-tenant handoff, profiles and the
 deploy-only adapter need validation/integration. This separate build is not a
 complete Colima/NICoSim demo.
+
+The separate `site` lane pins four producers to NKE PR #1160's exact candidate
+commit `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`, rather than combining older
+controller and CLI release pins. It uses the source-owned CLI Make build and
+controller Dockerfile, preserves chart versions `0.0.0` and `0.1.0-rc.2`, and binds
+the controller chart to the produced image. Its local Helm wrapper registers
+NKTP's three repositories before fetching locked chart dependencies; packaging
+then runs offline. Those dependency archives are not independent source builds
+or upstream-signature-verified inputs.
+
+```sh
+CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
+  bash scripts/nke-full-arm64-local.sh --check site
+CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
+  NKE_LOCAL_CLONE=/absolute/path/to/nke \
+  bash scripts/nke-full-arm64-local.sh arm64-site-01 1 site
+```
+
+Docker/Podman compiler contracts and an [isolated Helm preparation/package
+probe](../../docs/evidence/2026-10-08-local-site-chart-preparation.md) pass.
+A complete four-output NKD Run remains unexercised. The wrapper uses the existing
+pinned Helm 4.3.0, not the installer's required 4.2.4. Read the
+[handoff gaps](../../docs/nkd-to-nke-demo.md) before treating these inputs as a
+working deployment. Do not run another large build alongside the OS bake.

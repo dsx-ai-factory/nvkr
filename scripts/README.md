@@ -16,6 +16,10 @@ This incremental lane bootstraps pinned Go/GCC toolchain sources on Docker or
 when the recorded Podman image is missing, then binds the measured native ID
 through an exact attempt overlay. `--check simulator` performs no pull/build and
 does not require a previously cached toolchain; Docker bootstrap requires Buildx.
+`site` separately selects the installer-aligned CLI/controller and two chart
+outputs. Its local pinned Helm wrapper prepares NKTP's locked dependencies before
+offline packaging. It is a compiler-tested candidate, not a completed four-output
+Run or deployment; see the [site handoff](../docs/nkd-to-nke-demo.md).
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
 The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.
 `CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, or explicitly

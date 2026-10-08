@@ -224,6 +224,19 @@ Neither probe establishes real VM provisioning or qualification. Integration
 into the combined set and the complete
 Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
 qualification authority.
+The additional local `definition-site.json` declares four producers aligned to
+the exact PR #1160 staged-installer candidate: CLI, controller image, image-bound
+controller chart and NKTP chart. Docker/Podman compiler contracts cover the
+selection. The CLI uses source-owned Make; NKTP prepares locked dependencies in
+isolated Helm configuration before offline packaging. The tiny local wrapper
+retains the existing pinned Helm bytes and owns a shell-capable entrypoint;
+attempt substitutions do not override a pinned runtime entrypoint. A
+[bounded real Helm preparation/package probe](../evidence/2026-10-08-local-site-chart-preparation.md)
+passed. A complete four-output NKD Run and deployment remain unexercised; the
+site set is separate from `all`. Dependency charts remain acquisitions and the
+wrapper's Helm 4.3.0 does not satisfy the installer's 4.2.4 tool gate. Source-tree
+inventory rendering still prepares chart dependencies, despite existing staged
+installation hooks for packaged charts and a prepared CAPNICo image.
 The laptop launcher additionally enters an explicitly selected Colima ARM64
 Docker profile before invoking the existing Linux local runner. It does not
 select Docker Desktop, switch contexts, create/start/reset VMs, change OS
