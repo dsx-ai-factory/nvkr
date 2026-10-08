@@ -20,8 +20,8 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-// Exercise the emitted shell, not a duplicate of its GRUB mutation. This models
-// the loader's main-file/drop-in order; the real guest reboot remains acceptance.
+// Exercise the emitted shell, not a duplicate of its configuration mutation.
+// The GRUB loader is modeled; udev naming and a real reboot remain acceptance.
 func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog", "registry.yaml"))
 	if err != nil {
@@ -48,7 +48,7 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 		t.Fatal("missing source-template append boundary")
 	}
 	stanza = "printf '%s\\n' '#cloud-config' 'bootcmd:'" + stanza
-	for _, scenario := range []string{"new-and-repeat", "different", "symlink", "directory"} {
+	for _, scenario := range []string{"new-and-repeat", "different", "symlink", "directory", "link-different", "link-symlink", "link-directory", "link-parent-symlink"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
 			destination := filepath.Join(root, "bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain")
@@ -81,6 +81,10 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 			if err := os.Mkdir(filepath.Join(root, "grub.d"), 0o700); err != nil {
 				t.Fatal(err)
 			}
+			linkDirectory := filepath.Join(root, "network/10-netplan-enp1s0.link.d")
+			if err := os.MkdirAll(linkDirectory, 0o700); err != nil {
+				t.Fatal(err)
+			}
 			files := map[string]string{
 				"grub":                  "GRUB_CMDLINE_LINUX=old-main-value\n",
 				"grub.d/99-console.cfg": "GRUB_CMDLINE_LINUX=\"console=tty0 console=ttyAMA0,115200\"\n",
@@ -92,6 +96,7 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 				}
 			}
 			dropIn := filepath.Join(root, "grub.d/zz-nkd-local-network.cfg")
+			linkDropIn := filepath.Join(linkDirectory, "10-nkd-local-name.conf")
 			switch scenario {
 			case "different":
 				err = os.WriteFile(dropIn, []byte("foreign\n"), 0o600)
@@ -99,11 +104,23 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 				err = os.Symlink(filepath.Join(root, "grub"), dropIn)
 			case "directory":
 				err = os.Mkdir(dropIn, 0o700)
+			case "link-different":
+				err = os.WriteFile(linkDropIn, []byte("foreign\n"), 0o600)
+			case "link-symlink":
+				err = os.Symlink(filepath.Join(root, "grub"), linkDropIn)
+			case "link-directory":
+				err = os.Mkdir(linkDropIn, 0o700)
+			case "link-parent-symlink":
+				if err := os.Remove(linkDirectory); err != nil {
+					t.Fatal(err)
+				}
+				err = os.Symlink(filepath.Join(root, "grub.d"), linkDirectory)
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
 			projected := strings.ReplaceAll(config.Bootcmd[0], "/etc/default/grub.d", filepath.Join(root, "grub.d"))
+			projected = strings.ReplaceAll(projected, "/etc/systemd/network", filepath.Join(root, "network"))
 			for iteration := range 2 {
 				out, err := run(projected)
 				if scenario != "new-and-repeat" {
@@ -121,6 +138,10 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 				observed, err := os.ReadFile(filepath.Join(root, "observed"))
 				if err != nil || string(observed) != "console=tty0 console=ttyAMA0,115200 net.ifnames=1\n" {
 					t.Fatalf("console/naming lost or duplicated: %q, %v", observed, err)
+				}
+				link, err := os.ReadFile(linkDropIn)
+				if err != nil || string(link) != "[Link]\nNamePolicy=keep kernel database onboard slot path\n" {
+					t.Fatalf("generated Netplan link naming policy lost or changed: %q, %v", link, err)
 				}
 			}
 		})

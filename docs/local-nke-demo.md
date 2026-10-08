@@ -16,19 +16,17 @@ An earlier completed integrated attempt booted both guests but failed
 `kubeadm init`: containerd could not pull the source-pinned kube-vip image from
 GHCR, and the tenant API virtual IP remained unreachable. A raw registry `401`
 is only an authentication challenge, not proof that a public image pull is
-denied. In the subsequent live attempt, the control-plane node became Ready
+denied. A later integrated attempt completed first-boot local package installation
+on both guests; the control-plane node became Ready
 and kube-vip was Running and Ready with its exact pinned GHCR image digest.
-The worker had not joined: after reboot its console reported `eth0` without an
-IPv4 address, and NICoSim's diagnostic SSH request to its assigned address
-failed with `no route to host`. These observations do not establish a complete
-tenant/workload result. An earlier attempt
-also exposed insufficient control-plane memory for OVN and a network-name
-failure after reboot. The candidate projects eight-GiB guests and includes a
-profile boot command to retain predictable physical NIC names on subsequent boots, but that boot
-command does not establish first-boot network readiness or preserve the
-first boot's generated network configuration after an interface-name change.
-Tenant, workload and
-final cleanup acceptance have not passed together.
+The worker did not join. Although its reboot kernel selected `net.ifnames=1`,
+Netplan's generated MAC-matched `.link` omitted `NamePolicy`. Udev renamed
+`enp1s0` to `eth0`, while the persisted OVS bridge still referenced `enp1s0`.
+The worker then had no IPv4/default route and diagnostic SSH failed with
+`no route to host`. Kernel naming alone did not fix this.
+The candidate projects eight-GiB guests and now also supplies an exact Netplan
+link drop-in retaining the userspace name. Its contracts pass; a fresh integrated
+reboot, worker join, workload and final cleanup remain acceptance requirements.
 This guide is not yet a validated full-demo result.
 
 The selected controller hardcodes `ghcr.io/kube-vip/kube-vip` and renders a
@@ -98,9 +96,15 @@ uplink name used by OVN's generated network configuration. A previous profile
 set `net.ifnames=0` only for reboot: that renamed the physical NIC after OVN
 had persisted its first-boot name, leaving the worker without IPv4.
 This is laptop deployment configuration, not a change to the accepted QCOW2.
-An older completed profiles Run may contain the incorrect reboot-only naming
-change; rebuild the profiles
-lane with a fresh attempt and pass that exact Run to the consumer.
+Kernel naming alone was insufficient: Netplan's MAC-matched link could still
+rename the uplink during reapplication. The producer also installs
+`/etc/systemd/network/10-netplan-enp1s0.link.d/10-nkd-local-name.conf`, with
+`NamePolicy=keep kernel database onboard slot path`. This uses
+[systemd's supported link drop-in and naming policies](https://github.com/systemd/systemd/blob/v260/man/systemd.link.xml),
+preserving the generated MAC match and MTU. It is scoped to the measured local
+ARM64 VM interface, not a general host-network workaround. Different existing
+content or symlinks fail the boot command. Rebuild `profiles` with a fresh attempt
+and pass that exact Run; an older completed Run does not acquire this correction.
 
 The laptop profile also disables first-boot `package_update` and restricts APT
 installs to `/etc/apt/sources.list.d/nke-local.list`, disabling other source
@@ -111,7 +115,8 @@ marker; it is not permission to fetch Ubuntu packages or silently skip
 installation. This profile change does not rebuild the disk or establish
 complete offline deployment:
 kube-vip and the workload still have separate runtime acquisition requirements.
-Real first-boot installation with this correction remains unvalidated.
+Real first-boot installation completed on both guests with the local APT policy;
+that attempt still failed worker reboot networking and did not pass E2E.
 
 Cache the pinned service images using the existing build/management setup.
 The integrated adapter uses the existing `kind` Docker bridge. On a clean

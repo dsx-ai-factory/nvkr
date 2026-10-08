@@ -51,8 +51,26 @@ components:
         # prepends its own GRUB bootcmd to this list; this item runs afterward.
         # The installer writes 99-console.cfg, which overrides /etc/default/grub.
         # Source this exact local snippet after it, preserving the console value.
+        # Ubuntu's generated MAC-matched Netplan .link lacks NamePolicy. On the
+        # measured reboot it renamed enp1s0 to eth0 despite net.ifnames=1. Keep
+        # the existing userspace name in that exact generated link's drop-in;
+        # preserve Netplan's MAC match and MTU rather than replacing its file.
         printf '%s\n' '#cloud-config' 'bootcmd:' '  - |' \
           '    set -eu' \
+          '    test ! -L /etc/systemd/network' \
+          '    test -d /etc/systemd/network' \
+          '    directory=/etc/systemd/network/10-netplan-enp1s0.link.d' \
+          '    test ! -L "$directory"' \
+          '    mkdir -p "$directory"' \
+          '    link="$directory/10-nkd-local-name.conf"' \
+          '    link_expected="$(printf "[Link]\\nNamePolicy=keep kernel database onboard slot path\\n")"' \
+          '    test ! -L "$link"' \
+          '    if [ -e "$link" ]; then' \
+          '      test -f "$link"' \
+          '      test "$(cat "$link")" = "$link_expected"' \
+          '    else' \
+          '      printf "%s\n" "$link_expected" > "$link"' \
+          '    fi' \
           '    file=/etc/default/grub.d/zz-nkd-local-network.cfg' \
           '    expected='\''GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} net.ifnames=1"'\''' \
           '    test ! -L "$file"' \

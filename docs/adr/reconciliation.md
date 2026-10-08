@@ -232,10 +232,12 @@ private-file Bearer headers, disabled ambient curl configuration and bounded
 private log retention before deletion. The HTTP contract is exercised with a
 real loopback server; it is not a recorded full guest/tenant acceptance run.
 A private runtime seed projection raises the selected instance to eight GiB
-without changing accepted asset bytes. The local profiles producer adds a guest
-boot command retaining predictable physical NIC names across reboot, rather
-than renaming the uplink after OVN has persisted its first-boot name. Complete tenant
-acceptance with both corrections remains unexercised. None of these probes proves the full
+without changing accepted asset bytes. The local profiles producer includes both
+predictable kernel naming and an exact generated-Netplan-link naming-policy
+drop-in. Kernel naming alone failed during udev reapplication, leaving OVS
+pointed at a renamed uplink. Shell contracts cover the new drop-in's idempotence
+and foreign-path refusal. Complete tenant acceptance with these corrections
+remains unexercised. None of these probes proves the full
 tenant/workload path. Local evidence reports
 are intentionally not shipped in this PR. Private diagnostic logs and Run records
 are not authenticated external acceptance or qualified reproduction. The retained

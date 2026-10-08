@@ -32,7 +32,7 @@ the four-output `site` lane. This is not an approved release pin.
 | Input | Produced content |
 | --- | --- |
 | NKE fixture Dockerfile | Same copy/materialization layout; base changed from its `alpine:3.24.1` tag to the already maintained exact Alpine digest, observed as Alpine 3.24.2 |
-| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. An idempotent boot command adds `net.ifnames=1` through an exact `zz-nkd-local-network.cfg` snippet after the installer's `99-console.cfg` override, preserving the physical uplink name that OVN records on first boot. An existing different snippet or symlink fails |
+| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. Idempotent boot configuration adds `net.ifnames=1` after the console override plus the measured Netplan link's `NamePolicy`; different existing content or symlinks fail |
 | NKE VM config profiles | Source `nico-vms-cp` and `nico-vms-worker`, unchanged |
 | NKE fixture runbooks | All nine source runbooks, unchanged |
 | Local OS metadata | One `nke-local-26-04-arm64-plain` entry: ARM64, Ubuntu 26.04, injected Kubernetes version, diagnostic `local-plain-tpm` variant |
@@ -45,6 +45,15 @@ the NKE checkout and the accepted source closure remain unchanged. BuildKit
 resolves the pinned image base; Dockerfile build steps use network mode `none`.
 The enclosing wrapped producer still has declared build networking and is not
 a qualified or completely hermetic closure.
+
+The kernel flag alone did not preserve the reboot network: the generated
+`10-netplan-enp1s0.link` lacked a naming policy, and udev renamed the uplink to
+`eth0` while OVS retained `enp1s0`. The local profile adds only a `.link.d` drop-in
+with `NamePolicy=keep kernel database onboard slot path`; Netplan still owns the
+MAC match and MTU. This correction targets the measured ARM64 simulator interface,
+not arbitrary physical nodes. Shell contracts cover idempotence and rejection of
+foreign content, symlinks and directories; a new full reboot/tenant run is still
+required. Old completed profiles images are unchanged.
 
 Cloud-init still installs source-declared NKE/Kubernetes/CNI packages using APT,
 including the unversioned `nke-agent` command. The laptop projection selects only
