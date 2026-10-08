@@ -118,6 +118,10 @@ Install Colima if absent, then explicitly create a dedicated profile. The follow
 uses the checkout paths on your machine; run it from the NKE Recipes root:
 
 ```sh
+# Fail as one sequence: a failed mount check, mkdir, export or preflight must
+# not overwrite an existing export or launch a build anyway.
+(
+set -euo pipefail
 brew install colima
 colima list
 # Only if this dedicated profile does not already exist:
@@ -126,10 +130,26 @@ colima start --profile nkd-demo --arch aarch64 --runtime docker --vm-type vz \
   --mount "$(pwd -P):w"
 colima ssh --profile nkd-demo -- bash -c \
   'sudo apt-get update && sudo apt-get install -y git jq coreutils'
-CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
-  bash scripts/nke-full-arm64-local.sh --check os
-CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
-  bash scripts/nke-full-arm64-local.sh first-colima-os 1 os
+# Use a new committed-source export on native ext4, not the Mac shared mount.
+# Inspect/commit intended changes first: git archive does not include dirty files.
+NKD_COLIMA_SOURCE=$(git rev-parse HEAD)
+NKD_COLIMA_REPO=/mnt/lima-colima-nkd-demo/nkd-local/nke-recipes-$NKD_COLIMA_SOURCE
+colima ssh --profile nkd-demo -- bash -c \
+  'test "$(findmnt -n -o FSTYPE --mountpoint /mnt/lima-colima-nkd-demo)" = ext4 && sudo install -d -o "$(id -u)" -g "$(id -g)" -m 700 /mnt/lima-colima-nkd-demo/nkd-local'
+# mkdir fails if this source directory already exists; do not overwrite it.
+colima ssh --profile nkd-demo -- mkdir -m 700 "$NKD_COLIMA_REPO"
+git archive "$NKD_COLIMA_SOURCE" | \
+  colima ssh --profile nkd-demo -- tar -xf - -C "$NKD_COLIMA_REPO"
+df -h .  # physical Mac capacity still matters
+printf -v NKD_COLIMA_COMMAND \
+  'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh --check os' \
+  "$NKD_COLIMA_REPO" "${NKE_LOCAL_CLONE:-}"
+colima ssh --profile nkd-demo -- bash -c "$NKD_COLIMA_COMMAND"
+printf -v NKD_COLIMA_COMMAND \
+  'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh first-colima-os 1 os' \
+  "$NKD_COLIMA_REPO" "${NKE_LOCAL_CLONE:-}"
+colima ssh --profile nkd-demo -- bash -c "$NKD_COLIMA_COMMAND"
+)
 ```
 
 These are explicit setup mutations, not actions performed by `--check`. If reusing
@@ -140,11 +160,35 @@ authentication inside Colima. `DOCKER_HOST` and `DOCKER_CONTEXT` from the Mac ar
 not propagated into the VM. The Linux launcher checks native architecture, daemon
 reachability, tools, Buildx and OS capacity before bootstrap downloads.
 
+This exports the committed NKD source, without ignored attempts, caches, Git
+metadata or uncommitted changes. `NKE_LOCAL_CLONE` remains optional pinned-object
+transport, not a build of its dirty working tree. The Linux launcher uses its
+normal repository-relative `.nkd/runs` and `.nkd/laptop-bootstrap` inside this
+native source directory. No catalog or NKD containment rule is changed. An external
+absolute `--attempts-root` is rejected by the factory runner; do not symlink
+`.nkd` to work around containment.
+The data-mount path above was checked with Colima 0.10.3 and profile `nkd-demo`;
+inspect `colima ssh --profile NAME -- df -h` before using a different profile.
+No directory is created by `--check`. Reuse an existing export for fresh attempts
+only when its intended inputs are unchanged, or create a new export for a new
+source commit. A canonical authenticated Git clone into native storage is also
+an option; the archive approach does not require GitHub credentials in Colima
+for the NKD checkout itself.
+
+The October 8 shared-mount trial failed during the SPIRE source snapshot with
+`too many open files in system`, before Packer. An explicit clean-cache diagnostic
+reduced the Colima host VM process from 48,737 open file handles to 33; the next
+trial moves Run storage to native ext4 rather than adding automatic cache flushes
+or raising Mac limits. See the [Docker execution evidence](evidence/2026-10-08-colima-local-os-build.md).
+That investigation does not prove the retry or the QCOW2 succeeds.
+
 Colima's configured 150 GiB disk does not provide 150 GiB of physical host free
-space. This shared checkout still needs about 90 GiB free before a fresh OS
-attempt, with at least 64 GiB remaining at Packer admission. An internal sparse
-VM disk on the same nearly full Mac is not a safe workaround. A Colima entrypoint
-or successful preflight alone does not prove an OS bake or tenant lifecycle.
+space. Allow about 90 GiB free on both the host and the selected Run filesystem
+before a fresh OS attempt, with at least 64 GiB on the Run filesystem remaining
+at Packer admission. The launcher measures guest capacity; it does not reserve
+physical space for a sparse disk. A native guest filesystem addresses the shared
+filesystem boundary, not insufficient physical storage. A successful preflight
+alone does not prove an OS bake or tenant lifecycle.
 
 ### Check before the expensive build
 
@@ -367,6 +411,22 @@ For `first-components`:
 
 For `first-full`, a completed disk export is
 `.nkd/runs/first-full/outputs/nke-node-image-arm64.qcow2`.
+
+For the native Colima export, these paths are relative to `$NKD_COLIMA_REPO`
+inside Linux, not to your Mac checkout. Inspect them inside the same VM:
+
+```sh
+NKD_COLIMA_REPO=/mnt/lima-colima-nkd-demo/nkd-local/nke-recipes-$(git rev-parse HEAD)
+colima ssh --profile nkd-demo -- jq \
+  '{attempt,status,lane,expectedCount:(.expected|length),observedCount:(.observed|length),failure}' \
+  "$NKD_COLIMA_REPO/.nkd/runs/first-colima-os/lifecycle.json"
+```
+
+Only a completed Run exports the accepted QCOW2 under `outputs/`. Source trees,
+partial producer outputs and a toolchain image in a failed attempt are not that
+export. Keep the native Run files with the VM; resetting/deleting its disk would
+remove them. Export and independently hash the completed disk before moving it
+to another environment.
 
 ```sh
 jq '{attempt,status,lane,expectedCount:(.expected|length),

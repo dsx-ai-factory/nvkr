@@ -33,7 +33,7 @@ source-owned workflows. PR #113 is a separate draft, not merged support on main.
 | DSX IMDS | Release inventory retains payload digests but no established source revision | Accessible source with an approved pin, or a declared unavailable-source exception and accessible digest-matching payload. An older plugin-free SPIRE package is not completion |
 | OS material assembly | Existing OS graph produces image-inputs and stages them for source-owned Packer | Connect direct-source binary/image packages, remove package-folder calls including indirect agent packaging, and preserve the source-owned material contract |
 | Shared published/embedded image/chart bytes | [Issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116) records the missing generic handoff | An authenticated original-owner cross-output reuse contract. Independent rebuilds cannot be relabeled as identical published bytes |
-| Local OS runtime | Podman/TCG class, native Docker/TCG Environment, check-only diagnostics and containerized NKD bootstrap; fresh toolchains freeze native-validated IDs in attempt overlays | Exercise fresh Packer bootstrap and native Docker execution externally; provide enough real free workspace capacity, complete the bake and boot smoke. Docker Desktop on macOS is not supported by this launcher |
+| Local OS runtime | Podman/TCG class, native Docker/TCG Environment, check-only diagnostics and containerized NKD bootstrap; fresh toolchains freeze native-validated IDs in attempt overlays. The real Colima trial validated the fresh toolchain and executed material producers before failing at SPIRE snapshot preparation | Complete the native-filesystem retry, Packer bake and boot smoke; fresh toolchain/material execution is not QCOW2 acceptance. See the [Docker evidence](evidence/2026-10-08-colima-local-os-build.md). Docker Desktop on macOS is not supported by this launcher |
 
 Do not use an upstream release SBOM hash as the expected hash of a new source
 build. New bytes receive new identities. The release inventory guides membership
@@ -48,9 +48,17 @@ See the [Lia demo handoff](nkd-to-nke-demo.md) for installer alignment and E2E b
 
 Two source/access inputs cannot be invented: the fleet-profile repository/revision
 and the DSX IMDS source or accepted retained payload. The local OS also needs
-workspace headroom. The failed laptop OS trial used about 17 GiB preparing
-materials; the Packer gate still requires 64 GiB remaining. No attempt directories,
-Podman images or user caches are deleted automatically to obtain that space.
+workspace headroom. User-authorized removal of eleven old failed attempts on
+October 8 increased free host storage to 141 GiB and the real Colima OS preflight
+passed; see the [storage evidence](evidence/2026-10-08-local-storage-cleanup.md).
+The first Colima bake attempt subsequently failed before Packer with a SPIRE
+snapshot file-handle error. The next approach runs the same committed launcher
+from a native ext4 source export, preserving `.nkd` containment; see the
+[execution evidence](evidence/2026-10-08-colima-local-os-build.md).
+The fresh bake remains a separate acceptance gate. The earlier failed laptop OS
+trial used about 17 GiB preparing materials; the Packer gate still requires
+64 GiB remaining. The developer launcher never deletes attempts, Podman images
+or user caches automatically to obtain that space.
 
 ## Acceptance
 

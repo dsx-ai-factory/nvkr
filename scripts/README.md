@@ -20,6 +20,10 @@ The launcher bootstraps NKD inside the pinned utility container: no host Go/Make
 selected `COLIMA_PROFILE=NAME` on Apple Silicon; not Docker Desktop on macOS.
 The guide covers clean Podman/Colima VM setup and attempt-pinned fresh Packer
 bootstrap. Check-only diagnostics never pull/build or create attempts.
+The Colima guide exports the committed checkout to native ext4 to avoid large
+source trees on the Mac shared mount. Run storage remains below that checkout's
+`.nkd/`; an external absolute attempts root is not supported by the factory runner.
+Native guest capacity does not provide extra physical Mac space.
 Despite its historical filename, this launcher does not yet build a full
 source-built NKE distribution; see the [remaining work](../docs/full-nke-source-build.md).
 

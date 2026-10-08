@@ -98,6 +98,21 @@ starts NICoSim when no external NICo endpoint is configured. Its default simulat
 backend selection is `container`. `NicoCluster.spec.siteID` selects a simulator
 site; CAPD uses a different infrastructure contract.
 
+The existing source-built **Linux ARM64** simulator can also be used for a
+candidate VM-backed route inside Colima. NKE's
+[libvirt adapter](https://github.com/dsx-ai-factory/nke/blob/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4/controller/nico-sim/internal/vm/libvirt/virsh.go)
+selects a `qemu` domain when `/dev/kvm` is absent; its
+[domain template](https://github.com/dsx-ai-factory/nke/blob/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4/controller/nico-sim/internal/vm/libvirt/domain_xml.go)
+selects the ARM64 `virt` machine with `cortex-a57` for that software route.
+Therefore a native macOS simulator producer or nested KVM is not inherently
+required to try this route. The real candidate must use
+`NICO_VMS_VM_BACKEND=libvirt`, `NICO_CONTAINERS_ENABLED=false` and
+`NICO_VMS_BASE_IMAGE` pointing to the exact completed NKD disk export. Colima
+still needs libvirt/QEMU, firmware, cloud-init seed tooling, bridge/DHCP, metadata
+reachability and the chosen trust/attestation configuration. The source code
+establishes the route, not a completed Colima guest or tenant test; software
+execution performance and readiness budgets remain unmeasured.
+
 ## The installer Lia adds
 
 [PR #1160's installer](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/deploy/README.md)
@@ -179,8 +194,13 @@ test suite. Calling those scripts as-is cannot prove that NKD built everything.
 ## Concrete implementation order
 
 1. **Make the existing QCOW2 build run on the Mac.** Keep the authored ARM64 TCG
-   producer and admission requirements; resolve actual workspace capacity before
-   another expensive attempt. Use the real NICoSim VM backend for tenant nodes,
+   producer and admission requirements. October 8 failed-attempt cleanup recovered
+   sufficient workspace and the real Colima preflight passed; the fresh OS build
+   failed before Packer during SPIRE snapshot preparation. A native ext4 source
+   export is the retry path; see the [execution evidence](evidence/2026-10-08-colima-local-os-build.md)
+   and [storage evidence](evidence/2026-10-08-local-storage-cleanup.md).
+   Complete the bake rather than treating preflight or materials as acceptance.
+   Use the real NICoSim VM backend for tenant nodes,
    not CAPD or the default container backend. Record matching architecture,
    attestation/CNI choices and exact install source.
 2. **Complete the NKD Definition/catalog membership.** Add missing simulator,

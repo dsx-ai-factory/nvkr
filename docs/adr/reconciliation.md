@@ -215,8 +215,15 @@ Docker profile before invoking the existing Linux local runner. It does not
 select Docker Desktop, switch contexts, create/start/reset VMs, change OS
 requirements or introduce a new producer. The [real Colima preflight](../evidence/2026-10-08-colima-local-preflight.md)
 passed provider prerequisites and reached the OS capacity check, which failed
-before downloads. Colima producer execution, a fresh Docker/Packer bake and
-QCOW2-backed tenant provisioning remain unexercised.
+before downloads. After [failed-attempt cleanup](../evidence/2026-10-08-local-storage-cleanup.md),
+the OS preflight passed and real Docker execution validated the fresh Packer
+toolchain and built material producers, but failed at SPIRE private snapshot
+preparation with a shared-filesystem file-handle error. A native ext4 export of
+the same committed NKD source is the retry path; an external absolute Run root
+was rejected before execution and is not a supported workaround. See the
+[execution evidence](../evidence/2026-10-08-colima-local-os-build.md).
+A completed Colima QCOW2 bake, guest boot and tenant provisioning remain
+unestablished. No runtime, identity or `.nkd` containment requirement was relaxed.
 Mixed local offline utility
 admission is restricted to non-disk observation/SBOM/ordinary packaging and retains
 complete-Plan validation plus the original helper Plan digest. Workspace image
@@ -226,7 +233,10 @@ boundaries. The initial laptop component attempt failed final observation. The
 corrected rootless Podman component Run `laptop-dev-arm64-20261007-05` completed
 with launcher exit 0 and 20 expected/observed outputs in the unqualified local
 lane; it exercised local Git transport and four jobs, before the two provider
-additions, not the current combined disk set. No complete 22/23-output Run is claimed.
+additions, not the current combined disk set. The later container-bootstrap Run
+`laptop-container-components-arm64-20261007-01` completed 22/22 with no failure;
+see the [bootstrap evidence](../evidence/2026-10-07-local-container-bootstrap.md).
+No complete combined 23-output Run is claimed.
 The OS trial prepared materials and the patched ISO but failed capacity re-admission
 before Packer. Fresh native Podman toolchain reconstruction still mismatches the
 older local pin. Neither this example nor its previews establish M2 or release acceptance.

@@ -87,7 +87,13 @@ third-party images/charts; it is not a full source-built distribution.
 
 The [recorded container-bootstrap Run](evidence/2026-10-07-local-container-bootstrap.md)
 passed these artifact gates. The OS requires its separate capacity gate and real
-bake/boot; the current laptop lacks the required free workspace.
+bake/boot. On October 8, user-authorized failed-attempt cleanup recovered enough
+workspace for the real Colima prerequisite check to pass; see the
+[storage and preflight evidence](evidence/2026-10-08-local-storage-cleanup.md).
+The first fresh Docker disk attempt failed before Packer during SPIRE snapshot
+preparation. A native-filesystem retry is in progress; see the
+[execution evidence](evidence/2026-10-08-colima-local-os-build.md).
+Passing preflight or building materials is not bake/boot evidence.
 
 ## Registry and release-manifest handoff
 
